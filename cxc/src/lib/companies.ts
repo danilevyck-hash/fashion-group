@@ -31,8 +31,14 @@ export function getCompany(key: string) {
   return ALL_COMPANIES.find((c) => c.key === key);
 }
 
+// Boston-only company for David
+export const BOSTON_COMPANIES: Company[] = [
+  ALL_COMPANIES.find((c) => c.key === "confecciones_boston")!,
+];
+
 export function getCompaniesForRole(role: string): Company[] {
   if (role === "director") return ALL_COMPANIES;
   if (role === "admin") return ADMIN_COMPANIES;
+  if (role === "david") return BOSTON_COMPANIES;
   return ALL_COMPANIES; // upload sees all for uploading
 }

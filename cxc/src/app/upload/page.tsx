@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { COMPANIES } from "@/lib/companies";
+import { ALL_COMPANIES, getCompaniesForRole } from "@/lib/companies";
 import { normalizeName } from "@/lib/normalize";
 import { resolveAlias } from "@/lib/aliases";
 import Papa from "papaparse";
@@ -20,6 +20,12 @@ export default function UploadPage() {
   const [uploading, setUploading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "ok" | "err" } | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [userRole, setUserRole] = useState<string>("");
+
+  // David sees only Boston, admin/upload see all 7
+  const uploadCompanies = userRole === "david"
+    ? getCompaniesForRole("david")
+    : ALL_COMPANIES;
 
   useEffect(() => {
     const role = sessionStorage.getItem("cxc_role");
@@ -27,6 +33,7 @@ export default function UploadPage() {
       router.push("/");
       return;
     }
+    setUserRole(role);
     loadUploads();
   }, [router]);
 
@@ -211,7 +218,7 @@ export default function UploadPage() {
       )}
 
       <div className="space-y-3">
-        {COMPANIES.map((co) => {
+        {uploadCompanies.map((co) => {
           const up = uploads[co.key];
           const age = up ? uploadAge(up.uploaded_at) : null;
 
