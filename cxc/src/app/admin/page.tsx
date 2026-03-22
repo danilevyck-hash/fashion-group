@@ -50,8 +50,8 @@ function buildWhatsAppMsg(client: ConsolidatedClient) {
   }
   lines.push(``);
   if (client.current > 0) lines.push(`Corriente (0-90d): $${fmt(client.current)}`);
-  if (client.watch > 0) lines.push(`Vigilancia (91-180d): $${fmt(client.watch)}`);
-  if (client.overdue > 0) lines.push(`*Vencido (181d+): $${fmt(client.overdue)}*`);
+  if (client.watch > 0) lines.push(`Vigilancia (91-120d): $${fmt(client.watch)}`);
+  if (client.overdue > 0) lines.push(`*Vencido (121d+): $${fmt(client.overdue)}*`);
   lines.push(`*Total: $${fmt(client.total)}*`);
   lines.push(``);
   lines.push(`Agradecemos su pronta atencion a este saldo. Quedamos a su disposicion para cualquier consulta.`);
@@ -81,8 +81,8 @@ function buildEmailBody(client: ConsolidatedClient) {
   }
   lines.push(``);
   if (client.current > 0) lines.push(`Corriente (0-90d): $${fmt(client.current)}`);
-  if (client.watch > 0) lines.push(`Vigilancia (91-180d): $${fmt(client.watch)}`);
-  if (client.overdue > 0) lines.push(`VENCIDO (181d+): $${fmt(client.overdue)}`);
+  if (client.watch > 0) lines.push(`Vigilancia (91-120d): $${fmt(client.watch)}`);
+  if (client.overdue > 0) lines.push(`VENCIDO (121d+): $${fmt(client.overdue)}`);
   lines.push(`TOTAL: $${fmt(client.total)}`);
   lines.push(``);
   lines.push(`Agradecemos su pronta atencion a este saldo. Quedamos a su disposicion para cualquier consulta.`);
@@ -126,7 +126,7 @@ function generatePDF(data: ConsolidatedClient[], title: string) {
     <h2>${title} &middot; ${new Date().toLocaleDateString("es-PA")} &middot; ${data.length} clientes</h2>
     <table>
       <thead><tr>
-        <th>Cliente</th><th class="right">Corriente 0-90d</th><th class="right">Vigilancia 91-180d</th><th class="right">Vencido 181d+</th><th class="right">Total</th>
+        <th>Cliente</th><th class="right">Corriente 0-90d</th><th class="right">Vigilancia 91-120d</th><th class="right">Vencido 121d+</th><th class="right">Total</th>
       </tr></thead>
       <tbody>${rows}
         <tr class="totals">
@@ -138,14 +138,14 @@ function generatePDF(data: ConsolidatedClient[], title: string) {
         </tr>
       </tbody>
     </table>
-    <div class="footer">Politica: 0-90d corriente &middot; 91-180d vigilancia &middot; 181d+ vencido</div>
+    <div class="footer">Politica: 0-90d corriente &middot; 91-120d vigilancia &middot; 121d+ vencido</div>
     <script>window.onload=function(){window.print()}</script>
     </body></html>`);
   w.document.close();
 }
 
 function exportCSV(data: ConsolidatedClient[]) {
-  const header = "Cliente,Corriente 0-90d,Vigilancia 91-180d,Vencido 181d+,Total,Correo,Telefono,Celular\n";
+  const header = "Cliente,Corriente 0-90d,Vigilancia 91-120d,Vencido 121d+,Total,Correo,Telefono,Celular\n";
   const rows = data.map((c) =>
     `"${c.nombre_normalized}",${c.current.toFixed(2)},${c.watch.toFixed(2)},${c.overdue.toFixed(2)},${c.total.toFixed(2)},"${c.correo}","${c.telefono}","${c.celular}"`
   ).join("\n");
@@ -279,14 +279,15 @@ export default function AdminDashboard() {
       for (const co of Object.values(client.companies)) {
         total += co.total;
         current += co.d0_30 + co.d31_60 + co.d61_90;
-        watch += co.d91_120 + co.d121_180;
-        overdue += co.d181_270 + co.d271_365 + co.mas_365;
+        watch += co.d91_120;
+        overdue += co.d121_180 + co.d181_270 + co.d271_365 + co.mas_365;
       }
       client.total = total; client.current = current;
       client.watch = watch; client.overdue = overdue;
     }
 
-    setClients(Array.from(map.values()));
+    // Filter out clients with zero or negative total
+    setClients(Array.from(map.values()).filter((c) => c.total > 0));
     setLoading(false);
   }, []);
 
@@ -648,10 +649,10 @@ export default function AdminDashboard() {
             0-90d{sortArrow("current")}
           </div>
           <div className="col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("watch")}>
-            91-180d{sortArrow("watch")}
+            91-120d{sortArrow("watch")}
           </div>
           <div className="col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("overdue")}>
-            181d+{sortArrow("overdue")}
+            121d+{sortArrow("overdue")}
           </div>
           <div className="col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("total")}>
             Total{sortArrow("total")}
@@ -808,7 +809,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="mt-4 text-xs text-gray-400 text-center">
-        {filtered.length} clientes &middot; Politica: 0-90d corriente &middot; 91-180d vigilancia &middot; 181d+ vencido
+        {filtered.length} clientes &middot; Politica: 0-90d corriente &middot; 91-120d vigilancia &middot; 121d+ vencido
       </div>
     </div>
   );

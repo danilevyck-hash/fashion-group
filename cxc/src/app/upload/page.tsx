@@ -68,14 +68,26 @@ export default function UploadPage() {
       }
 
       // Normalize CSV headers: trim and collapse spaces
-      const rows = (parsed.data as Record<string, string>[]).map((row) => {
-        const clean: Record<string, string> = {};
-        for (const [key, val] of Object.entries(row)) {
-          const normalizedKey = key.trim().replace(/\s+/g, " ");
-          clean[normalizedKey] = val;
-        }
-        return clean;
-      });
+      const rows = (parsed.data as Record<string, string>[])
+        .map((row) => {
+          const clean: Record<string, string> = {};
+          for (const [key, val] of Object.entries(row)) {
+            const normalizedKey = key.trim().replace(/\s+/g, " ");
+            clean[normalizedKey] = (val || "").trim();
+          }
+          return clean;
+        })
+        // Filter out rows without a valid NOMBRE (junk rows, totals, empty)
+        .filter((r) => {
+          const nombre = (r["NOMBRE"] || "").trim();
+          if (!nombre) return false;
+          // Skip rows where NOMBRE looks like a number or bucket header
+          if (/^\d[\d.,\s-]*$/.test(nombre)) return false;
+          if (/^\d+-\d+$/.test(nombre)) return false;
+          if (/^Mas\s+de/i.test(nombre)) return false;
+          if (/^Total$/i.test(nombre)) return false;
+          return true;
+        });
 
       // Create upload record
       const { data: upload, error: uploadErr } = await supabase
