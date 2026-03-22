@@ -28,6 +28,7 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen">
       <form onSubmit={handleLogin} className="w-full max-w-sm space-y-6">
         <div className="text-center">
+          <img src="/logo.jpeg" alt="Fashion Group" className="w-24 h-24 mx-auto rounded-xl mb-3" />
           <h1 className="text-2xl font-bold">Fashion Group</h1>
           <p className="text-sm text-gray-500 mt-1">Cuentas por Cobrar</p>
         </div>

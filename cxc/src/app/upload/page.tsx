@@ -180,9 +180,12 @@ export default function UploadPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-xl font-bold">Carga de Archivos CXC</h1>
-          <p className="text-sm text-gray-500">Seleccione un CSV por empresa</p>
+        <div className="flex items-center gap-3">
+          <img src="/logo.jpeg" alt="FG" className="w-10 h-10 rounded" />
+          <div>
+            <h1 className="text-xl font-bold">Carga de Archivos CXC</h1>
+            <p className="text-sm text-gray-500">Seleccione un CSV por empresa</p>
+          </div>
         </div>
         <button
           onClick={() => {
