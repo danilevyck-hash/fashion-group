@@ -321,8 +321,8 @@ export default function AdminDashboard() {
           return {
             ...c,
             current: d.d0_30 + d.d31_60 + d.d61_90,
-            watch: d.d91_120 + d.d121_180,
-            overdue: d.d181_270 + d.d271_365 + d.mas_365,
+            watch: d.d91_120,
+            overdue: d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365,
             total: d.total,
           };
         });
@@ -438,8 +438,8 @@ export default function AdminDashboard() {
         if (!vendorClientNames.has(c.nombre_normalized)) return false;
         const d = c.companies[companyKey];
         if (!d || d.total <= 0) return false;
-        const watch = d.d91_120 + d.d121_180;
-        const overdue = d.d181_270 + d.d271_365 + d.mas_365;
+        const watch = d.d91_120;
+        const overdue = d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365;
         return watch > 0 || overdue > 0;
       })
       .map((c) => {
@@ -447,8 +447,8 @@ export default function AdminDashboard() {
         return {
           name: c.nombre_normalized,
           total: d.total,
-          watch: d.d91_120 + d.d121_180,
-          overdue: d.d181_270 + d.d271_365 + d.mas_365,
+          watch: d.d91_120,
+          overdue: d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365,
         };
       })
       .sort((a, b) => b.total - a.total);
@@ -560,7 +560,7 @@ export default function AdminDashboard() {
           <div className="text-2xl font-bold mt-1">${fmt(totalCxc)}</div>
         </div>
         <div className="border border-red-200 rounded px-4 py-3 bg-red-50">
-          <div className="text-xs text-red-600 uppercase tracking-wide">Vencido +181d</div>
+          <div className="text-xs text-red-600 uppercase tracking-wide">Vencido +121d</div>
           <div className="text-2xl font-bold mt-1 text-red-700">${fmt(totalOverdue)}</div>
         </div>
         <div className="border border-gray-200 rounded px-4 py-3">
