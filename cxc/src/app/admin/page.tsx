@@ -506,10 +506,14 @@ export default function AdminDashboard() {
                 </button>
                 <button
                   onClick={() => {
-                    const label = riskFilter === "all" ? "Todos los clientes"
+                    const riskLabel = riskFilter === "all" ? "Todos los clientes"
                       : riskFilter === "current" ? "Clientes Corrientes"
                       : riskFilter === "watch" ? "Clientes en Vigilancia"
                       : "Clientes Vencidos";
+                    const coLabel = companyFilter !== "all"
+                      ? COMPANIES.find((c) => c.key === companyFilter)?.name || ""
+                      : "";
+                    const label = coLabel ? `${riskLabel} — ${coLabel}` : riskLabel;
                     generatePDF(filtered, label);
                     setShowExport(false);
                   }}
