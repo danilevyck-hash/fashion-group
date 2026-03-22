@@ -654,24 +654,20 @@ export default function AdminDashboard() {
                 >
                   PDF Resumen
                 </button>
-                <button
+                {companyFilter === "all" && <button
                   onClick={() => {
                     const riskLabel = riskFilter === "all" ? "Todos los clientes"
                       : riskFilter === "current" ? "Clientes Corrientes"
                       : riskFilter === "watch" ? "Clientes en Vigilancia"
                       : "Clientes Vencidos";
-                    const coLabel = companyFilter !== "all"
-                      ? COMPANIES.find((c) => c.key === companyFilter)?.name || ""
-                      : "";
-                    const label = coLabel ? `${riskLabel} — ${coLabel}` : riskLabel;
-                    const keys = companyFilter !== "all" ? [companyFilter] : roleCompanies.map((c) => c.key);
-                    generatePDF(filtered, label, true, keys);
+                    const keys = roleCompanies.map((c) => c.key);
+                    generatePDF(filtered, riskLabel, true, keys);
                     setShowExport(false);
                   }}
                   className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
                 >
                   PDF Detallado
-                </button>
+                </button>}
               </div>
             )}
           </div>
