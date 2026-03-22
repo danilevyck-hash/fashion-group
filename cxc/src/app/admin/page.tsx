@@ -94,19 +94,52 @@ function buildEmailBody(client: ConsolidatedClient) {
 
 // ── PDF generation (pure client-side) ────────────────────
 
-function generatePDF(data: ConsolidatedClient[], title: string) {
+function generatePDF(data: ConsolidatedClient[], title: string, detailed: boolean = false, companyKeys?: string[]) {
   const w = window.open("", "_blank");
   if (!w) return;
 
-  const rows = data.map((c) => `
-    <tr>
-      <td style="padding:4px 8px;border-bottom:1px solid #eee">${c.nombre_normalized}</td>
-      <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;color:#15803d">${fmt(c.current)}</td>
-      <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;color:#ca8a04">${fmt(c.watch)}</td>
-      <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;color:#dc2626">${fmt(c.overdue)}</td>
-      <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:600">${fmt(c.total)}</td>
-    </tr>
-  `).join("");
+  let rows: string;
+
+  if (detailed && companyKeys) {
+    // Detailed view: show company breakdown per client
+    rows = data.map((c) => {
+      const mainRow = `
+        <tr style="background:#f9f9f9">
+          <td style="padding:6px 8px;border-bottom:1px solid #ddd;font-weight:600" colspan="1">${c.nombre_normalized}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right;color:#15803d;font-weight:600">${fmt(c.current)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right;color:#ca8a04;font-weight:600">${fmt(c.watch)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right;color:#dc2626;font-weight:600">${fmt(c.overdue)}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right;font-weight:700">${fmt(c.total)}</td>
+        </tr>`;
+      const companyRows = companyKeys
+        .filter((k) => c.companies[k] && c.companies[k].total !== 0)
+        .map((k) => {
+          const d = c.companies[k];
+          const co = COMPANIES.find((x) => x.key === k);
+          const cur = d.d0_30 + d.d31_60 + d.d61_90;
+          const wat = d.d91_120;
+          const ove = d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365;
+          return `<tr>
+            <td style="padding:2px 8px 2px 24px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#666">${co?.name || k}</td>
+            <td style="padding:2px 8px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:11px;color:#15803d">${fmt(cur)}</td>
+            <td style="padding:2px 8px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:11px;color:#ca8a04">${fmt(wat)}</td>
+            <td style="padding:2px 8px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:11px;color:#dc2626">${fmt(ove)}</td>
+            <td style="padding:2px 8px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:11px">${fmt(d.total)}</td>
+          </tr>`;
+        }).join("");
+      return mainRow + companyRows;
+    }).join("");
+  } else {
+    rows = data.map((c) => `
+      <tr>
+        <td style="padding:4px 8px;border-bottom:1px solid #eee">${c.nombre_normalized}</td>
+        <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;color:#15803d">${fmt(c.current)}</td>
+        <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;color:#ca8a04">${fmt(c.watch)}</td>
+        <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;color:#dc2626">${fmt(c.overdue)}</td>
+        <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:600">${fmt(c.total)}</td>
+      </tr>
+    `).join("");
+  }
 
   const totalCxc = data.reduce((s, c) => s + c.total, 0);
   const totalCurrent = data.reduce((s, c) => s + c.current, 0);
@@ -121,9 +154,10 @@ function generatePDF(data: ConsolidatedClient[], title: string) {
     h1{font-size:18px;margin:0} h2{font-size:13px;color:#666;margin:4px 0 20px}
     .footer{margin-top:16px;font-size:11px;color:#999;text-align:center}
     .totals td{font-weight:700;border-top:2px solid #111;padding:6px 8px}
+    @media print{body{margin:20px}}
     </style></head><body>
     <h1>CXC — Fashion Group</h1>
-    <h2>${title} &middot; ${new Date().toLocaleDateString("es-PA")} &middot; ${data.length} clientes</h2>
+    <h2>${title}${detailed ? " (Detallado)" : ""} &middot; ${new Date().toLocaleDateString("es-PA")} &middot; ${data.length} clientes</h2>
     <table>
       <thead><tr>
         <th>Cliente</th><th class="right">Corriente 0-90d</th><th class="right">Vigilancia 91-120d</th><th class="right">Vencido 121d+</th><th class="right">Total</th>
@@ -507,6 +541,44 @@ export default function AdminDashboard() {
     window.open(`https://wa.me/${co.vendedorPhone}?text=${msg}`, "_blank");
   }
 
+  function massWhatsApp(companyKey?: string) {
+    // Get overdue clients, optionally filtered by company
+    const targets = clients.filter((c) => {
+      if (companyKey) {
+        const d = c.companies[companyKey];
+        if (!d) return false;
+        const overdue = d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365;
+        return overdue > 0;
+      }
+      return c.overdue > 0;
+    });
+
+    if (targets.length === 0) {
+      alert("No hay clientes vencidos" + (companyKey ? " en esta empresa" : ""));
+      return;
+    }
+
+    // Filter to those with phone numbers
+    const withPhone = targets.filter((c) => c.celular || c.telefono);
+    if (withPhone.length === 0) {
+      alert(`Hay ${targets.length} clientes vencidos pero ninguno tiene numero de telefono registrado.`);
+      return;
+    }
+
+    if (!confirm(`Se abriran ${withPhone.length} ventanas de WhatsApp (de ${targets.length} clientes vencidos). ¿Continuar?`)) return;
+
+    // Open WhatsApp for each client with a small delay
+    withPhone.forEach((client, i) => {
+      setTimeout(() => {
+        let phone = (client.celular || client.telefono).replace(/[^0-9]/g, "");
+        if (!phone.startsWith("507") && phone.length <= 8) phone = "507" + phone;
+        const msg = encodeURIComponent(buildWhatsAppMsg(client));
+        window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
+        markContacted(client.nombre_normalized, "whatsapp");
+      }, i * 1500); // 1.5 sec delay between each
+    });
+  }
+
   function openEmail(client: ConsolidatedClient) {
     if (!client.correo) { alert("Este cliente no tiene correo registrado. Edite el contacto primero."); return; }
     const subject = encodeURIComponent(buildEmailSubject(client));
@@ -580,7 +652,25 @@ export default function AdminDashboard() {
                   }}
                   className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
                 >
-                  PDF (Imprimir)
+                  PDF Resumen
+                </button>
+                <button
+                  onClick={() => {
+                    const riskLabel = riskFilter === "all" ? "Todos los clientes"
+                      : riskFilter === "current" ? "Clientes Corrientes"
+                      : riskFilter === "watch" ? "Clientes en Vigilancia"
+                      : "Clientes Vencidos";
+                    const coLabel = companyFilter !== "all"
+                      ? COMPANIES.find((c) => c.key === companyFilter)?.name || ""
+                      : "";
+                    const label = coLabel ? `${riskLabel} — ${coLabel}` : riskLabel;
+                    const keys = companyFilter !== "all" ? [companyFilter] : roleCompanies.map((c) => c.key);
+                    generatePDF(filtered, label, true, keys);
+                    setShowExport(false);
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                >
+                  PDF Detallado
                 </button>
               </div>
             )}
@@ -679,6 +769,15 @@ export default function AdminDashboard() {
               </div>
             );
           })}
+        </div>
+        {/* Mass WhatsApp button */}
+        <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
+          <button
+            onClick={() => massWhatsApp(companyFilter !== "all" ? companyFilter : undefined)}
+            className="text-xs border border-green-600 text-green-700 px-3 py-1.5 rounded hover:bg-green-50 transition"
+          >
+            📱 WhatsApp masivo a vencidos {companyFilter !== "all" ? `de ${COMPANIES.find(c => c.key === companyFilter)?.name || ""}` : "(todas)"}
+          </button>
         </div>
       </div>
 
