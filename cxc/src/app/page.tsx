@@ -12,9 +12,13 @@ export default function LoginPage() {
     e.preventDefault();
     const adminPw = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
     const uploadPw = process.env.NEXT_PUBLIC_UPLOAD_PASSWORD;
+    const directorPw = process.env.NEXT_PUBLIC_DIRECTOR_PASSWORD;
 
     if (password === adminPw) {
       sessionStorage.setItem("cxc_role", "admin");
+      router.push("/admin");
+    } else if (password === directorPw) {
+      sessionStorage.setItem("cxc_role", "director");
       router.push("/admin");
     } else if (password === uploadPw) {
       sessionStorage.setItem("cxc_role", "upload");

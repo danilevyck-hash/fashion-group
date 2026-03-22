@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { COMPANIES } from "@/lib/companies";
+import { COMPANIES, getCompaniesForRole } from "@/lib/companies";
 import type { CxcRow, CxcUpload, ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
 import { VENDOR_MAP } from "@/lib/vendors";
@@ -198,13 +198,17 @@ export default function AdminDashboard() {
   const [copied, setCopied] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [contactLog, setContactLog] = useState<Record<string, { date: string; method: string }>>({});
+  const [userRole, setUserRole] = useState<string>("admin");
+
+  const roleCompanies = useMemo(() => getCompaniesForRole(userRole), [userRole]);
 
   useEffect(() => {
-    const role = sessionStorage.getItem("cxc_role");
-    if (role !== "admin") {
+    const r = sessionStorage.getItem("cxc_role");
+    if (r !== "admin" && r !== "director") {
       router.push("/");
       return;
     }
+    setUserRole(r);
     loadData();
   }, [router]);
 
@@ -328,7 +332,25 @@ export default function AdminDashboard() {
   // ── Filtering + sorting ──────────────────────────────
 
   const filtered = useMemo(() => {
-    let result = [...clients];
+    const roleKeys = new Set(roleCompanies.map((c) => c.key));
+    // Filter clients to only those with data in role's companies, recalculate totals
+    let result = clients
+      .map((c) => {
+        const filteredCompanies: typeof c.companies = {};
+        for (const [key, data] of Object.entries(c.companies)) {
+          if (roleKeys.has(key)) filteredCompanies[key] = data;
+        }
+        if (Object.keys(filteredCompanies).length === 0) return null;
+        let current = 0, watch = 0, overdue = 0, total = 0;
+        for (const co of Object.values(filteredCompanies)) {
+          current += co.d0_30 + co.d31_60 + co.d61_90;
+          watch += co.d91_120;
+          overdue += co.d121_180 + co.d181_270 + co.d271_365 + co.mas_365;
+          total += co.total;
+        }
+        return { ...c, companies: filteredCompanies, current, watch, overdue, total };
+      })
+      .filter((c): c is ConsolidatedClient => c !== null && c.total > 0);
 
     // Company filter — recalculate totals to show only that company's amounts
     if (companyFilter !== "all") {
@@ -371,7 +393,7 @@ export default function AdminDashboard() {
     });
 
     return result;
-  }, [clients, companyFilter, riskFilter, search, sortKey, sortDir]);
+  }, [clients, roleCompanies, companyFilter, riskFilter, search, sortKey, sortDir]);
 
   // ── KPIs ─────────────────────────────────────────────
 
@@ -388,14 +410,14 @@ export default function AdminDashboard() {
 
   const companySummary = useMemo(() => {
     const sums: Record<string, number> = {};
-    for (const co of COMPANIES) sums[co.key] = 0;
+    for (const co of roleCompanies) sums[co.key] = 0;
     for (const c of clients) {
       for (const [key, data] of Object.entries(c.companies)) {
         sums[key] = (sums[key] || 0) + data.total;
       }
     }
     return sums;
-  }, [clients]);
+  }, [clients, roleCompanies]);
 
   const maxCompanyTotal = Math.max(...Object.values(companySummary), 1);
 
@@ -444,7 +466,7 @@ export default function AdminDashboard() {
   }
 
   function sendVendorWhatsApp(companyKey: string) {
-    const co = COMPANIES.find((c) => c.key === companyKey);
+    const co = roleCompanies.find((c) => c.key === companyKey);
     if (!co?.vendedorPhone || !co?.vendedor) { alert("Esta empresa no tiene vendedor asignado."); return; }
 
     // Get this vendor's client list
@@ -563,9 +585,11 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
-          <button onClick={() => router.push("/upload")} className="text-sm text-gray-500 hover:text-black">
-            Cargar archivos
-          </button>
+          {userRole !== "director" && (
+            <button onClick={() => router.push("/upload")} className="text-sm text-gray-500 hover:text-black">
+              Cargar archivos
+            </button>
+          )}
           <button
             onClick={() => { sessionStorage.removeItem("cxc_role"); router.push("/"); }}
             className="text-sm text-gray-500 hover:text-black"
@@ -576,8 +600,8 @@ export default function AdminDashboard() {
       </div>
 
       {/* Upload freshness */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6">
-        {COMPANIES.map((co) => {
+      <div className={`grid grid-cols-2 ${roleCompanies.length > 5 ? "sm:grid-cols-4 lg:grid-cols-7" : "sm:grid-cols-5"} gap-2 mb-6`}>
+        {roleCompanies.map((co) => {
           const up = uploads[co.key];
           const age = up ? uploadAge(up.uploaded_at) : "stale";
           return (
@@ -632,7 +656,7 @@ export default function AdminDashboard() {
       <div className="mb-6 border border-gray-200 rounded px-4 py-3">
         <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">CXC por Empresa</div>
         <div className="space-y-2">
-          {COMPANIES.map((co) => {
+          {roleCompanies.map((co) => {
             const val = companySummary[co.key] || 0;
             const pct = (val / maxCompanyTotal) * 100;
             return (
@@ -684,7 +708,7 @@ export default function AdminDashboard() {
           className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-black"
         >
           <option value="all">Todas las empresas</option>
-          {COMPANIES.map((co) => (
+          {roleCompanies.map((co) => (
             <option key={co.key} value={co.key}>{co.name}</option>
           ))}
         </select>
@@ -825,8 +849,8 @@ export default function AdminDashboard() {
                   {/* Per-company breakdown */}
                   {(() => {
                     const visibleCompanies = companyFilter !== "all"
-                      ? COMPANIES.filter((co) => co.key === companyFilter && client.companies[co.key])
-                      : COMPANIES.filter((co) => client.companies[co.key]);
+                      ? roleCompanies.filter((co) => co.key === companyFilter && client.companies[co.key])
+                      : roleCompanies.filter((co) => client.companies[co.key]);
                     return visibleCompanies.length > 0 && (
                       <>
                   <div className="text-xs font-medium text-gray-500 uppercase mb-2">
