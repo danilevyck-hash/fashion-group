@@ -533,7 +533,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Upload freshness */}
-      <div className="grid grid-cols-5 gap-2 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-6">
         {COMPANIES.map((co) => {
           const up = uploads[co.key];
           const age = up ? uploadAge(up.uploaded_at) : "stale";
@@ -554,18 +554,18 @@ export default function AdminDashboard() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
         <div className="border border-gray-200 rounded px-4 py-3">
           <div className="text-xs text-gray-500 uppercase tracking-wide">Total CXC</div>
-          <div className="text-2xl font-bold mt-1">${fmt(totalCxc)}</div>
+          <div className="text-xl sm:text-2xl font-bold mt-1">${fmt(totalCxc)}</div>
         </div>
         <div className="border border-red-200 rounded px-4 py-3 bg-red-50">
           <div className="text-xs text-red-600 uppercase tracking-wide">Vencido +121d</div>
-          <div className="text-2xl font-bold mt-1 text-red-700">${fmt(totalOverdue)}</div>
+          <div className="text-xl sm:text-2xl font-bold mt-1 text-red-700">${fmt(totalOverdue)}</div>
         </div>
         <div className="border border-gray-200 rounded px-4 py-3">
           <div className="text-xs text-gray-500 uppercase tracking-wide">Clientes Criticos</div>
-          <div className="text-2xl font-bold mt-1">{criticalClients}</div>
+          <div className="text-xl sm:text-2xl font-bold mt-1">{criticalClients}</div>
         </div>
       </div>
 
@@ -641,20 +641,20 @@ export default function AdminDashboard() {
       {/* Client table */}
       <div className="border border-gray-200 rounded overflow-hidden">
         {/* Sortable header */}
-        <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wide select-none">
-          <div className="col-span-4 cursor-pointer hover:text-black" onClick={() => toggleSort("name")}>
+        <div className="grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-gray-50 text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wide select-none">
+          <div className="col-span-5 sm:col-span-4 cursor-pointer hover:text-black" onClick={() => toggleSort("name")}>
             Cliente{sortArrow("name")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("current")}>
+          <div className="hidden sm:block col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("current")}>
             0-90d{sortArrow("current")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("watch")}>
+          <div className="hidden sm:block col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("watch")}>
             91-120d{sortArrow("watch")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("overdue")}>
+          <div className="col-span-3 sm:col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("overdue")}>
             121d+{sortArrow("overdue")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("total")}>
+          <div className="col-span-4 sm:col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("total")}>
             Total{sortArrow("total")}
           </div>
         </div>
@@ -671,17 +671,17 @@ export default function AdminDashboard() {
             <div key={client.nombre_normalized} className={`border-l-4 ${riskColor(client.current, client.watch, client.overdue)}`}>
               {/* Main row */}
               <div
-                className="grid grid-cols-12 gap-2 px-4 py-3 text-sm cursor-pointer hover:bg-gray-50 transition border-b border-gray-100"
+                className="grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm cursor-pointer hover:bg-gray-50 transition border-b border-gray-100"
                 onClick={() => setExpanded(isExpanded ? null : client.nombre_normalized)}
               >
-                <div className="col-span-4 font-medium truncate">
-                  <span className="mr-2 text-gray-400 text-xs">{isExpanded ? "▼" : "▶"}</span>
+                <div className="col-span-5 sm:col-span-4 font-medium truncate">
+                  <span className="mr-1 sm:mr-2 text-gray-400 text-xs">{isExpanded ? "▼" : "▶"}</span>
                   {client.nombre_normalized}
                 </div>
-                <div className="col-span-2 text-right text-green-700">{fmt(client.current)}</div>
-                <div className="col-span-2 text-right text-yellow-600">{fmt(client.watch)}</div>
-                <div className="col-span-2 text-right text-red-600">{fmt(client.overdue)}</div>
-                <div className="col-span-2 text-right font-semibold">{fmt(client.total)}</div>
+                <div className="hidden sm:block col-span-2 text-right text-green-700">{fmt(client.current)}</div>
+                <div className="hidden sm:block col-span-2 text-right text-yellow-600">{fmt(client.watch)}</div>
+                <div className="col-span-3 sm:col-span-2 text-right text-red-600">{fmt(client.overdue)}</div>
+                <div className="col-span-4 sm:col-span-2 text-right font-semibold">{fmt(client.total)}</div>
               </div>
 
               {/* Expanded detail */}
