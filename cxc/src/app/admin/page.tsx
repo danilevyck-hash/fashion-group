@@ -144,7 +144,7 @@ function generatePDF(data: ConsolidatedClient[], title: string) {
   w.document.close();
 }
 
-function exportCSV(data: ConsolidatedClient[]) {
+function exportCSV(data: ConsolidatedClient[], label?: string) {
   const header = "Cliente,Corriente 0-90d,Vigilancia 91-120d,Vencido 121d+,Total,Correo,Telefono,Celular\n";
   const rows = data.map((c) =>
     `"${c.nombre_normalized}",${c.current.toFixed(2)},${c.watch.toFixed(2)},${c.overdue.toFixed(2)},${c.total.toFixed(2)},"${c.correo}","${c.telefono}","${c.celular}"`
@@ -153,7 +153,8 @@ function exportCSV(data: ConsolidatedClient[]) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `cxc_fashion_group_${new Date().toISOString().slice(0, 10)}.csv`;
+  const suffix = label ? `_${label.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()}` : "";
+  a.download = `cxc_fashion_group${suffix}_${new Date().toISOString().slice(0, 10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -196,6 +197,7 @@ export default function AdminDashboard() {
   const [showExport, setShowExport] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [contactLog, setContactLog] = useState<Record<string, { date: string; method: string }>>({});
 
   useEffect(() => {
     const role = sessionStorage.getItem("cxc_role");
@@ -288,6 +290,22 @@ export default function AdminDashboard() {
 
     // Filter out clients with zero or negative total
     setClients(Array.from(map.values()).filter((c) => c.total > 0));
+
+    // Load contact log (latest per client)
+    const { data: logData } = await supabase
+      .from("cxc_contact_log")
+      .select("*")
+      .order("contacted_at", { ascending: false });
+    const latestLog: Record<string, { date: string; method: string }> = {};
+    if (logData) {
+      for (const l of logData) {
+        if (!latestLog[l.nombre_normalized]) {
+          latestLog[l.nombre_normalized] = { date: l.contacted_at, method: l.method };
+        }
+      }
+    }
+    setContactLog(latestLog);
+
     setLoading(false);
   }, []);
 
@@ -358,8 +376,13 @@ export default function AdminDashboard() {
   // ── KPIs ─────────────────────────────────────────────
 
   const totalCxc = clients.reduce((s, c) => s + c.total, 0);
+  const totalCurrent = clients.reduce((s, c) => s + c.current, 0);
+  const totalWatch = clients.reduce((s, c) => s + c.watch, 0);
   const totalOverdue = clients.reduce((s, c) => s + c.overdue, 0);
   const criticalClients = clients.filter((c) => c.overdue > 0).length;
+  const pctCurrent = totalCxc > 0 ? (totalCurrent / totalCxc) * 100 : 0;
+  const pctWatch = totalCxc > 0 ? (totalWatch / totalCxc) * 100 : 0;
+  const pctOverdue = totalCxc > 0 ? (totalOverdue / totalCxc) * 100 : 0;
 
   // ── Company summary ──────────────────────────────────
 
@@ -469,6 +492,17 @@ export default function AdminDashboard() {
     window.open(`mailto:${client.correo}?subject=${subject}&body=${body}`, "_blank");
   }
 
+  async function markContacted(clientName: string, method: string) {
+    await supabase.from("cxc_contact_log").insert({
+      nombre_normalized: clientName,
+      method,
+    });
+    setContactLog((prev) => ({
+      ...prev,
+      [clientName]: { date: new Date().toISOString(), method },
+    }));
+  }
+
   // ── Render ────────────────────────────────────────────
 
   if (loading) {
@@ -499,7 +533,12 @@ export default function AdminDashboard() {
             {showExport && (
               <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-10">
                 <button
-                  onClick={() => { exportCSV(filtered); setShowExport(false); }}
+                  onClick={() => {
+                    const riskL = riskFilter === "all" ? "" : riskFilter === "current" ? "corriente" : riskFilter === "watch" ? "vigilancia" : "vencido";
+                    const coL = companyFilter !== "all" ? COMPANIES.find((c) => c.key === companyFilter)?.name || "" : "";
+                    exportCSV(filtered, [riskL, coL].filter(Boolean).join("_") || undefined);
+                    setShowExport(false);
+                  }}
                   className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
                 >
                   CSV (Excel)
@@ -572,6 +611,22 @@ export default function AdminDashboard() {
           <div className="text-xl sm:text-2xl font-bold mt-1">{criticalClients}</div>
         </div>
       </div>
+
+      {/* Risk % bar */}
+      {totalCxc > 0 && (
+        <div className="mb-6">
+          <div className="flex h-3 rounded overflow-hidden">
+            <div className="bg-green-500" style={{ width: `${pctCurrent}%` }} title={`Corriente: ${pctCurrent.toFixed(0)}%`} />
+            <div className="bg-yellow-400" style={{ width: `${pctWatch}%` }} title={`Vigilancia: ${pctWatch.toFixed(0)}%`} />
+            <div className="bg-red-500" style={{ width: `${pctOverdue}%` }} title={`Vencido: ${pctOverdue.toFixed(0)}%`} />
+          </div>
+          <div className="flex justify-between text-[10px] text-gray-500 mt-1">
+            <span>Corriente {pctCurrent.toFixed(0)}%</span>
+            <span>Vigilancia {pctWatch.toFixed(0)}%</span>
+            <span>Vencido {pctOverdue.toFixed(0)}%</span>
+          </div>
+        </div>
+      )}
 
       {/* Company summary bars */}
       <div className="mb-6 border border-gray-200 rounded px-4 py-3">
@@ -736,21 +791,33 @@ export default function AdminDashboard() {
                       </div>
                     )}
 
-                    {/* Action buttons: WhatsApp + Email */}
+                    {/* Action buttons: WhatsApp + Email + Mark contacted */}
                     {!isEditing && (
-                      <div className="flex gap-2 mt-3">
+                      <div className="flex flex-wrap gap-2 mt-3">
                         <button
-                          onClick={(e) => { e.stopPropagation(); openWhatsApp(client); }}
+                          onClick={(e) => { e.stopPropagation(); openWhatsApp(client); markContacted(client.nombre_normalized, "whatsapp"); }}
                           className="text-xs border border-green-600 text-green-700 px-3 py-1.5 rounded hover:bg-green-50 transition"
                         >
                           WhatsApp cobro
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); openEmail(client); }}
+                          onClick={(e) => { e.stopPropagation(); openEmail(client); markContacted(client.nombre_normalized, "email"); }}
                           className="text-xs border border-gray-400 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-100 transition"
                         >
                           Email cobro
                         </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); markContacted(client.nombre_normalized, "llamada"); }}
+                          className="text-xs border border-blue-400 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-50 transition"
+                        >
+                          Marcar llamada
+                        </button>
+                      </div>
+                    )}
+                    {/* Last contact */}
+                    {contactLog[client.nombre_normalized] && (
+                      <div className="mt-2 text-[11px] text-gray-400">
+                        Ultimo contacto: {new Date(contactLog[client.nombre_normalized].date).toLocaleDateString("es-PA")} via {contactLog[client.nombre_normalized].method}
                       </div>
                     )}
                   </div>
