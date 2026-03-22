@@ -67,7 +67,7 @@ export interface ConsolidatedClient {
   contacto: string;
   total: number;
   current: number;    // 0-90
-  watch: number;      // 91-120
-  overdue: number;    // 121+
+  watch: number;      // 91-180
+  overdue: number;    // 181+
   hasOverride: boolean;
 }

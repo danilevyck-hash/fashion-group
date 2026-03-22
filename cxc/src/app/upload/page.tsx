@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { COMPANIES } from "@/lib/companies";
 import { normalizeName } from "@/lib/normalize";
+import { resolveAlias } from "@/lib/aliases";
 import Papa from "papaparse";
 
 interface UploadStatus {
@@ -66,7 +67,15 @@ export default function UploadPage() {
         throw new Error("Error al parsear CSV: " + parsed.errors[0].message);
       }
 
-      const rows = parsed.data as Record<string, string>[];
+      // Normalize CSV headers: trim and collapse spaces
+      const rows = (parsed.data as Record<string, string>[]).map((row) => {
+        const clean: Record<string, string> = {};
+        for (const [key, val] of Object.entries(row)) {
+          const normalizedKey = key.trim().replace(/\s+/g, " ");
+          clean[normalizedKey] = val;
+        }
+        return clean;
+      });
 
       // Create upload record
       const { data: upload, error: uploadErr } = await supabase
@@ -88,7 +97,7 @@ export default function UploadPage() {
           company_key: companyKey,
           codigo: r["CODIGO"] || "",
           nombre: r["NOMBRE"] || "",
-          nombre_normalized: normalizeName(r["NOMBRE"] || ""),
+          nombre_normalized: resolveAlias(normalizeName(r["NOMBRE"] || "")),
           correo: r["CORREO"] || "",
           telefono: r["TELEFONO"] || "",
           celular: r["CELULAR"] || "",

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { COMPANIES } from "@/lib/companies";
 import type { CxcRow, CxcUpload, ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
+import { VENDOR_MAP } from "@/lib/vendors";
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -20,21 +21,162 @@ function uploadAge(dateStr: string): "fresh" | "warning" | "stale" {
   return "fresh";
 }
 
-const ageBg: Record<string, string> = {
-  fresh: "",
-  warning: "bg-yellow-50",
-  stale: "bg-red-50",
-};
-const ageDot: Record<string, string> = {
-  fresh: "bg-green-500",
-  warning: "bg-yellow-500",
-  stale: "bg-red-500",
-};
+const ageBg: Record<string, string> = { fresh: "", warning: "bg-yellow-50", stale: "bg-red-50" };
+const ageDot: Record<string, string> = { fresh: "bg-green-500", warning: "bg-yellow-500", stale: "bg-red-500" };
 
 function riskColor(current: number, watch: number, overdue: number) {
   if (overdue > 0) return "border-l-red-500";
   if (watch > 0) return "border-l-yellow-500";
   return "border-l-green-500";
+}
+
+type RiskFilter = "all" | "current" | "watch" | "overdue";
+type SortKey = "name" | "current" | "watch" | "overdue" | "total";
+type SortDir = "asc" | "desc";
+
+function buildWhatsAppMsg(client: ConsolidatedClient) {
+  const lines = [
+    `Estimado/a cliente,`,
+    ``,
+    `Le escribimos de Fashion Group para informarle sobre su estado de cuenta actualizado:`,
+    ``,
+    `*Estado de Cuenta - ${client.nombre_normalized}*`,
+    ``,
+  ];
+  for (const co of COMPANIES) {
+    const d = client.companies[co.key];
+    if (!d || d.total === 0) continue;
+    lines.push(`*${co.name}* (${co.brand}): $${fmt(d.total)}`);
+  }
+  lines.push(``);
+  if (client.current > 0) lines.push(`Corriente (0-90d): $${fmt(client.current)}`);
+  if (client.watch > 0) lines.push(`Vigilancia (91-180d): $${fmt(client.watch)}`);
+  if (client.overdue > 0) lines.push(`*Vencido (181d+): $${fmt(client.overdue)}*`);
+  lines.push(`*Total: $${fmt(client.total)}*`);
+  lines.push(``);
+  lines.push(`Agradecemos su pronta atencion a este saldo. Quedamos a su disposicion para cualquier consulta.`);
+  lines.push(``);
+  lines.push(`Atentamente,`);
+  lines.push(`Fashion Group - Departamento de Cobros`);
+  return lines.join("\n");
+}
+
+function buildEmailSubject(client: ConsolidatedClient) {
+  return `Estado de Cuenta - ${client.nombre_normalized} - Fashion Group`;
+}
+
+function buildEmailBody(client: ConsolidatedClient) {
+  const lines = [
+    `Estimado/a cliente,`,
+    ``,
+    `Le escribimos de Fashion Group para informarle sobre su estado de cuenta actualizado.`,
+    ``,
+    `Estado de Cuenta - ${client.nombre_normalized}`,
+    ``,
+  ];
+  for (const co of COMPANIES) {
+    const d = client.companies[co.key];
+    if (!d || d.total === 0) continue;
+    lines.push(`${co.name} (${co.brand}): $${fmt(d.total)}`);
+  }
+  lines.push(``);
+  if (client.current > 0) lines.push(`Corriente (0-90d): $${fmt(client.current)}`);
+  if (client.watch > 0) lines.push(`Vigilancia (91-180d): $${fmt(client.watch)}`);
+  if (client.overdue > 0) lines.push(`VENCIDO (181d+): $${fmt(client.overdue)}`);
+  lines.push(`TOTAL: $${fmt(client.total)}`);
+  lines.push(``);
+  lines.push(`Agradecemos su pronta atencion a este saldo. Quedamos a su disposicion para cualquier consulta.`);
+  lines.push(``);
+  lines.push(`Atentamente,`);
+  lines.push(`Fashion Group - Departamento de Cobros`);
+  return lines.join("\n");
+}
+
+// ── PDF generation (pure client-side) ────────────────────
+
+function generatePDF(data: ConsolidatedClient[], title: string) {
+  const w = window.open("", "_blank");
+  if (!w) return;
+
+  const rows = data.map((c) => `
+    <tr>
+      <td style="padding:4px 8px;border-bottom:1px solid #eee">${c.nombre_normalized}</td>
+      <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;color:#15803d">${fmt(c.current)}</td>
+      <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;color:#ca8a04">${fmt(c.watch)}</td>
+      <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;color:#dc2626">${fmt(c.overdue)}</td>
+      <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:600">${fmt(c.total)}</td>
+    </tr>
+  `).join("");
+
+  const totalCxc = data.reduce((s, c) => s + c.total, 0);
+  const totalCurrent = data.reduce((s, c) => s + c.current, 0);
+  const totalWatch = data.reduce((s, c) => s + c.watch, 0);
+  const totalOverdue = data.reduce((s, c) => s + c.overdue, 0);
+
+  w.document.write(`<!DOCTYPE html><html><head><title>${title}</title>
+    <style>body{font-family:-apple-system,sans-serif;margin:40px;color:#111}
+    table{width:100%;border-collapse:collapse;font-size:12px}
+    th{text-align:left;padding:6px 8px;border-bottom:2px solid #111;font-size:11px;text-transform:uppercase;color:#666}
+    .right{text-align:right}
+    h1{font-size:18px;margin:0} h2{font-size:13px;color:#666;margin:4px 0 20px}
+    .footer{margin-top:16px;font-size:11px;color:#999;text-align:center}
+    .totals td{font-weight:700;border-top:2px solid #111;padding:6px 8px}
+    </style></head><body>
+    <h1>CXC — Fashion Group</h1>
+    <h2>${title} &middot; ${new Date().toLocaleDateString("es-PA")} &middot; ${data.length} clientes</h2>
+    <table>
+      <thead><tr>
+        <th>Cliente</th><th class="right">Corriente 0-90d</th><th class="right">Vigilancia 91-180d</th><th class="right">Vencido 181d+</th><th class="right">Total</th>
+      </tr></thead>
+      <tbody>${rows}
+        <tr class="totals">
+          <td>TOTAL</td>
+          <td class="right" style="color:#15803d">${fmt(totalCurrent)}</td>
+          <td class="right" style="color:#ca8a04">${fmt(totalWatch)}</td>
+          <td class="right" style="color:#dc2626">${fmt(totalOverdue)}</td>
+          <td class="right">${fmt(totalCxc)}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="footer">Politica: 0-90d corriente &middot; 91-180d vigilancia &middot; 181d+ vencido</div>
+    <script>window.onload=function(){window.print()}</script>
+    </body></html>`);
+  w.document.close();
+}
+
+function exportCSV(data: ConsolidatedClient[]) {
+  const header = "Cliente,Corriente 0-90d,Vigilancia 91-180d,Vencido 181d+,Total,Correo,Telefono,Celular\n";
+  const rows = data.map((c) =>
+    `"${c.nombre_normalized}",${c.current.toFixed(2)},${c.watch.toFixed(2)},${c.overdue.toFixed(2)},${c.total.toFixed(2)},"${c.correo}","${c.telefono}","${c.celular}"`
+  ).join("\n");
+  const blob = new Blob([header + rows], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `cxc_fashion_group_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function buildVendorMsg(vendorName: string, companyName: string, brand: string, criticalClients: { name: string; total: number; overdue: number; watch: number }[]) {
+  const lines = [
+    `Hola ${vendorName}, te envio el reporte de cobros pendientes de *${companyName} (${brand})*:`,
+    ``,
+    `*Clientes criticos (${criticalClients.length}):*`,
+    ``,
+  ];
+  for (const c of criticalClients) {
+    let status = "";
+    if (c.overdue > 0) status = `Vencido: $${fmt(c.overdue)}`;
+    else if (c.watch > 0) status = `Vigilancia: $${fmt(c.watch)}`;
+    lines.push(`- *${c.name}*: Total $${fmt(c.total)}${status ? " | " + status : ""}`);
+  }
+  lines.push(``);
+  const totalPending = criticalClients.reduce((s, c) => s + c.total, 0);
+  lines.push(`*Total pendiente de cobro: $${fmt(totalPending)}*`);
+  lines.push(``);
+  lines.push(`Favor dar seguimiento a estos clientes. Gracias.`);
+  return lines.join("\n");
 }
 
 // ── Main Component ───────────────────────────────────────
@@ -47,6 +189,12 @@ export default function AdminDashboard() {
   const [editing, setEditing] = useState<string | null>(null);
   const [editData, setEditData] = useState({ correo: "", telefono: "", celular: "", contacto: "" });
   const [search, setSearch] = useState("");
+  const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
+  const [companyFilter, setCompanyFilter] = useState<string>("all");
+  const [sortKey, setSortKey] = useState<SortKey>("total");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [showExport, setShowExport] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -61,7 +209,6 @@ export default function AdminDashboard() {
   const loadData = useCallback(async () => {
     setLoading(true);
 
-    // Load latest uploads per company
     const { data: uploadData } = await supabase
       .from("cxc_uploads")
       .select("*")
@@ -75,19 +222,13 @@ export default function AdminDashboard() {
     }
     setUploads(latestUploads);
 
-    // Load all CXC rows
     const { data: rows } = await supabase.from("cxc_rows").select("*");
-
-    // Load overrides
     const { data: overrides } = await supabase.from("cxc_client_overrides").select("*");
     const overrideMap: Record<string, { correo: string; telefono: string; celular: string; contacto: string }> = {};
     if (overrides) {
-      for (const o of overrides) {
-        overrideMap[o.nombre_normalized] = o;
-      }
+      for (const o of overrides) overrideMap[o.nombre_normalized] = o;
     }
 
-    // Consolidate by normalized name
     const map = new Map<string, ConsolidatedClient>();
     if (rows) {
       for (const r of rows as CxcRow[]) {
@@ -104,44 +245,28 @@ export default function AdminDashboard() {
             telefono: ovr?.telefono || r.telefono || "",
             celular: ovr?.celular || r.celular || "",
             contacto: ovr?.contacto || r.contacto || "",
-            total: 0,
-            current: 0,
-            watch: 0,
-            overdue: 0,
+            total: 0, current: 0, watch: 0, overdue: 0,
             hasOverride: !!ovr,
           };
           map.set(key, client);
         }
 
-        // Aggregate per company
         const existing = client.companies[r.company_key];
         if (existing) {
-          existing.d0_30 += r.d0_30;
-          existing.d31_60 += r.d31_60;
-          existing.d61_90 += r.d61_90;
-          existing.d91_120 += r.d91_120;
-          existing.d121_180 += r.d121_180;
-          existing.d181_270 += r.d181_270;
-          existing.d271_365 += r.d271_365;
-          existing.mas_365 += r.mas_365;
-          existing.total += r.total;
+          existing.d0_30 += r.d0_30; existing.d31_60 += r.d31_60; existing.d61_90 += r.d61_90;
+          existing.d91_120 += r.d91_120; existing.d121_180 += r.d121_180;
+          existing.d181_270 += r.d181_270; existing.d271_365 += r.d271_365;
+          existing.mas_365 += r.mas_365; existing.total += r.total;
         } else {
           client.companies[r.company_key] = {
-            nombre: r.nombre,
-            codigo: r.codigo,
-            d0_30: r.d0_30,
-            d31_60: r.d31_60,
-            d61_90: r.d61_90,
-            d91_120: r.d91_120,
-            d121_180: r.d121_180,
-            d181_270: r.d181_270,
-            d271_365: r.d271_365,
-            mas_365: r.mas_365,
-            total: r.total,
+            nombre: r.nombre, codigo: r.codigo,
+            d0_30: r.d0_30, d31_60: r.d31_60, d61_90: r.d61_90,
+            d91_120: r.d91_120, d121_180: r.d121_180,
+            d181_270: r.d181_270, d271_365: r.d271_365,
+            mas_365: r.mas_365, total: r.total,
           };
         }
 
-        // Fill contact info from first non-empty
         if (!client.correo && r.correo) client.correo = r.correo;
         if (!client.telefono && r.telefono) client.telefono = r.telefono;
         if (!client.celular && r.celular) client.celular = r.celular;
@@ -149,25 +274,85 @@ export default function AdminDashboard() {
       }
     }
 
-    // Compute totals
     for (const client of map.values()) {
       let total = 0, current = 0, watch = 0, overdue = 0;
       for (const co of Object.values(client.companies)) {
         total += co.total;
         current += co.d0_30 + co.d31_60 + co.d61_90;
-        watch += co.d91_120;
-        overdue += co.d121_180 + co.d181_270 + co.d271_365 + co.mas_365;
+        watch += co.d91_120 + co.d121_180;
+        overdue += co.d181_270 + co.d271_365 + co.mas_365;
       }
-      client.total = total;
-      client.current = current;
-      client.watch = watch;
-      client.overdue = overdue;
+      client.total = total; client.current = current;
+      client.watch = watch; client.overdue = overdue;
     }
 
-    const sorted = Array.from(map.values()).sort((a, b) => b.total - a.total);
-    setClients(sorted);
+    setClients(Array.from(map.values()));
     setLoading(false);
   }, []);
+
+  // ── Sorting ──────────────────────────────────────────
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(sortDir === "desc" ? "asc" : "desc");
+    } else {
+      setSortKey(key);
+      setSortDir(key === "name" ? "asc" : "desc");
+    }
+  }
+
+  const sortArrow = (key: SortKey) => {
+    if (sortKey !== key) return " ↕";
+    return sortDir === "desc" ? " ↓" : " ↑";
+  };
+
+  // ── Filtering + sorting ──────────────────────────────
+
+  const filtered = useMemo(() => {
+    let result = [...clients];
+
+    // Company filter — recalculate totals to show only that company's amounts
+    if (companyFilter !== "all") {
+      result = result
+        .filter((c) => c.companies[companyFilter])
+        .map((c) => {
+          const d = c.companies[companyFilter];
+          return {
+            ...c,
+            current: d.d0_30 + d.d31_60 + d.d61_90,
+            watch: d.d91_120 + d.d121_180,
+            overdue: d.d181_270 + d.d271_365 + d.mas_365,
+            total: d.total,
+          };
+        });
+    }
+
+    // Risk filter
+    if (riskFilter === "current") result = result.filter((c) => c.overdue === 0 && c.watch === 0);
+    else if (riskFilter === "watch") result = result.filter((c) => c.watch > 0);
+    else if (riskFilter === "overdue") result = result.filter((c) => c.overdue > 0);
+
+    // Search
+    if (search) {
+      const q = normalizeName(search);
+      result = result.filter((c) => c.nombre_normalized.includes(q));
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      let va: number | string, vb: number | string;
+      if (sortKey === "name") { va = a.nombre_normalized; vb = b.nombre_normalized; }
+      else if (sortKey === "current") { va = a.current; vb = b.current; }
+      else if (sortKey === "watch") { va = a.watch; vb = b.watch; }
+      else if (sortKey === "overdue") { va = a.overdue; vb = b.overdue; }
+      else { va = a.total; vb = b.total; }
+      if (va < vb) return sortDir === "asc" ? -1 : 1;
+      if (va > vb) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [clients, companyFilter, riskFilter, search, sortKey, sortDir]);
 
   // ── KPIs ─────────────────────────────────────────────
 
@@ -175,42 +360,113 @@ export default function AdminDashboard() {
   const totalOverdue = clients.reduce((s, c) => s + c.overdue, 0);
   const criticalClients = clients.filter((c) => c.overdue > 0).length;
 
-  // ── Edit/Save Override ────────────────────────────────
+  // ── Company summary ──────────────────────────────────
+
+  const companySummary = useMemo(() => {
+    const sums: Record<string, number> = {};
+    for (const co of COMPANIES) sums[co.key] = 0;
+    for (const c of clients) {
+      for (const [key, data] of Object.entries(c.companies)) {
+        sums[key] = (sums[key] || 0) + data.total;
+      }
+    }
+    return sums;
+  }, [clients]);
+
+  const maxCompanyTotal = Math.max(...Object.values(companySummary), 1);
+
+  // ── Counts ───────────────────────────────────────────
+
+  const countCurrent = clients.filter((c) => c.overdue === 0 && c.watch === 0).length;
+  const countWatch = clients.filter((c) => c.watch > 0).length;
+  const countOverdue = clients.filter((c) => c.overdue > 0).length;
+
+  // ── Edit/Save ────────────────────────────────────────
 
   function startEdit(client: ConsolidatedClient) {
     setEditing(client.nombre_normalized);
     setEditData({
-      correo: client.correo,
-      telefono: client.telefono,
-      celular: client.celular,
-      contacto: client.contacto,
+      correo: client.correo, telefono: client.telefono,
+      celular: client.celular, contacto: client.contacto,
     });
   }
 
   async function saveEdit() {
     if (!editing) return;
     const { error } = await supabase.from("cxc_client_overrides").upsert(
-      {
-        nombre_normalized: editing,
-        correo: editData.correo,
-        telefono: editData.telefono,
-        celular: editData.celular,
-        contacto: editData.contacto,
-        updated_at: new Date().toISOString(),
-      },
+      { nombre_normalized: editing, ...editData, updated_at: new Date().toISOString() },
       { onConflict: "nombre_normalized" }
     );
-    if (!error) {
-      setEditing(null);
-      loadData();
-    }
+    if (!error) { setEditing(null); loadData(); }
   }
 
-  // ── Filter ────────────────────────────────────────────
+  // ── Actions ──────────────────────────────────────────
 
-  const filtered = search
-    ? clients.filter((c) => c.nombre_normalized.includes(normalizeName(search)))
-    : clients;
+  function copyEmail(email: string) {
+    navigator.clipboard.writeText(email);
+    setCopied(email);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  function openWhatsApp(client: ConsolidatedClient) {
+    let phone = (client.celular || client.telefono).replace(/[^0-9]/g, "");
+    if (!phone) { alert("Este cliente no tiene numero de telefono registrado. Edite el contacto primero."); return; }
+    // Auto-prepend Panama country code if not present
+    if (!phone.startsWith("507") && phone.length <= 8) {
+      phone = "507" + phone;
+    }
+    const msg = encodeURIComponent(buildWhatsAppMsg(client));
+    window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
+  }
+
+  function sendVendorWhatsApp(companyKey: string) {
+    const co = COMPANIES.find((c) => c.key === companyKey);
+    if (!co?.vendedorPhone || !co?.vendedor) { alert("Esta empresa no tiene vendedor asignado."); return; }
+
+    // Get this vendor's client list
+    const vendorClients = VENDOR_MAP[companyKey] || {};
+    const vendorClientNames = new Set(
+      Object.entries(vendorClients)
+        .filter(([, v]) => v === co.vendedor!.toUpperCase())
+        .map(([name]) => name)
+    );
+
+    // Find vendor's clients with debt that have watch or overdue
+    const critical = clients
+      .filter((c) => {
+        if (!vendorClientNames.has(c.nombre_normalized)) return false;
+        const d = c.companies[companyKey];
+        if (!d || d.total <= 0) return false;
+        const watch = d.d91_120 + d.d121_180;
+        const overdue = d.d181_270 + d.d271_365 + d.mas_365;
+        return watch > 0 || overdue > 0;
+      })
+      .map((c) => {
+        const d = c.companies[companyKey];
+        return {
+          name: c.nombre_normalized,
+          total: d.total,
+          watch: d.d91_120 + d.d121_180,
+          overdue: d.d181_270 + d.d271_365 + d.mas_365,
+        };
+      })
+      .sort((a, b) => b.total - a.total);
+
+    if (critical.length === 0) {
+      alert("No hay clientes criticos de " + co.vendedor + " en " + co.name);
+      return;
+    }
+
+    const msg = encodeURIComponent(buildVendorMsg(co.vendedor, co.name, co.brand, critical));
+    window.open(`https://wa.me/${co.vendedorPhone}?text=${msg}`, "_blank");
+  }
+
+  function openEmail(client: ConsolidatedClient) {
+    if (!client.correo) { alert("Este cliente no tiene correo registrado. Edite el contacto primero."); return; }
+    const subject = encodeURIComponent(buildEmailSubject(client));
+    const body = encodeURIComponent(buildEmailBody(client));
+    window.open(`mailto:${client.correo}?subject=${subject}&body=${body}`, "_blank");
+  }
 
   // ── Render ────────────────────────────────────────────
 
@@ -231,17 +487,43 @@ export default function AdminDashboard() {
           <p className="text-sm text-gray-500">Panel de Cuentas por Cobrar</p>
         </div>
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.push("/upload")}
-            className="text-sm text-gray-500 hover:text-black"
-          >
+          {/* Export dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowExport(!showExport)}
+              className="text-sm border border-gray-300 rounded px-3 py-1.5 hover:border-black transition"
+            >
+              Exportar
+            </button>
+            {showExport && (
+              <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-10">
+                <button
+                  onClick={() => { exportCSV(filtered); setShowExport(false); }}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                >
+                  CSV (Excel)
+                </button>
+                <button
+                  onClick={() => {
+                    const label = riskFilter === "all" ? "Todos los clientes"
+                      : riskFilter === "current" ? "Clientes Corrientes"
+                      : riskFilter === "watch" ? "Clientes en Vigilancia"
+                      : "Clientes Vencidos";
+                    generatePDF(filtered, label);
+                    setShowExport(false);
+                  }}
+                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                >
+                  PDF (Imprimir)
+                </button>
+              </div>
+            )}
+          </div>
+          <button onClick={() => router.push("/upload")} className="text-sm text-gray-500 hover:text-black">
             Cargar archivos
           </button>
           <button
-            onClick={() => {
-              sessionStorage.removeItem("cxc_role");
-              router.push("/");
-            }}
+            onClick={() => { sessionStorage.removeItem("cxc_role"); router.push("/"); }}
             className="text-sm text-gray-500 hover:text-black"
           >
             Salir
@@ -250,22 +532,17 @@ export default function AdminDashboard() {
       </div>
 
       {/* Upload freshness */}
-      <div className="grid grid-cols-3 md:grid-cols-6 gap-2 mb-6">
+      <div className="grid grid-cols-5 gap-2 mb-6">
         {COMPANIES.map((co) => {
           const up = uploads[co.key];
           const age = up ? uploadAge(up.uploaded_at) : "stale";
           return (
-            <div
-              key={co.key}
-              className={`rounded px-3 py-2 text-xs border border-gray-100 ${up ? ageBg[age] : "bg-gray-50"}`}
-            >
+            <div key={co.key} className={`rounded px-3 py-2 text-xs border border-gray-100 ${up ? ageBg[age] : "bg-gray-50"}`}>
               <div className="font-medium truncate">{co.name}</div>
               {up ? (
                 <div className="flex items-center gap-1 mt-1">
                   <span className={`w-1.5 h-1.5 rounded-full ${ageDot[age]}`} />
-                  <span className="text-gray-500">
-                    {new Date(up.uploaded_at).toLocaleDateString("es-PA")}
-                  </span>
+                  <span className="text-gray-500">{new Date(up.uploaded_at).toLocaleDateString("es-PA")}</span>
                 </div>
               ) : (
                 <div className="text-gray-400 mt-1">Sin datos</div>
@@ -276,41 +553,109 @@ export default function AdminDashboard() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="border border-gray-200 rounded px-4 py-3">
           <div className="text-xs text-gray-500 uppercase tracking-wide">Total CXC</div>
           <div className="text-2xl font-bold mt-1">${fmt(totalCxc)}</div>
         </div>
         <div className="border border-red-200 rounded px-4 py-3 bg-red-50">
-          <div className="text-xs text-red-600 uppercase tracking-wide">Vencido +120d</div>
+          <div className="text-xs text-red-600 uppercase tracking-wide">Vencido +181d</div>
           <div className="text-2xl font-bold mt-1 text-red-700">${fmt(totalOverdue)}</div>
         </div>
         <div className="border border-gray-200 rounded px-4 py-3">
-          <div className="text-xs text-gray-500 uppercase tracking-wide">Clientes Críticos</div>
+          <div className="text-xs text-gray-500 uppercase tracking-wide">Clientes Criticos</div>
           <div className="text-2xl font-bold mt-1">{criticalClients}</div>
         </div>
       </div>
 
-      {/* Search */}
-      <div className="mb-4">
+      {/* Company summary bars */}
+      <div className="mb-6 border border-gray-200 rounded px-4 py-3">
+        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">CXC por Empresa</div>
+        <div className="space-y-2">
+          {COMPANIES.map((co) => {
+            const val = companySummary[co.key] || 0;
+            const pct = (val / maxCompanyTotal) * 100;
+            return (
+              <div key={co.key} className="flex items-center gap-3">
+                <div className="w-36 text-xs truncate">{co.name}</div>
+                <div className="flex-1 h-4 bg-gray-100 rounded overflow-hidden">
+                  <div className="h-full bg-black rounded" style={{ width: `${pct}%` }} />
+                </div>
+                <div className="w-28 text-xs text-right font-medium">${fmt(val)}</div>
+                {co.vendedorPhone ? (
+                  <button
+                    onClick={() => sendVendorWhatsApp(co.key)}
+                    className="text-xs border border-green-600 text-green-700 px-2 py-1 rounded hover:bg-green-50 transition whitespace-nowrap"
+                  >
+                    Enviar a {co.vendedor}
+                  </button>
+                ) : (
+                  <div className="w-24" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Filters row */}
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={() => setRiskFilter("all")}
+            className={`px-3 py-1.5 rounded text-sm border transition ${riskFilter === "all" ? "bg-black text-white border-black" : "border-gray-300 text-gray-600 hover:border-black"}`}>
+            Todos ({clients.length})
+          </button>
+          <button onClick={() => setRiskFilter("current")}
+            className={`px-3 py-1.5 rounded text-sm border transition ${riskFilter === "current" ? "bg-green-600 text-white border-green-600" : "border-green-300 text-green-700 hover:bg-green-50"}`}>
+            Corriente ({countCurrent})
+          </button>
+          <button onClick={() => setRiskFilter("watch")}
+            className={`px-3 py-1.5 rounded text-sm border transition ${riskFilter === "watch" ? "bg-yellow-500 text-white border-yellow-500" : "border-yellow-300 text-yellow-700 hover:bg-yellow-50"}`}>
+            Vigilancia ({countWatch})
+          </button>
+          <button onClick={() => setRiskFilter("overdue")}
+            className={`px-3 py-1.5 rounded text-sm border transition ${riskFilter === "overdue" ? "bg-red-600 text-white border-red-600" : "border-red-300 text-red-700 hover:bg-red-50"}`}>
+            Vencido ({countOverdue})
+          </button>
+        </div>
+        <select
+          value={companyFilter}
+          onChange={(e) => setCompanyFilter(e.target.value)}
+          className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-black"
+        >
+          <option value="all">Todas las empresas</option>
+          {COMPANIES.map((co) => (
+            <option key={co.key} value={co.key}>{co.name}</option>
+          ))}
+        </select>
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar cliente..."
-          className="w-full border border-gray-300 rounded px-4 py-2 text-sm focus:outline-none focus:border-black"
+          className="flex-1 border border-gray-300 rounded px-4 py-1.5 text-sm focus:outline-none focus:border-black"
         />
       </div>
 
       {/* Client table */}
       <div className="border border-gray-200 rounded overflow-hidden">
-        {/* Header */}
-        <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wide">
-          <div className="col-span-4">Cliente</div>
-          <div className="col-span-2 text-right">Corriente</div>
-          <div className="col-span-2 text-right">Vigilancia</div>
-          <div className="col-span-2 text-right">Vencido</div>
-          <div className="col-span-2 text-right">Total</div>
+        {/* Sortable header */}
+        <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-gray-50 text-xs font-medium text-gray-500 uppercase tracking-wide select-none">
+          <div className="col-span-4 cursor-pointer hover:text-black" onClick={() => toggleSort("name")}>
+            Cliente{sortArrow("name")}
+          </div>
+          <div className="col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("current")}>
+            0-90d{sortArrow("current")}
+          </div>
+          <div className="col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("watch")}>
+            91-180d{sortArrow("watch")}
+          </div>
+          <div className="col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("overdue")}>
+            181d+{sortArrow("overdue")}
+          </div>
+          <div className="col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("total")}>
+            Total{sortArrow("total")}
+          </div>
         </div>
 
         {filtered.length === 0 && (
@@ -341,84 +686,85 @@ export default function AdminDashboard() {
               {/* Expanded detail */}
               {isExpanded && (
                 <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                  {/* Contact info */}
+                  {/* Contact info + action buttons */}
                   <div className="mb-4">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="text-xs font-medium text-gray-500 uppercase">Contacto</span>
                       {!isEditing && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startEdit(client);
-                          }}
-                          className="text-xs text-blue-600 hover:underline"
-                        >
-                          Editar
-                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); startEdit(client); }}
+                          className="text-xs text-blue-600 hover:underline">Editar</button>
                       )}
                     </div>
 
                     {isEditing ? (
                       <div className="grid grid-cols-2 gap-2 max-w-lg" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          className="border rounded px-2 py-1 text-sm"
-                          placeholder="Correo"
-                          value={editData.correo}
-                          onChange={(e) => setEditData({ ...editData, correo: e.target.value })}
-                        />
-                        <input
-                          className="border rounded px-2 py-1 text-sm"
-                          placeholder="Teléfono"
-                          value={editData.telefono}
-                          onChange={(e) => setEditData({ ...editData, telefono: e.target.value })}
-                        />
-                        <input
-                          className="border rounded px-2 py-1 text-sm"
-                          placeholder="Celular"
-                          value={editData.celular}
-                          onChange={(e) => setEditData({ ...editData, celular: e.target.value })}
-                        />
-                        <input
-                          className="border rounded px-2 py-1 text-sm"
-                          placeholder="Contacto"
-                          value={editData.contacto}
-                          onChange={(e) => setEditData({ ...editData, contacto: e.target.value })}
-                        />
+                        <input className="border rounded px-2 py-1 text-sm" placeholder="Correo"
+                          value={editData.correo} onChange={(e) => setEditData({ ...editData, correo: e.target.value })} />
+                        <input className="border rounded px-2 py-1 text-sm" placeholder="Telefono"
+                          value={editData.telefono} onChange={(e) => setEditData({ ...editData, telefono: e.target.value })} />
+                        <input className="border rounded px-2 py-1 text-sm" placeholder="WhatsApp / Celular"
+                          value={editData.celular} onChange={(e) => setEditData({ ...editData, celular: e.target.value })} />
+                        <input className="border rounded px-2 py-1 text-sm" placeholder="Nombre contacto"
+                          value={editData.contacto} onChange={(e) => setEditData({ ...editData, contacto: e.target.value })} />
                         <div className="col-span-2 flex gap-2 mt-1">
-                          <button
-                            onClick={saveEdit}
-                            className="text-xs bg-black text-white px-3 py-1 rounded hover:bg-gray-800"
-                          >
-                            Guardar
-                          </button>
-                          <button
-                            onClick={() => setEditing(null)}
-                            className="text-xs text-gray-500 hover:text-black"
-                          >
-                            Cancelar
-                          </button>
+                          <button onClick={saveEdit} className="text-xs bg-black text-white px-3 py-1 rounded hover:bg-gray-800">Guardar</button>
+                          <button onClick={() => setEditing(null)} className="text-xs text-gray-500 hover:text-black">Cancelar</button>
                         </div>
                       </div>
                     ) : (
                       <div className="text-sm text-gray-600 space-y-0.5">
-                        {client.contacto && <div>👤 {client.contacto}</div>}
-                        {client.correo && <div>✉ {client.correo}</div>}
-                        {client.telefono && <div>☎ {client.telefono}</div>}
-                        {client.celular && <div>📱 {client.celular}</div>}
-                        {!client.contacto && !client.correo && !client.telefono && !client.celular && (
-                          <div className="text-gray-400 italic">Sin información de contacto</div>
+                        {client.contacto && <div>Contacto: {client.contacto}</div>}
+                        {client.correo && (
+                          <div className="flex items-center gap-2">
+                            Correo: {client.correo}
+                            <button onClick={(e) => { e.stopPropagation(); copyEmail(client.correo); }}
+                              className="text-xs text-blue-600 hover:underline">
+                              {copied === client.correo ? "Copiado" : "Copiar"}
+                            </button>
+                          </div>
                         )}
+                        {client.telefono && <div>Tel: {client.telefono}</div>}
+                        {client.celular && <div>Cel: {client.celular}</div>}
+                        {!client.contacto && !client.correo && !client.telefono && !client.celular && (
+                          <div className="text-gray-400 italic">Sin informacion de contacto</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Action buttons: WhatsApp + Email */}
+                    {!isEditing && (
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openWhatsApp(client); }}
+                          className="text-xs border border-green-600 text-green-700 px-3 py-1.5 rounded hover:bg-green-50 transition"
+                        >
+                          WhatsApp cobro
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openEmail(client); }}
+                          className="text-xs border border-gray-400 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-100 transition"
+                        >
+                          Email cobro
+                        </button>
                       </div>
                     )}
                   </div>
 
                   {/* Per-company breakdown */}
-                  <div className="text-xs font-medium text-gray-500 uppercase mb-2">Desglose por empresa</div>
+                  {(() => {
+                    const visibleCompanies = companyFilter !== "all"
+                      ? COMPANIES.filter((co) => co.key === companyFilter && client.companies[co.key])
+                      : COMPANIES.filter((co) => client.companies[co.key]);
+                    return visibleCompanies.length > 0 && (
+                      <>
+                  <div className="text-xs font-medium text-gray-500 uppercase mb-2">
+                    {companyFilter !== "all" ? "Detalle de aging" : "Desglose por empresa"}
+                  </div>
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-xs text-gray-400 uppercase">
                         <th className="text-left py-1 font-medium">Empresa</th>
-                        <th className="text-left py-1 font-medium">Código</th>
+                        <th className="text-left py-1 font-medium">Codigo</th>
                         <th className="text-right py-1 font-medium">0-30</th>
                         <th className="text-right py-1 font-medium">31-60</th>
                         <th className="text-right py-1 font-medium">61-90</th>
@@ -431,7 +777,7 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {COMPANIES.filter((co) => client.companies[co.key]).map((co) => {
+                      {visibleCompanies.map((co) => {
                         const d = client.companies[co.key];
                         return (
                           <tr key={co.key} className="border-t border-gray-100">
@@ -441,7 +787,7 @@ export default function AdminDashboard() {
                             <td className="text-right py-1.5">{fmt(d.d31_60)}</td>
                             <td className="text-right py-1.5">{fmt(d.d61_90)}</td>
                             <td className="text-right py-1.5 text-yellow-600">{fmt(d.d91_120)}</td>
-                            <td className="text-right py-1.5 text-red-600">{fmt(d.d121_180)}</td>
+                            <td className="text-right py-1.5 text-yellow-600">{fmt(d.d121_180)}</td>
                             <td className="text-right py-1.5 text-red-600">{fmt(d.d181_270)}</td>
                             <td className="text-right py-1.5 text-red-600">{fmt(d.d271_365)}</td>
                             <td className="text-right py-1.5 text-red-600">{fmt(d.mas_365)}</td>
@@ -451,6 +797,9 @@ export default function AdminDashboard() {
                       })}
                     </tbody>
                   </table>
+                      </>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -459,7 +808,7 @@ export default function AdminDashboard() {
       </div>
 
       <div className="mt-4 text-xs text-gray-400 text-center">
-        {filtered.length} clientes &middot; Política: 0-90d corriente · 91-120d vigilancia · +120d vencido
+        {filtered.length} clientes &middot; Politica: 0-90d corriente &middot; 91-180d vigilancia &middot; 181d+ vencido
       </div>
     </div>
   );
