@@ -760,44 +760,46 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Company summary bars */}
-      <div className="mb-6 border border-gray-200 rounded px-4 py-3">
-        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">CXC por Empresa</div>
-        <div className="space-y-2">
-          {roleCompanies.map((co) => {
-            const val = companySummary[co.key] || 0;
-            const pct = (val / maxCompanyTotal) * 100;
-            return (
-              <div key={co.key} className="flex items-center gap-3">
-                <div className="w-36 text-xs truncate">{co.name}</div>
-                <div className="flex-1 h-4 bg-gray-100 rounded overflow-hidden">
-                  <div className="h-full bg-black rounded" style={{ width: `${pct}%` }} />
+      {/* Company summary bars — hide when only 1 company */}
+      {roleCompanies.length > 1 && (
+        <div className="mb-6 border border-gray-200 rounded px-4 py-3">
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">CXC por Empresa</div>
+          <div className="space-y-2">
+            {roleCompanies.map((co) => {
+              const val = companySummary[co.key] || 0;
+              const pct = (val / maxCompanyTotal) * 100;
+              return (
+                <div key={co.key} className="flex items-center gap-3">
+                  <div className="w-36 text-xs truncate">{co.name}</div>
+                  <div className="flex-1 h-4 bg-gray-100 rounded overflow-hidden">
+                    <div className="h-full bg-black rounded" style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="w-28 text-xs text-right font-medium">${fmt(val)}</div>
+                  {co.vendedorPhone ? (
+                    <button
+                      onClick={() => sendVendorWhatsApp(co.key)}
+                      className="text-xs border border-green-600 text-green-700 px-2 py-1 rounded hover:bg-green-50 transition whitespace-nowrap"
+                    >
+                      Enviar a {co.vendedor}
+                    </button>
+                  ) : (
+                    <div className="w-24" />
+                  )}
                 </div>
-                <div className="w-28 text-xs text-right font-medium">${fmt(val)}</div>
-                {co.vendedorPhone ? (
-                  <button
-                    onClick={() => sendVendorWhatsApp(co.key)}
-                    className="text-xs border border-green-600 text-green-700 px-2 py-1 rounded hover:bg-green-50 transition whitespace-nowrap"
-                  >
-                    Enviar a {co.vendedor}
-                  </button>
-                ) : (
-                  <div className="w-24" />
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+          {/* Mass WhatsApp button */}
+          <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
+            <button
+              onClick={() => massWhatsApp(companyFilter !== "all" ? companyFilter : undefined)}
+              className="text-xs border border-green-600 text-green-700 px-3 py-1.5 rounded hover:bg-green-50 transition"
+            >
+              📱 WhatsApp masivo a vencidos {companyFilter !== "all" ? `de ${COMPANIES.find(c => c.key === companyFilter)?.name || ""}` : "(todas)"}
+            </button>
+          </div>
         </div>
-        {/* Mass WhatsApp button */}
-        <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
-          <button
-            onClick={() => massWhatsApp(companyFilter !== "all" ? companyFilter : undefined)}
-            className="text-xs border border-green-600 text-green-700 px-3 py-1.5 rounded hover:bg-green-50 transition"
-          >
-            📱 WhatsApp masivo a vencidos {companyFilter !== "all" ? `de ${COMPANIES.find(c => c.key === companyFilter)?.name || ""}` : "(todas)"}
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* Filters row */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
@@ -819,16 +821,18 @@ export default function AdminDashboard() {
             Vencido ({countOverdue})
           </button>
         </div>
-        <select
-          value={companyFilter}
-          onChange={(e) => setCompanyFilter(e.target.value)}
-          className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-black"
-        >
-          <option value="all">Todas las empresas</option>
-          {roleCompanies.map((co) => (
-            <option key={co.key} value={co.key}>{co.name}</option>
-          ))}
-        </select>
+        {roleCompanies.length > 1 && (
+          <select
+            value={companyFilter}
+            onChange={(e) => setCompanyFilter(e.target.value)}
+            className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-black"
+          >
+            <option value="all">Todas las empresas</option>
+            {roleCompanies.map((co) => (
+              <option key={co.key} value={co.key}>{co.name}</option>
+            ))}
+          </select>
+        )}
         <input
           type="text"
           value={search}
@@ -971,12 +975,12 @@ export default function AdminDashboard() {
                     return visibleCompanies.length > 0 && (
                       <>
                   <div className="text-xs font-medium text-gray-500 uppercase mb-2">
-                    {companyFilter !== "all" ? "Detalle de aging" : "Desglose por empresa"}
+                    {roleCompanies.length === 1 || companyFilter !== "all" ? "Detalle de aging" : "Desglose por empresa"}
                   </div>
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="text-xs text-gray-400 uppercase">
-                        <th className="text-left py-1 font-medium">Empresa</th>
+                        {roleCompanies.length > 1 && <th className="text-left py-1 font-medium">Empresa</th>}
                         <th className="text-left py-1 font-medium">Codigo</th>
                         <th className="text-right py-1 font-medium">0-30</th>
                         <th className="text-right py-1 font-medium">31-60</th>
@@ -994,7 +998,7 @@ export default function AdminDashboard() {
                         const d = client.companies[co.key];
                         return (
                           <tr key={co.key} className="border-t border-gray-100">
-                            <td className="py-1.5">{co.name}</td>
+                            {roleCompanies.length > 1 && <td className="py-1.5">{co.name}</td>}
                             <td className="py-1.5 text-gray-500">{d.codigo}</td>
                             <td className="text-right py-1.5">{fmt(d.d0_30)}</td>
                             <td className="text-right py-1.5">{fmt(d.d31_60)}</td>
