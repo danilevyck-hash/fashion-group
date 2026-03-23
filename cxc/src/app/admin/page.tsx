@@ -429,13 +429,35 @@ export default function AdminDashboard() {
     return result;
   }, [clients, roleCompanies, companyFilter, riskFilter, search, sortKey, sortDir]);
 
+  // ── Role-filtered clients (only companies visible to this role) ──
+  const roleClients = useMemo(() => {
+    const roleKeys = new Set(roleCompanies.map((c) => c.key));
+    return clients
+      .map((c) => {
+        const fc: typeof c.companies = {};
+        for (const [key, data] of Object.entries(c.companies)) {
+          if (roleKeys.has(key)) fc[key] = data;
+        }
+        if (Object.keys(fc).length === 0) return null;
+        let current = 0, watch = 0, overdue = 0, total = 0;
+        for (const co of Object.values(fc)) {
+          current += co.d0_30 + co.d31_60 + co.d61_90;
+          watch += co.d91_120;
+          overdue += co.d121_180 + co.d181_270 + co.d271_365 + co.mas_365;
+          total += co.total;
+        }
+        return { ...c, companies: fc, current, watch, overdue, total };
+      })
+      .filter((c): c is ConsolidatedClient => c !== null && c.total > 0);
+  }, [clients, roleCompanies]);
+
   // ── KPIs ─────────────────────────────────────────────
 
-  const totalCxc = clients.reduce((s, c) => s + c.total, 0);
-  const totalCurrent = clients.reduce((s, c) => s + c.current, 0);
-  const totalWatch = clients.reduce((s, c) => s + c.watch, 0);
-  const totalOverdue = clients.reduce((s, c) => s + c.overdue, 0);
-  const criticalClients = clients.filter((c) => c.overdue > 0).length;
+  const totalCxc = roleClients.reduce((s, c) => s + c.total, 0);
+  const totalCurrent = roleClients.reduce((s, c) => s + c.current, 0);
+  const totalWatch = roleClients.reduce((s, c) => s + c.watch, 0);
+  const totalOverdue = roleClients.reduce((s, c) => s + c.overdue, 0);
+  const criticalClients = roleClients.filter((c) => c.overdue > 0).length;
   const pctCurrent = totalCxc > 0 ? (totalCurrent / totalCxc) * 100 : 0;
   const pctWatch = totalCxc > 0 ? (totalWatch / totalCxc) * 100 : 0;
   const pctOverdue = totalCxc > 0 ? (totalOverdue / totalCxc) * 100 : 0;
@@ -445,21 +467,21 @@ export default function AdminDashboard() {
   const companySummary = useMemo(() => {
     const sums: Record<string, number> = {};
     for (const co of roleCompanies) sums[co.key] = 0;
-    for (const c of clients) {
+    for (const c of roleClients) {
       for (const [key, data] of Object.entries(c.companies)) {
         sums[key] = (sums[key] || 0) + data.total;
       }
     }
     return sums;
-  }, [clients, roleCompanies]);
+  }, [roleClients, roleCompanies]);
 
   const maxCompanyTotal = Math.max(...Object.values(companySummary), 1);
 
   // ── Counts ───────────────────────────────────────────
 
-  const countCurrent = clients.filter((c) => c.overdue === 0 && c.watch === 0).length;
-  const countWatch = clients.filter((c) => c.watch > 0).length;
-  const countOverdue = clients.filter((c) => c.overdue > 0).length;
+  const countCurrent = roleClients.filter((c) => c.overdue === 0 && c.watch === 0).length;
+  const countWatch = roleClients.filter((c) => c.watch > 0).length;
+  const countOverdue = roleClients.filter((c) => c.overdue > 0).length;
 
   // ── Edit/Save ────────────────────────────────────────
 
