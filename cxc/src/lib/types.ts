@@ -67,7 +67,13 @@ export interface ConsolidatedClient {
   contacto: string;
   total: number;
   current: number;    // 0-90
-  watch: number;      // 91-180
-  overdue: number;    // 181+
+  watch: number;      // 91-120
+  overdue: number;    // 121+
+  // Granular buckets for David's view
+  d0_30: number;
+  d31_60: number;
+  d61_90: number;
+  d91_120: number;
+  d121_plus: number;
   hasOverride: boolean;
 }

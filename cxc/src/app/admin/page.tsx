@@ -286,6 +286,7 @@ export default function AdminDashboard() {
             celular: ovr?.celular || r.celular || "",
             contacto: ovr?.contacto || r.contacto || "",
             total: 0, current: 0, watch: 0, overdue: 0,
+            d0_30: 0, d31_60: 0, d61_90: 0, d91_120: 0, d121_plus: 0,
             hasOverride: !!ovr,
           };
           map.set(key, client);
@@ -316,14 +317,19 @@ export default function AdminDashboard() {
 
     for (const client of map.values()) {
       let total = 0, current = 0, watch = 0, overdue = 0;
+      let gd0 = 0, gd1 = 0, gd2 = 0, gd3 = 0, gd4 = 0;
       for (const co of Object.values(client.companies)) {
         total += co.total;
         current += co.d0_30 + co.d31_60 + co.d61_90;
         watch += co.d91_120;
         overdue += co.d121_180 + co.d181_270 + co.d271_365 + co.mas_365;
+        gd0 += co.d0_30; gd1 += co.d31_60; gd2 += co.d61_90;
+        gd3 += co.d91_120; gd4 += co.d121_180 + co.d181_270 + co.d271_365 + co.mas_365;
       }
       client.total = total; client.current = current;
       client.watch = watch; client.overdue = overdue;
+      client.d0_30 = gd0; client.d31_60 = gd1; client.d61_90 = gd2;
+      client.d91_120 = gd3; client.d121_plus = gd4;
     }
 
     // Filter out clients with zero or negative total
@@ -376,13 +382,16 @@ export default function AdminDashboard() {
         }
         if (Object.keys(filteredCompanies).length === 0) return null;
         let current = 0, watch = 0, overdue = 0, total = 0;
+        let gd0 = 0, gd1 = 0, gd2 = 0, gd3 = 0, gd4 = 0;
         for (const co of Object.values(filteredCompanies)) {
           current += co.d0_30 + co.d31_60 + co.d61_90;
           watch += co.d91_120;
           overdue += co.d121_180 + co.d181_270 + co.d271_365 + co.mas_365;
           total += co.total;
+          gd0 += co.d0_30; gd1 += co.d31_60; gd2 += co.d61_90;
+          gd3 += co.d91_120; gd4 += co.d121_180 + co.d181_270 + co.d271_365 + co.mas_365;
         }
-        return { ...c, companies: filteredCompanies, current, watch, overdue, total };
+        return { ...c, companies: filteredCompanies, current, watch, overdue, total, d0_30: gd0, d31_60: gd1, d61_90: gd2, d91_120: gd3, d121_plus: gd4 };
       })
       .filter((c): c is ConsolidatedClient => c !== null && c.total > 0);
 
@@ -398,6 +407,8 @@ export default function AdminDashboard() {
             watch: d.d91_120,
             overdue: d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365,
             total: d.total,
+            d0_30: d.d0_30, d31_60: d.d31_60, d61_90: d.d61_90,
+            d91_120: d.d91_120, d121_plus: d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365,
           };
         });
     }
@@ -845,6 +856,25 @@ export default function AdminDashboard() {
       {/* Client table */}
       <div className="border border-gray-200 rounded overflow-hidden">
         {/* Sortable header */}
+        {userRole === "david" ? (
+        <div className="grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-gray-50 text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wide select-none">
+          <div className="col-span-4 sm:col-span-3 cursor-pointer hover:text-black" onClick={() => toggleSort("name")}>
+            Cliente{sortArrow("name")}
+          </div>
+          <div className="hidden sm:block col-span-1 text-right">0-30</div>
+          <div className="hidden sm:block col-span-1 text-right">31-60</div>
+          <div className="hidden sm:block col-span-1 text-right">61-90</div>
+          <div className="hidden sm:block col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("watch")}>
+            91-120{sortArrow("watch")}
+          </div>
+          <div className="col-span-4 sm:col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("overdue")}>
+            121d+{sortArrow("overdue")}
+          </div>
+          <div className="col-span-4 sm:col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("total")}>
+            Total{sortArrow("total")}
+          </div>
+        </div>
+        ) : (
         <div className="grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-gray-50 text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wide select-none">
           <div className="col-span-5 sm:col-span-4 cursor-pointer hover:text-black" onClick={() => toggleSort("name")}>
             Cliente{sortArrow("name")}
@@ -862,6 +892,7 @@ export default function AdminDashboard() {
             Total{sortArrow("total")}
           </div>
         </div>
+        )}
 
         {filtered.length === 0 && (
           <div className="px-4 py-8 text-center text-sm text-gray-400">Sin resultados</div>
@@ -878,6 +909,18 @@ export default function AdminDashboard() {
                 className="grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm cursor-pointer hover:bg-gray-50 transition border-b border-gray-100"
                 onClick={() => setExpanded(isExpanded ? null : client.nombre_normalized)}
               >
+                {userRole === "david" ? (<>
+                <div className="col-span-4 sm:col-span-3 font-medium truncate">
+                  <span className="mr-1 sm:mr-2 text-gray-400 text-xs">{isExpanded ? "▼" : "▶"}</span>
+                  {client.nombre_normalized}
+                </div>
+                <div className="hidden sm:block col-span-1 text-right text-green-700">{fmt(client.d0_30)}</div>
+                <div className="hidden sm:block col-span-1 text-right text-green-700">{fmt(client.d31_60)}</div>
+                <div className="hidden sm:block col-span-1 text-right text-green-700">{fmt(client.d61_90)}</div>
+                <div className="hidden sm:block col-span-2 text-right text-yellow-600">{fmt(client.d91_120)}</div>
+                <div className="col-span-4 sm:col-span-2 text-right text-red-600">{fmt(client.d121_plus)}</div>
+                <div className="col-span-4 sm:col-span-2 text-right font-semibold">{fmt(client.total)}</div>
+                </>) : (<>
                 <div className="col-span-5 sm:col-span-4 font-medium truncate">
                   <span className="mr-1 sm:mr-2 text-gray-400 text-xs">{isExpanded ? "▼" : "▶"}</span>
                   {client.nombre_normalized}
@@ -886,6 +929,7 @@ export default function AdminDashboard() {
                 <div className="hidden sm:block col-span-2 text-right text-yellow-600">{fmt(client.watch)}</div>
                 <div className="col-span-3 sm:col-span-2 text-right text-red-600">{fmt(client.overdue)}</div>
                 <div className="col-span-4 sm:col-span-2 text-right font-semibold">{fmt(client.total)}</div>
+                </>)}
               </div>
 
               {/* Expanded detail */}
