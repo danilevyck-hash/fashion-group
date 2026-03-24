@@ -6,29 +6,37 @@ import { useRouter } from "next/navigation";
 export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    const adminPw = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
-    const uploadPw = process.env.NEXT_PUBLIC_UPLOAD_PASSWORD;
-    const directorPw = process.env.NEXT_PUBLIC_DIRECTOR_PASSWORD;
-    const davidPw = process.env.NEXT_PUBLIC_DAVID_PASSWORD;
+    setLoading(true);
+    setError("");
 
-    if (password === adminPw) {
-      sessionStorage.setItem("cxc_role", "admin");
-      router.push("/admin");
-    } else if (password === directorPw) {
-      sessionStorage.setItem("cxc_role", "director");
-      router.push("/admin");
-    } else if (password === davidPw) {
-      sessionStorage.setItem("cxc_role", "david");
-      router.push("/admin");
-    } else if (password === uploadPw) {
-      sessionStorage.setItem("cxc_role", "upload");
-      router.push("/upload");
-    } else {
-      setError("Contraseña incorrecta");
+    try {
+      const res = await fetch("/api/auth", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Contraseña incorrecta");
+        return;
+      }
+
+      sessionStorage.setItem("cxc_role", data.role);
+      if (data.role === "upload") {
+        router.push("/upload");
+      } else {
+        router.push("/admin");
+      }
+    } catch {
+      setError("Error de conexión");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -52,6 +60,7 @@ export default function LoginPage() {
             placeholder="Contraseña"
             className="w-full border border-gray-300 rounded px-4 py-3 text-sm focus:outline-none focus:border-black"
             autoFocus
+            disabled={loading}
           />
         </div>
 
@@ -59,9 +68,10 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          className="w-full bg-black text-white py-3 rounded text-sm font-medium hover:bg-gray-800 transition"
+          disabled={loading}
+          className="w-full bg-black text-white py-3 rounded text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50"
         >
-          Ingresar
+          {loading ? "Verificando..." : "Ingresar"}
         </button>
       </form>
     </div>
