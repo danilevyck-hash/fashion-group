@@ -66,20 +66,6 @@ export default function GuiasPage() {
   // Print state
   const [printGuia, setPrintGuia] = useState<Guia | null>(null);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const r = sessionStorage.getItem("cxc_role");
-    if (!r || (r !== "admin" && r !== "director")) {
-      router.push("/");
-    } else {
-      setRole(r);
-      setAuthChecked(true);
-      loadGuias();
-    }
-  }, []);
-
-  if (!authChecked) return null;
-
   const loadGuias = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -95,6 +81,20 @@ export default function GuiasPage() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const r = sessionStorage.getItem("cxc_role");
+    if (!r || (r !== "admin" && r !== "director" && r !== "upload")) {
+      router.push("/");
+    } else {
+      setRole(r);
+      setAuthChecked(true);
+      loadGuias();
+    }
+  }, []);
+
+  if (!authChecked) return null;
 
   async function deleteGuia(id: string) {
     if (!confirm("¿Eliminar esta guía?")) return;

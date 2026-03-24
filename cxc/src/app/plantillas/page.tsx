@@ -10,7 +10,7 @@ export default function PlantillasPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const r = sessionStorage.getItem("cxc_role");
-    if (!r || (r !== "admin" && r !== "director")) {
+    if (!r || (r !== "admin" && r !== "director" && r !== "upload")) {
       router.push("/");
     } else {
       setAuthChecked(true);

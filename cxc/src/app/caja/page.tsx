@@ -46,6 +46,7 @@ export default function CajaPage() {
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState<CajaPeriodo | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [role, setRole] = useState("");
 
   // Add expense form state
   const [gFecha, setGFecha] = useState(new Date().toISOString().slice(0, 10));
@@ -61,7 +62,11 @@ export default function CajaPage() {
   const itbmsNum = subtotalNum * (parseFloat(gItbmsPct) / 100);
   const totalNum = subtotalNum + itbmsNum;
 
-  useEffect(() => { loadPeriodos(); }, []);
+  useEffect(() => {
+    const r = sessionStorage.getItem("cxc_role");
+    if (r) setRole(r);
+    loadPeriodos();
+  }, []);
 
   const loadPeriodos = useCallback(async () => {
     setLoading(true);
@@ -106,6 +111,17 @@ export default function CajaPage() {
     await fetch(`/api/caja/periodos/${id}`, { method: "PATCH" });
     await loadDetail(id);
     loadPeriodos();
+  }
+
+  async function deletePeriodo(id: string) {
+    if (!confirm("¿Eliminar este período y todos sus gastos?")) return;
+    const res = await fetch(`/api/caja/periodos/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      loadPeriodos();
+      if (current?.id === id) { setCurrent(null); setView("list"); }
+    } else {
+      setError("Error al eliminar período");
+    }
   }
 
   async function addGasto() {
@@ -214,7 +230,10 @@ export default function CajaPage() {
                       <button onClick={() => { loadDetail(p.id).then(() => setView("print")); }}
                         className="text-sm text-gray-400 hover:text-black transition mr-3">Imprimir</button>
                       {p.estado === "abierto" && (
-                        <button onClick={() => closePeriodo(p.id)} className="text-sm text-gray-400 hover:text-black transition">Cerrar</button>
+                        <button onClick={() => closePeriodo(p.id)} className="text-sm text-gray-400 hover:text-black transition mr-3">Cerrar</button>
+                      )}
+                      {p.estado === "cerrado" && role === "admin" && (
+                        <button onClick={() => deletePeriodo(p.id)} className="text-sm text-gray-300 hover:text-black transition">Eliminar</button>
                       )}
                     </td>
                   </tr>
