@@ -67,6 +67,7 @@ export default function GuiasPage() {
   const [printGuia, setPrintGuia] = useState<Guia | null>(null);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const r = sessionStorage.getItem("cxc_role");
     if (!r || (r !== "admin" && r !== "director")) {
       router.push("/");

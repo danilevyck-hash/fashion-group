@@ -8,6 +8,7 @@ export default function PlantillasPage() {
   const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
     const r = sessionStorage.getItem("cxc_role");
     if (!r || (r !== "admin" && r !== "director")) {
       router.push("/");
