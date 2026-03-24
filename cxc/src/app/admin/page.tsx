@@ -7,27 +7,15 @@ import { COMPANIES, getCompaniesForRole } from "@/lib/companies";
 import type { CxcRow, CxcUpload, ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
 import { VENDOR_MAP } from "@/lib/vendors";
+import UploadFreshness from "./components/UploadFreshness";
+import KpiCards from "./components/KpiCards";
+import CompanySummary from "./components/CompanySummary";
+import ClientTable from "./components/ClientTable";
 
 // ── Helpers ──────────────────────────────────────────────
 
 function fmt(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function uploadAge(dateStr: string): "fresh" | "warning" | "stale" {
-  const days = (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24);
-  if (days > 15) return "stale";
-  if (days > 7) return "warning";
-  return "fresh";
-}
-
-const ageBg: Record<string, string> = { fresh: "", warning: "bg-yellow-50", stale: "bg-red-50" };
-const ageDot: Record<string, string> = { fresh: "bg-green-500", warning: "bg-yellow-500", stale: "bg-red-500" };
-
-function riskColor(current: number, watch: number, overdue: number) {
-  if (overdue > 0) return "border-l-red-500";
-  if (watch > 0) return "border-l-yellow-500";
-  return "border-l-green-500";
 }
 
 type RiskFilter = "all" | "current" | "watch" | "overdue";
@@ -101,7 +89,6 @@ function generatePDF(data: ConsolidatedClient[], title: string, detailed: boolea
   let rows: string;
 
   if (detailed && companyKeys) {
-    // Detailed view: show company breakdown per client
     rows = data.map((c) => {
       const mainRow = `
         <tr style="background:#f9f9f9">
@@ -220,16 +207,12 @@ export default function AdminDashboard() {
   const router = useRouter();
   const [clients, setClients] = useState<ConsolidatedClient[]>([]);
   const [uploads, setUploads] = useState<Record<string, CxcUpload>>({});
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [editData, setEditData] = useState({ correo: "", telefono: "", celular: "", contacto: "" });
   const [search, setSearch] = useState("");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [showExport, setShowExport] = useState(false);
-  const [copied, setCopied] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [contactLog, setContactLog] = useState<Record<string, { date: string; method: string }>>({});
   const [userRole, setUserRole] = useState<string>("admin");
@@ -332,10 +315,8 @@ export default function AdminDashboard() {
       client.d91_120 = gd3; client.d121_plus = gd4;
     }
 
-    // Filter out clients with zero or negative total
     setClients(Array.from(map.values()).filter((c) => c.total > 0));
 
-    // Load contact log (latest per client)
     const { data: logData } = await supabase
       .from("cxc_contact_log")
       .select("*")
@@ -373,7 +354,6 @@ export default function AdminDashboard() {
 
   const filtered = useMemo(() => {
     const roleKeys = new Set(roleCompanies.map((c) => c.key));
-    // Filter clients to only those with data in role's companies, recalculate totals
     let result = clients
       .map((c) => {
         const filteredCompanies: typeof c.companies = {};
@@ -395,7 +375,6 @@ export default function AdminDashboard() {
       })
       .filter((c): c is ConsolidatedClient => c !== null && c.total > 0);
 
-    // Company filter — recalculate totals to show only that company's amounts
     if (companyFilter !== "all") {
       result = result
         .filter((c) => c.companies[companyFilter])
@@ -413,18 +392,15 @@ export default function AdminDashboard() {
         });
     }
 
-    // Risk filter
     if (riskFilter === "current") result = result.filter((c) => c.overdue === 0 && c.watch === 0);
     else if (riskFilter === "watch") result = result.filter((c) => c.watch > 0);
     else if (riskFilter === "overdue") result = result.filter((c) => c.overdue > 0);
 
-    // Search
     if (search) {
       const q = normalizeName(search);
       result = result.filter((c) => c.nombre_normalized.includes(q));
     }
 
-    // Sort
     result.sort((a, b) => {
       let va: number | string, vb: number | string;
       if (sortKey === "name") { va = a.nombre_normalized; vb = b.nombre_normalized; }
@@ -440,7 +416,7 @@ export default function AdminDashboard() {
     return result;
   }, [clients, roleCompanies, companyFilter, riskFilter, search, sortKey, sortDir]);
 
-  // ── Role-filtered clients (only companies visible to this role) ──
+  // ── Role-filtered clients ──
   const roleClients = useMemo(() => {
     const roleKeys = new Set(roleCompanies.map((c) => c.key));
     return clients
@@ -462,69 +438,11 @@ export default function AdminDashboard() {
       .filter((c): c is ConsolidatedClient => c !== null && c.total > 0);
   }, [clients, roleCompanies]);
 
-  // ── KPIs ─────────────────────────────────────────────
-
-  const totalCxc = roleClients.reduce((s, c) => s + c.total, 0);
-  const totalCurrent = roleClients.reduce((s, c) => s + c.current, 0);
-  const totalWatch = roleClients.reduce((s, c) => s + c.watch, 0);
-  const totalOverdue = roleClients.reduce((s, c) => s + c.overdue, 0);
-  const criticalClients = roleClients.filter((c) => c.overdue > 0).length;
-  const pctCurrent = totalCxc > 0 ? (totalCurrent / totalCxc) * 100 : 0;
-  const pctWatch = totalCxc > 0 ? (totalWatch / totalCxc) * 100 : 0;
-  const pctOverdue = totalCxc > 0 ? (totalOverdue / totalCxc) * 100 : 0;
-
-  // ── Company summary ──────────────────────────────────
-
-  const companySummary = useMemo(() => {
-    const sums: Record<string, number> = {};
-    for (const co of roleCompanies) sums[co.key] = 0;
-    for (const c of roleClients) {
-      for (const [key, data] of Object.entries(c.companies)) {
-        sums[key] = (sums[key] || 0) + data.total;
-      }
-    }
-    return sums;
-  }, [roleClients, roleCompanies]);
-
-  const maxCompanyTotal = Math.max(...Object.values(companySummary), 1);
-
-  // ── Counts ───────────────────────────────────────────
-
-  const countCurrent = roleClients.filter((c) => c.overdue === 0 && c.watch === 0).length;
-  const countWatch = roleClients.filter((c) => c.watch > 0).length;
-  const countOverdue = roleClients.filter((c) => c.overdue > 0).length;
-
-  // ── Edit/Save ────────────────────────────────────────
-
-  function startEdit(client: ConsolidatedClient) {
-    setEditing(client.nombre_normalized);
-    setEditData({
-      correo: client.correo, telefono: client.telefono,
-      celular: client.celular, contacto: client.contacto,
-    });
-  }
-
-  async function saveEdit() {
-    if (!editing) return;
-    const { error } = await supabase.from("cxc_client_overrides").upsert(
-      { nombre_normalized: editing, ...editData, updated_at: new Date().toISOString() },
-      { onConflict: "nombre_normalized" }
-    );
-    if (!error) { setEditing(null); loadData(); }
-  }
-
   // ── Actions ──────────────────────────────────────────
-
-  function copyEmail(email: string) {
-    navigator.clipboard.writeText(email);
-    setCopied(email);
-    setTimeout(() => setCopied(null), 2000);
-  }
 
   function openWhatsApp(client: ConsolidatedClient) {
     let phone = (client.celular || client.telefono).replace(/[^0-9]/g, "");
     if (!phone) { alert("Este cliente no tiene numero de telefono registrado. Edite el contacto primero."); return; }
-    // Auto-prepend Panama country code if not present
     if (!phone.startsWith("507") && phone.length <= 8) {
       phone = "507" + phone;
     }
@@ -536,7 +454,6 @@ export default function AdminDashboard() {
     const co = roleCompanies.find((c) => c.key === companyKey);
     if (!co?.vendedorPhone || !co?.vendedor) { alert("Esta empresa no tiene vendedor asignado."); return; }
 
-    // Get this vendor's client list
     const vendorClients = VENDOR_MAP[companyKey] || {};
     const vendorClientNames = new Set(
       Object.entries(vendorClients)
@@ -544,7 +461,6 @@ export default function AdminDashboard() {
         .map(([name]) => name)
     );
 
-    // Find vendor's clients with debt that have watch or overdue
     const critical = clients
       .filter((c) => {
         if (!vendorClientNames.has(c.nombre_normalized)) return false;
@@ -575,7 +491,6 @@ export default function AdminDashboard() {
   }
 
   function massWhatsApp(companyKey?: string) {
-    // Get overdue clients, optionally filtered by company
     const targets = clients.filter((c) => {
       if (companyKey) {
         const d = c.companies[companyKey];
@@ -591,7 +506,6 @@ export default function AdminDashboard() {
       return;
     }
 
-    // Filter to those with phone numbers
     const withPhone = targets.filter((c) => c.celular || c.telefono);
     if (withPhone.length === 0) {
       alert(`Hay ${targets.length} clientes vencidos pero ninguno tiene numero de telefono registrado.`);
@@ -600,7 +514,6 @@ export default function AdminDashboard() {
 
     if (!confirm(`Se abriran ${withPhone.length} ventanas de WhatsApp (de ${targets.length} clientes vencidos). ¿Continuar?`)) return;
 
-    // Open WhatsApp for each client with a small delay
     withPhone.forEach((client, i) => {
       setTimeout(() => {
         let phone = (client.celular || client.telefono).replace(/[^0-9]/g, "");
@@ -608,7 +521,7 @@ export default function AdminDashboard() {
         const msg = encodeURIComponent(buildWhatsAppMsg(client));
         window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
         markContacted(client.nombre_normalized, "whatsapp");
-      }, i * 1500); // 1.5 sec delay between each
+      }, i * 1500);
     });
   }
 
@@ -628,6 +541,14 @@ export default function AdminDashboard() {
       ...prev,
       [clientName]: { date: new Date().toISOString(), method },
     }));
+  }
+
+  async function handleSaveEdit(nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) {
+    const { error } = await supabase.from("cxc_client_overrides").upsert(
+      { nombre_normalized: nombre, ...data, updated_at: new Date().toISOString() },
+      { onConflict: "nombre_normalized" }
+    );
+    if (!error) loadData();
   }
 
   // ── Render ────────────────────────────────────────────
@@ -718,359 +639,42 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Upload freshness */}
-      <div className={`grid grid-cols-2 ${roleCompanies.length > 5 ? "sm:grid-cols-4 lg:grid-cols-7" : "sm:grid-cols-5"} gap-2 mb-6`}>
-        {roleCompanies.map((co) => {
-          const up = uploads[co.key];
-          const age = up ? uploadAge(up.uploaded_at) : "stale";
-          return (
-            <div key={co.key} className={`rounded px-3 py-2 text-xs border border-gray-100 ${up ? ageBg[age] : "bg-gray-50"}`}>
-              <div className="font-medium truncate">{co.name}</div>
-              {up ? (
-                <div className="flex items-center gap-1 mt-1">
-                  <span className={`w-1.5 h-1.5 rounded-full ${ageDot[age]}`} />
-                  <span className="text-gray-500">{new Date(up.uploaded_at).toLocaleDateString("es-PA")}</span>
-                </div>
-              ) : (
-                <div className="text-gray-400 mt-1">Sin datos</div>
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <UploadFreshness roleCompanies={roleCompanies} uploads={uploads} />
 
-      {/* KPIs */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <div className="border border-gray-200 rounded px-4 py-3">
-          <div className="text-xs text-gray-500 uppercase tracking-wide">Total CXC</div>
-          <div className="text-xl sm:text-2xl font-bold mt-1">${fmt(totalCxc)}</div>
-        </div>
-        <div className="border border-red-200 rounded px-4 py-3 bg-red-50">
-          <div className="text-xs text-red-600 uppercase tracking-wide">Vencido +121d</div>
-          <div className="text-xl sm:text-2xl font-bold mt-1 text-red-700">${fmt(totalOverdue)}</div>
-        </div>
-        <div className="border border-gray-200 rounded px-4 py-3">
-          <div className="text-xs text-gray-500 uppercase tracking-wide">Clientes Criticos</div>
-          <div className="text-xl sm:text-2xl font-bold mt-1">{criticalClients}</div>
-        </div>
-      </div>
+      <KpiCards roleClients={roleClients} />
 
-      {/* Risk % bar */}
-      {totalCxc > 0 && (
-        <div className="mb-6">
-          <div className="flex h-3 rounded overflow-hidden">
-            <div className="bg-green-500" style={{ width: `${pctCurrent}%` }} title={`Corriente: ${pctCurrent.toFixed(0)}%`} />
-            <div className="bg-yellow-400" style={{ width: `${pctWatch}%` }} title={`Vigilancia: ${pctWatch.toFixed(0)}%`} />
-            <div className="bg-red-500" style={{ width: `${pctOverdue}%` }} title={`Vencido: ${pctOverdue.toFixed(0)}%`} />
-          </div>
-          <div className="flex justify-between text-[10px] text-gray-500 mt-1">
-            <span>Corriente {pctCurrent.toFixed(0)}%</span>
-            <span>Vigilancia {pctWatch.toFixed(0)}%</span>
-            <span>Vencido {pctOverdue.toFixed(0)}%</span>
-          </div>
-        </div>
-      )}
+      <CompanySummary
+        roleCompanies={roleCompanies}
+        roleClients={roleClients}
+        companyFilter={companyFilter}
+        clients={clients}
+        vendorMap={VENDOR_MAP}
+        onSendVendorWhatsApp={sendVendorWhatsApp}
+        onMassWhatsApp={massWhatsApp}
+      />
 
-      {/* Company summary bars — hide when only 1 company */}
-      {roleCompanies.length > 1 && (
-        <div className="mb-6 border border-gray-200 rounded px-4 py-3">
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">CXC por Empresa</div>
-          <div className="space-y-2">
-            {roleCompanies.map((co) => {
-              const val = companySummary[co.key] || 0;
-              const pct = (val / maxCompanyTotal) * 100;
-              return (
-                <div key={co.key} className="flex items-center gap-3">
-                  <div className="w-36 text-xs truncate">{co.name}</div>
-                  <div className="flex-1 h-4 bg-gray-100 rounded overflow-hidden">
-                    <div className="h-full bg-black rounded" style={{ width: `${pct}%` }} />
-                  </div>
-                  <div className="w-28 text-xs text-right font-medium">${fmt(val)}</div>
-                  {co.vendedorPhone ? (
-                    <button
-                      onClick={() => sendVendorWhatsApp(co.key)}
-                      className="text-xs border border-green-600 text-green-700 px-2 py-1 rounded hover:bg-green-50 transition whitespace-nowrap"
-                    >
-                      Enviar a {co.vendedor}
-                    </button>
-                  ) : (
-                    <div className="w-24" />
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {/* Mass WhatsApp button */}
-          <div className="mt-3 pt-3 border-t border-gray-100 flex gap-2">
-            <button
-              onClick={() => massWhatsApp(companyFilter !== "all" ? companyFilter : undefined)}
-              className="text-xs border border-green-600 text-green-700 px-3 py-1.5 rounded hover:bg-green-50 transition"
-            >
-              📱 WhatsApp masivo a vencidos {companyFilter !== "all" ? `de ${COMPANIES.find(c => c.key === companyFilter)?.name || ""}` : "(todas)"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Filters row */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={() => setRiskFilter("all")}
-            className={`px-3 py-1.5 rounded text-sm border transition ${riskFilter === "all" ? "bg-black text-white border-black" : "border-gray-300 text-gray-600 hover:border-black"}`}>
-            Todos ({clients.length})
-          </button>
-          <button onClick={() => setRiskFilter("current")}
-            className={`px-3 py-1.5 rounded text-sm border transition ${riskFilter === "current" ? "bg-green-600 text-white border-green-600" : "border-green-300 text-green-700 hover:bg-green-50"}`}>
-            Corriente ({countCurrent})
-          </button>
-          <button onClick={() => setRiskFilter("watch")}
-            className={`px-3 py-1.5 rounded text-sm border transition ${riskFilter === "watch" ? "bg-yellow-500 text-white border-yellow-500" : "border-yellow-300 text-yellow-700 hover:bg-yellow-50"}`}>
-            Vigilancia ({countWatch})
-          </button>
-          <button onClick={() => setRiskFilter("overdue")}
-            className={`px-3 py-1.5 rounded text-sm border transition ${riskFilter === "overdue" ? "bg-red-600 text-white border-red-600" : "border-red-300 text-red-700 hover:bg-red-50"}`}>
-            Vencido ({countOverdue})
-          </button>
-        </div>
-        {roleCompanies.length > 1 && (
-          <select
-            value={companyFilter}
-            onChange={(e) => setCompanyFilter(e.target.value)}
-            className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-black"
-          >
-            <option value="all">Todas las empresas</option>
-            {roleCompanies.map((co) => (
-              <option key={co.key} value={co.key}>{co.name}</option>
-            ))}
-          </select>
-        )}
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar cliente..."
-          className="flex-1 border border-gray-300 rounded px-4 py-1.5 text-sm focus:outline-none focus:border-black"
-        />
-      </div>
-
-      {/* Client table */}
-      <div className="border border-gray-200 rounded overflow-hidden">
-        {/* Sortable header */}
-        {userRole === "david" ? (
-        <div className="grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-gray-50 text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wide select-none">
-          <div className="col-span-4 sm:col-span-3 cursor-pointer hover:text-black" onClick={() => toggleSort("name")}>
-            Cliente{sortArrow("name")}
-          </div>
-          <div className="hidden sm:block col-span-1 text-right">0-30</div>
-          <div className="hidden sm:block col-span-1 text-right">31-60</div>
-          <div className="hidden sm:block col-span-1 text-right">61-90</div>
-          <div className="hidden sm:block col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("watch")}>
-            91-120{sortArrow("watch")}
-          </div>
-          <div className="col-span-4 sm:col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("overdue")}>
-            121d+{sortArrow("overdue")}
-          </div>
-          <div className="col-span-4 sm:col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("total")}>
-            Total{sortArrow("total")}
-          </div>
-        </div>
-        ) : (
-        <div className="grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-2 bg-gray-50 text-[10px] sm:text-xs font-medium text-gray-500 uppercase tracking-wide select-none">
-          <div className="col-span-5 sm:col-span-4 cursor-pointer hover:text-black" onClick={() => toggleSort("name")}>
-            Cliente{sortArrow("name")}
-          </div>
-          <div className="hidden sm:block col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("current")}>
-            0-90d{sortArrow("current")}
-          </div>
-          <div className="hidden sm:block col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("watch")}>
-            91-120d{sortArrow("watch")}
-          </div>
-          <div className="col-span-3 sm:col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("overdue")}>
-            121d+{sortArrow("overdue")}
-          </div>
-          <div className="col-span-4 sm:col-span-2 text-right cursor-pointer hover:text-black" onClick={() => toggleSort("total")}>
-            Total{sortArrow("total")}
-          </div>
-        </div>
-        )}
-
-        {filtered.length === 0 && (
-          <div className="px-4 py-8 text-center text-sm text-gray-400">Sin resultados</div>
-        )}
-
-        {filtered.map((client) => {
-          const isExpanded = expanded === client.nombre_normalized;
-          const isEditing = editing === client.nombre_normalized;
-
-          return (
-            <div key={client.nombre_normalized} className={`border-l-4 ${riskColor(client.current, client.watch, client.overdue)}`}>
-              {/* Main row */}
-              <div
-                className="grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm cursor-pointer hover:bg-gray-50 transition border-b border-gray-100"
-                onClick={() => setExpanded(isExpanded ? null : client.nombre_normalized)}
-              >
-                {userRole === "david" ? (<>
-                <div className="col-span-4 sm:col-span-3 font-medium truncate">
-                  <span className="mr-1 sm:mr-2 text-gray-400 text-xs">{isExpanded ? "▼" : "▶"}</span>
-                  {client.nombre_normalized}
-                </div>
-                <div className="hidden sm:block col-span-1 text-right text-green-700">{fmt(client.d0_30)}</div>
-                <div className="hidden sm:block col-span-1 text-right text-green-700">{fmt(client.d31_60)}</div>
-                <div className="hidden sm:block col-span-1 text-right text-green-700">{fmt(client.d61_90)}</div>
-                <div className="hidden sm:block col-span-2 text-right text-yellow-600">{fmt(client.d91_120)}</div>
-                <div className="col-span-4 sm:col-span-2 text-right text-red-600">{fmt(client.d121_plus)}</div>
-                <div className="col-span-4 sm:col-span-2 text-right font-semibold">{fmt(client.total)}</div>
-                </>) : (<>
-                <div className="col-span-5 sm:col-span-4 font-medium truncate">
-                  <span className="mr-1 sm:mr-2 text-gray-400 text-xs">{isExpanded ? "▼" : "▶"}</span>
-                  {client.nombre_normalized}
-                </div>
-                <div className="hidden sm:block col-span-2 text-right text-green-700">{fmt(client.current)}</div>
-                <div className="hidden sm:block col-span-2 text-right text-yellow-600">{fmt(client.watch)}</div>
-                <div className="col-span-3 sm:col-span-2 text-right text-red-600">{fmt(client.overdue)}</div>
-                <div className="col-span-4 sm:col-span-2 text-right font-semibold">{fmt(client.total)}</div>
-                </>)}
-              </div>
-
-              {/* Expanded detail */}
-              {isExpanded && (
-                <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                  {/* Contact info + action buttons */}
-                  <div className="mb-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span className="text-xs font-medium text-gray-500 uppercase">Contacto</span>
-                      {!isEditing && (
-                        <button onClick={(e) => { e.stopPropagation(); startEdit(client); }}
-                          className="text-xs text-blue-600 hover:underline">Editar</button>
-                      )}
-                    </div>
-
-                    {isEditing ? (
-                      <div className="grid grid-cols-2 gap-2 max-w-lg" onClick={(e) => e.stopPropagation()}>
-                        <input className="border rounded px-2 py-1 text-sm" placeholder="Correo"
-                          value={editData.correo} onChange={(e) => setEditData({ ...editData, correo: e.target.value })} />
-                        <input className="border rounded px-2 py-1 text-sm" placeholder="Telefono"
-                          value={editData.telefono} onChange={(e) => setEditData({ ...editData, telefono: e.target.value })} />
-                        <input className="border rounded px-2 py-1 text-sm" placeholder="WhatsApp / Celular"
-                          value={editData.celular} onChange={(e) => setEditData({ ...editData, celular: e.target.value })} />
-                        <input className="border rounded px-2 py-1 text-sm" placeholder="Nombre contacto"
-                          value={editData.contacto} onChange={(e) => setEditData({ ...editData, contacto: e.target.value })} />
-                        <div className="col-span-2 flex gap-2 mt-1">
-                          <button onClick={saveEdit} className="text-xs bg-black text-white px-3 py-1 rounded hover:bg-gray-800">Guardar</button>
-                          <button onClick={() => setEditing(null)} className="text-xs text-gray-500 hover:text-black">Cancelar</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-600 space-y-0.5">
-                        {client.contacto && <div>Contacto: {client.contacto}</div>}
-                        {client.correo && (
-                          <div className="flex items-center gap-2">
-                            Correo: {client.correo}
-                            <button onClick={(e) => { e.stopPropagation(); copyEmail(client.correo); }}
-                              className="text-xs text-blue-600 hover:underline">
-                              {copied === client.correo ? "Copiado" : "Copiar"}
-                            </button>
-                          </div>
-                        )}
-                        {client.telefono && <div>Tel: {client.telefono}</div>}
-                        {client.celular && <div>Cel: {client.celular}</div>}
-                        {!client.contacto && !client.correo && !client.telefono && !client.celular && (
-                          <div className="text-gray-400 italic">Sin informacion de contacto</div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Action buttons: WhatsApp + Email + Mark contacted */}
-                    {!isEditing && (
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); openWhatsApp(client); markContacted(client.nombre_normalized, "whatsapp"); }}
-                          className="text-xs border border-green-600 text-green-700 px-3 py-1.5 rounded hover:bg-green-50 transition"
-                        >
-                          WhatsApp cobro
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); openEmail(client); markContacted(client.nombre_normalized, "email"); }}
-                          className="text-xs border border-gray-400 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-100 transition"
-                        >
-                          Email cobro
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); markContacted(client.nombre_normalized, "llamada"); }}
-                          className="text-xs border border-blue-400 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-50 transition"
-                        >
-                          Marcar llamada
-                        </button>
-                      </div>
-                    )}
-                    {/* Last contact */}
-                    {contactLog[client.nombre_normalized] && (
-                      <div className="mt-2 text-[11px] text-gray-400">
-                        Ultimo contacto: {new Date(contactLog[client.nombre_normalized].date).toLocaleDateString("es-PA")} via {contactLog[client.nombre_normalized].method}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Per-company breakdown */}
-                  {(() => {
-                    const visibleCompanies = companyFilter !== "all"
-                      ? roleCompanies.filter((co) => co.key === companyFilter && client.companies[co.key])
-                      : roleCompanies.filter((co) => client.companies[co.key]);
-                    return visibleCompanies.length > 0 && (
-                      <>
-                  <div className="text-xs font-medium text-gray-500 uppercase mb-2">
-                    {roleCompanies.length === 1 || companyFilter !== "all" ? "Detalle de aging" : "Desglose por empresa"}
-                  </div>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-xs text-gray-400 uppercase">
-                        {roleCompanies.length > 1 && <th className="text-left py-1 font-medium">Empresa</th>}
-                        <th className="text-left py-1 font-medium">Codigo</th>
-                        <th className="text-right py-1 font-medium">0-30</th>
-                        <th className="text-right py-1 font-medium">31-60</th>
-                        <th className="text-right py-1 font-medium">61-90</th>
-                        <th className="text-right py-1 font-medium">91-120</th>
-                        <th className="text-right py-1 font-medium">121-180</th>
-                        <th className="text-right py-1 font-medium">181-270</th>
-                        <th className="text-right py-1 font-medium">271-365</th>
-                        <th className="text-right py-1 font-medium">+365</th>
-                        <th className="text-right py-1 font-medium">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {visibleCompanies.map((co) => {
-                        const d = client.companies[co.key];
-                        return (
-                          <tr key={co.key} className="border-t border-gray-100">
-                            {roleCompanies.length > 1 && <td className="py-1.5">{co.name}</td>}
-                            <td className="py-1.5 text-gray-500">{d.codigo}</td>
-                            <td className="text-right py-1.5">{fmt(d.d0_30)}</td>
-                            <td className="text-right py-1.5">{fmt(d.d31_60)}</td>
-                            <td className="text-right py-1.5">{fmt(d.d61_90)}</td>
-                            <td className="text-right py-1.5 text-yellow-600">{fmt(d.d91_120)}</td>
-                            <td className="text-right py-1.5 text-yellow-600">{fmt(d.d121_180)}</td>
-                            <td className="text-right py-1.5 text-red-600">{fmt(d.d181_270)}</td>
-                            <td className="text-right py-1.5 text-red-600">{fmt(d.d271_365)}</td>
-                            <td className="text-right py-1.5 text-red-600">{fmt(d.mas_365)}</td>
-                            <td className="text-right py-1.5 font-semibold">{fmt(d.total)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="mt-4 text-xs text-gray-400 text-center">
-        {filtered.length} clientes &middot; Politica: 0-90d corriente &middot; 91-120d vigilancia &middot; 121d+ vencido
-      </div>
+      <ClientTable
+        filtered={filtered}
+        roleCompanies={roleCompanies}
+        roleClients={roleClients}
+        companyFilter={companyFilter}
+        setCompanyFilter={setCompanyFilter}
+        riskFilter={riskFilter}
+        setRiskFilter={setRiskFilter}
+        search={search}
+        setSearch={setSearch}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        toggleSort={toggleSort}
+        sortArrow={sortArrow}
+        userRole={userRole}
+        clients={clients}
+        contactLog={contactLog}
+        onOpenWhatsApp={openWhatsApp}
+        onOpenEmail={openEmail}
+        onMarkContacted={markContacted}
+        onSaveEdit={handleSaveEdit}
+      />
     </div>
   );
 }

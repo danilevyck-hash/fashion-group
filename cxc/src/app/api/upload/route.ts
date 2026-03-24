@@ -1,13 +1,8 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { supabaseServer } from "@/lib/supabase-server";
 
 export async function GET() {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseServer
     .from("cxc_uploads")
     .select("*")
     .order("uploaded_at", { ascending: false });
