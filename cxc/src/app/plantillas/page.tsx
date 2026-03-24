@@ -1,0 +1,78 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+export default function PlantillasPage() {
+  const router = useRouter();
+  const [authChecked, setAuthChecked] = useState(false);
+
+  useEffect(() => {
+    const r = sessionStorage.getItem("cxc_role");
+    if (!r || (r !== "admin" && r !== "director")) {
+      router.push("/");
+    } else {
+      setAuthChecked(true);
+    }
+  }, []);
+
+  if (!authChecked) return null;
+
+  const cards = [
+    {
+      title: "Guía de Transporte",
+      description: "Registro de envíos con detalle de clientes, bultos y transportista",
+      href: "/guias",
+      icon: (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M1 3h15v13H1z" />
+          <path d="M16 8h4l3 3v5h-7V8z" />
+          <circle cx="5.5" cy="18.5" r="2.5" />
+          <circle cx="18.5" cy="18.5" r="2.5" />
+        </svg>
+      ),
+    },
+    {
+      title: "Caja Menuda",
+      description: "Control de gastos menores por período con reporte imprimible",
+      href: "/caja",
+      icon: (
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="M2 10h20" />
+          <path d="M6 14h4" />
+        </svg>
+      ),
+    },
+  ];
+
+  return (
+    <div className="max-w-3xl mx-auto px-6 py-12">
+      <button onClick={() => router.push("/admin")} className="text-sm text-gray-400 hover:text-black transition mb-8 block">
+        ← Dashboard
+      </button>
+
+      <h1 className="text-2xl font-semibold tracking-tight">Plantillas</h1>
+      <p className="text-sm text-gray-400 mt-1 mb-10">Documentos y formularios del grupo</p>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {cards.map((card) => (
+          <button
+            key={card.href}
+            onClick={() => router.push(card.href)}
+            className="relative text-left border border-gray-100 rounded-2xl p-6 hover:shadow-sm transition bg-white group"
+          >
+            <div className="bg-gray-50 rounded-full p-3 w-12 h-12 flex items-center justify-center">
+              {card.icon}
+            </div>
+            <div className="text-base font-semibold mt-4">{card.title}</div>
+            <div className="text-sm text-gray-400 mt-1">{card.description}</div>
+            <span className="absolute bottom-6 right-6 text-gray-300 group-hover:text-gray-500 transition text-lg">→</span>
+          </button>
+        ))}
+      </div>
+
+      <p className="text-xs text-gray-300 text-center mt-12">Más plantillas próximamente</p>
+    </div>
+  );
+}

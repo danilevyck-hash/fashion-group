@@ -45,6 +45,8 @@ type View = "list" | "form" | "print";
 
 export default function GuiasPage() {
   const router = useRouter();
+  const [role, setRole] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [view, setView] = useState<View>("list");
   const [guias, setGuias] = useState<Guia[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,12 +68,16 @@ export default function GuiasPage() {
 
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role");
-    if (r !== "admin" && r !== "director") {
+    if (!r || (r !== "admin" && r !== "director")) {
       router.push("/");
-      return;
+    } else {
+      setRole(r);
+      setAuthChecked(true);
+      loadGuias();
     }
-    loadGuias();
-  }, [router]);
+  }, []);
+
+  if (!authChecked) return null;
 
   const loadGuias = useCallback(async () => {
     setLoading(true);
@@ -171,6 +177,9 @@ export default function GuiasPage() {
             <button onClick={() => { resetForm(); setView("form"); }}
               className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
               Nueva Guía
+            </button>
+            <button onClick={() => router.push("/plantillas")} className="text-sm text-gray-400 hover:text-black transition">
+              Plantillas
             </button>
             <button onClick={() => router.push("/admin")} className="text-sm text-gray-400 hover:text-black transition">
               Panel CXC

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 
 interface CajaPeriodo {
   id: string;
@@ -39,6 +40,7 @@ function fmtDate(d: string) {
 type View = "list" | "detail" | "print";
 
 export default function CajaPage() {
+  const router = useRouter();
   const [view, setView] = useState<View>("list");
   const [periodos, setPeriodos] = useState<CajaPeriodo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -156,12 +158,17 @@ export default function CajaPage() {
             <h1 className="text-2xl font-semibold tracking-tight">Caja Menuda</h1>
             <p className="text-sm text-gray-400 mt-1">Fondo inicial: $200.00</p>
           </div>
-          {!hasOpenPeriod && (
-            <button onClick={createPeriodo}
-              className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
-              Nuevo Período
+          <div className="flex items-center gap-4">
+            {!hasOpenPeriod && (
+              <button onClick={createPeriodo}
+                className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
+                Nuevo Período
+              </button>
+            )}
+            <button onClick={() => router.push("/plantillas")} className="text-sm text-gray-400 hover:text-black transition">
+              Plantillas
             </button>
-          )}
+          </div>
         </div>
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}

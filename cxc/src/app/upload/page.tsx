@@ -195,11 +195,8 @@ export default function UploadPage() {
           </div>
         </div>
         <div className="flex items-center gap-4">
-          <button onClick={() => router.push("/guias")} className="text-sm text-gray-500 hover:text-black">
-            Guías
-          </button>
-          <button onClick={() => router.push("/caja")} className="text-sm text-gray-500 hover:text-black">
-            Caja
+          <button onClick={() => router.push("/plantillas")} className="text-sm text-gray-500 hover:text-black">
+            Plantillas
           </button>
           <button
             onClick={() => {
