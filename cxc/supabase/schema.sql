@@ -63,3 +63,18 @@ alter table cxc_client_overrides enable row level security;
 create policy "Allow all for anon" on cxc_uploads for all using (true) with check (true);
 create policy "Allow all for anon" on cxc_rows for all using (true) with check (true);
 create policy "Allow all for anon" on cxc_client_overrides for all using (true) with check (true);
+
+-- Vendor assignments
+create table if not exists vendor_assignments (
+  id uuid primary key default gen_random_uuid(),
+  company_key text not null,
+  client_name text not null,
+  vendor_name text not null,
+  updated_at timestamptz not null default now(),
+  unique(company_key, client_name)
+);
+
+create index idx_vendor_assignments_company on vendor_assignments(company_key);
+
+alter table vendor_assignments enable row level security;
+create policy "Allow all for anon" on vendor_assignments for all using (true) with check (true);
