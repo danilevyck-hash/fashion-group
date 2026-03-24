@@ -1,0 +1,60 @@
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/supabase-server";
+
+export async function GET() {
+  const { data, error } = await supabaseServer
+    .from("guia_transporte")
+    .select("*, guia_items(bultos)")
+    .order("numero", { ascending: false });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  const result = (data || []).map((g) => ({
+    ...g,
+    total_bultos: (g.guia_items || []).reduce((s: number, i: { bultos: number }) => s + (i.bultos || 0), 0),
+    item_count: (g.guia_items || []).length,
+  }));
+
+  return NextResponse.json(result);
+}
+
+export async function POST(req: NextRequest) {
+  const body = await req.json();
+  const { fecha, transportista, placa, observaciones, items } = body;
+
+  // Auto-increment numero
+  const { data: last } = await supabaseServer
+    .from("guia_transporte")
+    .select("numero")
+    .order("numero", { ascending: false })
+    .limit(1)
+    .single();
+
+  const numero = (last?.numero || 0) + 1;
+
+  const { data: guia, error: guiaErr } = await supabaseServer
+    .from("guia_transporte")
+    .insert({ numero, fecha, transportista, placa, observaciones })
+    .select()
+    .single();
+
+  if (guiaErr) return NextResponse.json({ error: guiaErr.message }, { status: 500 });
+
+  if (items && items.length > 0) {
+    const rows = items.map((item: Record<string, unknown>, i: number) => ({
+      guia_id: guia.id,
+      orden: i + 1,
+      cliente: item.cliente || "",
+      direccion: item.direccion || "",
+      empresa: item.empresa || "",
+      facturas: item.facturas || "",
+      bultos: item.bultos || 0,
+      numero_guia_transp: item.numero_guia_transp || "",
+    }));
+
+    const { error: itemsErr } = await supabaseServer.from("guia_items").insert(rows);
+    if (itemsErr) return NextResponse.json({ error: itemsErr.message }, { status: 500 });
+  }
+
+  return NextResponse.json(guia);
+}

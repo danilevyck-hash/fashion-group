@@ -11,3 +11,11 @@ body {
 input, button, select {
   font-family: inherit;
 }
+
+@media print {
+  @page { size: letter landscape; margin: 1.5cm; }
+  body * { visibility: hidden; }
+  #print-document, #print-document * { visibility: visible; }
+  #print-document { position: absolute; left: 0; top: 0; width: 100%; }
+  .no-print { display: none !important; }
+}

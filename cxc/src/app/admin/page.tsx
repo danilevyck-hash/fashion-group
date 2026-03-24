@@ -625,6 +625,14 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
+          {(userRole === "admin" || userRole === "director") && (
+            <button onClick={() => router.push("/guias")} className="text-sm text-gray-500 hover:text-black">
+              Guías
+            </button>
+          )}
+          <button onClick={() => router.push("/caja")} className="text-sm text-gray-500 hover:text-black">
+            Caja
+          </button>
           {userRole !== "director" && (
             <button onClick={() => router.push("/upload")} className="text-sm text-gray-500 hover:text-black">
               Cargar archivos
