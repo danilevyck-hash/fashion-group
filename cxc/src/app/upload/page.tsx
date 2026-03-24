@@ -194,15 +194,23 @@ export default function UploadPage() {
             <p className="text-sm text-gray-500">Seleccione un CSV por empresa</p>
           </div>
         </div>
-        <button
-          onClick={() => {
-            sessionStorage.removeItem("cxc_role");
-            router.push("/");
-          }}
-          className="text-sm text-gray-500 hover:text-black"
-        >
-          Salir
-        </button>
+        <div className="flex items-center gap-4">
+          <button onClick={() => router.push("/guias")} className="text-sm text-gray-500 hover:text-black">
+            Guías
+          </button>
+          <button onClick={() => router.push("/caja")} className="text-sm text-gray-500 hover:text-black">
+            Caja
+          </button>
+          <button
+            onClick={() => {
+              sessionStorage.removeItem("cxc_role");
+              router.push("/");
+            }}
+            className="text-sm text-gray-500 hover:text-black"
+          >
+            Salir
+          </button>
+        </div>
       </div>
 
       {message && (

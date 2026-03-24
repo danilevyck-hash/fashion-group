@@ -26,8 +26,10 @@ interface Guia {
   guia_items?: GuiaItem[];
 }
 
-const TRANSPORTISTAS = ["Mojica", "Arias", "González", "Pérez", "Rodríguez", "Hernández", "Martínez", "López", "Otro"];
+const TRANSPORTISTAS = ["RedNblue", "Mojica", "Transporte Sol", "Sanjur", "Otro"];
 const EMPRESAS = ["Vistana International", "Fashion Shoes", "Fashion Wear", "Active Shoes", "Active Wear", "Confecciones Boston", "Joystep", "Otra"];
+const CLIENTES = ["City Mall", "La Frontera Duty Free", "Jerusalem de Panama", "Plaza Los Angeles", "Golden Mall", "Multi Fashion Holding", "Kheriddine", "Bouti S.A.", "Jerusalem Duty Free", "Outlet Duty Free N2", "Outlet Duty Free N3", "Sporting Shoes N4"];
+const DIRECCIONES = ["Paso Canoas", "David", "Santiago", "Guabito", "Changinola"];
 
 function emptyItem(orden: number): GuiaItem {
   return { orden, cliente: "", direccion: "", empresa: "", facturas: "", bultos: 0, numero_guia_transp: "" };
@@ -89,8 +91,7 @@ export default function GuiasPage() {
   async function viewGuia(id: string) {
     const res = await fetch(`/api/guias/${id}`);
     if (res.ok) {
-      const data = await res.json();
-      setPrintGuia(data);
+      setPrintGuia(await res.json());
       setView("print");
     }
   }
@@ -138,11 +139,8 @@ export default function GuiasPage() {
 
     if (res.ok) {
       const guia = await res.json();
-      // Load full guia with items for print
       const fullRes = await fetch(`/api/guias/${guia.id}`);
-      if (fullRes.ok) {
-        setPrintGuia(await fullRes.json());
-      }
+      if (fullRes.ok) setPrintGuia(await fullRes.json());
       resetForm();
       loadGuias();
       setView("print");
@@ -155,55 +153,53 @@ export default function GuiasPage() {
   // ── LIST VIEW ──
   if (view === "list") {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        <div className="flex items-end justify-between mb-10">
           <div>
-            <h1 className="text-xl font-bold">Guías de Transporte</h1>
-            <p className="text-sm text-gray-500">Registro de despachos</p>
+            <h1 className="text-2xl font-semibold tracking-tight">Guías de Transporte</h1>
+            <p className="text-sm text-gray-400 mt-1">Registro de despachos</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <button onClick={() => { resetForm(); setView("form"); }}
-              className="text-sm bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition">
-              + Nueva Guía
+              className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
+              Nueva Guía
             </button>
-            <button onClick={() => router.push("/admin")} className="text-sm text-gray-500 hover:text-black">
+            <button onClick={() => router.push("/admin")} className="text-sm text-gray-400 hover:text-black transition">
               Panel CXC
             </button>
           </div>
         </div>
 
         {loading ? (
-          <p className="text-gray-400 text-sm text-center py-12">Cargando...</p>
+          <p className="text-gray-300 text-sm text-center py-20">Cargando...</p>
         ) : guias.length === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-12">No hay guías registradas</p>
+          <p className="text-gray-300 text-sm text-center py-20">No hay guías registradas</p>
         ) : (
-          <div className="border border-gray-200 rounded overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                  <th className="text-left px-4 py-2 font-medium">N°</th>
-                  <th className="text-left px-4 py-2 font-medium">Fecha</th>
-                  <th className="text-left px-4 py-2 font-medium">Transportista</th>
-                  <th className="text-right px-4 py-2 font-medium">Bultos</th>
-                  <th className="text-right px-4 py-2 font-medium">Acciones</th>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
+                <th className="text-left pb-3 font-medium">N°</th>
+                <th className="text-left pb-3 font-medium">Fecha</th>
+                <th className="text-left pb-3 font-medium">Transportista</th>
+                <th className="text-right pb-3 font-medium">Bultos</th>
+                <th className="text-right pb-3 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {guias.map((g) => (
+                <tr key={g.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition">
+                  <td className="py-3.5 font-medium">{g.numero}</td>
+                  <td className="py-3.5 text-gray-500">{fmtDate(g.fecha)}</td>
+                  <td className="py-3.5">{g.transportista}</td>
+                  <td className="py-3.5 text-right tabular-nums">{g.total_bultos}</td>
+                  <td className="py-3.5 text-right">
+                    <button onClick={() => viewGuia(g.id)} className="text-sm text-gray-400 hover:text-black transition mr-4">Ver</button>
+                    <button onClick={() => deleteGuia(g.id)} className="text-sm text-gray-300 hover:text-black transition">Eliminar</button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {guias.map((g) => (
-                  <tr key={g.id} className="border-t border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-2.5 font-medium">{g.numero}</td>
-                    <td className="px-4 py-2.5">{fmtDate(g.fecha)}</td>
-                    <td className="px-4 py-2.5">{g.transportista}</td>
-                    <td className="px-4 py-2.5 text-right">{g.total_bultos}</td>
-                    <td className="px-4 py-2.5 text-right">
-                      <button onClick={() => viewGuia(g.id)} className="text-xs text-blue-600 hover:underline mr-3">Ver</button>
-                      <button onClick={() => deleteGuia(g.id)} className="text-xs text-red-500 hover:underline">🗑</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
     );
@@ -212,122 +208,141 @@ export default function GuiasPage() {
   // ── FORM VIEW ──
   if (view === "form") {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <button onClick={() => setView("list")} className="text-sm text-gray-500 hover:text-black mb-4">
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        <button onClick={() => setView("list")} className="text-sm text-gray-400 hover:text-black transition mb-8 block">
           ← Guías
         </button>
-        <h1 className="text-xl font-bold mb-6">Nueva Guía de Transporte</h1>
+        <h1 className="text-2xl font-semibold tracking-tight mb-10">Nueva Guía de Transporte</h1>
 
-        {/* Header card */}
-        <div className="border border-gray-200 rounded p-4 mb-6">
-          <div className="grid grid-cols-2 gap-4">
+        {/* Header fields */}
+        <div className="mb-10">
+          <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Información General</div>
+          <div className="grid grid-cols-2 gap-x-12 gap-y-6">
             <div>
-              <label className="text-xs text-gray-500 uppercase tracking-wide font-medium">N° Guía</label>
-              <input type="text" readOnly value={nextNumero} className="w-full border border-gray-200 rounded px-3 py-2 text-sm bg-gray-50 mt-1" />
+              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">N° Guía</label>
+              <input type="text" readOnly value={nextNumero}
+                className="w-full border-b border-gray-200 bg-gray-50/50 py-2 text-sm outline-none" />
             </div>
             <div>
-              <label className="text-xs text-gray-500 uppercase tracking-wide font-medium">Fecha</label>
-              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="w-full border border-gray-200 rounded px-3 py-2 text-sm mt-1" />
+              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Fecha</label>
+              <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
             </div>
             <div>
-              <label className="text-xs text-gray-500 uppercase tracking-wide font-medium">Transportista</label>
-              <select value={transportista} onChange={(e) => setTransportista(e.target.value)} className="w-full border border-gray-200 rounded px-3 py-2 text-sm mt-1">
+              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Transportista</label>
+              <select value={transportista} onChange={(e) => setTransportista(e.target.value)}
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
                 <option value="">Seleccionar...</option>
                 {TRANSPORTISTAS.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
               {transportista === "Otro" && (
-                <input type="text" placeholder="Nombre del transportista" value={transportistaOtro} onChange={(e) => setTransportistaOtro(e.target.value)}
-                  className="w-full border border-gray-200 rounded px-3 py-2 text-sm mt-2" />
+                <input type="text" placeholder="Nombre del transportista" value={transportistaOtro}
+                  onChange={(e) => setTransportistaOtro(e.target.value)}
+                  className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition mt-3" />
               )}
             </div>
             <div>
-              <label className="text-xs text-gray-500 uppercase tracking-wide font-medium">Placa / Vehículo</label>
-              <input type="text" value={placa} onChange={(e) => setPlaca(e.target.value)} className="w-full border border-gray-200 rounded px-3 py-2 text-sm mt-1" />
+              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Placa / Vehículo</label>
+              <input type="text" value={placa} onChange={(e) => setPlaca(e.target.value)}
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
             </div>
           </div>
         </div>
 
         {/* Items table */}
-        <div className="border border-gray-200 rounded overflow-hidden mb-4">
+        <div className="mb-10">
+          <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Detalle de Envío</div>
+
+          {/* Datalists */}
+          <datalist id="clientes-list">
+            {CLIENTES.map((c) => <option key={c} value={c} />)}
+          </datalist>
+          <datalist id="direcciones-list">
+            {DIRECCIONES.map((d) => <option key={d} value={d} />)}
+          </datalist>
+
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                <th className="px-2 py-2 font-medium w-10">#</th>
-                <th className="px-2 py-2 font-medium text-left">Cliente</th>
-                <th className="px-2 py-2 font-medium text-left">Dirección</th>
-                <th className="px-2 py-2 font-medium text-left">Empresa</th>
-                <th className="px-2 py-2 font-medium text-left">Factura(s)</th>
-                <th className="px-2 py-2 font-medium w-20">Bultos</th>
-                <th className="px-2 py-2 font-medium text-left">N° Guía Transp.</th>
-                <th className="px-2 py-2 w-8"></th>
+              <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
+                <th className="pb-3 font-medium w-10 text-left">#</th>
+                <th className="pb-3 font-medium text-left">Cliente</th>
+                <th className="pb-3 font-medium text-left">Dirección</th>
+                <th className="pb-3 font-medium text-left">Empresa</th>
+                <th className="pb-3 font-medium text-left">Factura(s)</th>
+                <th className="pb-3 font-medium w-20 text-center">Bultos</th>
+                <th className="pb-3 font-medium text-left">N° Guía Transp.</th>
+                <th className="pb-3 w-8"></th>
               </tr>
             </thead>
             <tbody>
               {items.map((item, idx) => (
-                <tr key={idx} className="border-t border-gray-100">
-                  <td className="px-2 py-1 text-center text-gray-400">{idx + 1}</td>
-                  <td className="px-1 py-1">
-                    <input type="text" value={item.cliente} onChange={(e) => updateItem(idx, "cliente", e.target.value)}
-                      className="w-full border border-gray-200 rounded px-2 py-1 text-sm" />
+                <tr key={idx} className="border-b border-gray-100">
+                  <td className="py-2 text-gray-300">{idx + 1}</td>
+                  <td className="py-2 pr-2">
+                    <input list="clientes-list" type="text" value={item.cliente}
+                      onChange={(e) => updateItem(idx, "cliente", e.target.value)}
+                      className="w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition" />
                   </td>
-                  <td className="px-1 py-1">
-                    <input type="text" value={item.direccion} onChange={(e) => updateItem(idx, "direccion", e.target.value)}
-                      className="w-full border border-gray-200 rounded px-2 py-1 text-sm" />
+                  <td className="py-2 pr-2">
+                    <input list="direcciones-list" type="text" value={item.direccion}
+                      onChange={(e) => updateItem(idx, "direccion", e.target.value)}
+                      className="w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition" />
                   </td>
-                  <td className="px-1 py-1">
+                  <td className="py-2 pr-2">
                     <select value={item.empresa} onChange={(e) => updateItem(idx, "empresa", e.target.value)}
-                      className="w-full border border-gray-200 rounded px-2 py-1 text-sm">
+                      className="w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
                       <option value="">—</option>
                       {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
                     </select>
                   </td>
-                  <td className="px-1 py-1">
-                    <input type="text" value={item.facturas} onChange={(e) => updateItem(idx, "facturas", e.target.value)}
-                      className="w-full border border-gray-200 rounded px-2 py-1 text-sm" />
+                  <td className="py-2 pr-2">
+                    <input type="text" value={item.facturas}
+                      onChange={(e) => updateItem(idx, "facturas", e.target.value)}
+                      className="w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition" />
                   </td>
-                  <td className="px-1 py-1">
-                    <input type="number" min={0} value={item.bultos} onChange={(e) => updateItem(idx, "bultos", parseInt(e.target.value) || 0)}
-                      className="w-full border border-gray-200 rounded px-2 py-1 text-sm text-center" />
+                  <td className="py-2 pr-2">
+                    <input type="number" min={0} value={item.bultos}
+                      onChange={(e) => updateItem(idx, "bultos", parseInt(e.target.value) || 0)}
+                      className="w-full border-b border-gray-100 py-1 text-sm outline-none text-center focus:border-black transition" />
                   </td>
-                  <td className="px-1 py-1">
-                    <input type="text" value={item.numero_guia_transp} onChange={(e) => updateItem(idx, "numero_guia_transp", e.target.value)}
-                      className="w-full border border-gray-200 rounded px-2 py-1 text-sm" />
+                  <td className="py-2 pr-2">
+                    <input type="text" value={item.numero_guia_transp}
+                      onChange={(e) => updateItem(idx, "numero_guia_transp", e.target.value)}
+                      className="w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition" />
                   </td>
-                  <td className="px-1 py-1 text-center">
+                  <td className="py-2 text-center">
                     {items.length > 1 && (
-                      <button onClick={() => removeRow(idx)} className="text-red-400 hover:text-red-600 text-xs">×</button>
+                      <button onClick={() => removeRow(idx)} className="text-gray-300 hover:text-black transition text-sm">×</button>
                     )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <button onClick={addRow} className="text-sm text-gray-400 hover:text-black transition mt-3">
+            + Agregar fila
+          </button>
         </div>
 
-        <button onClick={addRow} className="text-sm text-blue-600 hover:underline mb-6">
-          + Agregar fila
-        </button>
-
-        <div className="border border-gray-200 rounded p-4 mb-6">
-          <div className="flex items-center gap-6 mb-4">
-            <div>
-              <span className="text-xs text-gray-500 uppercase tracking-wide font-medium">Total de bultos: </span>
-              <span className="font-bold">{totalBultos}</span>
-            </div>
+        {/* Footer */}
+        <div className="mb-10">
+          <div className="flex items-center gap-2 mb-6">
+            <span className="text-xs uppercase tracking-widest text-gray-400">Total de bultos:</span>
+            <span className="text-lg font-semibold tabular-nums">{totalBultos}</span>
           </div>
           <div>
-            <label className="text-xs text-gray-500 uppercase tracking-wide font-medium">Observaciones</label>
+            <label className="text-xs uppercase tracking-widest text-gray-400 block mb-2">Observaciones</label>
             <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
-              rows={3} className="w-full border border-gray-200 rounded px-3 py-2 text-sm mt-1" />
+              rows={3} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
           </div>
         </div>
 
-        <div className="flex gap-3">
+        <div className="flex items-center gap-6">
           <button onClick={saveGuia} disabled={saving}
-            className="bg-black text-white px-5 py-2 rounded text-sm hover:bg-gray-800 transition disabled:opacity-50">
+            className="bg-black text-white px-6 py-2 rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40">
             {saving ? "Guardando..." : "Guardar y Ver Guía"}
           </button>
-          <button onClick={() => setView("list")} className="text-sm text-gray-500 hover:text-black px-4 py-2">
+          <button onClick={() => setView("list")} className="text-sm text-gray-400 hover:text-black transition">
             Cancelar
           </button>
         </div>
@@ -342,15 +357,15 @@ export default function GuiasPage() {
     const bultos = guiaItems.reduce((s, i) => s + (i.bultos || 0), 0);
 
     return (
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="flex gap-3 mb-6 no-print">
-          <button onClick={() => setView("list")} className="text-sm text-gray-500 hover:text-black">← Volver</button>
-          <button onClick={() => window.print()} className="text-sm bg-black text-white px-4 py-2 rounded hover:bg-gray-800">
-            🖨 Imprimir
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        <div className="flex gap-4 mb-8 no-print">
+          <button onClick={() => setView("list")} className="text-sm text-gray-400 hover:text-black transition">← Volver</button>
+          <button onClick={() => window.print()} className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
+            Imprimir
           </button>
         </div>
 
-        <div id="print-document" className="border border-gray-200 rounded p-8" style={{ fontFamily: "-apple-system, sans-serif" }}>
+        <div id="print-document" className="border border-gray-200 rounded-lg p-8" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif" }}>
           <h1 className="text-center text-lg font-bold mb-6 uppercase tracking-wide">Guía de Transporte Interior</h1>
 
           <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
@@ -406,13 +421,11 @@ export default function GuiasPage() {
             </tbody>
           </table>
 
-          {/* Observaciones */}
           <div className="mb-8 text-xs">
             <div className="font-medium uppercase mb-1">Observaciones Generales del Envío</div>
             <div className="border border-gray-300 rounded p-2 min-h-[40px] whitespace-pre-wrap">{g.observaciones || ""}</div>
           </div>
 
-          {/* Signatures */}
           <div className="grid grid-cols-2 gap-12 mt-12 text-xs">
             <div>
               <div className="font-medium uppercase mb-6">Entregado por</div>
@@ -429,7 +442,6 @@ export default function GuiasPage() {
             </div>
           </div>
 
-          {/* Legal */}
           <div className="mt-8 pt-4 border-t border-gray-200 text-[9px] text-gray-400 text-center leading-relaxed">
             La firma del transportista constituye aceptación expresa de la mercancía detallada en este documento, en la cantidad y condición indicadas. Cualquier faltante o daño no reportado al momento de la recepción será responsabilidad exclusiva del transportista.
           </div>

@@ -132,73 +132,69 @@ export default function CajaPage() {
   // ── LIST VIEW ──
   if (view === "list") {
     return (
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        <div className="flex items-end justify-between mb-10">
           <div>
-            <h1 className="text-xl font-bold">Caja Menuda</h1>
-            <p className="text-sm text-gray-500">Fondo inicial: $200.00</p>
+            <h1 className="text-2xl font-semibold tracking-tight">Caja Menuda</h1>
+            <p className="text-sm text-gray-400 mt-1">Fondo inicial: $200.00</p>
           </div>
-          <div className="flex items-center gap-3">
-            {!hasOpenPeriod && (
-              <button onClick={createPeriodo}
-                className="text-sm bg-black text-white px-4 py-2 rounded hover:bg-gray-800 transition">
-                + Nuevo Período
-              </button>
-            )}
-          </div>
+          {!hasOpenPeriod && (
+            <button onClick={createPeriodo}
+              className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
+              Nuevo Período
+            </button>
+          )}
         </div>
 
         {loading ? (
-          <p className="text-gray-400 text-sm text-center py-12">Cargando...</p>
+          <p className="text-gray-300 text-sm text-center py-20">Cargando...</p>
         ) : periodos.length === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-12">No hay períodos registrados</p>
+          <p className="text-gray-300 text-sm text-center py-20">No hay períodos registrados</p>
         ) : (
-          <div className="border border-gray-200 rounded overflow-hidden">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                  <th className="text-left px-4 py-2 font-medium">N°</th>
-                  <th className="text-left px-4 py-2 font-medium">Apertura</th>
-                  <th className="text-left px-4 py-2 font-medium">Cierre</th>
-                  <th className="text-left px-4 py-2 font-medium">Estado</th>
-                  <th className="text-right px-4 py-2 font-medium">Gastado</th>
-                  <th className="text-right px-4 py-2 font-medium">Saldo</th>
-                  <th className="text-right px-4 py-2 font-medium">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {periodos.map((p) => {
-                  const saldo = p.fondo_inicial - p.total_gastado;
-                  return (
-                    <tr key={p.id} className="border-t border-gray-100 hover:bg-gray-50">
-                      <td className="px-4 py-2.5 font-medium">{p.numero}</td>
-                      <td className="px-4 py-2.5">{fmtDate(p.fecha_apertura)}</td>
-                      <td className="px-4 py-2.5">{p.fecha_cierre ? fmtDate(p.fecha_cierre) : "—"}</td>
-                      <td className="px-4 py-2.5">
-                        {p.estado === "abierto" ? (
-                          <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Abierto</span>
-                        ) : (
-                          <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">Cerrado</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-2.5 text-right">${fmt(p.total_gastado)}</td>
-                      <td className={`px-4 py-2.5 text-right font-medium ${saldo < 0 ? "text-red-600" : ""}`}>
-                        ${fmt(saldo)}
-                      </td>
-                      <td className="px-4 py-2.5 text-right">
-                        <button onClick={() => loadDetail(p.id)} className="text-xs text-blue-600 hover:underline mr-2">Ver</button>
-                        <button onClick={() => { loadDetail(p.id).then(() => setView("print")); }}
-                          className="text-xs text-gray-500 hover:underline mr-2">Imprimir</button>
-                        {p.estado === "abierto" && (
-                          <button onClick={() => closePeriodo(p.id)} className="text-xs text-red-500 hover:underline">Cerrar</button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
+                <th className="text-left pb-3 font-medium">N°</th>
+                <th className="text-left pb-3 font-medium">Apertura</th>
+                <th className="text-left pb-3 font-medium">Cierre</th>
+                <th className="text-left pb-3 font-medium">Estado</th>
+                <th className="text-right pb-3 font-medium">Gastado</th>
+                <th className="text-right pb-3 font-medium">Saldo</th>
+                <th className="text-right pb-3 font-medium"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {periodos.map((p) => {
+                const saldo = p.fondo_inicial - p.total_gastado;
+                return (
+                  <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition">
+                    <td className="py-3.5 font-medium">{p.numero}</td>
+                    <td className="py-3.5 text-gray-500">{fmtDate(p.fecha_apertura)}</td>
+                    <td className="py-3.5 text-gray-500">{p.fecha_cierre ? fmtDate(p.fecha_cierre) : "—"}</td>
+                    <td className="py-3.5">
+                      {p.estado === "abierto" ? (
+                        <span className="text-[11px] bg-black text-white px-2.5 py-0.5 rounded-full">Abierto</span>
+                      ) : (
+                        <span className="text-[11px] bg-gray-200 text-gray-500 px-2.5 py-0.5 rounded-full">Cerrado</span>
+                      )}
+                    </td>
+                    <td className="py-3.5 text-right tabular-nums">${fmt(p.total_gastado)}</td>
+                    <td className={`py-3.5 text-right tabular-nums font-medium ${saldo < 0 ? "text-red-600" : ""}`}>
+                      ${fmt(saldo)}
+                    </td>
+                    <td className="py-3.5 text-right">
+                      <button onClick={() => loadDetail(p.id)} className="text-sm text-gray-400 hover:text-black transition mr-3">Ver</button>
+                      <button onClick={() => { loadDetail(p.id).then(() => setView("print")); }}
+                        className="text-sm text-gray-400 hover:text-black transition mr-3">Imprimir</button>
+                      {p.estado === "abierto" && (
+                        <button onClick={() => closePeriodo(p.id)} className="text-sm text-gray-400 hover:text-black transition">Cerrar</button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         )}
       </div>
     );
@@ -214,88 +210,89 @@ export default function CajaPage() {
     const isOpen = current.estado === "abierto";
 
     return (
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <button onClick={() => { setView("list"); setCurrent(null); }} className="text-sm text-gray-500 hover:text-black mb-4">
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        <button onClick={() => { setView("list"); setCurrent(null); }}
+          className="text-sm text-gray-400 hover:text-black transition mb-8 block">
           ← Períodos
         </button>
 
-        <div className="flex items-center gap-4 mb-6">
-          <h1 className="text-xl font-bold">Período N° {current.numero}</h1>
-          <span className="text-xs text-gray-500">Apertura: {fmtDate(current.fecha_apertura)}</span>
+        <div className="flex items-center gap-4 mb-8">
+          <h1 className="text-2xl font-semibold tracking-tight">Período N° {current.numero}</h1>
+          <span className="text-sm text-gray-400">{fmtDate(current.fecha_apertura)}</span>
           {isOpen ? (
-            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Abierto</span>
+            <span className="text-[11px] bg-black text-white px-2.5 py-0.5 rounded-full">Abierto</span>
           ) : (
-            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">Cerrado — {fmtDate(current.fecha_cierre || "")}</span>
+            <span className="text-[11px] bg-gray-200 text-gray-500 px-2.5 py-0.5 rounded-full">Cerrado — {fmtDate(current.fecha_cierre || "")}</span>
           )}
         </div>
 
         {/* Summary */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="border border-gray-200 rounded px-4 py-3">
-            <div className="text-xs text-gray-500 uppercase tracking-wide">Fondo</div>
-            <div className="text-lg font-bold mt-1">${fmt(current.fondo_inicial)}</div>
+        <div className="grid grid-cols-3 gap-8 mb-10">
+          <div>
+            <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Fondo</div>
+            <div className="text-2xl font-semibold tabular-nums">${fmt(current.fondo_inicial)}</div>
           </div>
-          <div className="border border-gray-200 rounded px-4 py-3">
-            <div className="text-xs text-gray-500 uppercase tracking-wide">Gastado</div>
-            <div className="text-lg font-bold mt-1">${fmt(totalGastado)}</div>
+          <div>
+            <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Gastado</div>
+            <div className="text-2xl font-semibold tabular-nums">${fmt(totalGastado)}</div>
           </div>
-          <div className={`border rounded px-4 py-3 ${saldo < 0 ? "border-red-200 bg-red-50" : "border-gray-200"}`}>
-            <div className="text-xs text-gray-500 uppercase tracking-wide">Saldo</div>
-            <div className={`text-lg font-bold mt-1 ${saldo < 0 ? "text-red-600" : ""}`}>${fmt(saldo)}</div>
+          <div>
+            <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Saldo</div>
+            <div className={`text-2xl font-semibold tabular-nums ${saldo < 0 ? "text-red-600" : ""}`}>${fmt(saldo)}</div>
           </div>
         </div>
 
         {/* Add expense form */}
         {isOpen && (
-          <div className="border border-gray-200 rounded p-4 mb-6">
-            <div className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-3">Agregar Gasto</div>
-            <div className="grid grid-cols-9 gap-2 items-end">
+          <div className="mb-10">
+            <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Agregar Gasto</div>
+            <div className="grid grid-cols-9 gap-3 items-end">
               <div>
-                <label className="text-[10px] text-gray-400 uppercase">Fecha</label>
+                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Fecha</label>
                 <input type="date" value={gFecha} onChange={(e) => setGFecha(e.target.value)}
-                  className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm" />
+                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase">Nombre</label>
+                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Nombre</label>
                 <input type="text" value={gNombre} onChange={(e) => setGNombre(e.target.value)}
-                  className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm" />
+                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase">RUC</label>
+                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">RUC</label>
                 <input type="text" value={gRuc} onChange={(e) => setGRuc(e.target.value)}
-                  className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm" />
+                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase">DV</label>
+                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">DV</label>
                 <input type="text" value={gDv} onChange={(e) => setGDv(e.target.value)}
-                  className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm" />
+                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase">Factura</label>
+                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Factura</label>
                 <input type="text" value={gFactura} onChange={(e) => setGFactura(e.target.value)}
-                  className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm" />
+                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase">Sub-total</label>
+                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Sub-total</label>
                 <input type="number" step="0.01" value={gSubtotal} onChange={(e) => setGSubtotal(e.target.value)}
-                  className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm" />
+                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase">ITBMS</label>
+                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">ITBMS</label>
                 <select value={gItbmsPct} onChange={(e) => setGItbmsPct(e.target.value)}
-                  className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm">
+                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
                   <option value="0">0%</option>
                   <option value="7">7%</option>
                 </select>
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase">Total</label>
-                <input type="text" readOnly value={fmt(totalNum)}
-                  className="w-full border border-gray-200 rounded px-2 py-1.5 text-sm bg-gray-50" />
+                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Total</label>
+                <input type="text" readOnly value={`$${fmt(totalNum)}`}
+                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent tabular-nums" />
               </div>
               <div>
                 <button onClick={addGasto} disabled={addingGasto || !gNombre || subtotalNum <= 0}
-                  className="w-full bg-black text-white px-3 py-1.5 rounded text-sm hover:bg-gray-800 transition disabled:opacity-50">
+                  className="w-full bg-black text-white px-3 py-1.5 rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40">
                   Agregar
                 </button>
               </div>
@@ -304,48 +301,49 @@ export default function CajaPage() {
         )}
 
         {/* Expenses table */}
-        <div className="border border-gray-200 rounded overflow-hidden mb-6">
+        <div className="mb-10">
+          <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Gastos</div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
-                <th className="text-left px-3 py-2 font-medium">Fecha</th>
-                <th className="text-left px-3 py-2 font-medium">Nombre</th>
-                <th className="text-left px-3 py-2 font-medium">RUC</th>
-                <th className="text-left px-3 py-2 font-medium">DV</th>
-                <th className="text-left px-3 py-2 font-medium">Factura</th>
-                <th className="text-right px-3 py-2 font-medium">Sub-total</th>
-                <th className="text-right px-3 py-2 font-medium">ITBMS</th>
-                <th className="text-right px-3 py-2 font-medium">Total</th>
+              <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
+                <th className="text-left pb-3 font-medium">Fecha</th>
+                <th className="text-left pb-3 font-medium">Nombre</th>
+                <th className="text-left pb-3 font-medium">RUC</th>
+                <th className="text-left pb-3 font-medium">DV</th>
+                <th className="text-left pb-3 font-medium">Factura</th>
+                <th className="text-right pb-3 font-medium">Sub-total</th>
+                <th className="text-right pb-3 font-medium">ITBMS</th>
+                <th className="text-right pb-3 font-medium">Total</th>
                 {isOpen && <th className="w-8"></th>}
               </tr>
             </thead>
             <tbody>
               {gastos.length === 0 ? (
-                <tr><td colSpan={isOpen ? 9 : 8} className="px-4 py-6 text-center text-gray-400 text-sm">Sin gastos registrados</td></tr>
+                <tr><td colSpan={isOpen ? 9 : 8} className="py-12 text-center text-gray-300 text-sm">Sin gastos registrados</td></tr>
               ) : (
                 <>
                   {gastos.map((g) => (
-                    <tr key={g.id} className="border-t border-gray-100">
-                      <td className="px-3 py-2">{fmtDate(g.fecha)}</td>
-                      <td className="px-3 py-2">{g.nombre}</td>
-                      <td className="px-3 py-2">{g.ruc}</td>
-                      <td className="px-3 py-2">{g.dv}</td>
-                      <td className="px-3 py-2">{g.factura}</td>
-                      <td className="px-3 py-2 text-right">${fmt(g.subtotal)}</td>
-                      <td className="px-3 py-2 text-right">${fmt(g.itbms)}</td>
-                      <td className="px-3 py-2 text-right font-medium">${fmt(g.total)}</td>
+                    <tr key={g.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition">
+                      <td className="py-3 text-gray-500">{fmtDate(g.fecha)}</td>
+                      <td className="py-3">{g.nombre}</td>
+                      <td className="py-3 text-gray-500">{g.ruc}</td>
+                      <td className="py-3 text-gray-500">{g.dv}</td>
+                      <td className="py-3 text-gray-500">{g.factura}</td>
+                      <td className="py-3 text-right tabular-nums">${fmt(g.subtotal)}</td>
+                      <td className="py-3 text-right tabular-nums text-gray-500">${fmt(g.itbms)}</td>
+                      <td className="py-3 text-right tabular-nums font-medium">${fmt(g.total)}</td>
                       {isOpen && (
-                        <td className="px-2 py-2 text-center">
-                          <button onClick={() => deleteGasto(g.id)} className="text-red-400 hover:text-red-600 text-xs">×</button>
+                        <td className="py-3 text-center">
+                          <button onClick={() => deleteGasto(g.id)} className="text-gray-300 hover:text-black transition text-sm">×</button>
                         </td>
                       )}
                     </tr>
                   ))}
-                  <tr className="border-t-2 border-gray-300 font-bold">
-                    <td colSpan={5} className="px-3 py-2 text-right text-xs uppercase text-gray-500">Totales</td>
-                    <td className="px-3 py-2 text-right">${fmt(totalSubtotal)}</td>
-                    <td className="px-3 py-2 text-right">${fmt(totalItbms)}</td>
-                    <td className="px-3 py-2 text-right">${fmt(totalGastado)}</td>
+                  <tr className="border-t border-gray-300">
+                    <td colSpan={5} className="py-3 text-right text-xs uppercase tracking-widest text-gray-400">Totales</td>
+                    <td className="py-3 text-right tabular-nums font-medium">${fmt(totalSubtotal)}</td>
+                    <td className="py-3 text-right tabular-nums font-medium">${fmt(totalItbms)}</td>
+                    <td className="py-3 text-right tabular-nums font-semibold">${fmt(totalGastado)}</td>
                     {isOpen && <td></td>}
                   </tr>
                 </>
@@ -354,13 +352,14 @@ export default function CajaPage() {
           </table>
         </div>
 
-        <div className="flex gap-3">
-          <button onClick={() => setView("print")} className="text-sm border border-gray-300 px-4 py-2 rounded hover:border-black transition">
+        <div className="flex items-center gap-6">
+          <button onClick={() => setView("print")}
+            className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
             Imprimir
           </button>
           {isOpen && (
             <button onClick={() => closePeriodo(current.id)}
-              className="text-sm border border-red-300 text-red-600 px-4 py-2 rounded hover:bg-red-50 transition">
+              className="text-sm text-gray-400 hover:text-black transition">
               Cerrar Período
             </button>
           )}
@@ -378,15 +377,15 @@ export default function CajaPage() {
     const saldo = current.fondo_inicial - totalGastado;
 
     return (
-      <div className="max-w-5xl mx-auto px-4 py-8">
-        <div className="flex gap-3 mb-6 no-print">
-          <button onClick={() => setView("detail")} className="text-sm text-gray-500 hover:text-black">← Volver</button>
-          <button onClick={() => window.print()} className="text-sm bg-black text-white px-4 py-2 rounded hover:bg-gray-800">
-            🖨 Imprimir
+      <div className="max-w-5xl mx-auto px-6 py-12">
+        <div className="flex gap-4 mb-8 no-print">
+          <button onClick={() => setView("detail")} className="text-sm text-gray-400 hover:text-black transition">← Volver</button>
+          <button onClick={() => window.print()} className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
+            Imprimir
           </button>
         </div>
 
-        <div id="print-document" className="border border-gray-200 rounded p-8" style={{ fontFamily: "-apple-system, sans-serif" }}>
+        <div id="print-document" className="border border-gray-200 rounded-lg p-8" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif" }}>
           <h1 className="text-center text-lg font-bold mb-2 uppercase tracking-wide">Reporte de Caja Menuda</h1>
           <p className="text-center text-sm text-gray-600 mb-1">
             Período N° {current.numero} | Apertura: {fmtDate(current.fecha_apertura)}
