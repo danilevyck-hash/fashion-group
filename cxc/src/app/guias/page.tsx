@@ -48,6 +48,8 @@ export default function GuiasPage() {
   const [view, setView] = useState<View>("list");
   const [guias, setGuias] = useState<Guia[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
 
   // Form state
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
@@ -73,13 +75,18 @@ export default function GuiasPage() {
 
   const loadGuias = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/guias");
-    if (res.ok) {
+    setError(null);
+    try {
+      const res = await fetch("/api/guias");
+      if (!res.ok) throw new Error();
       const data = await res.json();
       setGuias(data);
       setNextNumero(data.length > 0 ? data[0].numero + 1 : 1);
+    } catch {
+      setError("Error al cargar guías");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   async function deleteGuia(id: string) {
@@ -138,6 +145,7 @@ export default function GuiasPage() {
     });
 
     if (res.ok) {
+      setError(null);
       const guia = await res.json();
       const fullRes = await fetch(`/api/guias/${guia.id}`);
       if (fullRes.ok) setPrintGuia(await fullRes.json());
@@ -145,7 +153,7 @@ export default function GuiasPage() {
       loadGuias();
       setView("print");
     } else {
-      alert("Error al guardar");
+      setError("Error al guardar. Verifica los datos.");
     }
     setSaving(false);
   }
@@ -170,11 +178,20 @@ export default function GuiasPage() {
           </div>
         </div>
 
+        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+
         {loading ? (
-          <p className="text-gray-300 text-sm text-center py-20">Cargando...</p>
+          <div>{[...Array(5)].map((_, i) => <div key={i} className="animate-pulse flex gap-4 py-3 border-b border-gray-100"><div className="h-3 bg-gray-100 rounded w-1/3" /><div className="h-3 bg-gray-100 rounded w-1/5 ml-auto" /><div className="h-3 bg-gray-100 rounded w-1/5" /><div className="h-3 bg-gray-100 rounded w-1/6" /></div>)}</div>
         ) : guias.length === 0 ? (
           <p className="text-gray-300 text-sm text-center py-20">No hay guías registradas</p>
-        ) : (
+        ) : (<>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por transportista o cliente..."
+            className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black w-full max-w-sm mb-6"
+          />
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
@@ -186,7 +203,7 @@ export default function GuiasPage() {
               </tr>
             </thead>
             <tbody>
-              {guias.map((g) => (
+              {guias.filter((g) => !search || g.transportista.toLowerCase().includes(search.toLowerCase())).map((g) => (
                 <tr key={g.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition">
                   <td className="py-3.5 font-medium">{g.numero}</td>
                   <td className="py-3.5 text-gray-500">{fmtDate(g.fecha)}</td>
@@ -200,7 +217,7 @@ export default function GuiasPage() {
               ))}
             </tbody>
           </table>
-        )}
+        </>)}
       </div>
     );
   }
@@ -337,6 +354,7 @@ export default function GuiasPage() {
           </div>
         </div>
 
+        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
         <div className="flex items-center gap-6">
           <button onClick={saveGuia} disabled={saving}
             className="bg-black text-white px-6 py-2 rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40">

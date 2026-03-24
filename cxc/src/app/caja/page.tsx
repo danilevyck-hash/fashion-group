@@ -43,6 +43,7 @@ export default function CajaPage() {
   const [periodos, setPeriodos] = useState<CajaPeriodo[]>([]);
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState<CajaPeriodo | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Add expense form state
   const [gFecha, setGFecha] = useState(new Date().toISOString().slice(0, 10));
@@ -62,17 +63,28 @@ export default function CajaPage() {
 
   const loadPeriodos = useCallback(async () => {
     setLoading(true);
-    const res = await fetch("/api/caja/periodos");
-    if (res.ok) setPeriodos(await res.json());
-    setLoading(false);
+    setError(null);
+    try {
+      const res = await fetch("/api/caja/periodos");
+      if (!res.ok) throw new Error();
+      setPeriodos(await res.json());
+    } catch {
+      setError("Error al cargar períodos");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   async function createPeriodo() {
-    const res = await fetch("/api/caja/periodos", { method: "POST" });
-    if (res.ok) {
+    setError(null);
+    try {
+      const res = await fetch("/api/caja/periodos", { method: "POST" });
+      if (!res.ok) throw new Error();
       const p = await res.json();
       loadPeriodos();
       await loadDetail(p.id);
+    } catch {
+      setError("Error al crear período");
     }
   }
 
@@ -97,27 +109,33 @@ export default function CajaPage() {
   async function addGasto() {
     if (!current) return;
     setAddingGasto(true);
-    const res = await fetch("/api/caja/gastos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        periodo_id: current.id,
-        fecha: gFecha,
-        nombre: gNombre,
-        ruc: gRuc,
-        dv: gDv,
-        factura: gFactura,
-        subtotal: subtotalNum,
-        itbms: itbmsNum,
-        total: totalNum,
-      }),
-    });
-    if (res.ok) {
+    setError(null);
+    try {
+      const res = await fetch("/api/caja/gastos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          periodo_id: current.id,
+          fecha: gFecha,
+          nombre: gNombre,
+          ruc: gRuc,
+          dv: gDv,
+          factura: gFactura,
+          subtotal: subtotalNum,
+          itbms: itbmsNum,
+          total: totalNum,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setGFecha(new Date().toISOString().split("T")[0]);
       setGNombre(""); setGRuc(""); setGDv(""); setGFactura(""); setGSubtotal(""); setGItbmsPct("0");
       await loadDetail(current.id);
       loadPeriodos();
+    } catch {
+      setError("Error al agregar gasto");
+    } finally {
+      setAddingGasto(false);
     }
-    setAddingGasto(false);
   }
 
   async function deleteGasto(gastoId: string) {
@@ -146,8 +164,10 @@ export default function CajaPage() {
           )}
         </div>
 
+        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+
         {loading ? (
-          <p className="text-gray-300 text-sm text-center py-20">Cargando...</p>
+          <div>{[...Array(5)].map((_, i) => <div key={i} className="animate-pulse flex gap-4 py-3 border-b border-gray-100"><div className="h-3 bg-gray-100 rounded w-1/3" /><div className="h-3 bg-gray-100 rounded w-1/5 ml-auto" /><div className="h-3 bg-gray-100 rounded w-1/5" /><div className="h-3 bg-gray-100 rounded w-1/6" /></div>)}</div>
         ) : periodos.length === 0 ? (
           <p className="text-gray-300 text-sm text-center py-20">No hay períodos registrados</p>
         ) : (
@@ -241,6 +261,8 @@ export default function CajaPage() {
             <div className={`text-2xl font-semibold tabular-nums ${saldo < 0 ? "text-red-600" : ""}`}>${fmt(saldo)}</div>
           </div>
         </div>
+
+        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
         {/* Add expense form */}
         {isOpen && (
