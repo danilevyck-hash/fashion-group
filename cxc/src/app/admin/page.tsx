@@ -535,6 +535,9 @@ export default function AdminDashboard() {
           <button onClick={() => router.push("/reclamos")} className="text-sm text-gray-400 hover:text-black transition">
             Reclamos
           </button>
+          <button onClick={() => router.push("/cheques")} className="text-sm text-gray-400 hover:text-black transition">
+            Cheques
+          </button>
           {userRole !== "director" && (
             <button onClick={() => router.push("/upload")} className="text-sm text-gray-400 hover:text-black transition">
               Cargar archivos

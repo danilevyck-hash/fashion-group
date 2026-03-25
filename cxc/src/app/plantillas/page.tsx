@@ -71,6 +71,17 @@ export default function PlantillasPage() {
         </svg>
       ),
     },
+    {
+      title: "Cheques Posfechados",
+      description: "Registro de cheques con recordatorios automáticos por email",
+      href: "/cheques",
+      icon: (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M9 12l2 2 4-4"/>
+        </svg>
+      ),
+    },
   ];
 
   return (

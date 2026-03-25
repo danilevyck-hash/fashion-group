@@ -199,6 +199,9 @@ export default function UploadPage() {
           <button onClick={() => router.push("/reclamos")} className="text-sm text-gray-400 hover:text-black transition">
             Reclamos
           </button>
+          <button onClick={() => router.push("/cheques")} className="text-sm text-gray-400 hover:text-black transition">
+            Cheques
+          </button>
           <button
             onClick={() => {
               sessionStorage.removeItem("cxc_role");
