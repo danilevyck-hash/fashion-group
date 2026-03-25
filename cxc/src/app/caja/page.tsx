@@ -21,15 +21,15 @@ interface CajaGasto {
   id: string;
   periodo_id: string;
   fecha: string;
-  nombre: string;
-  ruc: string;
-  dv: string;
-  factura: string;
+  descripcion: string;
+  proveedor: string;
+  nro_factura: string;
+  responsable: string;
+  categoria: string;
   subtotal: number;
   itbms: number;
   total: number;
-  categoria: string;
-  responsable: string;
+  nombre?: string; // legacy
 }
 
 const CATEGORIAS_DEFAULT = ["Papelería y oficina", "Transporte", "Mantenimiento", "Varios"];
@@ -76,15 +76,16 @@ export default function CajaPage() {
 
   // Add expense form state
   const [gFecha, setGFecha] = useState(new Date().toISOString().slice(0, 10));
-  const [gNombre, setGNombre] = useState("");
-  const [gRuc, setGRuc] = useState("");
-  const [gDv, setGDv] = useState("");
-  const [gFactura, setGFactura] = useState("");
+  const [gDescripcion, setGDescripcion] = useState("");
+  const [gProveedor, setGProveedor] = useState("");
+  const [gNroFactura, setGNroFactura] = useState("");
   const [gSubtotal, setGSubtotal] = useState("");
   const [gItbmsPct, setGItbmsPct] = useState("0");
   const [gCategoria, setGCategoria] = useState("Varios");
   const [gResponsable, setGResponsable] = useState("");
   const [addingGasto, setAddingGasto] = useState(false);
+  const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
+  const [editGasto, setEditGasto] = useState<Partial<CajaGasto>>({});
 
   const subtotalNum = parseFloat(gSubtotal) || 0;
   const itbmsNum = subtotalNum * (parseFloat(gItbmsPct) / 100);
@@ -186,20 +187,19 @@ export default function CajaPage() {
         body: JSON.stringify({
           periodo_id: current.id,
           fecha: gFecha,
-          nombre: gNombre,
-          ruc: gRuc,
-          dv: gDv,
-          factura: gFactura,
+          descripcion: gDescripcion,
+          proveedor: gProveedor,
+          nro_factura: gNroFactura,
+          responsable: gResponsable,
+          categoria: gCategoria,
           subtotal: subtotalNum,
           itbms: itbmsNum,
           total: totalNum,
-          categoria: gCategoria,
-          responsable: gResponsable,
         }),
       });
       if (!res.ok) throw new Error();
       setGFecha(new Date().toISOString().split("T")[0]);
-      setGNombre(""); setGRuc(""); setGDv(""); setGFactura(""); setGSubtotal(""); setGItbmsPct("0");
+      setGDescripcion(""); setGProveedor(""); setGNroFactura(""); setGSubtotal(""); setGItbmsPct("0");
       setGCategoria("Varios"); setGResponsable("");
       await loadDetail(current.id);
       loadPeriodos();
@@ -215,6 +215,19 @@ export default function CajaPage() {
     await fetch(`/api/caja/gastos/${gastoId}`, { method: "DELETE" });
     await loadDetail(current.id);
     loadPeriodos();
+  }
+
+  async function saveEditGasto() {
+    if (!current || !editingGastoId) return;
+    const sub = parseFloat(String(editGasto.subtotal)) || 0;
+    const tax = parseFloat(String(editGasto.itbms)) || 0;
+    await fetch(`/api/caja/gastos/${editingGastoId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...editGasto, subtotal: sub, itbms: tax, total: sub + tax }),
+    });
+    setEditingGastoId(null); setEditGasto({});
+    await loadDetail(current.id); loadPeriodos();
   }
 
   const hasOpenPeriod = periodos.some((p) => p.estado === "abierto");
@@ -376,30 +389,25 @@ export default function CajaPage() {
         {isOpen && (
           <div className="mb-10">
             <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Agregar Gasto</div>
-            <div className="grid grid-cols-6 gap-3 items-end mb-3">
+            <div className="grid grid-cols-5 gap-3 items-end mb-3">
               <div>
                 <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Fecha</label>
                 <input type="date" value={gFecha} onChange={(e) => setGFecha(e.target.value)}
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Nombre</label>
-                <input type="text" value={gNombre} onChange={(e) => setGNombre(e.target.value)}
+                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Descripción *</label>
+                <input type="text" value={gDescripcion} onChange={(e) => setGDescripcion(e.target.value)} placeholder="Qué se compró"
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">RUC</label>
-                <input type="text" value={gRuc} onChange={(e) => setGRuc(e.target.value)}
+                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Proveedor</label>
+                <input type="text" value={gProveedor} onChange={(e) => setGProveedor(e.target.value)} placeholder="Dónde se compró"
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">DV</label>
-                <input type="text" value={gDv} onChange={(e) => setGDv(e.target.value)}
-                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Factura</label>
-                <input type="text" value={gFactura} onChange={(e) => setGFactura(e.target.value)}
+                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">N° Factura</label>
+                <input type="text" value={gNroFactura} onChange={(e) => setGNroFactura(e.target.value)} placeholder="Opcional"
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
@@ -442,7 +450,7 @@ export default function CajaPage() {
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-6 gap-3 items-end">
+            <div className="grid grid-cols-5 gap-3 items-end">
               <div>
                 <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">
                   Responsable
@@ -490,7 +498,7 @@ export default function CajaPage() {
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent tabular-nums" />
               </div>
               <div className="col-span-2">
-                <button onClick={addGasto} disabled={addingGasto || !gNombre || subtotalNum <= 0}
+                <button onClick={addGasto} disabled={addingGasto || !gDescripcion || subtotalNum <= 0}
                   className="bg-black text-white px-6 py-1.5 rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40">
                   Agregar
                 </button>
@@ -506,44 +514,58 @@ export default function CajaPage() {
             <thead>
               <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
                 <th className="text-left pb-3 font-medium">Fecha</th>
-                <th className="text-left pb-3 font-medium">Nombre</th>
-                <th className="text-left pb-3 font-medium">Categoría</th>
+                <th className="text-left pb-3 font-medium">Descripción</th>
+                <th className="text-left pb-3 font-medium">Proveedor</th>
                 <th className="text-left pb-3 font-medium">Responsable</th>
-                <th className="text-left pb-3 font-medium">Factura</th>
+                <th className="text-left pb-3 font-medium">Categoría</th>
+                <th className="text-left pb-3 font-medium">N° Factura</th>
                 <th className="text-right pb-3 font-medium">Sub-total</th>
                 <th className="text-right pb-3 font-medium">ITBMS</th>
                 <th className="text-right pb-3 font-medium">Total</th>
-                {isOpen && <th className="w-8"></th>}
+                <th className="w-16"></th>
               </tr>
             </thead>
             <tbody>
               {gastos.length === 0 ? (
-                <tr><td colSpan={isOpen ? 9 : 8} className="py-12 text-center text-gray-300 text-sm">Sin gastos registrados</td></tr>
+                <tr><td colSpan={10} className="py-12 text-center text-gray-300 text-sm">Sin gastos registrados</td></tr>
               ) : (
                 <>
-                  {gastos.map((g) => (
+                  {gastos.map((g) => editingGastoId === g.id ? (
+                    <tr key={g.id} className="border-b border-gray-100 bg-gray-50">
+                      <td className="py-2 pr-1"><input type="date" value={editGasto.fecha || ""} onChange={(e) => setEditGasto({ ...editGasto, fecha: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
+                      <td className="py-2 pr-1"><input type="text" value={editGasto.descripcion || ""} onChange={(e) => setEditGasto({ ...editGasto, descripcion: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
+                      <td className="py-2 pr-1"><input type="text" value={editGasto.proveedor || ""} onChange={(e) => setEditGasto({ ...editGasto, proveedor: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
+                      <td className="py-2 pr-1"><select value={editGasto.responsable || ""} onChange={(e) => setEditGasto({ ...editGasto, responsable: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"><option value="">—</option>{["Daniel", "Angela"].map((r) => <option key={r} value={r}>{r}</option>)}</select></td>
+                      <td className="py-2 pr-1"><select value={editGasto.categoria || "Varios"} onChange={(e) => setEditGasto({ ...editGasto, categoria: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent">{categorias.map((c) => <option key={c} value={c}>{c}</option>)}</select></td>
+                      <td className="py-2 pr-1"><input type="text" value={editGasto.nro_factura || ""} onChange={(e) => setEditGasto({ ...editGasto, nro_factura: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
+                      <td className="py-2 pr-1"><input type="number" step="0.01" value={editGasto.subtotal ?? ""} onChange={(e) => setEditGasto({ ...editGasto, subtotal: parseFloat(e.target.value) || 0 })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent text-right" /></td>
+                      <td className="py-2 pr-1"><input type="number" step="0.01" value={editGasto.itbms ?? ""} onChange={(e) => setEditGasto({ ...editGasto, itbms: parseFloat(e.target.value) || 0 })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent text-right" /></td>
+                      <td className="py-2 text-right tabular-nums text-xs font-medium">${fmt((parseFloat(String(editGasto.subtotal)) || 0) + (parseFloat(String(editGasto.itbms)) || 0))}</td>
+                      <td className="py-2 text-center text-xs"><button onClick={saveEditGasto} className="text-gray-500 hover:text-black mr-1">✓</button><button onClick={() => setEditingGastoId(null)} className="text-gray-300 hover:text-black">×</button></td>
+                    </tr>
+                  ) : (
                     <tr key={g.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition">
                       <td className="py-3 text-gray-500">{fmtDate(g.fecha)}</td>
-                      <td className="py-3">{g.nombre}</td>
-                      <td className="py-3 text-gray-500">{g.categoria || "Varios"}</td>
+                      <td className="py-3">{g.descripcion || g.nombre}</td>
+                      <td className="py-3 text-gray-500">{g.proveedor || "—"}</td>
                       <td className="py-3 text-gray-500">{g.responsable || "—"}</td>
-                      <td className="py-3 text-gray-500">{g.factura}</td>
+                      <td className="py-3 text-gray-500">{g.categoria || "Varios"}</td>
+                      <td className="py-3 text-gray-500">{g.nro_factura || "—"}</td>
                       <td className="py-3 text-right tabular-nums">${fmt(g.subtotal)}</td>
                       <td className="py-3 text-right tabular-nums text-gray-500">${fmt(g.itbms)}</td>
                       <td className="py-3 text-right tabular-nums font-medium">${fmt(g.total)}</td>
-                      {isOpen && (
-                        <td className="py-3 text-center">
-                          <button onClick={() => deleteGasto(g.id)} className="text-gray-300 hover:text-black transition text-sm">×</button>
-                        </td>
-                      )}
+                      <td className="py-3 text-center text-xs">
+                        <button onClick={() => { setEditingGastoId(g.id); setEditGasto({ fecha: g.fecha, descripcion: g.descripcion || g.nombre, proveedor: g.proveedor || "", nro_factura: g.nro_factura || "", responsable: g.responsable || "", categoria: g.categoria || "Varios", subtotal: g.subtotal, itbms: g.itbms }); }} className="text-gray-400 hover:text-black transition mr-1">Editar</button>
+                        <button onClick={() => deleteGasto(g.id)} className="text-gray-300 hover:text-red-500 transition">×</button>
+                      </td>
                     </tr>
                   ))}
                   <tr className="border-t border-gray-300">
-                    <td colSpan={5} className="py-3 text-right text-xs uppercase tracking-widest text-gray-400">Totales</td>
+                    <td colSpan={6} className="py-3 text-right text-xs uppercase tracking-widest text-gray-400">Totales</td>
                     <td className="py-3 text-right tabular-nums font-medium">${fmt(totalSubtotal)}</td>
                     <td className="py-3 text-right tabular-nums font-medium">${fmt(totalItbms)}</td>
                     <td className="py-3 text-right tabular-nums font-semibold">${fmt(totalGastado)}</td>
-                    {isOpen && <td></td>}
+                    <td></td>
                   </tr>
                 </>
               )}
@@ -617,10 +639,10 @@ export default function CajaPage() {
             <thead>
               <tr className="bg-gray-100">
                 <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Fecha</th>
-                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Nombre</th>
-                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">RUC</th>
-                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">DV</th>
-                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Factura</th>
+                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Descripción</th>
+                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Proveedor</th>
+                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Responsable</th>
+                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Categoría</th>
                 <th className="border border-gray-300 px-2 py-1.5 font-medium text-right">Sub-total</th>
                 <th className="border border-gray-300 px-2 py-1.5 font-medium text-right">ITBMS</th>
                 <th className="border border-gray-300 px-2 py-1.5 font-medium text-right">Total</th>
@@ -630,10 +652,10 @@ export default function CajaPage() {
               {gastos.map((g) => (
                 <tr key={g.id}>
                   <td className="border border-gray-300 px-2 py-1">{fmtDate(g.fecha)}</td>
-                  <td className="border border-gray-300 px-2 py-1">{g.nombre}</td>
-                  <td className="border border-gray-300 px-2 py-1">{g.ruc}</td>
-                  <td className="border border-gray-300 px-2 py-1">{g.dv}</td>
-                  <td className="border border-gray-300 px-2 py-1">{g.factura}</td>
+                  <td className="border border-gray-300 px-2 py-1">{g.descripcion || g.nombre}</td>
+                  <td className="border border-gray-300 px-2 py-1">{g.proveedor || "—"}</td>
+                  <td className="border border-gray-300 px-2 py-1">{g.responsable || "—"}</td>
+                  <td className="border border-gray-300 px-2 py-1">{g.categoria || "Varios"}</td>
                   <td className="border border-gray-300 px-2 py-1 text-right">${fmt(g.subtotal)}</td>
                   <td className="border border-gray-300 px-2 py-1 text-right">${fmt(g.itbms)}</td>
                   <td className="border border-gray-300 px-2 py-1 text-right">${fmt(g.total)}</td>
