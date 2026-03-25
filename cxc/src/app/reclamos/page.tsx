@@ -132,7 +132,7 @@ export default function ReclamosPage() {
   }
 
   function updateFItem(idx: number, field: string, value: string | number) {
-    setFItems(fItems.map((item, i) => {
+    setFItems((prev) => prev.map((item, i) => {
       if (i !== idx) return item;
       const updated = { ...item, [field]: value };
       updated.subtotal = (updated.cantidad || 0) * (updated.precio_unitario || 0);
@@ -172,7 +172,10 @@ export default function ReclamosPage() {
         } catch { /* photo upload is optional */ }
       }
       resetForm(); loadReclamos(); await loadDetail(reclamo.id);
-      if (warning) setError("Reclamo guardado, pero los ítems no se pudieron guardar.");
+      if (warning) {
+        setError("Reclamo guardado, pero los ítems no se pudieron guardar: " + warning);
+        alert("Advertencia: Los ítems no se guardaron. " + warning);
+      }
     } else {
       const errData = await res.json().catch(() => null);
       setError(errData?.error || "Error al guardar.");

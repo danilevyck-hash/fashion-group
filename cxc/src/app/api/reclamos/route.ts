@@ -64,8 +64,10 @@ export async function POST(req: NextRequest) {
     attempted_nro: nro_reclamo,
   }, { status: 500 });
 
+  let itemsWarning = "";
   if (items && items.length > 0) {
-    const rows = items.map((item: Record<string, unknown>) => ({
+    // First attempt: with subtotal
+    const rowsFull = items.map((item: Record<string, unknown>) => ({
       reclamo_id: reclamo.id,
       referencia: String(item.referencia || ""),
       descripcion: String(item.descripcion || ""),
@@ -75,11 +77,24 @@ export async function POST(req: NextRequest) {
       subtotal: (Number(item.cantidad) || 1) * (Number(item.precio_unitario) || 0),
       motivo: String(item.motivo || "Faltante de Mercancía"),
     }));
-    const { error: itemsErr } = await supabaseServer.from("reclamo_items").insert(rows);
-    if (itemsErr) {
-      console.error("Items insert error:", itemsErr);
-      // Return reclamo with warning — don't fail the whole request
-      return NextResponse.json({ ...reclamo, reclamo_items: [], items_warning: itemsErr.message });
+    const { error: err1 } = await supabaseServer.from("reclamo_items").insert(rowsFull);
+    if (err1) {
+      console.error("Items insert error:", JSON.stringify(err1));
+      // Retry without subtotal in case column type mismatch
+      const rowsMin = items.map((item: Record<string, unknown>) => ({
+        reclamo_id: reclamo.id,
+        referencia: String(item.referencia || ""),
+        descripcion: String(item.descripcion || ""),
+        talla: String(item.talla || ""),
+        cantidad: Number(item.cantidad) || 1,
+        precio_unitario: Number(item.precio_unitario) || 0,
+        motivo: String(item.motivo || "Faltante de Mercancía"),
+      }));
+      const { error: err2 } = await supabaseServer.from("reclamo_items").insert(rowsMin);
+      if (err2) {
+        console.error("Items retry error:", JSON.stringify(err2));
+        itemsWarning = err2.message;
+      }
     }
   }
 
@@ -89,5 +104,5 @@ export async function POST(req: NextRequest) {
     .eq("id", reclamo.id)
     .single();
 
-  return NextResponse.json(full);
+  return NextResponse.json({ ...(full || reclamo), items_warning: itemsWarning || undefined });
 }
