@@ -53,7 +53,7 @@ const ESTADO_COLORS: Record<string, string> = {
 
 function fmt(n: number) { return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function fmtDate(d: string) { if (!d) return ""; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }
-function daysBetween(d: string) { return Math.floor((Date.now() - new Date(d).getTime()) / 86400000); }
+function daysBetween(d: string) { if (!d) return 0; return Math.floor((Date.now() - new Date(d).getTime()) / 86400000); }
 
 type View = "list" | "form" | "detail";
 
@@ -101,7 +101,10 @@ export default function ReclamosPage() {
     setLoading(true);
     try {
       const res = await fetch("/api/reclamos");
-      if (res.ok) setReclamos(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setReclamos(Array.isArray(data) ? data : []);
+      }
     } catch { setError("Error al cargar reclamos"); }
     finally { setLoading(false); }
   }, []);
@@ -113,8 +116,13 @@ export default function ReclamosPage() {
   const info = fEmpresa ? EMPRESAS_MAP[fEmpresa] : null;
 
   async function loadDetail(id: string) {
-    const res = await fetch(`/api/reclamos/${id}`);
-    if (res.ok) { setCurrent(await res.json()); setView("detail"); }
+    try {
+      const res = await fetch(`/api/reclamos/${id}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.id) { setCurrent(data); setView("detail"); }
+      }
+    } catch { /* ignore */ }
   }
 
   async function deleteReclamo(id: string) {
@@ -224,7 +232,7 @@ export default function ReclamosPage() {
   const filtered = reclamos.filter((r) => {
     if (filterEmpresa !== "all" && r.empresa !== filterEmpresa) return false;
     if (filterEstado !== "all" && r.estado !== filterEstado) return false;
-    if (search) { const q = search.toLowerCase(); if (!r.nro_reclamo.toLowerCase().includes(q) && !r.nro_factura.toLowerCase().includes(q)) return false; }
+    if (search) { const q = search.toLowerCase(); if (!(r.nro_reclamo || "").toLowerCase().includes(q) && !(r.nro_factura || "").toLowerCase().includes(q)) return false; }
     return true;
   });
 
