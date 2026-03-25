@@ -163,13 +163,20 @@ export default function ReclamosPage() {
 
     if (res.ok) {
       const reclamo = await res.json();
-      // Upload photos
+      const warning = reclamo.items_warning;
+      // Upload photos (best effort)
       for (const photo of fPhotos) {
-        const fd = new FormData(); fd.append("file", photo);
-        await fetch(`/api/reclamos/${reclamo.id}/fotos`, { method: "POST", body: fd });
+        try {
+          const fd = new FormData(); fd.append("file", photo);
+          await fetch(`/api/reclamos/${reclamo.id}/fotos`, { method: "POST", body: fd });
+        } catch { /* photo upload is optional */ }
       }
       resetForm(); loadReclamos(); await loadDetail(reclamo.id);
-    } else { setError("Error al guardar."); }
+      if (warning) setError("Reclamo guardado, pero los ítems no se pudieron guardar.");
+    } else {
+      const errData = await res.json().catch(() => null);
+      setError(errData?.error || "Error al guardar.");
+    }
     setSaving(false);
   }
 

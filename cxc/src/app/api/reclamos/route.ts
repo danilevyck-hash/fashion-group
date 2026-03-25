@@ -76,7 +76,11 @@ export async function POST(req: NextRequest) {
       motivo: item.motivo || "",
     }));
     const { error: itemsErr } = await supabaseServer.from("reclamo_items").insert(rows);
-    if (itemsErr) return NextResponse.json({ error: itemsErr.message, hint: "Items insert failed" }, { status: 500 });
+    if (itemsErr) {
+      console.error("Items insert error:", itemsErr);
+      // Return reclamo with warning — don't fail the whole request
+      return NextResponse.json({ ...reclamo, reclamo_items: [], items_warning: itemsErr.message });
+    }
   }
 
   const { data: full } = await supabaseServer
