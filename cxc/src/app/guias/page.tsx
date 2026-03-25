@@ -65,6 +65,7 @@ export default function GuiasPage() {
 
   // Print state
   const [printGuia, setPrintGuia] = useState<Guia | null>(null);
+  const [showHelp, setShowHelp] = useState(false);
 
   const loadGuias = useCallback(async () => {
     setLoading(true);
@@ -164,8 +165,6 @@ export default function GuiasPage() {
     }
     setSaving(false);
   }
-
-  const [showHelp, setShowHelp] = useState(false);
 
   // ── LIST VIEW ──
   if (view === "list") {
