@@ -247,6 +247,8 @@ export default function ReclamosPage() {
       return true;
     });
     const c = getC(activeEmpresa);
+    const allSelectableIds = empresaRecs.filter((r) => r.estado !== "Aplicada").map((r) => r.id);
+    const allSelected = allSelectableIds.length > 0 && allSelectableIds.every((id) => selectedIds.includes(id));
 
     return (
       <div className="max-w-6xl mx-auto px-6 py-12">
@@ -259,6 +261,7 @@ export default function ReclamosPage() {
           <div className="flex items-center gap-3">
             {selectionMode ? (<>
               <span className="text-sm text-gray-400">{selectedIds.length} seleccionados</span>
+              <button onClick={() => allSelected ? setSelectedIds([]) : setSelectedIds(allSelectableIds)} className="text-sm text-gray-400 hover:text-black transition">{allSelected ? "Deseleccionar todo" : "Seleccionar todo"}</button>
               {selectedIds.length > 0 && <>
                 <button onClick={sendSelectedWA} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">WhatsApp</button>
                 <button onClick={downloadSelectedExcel} className="text-sm border border-gray-200 text-gray-600 px-5 py-2 rounded-full hover:bg-gray-50 transition">Excel ({selectedIds.length})</button>
