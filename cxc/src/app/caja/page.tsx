@@ -54,6 +54,8 @@ export default function CajaPage() {
   const [current, setCurrent] = useState<CajaPeriodo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [role, setRole] = useState("");
+  const [lowBalanceWarning, setLowBalanceWarning] = useState(false);
+  const [showChart, setShowChart] = useState(false);
 
   // Responsables
   const [responsables, setResponsables] = useState<string[]>([]);
@@ -118,6 +120,7 @@ export default function CajaPage() {
       const data = await res.json();
       const gastos = data.caja_gastos || [];
       data.total_gastado = gastos.reduce((s: number, g: CajaGasto) => s + (g.total || 0), 0);
+      setLowBalanceWarning(data.total_gastado > (data.fondo_inicial || 200) * 0.80);
       setCurrent(data);
       setView("detail");
     }
@@ -139,6 +142,16 @@ export default function CajaPage() {
     } else {
       setError("Error al eliminar período");
     }
+  }
+
+  async function aprobarReposicion(id: string) {
+    const res = await fetch(`/api/caja/periodos/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "repuesto" }),
+    });
+    if (res.ok) { await loadDetail(id); loadPeriodos(); }
+    else setError("Error al aprobar reposición");
   }
 
   async function addGasto() {
@@ -310,6 +323,15 @@ export default function CajaPage() {
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
+        {lowBalanceWarning && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 flex items-center gap-3">
+            <span className="text-amber-500 text-base">⚠️</span>
+            <p className="text-sm text-amber-700">
+              Saldo bajo — menos del 20% del fondo disponible. Considera solicitar reposición.
+            </p>
+          </div>
+        )}
+
         {/* Add expense form */}
         {isOpen && (
           <div className="mb-10">
@@ -457,7 +479,67 @@ export default function CajaPage() {
           </table>
         </div>
 
-        <div className="flex items-center gap-6">
+        {/* Category chart */}
+        {gastos.length > 0 && (
+          <div className="mt-8 border-t border-gray-100 pt-6">
+            <button
+              onClick={() => setShowChart(!showChart)}
+              className="text-sm text-gray-400 hover:text-black transition flex items-center gap-2"
+            >
+              <span>{showChart ? "▼" : "▶"}</span>
+              Ver por categoría
+            </button>
+
+            {showChart && (() => {
+              const totals: Record<string, number> = {};
+              for (const g of gastos) {
+                const cat = g.categoria || "Varios";
+                totals[cat] = (totals[cat] || 0) + g.total;
+              }
+              const totalCat = Object.values(totals).reduce((s, v) => s + v, 0);
+              const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+              return (
+                <div className="mt-4 space-y-3">
+                  {sorted.map(([cat, total]) => (
+                    <div key={cat} className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500 w-36 truncate">{cat}</span>
+                      <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+                        <div
+                          className="bg-black h-1.5 rounded-full transition-all"
+                          style={{ width: `${totalCat > 0 ? ((total / totalCat) * 100).toFixed(0) : 0}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-gray-500 w-16 text-right">${fmt(total)}</span>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Reposicion */}
+        {current.estado === "cerrado" && (
+          <div className="mt-8 border-t border-gray-100 pt-8 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Reposición de fondos</p>
+              <p className="text-sm text-gray-400 mt-0.5">Total a reponer: ${fmt(totalGastado)}</p>
+            </div>
+            {!current.repuesto ? (
+              <button
+                onClick={() => aprobarReposicion(current.id)}
+                className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
+                Aprobar reposición
+              </button>
+            ) : (
+              <span className="text-sm text-green-600 font-medium">
+                ✓ Repuesto el {current.repuesto_at ? new Date(current.repuesto_at).toLocaleDateString("es-PA") : ""}
+              </span>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center gap-6 mt-8">
           <button onClick={() => setView("print")}
             className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
             Imprimir
