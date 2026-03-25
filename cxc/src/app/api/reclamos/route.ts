@@ -7,7 +7,7 @@ export async function GET() {
     .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_seguimiento(*)")
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: error.message, details: error, hint: "GET failed" }, { status: 500 });
   return NextResponse.json(data);
 }
 
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (recErr) return NextResponse.json({ error: recErr.message }, { status: 500 });
+  if (recErr) return NextResponse.json({ error: recErr.message, details: recErr, hint: "Insert failed", nro_reclamo }, { status: 500 });
 
   if (items && items.length > 0) {
     const rows = items.map((item: Record<string, unknown>) => ({
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       motivo: item.motivo || "",
     }));
     const { error: itemsErr } = await supabaseServer.from("reclamo_items").insert(rows);
-    if (itemsErr) return NextResponse.json({ error: itemsErr.message }, { status: 500 });
+    if (itemsErr) return NextResponse.json({ error: itemsErr.message, details: itemsErr, hint: "Items insert failed" }, { status: 500 });
   }
 
   // Return with items
