@@ -68,8 +68,8 @@ function emptyItem(): RItem {
   return { referencia: "", descripcion: "", talla: "", cantidad: 1, precio_unitario: 0, subtotal: 0, motivo: "" };
 }
 
-function fmt(n: number) {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+function fmt(n: number | undefined | null) {
+  return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function fmtDate(d: string) {
@@ -249,7 +249,7 @@ export default function ReclamosPage() {
     loadReclamos();
   }
 
-  const fSubtotal = fItems.reduce((s, i) => s + i.subtotal, 0);
+  const fSubtotal = fItems.reduce((s, i) => s + (i.subtotal || 0), 0);
 
   // ── LIST VIEW ──
   if (view === "list") {
@@ -565,7 +565,7 @@ export default function ReclamosPage() {
                   <td className="py-2">{item.referencia}</td>
                   <td className="py-2 text-gray-500">{item.descripcion}</td>
                   <td className="py-2 text-gray-500">{item.talla}</td>
-                  <td className="py-2 text-right tabular-nums">{item.cantidad}</td>
+                  <td className="py-2 text-right tabular-nums">{item.cantidad || 0}</td>
                   <td className="py-2 text-right tabular-nums">${fmt(item.precio_unitario)}</td>
                   <td className="py-2 text-right tabular-nums font-medium">${fmt(item.subtotal)}</td>
                   <td className="py-2 text-gray-500 text-xs">{item.motivo}</td>
