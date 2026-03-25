@@ -73,11 +73,8 @@ export default function ReclamosPage() {
 
   // Detail
   const [nota, setNota] = useState("");
-  const [showEnvio, setShowEnvio] = useState(false);
-  const [emailPara, setEmailPara] = useState("");
-  const [emailAsunto, setEmailAsunto] = useState("");
-  const [emailCuerpo, setEmailCuerpo] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendSuccess, setSendSuccess] = useState(false);
   const fotoRef = useRef<HTMLInputElement>(null);
 
   // Contactos
@@ -129,7 +126,7 @@ export default function ReclamosPage() {
   }
 
   async function loadDetail(id: string) {
-    try { const res = await fetch(`/api/reclamos/${id}`); if (res.ok) { const d = await res.json(); if (d?.id) { setCurrent(d); setView("detail"); setShowEnvio(false); } } } catch { /* */ }
+    try { const res = await fetch(`/api/reclamos/${id}`); if (res.ok) { const d = await res.json(); if (d?.id) { setCurrent(d); setView("detail"); } } } catch { /* */ }
   }
 
   async function saveReclamo() {
@@ -149,14 +146,13 @@ export default function ReclamosPage() {
   async function changeEstado(e: string) { if (!current || current.estado === e) return; if (!confirm(`¿Cambiar estado a "${e}"?`)) return; await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: e }) }); await loadDetail(current.id); loadReclamos(); }
   async function deleteReclamo(id: string) { if (!confirm("¿Eliminar este reclamo?")) return; await fetch(`/api/reclamos/${id}`, { method: "DELETE" }); setCurrent(null); setView("list"); loadReclamos(); }
 
-  function prepareEnvio(rec: Reclamo) {
-    window.open(`/api/reclamos/${rec.id}/excel`);
-    const c = getC(rec.empresa);
-    const sub = calcSub(rec.reclamo_items ?? []);
-    setEmailPara(c?.correo || "");
-    setEmailAsunto(`Reclamo ${rec.nro_reclamo} — ${rec.empresa} — Factura ${rec.nro_factura}`);
-    setEmailCuerpo(`Estimado/a ${c?.nombre || ""},\n\nAdjunto el Excel del reclamo N° ${rec.nro_reclamo} de ${rec.empresa}.\n\n• Factura: ${rec.nro_factura}\n• Total a acreditar: $${fmt(sub * 1.17)}\n• Estado: ${rec.estado}\n\nQuedamos en espera de la nota de crédito.\n\nSaludos,\nFashion Group`);
-    setShowEnvio(true);
+  async function sendEmail(reclamoId: string) {
+    setSending(true); setSendSuccess(false);
+    const res = await fetch(`/api/reclamos/${reclamoId}/send-email`, { method: "POST" });
+    const data = await res.json();
+    if (res.ok) { setSendSuccess(true); setTimeout(() => setSendSuccess(false), 4000); if (current) await loadDetail(current.id); }
+    else { alert(data.error || "Error al enviar correo."); }
+    setSending(false);
   }
 
   async function uploadFoto(file: File) { if (!current) return; const fd = new FormData(); fd.append("file", file); await fetch(`/api/reclamos/${current.id}/fotos`, { method: "POST", body: fd }); await loadDetail(current.id); }
@@ -443,6 +439,10 @@ export default function ReclamosPage() {
             </div>
             <button onClick={() => { const id = savedReclamoId; resetForm(); loadReclamos(); if (id) loadDetail(id); }}
               className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition">Ver reclamo →</button>
+            <button onClick={() => sendEmail(savedReclamoId!)} disabled={sending}
+              className="text-sm text-gray-400 hover:text-black transition disabled:opacity-40 mt-3 block">
+              {sending ? "Enviando..." : sendSuccess ? "✓ Correo enviado" : "Enviar por correo"}
+            </button>
           </div>
         ) : (
           <div className="mt-8">
@@ -534,26 +534,13 @@ export default function ReclamosPage() {
       </div>
 
       <div className="flex gap-3 flex-wrap mb-4">
-        <button onClick={() => prepareEnvio(current)} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">Preparar Envío</button>
+        <button onClick={() => sendEmail(current.id)} disabled={sending}
+          className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition disabled:opacity-40">
+          {sending ? "Enviando..." : sendSuccess ? "✓ Enviado" : "Enviar por Correo"}
+        </button>
         <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} className="text-sm text-gray-400 hover:text-black transition">Descargar Excel</button>
         {role === "admin" && <button onClick={() => deleteReclamo(current.id)} className="text-sm text-gray-300 hover:text-red-500 transition ml-auto">Eliminar</button>}
       </div>
-
-      {showEnvio && (
-        <div className="mt-6 border border-gray-200 rounded-2xl p-6">
-          <p className="text-sm font-medium mb-4">Correo preparado — adjunta el Excel descargado</p>
-          <div className="space-y-3">
-            <div><label className="text-[10px] text-gray-400 uppercase">Para</label><input type="text" value={emailPara} onChange={(e) => setEmailPara(e.target.value)} className="w-full border-b border-gray-200 py-1.5 text-sm outline-none" /></div>
-            <div><label className="text-[10px] text-gray-400 uppercase">Asunto</label><input type="text" value={emailAsunto} onChange={(e) => setEmailAsunto(e.target.value)} className="w-full border-b border-gray-200 py-1.5 text-sm outline-none" /></div>
-            <div><label className="text-[10px] text-gray-400 uppercase">Cuerpo</label><textarea value={emailCuerpo} onChange={(e) => setEmailCuerpo(e.target.value)} rows={8} className="w-full border border-gray-200 rounded-lg p-3 text-sm outline-none resize-none mt-1" /></div>
-            <div className="flex gap-3">
-              <button onClick={() => { navigator.clipboard.writeText(emailCuerpo); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className="text-sm text-gray-400 hover:text-black transition">{copied ? "¡Copiado!" : "Copiar cuerpo"}</button>
-              <button onClick={() => window.open(`mailto:${emailPara}?subject=${encodeURIComponent(emailAsunto)}&body=${encodeURIComponent(emailCuerpo)}`, "_blank")} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">Abrir en Mail</button>
-              <button onClick={() => setShowEnvio(false)} className="text-sm text-gray-400 hover:text-black transition">Cerrar</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
