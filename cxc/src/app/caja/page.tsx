@@ -113,9 +113,17 @@ export default function CajaPage() {
   }, []);
 
   async function createPeriodo() {
+    const input = window.prompt("Fondo inicial del período ($):", "200");
+    if (!input) return;
+    const fondo = parseFloat(input);
+    if (isNaN(fondo) || fondo <= 0) return;
     setError(null);
     try {
-      const res = await fetch("/api/caja/periodos", { method: "POST" });
+      const res = await fetch("/api/caja/periodos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fondo_inicial: fondo }),
+      });
       if (!res.ok) throw new Error();
       const p = await res.json();
       loadPeriodos();
@@ -216,7 +224,7 @@ export default function CajaPage() {
         <div className="flex items-end justify-between mb-10">
           <div>
             <FGLogo variant="horizontal" theme="light" size={32} />
-            <p className="text-sm text-gray-400 mt-2">Caja Menuda — Fondo inicial: $200.00</p>
+            <p className="text-sm text-gray-400 mt-2">Caja Menuda</p>
           </div>
           <div className="flex items-center gap-4">
             {!hasOpenPeriod && (
@@ -245,6 +253,7 @@ export default function CajaPage() {
                 <th className="text-left pb-3 font-medium">Apertura</th>
                 <th className="text-left pb-3 font-medium">Cierre</th>
                 <th className="text-left pb-3 font-medium">Estado</th>
+                <th className="text-right pb-3 font-medium">Fondo</th>
                 <th className="text-right pb-3 font-medium">Gastado</th>
                 <th className="text-right pb-3 font-medium">Saldo</th>
                 <th className="text-right pb-3 font-medium"></th>
@@ -265,6 +274,7 @@ export default function CajaPage() {
                         <span className="text-[11px] bg-gray-200 text-gray-500 px-2.5 py-0.5 rounded-full">Cerrado</span>
                       )}
                     </td>
+                    <td className="py-3.5 text-right tabular-nums text-gray-400">${fmt(p.fondo_inicial)}</td>
                     <td className="py-3.5 text-right tabular-nums">${fmt(p.total_gastado)}</td>
                     <td className={`py-3.5 text-right tabular-nums font-medium ${saldo < 0 ? "text-red-600" : ""}`}>
                       ${fmt(saldo)}

@@ -285,6 +285,27 @@ export default function ReclamosPage() {
                       {r.nro_reclamo} | Factura {r.nro_factura} | ${fmt(calcSub(r.reclamo_items ?? []) * 1.17)}
                     </label>
                   ))}
+                  {/* Per-empresa actions */}
+                  {recs.some((r) => selectedIds.includes(r.id)) && (
+                    <div className="flex gap-3 mt-3 pl-5">
+                      <button onClick={() => {
+                        const c = getC(empresa);
+                        if (!c?.whatsapp) { alert("No hay contacto con WhatsApp para esta empresa."); return; }
+                        const sel = recs.filter((r) => selectedIds.includes(r.id));
+                        const lines = sel.map((r) => { const t = calcSub(r.reclamo_items ?? []) * 1.17; const d = daysSince(r.fecha_reclamo); return `• ${r.nro_reclamo} | Factura ${r.nro_factura} | $${fmt(t)} | Hace ${d} días`; }).join("\n");
+                        const msg = `Hola ${c.nombre}, buenos días. Le escribo de parte de Fashion Group para dar seguimiento a los siguientes reclamos pendientes:\n\n${lines}\n\n¿Nos puede confirmar el estado de estos reclamos? Gracias.`;
+                        window.open(`https://wa.me/${c.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
+                      }} className="text-xs text-gray-400 hover:text-black transition">WhatsApp</button>
+                      <button onClick={() => {
+                        const c = getC(empresa);
+                        const sel = recs.filter((r) => selectedIds.includes(r.id));
+                        const lines = sel.map((r) => `• ${r.nro_reclamo} — Factura ${r.nro_factura} — Total: $${fmt(calcSub(r.reclamo_items ?? []) * 1.17)} — Estado: ${r.estado}`).join("\n");
+                        const asunto = `Seguimiento de Reclamos Pendientes — ${empresa}`;
+                        const cuerpo = `Estimado/a ${c?.nombre || ""},\n\nPor medio de la presente, le hacemos llegar el resumen de los reclamos pendientes de ${empresa}:\n\n${lines}\n\nQuedamos en espera de su confirmación y las notas de crédito correspondientes.\n\nSaludos,\nFashion Group`;
+                        window.open(`mailto:${c?.correo || ""}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`);
+                      }} className="text-xs text-gray-400 hover:text-black transition">Correo</button>
+                    </div>
+                  )}
                 </div>); })}
               <div className="flex gap-3 mt-4">
                 <button onClick={downloadBulkExcel} disabled={!selectedIds.length} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition disabled:opacity-40">Descargar Excel ({selectedIds.length})</button>

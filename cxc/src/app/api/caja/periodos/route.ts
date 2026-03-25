@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export async function GET() {
@@ -17,8 +17,15 @@ export async function GET() {
   return NextResponse.json(result);
 }
 
-export async function POST() {
-  // Auto-increment numero
+export async function POST(req: NextRequest) {
+  let fondo = 200;
+  try {
+    const body = await req.json();
+    if (body.fondo_inicial && !isNaN(Number(body.fondo_inicial))) {
+      fondo = Number(body.fondo_inicial);
+    }
+  } catch { /* empty body = default fondo */ }
+
   const { data: last } = await supabaseServer
     .from("caja_periodos")
     .select("numero")
@@ -31,7 +38,7 @@ export async function POST() {
 
   const { data, error } = await supabaseServer
     .from("caja_periodos")
-    .insert({ numero, fecha_apertura: today, fondo_inicial: 200, estado: "abierto" })
+    .insert({ numero, fecha_apertura: today, fondo_inicial: fondo, estado: "abierto" })
     .select()
     .single();
 
