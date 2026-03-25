@@ -32,7 +32,15 @@ interface CajaGasto {
   responsable: string;
 }
 
-const CATEGORIAS = ["Papelería y oficina", "Transporte", "Mantenimiento", "Varios"];
+const CATEGORIAS_DEFAULT = ["Papelería y oficina", "Transporte", "Mantenimiento", "Varios"];
+
+function loadCategorias(): string[] {
+  if (typeof window === "undefined") return CATEGORIAS_DEFAULT;
+  try {
+    const stored = JSON.parse(localStorage.getItem("fg_categorias") || "[]") as string[];
+    return [...CATEGORIAS_DEFAULT, ...stored.filter((s) => s && !CATEGORIAS_DEFAULT.includes(s))];
+  } catch { return CATEGORIAS_DEFAULT; }
+}
 
 function fmt(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -55,7 +63,9 @@ export default function CajaPage() {
   const [error, setError] = useState<string | null>(null);
   const [role, setRole] = useState("");
   const [lowBalanceWarning, setLowBalanceWarning] = useState(false);
-  const [showChart, setShowChart] = useState(false);
+  const [categorias, setCategorias] = useState(CATEGORIAS_DEFAULT);
+  const [showManageCat, setShowManageCat] = useState(false);
+  const [newCatName, setNewCatName] = useState("");
 
   // Responsables
   const [responsables, setResponsables] = useState<string[]>([]);
@@ -81,6 +91,7 @@ export default function CajaPage() {
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role");
     if (r) setRole(r);
+    setCategorias(loadCategorias());
     loadPeriodos();
     fetch("/api/caja/responsables").then((r) => r.ok ? r.json() : []).then((data) => {
       setResponsables((data || []).map((r: { nombre: string }) => r.nombre));
@@ -321,6 +332,29 @@ export default function CajaPage() {
           </div>
         </div>
 
+        {/* Category chart — always visible */}
+        {gastos.length > 0 && (() => {
+          const catTotals: Record<string, number> = {};
+          for (const g of gastos) { const cat = g.categoria || "Varios"; catTotals[cat] = (catTotals[cat] || 0) + g.total; }
+          const catTotal = Object.values(catTotals).reduce((s, v) => s + v, 0);
+          const chartEntries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+          return (
+            <div className="mb-6">
+              <div className="space-y-1.5">
+                {chartEntries.map(([cat, total]) => (
+                  <div key={cat} className="flex items-center gap-2">
+                    <span className="text-xs text-gray-400 w-32 truncate">{cat}</span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-1">
+                      <div className="bg-black h-1 rounded-full" style={{ width: `${catTotal > 0 ? ((total / catTotal) * 100).toFixed(0) : 0}%` }} />
+                    </div>
+                    <span className="text-xs text-gray-400 w-14 text-right tabular-nums">${total.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
         {lowBalanceWarning && (
@@ -366,8 +400,36 @@ export default function CajaPage() {
                 <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Categoría</label>
                 <select value={gCategoria} onChange={(e) => setGCategoria(e.target.value)}
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
-                  {CATEGORIAS.map((c) => <option key={c} value={c}>{c}</option>)}
+                  {categorias.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
+                <button onClick={() => setShowManageCat(!showManageCat)} className="text-[10px] text-gray-300 hover:text-gray-500 mt-1 block">
+                  Gestionar categorías
+                </button>
+                {showManageCat && (
+                  <div className="mt-2 p-2 bg-gray-50 rounded text-xs space-y-1">
+                    {categorias.filter((c) => !CATEGORIAS_DEFAULT.includes(c)).map((c) => (
+                      <div key={c} className="flex items-center justify-between">
+                        <span>{c}</span>
+                        <button onClick={() => {
+                          const updated = categorias.filter((x) => x !== c);
+                          setCategorias(updated);
+                          localStorage.setItem("fg_categorias", JSON.stringify(updated.filter((x) => !CATEGORIAS_DEFAULT.includes(x))));
+                        }} className="text-gray-300 hover:text-red-500">×</button>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-1 mt-1">
+                      <input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="Nueva categoría"
+                        className="flex-1 border-b border-gray-200 py-0.5 text-xs outline-none" />
+                      <button onClick={() => {
+                        if (!newCatName.trim() || categorias.includes(newCatName.trim())) return;
+                        const updated = [...categorias, newCatName.trim()];
+                        setCategorias(updated);
+                        localStorage.setItem("fg_categorias", JSON.stringify(updated.filter((x) => !CATEGORIAS_DEFAULT.includes(x))));
+                        setNewCatName("");
+                      }} className="text-xs text-gray-500 hover:text-black">＋</button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-6 gap-3 items-end">
@@ -478,45 +540,6 @@ export default function CajaPage() {
             </tbody>
           </table>
         </div>
-
-        {/* Category chart */}
-        {gastos.length > 0 && (
-          <div className="mt-8 border-t border-gray-100 pt-6">
-            <button
-              onClick={() => setShowChart(!showChart)}
-              className="text-sm text-gray-400 hover:text-black transition flex items-center gap-2"
-            >
-              <span>{showChart ? "▼" : "▶"}</span>
-              Ver por categoría
-            </button>
-
-            {showChart && (() => {
-              const totals: Record<string, number> = {};
-              for (const g of gastos) {
-                const cat = g.categoria || "Varios";
-                totals[cat] = (totals[cat] || 0) + g.total;
-              }
-              const totalCat = Object.values(totals).reduce((s, v) => s + v, 0);
-              const sorted = Object.entries(totals).sort((a, b) => b[1] - a[1]);
-              return (
-                <div className="mt-4 space-y-3">
-                  {sorted.map(([cat, total]) => (
-                    <div key={cat} className="flex items-center gap-3">
-                      <span className="text-xs text-gray-500 w-36 truncate">{cat}</span>
-                      <div className="flex-1 bg-gray-100 rounded-full h-1.5">
-                        <div
-                          className="bg-black h-1.5 rounded-full transition-all"
-                          style={{ width: `${totalCat > 0 ? ((total / totalCat) * 100).toFixed(0) : 0}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-gray-500 w-16 text-right">${fmt(total)}</span>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-          </div>
-        )}
 
         {/* Reposicion */}
         {current.estado === "cerrado" && (
