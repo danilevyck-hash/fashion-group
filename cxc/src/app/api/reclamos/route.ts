@@ -76,6 +76,8 @@ export async function POST(req: NextRequest) {
       precio_unitario: Number(item.precio_unitario) || 0,
       subtotal: (Number(item.cantidad) || 1) * (Number(item.precio_unitario) || 0),
       motivo: String(item.motivo || "Faltante de Mercancía"),
+      nro_factura: String(item.nro_factura || ""),
+      nro_orden_compra: String(item.nro_orden_compra || ""),
     }));
     const { error: err1 } = await supabaseServer.from("reclamo_items").insert(rowsFull);
     if (err1) {
@@ -89,6 +91,8 @@ export async function POST(req: NextRequest) {
         cantidad: Number(item.cantidad) || 1,
         precio_unitario: Number(item.precio_unitario) || 0,
         motivo: String(item.motivo || "Faltante de Mercancía"),
+        nro_factura: String(item.nro_factura || ""),
+        nro_orden_compra: String(item.nro_orden_compra || ""),
       }));
       const { error: err2 } = await supabaseServer.from("reclamo_items").insert(rowsMin);
       if (err2) {

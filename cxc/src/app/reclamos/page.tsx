@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 
 // ── Types ──
-interface RItem { referencia: string; descripcion: string; talla: string; cantidad: number; precio_unitario: number; subtotal: number; motivo: string; }
+interface RItem { referencia: string; descripcion: string; talla: string; cantidad: number; precio_unitario: number; subtotal: number; motivo: string; nro_factura: string; nro_orden_compra: string; }
 interface Seguimiento { id: string; nota: string; autor: string; created_at: string; }
 interface Foto { id: string; storage_path: string; url: string; }
 interface Contacto { id: string; empresa: string; nombre: string; whatsapp: string; correo: string; }
@@ -26,10 +26,11 @@ const EMPRESAS_MAP: Record<string, { proveedor: string; marca: string }> = {
 };
 const EMPRESAS = Object.keys(EMPRESAS_MAP);
 const MOTIVOS = ["Faltante de Mercancía", "Mercancía Dañada", "Mercancía Manchada", "Mercancía Incorrecta", "Sobrante de Mercancía", "Discrepancia de Precio", "Mercancía Defectuosa"];
+const TALLAS = ["XS", "S", "M", "L", "XL", "XXL", "OS", "Otros"];
 const ESTADOS = ["Enviado", "En Revisión", "N/C Aprobada", "Aplicada"];
 const EC: Record<string, string> = { "Enviado": "bg-blue-50 text-blue-700", "En Revisión": "bg-yellow-50 text-yellow-700", "N/C Aprobada": "bg-green-50 text-green-700", "Aplicada": "bg-gray-100 text-gray-500" };
 
-function emptyItem(): RItem { return { referencia: "", descripcion: "", talla: "", cantidad: 1, precio_unitario: 0, subtotal: 0, motivo: "" }; }
+function emptyItem(): RItem { return { referencia: "", descripcion: "", talla: "", cantidad: 1, precio_unitario: 0, subtotal: 0, motivo: "", nro_factura: "", nro_orden_compra: "" }; }
 function fmt(n: number | undefined | null) { return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function fmtDate(d: string) { if (!d) return ""; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }
 function daysSince(d: string) { if (!d) return 0; return Math.floor((Date.now() - new Date(d).getTime()) / 86400000); }
@@ -62,8 +63,6 @@ export default function ReclamosPage() {
   // Form
   const [fEmpresa, setFEmpresa] = useState("");
   const [fFecha, setFFecha] = useState(new Date().toISOString().slice(0, 10));
-  const [fFacturas, setFFacturas] = useState<string[]>([""]);
-  const [fOrden, setFOrden] = useState("");
   const [fNotas, setFNotas] = useState("");
   const [fItems, setFItems] = useState<RItem[]>([emptyItem()]);
 
@@ -118,7 +117,7 @@ export default function ReclamosPage() {
 
   function getC(empresa: string) { return contactos.find((c) => c.empresa === empresa) || null; }
 
-  function resetForm() { setFEmpresa(""); setFFecha(new Date().toISOString().slice(0, 10)); setFFacturas([""]); setFOrden(""); setFNotas(""); setFItems([emptyItem()]); setError(null); }
+  function resetForm() { setFEmpresa(""); setFFecha(new Date().toISOString().slice(0, 10)); setFNotas(""); setFItems([emptyItem()]); setError(null); }
 
   function updateItem(idx: number, field: string, val: string | number) {
     setFItems((prev) => prev.map((item, i) => { if (i !== idx) return item; const u = { ...item, [field]: val }; u.subtotal = (u.cantidad || 0) * (u.precio_unitario || 0); return u; }));
@@ -129,13 +128,13 @@ export default function ReclamosPage() {
   }
 
   async function saveReclamo() {
-    const facturaStr = fFacturas.filter((f) => f.trim()).join(", ");
-    if (!fEmpresa || !fFecha || !facturaStr) { setError("Completa empresa, fecha y al menos una factura."); return; }
+    if (!fEmpresa || !fFecha) { setError("Completa empresa y fecha."); return; }
     const items = fItems.filter((i) => i.referencia || i.cantidad > 0);
     if (!items.length) { setError("Agrega al menos un ítem."); return; }
+    const mainFactura = items.find((i) => i.nro_factura)?.nro_factura || "—";
     setSaving(true); setError(null);
     try {
-      const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: facturaStr, nro_orden_compra: fOrden, fecha_reclamo: fFecha, notas: fNotas, items }) });
+      const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: mainFactura, nro_orden_compra: "", fecha_reclamo: fFecha, notas: fNotas, items }) });
       if (res.ok) { const saved = await res.json(); resetForm(); loadReclamos(); if (saved.id) await loadDetail(saved.id); }
       else { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); }
     } catch { setError("Error de conexión."); } setSaving(false);
@@ -331,43 +330,70 @@ export default function ReclamosPage() {
   // ── FORM VIEW ──
   if (view === "form") {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div className="max-w-6xl mx-auto px-6 py-12">
         <button onClick={() => setView("list")} className="text-sm text-gray-400 hover:text-black transition mb-8 block">← Reclamos</button>
         <h1 className="text-2xl font-semibold tracking-tight mb-10">Nuevo Reclamo</h1>
         <div className="mb-10">
-          <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Información General</div>
-          <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-            <div><label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Empresa *</label><select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent"><option value="">Seleccionar...</option>{EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}</select>{empInfo && <p className="text-xs text-gray-400 mt-2">Proveedor: {empInfo.proveedor} | Marca: {empInfo.marca}</p>}</div>
-            <div><label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Fecha *</label><input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none" /></div>
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">N° Factura(s) *</label>
-              {fFacturas.map((f, idx) => (
-                <div key={idx} className="flex items-center gap-2 mb-2">
-                  <input type="text" value={f} onChange={(e) => { const u = [...fFacturas]; u[idx] = e.target.value; setFFacturas(u); }} placeholder="N° Factura" className="flex-1 border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
-                  {fFacturas.length > 1 && <button onClick={() => setFFacturas(fFacturas.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black transition text-sm">×</button>}
-                </div>
-              ))}
-              <button onClick={() => setFFacturas([...fFacturas, ""])} className="text-xs text-gray-400 hover:text-black transition mt-1">+ Agregar factura</button>
+          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Información General</div>
+          <div className="grid grid-cols-3 gap-x-12 gap-y-5">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa *</label>
+              <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm text-black outline-none bg-transparent"><option value="">Seleccionar...</option>{EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}</select>
+              {empInfo && <p className="text-xs text-gray-400 mt-1">Proveedor: {empInfo.proveedor} | Marca: {empInfo.marca}</p>}
             </div>
-            <div><label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">N° Orden de Compra</label><input type="text" value={fOrden} onChange={(e) => setFOrden(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none" /></div>
-            <div className="col-span-2"><label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Notas</label><textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} className="w-full border-b border-gray-200 py-2 text-sm outline-none resize-none" /></div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha *</label>
+              <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm text-black outline-none" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Notas</label>
+              <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={1} className="border-b border-gray-200 py-1.5 text-sm text-black outline-none resize-none" />
+            </div>
           </div>
         </div>
         <div className="mb-10">
-          <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Ítems del Reclamo</div>
-          <table className="w-full text-sm"><thead><tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400"><th className="pb-3 font-medium text-left">Ref.</th><th className="pb-3 font-medium text-left">Descripción</th><th className="pb-3 font-medium text-left w-20">Talla</th><th className="pb-3 font-medium w-20 text-center">Cant.</th><th className="pb-3 font-medium w-24 text-right">Precio U.</th><th className="pb-3 font-medium text-left">Motivo</th><th className="pb-3 font-medium w-24 text-right">Subtotal</th><th className="pb-3 w-8"></th></tr></thead>
+          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Ítems del Reclamo</div>
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead><tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
+              <th className="pb-2 font-medium text-left">Código</th>
+              <th className="pb-2 font-medium text-left">Descripción</th>
+              <th className="pb-2 font-medium text-left" style={{minWidth:70}}>Talla</th>
+              <th className="pb-2 font-medium text-center" style={{minWidth:60}}>Cant.</th>
+              <th className="pb-2 font-medium text-right" style={{minWidth:80}}>Precio U.</th>
+              <th className="pb-2 font-medium text-left">Motivo</th>
+              <th className="pb-2 font-medium text-left" style={{minWidth:90}}>N° Factura</th>
+              <th className="pb-2 font-medium text-left" style={{minWidth:80}}>N° PO</th>
+              <th className="pb-2 font-medium text-right" style={{minWidth:80}}>Subtotal</th>
+              <th className="pb-2 w-6"></th>
+            </tr></thead>
             <tbody>{fItems.map((item, idx) => (
               <tr key={idx} className="border-b border-gray-100">
-                <td className="py-2 pr-2"><input type="text" value={item.referencia} onChange={(e) => updateItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
-                <td className="py-2 pr-2"><input type="text" value={item.descripcion} onChange={(e) => updateItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
-                <td className="py-2 pr-2"><input type="text" value={item.talla} onChange={(e) => updateItem(idx, "talla", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
-                <td className="py-2 pr-2"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-center" /></td>
-                <td className="py-2 pr-2"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-right" /></td>
-                <td className="py-2 pr-2"><select value={item.motivo} onChange={(e) => updateItem(idx, "motivo", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent"><option value="">—</option>{MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}</select></td>
-                <td className="py-2 text-right tabular-nums text-gray-500">${fmt((item.cantidad || 0) * (item.precio_unitario || 0))}</td>
+                <td className="py-2 pr-1"><input type="text" value={item.referencia} onChange={(e) => updateItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
+                <td className="py-2 pr-1"><input type="text" value={item.descripcion} onChange={(e) => updateItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
+                <td className="py-2 pr-1">
+                  {(!TALLAS.includes(item.talla) && item.talla !== "") ? (
+                    <div className="flex items-center gap-1">
+                      <input type="text" value={item.talla} onChange={(e) => updateItem(idx, "talla", e.target.value)} placeholder="Talla" className="w-full border-b border-gray-100 py-1 text-sm outline-none" style={{minWidth:50}} />
+                      <button onClick={() => updateItem(idx, "talla", "")} className="text-gray-300 hover:text-black text-xs">×</button>
+                    </div>
+                  ) : (
+                    <select value={item.talla} onChange={(e) => { if (e.target.value === "Otros") updateItem(idx, "talla", " "); else updateItem(idx, "talla", e.target.value); }} className="border-b border-gray-100 py-1 text-sm outline-none bg-transparent" style={{minWidth:60}}>
+                      <option value="">—</option>
+                      {TALLAS.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  )}
+                </td>
+                <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-center" /></td>
+                <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-right" /></td>
+                <td className="py-2 pr-1"><select value={item.motivo} onChange={(e) => updateItem(idx, "motivo", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent"><option value="">—</option>{MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}</select></td>
+                <td className="py-2 pr-1"><input type="text" value={item.nro_factura} onChange={(e) => updateItem(idx, "nro_factura", e.target.value)} placeholder="Factura" className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
+                <td className="py-2 pr-1"><input type="text" value={item.nro_orden_compra} onChange={(e) => updateItem(idx, "nro_orden_compra", e.target.value)} placeholder="PO" className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
+                <td className="py-2 text-right tabular-nums text-gray-500 text-xs">${fmt((item.cantidad || 0) * (item.precio_unitario || 0))}</td>
                 <td className="py-2 text-center">{fItems.length > 1 && <button onClick={() => setFItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm">×</button>}</td>
               </tr>))}</tbody>
           </table>
+          </div>
           <button onClick={() => setFItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition mt-3">+ Agregar fila</button>
           <div className="mt-6 text-right text-sm space-y-1">
             <div>Subtotal: <span className="tabular-nums font-medium">${fmt(fSubtotal)}</span></div>
@@ -375,6 +401,10 @@ export default function ReclamosPage() {
             <div className="text-gray-400">ITBMS (7%): ${fmt(fSubtotal * 0.07)}</div>
             <div className="text-lg font-semibold">Total: ${fmt(fSubtotal * 1.17)}</div>
           </div>
+        </div>
+        <div className="mt-8 border-t border-gray-100 pt-6 mb-8">
+          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Fotos de evidencia</div>
+          <p className="text-sm text-gray-400">Podrás agregar fotos después de guardar el reclamo.</p>
         </div>
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
         <div className="flex items-center gap-6">
@@ -419,10 +449,14 @@ export default function ReclamosPage() {
       {items.length > 0 && (
         <div className="mb-8">
           <div className="text-xs uppercase tracking-widest text-gray-400 mb-3">Ítems</div>
-          <table className="w-full text-sm"><thead><tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400"><th className="text-left pb-2 font-medium">Ref.</th><th className="text-left pb-2 font-medium">Descripción</th><th className="text-left pb-2 font-medium">Talla</th><th className="text-right pb-2 font-medium">Cant.</th><th className="text-right pb-2 font-medium">Precio</th><th className="text-right pb-2 font-medium">Subtotal</th><th className="text-left pb-2 font-medium">Motivo</th></tr></thead>
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm"><thead><tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
+            <th className="text-left pb-2 font-medium">Código</th><th className="text-left pb-2 font-medium">Descripción</th><th className="text-left pb-2 font-medium">Talla</th><th className="text-right pb-2 font-medium">Cant.</th><th className="text-right pb-2 font-medium">Precio</th><th className="text-right pb-2 font-medium">Subtotal</th><th className="text-left pb-2 font-medium">Motivo</th><th className="text-left pb-2 font-medium">Factura</th><th className="text-left pb-2 font-medium">PO</th>
+          </tr></thead>
             <tbody>{items.map((item, i) => (
-              <tr key={i} className="border-b border-gray-100"><td className="py-2">{item.referencia}</td><td className="py-2 text-gray-500">{item.descripcion}</td><td className="py-2 text-gray-500">{item.talla}</td><td className="py-2 text-right tabular-nums">{Number(item.cantidad) || 0}</td><td className="py-2 text-right tabular-nums">${fmt(item.precio_unitario)}</td><td className="py-2 text-right tabular-nums font-medium">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td><td className="py-2 text-gray-500 text-xs">{item.motivo}</td></tr>
+              <tr key={i} className="border-b border-gray-100"><td className="py-2">{item.referencia}</td><td className="py-2 text-gray-500">{item.descripcion}</td><td className="py-2 text-gray-500">{item.talla}</td><td className="py-2 text-right tabular-nums">{Number(item.cantidad) || 0}</td><td className="py-2 text-right tabular-nums">${fmt(item.precio_unitario)}</td><td className="py-2 text-right tabular-nums font-medium">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td><td className="py-2 text-gray-500 text-xs">{item.motivo}</td><td className="py-2 text-gray-500 text-xs">{item.nro_factura}</td><td className="py-2 text-gray-500 text-xs">{item.nro_orden_compra}</td></tr>
             ))}</tbody></table>
+          </div>
         </div>
       )}
 

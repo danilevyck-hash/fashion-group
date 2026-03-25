@@ -24,7 +24,7 @@ function buildSheet(rec: Record<string, unknown>, items: Record<string, unknown>
   rows.push(["Fecha de Reclamo", fmtDate(rec.fecha_reclamo as string)]);
   rows.push(["Estado", rec.estado]);
   rows.push([]);
-  rows.push(["Referencia", "Descripción", "Talla", "Cant.", "Precio Unit.", "Subtotal", "Motivo"]);
+  rows.push(["Código", "Descripción", "Talla", "Cant.", "Precio Unit.", "Subtotal", "Motivo", "N° Factura", "N° PO"]);
 
   let subtotal = 0;
   for (const item of items) {
@@ -32,7 +32,7 @@ function buildSheet(rec: Record<string, unknown>, items: Record<string, unknown>
     const precio = Number(item.precio_unitario) || 0;
     const sub = cant * precio;
     subtotal += sub;
-    rows.push([item.referencia, item.descripcion, item.talla, cant, precio, sub, item.motivo]);
+    rows.push([item.referencia, item.descripcion, item.talla, cant, precio, sub, item.motivo, item.nro_factura || "", item.nro_orden_compra || ""]);
   }
 
   rows.push([]);
@@ -61,12 +61,12 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
 
-  // Merge A1:G1 for title
-  ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+  // Merge A1:I1 for title
+  ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 8 } }];
 
   // Column widths
   ws["!cols"] = [
-    { wch: 18 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 24 },
+    { wch: 18 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 24 }, { wch: 16 }, { wch: 14 },
   ];
 
   const wb = XLSX.utils.book_new();
