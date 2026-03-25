@@ -26,13 +26,32 @@ interface Guia {
   guia_items?: GuiaItem[];
 }
 
-const TRANSPORTISTAS = ["RedNblue", "Mojica", "Transporte Sol", "Sanjur", "Otro"];
-const CLIENTES = ["City Mall", "La Frontera Duty Free", "Jerusalem de Panama", "Plaza Los Angeles", "Golden Mall", "Multi Fashion Holding", "Kheriddine", "Bouti S.A.", "Jerusalem Duty Free", "Outlet Duty Free N2", "Outlet Duty Free N3", "Sporting Shoes N4"];
-const DIRECCIONES = ["Paso Canoas", "David", "Santiago", "Guabito", "Changinola"];
-const DEFAULT_EMPRESA = "MultiFashion Holding";
+// ── Default lists (merged with localStorage on load) ──
 
-function emptyItem(orden: number): GuiaItem {
-  return { orden, cliente: "", direccion: "", empresa: DEFAULT_EMPRESA, facturas: "", bultos: 0, numero_guia_transp: "" };
+const DEFAULT_TRANSPORTISTAS = ["RedNblue", "Mojica", "Transporte Sol", "Sanjur"];
+const DEFAULT_CLIENTES = ["City Mall", "La Frontera Duty Free", "Jerusalem de Panama", "Plaza Los Angeles", "Golden Mall", "Multi Fashion Holding", "Kheriddine", "Bouti S.A.", "Jerusalem Duty Free", "Outlet Duty Free N2", "Outlet Duty Free N3", "Sporting Shoes N4"];
+const DEFAULT_DIRECCIONES = ["Paso Canoas", "David", "Santiago", "Guabito", "Changinola"];
+const DEFAULT_EMPRESAS = ["MultiFashion Holding", "Vistana International", "Fashion Shoes", "Fashion Wear", "Active Shoes", "Active Wear", "Confecciones Boston", "Joystep"];
+
+function loadList(key: string, defaults: string[]): string[] {
+  if (typeof window === "undefined") return defaults;
+  try {
+    const stored = JSON.parse(localStorage.getItem(key) || "[]") as string[];
+    const merged = [...defaults];
+    for (const s of stored) {
+      if (s && !merged.includes(s)) merged.push(s);
+    }
+    return merged;
+  } catch { return defaults; }
+}
+
+function saveList(key: string, defaults: string[], list: string[]) {
+  const custom = list.filter((s) => !defaults.includes(s));
+  localStorage.setItem(key, JSON.stringify(custom));
+}
+
+function emptyItem(orden: number, empresa: string): GuiaItem {
+  return { orden, cliente: "", direccion: "", empresa, facturas: "", bultos: 0, numero_guia_transp: "" };
 }
 
 function fmtDate(d: string) {
@@ -42,6 +61,27 @@ function fmtDate(d: string) {
 }
 
 type View = "list" | "form" | "print";
+
+// ── Inline "add new" component ──
+
+function AddNewInline({ onAdd, placeholder }: { onAdd: (v: string) => void; placeholder: string }) {
+  const [open, setOpen] = useState(false);
+  const [val, setVal] = useState("");
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="text-gray-300 hover:text-gray-500 transition text-xs ml-1" title="Agregar nuevo">＋</button>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 ml-1">
+      <input type="text" value={val} onChange={(e) => setVal(e.target.value)} placeholder={placeholder}
+        className="border-b border-gray-300 py-0.5 px-1 text-xs outline-none focus:border-black w-24" autoFocus />
+      <button onClick={() => { if (val.trim()) { onAdd(val.trim()); setVal(""); setOpen(false); } }}
+        className="text-xs text-gray-500 hover:text-black">OK</button>
+      <button onClick={() => { setVal(""); setOpen(false); }} className="text-xs text-gray-300 hover:text-black">×</button>
+    </span>
+  );
+}
 
 export default function GuiasPage() {
   const router = useRouter();
@@ -55,19 +95,59 @@ export default function GuiasPage() {
   const [showHelp, setShowHelp] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
 
+  // Dynamic lists
+  const [transportistas, setTransportistas] = useState<string[]>(DEFAULT_TRANSPORTISTAS);
+  const [clientes, setClientes] = useState<string[]>(DEFAULT_CLIENTES);
+  const [direcciones, setDirecciones] = useState<string[]>(DEFAULT_DIRECCIONES);
+  const [empresas, setEmpresas] = useState<string[]>(DEFAULT_EMPRESAS);
+
   // Form state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [transportista, setTransportista] = useState("");
   const [transportistaOtro, setTransportistaOtro] = useState("");
+  const [placa, setPlaca] = useState("");
   const [observaciones, setObservaciones] = useState("");
-  const [items, setItems] = useState<GuiaItem[]>([emptyItem(1)]);
+  const [items, setItems] = useState<GuiaItem[]>([emptyItem(1, DEFAULT_EMPRESAS[0])]);
   const [nextNumero, setNextNumero] = useState(1);
   const [formNumero, setFormNumero] = useState(1);
   const [saving, setSaving] = useState(false);
 
   // Print state
   const [printGuia, setPrintGuia] = useState<Guia | null>(null);
+
+  // Load dynamic lists from localStorage
+  useEffect(() => {
+    setTransportistas(loadList("fg_transportistas", DEFAULT_TRANSPORTISTAS));
+    setClientes(loadList("fg_clientes", DEFAULT_CLIENTES));
+    setDirecciones(loadList("fg_direcciones", DEFAULT_DIRECCIONES));
+    setEmpresas(loadList("fg_empresas", DEFAULT_EMPRESAS));
+  }, []);
+
+  function addTransportista(name: string) {
+    const updated = [...transportistas, name];
+    setTransportistas(updated);
+    saveList("fg_transportistas", DEFAULT_TRANSPORTISTAS, updated);
+    setTransportista(name);
+  }
+
+  function addCliente(name: string) {
+    const updated = [...clientes, name];
+    setClientes(updated);
+    saveList("fg_clientes", DEFAULT_CLIENTES, updated);
+  }
+
+  function addDireccion(name: string) {
+    const updated = [...direcciones, name];
+    setDirecciones(updated);
+    saveList("fg_direcciones", DEFAULT_DIRECCIONES, updated);
+  }
+
+  function addEmpresa(name: string) {
+    const updated = [...empresas, name];
+    setEmpresas(updated);
+    saveList("fg_empresas", DEFAULT_EMPRESAS, updated);
+  }
 
   const loadGuias = useCallback(async () => {
     setLoading(true);
@@ -99,6 +179,8 @@ export default function GuiasPage() {
 
   if (!authChecked) return null;
 
+  const defaultEmpresa = empresas[0] || DEFAULT_EMPRESAS[0];
+
   async function deleteGuia(id: string) {
     if (!confirm("¿Eliminar esta guía?")) return;
     await fetch(`/api/guias/${id}`, { method: "DELETE" });
@@ -120,17 +202,17 @@ export default function GuiasPage() {
     setEditingId(g.id);
     setFormNumero(g.numero);
     setFecha(g.fecha);
-    // Determine if transportista is in the list or "Otro"
-    if (TRANSPORTISTAS.includes(g.transportista)) {
+    if (transportistas.includes(g.transportista)) {
       setTransportista(g.transportista);
       setTransportistaOtro("");
     } else {
-      setTransportista("Otro");
+      setTransportista("__other__");
       setTransportistaOtro(g.transportista);
     }
+    setPlaca(g.placa || "");
     setObservaciones(g.observaciones || "");
     const guiaItems = (g.guia_items || []) as GuiaItem[];
-    setItems(guiaItems.length > 0 ? guiaItems.map((item: GuiaItem, i: number) => ({ ...item, orden: i + 1 })) : [emptyItem(1)]);
+    setItems(guiaItems.length > 0 ? guiaItems.map((item: GuiaItem, i: number) => ({ ...item, orden: i + 1 })) : [emptyItem(1, defaultEmpresa)]);
     setError(null);
     setValidationErrors(new Set());
     setView("form");
@@ -141,14 +223,15 @@ export default function GuiasPage() {
     setFecha(new Date().toISOString().slice(0, 10));
     setTransportista("");
     setTransportistaOtro("");
+    setPlaca("");
     setObservaciones("");
-    setItems([emptyItem(1)]);
+    setItems([emptyItem(1, defaultEmpresa)]);
     setFormNumero(nextNumero);
     setValidationErrors(new Set());
   }
 
   function addRow() {
-    setItems([...items, emptyItem(items.length + 1)]);
+    setItems([...items, emptyItem(items.length + 1, defaultEmpresa)]);
   }
 
   function removeRow(idx: number) {
@@ -164,7 +247,7 @@ export default function GuiasPage() {
 
   function validate(): boolean {
     const errors = new Set<string>();
-    const transp = transportista === "Otro" ? transportistaOtro : transportista;
+    const transp = transportista === "__other__" ? transportistaOtro : transportista;
 
     if (!fecha) errors.add("fecha");
     if (!transp) errors.add("transportista");
@@ -173,7 +256,6 @@ export default function GuiasPage() {
     if (validItems.length === 0) errors.add("items-empty");
 
     items.forEach((item, idx) => {
-      // Only validate rows that have any data
       const hasData = item.cliente || item.direccion || item.facturas || item.bultos > 0;
       if (!hasData) return;
       if (!item.cliente) errors.add(`item-${idx}-cliente`);
@@ -197,7 +279,7 @@ export default function GuiasPage() {
   async function saveGuia() {
     if (!validate()) return;
 
-    const transp = transportista === "Otro" ? transportistaOtro : transportista;
+    const transp = transportista === "__other__" ? transportistaOtro : transportista;
     const validItems = items.filter((i) => i.cliente || i.direccion || i.facturas || i.bultos > 0);
 
     setSaving(true);
@@ -211,7 +293,7 @@ export default function GuiasPage() {
       body: JSON.stringify({
         fecha,
         transportista: transp,
-        placa: "",
+        placa,
         observaciones,
         items: validItems,
       }),
@@ -222,14 +304,10 @@ export default function GuiasPage() {
       const guia = await res.json();
       const guiaId = guia.id || editingId;
       const fullRes = await fetch(`/api/guias/${guiaId}`);
-      if (fullRes.ok) {
-        const fullGuia = await fullRes.json();
-        setPrintGuia(fullGuia);
-      }
+      if (fullRes.ok) setPrintGuia(await fullRes.json());
       resetForm();
       loadGuias();
       setView("print");
-      // Auto-print after a brief render delay
       setTimeout(() => window.print(), 600);
     } else {
       setError("Error al guardar. Verifica los datos.");
@@ -365,22 +443,31 @@ export default function GuiasPage() {
                 className={inputClass("fecha", "w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition")} />
             </div>
             <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Transportista *</label>
+              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">
+                Transportista *
+                <AddNewInline placeholder="Nombre" onAdd={addTransportista} />
+              </label>
               <select value={transportista} onChange={(e) => setTransportista(e.target.value)}
                 className={inputClass("transportista", "w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none")}>
                 <option value="">Seleccionar...</option>
-                {TRANSPORTISTAS.map((t) => <option key={t} value={t}>{t}</option>)}
+                {transportistas.map((t) => <option key={t} value={t}>{t}</option>)}
+                <option value="__other__">Otro...</option>
               </select>
-              {transportista === "Otro" && (
+              {transportista === "__other__" && (
                 <input type="text" placeholder="Nombre del transportista" value={transportistaOtro}
                   onChange={(e) => setTransportistaOtro(e.target.value)}
                   className={inputClass("transportista", "w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition mt-3")} />
               )}
             </div>
-            <div className="col-span-2">
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Placa / Vehículo</label>
+              <input type="text" value={placa} onChange={(e) => setPlaca(e.target.value)}
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+            </div>
+            <div>
               <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Observaciones</label>
               <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
-                rows={2} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
+                rows={1} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
             </div>
           </div>
         </div>
@@ -390,10 +477,10 @@ export default function GuiasPage() {
           <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Detalle de Envío</div>
 
           <datalist id="clientes-list">
-            {CLIENTES.map((c) => <option key={c} value={c} />)}
+            {clientes.map((c) => <option key={c} value={c} />)}
           </datalist>
           <datalist id="direcciones-list">
-            {DIRECCIONES.map((d) => <option key={d} value={d} />)}
+            {direcciones.map((d) => <option key={d} value={d} />)}
           </datalist>
 
           {validationErrors.has("items-empty") && (
@@ -404,9 +491,18 @@ export default function GuiasPage() {
             <thead>
               <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
                 <th className="pb-3 font-medium w-10 text-left">#</th>
-                <th className="pb-3 font-medium text-left">Cliente *</th>
-                <th className="pb-3 font-medium text-left">Dirección *</th>
-                <th className="pb-3 font-medium text-left">Empresa</th>
+                <th className="pb-3 font-medium text-left">
+                  Cliente *
+                  <AddNewInline placeholder="Cliente" onAdd={(v) => { addCliente(v); }} />
+                </th>
+                <th className="pb-3 font-medium text-left">
+                  Dirección *
+                  <AddNewInline placeholder="Ciudad" onAdd={(v) => { addDireccion(v); }} />
+                </th>
+                <th className="pb-3 font-medium text-left">
+                  Empresa
+                  <AddNewInline placeholder="Empresa" onAdd={(v) => { addEmpresa(v); }} />
+                </th>
                 <th className="pb-3 font-medium text-left">Factura(s) *</th>
                 <th className="pb-3 font-medium w-20 text-center">Bultos *</th>
                 <th className="pb-3 w-8"></th>
@@ -427,7 +523,10 @@ export default function GuiasPage() {
                       className={inputClass(`item-${idx}-direccion`, "w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition")} />
                   </td>
                   <td className="py-2 pr-2">
-                    <span className="text-sm text-gray-500">{DEFAULT_EMPRESA}</span>
+                    <select value={item.empresa} onChange={(e) => updateItem(idx, "empresa", e.target.value)}
+                      className="w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
+                      {empresas.map((e) => <option key={e} value={e}>{e}</option>)}
+                    </select>
                   </td>
                   <td className="py-2 pr-2">
                     <input type="text" value={item.facturas}
@@ -508,7 +607,7 @@ export default function GuiasPage() {
             </div>
             <div className="flex gap-2">
               <span className="font-medium">PLACA / VEHÍCULO:</span>
-              <span className="border-b border-gray-300 flex-1 text-center">&nbsp;</span>
+              <span className="border-b border-gray-300 flex-1 text-center">{g.placa || "\u00A0"}</span>
             </div>
           </div>
 
