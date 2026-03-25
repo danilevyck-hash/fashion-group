@@ -147,8 +147,8 @@ export default function ReclamosPage() {
 
   async function saveReclamo() {
     if (!fEmpresa || !fFecha || !fFactura) { setError("Completa empresa, fecha y factura."); return; }
-    const validItems = fItems.filter((i) => i.referencia && i.cantidad > 0);
-    if (validItems.length === 0) { setError("Agrega al menos un ítem con referencia y cantidad."); return; }
+    const validItems = fItems.filter((i) => i.referencia || i.cantidad > 0);
+    if (validItems.length === 0) { setError("Agrega al menos un ítem con referencia o cantidad."); return; }
 
     setSaving(true); setError(null);
     const res = await fetch("/api/reclamos", {

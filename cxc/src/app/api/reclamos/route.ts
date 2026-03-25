@@ -67,13 +67,13 @@ export async function POST(req: NextRequest) {
   if (items && items.length > 0) {
     const rows = items.map((item: Record<string, unknown>) => ({
       reclamo_id: reclamo.id,
-      referencia: item.referencia || "",
-      descripcion: item.descripcion || "",
-      talla: item.talla || "",
-      cantidad: item.cantidad || 0,
-      precio_unitario: item.precio_unitario || 0,
-      subtotal: ((item.cantidad as number) || 0) * ((item.precio_unitario as number) || 0),
-      motivo: item.motivo || "",
+      referencia: String(item.referencia || ""),
+      descripcion: String(item.descripcion || ""),
+      talla: String(item.talla || ""),
+      cantidad: Number(item.cantidad) || 1,
+      precio_unitario: Number(item.precio_unitario) || 0,
+      subtotal: (Number(item.cantidad) || 1) * (Number(item.precio_unitario) || 0),
+      motivo: String(item.motivo || "Faltante de Mercancía"),
     }));
     const { error: itemsErr } = await supabaseServer.from("reclamo_items").insert(rows);
     if (itemsErr) {
