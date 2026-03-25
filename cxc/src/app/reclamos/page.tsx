@@ -9,7 +9,7 @@ import AppHeader from "@/components/AppHeader";
 interface RItem { referencia: string; descripcion: string; talla: string; cantidad: number; precio_unitario: number; subtotal: number; motivo: string; nro_factura: string; nro_orden_compra: string; }
 interface Seguimiento { id: string; nota: string; autor: string; created_at: string; }
 interface Foto { id: string; storage_path: string; url: string; }
-interface Contacto { id: string; empresa: string; nombre: string; whatsapp: string; correo: string; }
+interface Contacto { id: string; empresa: string; nombre: string; nombre_contacto: string; whatsapp: string; correo: string; }
 interface Reclamo {
   id: string; nro_reclamo: string; empresa: string; proveedor: string; marca: string;
   nro_factura: string; nro_orden_compra: string; fecha_reclamo: string; estado: string;
@@ -57,7 +57,6 @@ export default function ReclamosPage() {
   const [activeEmpresa, setActiveEmpresa] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [showEmailPanel, setShowEmailPanel] = useState(false);
   const [search, setSearch] = useState("");
   const [filterEstado, setFilterEstado] = useState("all");
 
@@ -66,29 +65,13 @@ export default function ReclamosPage() {
   const [fFecha, setFFecha] = useState(new Date().toISOString().slice(0, 10));
   const [fNotas, setFNotas] = useState("");
   const [fItems, setFItems] = useState<RItem[]>([emptyItem()]);
-  const [savedReclamoId, setSavedReclamoId] = useState<string | null>(null);
-  const [savedNroReclamo, setSavedNroReclamo] = useState("");
-  const [formFotos, setFormFotos] = useState<Foto[]>([]);
-  const [uploadingFormFoto, setUploadingFormFoto] = useState(false);
-  const formFotoRef = useRef<HTMLInputElement>(null);
 
   // Detail
   const [nota, setNota] = useState("");
-  const [sending, setSending] = useState(false);
-  const [sendSuccess, setSendSuccess] = useState(false);
   const fotoRef = useRef<HTMLInputElement>(null);
 
-  // Contactos
+  // Contactos (read-only, for WhatsApp)
   const [contactos, setContactos] = useState<Contacto[]>([]);
-  const [showContactos, setShowContactos] = useState(false);
-  const [editContactId, setEditContactId] = useState<string | null>(null);
-  const [editContact, setEditContact] = useState<Partial<Contacto>>({});
-
-  // List email panel
-  const [listEmailPara, setListEmailPara] = useState("");
-  const [listEmailAsunto, setListEmailAsunto] = useState("");
-  const [listEmailCuerpo, setListEmailCuerpo] = useState("");
-  const [listCopied, setListCopied] = useState(false);
 
   // Auth
   useEffect(() => {
@@ -120,7 +103,7 @@ export default function ReclamosPage() {
 
   function getC(empresa: string) { return contactos.find((c) => c.empresa === empresa) || null; }
 
-  function resetForm() { setFEmpresa(""); setFFecha(new Date().toISOString().slice(0, 10)); setFNotas(""); setFItems([emptyItem()]); setError(null); setSavedReclamoId(null); setSavedNroReclamo(""); setFormFotos([]); }
+  function resetForm() { setFEmpresa(""); setFFecha(new Date().toISOString().slice(0, 10)); setFNotas(""); setFItems([emptyItem()]); setError(null); }
 
   function updateItem(idx: number, field: string, val: string | number) {
     setFItems((prev) => prev.map((item, i) => { if (i !== idx) return item; const u = { ...item, [field]: val }; u.subtotal = (u.cantidad || 0) * (u.precio_unitario || 0); return u; }));
@@ -138,7 +121,7 @@ export default function ReclamosPage() {
     setSaving(true); setError(null);
     try {
       const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: mainFactura, nro_orden_compra: "", fecha_reclamo: fFecha, notas: fNotas, items }) });
-      if (res.ok) { const saved = await res.json(); if (saved.id) { setSavedReclamoId(saved.id); setSavedNroReclamo(saved.nro_reclamo || ""); setFormFotos([]); loadReclamos(); } }
+      if (res.ok) { const saved = await res.json(); resetForm(); loadReclamos(); if (saved.id) await loadDetail(saved.id); }
       else { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); }
     } catch { setError("Error de conexión."); } setSaving(false);
   }
@@ -147,23 +130,10 @@ export default function ReclamosPage() {
   async function changeEstado(e: string) { if (!current || current.estado === e) return; if (!confirm(`¿Cambiar estado a "${e}"?`)) return; await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: e }) }); await loadDetail(current.id); loadReclamos(); }
   async function deleteReclamo(id: string) { if (!confirm("¿Eliminar este reclamo?")) return; await fetch(`/api/reclamos/${id}`, { method: "DELETE" }); setCurrent(null); setView("list"); loadReclamos(); }
 
-  async function sendEmail(reclamoId: string) {
-    setSending(true); setSendSuccess(false);
-    const res = await fetch(`/api/reclamos/${reclamoId}/send-email`, { method: "POST" });
-    const data = await res.json();
-    if (res.ok) { setSendSuccess(true); setTimeout(() => setSendSuccess(false), 4000); if (current) await loadDetail(current.id); }
-    else { alert(data.error || "Error al enviar correo."); }
-    setSending(false);
-  }
 
   async function uploadFoto(file: File) { if (!current) return; const fd = new FormData(); fd.append("file", file); await fetch(`/api/reclamos/${current.id}/fotos`, { method: "POST", body: fd }); await loadDetail(current.id); }
   async function deleteFoto(fotoId: string, path: string) { if (!current) return; await fetch(`/api/reclamos/${current.id}/fotos`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ foto_id: fotoId, storage_path: path }) }); await loadDetail(current.id); }
 
-  async function saveContact() {
-    if (editContactId === "new") await fetch("/api/reclamos/contactos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(editContact) });
-    else if (editContactId) await fetch("/api/reclamos/contactos", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: editContactId, ...editContact }) });
-    setEditContactId(null); setEditContact({}); loadContactos();
-  }
 
   function toggleSelect(id: string) { setSelectedIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]); }
 
@@ -173,20 +143,10 @@ export default function ReclamosPage() {
     if (!c?.whatsapp) { alert("No hay contacto con WhatsApp para esta empresa."); return; }
     const sel = reclamos.filter((r) => selectedIds.includes(r.id));
     const lines = sel.map((r) => `• ${r.nro_reclamo} | Factura ${r.nro_factura} | $${fmt(calcSub(r.reclamo_items ?? []) * 1.177)} | Hace ${daysSince(r.fecha_reclamo)} días`).join("\n");
-    const msg = `Hola ${c.nombre}, buenos días. Le escribo de parte de Fashion Group para dar seguimiento:\n\n${lines}\n\n¿Nos puede confirmar el estado? Gracias.`;
+    const msg = `Hola ${(c.nombre_contacto || c.nombre || "equipo")}, buenos días. Le escribo de parte de Fashion Group para dar seguimiento:\n\n${lines}\n\n¿Nos puede confirmar el estado? Gracias.`;
     window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
-  function prepareSelectedEmail() {
-    if (!activeEmpresa) return;
-    const c = getC(activeEmpresa);
-    const sel = reclamos.filter((r) => selectedIds.includes(r.id));
-    const lines = sel.map((r) => `• ${r.nro_reclamo} — Factura ${r.nro_factura} — $${fmt(calcSub(r.reclamo_items ?? []) * 1.177)} — ${r.estado}`).join("\n");
-    setListEmailPara(c?.correo || "");
-    setListEmailAsunto(`Seguimiento Reclamos Pendientes — ${activeEmpresa}`);
-    setListEmailCuerpo(`Estimado/a ${c?.nombre || ""},\n\nResumen de reclamos pendientes de ${activeEmpresa}:\n\n${lines}\n\nQuedamos en espera de su confirmación.\n\nSaludos,\nFashion Group`);
-    setShowEmailPanel(true);
-  }
 
   // ── LIST VIEW ──
   if (view === "list") {
@@ -221,7 +181,7 @@ export default function ReclamosPage() {
                 const hasAlert = open.some((r) => daysSince(r.fecha_reclamo) > 45);
                 const c = getC(empresa);
                 return (
-                  <div key={empresa} onClick={() => { setActiveEmpresa(empresa); setSelectionMode(false); setSelectedIds([]); setShowEmailPanel(false); setSearch(""); setFilterEstado("all"); }}
+                  <div key={empresa} onClick={() => { setActiveEmpresa(empresa); setSelectionMode(false); setSelectedIds([]); setSearch(""); setFilterEstado("all"); }}
                     className="border border-gray-100 rounded-2xl p-6 cursor-pointer hover:border-gray-300 transition">
                     <div className="flex items-start justify-between mb-4">
                       <div><p className="text-sm font-semibold">{empresa}</p><p className="text-xs text-gray-400 mt-0.5">{c?.nombre || "Sin contacto"}</p></div>
@@ -237,23 +197,6 @@ export default function ReclamosPage() {
             </div>
           )}
 
-          {/* Contactos panel */}
-          {showContactos && (
-            <div className="fixed inset-0 bg-black/20 z-50 flex justify-end" onClick={() => setShowContactos(false)}>
-              <div className="bg-white w-full max-w-md h-full overflow-y-auto p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-                <div className="flex items-center justify-between mb-6"><h2 className="text-lg font-semibold">Contactos</h2><button onClick={() => setShowContactos(false)} className="text-gray-400 hover:text-black text-lg">×</button></div>
-                {contactos.map((c) => (
-                  <div key={c.id} className="border-b border-gray-100 py-3">
-                    {editContactId === c.id ? (
-                      <div className="space-y-2">{(["empresa", "nombre", "whatsapp", "correo"] as const).map((f) => <input key={f} type="text" placeholder={f} value={(editContact as Record<string, string>)[f] || ""} onChange={(e) => setEditContact({ ...editContact, [f]: e.target.value })} className="w-full border-b border-gray-200 py-1 text-sm outline-none" />)}<div className="flex gap-2 mt-2"><button onClick={saveContact} className="text-xs bg-black text-white px-3 py-1 rounded-full">Guardar</button><button onClick={() => setEditContactId(null)} className="text-xs text-gray-400">Cancelar</button></div></div>
-                    ) : (<div><div className="font-medium text-sm">{c.empresa}</div><div className="text-xs text-gray-500">{c.nombre} | {c.whatsapp} | {c.correo}</div><button onClick={() => { setEditContactId(c.id); setEditContact(c); }} className="text-xs text-gray-400 hover:text-black mt-1">Editar</button></div>)}
-                  </div>
-                ))}
-                <button onClick={() => { setEditContactId("new"); setEditContact({}); }} className="text-sm text-gray-400 hover:text-black mt-4">+ Nuevo contacto</button>
-                {editContactId === "new" && <div className="mt-3 space-y-2">{(["empresa", "nombre", "whatsapp", "correo"] as const).map((f) => <input key={f} type="text" placeholder={f} value={(editContact as Record<string, string>)[f] || ""} onChange={(e) => setEditContact({ ...editContact, [f]: e.target.value })} className="w-full border-b border-gray-200 py-1 text-sm outline-none" />)}<button onClick={saveContact} className="text-xs bg-black text-white px-3 py-1 rounded-full mt-2">Guardar</button></div>}
-              </div>
-            </div>
-          )}
         </div>
         </div>
       );
@@ -271,16 +214,15 @@ export default function ReclamosPage() {
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="flex items-end justify-between mb-8">
           <div>
-            <button onClick={() => { setActiveEmpresa(null); setSelectionMode(false); setSelectedIds([]); setShowEmailPanel(false); }} className="text-sm text-gray-400 hover:text-black transition mb-2 block">← Empresas</button>
+            <button onClick={() => { setActiveEmpresa(null); setSelectionMode(false); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition mb-2 block">← Empresas</button>
             <h1 className="text-2xl font-semibold tracking-tight">{activeEmpresa}</h1>
-            {c && <p className="text-xs text-gray-400 mt-1">Contacto: {c.nombre} | {c.correo}</p>}
+            {c && <p className="text-xs text-gray-400 mt-1">Contacto: {(c.nombre_contacto || c.nombre || "equipo")} | {c.correo}</p>}
           </div>
           <div className="flex items-center gap-3">
             {selectionMode ? (<>
               <span className="text-sm text-gray-400">{selectedIds.length} seleccionados</span>
               {selectedIds.length > 0 && <button onClick={sendSelectedWA} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">WhatsApp</button>}
-              {selectedIds.length > 0 && <button onClick={prepareSelectedEmail} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">Correo</button>}
-              <button onClick={() => { setSelectionMode(false); setSelectedIds([]); setShowEmailPanel(false); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+              <button onClick={() => { setSelectionMode(false); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
             </>) : (<>
               <button onClick={() => { setSelectionMode(true); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition">Seleccionar</button>
               <button onClick={() => { resetForm(); setFEmpresa(activeEmpresa); setView("form"); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">Nuevo Reclamo</button>
@@ -311,22 +253,6 @@ export default function ReclamosPage() {
           </table>
         )}
 
-        {/* Email panel for selection */}
-        {showEmailPanel && (
-          <div className="mt-6 border border-gray-200 rounded-2xl p-6">
-            <p className="text-sm font-medium mb-4">Correo — {selectedIds.length} reclamos seleccionados</p>
-            <div className="space-y-3">
-              <div><label className="text-[10px] text-gray-400 uppercase">Para</label><input type="text" value={listEmailPara} onChange={(e) => setListEmailPara(e.target.value)} className="w-full border-b border-gray-200 py-1.5 text-sm outline-none" /></div>
-              <div><label className="text-[10px] text-gray-400 uppercase">Asunto</label><input type="text" value={listEmailAsunto} onChange={(e) => setListEmailAsunto(e.target.value)} className="w-full border-b border-gray-200 py-1.5 text-sm outline-none" /></div>
-              <div><label className="text-[10px] text-gray-400 uppercase">Cuerpo</label><textarea value={listEmailCuerpo} onChange={(e) => setListEmailCuerpo(e.target.value)} rows={8} className="w-full border border-gray-200 rounded-lg p-3 text-sm outline-none resize-none mt-1" /></div>
-              <div className="flex gap-3">
-                <button onClick={() => { navigator.clipboard.writeText(listEmailCuerpo); setListCopied(true); setTimeout(() => setListCopied(false), 2000); }} className="text-sm text-gray-400 hover:text-black transition">{listCopied ? "¡Copiado!" : "Copiar cuerpo"}</button>
-                <button onClick={() => window.open(`mailto:${listEmailPara}?subject=${encodeURIComponent(listEmailAsunto)}&body=${encodeURIComponent(listEmailCuerpo)}`)} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">Abrir en Mail</button>
-                <button onClick={() => setShowEmailPanel(false)} className="text-sm text-gray-400 hover:text-black transition">Cerrar</button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
@@ -406,60 +332,11 @@ export default function ReclamosPage() {
             <div className="text-lg font-semibold">Total: ${fmt(fSubtotal * 1.177)}</div>
           </div>
         </div>
-        {savedReclamoId ? (
-          <div className="mt-8 border-t border-gray-100 pt-6">
-            <div className="flex items-center gap-3 mb-6 p-4 bg-gray-50 rounded-xl">
-              <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center flex-shrink-0">
-                <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round"/></svg>
-              </div>
-              <div><p className="text-sm font-medium">{savedNroReclamo} guardado</p><p className="text-xs text-gray-400">Agrega fotos de evidencia (opcional)</p></div>
-            </div>
-            <div className="mb-6">
-              <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Fotos de evidencia</div>
-              {formFotos.length > 0 && (
-                <div className="flex gap-3 flex-wrap mb-3">
-                  {formFotos.map((f) => (
-                    <div key={f.id} className="relative">
-                      <img src={f.url || `${SUPA_URL}/storage/v1/object/public/reclamo-fotos/${f.storage_path}`} alt="" className="w-20 h-20 object-cover rounded-xl border border-gray-100" />
-                      <button onClick={async () => { await fetch(`/api/reclamos/${savedReclamoId}/fotos`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ foto_id: f.id, storage_path: f.storage_path }) }); setFormFotos((p) => p.filter((x) => x.id !== f.id)); }}
-                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {formFotos.length < 3 && (<>
-                <input ref={formFotoRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
-                  const file = e.target.files?.[0]; if (!file || !savedReclamoId) return;
-                  setUploadingFormFoto(true);
-                  const fd = new FormData(); fd.append("file", file);
-                  const res = await fetch(`/api/reclamos/${savedReclamoId}/fotos`, { method: "POST", body: fd });
-                  if (res.ok) { const data = await res.json(); setFormFotos((p) => [...p, data]); }
-                  setUploadingFormFoto(false);
-                  if (formFotoRef.current) formFotoRef.current.value = "";
-                }} />
-                <button onClick={() => formFotoRef.current?.click()} disabled={uploadingFormFoto} className="text-sm text-gray-400 hover:text-black transition disabled:opacity-40">{uploadingFormFoto ? "Subiendo..." : "+ Agregar foto"}</button>
-              </>)}
-            </div>
-            <button onClick={() => { const id = savedReclamoId; resetForm(); loadReclamos(); if (id) loadDetail(id); }}
-              className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition">Ver reclamo →</button>
-            <button onClick={() => sendEmail(savedReclamoId!)} disabled={sending}
-              className="text-sm text-gray-400 hover:text-black transition disabled:opacity-40 mt-3 block">
-              {sending ? "Enviando..." : sendSuccess ? "✓ Correo enviado" : "Enviar por correo"}
-            </button>
-          </div>
-        ) : (
-          <div className="mt-8">
-            <div className="border-t border-gray-100 pt-6 mb-6">
-              <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Fotos de evidencia</div>
-              <p className="text-[12px] text-gray-400 italic">Podrás agregar fotos después de guardar.</p>
-            </div>
-            {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-            <div className="flex items-center gap-6">
-              <button onClick={saveReclamo} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">{saving ? "Guardando..." : "Guardar Reclamo"}</button>
-              <button onClick={() => { resetForm(); setView("list"); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
-            </div>
-          </div>
-        )}
+        {error && <p className="text-red-500 text-sm mt-6 mb-4">{error}</p>}
+        <div className="flex items-center gap-6 mt-6">
+          <button onClick={saveReclamo} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">{saving ? "Guardando..." : "Guardar Reclamo"}</button>
+          <button onClick={() => { resetForm(); setView("list"); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+        </div>
       </div>
     );
   }
@@ -537,10 +414,6 @@ export default function ReclamosPage() {
       </div>
 
       <div className="flex gap-3 flex-wrap mb-4">
-        <button onClick={() => sendEmail(current.id)} disabled={sending}
-          className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition disabled:opacity-40">
-          {sending ? "Enviando..." : sendSuccess ? "✓ Enviado" : "Enviar por Correo"}
-        </button>
         <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} className="text-sm text-gray-400 hover:text-black transition">Descargar Excel</button>
         {role === "admin" && <button onClick={() => deleteReclamo(current.id)} className="text-sm text-gray-300 hover:text-red-500 transition ml-auto">Eliminar</button>}
       </div>

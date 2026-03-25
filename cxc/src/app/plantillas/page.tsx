@@ -67,10 +67,10 @@ export default function PlantillasPage() {
             <div><div className="text-xl font-semibold text-red-600 tabular-nums">${fmt(cxc.vencidoMas121)}</div><div className="text-xs text-gray-400 mt-0.5">Vencido +121d</div></div>
             <div><div className="text-xl font-semibold tabular-nums">{cxc.clientesCriticos}</div><div className="text-xs text-gray-400 mt-0.5">Clientes críticos</div></div>
           </div>
-          <div className="mt-3 h-1.5 rounded-full overflow-hidden flex gap-0.5">
-            <div className="bg-green-500 rounded-full" style={{ flexBasis: `${cxc.corrientePct}%` }} />
-            <div className="bg-yellow-400 rounded-full" style={{ flexBasis: `${cxc.vigilanciaPct}%` }} />
-            <div className="bg-red-400 rounded-full" style={{ flexBasis: `${cxc.vencidoPct}%` }} />
+          <div className="mt-3 flex h-1.5 rounded-full overflow-hidden gap-px">
+            <div style={{ flex: cxc.corrientePct, background: "#22c55e" }} className="rounded-l-full" />
+            <div style={{ flex: cxc.vigilanciaPct, background: "#facc15" }} />
+            <div style={{ flex: cxc.vencidoPct, background: "#f87171" }} className="rounded-r-full" />
           </div>
         </button>
       )}
