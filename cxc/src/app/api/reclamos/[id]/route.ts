@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+  const { id } = params;
+  if (!uuidRegex.test(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+
   const { data, error } = await supabaseServer
     .from("reclamos")
     .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_seguimiento(*)")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -19,12 +24,15 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const { id } = params;
+  if (!uuidRegex.test(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+
   const body = await req.json();
   const { estado, notas, seguimiento_nota, autor } = body;
 
   if (seguimiento_nota) {
     await supabaseServer.from("reclamo_seguimiento").insert({
-      reclamo_id: params.id,
+      reclamo_id: id,
       nota: seguimiento_nota,
       autor: autor || "",
     });
@@ -35,7 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (notas !== undefined) updates.notas = notas;
 
   if (Object.keys(updates).length > 1) {
-    const { error } = await supabaseServer.from("reclamos").update(updates).eq("id", params.id);
+    const { error } = await supabaseServer.from("reclamos").update(updates).eq("id", id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -43,11 +51,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  // Get fotos to delete from storage
+  const { id } = params;
+  if (!uuidRegex.test(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+
   const { data: fotos } = await supabaseServer
     .from("reclamo_fotos")
     .select("storage_path")
-    .eq("reclamo_id", params.id);
+    .eq("reclamo_id", id);
 
   if (fotos) {
     for (const f of fotos) {
@@ -55,7 +65,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     }
   }
 
-  const { error } = await supabaseServer.from("reclamos").delete().eq("id", params.id);
+  const { error } = await supabaseServer.from("reclamos").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

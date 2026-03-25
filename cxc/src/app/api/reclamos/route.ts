@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (recErr) return NextResponse.json({ error: recErr.message, details: recErr, hint: "Insert failed", nro_reclamo }, { status: 500 });
+  if (recErr) return NextResponse.json({ error: recErr.message, code: recErr.code, details: recErr.details, hint: recErr.hint }, { status: 500 });
 
   if (items && items.length > 0) {
     const rows = items.map((item: Record<string, unknown>) => ({
