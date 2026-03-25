@@ -53,8 +53,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     xlRows.push([]);
     xlRows.push([null, null, null, null, "Subtotal", subtotal]);
     xlRows.push([null, null, null, null, "Importación (10%)", subtotal * 0.10]);
-    xlRows.push([null, null, null, null, "ITBMS (7%)", subtotal * 0.07]);
-    xlRows.push([null, null, null, null, "TOTAL", subtotal * 1.17]);
+    xlRows.push([null, null, null, null, "ITBMS (7%)", subtotal * 0.077]);
+    xlRows.push([null, null, null, null, "TOTAL", subtotal * 1.177]);
 
     const ws = XLSX.utils.aoa_to_sheet(xlRows);
     ws["!cols"] = [{ wch: 18 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 24 }, { wch: 16 }, { wch: 14 }];
@@ -81,7 +81,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     }
 
     // Build HTML
-    const total = subtotal * 1.17;
+    const total = subtotal * 1.177;
     const itemRowsHtml = items.map((item) => `
       <tr>
         <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0">${item.referencia}</td>
@@ -121,7 +121,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
           <tfoot>
             <tr><td colspan="5" style="padding:8px;text-align:right;color:#666;font-size:11px">Subtotal</td><td style="padding:8px;text-align:right">$${fmt(subtotal)}</td><td colspan="2"></td></tr>
             <tr><td colspan="5" style="padding:4px 8px;text-align:right;color:#666;font-size:11px">Importación (10%)</td><td style="padding:4px 8px;text-align:right;font-size:11px">$${fmt(subtotal * 0.10)}</td><td colspan="2"></td></tr>
-            <tr><td colspan="5" style="padding:4px 8px;text-align:right;color:#666;font-size:11px">ITBMS (7%)</td><td style="padding:4px 8px;text-align:right;font-size:11px">$${fmt(subtotal * 0.07)}</td><td colspan="2"></td></tr>
+            <tr><td colspan="5" style="padding:4px 8px;text-align:right;color:#666;font-size:11px">ITBMS (7%)</td><td style="padding:4px 8px;text-align:right;font-size:11px">$${fmt(subtotal * 0.077)}</td><td colspan="2"></td></tr>
             <tr style="border-top:2px solid #000"><td colspan="5" style="padding:8px;text-align:right;font-weight:600">TOTAL</td><td style="padding:8px;text-align:right;font-weight:600">$${fmt(total)}</td><td colspan="2"></td></tr>
           </tfoot>
         </table>

@@ -114,7 +114,7 @@ export default function ReclamosPage() {
   const empInfo = fEmpresa ? EMPRESAS_MAP[fEmpresa] : null;
   const fSubtotal = fItems.reduce((s, i) => s + (i.subtotal || 0), 0);
   const pendientes = reclamos.filter((r) => r.estado !== "Aplicada");
-  const totalPendiente = pendientes.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * 1.17, 0);
+  const totalPendiente = pendientes.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * 1.177, 0);
   const alertas = pendientes.filter((r) => daysSince(r.fecha_reclamo) > 45).length;
 
   function getC(empresa: string) { return contactos.find((c) => c.empresa === empresa) || null; }
@@ -171,7 +171,7 @@ export default function ReclamosPage() {
     const c = getC(activeEmpresa);
     if (!c?.whatsapp) { alert("No hay contacto con WhatsApp para esta empresa."); return; }
     const sel = reclamos.filter((r) => selectedIds.includes(r.id));
-    const lines = sel.map((r) => `• ${r.nro_reclamo} | Factura ${r.nro_factura} | $${fmt(calcSub(r.reclamo_items ?? []) * 1.17)} | Hace ${daysSince(r.fecha_reclamo)} días`).join("\n");
+    const lines = sel.map((r) => `• ${r.nro_reclamo} | Factura ${r.nro_factura} | $${fmt(calcSub(r.reclamo_items ?? []) * 1.177)} | Hace ${daysSince(r.fecha_reclamo)} días`).join("\n");
     const msg = `Hola ${c.nombre}, buenos días. Le escribo de parte de Fashion Group para dar seguimiento:\n\n${lines}\n\n¿Nos puede confirmar el estado? Gracias.`;
     window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
   }
@@ -180,7 +180,7 @@ export default function ReclamosPage() {
     if (!activeEmpresa) return;
     const c = getC(activeEmpresa);
     const sel = reclamos.filter((r) => selectedIds.includes(r.id));
-    const lines = sel.map((r) => `• ${r.nro_reclamo} — Factura ${r.nro_factura} — $${fmt(calcSub(r.reclamo_items ?? []) * 1.17)} — ${r.estado}`).join("\n");
+    const lines = sel.map((r) => `• ${r.nro_reclamo} — Factura ${r.nro_factura} — $${fmt(calcSub(r.reclamo_items ?? []) * 1.177)} — ${r.estado}`).join("\n");
     setListEmailPara(c?.correo || "");
     setListEmailAsunto(`Seguimiento Reclamos Pendientes — ${activeEmpresa}`);
     setListEmailCuerpo(`Estimado/a ${c?.nombre || ""},\n\nResumen de reclamos pendientes de ${activeEmpresa}:\n\n${lines}\n\nQuedamos en espera de su confirmación.\n\nSaludos,\nFashion Group`);
@@ -215,7 +215,7 @@ export default function ReclamosPage() {
               {EMPRESAS.map((empresa) => {
                 const ers = reclamos.filter((r) => r.empresa === empresa);
                 const open = ers.filter((r) => r.estado !== "Aplicada");
-                const tot = open.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * 1.17, 0);
+                const tot = open.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * 1.177, 0);
                 const hasAlert = open.some((r) => daysSince(r.fecha_reclamo) > 45);
                 const c = getC(empresa);
                 return (
@@ -226,7 +226,7 @@ export default function ReclamosPage() {
                       {hasAlert && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full">Alerta</span>}
                     </div>
                     <div className="flex gap-6">
-                      <div><p className="text-2xl font-semibold tabular-nums">{open.length}</p><p className="text-xs text-gray-400 mt-0.5">abiertos</p></div>
+                      <div><p className="text-2xl font-semibold tabular-nums">{open.length}</p><p className="text-xs text-gray-400 mt-0.5">facturas</p></div>
                       <div><p className="text-2xl font-semibold tabular-nums">${fmt(tot)}</p><p className="text-xs text-gray-400 mt-0.5">pendiente</p></div>
                     </div>
                   </div>
@@ -294,12 +294,12 @@ export default function ReclamosPage() {
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
               {selectionMode && <th className="pb-3 w-8"></th>}
-              <th className="text-left pb-3 font-medium">N°</th><th className="text-left pb-3 font-medium">Factura</th><th className="text-left pb-3 font-medium">Fecha</th><th className="text-right pb-3 font-medium">Días</th><th className="text-left pb-3 font-medium">Estado</th><th className="text-right pb-3 font-medium">Total</th><th className="text-right pb-3 font-medium"></th>
+              <th className="text-left pb-3 font-medium">Factura</th><th className="text-left pb-3 font-medium">N° Reclamo</th><th className="text-left pb-3 font-medium">Fecha</th><th className="text-right pb-3 font-medium">Días</th><th className="text-left pb-3 font-medium">Estado</th><th className="text-right pb-3 font-medium">Total</th><th className="text-right pb-3 font-medium"></th>
             </tr></thead>
-            <tbody>{empresaRecs.map((r) => { const days = daysSince(r.fecha_reclamo); const total = calcSub(r.reclamo_items ?? []) * 1.17; const canSelect = r.estado !== "Aplicada"; return (
+            <tbody>{empresaRecs.map((r) => { const days = daysSince(r.fecha_reclamo); const total = calcSub(r.reclamo_items ?? []) * 1.177; const canSelect = r.estado !== "Aplicada"; return (
               <tr key={r.id} onClick={() => !selectionMode && loadDetail(r.id)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
                 {selectionMode && <td className="py-3" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!canSelect} className="accent-black disabled:opacity-30" /></td>}
-                <td className="py-3 font-medium">{r.nro_reclamo}</td><td className="py-3 text-gray-500">{r.nro_factura}</td><td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
+                <td className="py-3 font-medium">{r.nro_factura}</td><td className="py-3"><span className="text-gray-500 text-xs">{r.nro_reclamo}</span></td><td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
                 <td className={`py-3 text-right tabular-nums ${days > 60 && canSelect ? "text-red-600 font-medium" : "text-gray-400"}`}>{days}</td>
                 <td className="py-3"><span className={`text-[11px] px-2 py-0.5 rounded-full ${EC[r.estado] || "bg-gray-100 text-gray-500"}`}>{r.estado}</span></td>
                 <td className="py-3 text-right tabular-nums">${fmt(total)}</td>
@@ -399,8 +399,8 @@ export default function ReclamosPage() {
           <div className="mt-6 text-right text-sm space-y-1">
             <div>Subtotal: <span className="tabular-nums font-medium">${fmt(fSubtotal)}</span></div>
             <div className="text-gray-400">Importación (10%): ${fmt(fSubtotal * 0.10)}</div>
-            <div className="text-gray-400">ITBMS (7%): ${fmt(fSubtotal * 0.07)}</div>
-            <div className="text-lg font-semibold">Total: ${fmt(fSubtotal * 1.17)}</div>
+            <div className="text-gray-400">ITBMS (7% s/imp.): ${fmt(fSubtotal * 0.077)}</div>
+            <div className="text-lg font-semibold">Total: ${fmt(fSubtotal * 1.177)}</div>
           </div>
         </div>
         {savedReclamoId ? (
@@ -448,7 +448,7 @@ export default function ReclamosPage() {
           <div className="mt-8">
             <div className="border-t border-gray-100 pt-6 mb-6">
               <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Fotos de evidencia</div>
-              <p className="text-sm text-gray-300">Podrás agregar fotos después de guardar.</p>
+              <p className="text-[12px] text-gray-400 italic">Podrás agregar fotos después de guardar.</p>
             </div>
             {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
             <div className="flex items-center gap-6">
@@ -488,8 +488,8 @@ export default function ReclamosPage() {
       <div className="grid grid-cols-4 gap-4 mb-8">
         <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Subtotal</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub)}</div></div>
         <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Import. 10%</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * 0.10)}</div></div>
-        <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS 7%</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * 0.07)}</div></div>
-        <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Total</div><div className="text-base font-bold tabular-nums mt-1">${fmt(sub * 1.17)}</div></div>
+        <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * 0.077)}</div></div>
+        <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Total</div><div className="text-base font-bold tabular-nums mt-1">${fmt(sub * 1.177)}</div></div>
       </div>
 
       {items.length > 0 && (
@@ -509,7 +509,7 @@ export default function ReclamosPage() {
       {/* Fotos */}
       <div className="mb-8">
         <div className="text-xs uppercase tracking-widest text-gray-400 mb-3">Fotos de Evidencia</div>
-        {fotos.length === 0 ? <p className="text-sm text-gray-300">Sin fotos adjuntas</p> : (
+        {fotos.length === 0 ? <p className="text-[12px] text-gray-400 italic">Sin fotos adjuntas</p> : (
           <div className="flex gap-3 flex-wrap">
             {fotos.map((f) => (
               <div key={f.id} className="relative">

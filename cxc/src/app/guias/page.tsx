@@ -386,7 +386,7 @@ export default function GuiasPage() {
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por transportista o cliente..."
+            placeholder="Buscar por transportista, cliente o factura..."
             className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black w-full max-w-sm mb-6"
           />
           <table className="w-full text-sm">
@@ -400,7 +400,7 @@ export default function GuiasPage() {
               </tr>
             </thead>
             <tbody>
-              {guias.filter((g) => !search || g.transportista.toLowerCase().includes(search.toLowerCase())).map((g) => (
+              {guias.filter((g) => { if (!search) return true; const q = search.toLowerCase(); return g.transportista.toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).map((g) => (
                 <tr key={g.id} onClick={() => viewGuia(g.id)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
                   <td className="py-3.5 font-medium">{g.numero}</td>
                   <td className="py-3.5 text-gray-500">{fmtDate(g.fecha)}</td>

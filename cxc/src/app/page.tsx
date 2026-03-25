@@ -29,11 +29,7 @@ export default function LoginPage() {
       }
 
       sessionStorage.setItem("cxc_role", data.role);
-      if (data.role === "upload") {
-        router.push("/upload");
-      } else {
-        router.push("/admin");
-      }
+      router.push("/plantillas");
     } catch {
       setError("Error de conexión");
     } finally {

@@ -38,8 +38,8 @@ function buildSheet(rec: Record<string, unknown>, items: Record<string, unknown>
   rows.push([]);
   rows.push([null, null, null, null, null, "Subtotal:", subtotal]);
   rows.push([null, null, null, null, null, "Importación (10%):", subtotal * 0.10]);
-  rows.push([null, null, null, null, null, "ITBMS (7%):", subtotal * 0.07]);
-  rows.push([null, null, null, null, null, "TOTAL:", subtotal * 1.17]);
+  rows.push([null, null, null, null, null, "ITBMS (7%):", subtotal * 0.077]);
+  rows.push([null, null, null, null, null, "TOTAL:", subtotal * 1.177]);
 
   return rows;
 }
