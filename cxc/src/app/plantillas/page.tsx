@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import FGLogo from "@/components/FGLogo";
 
 export default function PlantillasPage() {
   const router = useRouter();
@@ -66,8 +67,8 @@ export default function PlantillasPage() {
         ← Dashboard
       </button>
 
-      <h1 className="text-2xl font-semibold tracking-tight">Plantillas</h1>
-      <p className="text-sm text-gray-400 mt-1 mb-10">Documentos y formularios del grupo</p>
+      <FGLogo variant="horizontal" theme="light" size={32} />
+      <p className="text-sm text-gray-400 mt-2 mb-10">Plantillas — Documentos y formularios del grupo</p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {cards.map((card) => (

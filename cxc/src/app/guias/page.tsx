@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import FGLogo from "@/components/FGLogo";
 
 interface GuiaItem {
   id?: string;
@@ -321,8 +322,8 @@ export default function GuiasPage() {
       <div className="max-w-5xl mx-auto px-6 py-12">
         <div className="flex items-end justify-between mb-10">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Guías de Transporte</h1>
-            <p className="text-sm text-gray-400 mt-1">Registro de despachos</p>
+            <FGLogo variant="horizontal" theme="light" size={32} />
+            <p className="text-sm text-gray-400 mt-2">Guías de Transporte</p>
           </div>
           <div className="flex items-center gap-4">
             <button onClick={() => { resetForm(); setFormNumero(nextNumero); setView("form"); }}

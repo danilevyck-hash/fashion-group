@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import FGLogo from "@/components/FGLogo";
 import { supabase } from "@/lib/supabase";
 import { ALL_COMPANIES, getCompaniesForRole } from "@/lib/companies";
 import { normalizeName } from "@/lib/normalize";
@@ -187,13 +188,7 @@ export default function UploadPage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-3">
-          <img src="/logo.jpeg" alt="FG" className="w-10 h-10 rounded" />
-          <div>
-            <h1 className="text-xl font-bold">Carga de Archivos CXC</h1>
-            <p className="text-sm text-gray-500">Seleccione un CSV por empresa</p>
-          </div>
-        </div>
+        <FGLogo variant="horizontal" theme="light" size={32} />
         <div className="flex items-center gap-4">
           <button onClick={() => router.push("/plantillas")} className="text-sm text-gray-400 hover:text-black transition">
             Plantillas

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import FGLogo from "@/components/FGLogo";
 
 interface Cliente {
   id: string;
@@ -128,8 +129,8 @@ export default function DirectorioPage() {
       {/* Header */}
       <div className="flex items-end justify-between mb-10">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Directorio</h1>
-          <p className="text-sm text-gray-400 mt-1">Contactos del grupo</p>
+          <FGLogo variant="horizontal" theme="light" size={32} />
+          <p className="text-sm text-gray-400 mt-2">Directorio — Contactos del grupo</p>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => router.push("/admin")} className="text-sm text-gray-400 hover:text-black transition">

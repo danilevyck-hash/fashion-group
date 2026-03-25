@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import FGLogo from "@/components/FGLogo";
 
 interface CajaPeriodo {
   id: string;
@@ -11,6 +12,8 @@ interface CajaPeriodo {
   fondo_inicial: number;
   estado: string;
   total_gastado: number;
+  repuesto: boolean;
+  repuesto_at: string | null;
   caja_gastos?: CajaGasto[];
 }
 
@@ -25,7 +28,11 @@ interface CajaGasto {
   subtotal: number;
   itbms: number;
   total: number;
+  categoria: string;
+  responsable: string;
 }
+
+const CATEGORIAS = ["Papelería y oficina", "Transporte", "Mantenimiento", "Varios"];
 
 function fmt(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -48,6 +55,11 @@ export default function CajaPage() {
   const [error, setError] = useState<string | null>(null);
   const [role, setRole] = useState("");
 
+  // Responsables
+  const [responsables, setResponsables] = useState<string[]>([]);
+  const [showAddResponsable, setShowAddResponsable] = useState(false);
+  const [newResponsable, setNewResponsable] = useState("");
+
   // Add expense form state
   const [gFecha, setGFecha] = useState(new Date().toISOString().slice(0, 10));
   const [gNombre, setGNombre] = useState("");
@@ -56,6 +68,8 @@ export default function CajaPage() {
   const [gFactura, setGFactura] = useState("");
   const [gSubtotal, setGSubtotal] = useState("");
   const [gItbmsPct, setGItbmsPct] = useState("0");
+  const [gCategoria, setGCategoria] = useState("Varios");
+  const [gResponsable, setGResponsable] = useState("");
   const [addingGasto, setAddingGasto] = useState(false);
 
   const subtotalNum = parseFloat(gSubtotal) || 0;
@@ -66,6 +80,9 @@ export default function CajaPage() {
     const r = sessionStorage.getItem("cxc_role");
     if (r) setRole(r);
     loadPeriodos();
+    fetch("/api/caja/responsables").then((r) => r.ok ? r.json() : []).then((data) => {
+      setResponsables((data || []).map((r: { nombre: string }) => r.nombre));
+    }).catch(() => {});
   }, []);
 
   const loadPeriodos = useCallback(async () => {
@@ -142,11 +159,14 @@ export default function CajaPage() {
           subtotal: subtotalNum,
           itbms: itbmsNum,
           total: totalNum,
+          categoria: gCategoria,
+          responsable: gResponsable,
         }),
       });
       if (!res.ok) throw new Error();
       setGFecha(new Date().toISOString().split("T")[0]);
       setGNombre(""); setGRuc(""); setGDv(""); setGFactura(""); setGSubtotal(""); setGItbmsPct("0");
+      setGCategoria("Varios"); setGResponsable("");
       await loadDetail(current.id);
       loadPeriodos();
     } catch {
@@ -171,8 +191,8 @@ export default function CajaPage() {
       <div className="max-w-5xl mx-auto px-6 py-12">
         <div className="flex items-end justify-between mb-10">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Caja Menuda</h1>
-            <p className="text-sm text-gray-400 mt-1">Fondo inicial: $200.00</p>
+            <FGLogo variant="horizontal" theme="light" size={32} />
+            <p className="text-sm text-gray-400 mt-2">Caja Menuda — Fondo inicial: $200.00</p>
           </div>
           <div className="flex items-center gap-4">
             {!hasOpenPeriod && (
@@ -294,7 +314,7 @@ export default function CajaPage() {
         {isOpen && (
           <div className="mb-10">
             <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Agregar Gasto</div>
-            <div className="grid grid-cols-9 gap-3 items-end">
+            <div className="grid grid-cols-6 gap-3 items-end mb-3">
               <div>
                 <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Fecha</label>
                 <input type="date" value={gFecha} onChange={(e) => setGFecha(e.target.value)}
@@ -321,6 +341,43 @@ export default function CajaPage() {
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
+                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Categoría</label>
+                <select value={gCategoria} onChange={(e) => setGCategoria(e.target.value)}
+                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
+                  {CATEGORIAS.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-6 gap-3 items-end">
+              <div>
+                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">
+                  Responsable
+                  {!showAddResponsable && (
+                    <button onClick={() => setShowAddResponsable(true)} className="text-gray-300 hover:text-gray-500 transition text-xs ml-1">＋</button>
+                  )}
+                </label>
+                {showAddResponsable ? (
+                  <div className="flex items-center gap-1">
+                    <input type="text" value={newResponsable} onChange={(e) => setNewResponsable(e.target.value)} placeholder="Nombre"
+                      className="flex-1 border-b border-gray-300 py-1 text-xs outline-none focus:border-black" autoFocus />
+                    <button onClick={async () => {
+                      if (!newResponsable.trim()) return;
+                      await fetch("/api/caja/responsables", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre: newResponsable.trim() }) });
+                      setResponsables([...responsables, newResponsable.trim()]);
+                      setGResponsable(newResponsable.trim());
+                      setNewResponsable(""); setShowAddResponsable(false);
+                    }} className="text-xs text-gray-500 hover:text-black">OK</button>
+                    <button onClick={() => { setNewResponsable(""); setShowAddResponsable(false); }} className="text-xs text-gray-300 hover:text-black">×</button>
+                  </div>
+                ) : (
+                  <select value={gResponsable} onChange={(e) => setGResponsable(e.target.value)}
+                    className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
+                    <option value="">—</option>
+                    {responsables.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                )}
+              </div>
+              <div>
                 <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Sub-total</label>
                 <input type="number" step="0.01" value={gSubtotal} onChange={(e) => setGSubtotal(e.target.value)}
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
@@ -338,9 +395,9 @@ export default function CajaPage() {
                 <input type="text" readOnly value={`$${fmt(totalNum)}`}
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent tabular-nums" />
               </div>
-              <div>
+              <div className="col-span-2">
                 <button onClick={addGasto} disabled={addingGasto || !gNombre || subtotalNum <= 0}
-                  className="w-full bg-black text-white px-3 py-1.5 rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40">
+                  className="bg-black text-white px-6 py-1.5 rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40">
                   Agregar
                 </button>
               </div>
@@ -356,8 +413,8 @@ export default function CajaPage() {
               <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
                 <th className="text-left pb-3 font-medium">Fecha</th>
                 <th className="text-left pb-3 font-medium">Nombre</th>
-                <th className="text-left pb-3 font-medium">RUC</th>
-                <th className="text-left pb-3 font-medium">DV</th>
+                <th className="text-left pb-3 font-medium">Categoría</th>
+                <th className="text-left pb-3 font-medium">Responsable</th>
                 <th className="text-left pb-3 font-medium">Factura</th>
                 <th className="text-right pb-3 font-medium">Sub-total</th>
                 <th className="text-right pb-3 font-medium">ITBMS</th>
@@ -374,8 +431,8 @@ export default function CajaPage() {
                     <tr key={g.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition">
                       <td className="py-3 text-gray-500">{fmtDate(g.fecha)}</td>
                       <td className="py-3">{g.nombre}</td>
-                      <td className="py-3 text-gray-500">{g.ruc}</td>
-                      <td className="py-3 text-gray-500">{g.dv}</td>
+                      <td className="py-3 text-gray-500">{g.categoria || "Varios"}</td>
+                      <td className="py-3 text-gray-500">{g.responsable || "—"}</td>
                       <td className="py-3 text-gray-500">{g.factura}</td>
                       <td className="py-3 text-right tabular-nums">${fmt(g.subtotal)}</td>
                       <td className="py-3 text-right tabular-nums text-gray-500">${fmt(g.itbms)}</td>

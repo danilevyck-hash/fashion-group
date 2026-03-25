@@ -7,6 +7,7 @@ import { COMPANIES, getCompaniesForRole } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
 import { VENDOR_MAP } from "@/lib/vendors";
+import FGLogo from "@/components/FGLogo";
 import UploadFreshness from "./components/UploadFreshness";
 import KpiCards from "./components/KpiCards";
 import CompanySummary from "./components/CompanySummary";
@@ -468,10 +469,7 @@ export default function AdminDashboard() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-8 border-b border-gray-100 px-6 py-4 -mx-4 -mt-4">
-        <div>
-          <h1 className="text-xl font-bold">Fashion Group</h1>
-          <p className="text-sm text-gray-500">Panel Administrativo</p>
-        </div>
+        <FGLogo variant="horizontal" theme="light" size={36} />
         <div className="flex items-center gap-6">
           {/* Export dropdown */}
           <div className="relative">
