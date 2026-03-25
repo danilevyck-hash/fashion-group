@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import FGLogo from "@/components/FGLogo";
+import AppHeader from "@/components/AppHeader";
 
 interface GuiaItem {
   id?: string;
@@ -319,11 +319,12 @@ export default function GuiasPage() {
   // ── LIST VIEW ──
   if (view === "list") {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div>
+        <AppHeader module="Guías de Transporte" />
+        <div className="max-w-5xl mx-auto px-6 py-8">
         <div className="flex items-end justify-between mb-10">
           <div>
-            <FGLogo variant="horizontal" theme="light" size={32} />
-            <p className="text-sm text-gray-400 mt-2">Guías de Transporte</p>
+            <h1 className="text-xl font-semibold tracking-tight">Guías de Transporte</h1>
           </div>
           <div className="flex items-center gap-4">
             <button onClick={() => { resetForm(); setFormNumero(nextNumero); setView("form"); }}
@@ -336,12 +337,6 @@ export default function GuiasPage() {
               title="Ayuda"
             >
               ?
-            </button>
-            <button onClick={() => router.push("/plantillas")} className="text-sm text-gray-400 hover:text-black transition">
-              Plantillas
-            </button>
-            <button onClick={() => router.push("/admin")} className="text-sm text-gray-400 hover:text-black transition">
-              Panel CXC
             </button>
           </div>
         </div>
@@ -415,6 +410,7 @@ export default function GuiasPage() {
             </tbody>
           </table>
         </>)}
+      </div>
       </div>
     );
   }

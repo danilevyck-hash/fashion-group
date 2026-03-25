@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import FGLogo from "@/components/FGLogo";
+import AppHeader from "@/components/AppHeader";
 
 interface CajaPeriodo {
   id: string;
@@ -222,23 +222,17 @@ export default function CajaPage() {
   // ── LIST VIEW ──
   if (view === "list") {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div>
+        <AppHeader module="Caja Menuda" />
+        <div className="max-w-5xl mx-auto px-6 py-8">
         <div className="flex items-end justify-between mb-10">
-          <div>
-            <FGLogo variant="horizontal" theme="light" size={32} />
-            <p className="text-sm text-gray-400 mt-2">Caja Menuda</p>
-          </div>
-          <div className="flex items-center gap-4">
-            {!hasOpenPeriod && (
-              <button onClick={createPeriodo}
-                className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
-                Nuevo Período
-              </button>
-            )}
-            <button onClick={() => router.push("/plantillas")} className="text-sm text-gray-400 hover:text-black transition">
-              Plantillas
+          <h1 className="text-xl font-semibold tracking-tight">Caja Menuda</h1>
+          {!hasOpenPeriod && (
+            <button onClick={createPeriodo}
+              className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
+              Nuevo Período
             </button>
-          </div>
+          )}
         </div>
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
@@ -297,6 +291,7 @@ export default function CajaPage() {
             </tbody>
           </table>
         )}
+      </div>
       </div>
     );
   }

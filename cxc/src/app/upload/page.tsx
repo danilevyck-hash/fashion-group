@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import FGLogo from "@/components/FGLogo";
+import AppHeader from "@/components/AppHeader";
 import { supabase } from "@/lib/supabase";
 import { ALL_COMPANIES, getCompaniesForRole } from "@/lib/companies";
 import { normalizeName } from "@/lib/normalize";
@@ -186,31 +186,12 @@ export default function UploadPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div>
+      <AppHeader module="Carga de Archivos" />
+      <div className="max-w-2xl mx-auto px-6 py-8">
       <div className="flex items-center justify-between mb-8">
-        <FGLogo variant="horizontal" theme="light" size={32} />
+        <h1 className="text-xl font-semibold tracking-tight">Carga de Archivos CXC</h1>
         <div className="flex items-center gap-4">
-          <button onClick={() => router.push("/plantillas")} className="text-sm text-gray-400 hover:text-black transition">
-            Plantillas
-          </button>
-          <button onClick={() => router.push("/directorio")} className="text-sm text-gray-400 hover:text-black transition">
-            Directorio
-          </button>
-          <button onClick={() => router.push("/reclamos")} className="text-sm text-gray-400 hover:text-black transition">
-            Reclamos
-          </button>
-          <button onClick={() => router.push("/cheques")} className="text-sm text-gray-400 hover:text-black transition">
-            Cheques
-          </button>
-          <button
-            onClick={() => {
-              sessionStorage.removeItem("cxc_role");
-              router.push("/");
-            }}
-            className="text-sm text-gray-500 hover:text-black"
-          >
-            Salir
-          </button>
         </div>
       </div>
 
@@ -276,6 +257,7 @@ export default function UploadPage() {
           );
         })}
       </div>
+    </div>
     </div>
   );
 }

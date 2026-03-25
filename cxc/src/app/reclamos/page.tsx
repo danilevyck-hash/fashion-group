@@ -63,12 +63,23 @@ export default function ReclamosPage() {
   // Form
   const [fEmpresa, setFEmpresa] = useState("");
   const [fFecha, setFFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [fFactura, setFFactura] = useState("");
+  const [fPedido, setFPedido] = useState("");
   const [fNotas, setFNotas] = useState("");
   const [fItems, setFItems] = useState<RItem[]>([emptyItem()]);
 
   // Detail
   const [nota, setNota] = useState("");
   const fotoRef = useRef<HTMLInputElement>(null);
+  const [editMode, setEditMode] = useState(false);
+  const [editEmpresa, setEditEmpresa] = useState("");
+  const [editFactura, setEditFactura] = useState("");
+  const [editPedido, setEditPedido] = useState("");
+  const [editFecha, setEditFecha] = useState("");
+  const [editNotas, setEditNotas] = useState("");
+  const [editEstado, setEditEstado] = useState("");
+  const [editItems, setEditItems] = useState<RItem[]>([]);
+  const [editSaving, setEditSaving] = useState(false);
 
   // Contactos (read-only, for WhatsApp)
   const [contactos, setContactos] = useState<Contacto[]>([]);
@@ -103,7 +114,7 @@ export default function ReclamosPage() {
 
   function getC(empresa: string) { return contactos.find((c) => c.empresa === empresa) || null; }
 
-  function resetForm() { setFEmpresa(""); setFFecha(new Date().toISOString().slice(0, 10)); setFNotas(""); setFItems([emptyItem()]); setError(null); }
+  function resetForm() { setFEmpresa(""); setFFecha(new Date().toISOString().slice(0, 10)); setFFactura(""); setFPedido(""); setFNotas(""); setFItems([emptyItem()]); setError(null); }
 
   function updateItem(idx: number, field: string, val: string | number) {
     setFItems((prev) => prev.map((item, i) => { if (i !== idx) return item; const u = { ...item, [field]: val }; u.subtotal = (u.cantidad || 0) * (u.precio_unitario || 0); return u; }));
@@ -114,13 +125,12 @@ export default function ReclamosPage() {
   }
 
   async function saveReclamo() {
-    if (!fEmpresa || !fFecha) { setError("Completa empresa y fecha."); return; }
+    if (!fEmpresa || !fFecha || !fFactura) { setError("Completa empresa, factura y fecha."); return; }
     const items = fItems.filter((i) => i.referencia || i.cantidad > 0);
     if (!items.length) { setError("Agrega al menos un ítem."); return; }
-    const mainFactura = items.find((i) => i.nro_factura)?.nro_factura || "—";
     setSaving(true); setError(null);
     try {
-      const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: mainFactura, nro_orden_compra: "", fecha_reclamo: fFecha, notas: fNotas, items }) });
+      const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: fFactura, nro_orden_compra: fPedido, fecha_reclamo: fFecha, notas: fNotas, items }) });
       if (res.ok) { const saved = await res.json(); resetForm(); loadReclamos(); if (saved.id) await loadDetail(saved.id); }
       else { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); }
     } catch { setError("Error de conexión."); } setSaving(false);
@@ -136,6 +146,34 @@ export default function ReclamosPage() {
 
 
   function toggleSelect(id: string) { setSelectedIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]); }
+
+  function startEdit() {
+    if (!current) return;
+    setEditEmpresa(current.empresa); setEditFactura(current.nro_factura || ""); setEditPedido(current.nro_orden_compra || "");
+    setEditFecha(current.fecha_reclamo || ""); setEditNotas(current.notas || ""); setEditEstado(current.estado || "");
+    setEditItems((current.reclamo_items || []).map((i) => ({ ...i }))); setEditMode(true);
+  }
+
+  async function saveEdit() {
+    if (!current) return;
+    setEditSaving(true);
+    try {
+      await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: editEmpresa, proveedor: EMPRESAS_MAP[editEmpresa]?.proveedor || current.proveedor, marca: EMPRESAS_MAP[editEmpresa]?.marca || current.marca, nro_factura: editFactura, nro_orden_compra: editPedido, fecha_reclamo: editFecha, notas: editNotas, estado: editEstado }) });
+      await fetch(`/api/reclamos/${current.id}/items`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: editItems }) });
+      setEditMode(false); await loadDetail(current.id); loadReclamos();
+    } catch { /* */ }
+    setEditSaving(false);
+  }
+
+  function updateEditItem(idx: number, field: string, val: string | number) {
+    setEditItems((prev) => prev.map((item, i) => { if (i !== idx) return item; const u = { ...item, [field]: val }; u.subtotal = (Number(u.cantidad) || 0) * (Number(u.precio_unitario) || 0); return u; }));
+  }
+
+  async function downloadSelectedExcel() {
+    if (!selectedIds.length) return;
+    const res = await fetch("/api/reclamos/export-excel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: selectedIds }) });
+    if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Reclamos-${activeEmpresa || "export"}-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url); }
+  }
 
   function sendSelectedWA() {
     if (!activeEmpresa) return;
@@ -221,7 +259,10 @@ export default function ReclamosPage() {
           <div className="flex items-center gap-3">
             {selectionMode ? (<>
               <span className="text-sm text-gray-400">{selectedIds.length} seleccionados</span>
-              {selectedIds.length > 0 && <button onClick={sendSelectedWA} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">WhatsApp</button>}
+              {selectedIds.length > 0 && <>
+                <button onClick={sendSelectedWA} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">WhatsApp</button>
+                <button onClick={downloadSelectedExcel} className="text-sm border border-gray-200 text-gray-600 px-5 py-2 rounded-full hover:bg-gray-50 transition">Excel ({selectedIds.length})</button>
+              </>}
               <button onClick={() => { setSelectionMode(false); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
             </>) : (<>
               <button onClick={() => { setSelectionMode(true); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition">Seleccionar</button>
@@ -242,8 +283,8 @@ export default function ReclamosPage() {
               <th className="text-left pb-3 font-medium">Factura</th><th className="text-left pb-3 font-medium">N° Reclamo</th><th className="text-left pb-3 font-medium">Fecha</th><th className="text-right pb-3 font-medium">Días</th><th className="text-left pb-3 font-medium">Estado</th><th className="text-right pb-3 font-medium">Total</th><th className="text-right pb-3 font-medium"></th>
             </tr></thead>
             <tbody>{empresaRecs.map((r) => { const days = daysSince(r.fecha_reclamo); const total = calcSub(r.reclamo_items ?? []) * 1.177; const canSelect = r.estado !== "Aplicada"; return (
-              <tr key={r.id} onClick={() => !selectionMode && loadDetail(r.id)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
-                {selectionMode && <td className="py-3" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!canSelect} className="accent-black disabled:opacity-30" /></td>}
+              <tr key={r.id} onClick={() => selectionMode ? (canSelect && toggleSelect(r.id)) : loadDetail(r.id)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
+                {selectionMode && <td className="py-3"><input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!canSelect} className="accent-black disabled:opacity-30" /></td>}
                 <td className="py-3 font-medium">{r.nro_factura}</td><td className="py-3"><span className="text-gray-500 text-xs">{r.nro_reclamo}</span></td><td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
                 <td className={`py-3 text-right tabular-nums ${days > 60 && canSelect ? "text-red-600 font-medium" : "text-gray-400"}`}>{days}</td>
                 <td className="py-3"><span className={`text-[11px] px-2 py-0.5 rounded-full ${EC[r.estado] || "bg-gray-100 text-gray-500"}`}>{r.estado}</span></td>
@@ -265,17 +306,25 @@ export default function ReclamosPage() {
         <h1 className="text-2xl font-semibold tracking-tight mb-10">Nuevo Reclamo</h1>
         <div className="mb-10">
           <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Información General</div>
-          <div className="grid grid-cols-3 gap-x-12 gap-y-5">
+          <div className="grid grid-cols-3 gap-x-12 gap-y-5 mb-6">
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa *</label>
               <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm text-black outline-none bg-transparent"><option value="">Seleccionar...</option>{EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}</select>
               {empInfo && <p className="text-xs text-gray-400 mt-1">Proveedor: {empInfo.proveedor} | Marca: {empInfo.marca}</p>}
             </div>
             <div className="flex flex-col gap-1">
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Factura *</label>
+              <input type="text" value={fFactura} onChange={(e) => setFFactura(e.target.value)} placeholder="Ej. 3000012593" className="border-b border-gray-200 py-1.5 text-sm text-black outline-none" />
+            </div>
+            <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha *</label>
               <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm text-black outline-none" />
             </div>
             <div className="flex flex-col gap-1">
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Pedido</label>
+              <input type="text" value={fPedido} onChange={(e) => setFPedido(e.target.value)} placeholder="Ej. PO-2026-001" className="border-b border-gray-200 py-1.5 text-sm text-black outline-none" />
+            </div>
+            <div className="flex flex-col gap-1 col-span-2">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Notas</label>
               <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={1} className="border-b border-gray-200 py-1.5 text-sm text-black outline-none resize-none" />
             </div>
@@ -292,8 +341,6 @@ export default function ReclamosPage() {
               <th className="pb-2 font-medium text-center" style={{minWidth:60}}>Cant.</th>
               <th className="pb-2 font-medium text-right" style={{minWidth:80}}>Precio U.</th>
               <th className="pb-2 font-medium text-left">Motivo</th>
-              <th className="pb-2 font-medium text-left" style={{minWidth:90}}>N° Factura</th>
-              <th className="pb-2 font-medium text-left" style={{minWidth:80}}>N° PO</th>
               <th className="pb-2 font-medium text-right" style={{minWidth:80}}>Subtotal</th>
               <th className="pb-2 w-6"></th>
             </tr></thead>
@@ -317,8 +364,6 @@ export default function ReclamosPage() {
                 <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-center" /></td>
                 <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-right" /></td>
                 <td className="py-2 pr-1"><select value={item.motivo} onChange={(e) => updateItem(idx, "motivo", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent"><option value="">—</option>{MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}</select></td>
-                <td className="py-2 pr-1"><input type="text" value={item.nro_factura} onChange={(e) => updateItem(idx, "nro_factura", e.target.value)} placeholder="Factura" className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
-                <td className="py-2 pr-1"><input type="text" value={item.nro_orden_compra} onChange={(e) => updateItem(idx, "nro_orden_compra", e.target.value)} placeholder="PO" className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
                 <td className="py-2 text-right tabular-nums text-gray-500 text-xs">${fmt((item.cantidad || 0) * (item.precio_unitario || 0))}</td>
                 <td className="py-2 text-center">{fItems.length > 1 && <button onClick={() => setFItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm">×</button>}</td>
               </tr>))}</tbody>
@@ -414,9 +459,55 @@ export default function ReclamosPage() {
       </div>
 
       <div className="flex gap-3 flex-wrap mb-4">
-        <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} className="text-sm text-gray-400 hover:text-black transition">Descargar Excel</button>
+        <button onClick={startEdit} className="text-sm text-gray-400 hover:text-black transition">Editar</button>
+        <button onClick={() => {
+          const c = getC(current.empresa);
+          if (!c?.whatsapp) { alert("No hay contacto WhatsApp para esta empresa."); return; }
+          const nombre = c.nombre_contacto || c.nombre || "equipo";
+          const total = calcSub(current.reclamo_items ?? []) * 1.177;
+          const msg = `Hola ${nombre}, te escribo de parte de Fashion Group para dar seguimiento al reclamo ${current.nro_reclamo}.\n\nFactura: ${current.nro_factura}\nTotal a acreditar: $${fmt(total)}\nEstado: ${current.estado}\nFecha: ${fmtDate(current.fecha_reclamo)}\n\n¿Nos puedes confirmar el estado? Gracias.`;
+          window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
+        }} className="text-sm text-gray-400 hover:text-black transition">WhatsApp</button>
+        <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} className="text-sm text-gray-400 hover:text-black transition">Excel</button>
         {role === "admin" && <button onClick={() => deleteReclamo(current.id)} className="text-sm text-gray-300 hover:text-red-500 transition ml-auto">Eliminar</button>}
       </div>
+
+      {/* Edit mode */}
+      {editMode && (
+        <div className="border-t border-gray-100 pt-6">
+          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Editando Reclamo</div>
+          <div className="grid grid-cols-3 gap-x-12 gap-y-5 mb-6">
+            <div className="flex flex-col gap-1"><label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa</label><select value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent">{EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}</select></div>
+            <div className="flex flex-col gap-1"><label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Factura</label><input type="text" value={editFactura} onChange={(e) => setEditFactura(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" /></div>
+            <div className="flex flex-col gap-1"><label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha</label><input type="date" value={editFecha} onChange={(e) => setEditFecha(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" /></div>
+            <div className="flex flex-col gap-1"><label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Pedido</label><input type="text" value={editPedido} onChange={(e) => setEditPedido(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" /></div>
+            <div className="flex flex-col gap-1"><label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Estado</label><select value={editEstado} onChange={(e) => setEditEstado(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent">{ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}</select></div>
+            <div className="flex flex-col gap-1"><label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Notas</label><textarea value={editNotas} onChange={(e) => setEditNotas(e.target.value)} rows={1} className="border-b border-gray-200 py-1.5 text-sm outline-none resize-none" /></div>
+          </div>
+          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Ítems</div>
+          <div className="overflow-x-auto mb-4">
+            <table className="w-full text-sm"><thead><tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
+              <th className="pb-2 font-medium text-left">Código</th><th className="pb-2 font-medium text-left">Descripción</th><th className="pb-2 font-medium text-left" style={{minWidth:70}}>Talla</th><th className="pb-2 font-medium text-center" style={{minWidth:60}}>Cant.</th><th className="pb-2 font-medium text-right" style={{minWidth:80}}>Precio U.</th><th className="pb-2 font-medium text-left">Motivo</th><th className="pb-2 font-medium text-right" style={{minWidth:80}}>Subtotal</th><th className="pb-2 w-6"></th>
+            </tr></thead>
+            <tbody>{editItems.map((item, idx) => (
+              <tr key={idx} className="border-b border-gray-100">
+                <td className="py-2 pr-1"><input type="text" value={item.referencia} onChange={(e) => updateEditItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
+                <td className="py-2 pr-1"><input type="text" value={item.descripcion} onChange={(e) => updateEditItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
+                <td className="py-2 pr-1"><input type="text" value={item.talla} onChange={(e) => updateEditItem(idx, "talla", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none" style={{minWidth:50}} /></td>
+                <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateEditItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-center" /></td>
+                <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateEditItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-right" /></td>
+                <td className="py-2 pr-1"><select value={item.motivo} onChange={(e) => updateEditItem(idx, "motivo", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent"><option value="">—</option>{MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}</select></td>
+                <td className="py-2 text-right tabular-nums text-gray-500 text-xs">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>
+                <td className="py-2 text-center">{editItems.length > 1 && <button onClick={() => setEditItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm">×</button>}</td>
+              </tr>))}</tbody></table>
+          </div>
+          <button onClick={() => setEditItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition mb-6">+ Agregar fila</button>
+          <div className="flex items-center gap-6">
+            <button onClick={saveEdit} disabled={editSaving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">{editSaving ? "Guardando..." : "Guardar cambios"}</button>
+            <button onClick={() => setEditMode(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

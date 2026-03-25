@@ -7,7 +7,7 @@ import { COMPANIES, getCompaniesForRole } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
 import { VENDOR_MAP } from "@/lib/vendors";
-import FGLogo from "@/components/FGLogo";
+import AppHeader from "@/components/AppHeader";
 import UploadFreshness from "./components/UploadFreshness";
 import KpiCards from "./components/KpiCards";
 import CompanySummary from "./components/CompanySummary";
@@ -466,12 +466,11 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8 border-b border-gray-100 px-6 py-4 -mx-4 -mt-4">
-        <FGLogo variant="horizontal" theme="light" size={36} />
-        <div className="flex items-center gap-6">
-          {/* Export dropdown */}
+    <div>
+      <AppHeader module="Panel CXC" />
+      <div className="max-w-6xl mx-auto px-6 py-8">
+      {/* Export */}
+      <div className="flex justify-end mb-6">
           <div className="relative">
             <button
               onClick={() => setShowExport(!showExport)}
@@ -526,30 +525,6 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
-          <button onClick={() => router.push("/plantillas")} className="text-sm text-gray-400 hover:text-black transition">
-            Plantillas
-          </button>
-          <button onClick={() => router.push("/directorio")} className="text-sm text-gray-400 hover:text-black transition">
-            Directorio
-          </button>
-          <button onClick={() => router.push("/reclamos")} className="text-sm text-gray-400 hover:text-black transition">
-            Reclamos
-          </button>
-          <button onClick={() => router.push("/cheques")} className="text-sm text-gray-400 hover:text-black transition">
-            Cheques
-          </button>
-          {userRole !== "director" && (
-            <button onClick={() => router.push("/upload")} className="text-sm text-gray-400 hover:text-black transition">
-              Cargar archivos
-            </button>
-          )}
-          <button
-            onClick={() => { sessionStorage.removeItem("cxc_role"); router.push("/"); }}
-            className="text-sm text-gray-400 hover:text-black transition"
-          >
-            Salir
-          </button>
-        </div>
       </div>
 
       <UploadFreshness roleCompanies={roleCompanies} uploads={uploads} />
@@ -588,6 +563,7 @@ export default function AdminDashboard() {
         onMarkContacted={markContacted}
         onSaveEdit={handleSaveEdit}
       />
+    </div>
     </div>
   );
 }
