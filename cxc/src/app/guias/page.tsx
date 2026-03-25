@@ -401,13 +401,12 @@ export default function GuiasPage() {
             </thead>
             <tbody>
               {guias.filter((g) => !search || g.transportista.toLowerCase().includes(search.toLowerCase())).map((g) => (
-                <tr key={g.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition">
+                <tr key={g.id} onClick={() => viewGuia(g.id)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
                   <td className="py-3.5 font-medium">{g.numero}</td>
                   <td className="py-3.5 text-gray-500">{fmtDate(g.fecha)}</td>
                   <td className="py-3.5">{g.transportista}</td>
                   <td className="py-3.5 text-right tabular-nums">{g.total_bultos}</td>
-                  <td className="py-3.5 text-right">
-                    <button onClick={() => viewGuia(g.id)} className="text-sm text-gray-400 hover:text-black transition mr-3">Ver</button>
+                  <td className="py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => startEdit(g.id)} className="text-sm text-gray-400 hover:text-black transition mr-3">Editar</button>
                     <button onClick={() => deleteGuia(g.id)} className="text-sm text-gray-300 hover:text-black transition">Eliminar</button>
                   </td>

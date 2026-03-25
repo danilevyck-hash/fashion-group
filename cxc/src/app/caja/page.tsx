@@ -265,7 +265,7 @@ export default function CajaPage() {
               {periodos.map((p) => {
                 const saldo = p.fondo_inicial - p.total_gastado;
                 return (
-                  <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition">
+                  <tr key={p.id} onClick={() => loadDetail(p.id)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
                     <td className="py-3.5 font-medium">{p.numero}</td>
                     <td className="py-3.5 text-gray-500">{fmtDate(p.fecha_apertura)}</td>
                     <td className="py-3.5 text-gray-500">{p.fecha_cierre ? fmtDate(p.fecha_cierre) : "—"}</td>
@@ -281,8 +281,7 @@ export default function CajaPage() {
                     <td className={`py-3.5 text-right tabular-nums font-medium ${saldo < 0 ? "text-red-600" : ""}`}>
                       ${fmt(saldo)}
                     </td>
-                    <td className="py-3.5 text-right">
-                      <button onClick={() => loadDetail(p.id)} className="text-sm text-gray-400 hover:text-black transition mr-3">Ver</button>
+                    <td className="py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => { loadDetail(p.id).then(() => setView("print")); }}
                         className="text-sm text-gray-400 hover:text-black transition mr-3">Imprimir</button>
                       {p.estado === "abierto" && (

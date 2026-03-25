@@ -65,6 +65,11 @@ export default function ReclamosPage() {
   const [fFecha, setFFecha] = useState(new Date().toISOString().slice(0, 10));
   const [fNotas, setFNotas] = useState("");
   const [fItems, setFItems] = useState<RItem[]>([emptyItem()]);
+  const [savedReclamoId, setSavedReclamoId] = useState<string | null>(null);
+  const [savedNroReclamo, setSavedNroReclamo] = useState("");
+  const [formFotos, setFormFotos] = useState<Foto[]>([]);
+  const [uploadingFormFoto, setUploadingFormFoto] = useState(false);
+  const formFotoRef = useRef<HTMLInputElement>(null);
 
   // Detail
   const [nota, setNota] = useState("");
@@ -117,7 +122,7 @@ export default function ReclamosPage() {
 
   function getC(empresa: string) { return contactos.find((c) => c.empresa === empresa) || null; }
 
-  function resetForm() { setFEmpresa(""); setFFecha(new Date().toISOString().slice(0, 10)); setFNotas(""); setFItems([emptyItem()]); setError(null); }
+  function resetForm() { setFEmpresa(""); setFFecha(new Date().toISOString().slice(0, 10)); setFNotas(""); setFItems([emptyItem()]); setError(null); setSavedReclamoId(null); setSavedNroReclamo(""); setFormFotos([]); }
 
   function updateItem(idx: number, field: string, val: string | number) {
     setFItems((prev) => prev.map((item, i) => { if (i !== idx) return item; const u = { ...item, [field]: val }; u.subtotal = (u.cantidad || 0) * (u.precio_unitario || 0); return u; }));
@@ -135,7 +140,7 @@ export default function ReclamosPage() {
     setSaving(true); setError(null);
     try {
       const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: mainFactura, nro_orden_compra: "", fecha_reclamo: fFecha, notas: fNotas, items }) });
-      if (res.ok) { const saved = await res.json(); resetForm(); loadReclamos(); if (saved.id) await loadDetail(saved.id); }
+      if (res.ok) { const saved = await res.json(); if (saved.id) { setSavedReclamoId(saved.id); setSavedNroReclamo(saved.nro_reclamo || ""); setFormFotos([]); loadReclamos(); } }
       else { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); }
     } catch { setError("Error de conexión."); } setSaving(false);
   }
@@ -296,13 +301,13 @@ export default function ReclamosPage() {
               <th className="text-left pb-3 font-medium">N°</th><th className="text-left pb-3 font-medium">Factura</th><th className="text-left pb-3 font-medium">Fecha</th><th className="text-right pb-3 font-medium">Días</th><th className="text-left pb-3 font-medium">Estado</th><th className="text-right pb-3 font-medium">Total</th><th className="text-right pb-3 font-medium"></th>
             </tr></thead>
             <tbody>{empresaRecs.map((r) => { const days = daysSince(r.fecha_reclamo); const total = calcSub(r.reclamo_items ?? []) * 1.17; const canSelect = r.estado !== "Aplicada"; return (
-              <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition">
-                {selectionMode && <td className="py-3"><input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!canSelect} className="accent-black disabled:opacity-30" /></td>}
+              <tr key={r.id} onClick={() => !selectionMode && loadDetail(r.id)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
+                {selectionMode && <td className="py-3" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!canSelect} className="accent-black disabled:opacity-30" /></td>}
                 <td className="py-3 font-medium">{r.nro_reclamo}</td><td className="py-3 text-gray-500">{r.nro_factura}</td><td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
                 <td className={`py-3 text-right tabular-nums ${days > 60 && canSelect ? "text-red-600 font-medium" : "text-gray-400"}`}>{days}</td>
                 <td className="py-3"><span className={`text-[11px] px-2 py-0.5 rounded-full ${EC[r.estado] || "bg-gray-100 text-gray-500"}`}>{r.estado}</span></td>
                 <td className="py-3 text-right tabular-nums">${fmt(total)}</td>
-                <td className="py-3 text-right"><button onClick={() => loadDetail(r.id)} className="text-sm text-gray-400 hover:text-black transition mr-3">Ver</button>{role === "admin" && <button onClick={() => deleteReclamo(r.id)} className="text-sm text-gray-300 hover:text-black transition">Eliminar</button>}</td>
+                <td className="py-3 text-right" onClick={(e) => e.stopPropagation()}>{role === "admin" && <button onClick={() => deleteReclamo(r.id)} className="text-sm text-gray-300 hover:text-black transition">Eliminar</button>}</td>
               </tr>); })}</tbody>
           </table>
         )}
@@ -402,15 +407,56 @@ export default function ReclamosPage() {
             <div className="text-lg font-semibold">Total: ${fmt(fSubtotal * 1.17)}</div>
           </div>
         </div>
-        <div className="mt-8 border-t border-gray-100 pt-6 mb-8">
-          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Fotos de evidencia</div>
-          <p className="text-sm text-gray-400">Podrás agregar fotos después de guardar el reclamo.</p>
-        </div>
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-        <div className="flex items-center gap-6">
-          <button onClick={saveReclamo} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">{saving ? "Guardando..." : "Guardar Reclamo"}</button>
-          <button onClick={() => setView("list")} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
-        </div>
+        {savedReclamoId ? (
+          <div className="mt-8 border-t border-gray-100 pt-6">
+            <div className="flex items-center gap-3 mb-6 p-4 bg-gray-50 rounded-xl">
+              <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center flex-shrink-0">
+                <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round"/></svg>
+              </div>
+              <div><p className="text-sm font-medium">{savedNroReclamo} guardado</p><p className="text-xs text-gray-400">Agrega fotos de evidencia (opcional)</p></div>
+            </div>
+            <div className="mb-6">
+              <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Fotos de evidencia</div>
+              {formFotos.length > 0 && (
+                <div className="flex gap-3 flex-wrap mb-3">
+                  {formFotos.map((f) => (
+                    <div key={f.id} className="relative">
+                      <img src={f.url || `${SUPA_URL}/storage/v1/object/public/reclamo-fotos/${f.storage_path}`} alt="" className="w-20 h-20 object-cover rounded-xl border border-gray-100" />
+                      <button onClick={async () => { await fetch(`/api/reclamos/${savedReclamoId}/fotos`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ foto_id: f.id, storage_path: f.storage_path }) }); setFormFotos((p) => p.filter((x) => x.id !== f.id)); }}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {formFotos.length < 3 && (<>
+                <input ref={formFotoRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                  const file = e.target.files?.[0]; if (!file || !savedReclamoId) return;
+                  setUploadingFormFoto(true);
+                  const fd = new FormData(); fd.append("file", file);
+                  const res = await fetch(`/api/reclamos/${savedReclamoId}/fotos`, { method: "POST", body: fd });
+                  if (res.ok) { const data = await res.json(); setFormFotos((p) => [...p, data]); }
+                  setUploadingFormFoto(false);
+                  if (formFotoRef.current) formFotoRef.current.value = "";
+                }} />
+                <button onClick={() => formFotoRef.current?.click()} disabled={uploadingFormFoto} className="text-sm text-gray-400 hover:text-black transition disabled:opacity-40">{uploadingFormFoto ? "Subiendo..." : "+ Agregar foto"}</button>
+              </>)}
+            </div>
+            <button onClick={() => { const id = savedReclamoId; resetForm(); loadReclamos(); if (id) loadDetail(id); }}
+              className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition">Ver reclamo →</button>
+          </div>
+        ) : (
+          <div className="mt-8">
+            <div className="border-t border-gray-100 pt-6 mb-6">
+              <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Fotos de evidencia</div>
+              <p className="text-sm text-gray-300">Podrás agregar fotos después de guardar.</p>
+            </div>
+            {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+            <div className="flex items-center gap-6">
+              <button onClick={saveReclamo} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">{saving ? "Guardando..." : "Guardar Reclamo"}</button>
+              <button onClick={() => { resetForm(); setView("list"); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }

@@ -14,15 +14,26 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+    console.log(`Foto upload: ${file.name}, size: ${buffer.length} bytes`);
+
     const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
     const fileName = `${crypto.randomUUID()}.${ext}`;
     const storagePath = `${id}/${fileName}`;
 
+    const contentType = file.type ||
+      (ext === "jpg" || ext === "jpeg" ? "image/jpeg" :
+       ext === "png" ? "image/png" :
+       ext === "gif" ? "image/gif" :
+       ext === "webp" ? "image/webp" : "image/jpeg");
+
     const { error: uploadError } = await supabaseServer.storage
       .from("reclamo-fotos")
-      .upload(storagePath, buffer, { contentType: file.type || "image/jpeg", upsert: false });
+      .upload(storagePath, buffer, { contentType, upsert: true });
 
-    if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
+    if (uploadError) {
+      console.error("Storage upload error:", JSON.stringify(uploadError));
+      return NextResponse.json({ error: uploadError.message, details: uploadError }, { status: 500 });
+    }
 
     const { data: urlData } = supabaseServer.storage.from("reclamo-fotos").getPublicUrl(storagePath);
 
@@ -35,6 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
     return NextResponse.json(data);
   } catch (err) {
+    console.error("Foto upload exception:", err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }
