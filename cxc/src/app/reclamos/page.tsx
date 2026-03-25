@@ -431,7 +431,7 @@ export default function ReclamosPage() {
                       {MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}
                     </select>
                   </td>
-                  <td className="py-2 text-right tabular-nums text-gray-500">${fmt(item.subtotal)}</td>
+                  <td className="py-2 text-right tabular-nums text-gray-500">${fmt((item.cantidad || 0) * (item.precio_unitario || 0))}</td>
                   <td className="py-2 text-center">
                     {fItems.length > 1 && (
                       <button
@@ -484,7 +484,7 @@ export default function ReclamosPage() {
 
   const items = current.reclamo_items ?? [];
   const seg = current.reclamo_seguimiento ?? [];
-  const sub = items.reduce((s, i) => s + (i.subtotal || 0), 0);
+  const sub = items.reduce((s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0), 0);
   const days = daysSince(current.fecha_reclamo);
 
   return (
@@ -567,7 +567,7 @@ export default function ReclamosPage() {
                   <td className="py-2 text-gray-500">{item.talla}</td>
                   <td className="py-2 text-right tabular-nums">{item.cantidad || 0}</td>
                   <td className="py-2 text-right tabular-nums">${fmt(item.precio_unitario)}</td>
-                  <td className="py-2 text-right tabular-nums font-medium">${fmt(item.subtotal)}</td>
+                  <td className="py-2 text-right tabular-nums font-medium">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>
                   <td className="py-2 text-gray-500 text-xs">{item.motivo}</td>
                 </tr>
               ))}
