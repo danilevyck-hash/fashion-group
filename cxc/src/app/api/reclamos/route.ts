@@ -7,7 +7,7 @@ export async function GET() {
     .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_seguimiento(*)")
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message, details: error, hint: "GET failed" }, { status: 500 });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
 
@@ -19,27 +19,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Campos requeridos faltantes" }, { status: 400 });
   }
 
-  // Generate nro_reclamo: REC-YYYY-NNNN
+  // Generate nro_reclamo with retry to avoid UNIQUE conflicts
   const year = new Date().getFullYear();
-  let seq = 1;
-  try {
-    const { data: existing, error: countErr } = await supabaseServer
+  let nro_reclamo = "";
+  let attempts = 0;
+  while (!nro_reclamo && attempts < 5) {
+    attempts++;
+    const { count } = await supabaseServer
       .from("reclamos")
-      .select("nro_reclamo")
-      .like("nro_reclamo", `REC-${year}-%`)
-      .order("nro_reclamo", { ascending: false })
-      .limit(1);
-
-    if (!countErr && existing && existing.length > 0) {
-      const last = existing[0].nro_reclamo as string;
-      const parts = last.split("-");
-      seq = (parseInt(parts[2]) || 0) + 1;
-    }
-  } catch {
-    // If table is empty or query fails, start at 1
+      .select("*", { count: "exact", head: true })
+      .then((r) => ({ count: r.count ?? 0 }));
+    const seq = (count || 0) + attempts;
+    const candidate = `REC-${year}-${String(seq).padStart(4, "0")}`;
+    const { data: existing } = await supabaseServer
+      .from("reclamos")
+      .select("id")
+      .eq("nro_reclamo", candidate)
+      .maybeSingle();
+    if (!existing) nro_reclamo = candidate;
   }
-
-  const nro_reclamo = `REC-${year}-${String(seq).padStart(4, "0")}`;
+  if (!nro_reclamo) nro_reclamo = `REC-${year}-${Date.now()}`;
 
   const { data: reclamo, error: recErr } = await supabaseServer
     .from("reclamos")
@@ -51,12 +50,19 @@ export async function POST(req: NextRequest) {
       nro_factura,
       nro_orden_compra: nro_orden_compra || "",
       fecha_reclamo,
+      estado: "Enviado",
       notas: notas || "",
     })
     .select()
     .single();
 
-  if (recErr) return NextResponse.json({ error: recErr.message, code: recErr.code, details: recErr.details, hint: recErr.hint }, { status: 500 });
+  if (recErr) return NextResponse.json({
+    error: recErr.message,
+    code: recErr.code,
+    details: recErr.details,
+    hint: recErr.hint,
+    attempted_nro: nro_reclamo,
+  }, { status: 500 });
 
   if (items && items.length > 0) {
     const rows = items.map((item: Record<string, unknown>) => ({
@@ -70,10 +76,9 @@ export async function POST(req: NextRequest) {
       motivo: item.motivo || "",
     }));
     const { error: itemsErr } = await supabaseServer.from("reclamo_items").insert(rows);
-    if (itemsErr) return NextResponse.json({ error: itemsErr.message, details: itemsErr, hint: "Items insert failed" }, { status: 500 });
+    if (itemsErr) return NextResponse.json({ error: itemsErr.message, hint: "Items insert failed" }, { status: 500 });
   }
 
-  // Return with items
   const { data: full } = await supabaseServer
     .from("reclamos")
     .select("*, reclamo_items(*)")
