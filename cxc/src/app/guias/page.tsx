@@ -165,6 +165,8 @@ export default function GuiasPage() {
     setSaving(false);
   }
 
+  const [showHelp, setShowHelp] = useState(false);
+
   // ── LIST VIEW ──
   if (view === "list") {
     return (
@@ -176,8 +178,15 @@ export default function GuiasPage() {
           </div>
           <div className="flex items-center gap-4">
             <button onClick={() => { resetForm(); setView("form"); }}
-              className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
+              className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
               Nueva Guía
+            </button>
+            <button
+              onClick={() => setShowHelp(!showHelp)}
+              className="w-8 h-8 rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100 text-sm flex items-center justify-center transition"
+              title="Ayuda"
+            >
+              ?
             </button>
             <button onClick={() => router.push("/plantillas")} className="text-sm text-gray-400 hover:text-black transition">
               Plantillas
@@ -188,12 +197,41 @@ export default function GuiasPage() {
           </div>
         </div>
 
+        {showHelp && (
+          <div className="bg-gray-50 rounded-2xl p-6 mb-8 text-sm">
+            <p className="font-medium mb-3">¿Cómo usar las Guías de Transporte?</p>
+            <ol className="space-y-2 text-gray-500 list-decimal list-inside">
+              <li>Haz clic en &quot;Nueva Guía&quot; para registrar un despacho</li>
+              <li>Selecciona el transportista y la fecha del envío</li>
+              <li>Agrega una fila por cada cliente que recibe mercancía</li>
+              <li>Indica la empresa que despacha, las facturas incluidas y la cantidad de bultos</li>
+              <li>Guarda — se genera automáticamente el documento listo para imprimir</li>
+              <li>Desde la lista puedes ver, imprimir o eliminar cualquier guía anterior</li>
+            </ol>
+          </div>
+        )}
+
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
         {loading ? (
           <div>{[...Array(5)].map((_, i) => <div key={i} className="animate-pulse flex gap-4 py-3 border-b border-gray-100"><div className="h-3 bg-gray-100 rounded w-1/3" /><div className="h-3 bg-gray-100 rounded w-1/5 ml-auto" /><div className="h-3 bg-gray-100 rounded w-1/5" /><div className="h-3 bg-gray-100 rounded w-1/6" /></div>)}</div>
         ) : guias.length === 0 ? (
-          <p className="text-gray-300 text-sm text-center py-20">No hay guías registradas</p>
+          <div className="text-center py-20">
+            <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-400">
+                <rect x="1" y="3" width="15" height="13" rx="2"/>
+                <path d="M16 8h4l3 5v3h-7V8z"/>
+                <circle cx="5.5" cy="18.5" r="2.5"/>
+                <circle cx="18.5" cy="18.5" r="2.5"/>
+              </svg>
+            </div>
+            <p className="text-sm font-medium text-gray-700 mb-1">No hay guías registradas</p>
+            <p className="text-sm text-gray-400 mb-6">Crea tu primera guía para registrar un despacho</p>
+            <button onClick={() => { resetForm(); setView("form"); }}
+              className="text-sm bg-black text-white px-6 py-2.5 rounded-full hover:bg-gray-800 transition">
+              Crear primera guía
+            </button>
+          </div>
         ) : (<>
           <input
             type="text"

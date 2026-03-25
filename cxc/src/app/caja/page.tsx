@@ -177,7 +177,7 @@ export default function CajaPage() {
           <div className="flex items-center gap-4">
             {!hasOpenPeriod && (
               <button onClick={createPeriodo}
-                className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
+                className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
                 Nuevo Período
               </button>
             )}

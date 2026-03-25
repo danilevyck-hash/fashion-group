@@ -467,17 +467,17 @@ export default function AdminDashboard() {
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-8 border-b border-gray-100 px-6 py-4 -mx-4 -mt-4">
         <div>
-          <h1 className="text-xl font-bold">CXC — Fashion Group</h1>
-          <p className="text-sm text-gray-500">Panel de Cuentas por Cobrar</p>
+          <h1 className="text-xl font-bold">Fashion Group</h1>
+          <p className="text-sm text-gray-500">Panel Administrativo</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-6">
           {/* Export dropdown */}
           <div className="relative">
             <button
               onClick={() => setShowExport(!showExport)}
-              className="text-sm border border-gray-300 rounded px-3 py-1.5 hover:border-black transition"
+              className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition"
             >
               Exportar
             </button>
@@ -528,17 +528,20 @@ export default function AdminDashboard() {
               </div>
             )}
           </div>
-          <button onClick={() => router.push("/plantillas")} className="text-sm text-gray-500 hover:text-black">
+          <button onClick={() => router.push("/plantillas")} className="text-sm text-gray-400 hover:text-black transition">
             Plantillas
           </button>
+          <button onClick={() => router.push("/directorio")} className="text-sm text-gray-400 hover:text-black transition">
+            Directorio
+          </button>
           {userRole !== "director" && (
-            <button onClick={() => router.push("/upload")} className="text-sm text-gray-500 hover:text-black">
+            <button onClick={() => router.push("/upload")} className="text-sm text-gray-400 hover:text-black transition">
               Cargar archivos
             </button>
           )}
           <button
             onClick={() => { sessionStorage.removeItem("cxc_role"); router.push("/"); }}
-            className="text-sm text-gray-500 hover:text-black"
+            className="text-sm text-gray-400 hover:text-black transition"
           >
             Salir
           </button>
