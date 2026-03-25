@@ -38,7 +38,9 @@ function loadCategorias(): string[] {
   if (typeof window === "undefined") return CATEGORIAS_DEFAULT;
   try {
     const stored = JSON.parse(localStorage.getItem("fg_categorias") || "[]") as string[];
-    return [...CATEGORIAS_DEFAULT, ...stored.filter((s) => s && !CATEGORIAS_DEFAULT.includes(s))];
+    const deleted = JSON.parse(localStorage.getItem("fg_categorias_deleted") || "[]") as string[];
+    const defaults = CATEGORIAS_DEFAULT.filter((c) => !deleted.includes(c));
+    return [...defaults, ...stored.filter((s) => s && !defaults.includes(s))];
   } catch { return CATEGORIAS_DEFAULT; }
 }
 
@@ -417,14 +419,18 @@ export default function CajaPage() {
                 </button>
                 {showManageCat && (
                   <div className="mt-2 p-2 bg-gray-50 rounded text-xs space-y-1">
-                    {categorias.filter((c) => !CATEGORIAS_DEFAULT.includes(c)).map((c) => (
-                      <div key={c} className="flex items-center justify-between">
+                    {categorias.map((c) => (
+                      <div key={c} className="flex items-center justify-between py-1">
                         <span>{c}</span>
                         <button onClick={() => {
                           const updated = categorias.filter((x) => x !== c);
                           setCategorias(updated);
                           localStorage.setItem("fg_categorias", JSON.stringify(updated.filter((x) => !CATEGORIAS_DEFAULT.includes(x))));
-                        }} className="text-gray-300 hover:text-red-500">×</button>
+                          if (CATEGORIAS_DEFAULT.includes(c)) {
+                            const del = JSON.parse(localStorage.getItem("fg_categorias_deleted") || "[]");
+                            localStorage.setItem("fg_categorias_deleted", JSON.stringify([...del, c]));
+                          }
+                        }} className="text-gray-300 hover:text-red-500 text-xs ml-3">×</button>
                       </div>
                     ))}
                     <div className="flex items-center gap-1 mt-1">

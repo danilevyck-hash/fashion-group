@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 
 // ── Types ──
-
 interface RItem { referencia: string; descripcion: string; talla: string; cantidad: number; precio_unitario: number; subtotal: number; motivo: string; }
 interface Seguimiento { id: string; nota: string; autor: string; created_at: string; }
 interface Foto { id: string; storage_path: string; url: string; }
@@ -18,7 +17,6 @@ interface Reclamo {
 }
 
 // ── Constants ──
-
 const EMPRESAS_MAP: Record<string, { proveedor: string; marca: string }> = {
   "Vistana International": { proveedor: "American Designer Fashion", marca: "Calvin Klein" },
   "Fashion Wear": { proveedor: "American Fashion Wear", marca: "Tommy Hilfiger" },
@@ -26,6 +24,7 @@ const EMPRESAS_MAP: Record<string, { proveedor: string; marca: string }> = {
   "Active Shoes": { proveedor: "Latin Fitness Group", marca: "Reebok" },
   "Active Wear": { proveedor: "Latin Fitness Group", marca: "Reebok" },
 };
+const EMPRESAS = Object.keys(EMPRESAS_MAP);
 const MOTIVOS = ["Faltante de Mercancía", "Mercancía Dañada", "Mercancía Manchada", "Mercancía Incorrecta", "Sobrante de Mercancía", "Discrepancia de Precio", "Mercancía Defectuosa"];
 const ESTADOS = ["Enviado", "En Revisión", "N/C Aprobada", "Aplicada"];
 const EC: Record<string, string> = { "Enviado": "bg-blue-50 text-blue-700", "En Revisión": "bg-yellow-50 text-yellow-700", "N/C Aprobada": "bg-green-50 text-green-700", "Aplicada": "bg-gray-100 text-gray-500" };
@@ -36,12 +35,13 @@ function fmtDate(d: string) { if (!d) return ""; const [y, m, day] = d.split("-"
 function daysSince(d: string) { if (!d) return 0; return Math.floor((Date.now() - new Date(d).getTime()) / 86400000); }
 function calcSub(items: RItem[]) { return items.reduce((s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0), 0); }
 
-// ── Component ──
+const SUPA_URL = typeof window !== "undefined" ? (process.env.NEXT_PUBLIC_SUPABASE_URL || "") : "";
 
+// ── Component ──
 export default function ReclamosPage() {
   const router = useRouter();
 
-  // State — ALL hooks before any return
+  // ALL hooks first
   const [authChecked, setAuthChecked] = useState(false);
   const [role, setRole] = useState("");
   const [view, setView] = useState<"list" | "form" | "detail">("list");
@@ -50,14 +50,19 @@ export default function ReclamosPage() {
   const [error, setError] = useState<string | null>(null);
   const [current, setCurrent] = useState<Reclamo | null>(null);
   const [saving, setSaving] = useState(false);
-  const [filterEmpresa, setFilterEmpresa] = useState("all");
-  const [filterEstado, setFilterEstado] = useState("all");
+
+  // List: empresa view
+  const [activeEmpresa, setActiveEmpresa] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [showEmailPanel, setShowEmailPanel] = useState(false);
   const [search, setSearch] = useState("");
+  const [filterEstado, setFilterEstado] = useState("all");
 
   // Form
   const [fEmpresa, setFEmpresa] = useState("");
   const [fFecha, setFFecha] = useState(new Date().toISOString().slice(0, 10));
-  const [fFactura, setFFactura] = useState("");
+  const [fFacturas, setFFacturas] = useState<string[]>([""]);
   const [fOrden, setFOrden] = useState("");
   const [fNotas, setFNotas] = useState("");
   const [fItems, setFItems] = useState<RItem[]>([emptyItem()]);
@@ -71,14 +76,17 @@ export default function ReclamosPage() {
   const [copied, setCopied] = useState(false);
   const fotoRef = useRef<HTMLInputElement>(null);
 
-  // Contactos + panels
+  // Contactos
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [showContactos, setShowContactos] = useState(false);
   const [editContactId, setEditContactId] = useState<string | null>(null);
   const [editContact, setEditContact] = useState<Partial<Contacto>>({});
-  const [showBulkWA, setShowBulkWA] = useState(false);
-  const [showMasivo, setShowMasivo] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // List email panel
+  const [listEmailPara, setListEmailPara] = useState("");
+  const [listEmailAsunto, setListEmailAsunto] = useState("");
+  const [listEmailCuerpo, setListEmailCuerpo] = useState("");
+  const [listCopied, setListCopied] = useState(false);
 
   // Auth
   useEffect(() => {
@@ -90,7 +98,7 @@ export default function ReclamosPage() {
   const loadReclamos = useCallback(async () => {
     setLoading(true);
     try { const res = await fetch("/api/reclamos"); if (res.ok) { const d = await res.json(); setReclamos(Array.isArray(d) ? d : []); } }
-    catch { /* ignore */ } setLoading(false);
+    catch { /* */ } setLoading(false);
   }, []);
 
   const loadContactos = useCallback(async () => {
@@ -108,16 +116,9 @@ export default function ReclamosPage() {
   const totalPendiente = pendientes.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * 1.17, 0);
   const alertas = pendientes.filter((r) => daysSince(r.fecha_reclamo) > 45).length;
 
-  const filtered = reclamos.filter((r) => {
-    if (filterEmpresa !== "all" && r.empresa !== filterEmpresa) return false;
-    if (filterEstado !== "all" && r.estado !== filterEstado) return false;
-    if (search) { const q = search.toLowerCase(); if (!(r.nro_reclamo || "").toLowerCase().includes(q) && !(r.nro_factura || "").toLowerCase().includes(q)) return false; }
-    return true;
-  });
-
   function getC(empresa: string) { return contactos.find((c) => c.empresa === empresa) || null; }
 
-  function resetForm() { setFEmpresa(""); setFFecha(new Date().toISOString().slice(0, 10)); setFFactura(""); setFOrden(""); setFNotas(""); setFItems([emptyItem()]); setError(null); }
+  function resetForm() { setFEmpresa(""); setFFecha(new Date().toISOString().slice(0, 10)); setFFacturas([""]); setFOrden(""); setFNotas(""); setFItems([emptyItem()]); setError(null); }
 
   function updateItem(idx: number, field: string, val: string | number) {
     setFItems((prev) => prev.map((item, i) => { if (i !== idx) return item; const u = { ...item, [field]: val }; u.subtotal = (u.cantidad || 0) * (u.precio_unitario || 0); return u; }));
@@ -128,12 +129,13 @@ export default function ReclamosPage() {
   }
 
   async function saveReclamo() {
-    if (!fEmpresa || !fFecha || !fFactura) { setError("Completa empresa, fecha y factura."); return; }
+    const facturaStr = fFacturas.filter((f) => f.trim()).join(", ");
+    if (!fEmpresa || !fFecha || !facturaStr) { setError("Completa empresa, fecha y al menos una factura."); return; }
     const items = fItems.filter((i) => i.referencia || i.cantidad > 0);
     if (!items.length) { setError("Agrega al menos un ítem."); return; }
     setSaving(true); setError(null);
     try {
-      const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: fFactura, nro_orden_compra: fOrden, fecha_reclamo: fFecha, notas: fNotas, items }) });
+      const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: facturaStr, nro_orden_compra: fOrden, fecha_reclamo: fFecha, notas: fNotas, items }) });
       if (res.ok) { const saved = await res.json(); resetForm(); loadReclamos(); if (saved.id) await loadDetail(saved.id); }
       else { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); }
     } catch { setError("Error de conexión."); } setSaving(false);
@@ -143,36 +145,18 @@ export default function ReclamosPage() {
   async function changeEstado(e: string) { if (!current || current.estado === e) return; if (!confirm(`¿Cambiar estado a "${e}"?`)) return; await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: e }) }); await loadDetail(current.id); loadReclamos(); }
   async function deleteReclamo(id: string) { if (!confirm("¿Eliminar este reclamo?")) return; await fetch(`/api/reclamos/${id}`, { method: "DELETE" }); setCurrent(null); setView("list"); loadReclamos(); }
 
-  function sendWA(rec: Reclamo) {
-    const c = getC(rec.empresa);
-    if (!c?.whatsapp) { alert("No hay contacto con WhatsApp para esta empresa."); return; }
-    const sub = calcSub(rec.reclamo_items ?? []);
-    const msg = `Hola ${c.nombre}, le escribo de parte de Fashion Group.\n\n*${rec.nro_reclamo}* — ${rec.empresa}\nFactura: ${rec.nro_factura}${rec.nro_orden_compra ? ` | PO: ${rec.nro_orden_compra}` : ""}\nTotal: $${fmt(sub * 1.17)}\nEstado: ${rec.estado}\n\nPor favor confirmar el estado de este reclamo. Gracias.`;
-    window.open(`https://wa.me/${c.whatsapp}?text=${encodeURIComponent(msg)}`, "_blank");
-  }
-
   function prepareEnvio(rec: Reclamo) {
     window.open(`/api/reclamos/${rec.id}/excel`);
     const c = getC(rec.empresa);
     const sub = calcSub(rec.reclamo_items ?? []);
     setEmailPara(c?.correo || "");
     setEmailAsunto(`Reclamo ${rec.nro_reclamo} — ${rec.empresa} — Factura ${rec.nro_factura}`);
-    setEmailCuerpo(`Estimado/a ${c?.nombre || ""},\n\nPor medio de la presente, le hacemos llegar el detalle del reclamo N° ${rec.nro_reclamo} correspondiente a ${rec.empresa}.\n\nAdjunto encontrará el archivo Excel con el detalle completo de los ítems reclamados.\n\nResumen:\n• Factura: ${rec.nro_factura}\n• Orden de Compra: ${rec.nro_orden_compra || "N/A"}\n• Total a acreditar: $${fmt(sub * 1.17)}\n• Estado actual: ${rec.estado}\n\nQuedamos en espera de la nota de crédito correspondiente.\n\nSaludos,\nFashion Group`);
+    setEmailCuerpo(`Estimado/a ${c?.nombre || ""},\n\nAdjunto el Excel del reclamo N° ${rec.nro_reclamo} de ${rec.empresa}.\n\n• Factura: ${rec.nro_factura}\n• Total a acreditar: $${fmt(sub * 1.17)}\n• Estado: ${rec.estado}\n\nQuedamos en espera de la nota de crédito.\n\nSaludos,\nFashion Group`);
     setShowEnvio(true);
   }
 
-  async function uploadFoto(file: File) {
-    if (!current) return;
-    const fd = new FormData(); fd.append("file", file);
-    await fetch(`/api/reclamos/${current.id}/fotos`, { method: "POST", body: fd });
-    await loadDetail(current.id);
-  }
-
-  async function deleteFoto(fotoId: string, path: string) {
-    if (!current) return;
-    await fetch(`/api/reclamos/${current.id}/fotos`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ foto_id: fotoId, storage_path: path }) });
-    await loadDetail(current.id);
-  }
+  async function uploadFoto(file: File) { if (!current) return; const fd = new FormData(); fd.append("file", file); await fetch(`/api/reclamos/${current.id}/fotos`, { method: "POST", body: fd }); await loadDetail(current.id); }
+  async function deleteFoto(fotoId: string, path: string) { if (!current) return; await fetch(`/api/reclamos/${current.id}/fotos`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ foto_id: fotoId, storage_path: path }) }); await loadDetail(current.id); }
 
   async function saveContact() {
     if (editContactId === "new") await fetch("/api/reclamos/contactos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(editContact) });
@@ -180,71 +164,143 @@ export default function ReclamosPage() {
     setEditContactId(null); setEditContact({}); loadContactos();
   }
 
-  function exportCSV() { const p = new URLSearchParams(); if (filterEmpresa !== "all") p.set("empresa", filterEmpresa); if (filterEstado !== "all") p.set("estado", filterEstado); window.open(`/api/reclamos/export?${p.toString()}`); }
+  function toggleSelect(id: string) { setSelectedIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]); }
 
-  async function downloadBulkExcel() {
-    if (!selectedIds.length) return;
-    const res = await fetch("/api/reclamos/export-excel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: selectedIds }) });
-    if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Reclamos-Fashion-Group-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url); }
+  function sendSelectedWA() {
+    if (!activeEmpresa) return;
+    const c = getC(activeEmpresa);
+    if (!c?.whatsapp) { alert("No hay contacto con WhatsApp para esta empresa."); return; }
+    const sel = reclamos.filter((r) => selectedIds.includes(r.id));
+    const lines = sel.map((r) => `• ${r.nro_reclamo} | Factura ${r.nro_factura} | $${fmt(calcSub(r.reclamo_items ?? []) * 1.17)} | Hace ${daysSince(r.fecha_reclamo)} días`).join("\n");
+    const msg = `Hola ${c.nombre}, buenos días. Le escribo de parte de Fashion Group para dar seguimiento:\n\n${lines}\n\n¿Nos puede confirmar el estado? Gracias.`;
+    window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
-  const bulkByEmpresa = (() => {
-    const m: Record<string, Reclamo[]> = {};
-    for (const r of pendientes) { if (!m[r.empresa]) m[r.empresa] = []; m[r.empresa].push(r); }
-    return Object.entries(m);
-  })();
-
-  function toggleSelect(id: string) { setSelectedIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]); }
-  function toggleEmpresa(recs: Reclamo[]) {
-    const ids = recs.map((r) => r.id);
-    const allSelected = ids.every((id) => selectedIds.includes(id));
-    if (allSelected) setSelectedIds((p) => p.filter((x) => !ids.includes(x)));
-    else setSelectedIds((p) => [...new Set([...p, ...ids])]);
+  function prepareSelectedEmail() {
+    if (!activeEmpresa) return;
+    const c = getC(activeEmpresa);
+    const sel = reclamos.filter((r) => selectedIds.includes(r.id));
+    const lines = sel.map((r) => `• ${r.nro_reclamo} — Factura ${r.nro_factura} — $${fmt(calcSub(r.reclamo_items ?? []) * 1.17)} — ${r.estado}`).join("\n");
+    setListEmailPara(c?.correo || "");
+    setListEmailAsunto(`Seguimiento Reclamos Pendientes — ${activeEmpresa}`);
+    setListEmailCuerpo(`Estimado/a ${c?.nombre || ""},\n\nResumen de reclamos pendientes de ${activeEmpresa}:\n\n${lines}\n\nQuedamos en espera de su confirmación.\n\nSaludos,\nFashion Group`);
+    setShowEmailPanel(true);
   }
 
   // ── LIST VIEW ──
   if (view === "list") {
+    // Sub-view A: company selector
+    if (!activeEmpresa) {
+      return (
+        <div className="max-w-5xl mx-auto px-6 py-12">
+          <div className="flex items-end justify-between mb-8">
+            <div><FGLogo variant="horizontal" theme="light" size={32} /><p className="text-sm text-gray-400 mt-2">Reclamos a Proveedores</p></div>
+            <div className="flex items-center gap-4">
+              <button onClick={() => { resetForm(); setView("form"); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">Nuevo Reclamo</button>
+              <button onClick={() => setShowContactos(true)} className="text-sm text-gray-400 hover:text-black transition">Contactos</button>
+              <button onClick={() => router.push("/admin")} className="text-sm text-gray-400 hover:text-black transition">← Panel</button>
+            </div>
+          </div>
+
+          {role === "admin" && (
+            <div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="border border-gray-100 rounded-xl p-4"><div className="text-xs text-gray-400 uppercase tracking-widest">Total Pendiente</div><div className="text-xl font-semibold mt-1 tabular-nums">${fmt(totalPendiente)}</div></div>
+              <div className="border border-gray-100 rounded-xl p-4"><div className="text-xs text-gray-400 uppercase tracking-widest">Reclamos Abiertos</div><div className="text-xl font-semibold mt-1">{pendientes.length}</div></div>
+              <div className={`border rounded-xl p-4 ${alertas > 0 ? "border-red-200 bg-red-50" : "border-gray-100"}`}><div className="text-xs text-gray-400 uppercase tracking-widest">Alertas +45 días</div><div className={`text-xl font-semibold mt-1 ${alertas > 0 ? "text-red-600" : ""}`}>{alertas}</div></div>
+            </div>
+          )}
+
+          {loading ? <div>{[...Array(3)].map((_, i) => <div key={i} className="animate-pulse h-24 bg-gray-50 rounded-2xl mb-4" />)}</div> : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {EMPRESAS.map((empresa) => {
+                const ers = reclamos.filter((r) => r.empresa === empresa);
+                const open = ers.filter((r) => r.estado !== "Aplicada");
+                const tot = open.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * 1.17, 0);
+                const hasAlert = open.some((r) => daysSince(r.fecha_reclamo) > 45);
+                const c = getC(empresa);
+                return (
+                  <div key={empresa} onClick={() => { setActiveEmpresa(empresa); setSelectionMode(false); setSelectedIds([]); setShowEmailPanel(false); setSearch(""); setFilterEstado("all"); }}
+                    className="border border-gray-100 rounded-2xl p-6 cursor-pointer hover:border-gray-300 transition">
+                    <div className="flex items-start justify-between mb-4">
+                      <div><p className="text-sm font-semibold">{empresa}</p><p className="text-xs text-gray-400 mt-0.5">{c?.nombre || "Sin contacto"}</p></div>
+                      {hasAlert && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full">Alerta</span>}
+                    </div>
+                    <div className="flex gap-6">
+                      <div><p className="text-2xl font-semibold tabular-nums">{open.length}</p><p className="text-xs text-gray-400 mt-0.5">abiertos</p></div>
+                      <div><p className="text-2xl font-semibold tabular-nums">${fmt(tot)}</p><p className="text-xs text-gray-400 mt-0.5">pendiente</p></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Contactos panel */}
+          {showContactos && (
+            <div className="fixed inset-0 bg-black/20 z-50 flex justify-end" onClick={() => setShowContactos(false)}>
+              <div className="bg-white w-full max-w-md h-full overflow-y-auto p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-6"><h2 className="text-lg font-semibold">Contactos</h2><button onClick={() => setShowContactos(false)} className="text-gray-400 hover:text-black text-lg">×</button></div>
+                {contactos.map((c) => (
+                  <div key={c.id} className="border-b border-gray-100 py-3">
+                    {editContactId === c.id ? (
+                      <div className="space-y-2">{(["empresa", "nombre", "whatsapp", "correo"] as const).map((f) => <input key={f} type="text" placeholder={f} value={(editContact as Record<string, string>)[f] || ""} onChange={(e) => setEditContact({ ...editContact, [f]: e.target.value })} className="w-full border-b border-gray-200 py-1 text-sm outline-none" />)}<div className="flex gap-2 mt-2"><button onClick={saveContact} className="text-xs bg-black text-white px-3 py-1 rounded-full">Guardar</button><button onClick={() => setEditContactId(null)} className="text-xs text-gray-400">Cancelar</button></div></div>
+                    ) : (<div><div className="font-medium text-sm">{c.empresa}</div><div className="text-xs text-gray-500">{c.nombre} | {c.whatsapp} | {c.correo}</div><button onClick={() => { setEditContactId(c.id); setEditContact(c); }} className="text-xs text-gray-400 hover:text-black mt-1">Editar</button></div>)}
+                  </div>
+                ))}
+                <button onClick={() => { setEditContactId("new"); setEditContact({}); }} className="text-sm text-gray-400 hover:text-black mt-4">+ Nuevo contacto</button>
+                {editContactId === "new" && <div className="mt-3 space-y-2">{(["empresa", "nombre", "whatsapp", "correo"] as const).map((f) => <input key={f} type="text" placeholder={f} value={(editContact as Record<string, string>)[f] || ""} onChange={(e) => setEditContact({ ...editContact, [f]: e.target.value })} className="w-full border-b border-gray-200 py-1 text-sm outline-none" />)}<button onClick={saveContact} className="text-xs bg-black text-white px-3 py-1 rounded-full mt-2">Guardar</button></div>}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // Sub-view B: reclamos of selected empresa
+    const empresaRecs = reclamos.filter((r) => r.empresa === activeEmpresa).filter((r) => {
+      if (filterEstado !== "all" && r.estado !== filterEstado) return false;
+      if (search) { const q = search.toLowerCase(); if (!(r.nro_reclamo || "").toLowerCase().includes(q) && !(r.nro_factura || "").toLowerCase().includes(q)) return false; }
+      return true;
+    });
+    const c = getC(activeEmpresa);
+
     return (
       <div className="max-w-6xl mx-auto px-6 py-12">
         <div className="flex items-end justify-between mb-8">
-          <div><FGLogo variant="horizontal" theme="light" size={32} /><p className="text-sm text-gray-400 mt-2">Reclamos a Proveedores</p></div>
-          <div className="flex items-center gap-4">
-            <button onClick={() => { resetForm(); setView("form"); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">Nuevo Reclamo</button>
-            {role === "admin" && pendientes.length > 0 && <button onClick={() => { setShowMasivo(true); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition">Envío Masivo</button>}
-            {role === "admin" && pendientes.length > 0 && <button onClick={() => setShowBulkWA(true)} className="text-sm text-gray-400 hover:text-black transition">WhatsApp masivo</button>}
-            <button onClick={exportCSV} className="text-sm text-gray-400 hover:text-black transition">Exportar CSV</button>
-            <button onClick={() => setShowContactos(true)} className="text-sm text-gray-400 hover:text-black transition">Contactos</button>
-            <button onClick={() => router.push("/admin")} className="text-sm text-gray-400 hover:text-black transition">← Panel</button>
+          <div>
+            <button onClick={() => { setActiveEmpresa(null); setSelectionMode(false); setSelectedIds([]); setShowEmailPanel(false); }} className="text-sm text-gray-400 hover:text-black transition mb-2 block">← Empresas</button>
+            <h1 className="text-2xl font-semibold tracking-tight">{activeEmpresa}</h1>
+            {c && <p className="text-xs text-gray-400 mt-1">Contacto: {c.nombre} | {c.correo}</p>}
+          </div>
+          <div className="flex items-center gap-3">
+            {selectionMode ? (<>
+              <span className="text-sm text-gray-400">{selectedIds.length} seleccionados</span>
+              {selectedIds.length > 0 && <button onClick={sendSelectedWA} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">WhatsApp</button>}
+              {selectedIds.length > 0 && <button onClick={prepareSelectedEmail} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">Correo</button>}
+              <button onClick={() => { setSelectionMode(false); setSelectedIds([]); setShowEmailPanel(false); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+            </>) : (<>
+              <button onClick={() => { setSelectionMode(true); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition">Seleccionar</button>
+              <button onClick={() => { resetForm(); setFEmpresa(activeEmpresa); setView("form"); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">Nuevo Reclamo</button>
+            </>)}
           </div>
         </div>
 
-        {role === "admin" && (
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="border border-gray-100 rounded-xl p-4"><div className="text-xs text-gray-400 uppercase tracking-widest">Total Pendiente</div><div className="text-xl font-semibold mt-1 tabular-nums">${fmt(totalPendiente)}</div></div>
-            <div className="border border-gray-100 rounded-xl p-4"><div className="text-xs text-gray-400 uppercase tracking-widest">Reclamos Abiertos</div><div className="text-xl font-semibold mt-1">{pendientes.length}</div></div>
-            <div className={`border rounded-xl p-4 ${alertas > 0 ? "border-red-200 bg-red-50" : "border-gray-100"}`}><div className="text-xs text-gray-400 uppercase tracking-widest">Alertas +45 días</div><div className={`text-xl font-semibold mt-1 ${alertas > 0 ? "text-red-600" : ""}`}>{alertas}</div></div>
-          </div>
-        )}
-
-        <div className="flex gap-3 mb-6 flex-wrap">
-          <select value={filterEmpresa} onChange={(e) => setFilterEmpresa(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent"><option value="all">Todas las empresas</option>{Object.keys(EMPRESAS_MAP).map((e) => <option key={e} value={e}>{e}</option>)}</select>
+        <div className="flex gap-3 mb-6">
           <select value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent"><option value="all">Todos los estados</option>{ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}</select>
           <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="border-b border-gray-200 py-2 text-sm outline-none flex-1 max-w-xs" />
         </div>
 
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-
-        {loading ? <div>{[...Array(4)].map((_, i) => <div key={i} className="animate-pulse flex gap-4 py-3 border-b border-gray-100"><div className="h-3 bg-gray-100 rounded w-1/4" /><div className="h-3 bg-gray-100 rounded w-1/6 ml-auto" /></div>)}</div>
-        : filtered.length === 0 ? <p className="text-center text-gray-300 text-sm py-20">No hay reclamos registrados</p>
-        : (
+        {empresaRecs.length === 0 ? <p className="text-center text-gray-300 text-sm py-20">Sin reclamos</p> : (
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
-              <th className="text-left pb-3 font-medium">N°</th><th className="text-left pb-3 font-medium">Empresa</th><th className="text-left pb-3 font-medium">Factura</th><th className="text-left pb-3 font-medium">Fecha</th><th className="text-right pb-3 font-medium">Días</th><th className="text-left pb-3 font-medium">Estado</th><th className="text-right pb-3 font-medium">Total</th><th className="text-right pb-3 font-medium"></th>
+              {selectionMode && <th className="pb-3 w-8"></th>}
+              <th className="text-left pb-3 font-medium">N°</th><th className="text-left pb-3 font-medium">Factura</th><th className="text-left pb-3 font-medium">Fecha</th><th className="text-right pb-3 font-medium">Días</th><th className="text-left pb-3 font-medium">Estado</th><th className="text-right pb-3 font-medium">Total</th><th className="text-right pb-3 font-medium"></th>
             </tr></thead>
-            <tbody>{filtered.map((r) => { const days = daysSince(r.fecha_reclamo); const total = calcSub(r.reclamo_items ?? []) * 1.17; return (
+            <tbody>{empresaRecs.map((r) => { const days = daysSince(r.fecha_reclamo); const total = calcSub(r.reclamo_items ?? []) * 1.17; const canSelect = r.estado !== "Aplicada"; return (
               <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition">
-                <td className="py-3 font-medium">{r.nro_reclamo}</td><td className="py-3 text-gray-500">{r.empresa}</td><td className="py-3 text-gray-500">{r.nro_factura}</td><td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
-                <td className={`py-3 text-right tabular-nums ${days > 60 && r.estado !== "Aplicada" ? "text-red-600 font-medium" : "text-gray-400"}`}>{days}</td>
+                {selectionMode && <td className="py-3"><input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!canSelect} className="accent-black disabled:opacity-30" /></td>}
+                <td className="py-3 font-medium">{r.nro_reclamo}</td><td className="py-3 text-gray-500">{r.nro_factura}</td><td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
+                <td className={`py-3 text-right tabular-nums ${days > 60 && canSelect ? "text-red-600 font-medium" : "text-gray-400"}`}>{days}</td>
                 <td className="py-3"><span className={`text-[11px] px-2 py-0.5 rounded-full ${EC[r.estado] || "bg-gray-100 text-gray-500"}`}>{r.estado}</span></td>
                 <td className="py-3 text-right tabular-nums">${fmt(total)}</td>
                 <td className="py-3 text-right"><button onClick={() => loadDetail(r.id)} className="text-sm text-gray-400 hover:text-black transition mr-3">Ver</button>{role === "admin" && <button onClick={() => deleteReclamo(r.id)} className="text-sm text-gray-300 hover:text-black transition">Eliminar</button>}</td>
@@ -252,82 +308,19 @@ export default function ReclamosPage() {
           </table>
         )}
 
-        {/* Bulk WhatsApp */}
-        {showBulkWA && (
-          <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center" onClick={() => setShowBulkWA(false)}>
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
-              <h2 className="text-lg font-semibold mb-4">WhatsApp masivo</h2>
-              {bulkByEmpresa.map(([empresa, recs]) => { const c = getC(empresa); return (
-                <div key={empresa} className="flex items-center justify-between border-b border-gray-100 pb-3 mb-3">
-                  <div><div className="text-sm font-medium">{c?.nombre || empresa}</div><div className="text-xs text-gray-400">{recs.length} reclamo{recs.length > 1 ? "s" : ""}</div></div>
-                  {c?.whatsapp && <button onClick={() => { const lines = recs.map((r) => `• ${r.nro_reclamo} — Factura ${r.nro_factura} — $${fmt(calcSub(r.reclamo_items ?? []) * 1.17)} — ${r.estado}`).join("\n"); window.open(`https://wa.me/${c.whatsapp}?text=${encodeURIComponent(`Hola ${c.nombre}, le escribo de parte de Fashion Group.\n\nReclamos pendientes:\n${lines}\n\nPor favor confirmar el estado de estos reclamos. Gracias.`)}`, "_blank"); }} className="text-sm bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 transition">Enviar</button>}
-                </div>); })}
-              <button onClick={() => setShowBulkWA(false)} className="text-sm text-gray-400 hover:text-black transition mt-2">Cerrar</button>
-            </div>
-          </div>
-        )}
-
-        {/* Envío Masivo */}
-        {showMasivo && (
-          <div className="fixed inset-0 bg-black/20 z-50 flex justify-end" onClick={() => setShowMasivo(false)}>
-            <div className="bg-white w-full max-w-lg h-full overflow-y-auto p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-6"><h2 className="text-lg font-semibold">Envío Masivo</h2><button onClick={() => setShowMasivo(false)} className="text-gray-400 hover:text-black text-lg">×</button></div>
-              {bulkByEmpresa.map(([empresa, recs]) => { const c = getC(empresa); const allSel = recs.every((r) => selectedIds.includes(r.id)); return (
-                <div key={empresa} className="mb-6">
-                  <div className="flex items-center gap-2 mb-2">
-                    <input type="checkbox" checked={allSel} onChange={() => toggleEmpresa(recs)} className="accent-black" />
-                    <span className="text-sm font-medium">{empresa}</span>
-                    {c && <span className="text-xs text-gray-400">— {c.nombre} | {c.correo}</span>}
-                  </div>
-                  {recs.map((r) => (
-                    <label key={r.id} className="flex items-center gap-2 pl-5 py-1 text-sm text-gray-500 cursor-pointer">
-                      <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} className="accent-black" />
-                      {r.nro_reclamo} | Factura {r.nro_factura} | ${fmt(calcSub(r.reclamo_items ?? []) * 1.17)}
-                    </label>
-                  ))}
-                  {/* Per-empresa actions */}
-                  {recs.some((r) => selectedIds.includes(r.id)) && (
-                    <div className="flex gap-3 mt-3 pl-5">
-                      <button onClick={() => {
-                        const c = getC(empresa);
-                        if (!c?.whatsapp) { alert("No hay contacto con WhatsApp para esta empresa."); return; }
-                        const sel = recs.filter((r) => selectedIds.includes(r.id));
-                        const lines = sel.map((r) => { const t = calcSub(r.reclamo_items ?? []) * 1.17; const d = daysSince(r.fecha_reclamo); return `• ${r.nro_reclamo} | Factura ${r.nro_factura} | $${fmt(t)} | Hace ${d} días`; }).join("\n");
-                        const msg = `Hola ${c.nombre}, buenos días. Le escribo de parte de Fashion Group para dar seguimiento a los siguientes reclamos pendientes:\n\n${lines}\n\n¿Nos puede confirmar el estado de estos reclamos? Gracias.`;
-                        window.open(`https://wa.me/${c.whatsapp.replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
-                      }} className="text-xs text-gray-400 hover:text-black transition">WhatsApp</button>
-                      <button onClick={() => {
-                        const c = getC(empresa);
-                        const sel = recs.filter((r) => selectedIds.includes(r.id));
-                        const lines = sel.map((r) => `• ${r.nro_reclamo} — Factura ${r.nro_factura} — Total: $${fmt(calcSub(r.reclamo_items ?? []) * 1.17)} — Estado: ${r.estado}`).join("\n");
-                        const asunto = `Seguimiento de Reclamos Pendientes — ${empresa}`;
-                        const cuerpo = `Estimado/a ${c?.nombre || ""},\n\nPor medio de la presente, le hacemos llegar el resumen de los reclamos pendientes de ${empresa}:\n\n${lines}\n\nQuedamos en espera de su confirmación y las notas de crédito correspondientes.\n\nSaludos,\nFashion Group`;
-                        window.open(`mailto:${c?.correo || ""}?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`);
-                      }} className="text-xs text-gray-400 hover:text-black transition">Correo</button>
-                    </div>
-                  )}
-                </div>); })}
-              <div className="flex gap-3 mt-4">
-                <button onClick={downloadBulkExcel} disabled={!selectedIds.length} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition disabled:opacity-40">Descargar Excel ({selectedIds.length})</button>
+        {/* Email panel for selection */}
+        {showEmailPanel && (
+          <div className="mt-6 border border-gray-200 rounded-2xl p-6">
+            <p className="text-sm font-medium mb-4">Correo — {selectedIds.length} reclamos seleccionados</p>
+            <div className="space-y-3">
+              <div><label className="text-[10px] text-gray-400 uppercase">Para</label><input type="text" value={listEmailPara} onChange={(e) => setListEmailPara(e.target.value)} className="w-full border-b border-gray-200 py-1.5 text-sm outline-none" /></div>
+              <div><label className="text-[10px] text-gray-400 uppercase">Asunto</label><input type="text" value={listEmailAsunto} onChange={(e) => setListEmailAsunto(e.target.value)} className="w-full border-b border-gray-200 py-1.5 text-sm outline-none" /></div>
+              <div><label className="text-[10px] text-gray-400 uppercase">Cuerpo</label><textarea value={listEmailCuerpo} onChange={(e) => setListEmailCuerpo(e.target.value)} rows={8} className="w-full border border-gray-200 rounded-lg p-3 text-sm outline-none resize-none mt-1" /></div>
+              <div className="flex gap-3">
+                <button onClick={() => { navigator.clipboard.writeText(listEmailCuerpo); setListCopied(true); setTimeout(() => setListCopied(false), 2000); }} className="text-sm text-gray-400 hover:text-black transition">{listCopied ? "¡Copiado!" : "Copiar cuerpo"}</button>
+                <button onClick={() => window.open(`mailto:${listEmailPara}?subject=${encodeURIComponent(listEmailAsunto)}&body=${encodeURIComponent(listEmailCuerpo)}`)} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">Abrir en Mail</button>
+                <button onClick={() => setShowEmailPanel(false)} className="text-sm text-gray-400 hover:text-black transition">Cerrar</button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* Contactos */}
-        {showContactos && (
-          <div className="fixed inset-0 bg-black/20 z-50 flex justify-end" onClick={() => setShowContactos(false)}>
-            <div className="bg-white w-full max-w-md h-full overflow-y-auto p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-              <div className="flex items-center justify-between mb-6"><h2 className="text-lg font-semibold">Contactos</h2><button onClick={() => setShowContactos(false)} className="text-gray-400 hover:text-black text-lg">×</button></div>
-              {contactos.map((c) => (
-                <div key={c.id} className="border-b border-gray-100 py-3">
-                  {editContactId === c.id ? (
-                    <div className="space-y-2">{(["empresa", "nombre", "whatsapp", "correo"] as const).map((f) => <input key={f} type="text" placeholder={f} value={(editContact as Record<string, string>)[f] || ""} onChange={(e) => setEditContact({ ...editContact, [f]: e.target.value })} className="w-full border-b border-gray-200 py-1 text-sm outline-none" />)}<div className="flex gap-2 mt-2"><button onClick={saveContact} className="text-xs bg-black text-white px-3 py-1 rounded-full">Guardar</button><button onClick={() => setEditContactId(null)} className="text-xs text-gray-400">Cancelar</button></div></div>
-                  ) : (<div><div className="font-medium text-sm">{c.empresa}</div><div className="text-xs text-gray-500">{c.nombre} | {c.whatsapp} | {c.correo}</div><button onClick={() => { setEditContactId(c.id); setEditContact(c); }} className="text-xs text-gray-400 hover:text-black mt-1">Editar</button></div>)}
-                </div>
-              ))}
-              <button onClick={() => { setEditContactId("new"); setEditContact({}); }} className="text-sm text-gray-400 hover:text-black mt-4">+ Nuevo contacto</button>
-              {editContactId === "new" && <div className="mt-3 space-y-2">{(["empresa", "nombre", "whatsapp", "correo"] as const).map((f) => <input key={f} type="text" placeholder={f} value={(editContact as Record<string, string>)[f] || ""} onChange={(e) => setEditContact({ ...editContact, [f]: e.target.value })} className="w-full border-b border-gray-200 py-1 text-sm outline-none" />)}<button onClick={saveContact} className="text-xs bg-black text-white px-3 py-1 rounded-full mt-2">Guardar</button></div>}
             </div>
           </div>
         )}
@@ -344,9 +337,18 @@ export default function ReclamosPage() {
         <div className="mb-10">
           <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Información General</div>
           <div className="grid grid-cols-2 gap-x-12 gap-y-6">
-            <div><label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Empresa *</label><select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent"><option value="">Seleccionar...</option>{Object.keys(EMPRESAS_MAP).map((e) => <option key={e} value={e}>{e}</option>)}</select>{empInfo && <p className="text-xs text-gray-400 mt-2">Proveedor: {empInfo.proveedor} | Marca: {empInfo.marca}</p>}</div>
+            <div><label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Empresa *</label><select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent"><option value="">Seleccionar...</option>{EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}</select>{empInfo && <p className="text-xs text-gray-400 mt-2">Proveedor: {empInfo.proveedor} | Marca: {empInfo.marca}</p>}</div>
             <div><label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Fecha *</label><input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none" /></div>
-            <div><label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">N° Factura *</label><input type="text" value={fFactura} onChange={(e) => setFFactura(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none" /></div>
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">N° Factura(s) *</label>
+              {fFacturas.map((f, idx) => (
+                <div key={idx} className="flex items-center gap-2 mb-2">
+                  <input type="text" value={f} onChange={(e) => { const u = [...fFacturas]; u[idx] = e.target.value; setFFacturas(u); }} placeholder="N° Factura" className="flex-1 border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
+                  {fFacturas.length > 1 && <button onClick={() => setFFacturas(fFacturas.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black transition text-sm">×</button>}
+                </div>
+              ))}
+              <button onClick={() => setFFacturas([...fFacturas, ""])} className="text-xs text-gray-400 hover:text-black transition mt-1">+ Agregar factura</button>
+            </div>
             <div><label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">N° Orden de Compra</label><input type="text" value={fOrden} onChange={(e) => setFOrden(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none" /></div>
             <div className="col-span-2"><label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Notas</label><textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} className="w-full border-b border-gray-200 py-2 text-sm outline-none resize-none" /></div>
           </div>
@@ -431,18 +433,16 @@ export default function ReclamosPage() {
           <div className="flex gap-3 flex-wrap">
             {fotos.map((f) => (
               <div key={f.id} className="relative">
-                <img src={f.url} alt="" className="w-24 h-24 object-cover rounded-lg border border-gray-100" />
-                {role === "admin" && <button onClick={() => deleteFoto(f.id, f.storage_path)} className="absolute -top-1 -right-1 w-5 h-5 bg-white border border-gray-200 rounded-full text-xs text-gray-400 hover:text-black flex items-center justify-center">×</button>}
+                <img src={f.url || `${SUPA_URL}/storage/v1/object/public/reclamo-fotos/${f.storage_path}`} alt="" className="w-24 h-24 object-cover rounded-xl border border-gray-100" />
+                <button onClick={() => deleteFoto(f.id, f.storage_path)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
               </div>
             ))}
           </div>
         )}
-        {fotos.length < 3 && (
-          <>
-            <input ref={fotoRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFoto(f); if (fotoRef.current) fotoRef.current.value = ""; }} />
-            <button onClick={() => fotoRef.current?.click()} className="text-sm text-gray-400 hover:text-black transition mt-2">+ Agregar foto</button>
-          </>
-        )}
+        {fotos.length < 3 && (<>
+          <input ref={fotoRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadFoto(f); if (fotoRef.current) fotoRef.current.value = ""; }} />
+          <button onClick={() => fotoRef.current?.click()} className="text-sm text-gray-400 hover:text-black transition mt-2">+ Agregar foto</button>
+        </>)}
       </div>
 
       {current.notas && <p className="text-sm text-gray-400 mb-6">Notas: {current.notas}</p>}
@@ -453,15 +453,12 @@ export default function ReclamosPage() {
         {seg.map((s) => <div key={s.id} className="border-b border-gray-50 py-2"><p className="text-sm">{s.nota}</p><p className="text-[10px] text-gray-400 mt-0.5">{new Date(s.created_at).toLocaleString("es-PA")} — {s.autor}</p></div>)}
       </div>
 
-      {/* Action buttons */}
       <div className="flex gap-3 flex-wrap mb-4">
-        <button onClick={() => sendWA(current)} className="text-sm border border-green-600 text-green-700 px-4 py-2 rounded-full hover:bg-green-50 transition">WhatsApp</button>
-        <button onClick={() => prepareEnvio(current)} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">Preparar Envío por Correo</button>
+        <button onClick={() => prepareEnvio(current)} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">Preparar Envío</button>
         <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} className="text-sm text-gray-400 hover:text-black transition">Descargar Excel</button>
         {role === "admin" && <button onClick={() => deleteReclamo(current.id)} className="text-sm text-gray-300 hover:text-red-500 transition ml-auto">Eliminar</button>}
       </div>
 
-      {/* Email panel */}
       {showEnvio && (
         <div className="mt-6 border border-gray-200 rounded-2xl p-6">
           <p className="text-sm font-medium mb-4">Correo preparado — adjunta el Excel descargado</p>
@@ -470,8 +467,8 @@ export default function ReclamosPage() {
             <div><label className="text-[10px] text-gray-400 uppercase">Asunto</label><input type="text" value={emailAsunto} onChange={(e) => setEmailAsunto(e.target.value)} className="w-full border-b border-gray-200 py-1.5 text-sm outline-none" /></div>
             <div><label className="text-[10px] text-gray-400 uppercase">Cuerpo</label><textarea value={emailCuerpo} onChange={(e) => setEmailCuerpo(e.target.value)} rows={8} className="w-full border border-gray-200 rounded-lg p-3 text-sm outline-none resize-none mt-1" /></div>
             <div className="flex gap-3">
-              <button onClick={() => { navigator.clipboard.writeText(emailCuerpo); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">{copied ? "¡Copiado!" : "Copiar cuerpo"}</button>
-              <button onClick={() => window.open(`mailto:${emailPara}?subject=${encodeURIComponent(emailAsunto)}&body=${encodeURIComponent(emailCuerpo)}`, "_blank")} className="text-sm border border-gray-300 text-gray-600 px-5 py-2 rounded-full hover:bg-gray-50 transition">Abrir en Mail</button>
+              <button onClick={() => { navigator.clipboard.writeText(emailCuerpo); setCopied(true); setTimeout(() => setCopied(false), 2000); }} className="text-sm text-gray-400 hover:text-black transition">{copied ? "¡Copiado!" : "Copiar cuerpo"}</button>
+              <button onClick={() => window.open(`mailto:${emailPara}?subject=${encodeURIComponent(emailAsunto)}&body=${encodeURIComponent(emailCuerpo)}`, "_blank")} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">Abrir en Mail</button>
               <button onClick={() => setShowEnvio(false)} className="text-sm text-gray-400 hover:text-black transition">Cerrar</button>
             </div>
           </div>

@@ -7,21 +7,12 @@ for size in [192, 512]:
     img = Image.new("RGB", (size, size), "#0a0a0a")
     draw = ImageDraw.Draw(img)
 
-    # Border
-    border = int(size * 0.04)
-    draw.rectangle(
-        [border, border, size - border, size - border],
-        outline="white",
-        width=max(1, int(size * 0.008))
-    )
-
-    # "FG" text
-    font_size = int(size * 0.42)
+    font_size = int(size * 0.46)
     try:
-        font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Times New Roman.ttf", font_size)
+        font = ImageFont.truetype("/System/Library/Fonts/Times New Roman.ttf", font_size)
     except Exception:
         try:
-            font = ImageFont.truetype("/System/Library/Fonts/Times New Roman.ttf", font_size)
+            font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Times New Roman.ttf", font_size)
         except Exception:
             font = ImageFont.load_default()
 

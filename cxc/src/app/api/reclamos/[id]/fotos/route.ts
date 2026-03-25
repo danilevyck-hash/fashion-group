@@ -1,30 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const formData = await req.formData();
-  const file = formData.get("file") as File;
-  if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
+  const { id } = params;
+  if (!uuidRegex.test(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
-  const ext = file.name.split(".").pop() || "jpg";
-  const path = `${params.id}/${crypto.randomUUID()}.${ext}`;
+  try {
+    const formData = await req.formData();
+    const file = formData.get("file") as File;
+    if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
 
-  const { error: uploadErr } = await supabaseServer.storage
-    .from("reclamo-fotos")
-    .upload(path, file, { contentType: file.type });
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+    const fileName = `${crypto.randomUUID()}.${ext}`;
+    const storagePath = `${id}/${fileName}`;
 
-  if (uploadErr) return NextResponse.json({ error: uploadErr.message }, { status: 500 });
+    const { error: uploadError } = await supabaseServer.storage
+      .from("reclamo-fotos")
+      .upload(storagePath, buffer, { contentType: file.type || "image/jpeg", upsert: false });
 
-  const { data: urlData } = supabaseServer.storage.from("reclamo-fotos").getPublicUrl(path);
+    if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
 
-  const { data, error } = await supabaseServer
-    .from("reclamo_fotos")
-    .insert({ reclamo_id: params.id, storage_path: path, url: urlData.publicUrl })
-    .select()
-    .single();
+    const { data: urlData } = supabaseServer.storage.from("reclamo-fotos").getPublicUrl(storagePath);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json(data);
+    const { data, error: dbError } = await supabaseServer
+      .from("reclamo_fotos")
+      .insert({ reclamo_id: id, storage_path: storagePath, url: urlData.publicUrl })
+      .select()
+      .single();
+
+    if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 });
+    return NextResponse.json(data);
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
 }
 
 export async function DELETE(req: NextRequest) {
