@@ -27,12 +27,12 @@ interface Guia {
 }
 
 const TRANSPORTISTAS = ["RedNblue", "Mojica", "Transporte Sol", "Sanjur", "Otro"];
-const EMPRESAS = ["Vistana International", "Fashion Shoes", "Fashion Wear", "Active Shoes", "Active Wear", "Confecciones Boston", "Joystep", "Otra"];
 const CLIENTES = ["City Mall", "La Frontera Duty Free", "Jerusalem de Panama", "Plaza Los Angeles", "Golden Mall", "Multi Fashion Holding", "Kheriddine", "Bouti S.A.", "Jerusalem Duty Free", "Outlet Duty Free N2", "Outlet Duty Free N3", "Sporting Shoes N4"];
 const DIRECCIONES = ["Paso Canoas", "David", "Santiago", "Guabito", "Changinola"];
+const DEFAULT_EMPRESA = "MultiFashion Holding";
 
 function emptyItem(orden: number): GuiaItem {
-  return { orden, cliente: "", direccion: "", empresa: "", facturas: "", bultos: 0, numero_guia_transp: "" };
+  return { orden, cliente: "", direccion: "", empresa: DEFAULT_EMPRESA, facturas: "", bultos: 0, numero_guia_transp: "" };
 }
 
 function fmtDate(d: string) {
@@ -45,27 +45,29 @@ type View = "list" | "form" | "print";
 
 export default function GuiasPage() {
   const router = useRouter();
-  const [role, setRole] = useState<string | null>(null);
+  const [, setRole] = useState<string | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [view, setView] = useState<View>("list");
   const [guias, setGuias] = useState<Guia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [showHelp, setShowHelp] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
 
   // Form state
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [transportista, setTransportista] = useState("");
   const [transportistaOtro, setTransportistaOtro] = useState("");
-  const [placa, setPlaca] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [items, setItems] = useState<GuiaItem[]>([emptyItem(1)]);
   const [nextNumero, setNextNumero] = useState(1);
+  const [formNumero, setFormNumero] = useState(1);
   const [saving, setSaving] = useState(false);
 
   // Print state
   const [printGuia, setPrintGuia] = useState<Guia | null>(null);
-  const [showHelp, setShowHelp] = useState(false);
 
   const loadGuias = useCallback(async () => {
     setLoading(true);
@@ -111,13 +113,38 @@ export default function GuiasPage() {
     }
   }
 
+  async function startEdit(id: string) {
+    const res = await fetch(`/api/guias/${id}`);
+    if (!res.ok) return;
+    const g = await res.json();
+    setEditingId(g.id);
+    setFormNumero(g.numero);
+    setFecha(g.fecha);
+    // Determine if transportista is in the list or "Otro"
+    if (TRANSPORTISTAS.includes(g.transportista)) {
+      setTransportista(g.transportista);
+      setTransportistaOtro("");
+    } else {
+      setTransportista("Otro");
+      setTransportistaOtro(g.transportista);
+    }
+    setObservaciones(g.observaciones || "");
+    const guiaItems = (g.guia_items || []) as GuiaItem[];
+    setItems(guiaItems.length > 0 ? guiaItems.map((item: GuiaItem, i: number) => ({ ...item, orden: i + 1 })) : [emptyItem(1)]);
+    setError(null);
+    setValidationErrors(new Set());
+    setView("form");
+  }
+
   function resetForm() {
+    setEditingId(null);
     setFecha(new Date().toISOString().slice(0, 10));
     setTransportista("");
     setTransportistaOtro("");
-    setPlaca("");
     setObservaciones("");
     setItems([emptyItem(1)]);
+    setFormNumero(nextNumero);
+    setValidationErrors(new Set());
   }
 
   function addRow() {
@@ -135,31 +162,75 @@ export default function GuiasPage() {
 
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
 
-  async function saveGuia() {
+  function validate(): boolean {
+    const errors = new Set<string>();
     const transp = transportista === "Otro" ? transportistaOtro : transportista;
-    if (!transp) { alert("Seleccione un transportista"); return; }
+
+    if (!fecha) errors.add("fecha");
+    if (!transp) errors.add("transportista");
+
+    const validItems = items.filter((i) => i.cliente || i.direccion || i.facturas || i.bultos > 0);
+    if (validItems.length === 0) errors.add("items-empty");
+
+    items.forEach((item, idx) => {
+      // Only validate rows that have any data
+      const hasData = item.cliente || item.direccion || item.facturas || item.bultos > 0;
+      if (!hasData) return;
+      if (!item.cliente) errors.add(`item-${idx}-cliente`);
+      if (!item.direccion) errors.add(`item-${idx}-direccion`);
+      if (!item.facturas) errors.add(`item-${idx}-facturas`);
+      if (!item.bultos || item.bultos <= 0) errors.add(`item-${idx}-bultos`);
+    });
+
+    setValidationErrors(errors);
+    if (errors.size > 0) {
+      setError("Completa todos los campos obligatorios antes de guardar.");
+      return false;
+    }
+    return true;
+  }
+
+  function inputClass(key: string, base: string) {
+    return `${base} ${validationErrors.has(key) ? "border-red-400" : ""}`;
+  }
+
+  async function saveGuia() {
+    if (!validate()) return;
+
+    const transp = transportista === "Otro" ? transportistaOtro : transportista;
+    const validItems = items.filter((i) => i.cliente || i.direccion || i.facturas || i.bultos > 0);
 
     setSaving(true);
-    const res = await fetch("/api/guias", {
-      method: "POST",
+
+    const url = editingId ? `/api/guias/${editingId}` : "/api/guias";
+    const method = editingId ? "PUT" : "POST";
+
+    const res = await fetch(url, {
+      method,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fecha,
         transportista: transp,
-        placa,
+        placa: "",
         observaciones,
-        items: items.filter((i) => i.cliente || i.direccion || i.empresa || i.facturas || i.bultos > 0),
+        items: validItems,
       }),
     });
 
     if (res.ok) {
       setError(null);
       const guia = await res.json();
-      const fullRes = await fetch(`/api/guias/${guia.id}`);
-      if (fullRes.ok) setPrintGuia(await fullRes.json());
+      const guiaId = guia.id || editingId;
+      const fullRes = await fetch(`/api/guias/${guiaId}`);
+      if (fullRes.ok) {
+        const fullGuia = await fullRes.json();
+        setPrintGuia(fullGuia);
+      }
       resetForm();
       loadGuias();
       setView("print");
+      // Auto-print after a brief render delay
+      setTimeout(() => window.print(), 600);
     } else {
       setError("Error al guardar. Verifica los datos.");
     }
@@ -176,7 +247,7 @@ export default function GuiasPage() {
             <p className="text-sm text-gray-400 mt-1">Registro de despachos</p>
           </div>
           <div className="flex items-center gap-4">
-            <button onClick={() => { resetForm(); setView("form"); }}
+            <button onClick={() => { resetForm(); setFormNumero(nextNumero); setView("form"); }}
               className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
               Nueva Guía
             </button>
@@ -203,9 +274,9 @@ export default function GuiasPage() {
               <li>Haz clic en &quot;Nueva Guía&quot; para registrar un despacho</li>
               <li>Selecciona el transportista y la fecha del envío</li>
               <li>Agrega una fila por cada cliente que recibe mercancía</li>
-              <li>Indica la empresa que despacha, las facturas incluidas y la cantidad de bultos</li>
+              <li>Indica las facturas incluidas y la cantidad de bultos</li>
               <li>Guarda — se genera automáticamente el documento listo para imprimir</li>
-              <li>Desde la lista puedes ver, imprimir o eliminar cualquier guía anterior</li>
+              <li>Desde la lista puedes ver, editar, imprimir o eliminar cualquier guía</li>
             </ol>
           </div>
         )}
@@ -226,7 +297,7 @@ export default function GuiasPage() {
             </div>
             <p className="text-sm font-medium text-gray-700 mb-1">No hay guías registradas</p>
             <p className="text-sm text-gray-400 mb-6">Crea tu primera guía para registrar un despacho</p>
-            <button onClick={() => { resetForm(); setView("form"); }}
+            <button onClick={() => { resetForm(); setFormNumero(nextNumero); setView("form"); }}
               className="text-sm bg-black text-white px-6 py-2.5 rounded-full hover:bg-gray-800 transition">
               Crear primera guía
             </button>
@@ -257,7 +328,8 @@ export default function GuiasPage() {
                   <td className="py-3.5">{g.transportista}</td>
                   <td className="py-3.5 text-right tabular-nums">{g.total_bultos}</td>
                   <td className="py-3.5 text-right">
-                    <button onClick={() => viewGuia(g.id)} className="text-sm text-gray-400 hover:text-black transition mr-4">Ver</button>
+                    <button onClick={() => viewGuia(g.id)} className="text-sm text-gray-400 hover:text-black transition mr-3">Ver</button>
+                    <button onClick={() => startEdit(g.id)} className="text-sm text-gray-400 hover:text-black transition mr-3">Editar</button>
                     <button onClick={() => deleteGuia(g.id)} className="text-sm text-gray-300 hover:text-black transition">Eliminar</button>
                   </td>
                 </tr>
@@ -273,42 +345,42 @@ export default function GuiasPage() {
   if (view === "form") {
     return (
       <div className="max-w-5xl mx-auto px-6 py-12">
-        <button onClick={() => setView("list")} className="text-sm text-gray-400 hover:text-black transition mb-8 block">
+        <button onClick={() => { setView("list"); resetForm(); }} className="text-sm text-gray-400 hover:text-black transition mb-8 block">
           ← Guías
         </button>
-        <h1 className="text-2xl font-semibold tracking-tight mb-10">Nueva Guía de Transporte</h1>
+        <div className="flex items-baseline gap-4 mb-10">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {editingId ? "Editar" : "Nueva"} Guía de Transporte
+          </h1>
+          <span className="text-sm text-gray-400">N° {formNumero}</span>
+        </div>
 
         {/* Header fields */}
         <div className="mb-10">
           <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Información General</div>
           <div className="grid grid-cols-2 gap-x-12 gap-y-6">
             <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">N° Guía</label>
-              <input type="text" readOnly value={nextNumero}
-                className="w-full border-b border-gray-200 bg-gray-50/50 py-2 text-sm outline-none" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Fecha</label>
+              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Fecha *</label>
               <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+                className={inputClass("fecha", "w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition")} />
             </div>
             <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Transportista</label>
+              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Transportista *</label>
               <select value={transportista} onChange={(e) => setTransportista(e.target.value)}
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
+                className={inputClass("transportista", "w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none")}>
                 <option value="">Seleccionar...</option>
                 {TRANSPORTISTAS.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
               {transportista === "Otro" && (
                 <input type="text" placeholder="Nombre del transportista" value={transportistaOtro}
                   onChange={(e) => setTransportistaOtro(e.target.value)}
-                  className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition mt-3" />
+                  className={inputClass("transportista", "w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition mt-3")} />
               )}
             </div>
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Placa / Vehículo</label>
-              <input type="text" value={placa} onChange={(e) => setPlaca(e.target.value)}
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+            <div className="col-span-2">
+              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Observaciones</label>
+              <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
+                rows={2} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
             </div>
           </div>
         </div>
@@ -317,7 +389,6 @@ export default function GuiasPage() {
         <div className="mb-10">
           <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Detalle de Envío</div>
 
-          {/* Datalists */}
           <datalist id="clientes-list">
             {CLIENTES.map((c) => <option key={c} value={c} />)}
           </datalist>
@@ -325,16 +396,19 @@ export default function GuiasPage() {
             {DIRECCIONES.map((d) => <option key={d} value={d} />)}
           </datalist>
 
+          {validationErrors.has("items-empty") && (
+            <p className="text-red-500 text-xs mb-3">Agrega al menos un envío con todos los campos completos.</p>
+          )}
+
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
                 <th className="pb-3 font-medium w-10 text-left">#</th>
-                <th className="pb-3 font-medium text-left">Cliente</th>
-                <th className="pb-3 font-medium text-left">Dirección</th>
+                <th className="pb-3 font-medium text-left">Cliente *</th>
+                <th className="pb-3 font-medium text-left">Dirección *</th>
                 <th className="pb-3 font-medium text-left">Empresa</th>
-                <th className="pb-3 font-medium text-left">Factura(s)</th>
-                <th className="pb-3 font-medium w-20 text-center">Bultos</th>
-                <th className="pb-3 font-medium text-left">N° Guía Transp.</th>
+                <th className="pb-3 font-medium text-left">Factura(s) *</th>
+                <th className="pb-3 font-medium w-20 text-center">Bultos *</th>
                 <th className="pb-3 w-8"></th>
               </tr>
             </thead>
@@ -345,34 +419,25 @@ export default function GuiasPage() {
                   <td className="py-2 pr-2">
                     <input list="clientes-list" type="text" value={item.cliente}
                       onChange={(e) => updateItem(idx, "cliente", e.target.value)}
-                      className="w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition" />
+                      className={inputClass(`item-${idx}-cliente`, "w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition")} />
                   </td>
                   <td className="py-2 pr-2">
                     <input list="direcciones-list" type="text" value={item.direccion}
                       onChange={(e) => updateItem(idx, "direccion", e.target.value)}
-                      className="w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition" />
+                      className={inputClass(`item-${idx}-direccion`, "w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition")} />
                   </td>
                   <td className="py-2 pr-2">
-                    <select value={item.empresa} onChange={(e) => updateItem(idx, "empresa", e.target.value)}
-                      className="w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
-                      <option value="">—</option>
-                      {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
-                    </select>
+                    <span className="text-sm text-gray-500">{DEFAULT_EMPRESA}</span>
                   </td>
                   <td className="py-2 pr-2">
                     <input type="text" value={item.facturas}
                       onChange={(e) => updateItem(idx, "facturas", e.target.value)}
-                      className="w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition" />
+                      className={inputClass(`item-${idx}-facturas`, "w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition")} />
                   </td>
                   <td className="py-2 pr-2">
                     <input type="number" min={0} value={item.bultos}
                       onChange={(e) => updateItem(idx, "bultos", parseInt(e.target.value) || 0)}
-                      className="w-full border-b border-gray-100 py-1 text-sm outline-none text-center focus:border-black transition" />
-                  </td>
-                  <td className="py-2 pr-2">
-                    <input type="text" value={item.numero_guia_transp}
-                      onChange={(e) => updateItem(idx, "numero_guia_transp", e.target.value)}
-                      className="w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition" />
+                      className={inputClass(`item-${idx}-bultos`, "w-full border-b border-gray-100 py-1 text-sm outline-none text-center focus:border-black transition")} />
                   </td>
                   <td className="py-2 text-center">
                     {items.length > 1 && (
@@ -390,24 +455,19 @@ export default function GuiasPage() {
 
         {/* Footer */}
         <div className="mb-10">
-          <div className="flex items-center gap-2 mb-6">
+          <div className="flex items-center gap-2">
             <span className="text-xs uppercase tracking-widest text-gray-400">Total de bultos:</span>
             <span className="text-lg font-semibold tabular-nums">{totalBultos}</span>
-          </div>
-          <div>
-            <label className="text-xs uppercase tracking-widest text-gray-400 block mb-2">Observaciones</label>
-            <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
-              rows={3} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
           </div>
         </div>
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
         <div className="flex items-center gap-6">
           <button onClick={saveGuia} disabled={saving}
-            className="bg-black text-white px-6 py-2 rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40">
-            {saving ? "Guardando..." : "Guardar y Ver Guía"}
+            className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
+            {saving ? "Guardando..." : editingId ? "Guardar Cambios" : "Guardar y Imprimir"}
           </button>
-          <button onClick={() => setView("list")} className="text-sm text-gray-400 hover:text-black transition">
+          <button onClick={() => { setView("list"); resetForm(); }} className="text-sm text-gray-400 hover:text-black transition">
             Cancelar
           </button>
         </div>
@@ -425,7 +485,7 @@ export default function GuiasPage() {
       <div className="max-w-5xl mx-auto px-6 py-12">
         <div className="flex gap-4 mb-8 no-print">
           <button onClick={() => setView("list")} className="text-sm text-gray-400 hover:text-black transition">← Volver</button>
-          <button onClick={() => window.print()} className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
+          <button onClick={() => window.print()} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
             Imprimir
           </button>
         </div>
@@ -448,7 +508,7 @@ export default function GuiasPage() {
             </div>
             <div className="flex gap-2">
               <span className="font-medium">PLACA / VEHÍCULO:</span>
-              <span className="border-b border-gray-300 flex-1 text-center">{g.placa || ""}</span>
+              <span className="border-b border-gray-300 flex-1 text-center">&nbsp;</span>
             </div>
           </div>
 
@@ -475,7 +535,7 @@ export default function GuiasPage() {
                   <td className="border border-gray-300 px-2 py-1">{item.empresa}</td>
                   <td className="border border-gray-300 px-2 py-1">{item.facturas}</td>
                   <td className="border border-gray-300 px-2 py-1 text-center">{item.bultos || ""}</td>
-                  <td className="border border-gray-300 px-2 py-1">{item.numero_guia_transp}</td>
+                  <td className="border border-gray-300 px-2 py-1">&nbsp;</td>
                 </tr>
               ))}
               <tr className="font-bold bg-gray-50">
