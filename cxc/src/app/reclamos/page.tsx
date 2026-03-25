@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
+import AppHeader from "@/components/AppHeader";
 
 // ── Types ──
 interface RItem { referencia: string; descripcion: string; talla: string; cantidad: number; precio_unitario: number; subtotal: number; motivo: string; nro_factura: string; nro_orden_compra: string; }
@@ -192,14 +193,15 @@ export default function ReclamosPage() {
     // Sub-view A: company selector
     if (!activeEmpresa) {
       return (
-        <div className="max-w-5xl mx-auto px-6 py-12">
+        <div>
+          <AppHeader module="Reclamos a Proveedores" />
+          <div className="max-w-5xl mx-auto px-6 py-8">
           <div className="flex items-end justify-between mb-8">
-            <div><FGLogo variant="horizontal" theme="light" size={32} /><p className="text-sm text-gray-400 mt-2">Reclamos a Proveedores</p></div>
-            <div className="flex items-center gap-4">
-              <button onClick={() => { resetForm(); setView("form"); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">Nuevo Reclamo</button>
-              <button onClick={() => setShowContactos(true)} className="text-sm text-gray-400 hover:text-black transition">Contactos</button>
-              <button onClick={() => router.push("/admin")} className="text-sm text-gray-400 hover:text-black transition">← Panel</button>
+            <div>
+              <h1 className="text-xl font-semibold tracking-tight">Reclamos</h1>
+              <p className="text-sm text-gray-400 mt-1">Selecciona una empresa</p>
             </div>
+            <button onClick={() => { resetForm(); setView("form"); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">Nuevo Reclamo</button>
           </div>
 
           {role === "admin" && (
@@ -252,6 +254,7 @@ export default function ReclamosPage() {
               </div>
             </div>
           )}
+        </div>
         </div>
       );
     }

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import AppHeader from "@/components/AppHeader";
 import FGLogo from "@/components/FGLogo";
 
 interface Cliente {
@@ -125,17 +126,15 @@ export default function DirectorioPage() {
   });
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-12">
-      {/* Header */}
+    <div>
+      <AppHeader module="Directorio de Clientes" />
+      <div className="max-w-5xl mx-auto px-6 py-8">
       <div className="flex items-end justify-between mb-10">
         <div>
-          <FGLogo variant="horizontal" theme="light" size={32} />
-          <p className="text-sm text-gray-400 mt-2">Directorio — Contactos del grupo</p>
+          <h1 className="text-xl font-semibold tracking-tight">Directorio</h1>
+          <p className="text-sm text-gray-400 mt-1">Contactos del grupo</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push("/admin")} className="text-sm text-gray-400 hover:text-black transition">
-            ← Panel
-          </button>
           <input
             ref={importRef}
             type="file"
@@ -316,6 +315,7 @@ export default function DirectorioPage() {
           {toast}
         </div>
       )}
+    </div>
     </div>
   );
 }

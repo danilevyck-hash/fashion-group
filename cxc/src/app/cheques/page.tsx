@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import AppHeader from "@/components/AppHeader";
 
 interface Cheque {
   id: string;
@@ -108,20 +109,17 @@ export default function ChequesPage() {
   const filtered = filter === "all" ? cheques : cheques.filter((c) => c.estado === filter);
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-12">
-      {/* Header */}
+    <div>
+      <AppHeader module="Cheques Posfechados" />
+      <div className="max-w-6xl mx-auto px-6 py-8">
       <div className="flex items-end justify-between mb-8">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Cheques Posfechados</h1>
           <p className="text-sm text-gray-400 mt-1">Gestión de cheques recibidos</p>
         </div>
-        <div className="flex items-center gap-4">
-          <button onClick={() => { resetForm(); setShowForm(!showForm); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
-            {showForm ? "Cerrar" : "Nuevo Cheque"}
-          </button>
-          <button onClick={() => router.push("/plantillas")} className="text-sm text-gray-400 hover:text-black transition">Plantillas</button>
-          <button onClick={() => router.push("/admin")} className="text-sm text-gray-400 hover:text-black transition">← Panel</button>
-        </div>
+        <button onClick={() => { resetForm(); setShowForm(!showForm); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
+          {showForm ? "Cerrar" : "Nuevo Cheque"}
+        </button>
       </div>
 
       {/* KPIs */}
@@ -252,6 +250,7 @@ export default function ChequesPage() {
           </tbody>
         </table>
       )}
+    </div>
     </div>
   );
 }

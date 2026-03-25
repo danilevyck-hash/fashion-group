@@ -28,7 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!uuidRegex.test(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
   const body = await req.json();
-  const { estado, notas, seguimiento_nota, autor } = body;
+  const { seguimiento_nota, autor, ...fields } = body;
 
   if (seguimiento_nota) {
     await supabaseServer.from("reclamo_seguimiento").insert({
@@ -39,8 +39,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (estado) updates.estado = estado;
-  if (notas !== undefined) updates.notas = notas;
+  for (const key of ["empresa", "proveedor", "marca", "nro_factura", "nro_orden_compra", "fecha_reclamo", "notas", "estado"]) {
+    if (fields[key] !== undefined) updates[key] = fields[key];
+  }
 
   if (Object.keys(updates).length > 1) {
     const { error } = await supabaseServer.from("reclamos").update(updates).eq("id", id);
