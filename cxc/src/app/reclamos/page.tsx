@@ -155,7 +155,7 @@ export default function ReclamosPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        empresa: fEmpresa, proveedor: info!.proveedor, marca: info!.marca,
+        empresa: fEmpresa, proveedor: info?.proveedor || "", marca: info?.marca || "",
         nro_factura: fFactura, nro_orden_compra: fOrden, fecha_reclamo: fFecha,
         notas: fNotas, items: validItems,
       }),

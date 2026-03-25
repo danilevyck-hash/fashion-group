@@ -15,26 +15,44 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { empresa, proveedor, marca, nro_factura, nro_orden_compra, fecha_reclamo, notas, items } = body;
 
+  if (!empresa || !nro_factura || !fecha_reclamo) {
+    return NextResponse.json({ error: "Campos requeridos faltantes" }, { status: 400 });
+  }
+
   // Generate nro_reclamo: REC-YYYY-NNNN
   const year = new Date().getFullYear();
-  const { data: existing } = await supabaseServer
-    .from("reclamos")
-    .select("nro_reclamo")
-    .like("nro_reclamo", `REC-${year}-%`)
-    .order("nro_reclamo", { ascending: false })
-    .limit(1);
-
   let seq = 1;
-  if (existing && existing.length > 0) {
-    const last = existing[0].nro_reclamo;
-    const parts = last.split("-");
-    seq = (parseInt(parts[2]) || 0) + 1;
+  try {
+    const { data: existing, error: countErr } = await supabaseServer
+      .from("reclamos")
+      .select("nro_reclamo")
+      .like("nro_reclamo", `REC-${year}-%`)
+      .order("nro_reclamo", { ascending: false })
+      .limit(1);
+
+    if (!countErr && existing && existing.length > 0) {
+      const last = existing[0].nro_reclamo as string;
+      const parts = last.split("-");
+      seq = (parseInt(parts[2]) || 0) + 1;
+    }
+  } catch {
+    // If table is empty or query fails, start at 1
   }
+
   const nro_reclamo = `REC-${year}-${String(seq).padStart(4, "0")}`;
 
   const { data: reclamo, error: recErr } = await supabaseServer
     .from("reclamos")
-    .insert({ nro_reclamo, empresa, proveedor, marca, nro_factura, nro_orden_compra: nro_orden_compra || "", fecha_reclamo, notas: notas || "" })
+    .insert({
+      nro_reclamo,
+      empresa,
+      proveedor: proveedor || "",
+      marca: marca || "",
+      nro_factura,
+      nro_orden_compra: nro_orden_compra || "",
+      fecha_reclamo,
+      notas: notas || "",
+    })
     .select()
     .single();
 
