@@ -534,21 +534,13 @@ export default function AdminDashboard() {
 
       <UploadFreshness roleCompanies={roleCompanies} uploads={uploads} />
 
-      {/* Search bar */}
-      <div className="mb-6">
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar cliente..."
-          className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black w-full max-w-md"
-        />
-      </div>
-
       {/* Activity logs */}
       {userRole === "admin" && (
         <div className="mb-4">
-          <button onClick={async () => { if (showActivity) { setShowActivity(false); return; } const res = await fetch("/api/activity-logs"); if (res.ok) setActivityLogs(await res.json()); setShowActivity(true); }} className="text-xs text-gray-400 hover:text-black transition flex items-center gap-1">{showActivity ? "▲" : "▼"} Actividad reciente</button>
+          <button onClick={async () => { if (showActivity) { setShowActivity(false); return; } const res = await fetch("/api/activity-logs"); if (res.ok) setActivityLogs(await res.json()); setShowActivity(true); }} className="text-xs text-gray-400 hover:text-gray-700 transition flex items-center gap-1.5">
+            <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${showActivity ? "rotate-90" : ""}`} fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg>
+            Actividad reciente
+          </button>
           {showActivity && (
             <div className="mt-3">{activityLogs.length === 0 ? <p className="text-sm text-gray-300 py-4 text-center">Sin actividad registrada</p> : (
               <div className="space-y-1">{activityLogs.map((log) => {
@@ -565,7 +557,10 @@ export default function AdminDashboard() {
 
       {/* Upload history toggle */}
       <div className="mb-4">
-        <button onClick={() => setShowUploadHistory(!showUploadHistory)} className="text-xs text-gray-400 hover:text-black transition flex items-center gap-1">{showUploadHistory ? "▲" : "▼"} Historial de cargas</button>
+        <button onClick={() => setShowUploadHistory(!showUploadHistory)} className="text-xs text-gray-400 hover:text-gray-700 transition flex items-center gap-1.5">
+            <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${showUploadHistory ? "rotate-90" : ""}`} fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg>
+            Historial de cargas
+          </button>
         {showUploadHistory && (
           <div className="mt-3 border border-gray-100 rounded-xl overflow-hidden">
             <table className="w-full text-xs"><thead><tr className="bg-gray-50 border-b border-gray-100"><th className="text-left px-4 py-2.5 font-medium text-gray-500">Empresa</th><th className="text-left px-4 py-2.5 font-medium text-gray-500">Último upload</th><th className="text-left px-4 py-2.5 font-medium text-gray-500">Hace</th><th className="text-right px-4 py-2.5 font-medium text-gray-500">Registros</th></tr></thead>
@@ -582,7 +577,7 @@ export default function AdminDashboard() {
         )}
       </div>
 
-      <KpiCards roleClients={roleClients} />
+      <KpiCards roleClients={roleClients} onFilterOverdue={() => setRiskFilter("overdue")} />
 
       <CompanySummary
         roleCompanies={roleCompanies}

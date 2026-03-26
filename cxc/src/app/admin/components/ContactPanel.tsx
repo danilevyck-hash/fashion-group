@@ -50,84 +50,98 @@ export default function ContactPanel({
     setTimeout(() => setCopied(null), 2000);
   }
 
+  const lastContact = contactLog[client.nombre_normalized];
+  const daysSince = lastContact ? Math.floor((Date.now() - new Date(lastContact.date).getTime()) / 86400000) : null;
+
   const visibleCompanies = companyFilter !== "all"
     ? roleCompanies.filter((co) => co.key === companyFilter && client.companies[co.key])
     : roleCompanies.filter((co) => client.companies[co.key]);
 
   return (
-    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-      {/* Contact info + action buttons */}
-      <div className="mb-4">
-        <div className="flex items-center gap-3 mb-2">
-          <span className="text-xs font-medium text-gray-500 uppercase">Contacto</span>
-          {!editing && (
-            <button onClick={(e) => { e.stopPropagation(); startEdit(); }}
-              className="text-xs text-blue-600 hover:underline">Editar</button>
+    <div className="bg-gray-50/80 px-6 py-5 border-b border-gray-200">
+      <div className="flex flex-col sm:flex-row gap-6">
+        {/* Left: Contact info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Contacto</span>
+            {!editing && (
+              <button onClick={(e) => { e.stopPropagation(); startEdit(); }}
+                className="text-[11px] text-gray-400 hover:text-gray-700 transition flex items-center gap-1">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                Editar
+              </button>
+            )}
+          </div>
+
+          {editing ? (
+            <div className="grid grid-cols-2 gap-2 max-w-lg" onClick={(e) => e.stopPropagation()}>
+              <input className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300" placeholder="Correo"
+                value={editData.correo} onChange={(e) => setEditData({ ...editData, correo: e.target.value })} />
+              <input className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300" placeholder="Telefono"
+                value={editData.telefono} onChange={(e) => setEditData({ ...editData, telefono: e.target.value })} />
+              <input className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300" placeholder="WhatsApp / Celular"
+                value={editData.celular} onChange={(e) => setEditData({ ...editData, celular: e.target.value })} />
+              <input className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300" placeholder="Nombre contacto"
+                value={editData.contacto} onChange={(e) => setEditData({ ...editData, contacto: e.target.value })} />
+              <div className="col-span-2 flex gap-2 mt-1">
+                <button onClick={saveEdit} className="text-xs bg-gray-900 text-white px-4 py-1.5 rounded-lg hover:bg-gray-800 transition font-medium">Guardar</button>
+                <button onClick={() => setEditing(false)} className="text-xs text-gray-500 hover:text-black transition">Cancelar</button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-gray-600 space-y-1">
+              {client.contacto && <div className="flex items-center gap-1.5"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>{client.contacto}</div>}
+              {client.correo && (
+                <div className="flex items-center gap-1.5">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  {client.correo}
+                  <button onClick={(e) => { e.stopPropagation(); copyEmail(client.correo); }}
+                    className="text-[10px] text-gray-400 hover:text-gray-600 transition">
+                    {copied === client.correo ? "Copiado" : "Copiar"}
+                  </button>
+                </div>
+              )}
+              {client.telefono && <div className="flex items-center gap-1.5"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>Tel: {client.telefono}</div>}
+              {client.celular && <div className="flex items-center gap-1.5"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>Cel: {client.celular}</div>}
+              {!client.contacto && !client.correo && !client.telefono && !client.celular && (
+                <div className="text-gray-400 italic">Sin informacion de contacto — <button onClick={(e) => { e.stopPropagation(); startEdit(); }} className="underline hover:text-gray-600">agregar</button></div>
+              )}
+            </div>
+          )}
+
+          {/* Last contact badge */}
+          {lastContact && (
+            <div className={`mt-2 inline-flex items-center gap-1.5 text-[11px] px-2 py-1 rounded-md ${daysSince !== null && daysSince <= 7 ? "bg-emerald-50 text-emerald-700" : daysSince !== null && daysSince <= 30 ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"}`}>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Hace {daysSince}d via {lastContact.method}
+            </div>
           )}
         </div>
 
-        {editing ? (
-          <div className="grid grid-cols-2 gap-2 max-w-lg" onClick={(e) => e.stopPropagation()}>
-            <input className="border rounded px-2 py-1 text-sm" placeholder="Correo"
-              value={editData.correo} onChange={(e) => setEditData({ ...editData, correo: e.target.value })} />
-            <input className="border rounded px-2 py-1 text-sm" placeholder="Telefono"
-              value={editData.telefono} onChange={(e) => setEditData({ ...editData, telefono: e.target.value })} />
-            <input className="border rounded px-2 py-1 text-sm" placeholder="WhatsApp / Celular"
-              value={editData.celular} onChange={(e) => setEditData({ ...editData, celular: e.target.value })} />
-            <input className="border rounded px-2 py-1 text-sm" placeholder="Nombre contacto"
-              value={editData.contacto} onChange={(e) => setEditData({ ...editData, contacto: e.target.value })} />
-            <div className="col-span-2 flex gap-2 mt-1">
-              <button onClick={saveEdit} className="text-xs bg-black text-white px-3 py-1 rounded hover:bg-gray-800">Guardar</button>
-              <button onClick={() => setEditing(false)} className="text-xs text-gray-500 hover:text-black">Cancelar</button>
-            </div>
-          </div>
-        ) : (
-          <div className="text-sm text-gray-600 space-y-0.5">
-            {client.contacto && <div>Contacto: {client.contacto}</div>}
-            {client.correo && (
-              <div className="flex items-center gap-2">
-                Correo: {client.correo}
-                <button onClick={(e) => { e.stopPropagation(); copyEmail(client.correo); }}
-                  className="text-xs text-blue-600 hover:underline">
-                  {copied === client.correo ? "Copiado" : "Copiar"}
-                </button>
-              </div>
-            )}
-            {client.telefono && <div>Tel: {client.telefono}</div>}
-            {client.celular && <div>Cel: {client.celular}</div>}
-            {!client.contacto && !client.correo && !client.telefono && !client.celular && (
-              <div className="text-gray-400 italic">Sin informacion de contacto</div>
-            )}
-          </div>
-        )}
-
-        {/* Action buttons */}
+        {/* Right: Action buttons */}
         {!editing && (
-          <div className="flex flex-wrap gap-2 mt-3">
+          <div className="flex sm:flex-col gap-2">
             <button
               onClick={(e) => { e.stopPropagation(); onOpenWhatsApp(client); onMarkContacted(client.nombre_normalized, "whatsapp"); }}
-              className="text-xs border border-green-600 text-green-700 px-3 py-1.5 rounded hover:bg-green-50 transition"
+              className="flex items-center gap-2 text-xs border border-emerald-200 text-emerald-700 px-3 py-2 rounded-lg hover:bg-emerald-50 transition font-medium"
             >
-              WhatsApp cobro
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              WhatsApp
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onOpenEmail(client); onMarkContacted(client.nombre_normalized, "email"); }}
-              className="text-xs border border-gray-400 text-gray-700 px-3 py-1.5 rounded hover:bg-gray-100 transition"
+              className="flex items-center gap-2 text-xs border border-gray-200 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-100 transition font-medium"
             >
-              Email cobro
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              Email
             </button>
             <button
               onClick={(e) => { e.stopPropagation(); onMarkContacted(client.nombre_normalized, "llamada"); }}
-              className="text-xs border border-blue-400 text-blue-700 px-3 py-1.5 rounded hover:bg-blue-50 transition"
+              className="flex items-center gap-2 text-xs border border-gray-200 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-100 transition font-medium"
             >
-              Marcar llamada
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+              Llamada
             </button>
-          </div>
-        )}
-        {/* Last contact */}
-        {contactLog[client.nombre_normalized] && (
-          <div className="mt-2 text-[11px] text-gray-400">
-            Ultimo contacto: {new Date(contactLog[client.nombre_normalized].date).toLocaleDateString("es-PA")} via {contactLog[client.nombre_normalized].method}
           </div>
         )}
       </div>
@@ -137,48 +151,50 @@ export default function ContactPanel({
 
       {/* Per-company breakdown */}
       {visibleCompanies.length > 0 && (
-        <>
-          <div className="text-xs font-medium text-gray-500 uppercase mb-2">
+        <div className="mt-4">
+          <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-2">
             {roleCompanies.length === 1 || companyFilter !== "all" ? "Detalle de aging" : "Desglose por empresa"}
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-xs">
             <thead>
-              <tr className="text-xs text-gray-400 uppercase">
-                {roleCompanies.length > 1 && <th className="text-left py-1 font-medium">Empresa</th>}
-                <th className="text-left py-1 font-medium">Codigo</th>
-                <th className="text-right py-1 font-medium">0-30</th>
-                <th className="text-right py-1 font-medium">31-60</th>
-                <th className="text-right py-1 font-medium">61-90</th>
-                <th className="text-right py-1 font-medium">91-120</th>
-                <th className="text-right py-1 font-medium">121-180</th>
-                <th className="text-right py-1 font-medium">181-270</th>
-                <th className="text-right py-1 font-medium">271-365</th>
-                <th className="text-right py-1 font-medium">+365</th>
-                <th className="text-right py-1 font-medium">Total</th>
+              <tr className="text-[10px] text-gray-400 uppercase tracking-wider">
+                {roleCompanies.length > 1 && <th className="text-left py-1.5 font-medium">Empresa</th>}
+                <th className="text-left py-1.5 font-medium">Codigo</th>
+                <th className="text-right py-1.5 font-medium">0-30</th>
+                <th className="text-right py-1.5 font-medium">31-60</th>
+                <th className="text-right py-1.5 font-medium">61-90</th>
+                <th className="text-right py-1.5 font-medium text-amber-600">91-120</th>
+                <th className="text-right py-1.5 font-medium text-amber-600">121-180</th>
+                <th className="text-right py-1.5 font-medium text-red-500">181-270</th>
+                <th className="text-right py-1.5 font-medium text-red-500">271-365</th>
+                <th className="text-right py-1.5 font-medium text-red-500">+365</th>
+                <th className="text-right py-1.5 font-medium">Total</th>
               </tr>
             </thead>
             <tbody>
               {visibleCompanies.map((co) => {
                 const d = client.companies[co.key];
                 return (
-                  <tr key={co.key} className="border-t border-gray-100">
-                    {roleCompanies.length > 1 && <td className="py-1.5">{co.name}</td>}
-                    <td className="py-1.5 text-gray-500">{d.codigo}</td>
-                    <td className="text-right py-1.5">{fmt(d.d0_30)}</td>
-                    <td className="text-right py-1.5">{fmt(d.d31_60)}</td>
-                    <td className="text-right py-1.5">{fmt(d.d61_90)}</td>
-                    <td className="text-right py-1.5 text-yellow-600">{fmt(d.d91_120)}</td>
-                    <td className="text-right py-1.5 text-yellow-600">{fmt(d.d121_180)}</td>
-                    <td className="text-right py-1.5 text-red-600">{fmt(d.d181_270)}</td>
-                    <td className="text-right py-1.5 text-red-600">{fmt(d.d271_365)}</td>
-                    <td className="text-right py-1.5 text-red-600">{fmt(d.mas_365)}</td>
-                    <td className="text-right py-1.5 font-semibold">{fmt(d.total)}</td>
+                  <tr key={co.key} className="border-t border-gray-100 hover:bg-white transition">
+                    {roleCompanies.length > 1 && <td className="py-1.5 font-medium">{co.name}</td>}
+                    <td className="py-1.5 text-gray-400">{d.codigo}</td>
+                    <td className="text-right py-1.5 tabular-nums">{fmt(d.d0_30)}</td>
+                    <td className="text-right py-1.5 tabular-nums">{fmt(d.d31_60)}</td>
+                    <td className="text-right py-1.5 tabular-nums">{fmt(d.d61_90)}</td>
+                    <td className="text-right py-1.5 tabular-nums text-amber-600">{fmt(d.d91_120)}</td>
+                    <td className="text-right py-1.5 tabular-nums text-amber-600">{fmt(d.d121_180)}</td>
+                    <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(d.d181_270)}</td>
+                    <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(d.d271_365)}</td>
+                    <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(d.mas_365)}</td>
+                    <td className="text-right py-1.5 tabular-nums font-semibold">{fmt(d.total)}</td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-        </>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -194,10 +210,13 @@ function ClientNote({ clientName }: { clientName: string }) {
     try { const all = JSON.parse(localStorage.getItem("fg_client_notes") || "{}"); all[clientName] = v; localStorage.setItem("fg_client_notes", JSON.stringify(all)); } catch { /* */ }
   }
   return (
-    <div className="mt-3 mb-3">
-      <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">Nota interna</div>
+    <div className="mt-4 mb-2">
+      <div className="text-[11px] uppercase tracking-wider text-gray-400 mb-1.5 font-medium flex items-center gap-1.5">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Nota interna
+      </div>
       <textarea value={note} onChange={(e) => save(e.target.value)} placeholder="Ej: Acuerdo de pago, cliente VIP..." rows={2}
-        className="w-full border border-gray-100 rounded-lg p-2 text-xs outline-none focus:border-gray-300 resize-none text-gray-600 placeholder:text-gray-300" />
+        className="w-full border border-gray-200 rounded-lg p-2.5 text-xs outline-none focus:ring-1 focus:ring-gray-300 resize-none text-gray-600 placeholder:text-gray-300" />
     </div>
   );
 }
