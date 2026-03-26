@@ -36,20 +36,21 @@ export function buildReclamoSheet(rec: Record<string, unknown>, items: Record<st
     ["N° Reclamo", String(rec.nro_reclamo || ""), true, "Empresa", String(rec.empresa || ""), false],
     ["Proveedor", String(rec.proveedor || ""), false, "Marca", String(rec.marca || ""), false],
     ["N° Factura", String(rec.nro_factura || ""), true, "Fecha", fmtDate(String(rec.fecha_reclamo || "")), false],
-    ["Estado", String(rec.estado || ""), false, "N° Pedido", String(rec.nro_orden_compra || "—"), false],
+    ["N° Pedido", String(rec.nro_orden_compra || "—"), false, "Estado", String(rec.estado || ""), false],
   ] as const;
 
   for (const [aLbl, aVal, aBold, eLbl, eVal] of meta) {
     ws[addr(r, 0)] = mLbl(aLbl);
-    if (aLbl === "Estado") {
-      const fg = ESTADO_FG[aVal] || "374151";
-      ws[addr(r, 1)] = { v: aVal, t: "s", s: { font: { sz: 10, color: { rgb: fg }, name: "Calibri" }, fill: { fgColor: { rgb: VAL_BG } }, alignment: { horizontal: "left" } } };
-    } else {
-      ws[addr(r, 1)] = mVal(aVal, aBold as boolean);
-    }
+    ws[addr(r, 1)] = mVal(aVal, aBold as boolean);
     for (let c = 2; c <= 3; c++) ws[addr(r, c)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: VAL_BG } } } };
     ws[addr(r, 4)] = mLbl(eLbl);
-    ws[addr(r, 5)] = mVal(eVal as string);
+    if (eLbl === "Estado") {
+      const fg = ESTADO_FG[eVal as string] || "374151";
+      const ebg = ({ "Enviado": "EBF5FB", "En Revisión": "FFF7ED", "N/C Aprobada": "F0FDF4", "Aplicada": "F9FAFB" } as Record<string, string>)[eVal as string] || VAL_BG;
+      ws[addr(r, 5)] = { v: eVal, t: "s", s: { font: { bold: true, sz: 10, color: { rgb: fg }, name: "Calibri" }, fill: { fgColor: { rgb: ebg } }, alignment: { horizontal: "left" }, border: B } };
+    } else {
+      ws[addr(r, 5)] = mVal(eVal as string);
+    }
     ws[addr(r, 6)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: VAL_BG } } } };
     merges.push({ s: { r, c: 1 }, e: { r, c: 3 } });
     merges.push({ s: { r, c: 5 }, e: { r, c: 6 } });
@@ -83,12 +84,13 @@ export function buildReclamoSheet(rec: Record<string, unknown>, items: Record<st
   }
 
   // Spacer
+  ws[addr(r, 0)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: "FFFFFF" } } } };
   h[r] = 6; r++;
 
   // Totals
   const imp = subtotal * 0.10; const itbms = subtotal * 0.077; const total = subtotal + imp + itbms;
-  const tLbl = (v: string) => ({ v, t: "s", s: { font: { bold: true, sz: 9, color: { rgb: PRI }, name: "Calibri" }, alignment: { horizontal: "right" } } });
-  const tVal = (v: number) => ({ v, t: "n", z: '"$"#,##0.00', s: { font: { sz: 10, name: "Calibri" }, alignment: { horizontal: "right" }, border: { bottom: { style: "thin", color: { rgb: BRD } } } } });
+  const tLbl = (v: string) => ({ v, t: "s", s: { font: { bold: true, sz: 9, color: { rgb: PRI }, name: "Calibri" }, fill: { fgColor: { rgb: "FFFFFF" } }, alignment: { horizontal: "right" } } });
+  const tVal = (v: number) => ({ v, t: "n", z: '"$"#,##0.00', s: { font: { sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "FFFFFF" } }, alignment: { horizontal: "right" }, border: { bottom: { style: "thin", color: { rgb: BRD } } } } });
 
   ws[addr(r, 5)] = tLbl("Subtotal:"); ws[addr(r, 6)] = tVal(subtotal); h[r] = 16; r++;
   ws[addr(r, 5)] = tLbl("Importación (10%):"); ws[addr(r, 6)] = tVal(imp); h[r] = 16; r++;
