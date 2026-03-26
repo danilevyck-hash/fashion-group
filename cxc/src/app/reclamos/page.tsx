@@ -59,6 +59,8 @@ export default function ReclamosPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [filterEstado, setFilterEstado] = useState("all");
+  const [confirmingEstado, setConfirmingEstado] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Form
   const [fEmpresa, setFEmpresa] = useState("");
@@ -137,8 +139,8 @@ export default function ReclamosPage() {
   }
 
   async function addNota() { if (!current || !nota.trim()) return; await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seguimiento_nota: nota, autor: role }) }); setNota(""); await loadDetail(current.id); }
-  async function changeEstado(e: string) { if (!current || current.estado === e) return; if (!confirm(`¿Cambiar estado a "${e}"?`)) return; await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: e }) }); await loadDetail(current.id); loadReclamos(); }
-  async function deleteReclamo(id: string) { if (!confirm("¿Eliminar este reclamo?")) return; await fetch(`/api/reclamos/${id}`, { method: "DELETE" }); setCurrent(null); setView("list"); loadReclamos(); }
+  async function changeEstado(e: string) { if (!current || current.estado === e) return; setConfirmingEstado(null); await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: e }) }); await loadDetail(current.id); loadReclamos(); }
+  async function deleteReclamo(id: string) { setShowDeleteConfirm(false); await fetch(`/api/reclamos/${id}`, { method: "DELETE" }); setCurrent(null); setView("list"); loadReclamos(); }
 
 
   async function uploadFoto(file: File) { if (!current) return; const fd = new FormData(); fd.append("file", file); await fetch(`/api/reclamos/${current.id}/fotos`, { method: "POST", body: fd }); await loadDetail(current.id); }
@@ -241,7 +243,8 @@ export default function ReclamosPage() {
     }
 
     // Sub-view B: reclamos of selected empresa
-    const empresaRecs = reclamos.filter((r) => r.empresa === activeEmpresa).filter((r) => {
+    const allEmpresaRecs = reclamos.filter((r) => r.empresa === activeEmpresa);
+    const empresaRecs = allEmpresaRecs.filter((r) => {
       if (filterEstado !== "all" && r.estado !== filterEstado) return false;
       if (search) { const q = search.toLowerCase(); if (!(r.nro_reclamo || "").toLowerCase().includes(q) && !(r.nro_factura || "").toLowerCase().includes(q)) return false; }
       return true;
@@ -274,22 +277,34 @@ export default function ReclamosPage() {
           </div>
         </div>
 
-        <div className="flex gap-3 mb-6">
-          <select value={filterEstado} onChange={(e) => setFilterEstado(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent"><option value="all">Todos los estados</option>{ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}</select>
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="border-b border-gray-200 py-2 text-sm outline-none flex-1 max-w-xs" />
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button onClick={() => setFilterEstado("all")} className={`text-xs px-3 py-1 rounded-full transition ${filterEstado === "all" ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+            Todos <span className="ml-1 opacity-60">{allEmpresaRecs.length}</span>
+          </button>
+          {ESTADOS.map((e) => {
+            const count = allEmpresaRecs.filter((r) => r.estado === e).length;
+            return (
+              <button key={e} onClick={() => setFilterEstado(e)} className={`text-xs px-3 py-1 rounded-full transition ${filterEstado === e ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                {e} <span className="ml-1 opacity-60">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+        <div className="mb-6">
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="border-b border-gray-200 py-2 text-sm outline-none w-full max-w-xs" />
         </div>
 
         {empresaRecs.length === 0 ? <p className="text-center text-gray-300 text-sm py-20">Sin reclamos</p> : (
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
               {selectionMode && <th className="pb-3 w-8"></th>}
-              <th className="text-left pb-3 font-medium">Factura</th><th className="text-left pb-3 font-medium">N° Reclamo</th><th className="text-left pb-3 font-medium">Fecha</th><th className="text-right pb-3 font-medium">Días</th><th className="text-left pb-3 font-medium">Estado</th><th className="text-right pb-3 font-medium">Total</th><th className="text-right pb-3 font-medium"></th>
+              <th className="text-left pb-3 font-medium">Factura</th><th className="text-left pb-3 font-medium">N° Reclamo</th><th className="text-left pb-3 font-medium">Fecha</th><th className="text-right pb-3 font-medium">Antigüedad</th><th className="text-left pb-3 font-medium">Estado</th><th className="text-right pb-3 font-medium">Total</th><th className="text-right pb-3 font-medium"></th>
             </tr></thead>
             <tbody>{empresaRecs.map((r) => { const days = daysSince(r.fecha_reclamo); const total = calcSub(r.reclamo_items ?? []) * 1.177; const canSelect = r.estado !== "Aplicada"; return (
               <tr key={r.id} onClick={() => selectionMode ? (canSelect && toggleSelect(r.id)) : loadDetail(r.id)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
                 {selectionMode && <td className="py-3"><input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!canSelect} className="accent-black disabled:opacity-30" /></td>}
                 <td className="py-3 font-medium">{r.nro_factura}</td><td className="py-3"><span className="text-gray-500 text-xs">{r.nro_reclamo}</span></td><td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
-                <td className={`py-3 text-right tabular-nums ${days > 60 && canSelect ? "text-red-600 font-medium" : "text-gray-400"}`}>{days}</td>
+                <td className={`py-3 text-right tabular-nums ${days > 60 && canSelect ? "text-red-600 font-medium" : days > 30 && canSelect ? "text-amber-600" : "text-gray-400"}`}>{days}d</td>
                 <td className="py-3"><span className={`text-[11px] px-2 py-0.5 rounded-full ${EC[r.estado] || "bg-gray-100 text-gray-500"}`}>{r.estado}</span></td>
                 <td className="py-3 text-right tabular-nums">${fmt(total)}</td>
                 <td className="py-3 text-right" onClick={(e) => e.stopPropagation()}>{role === "admin" && <button onClick={() => deleteReclamo(r.id)} className="text-sm text-gray-300 hover:text-black transition">Eliminar</button>}</td>
@@ -411,7 +426,27 @@ export default function ReclamosPage() {
         <span className={`text-xs px-3 py-1 rounded-full ${EC[current.estado] || "bg-gray-100 text-gray-500"}`}>{current.estado}</span>
       </div>
 
-      <div className="flex gap-1 mb-8">{ESTADOS.map((e, i) => <button key={e} onClick={() => changeEstado(e)} className={`flex-1 py-2 text-xs text-center rounded transition ${ESTADOS.indexOf(current.estado) >= i ? "bg-black text-white" : "bg-gray-100 text-gray-400 hover:bg-gray-200"}`}>{e}</button>)}</div>
+      <div className="flex gap-1 mb-8">{ESTADOS.map((e, i) => {
+        const active = ESTADOS.indexOf(current.estado) >= i;
+        const isCurrent = current.estado === e;
+        return (
+          <div key={e} className="flex-1 relative">
+            <button onClick={() => { if (!isCurrent) setConfirmingEstado(confirmingEstado === e ? null : e); }}
+              className={`w-full py-2 text-xs text-center rounded transition ${active ? "bg-black text-white" : "bg-gray-100 text-gray-400 hover:bg-gray-200"} ${isCurrent ? "ring-1 ring-black" : ""}`}>
+              {e}
+            </button>
+            {confirmingEstado === e && !isCurrent && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-10 text-center">
+                <p className="text-[11px] text-gray-500 mb-1.5">Cambiar a {e}?</p>
+                <div className="flex gap-1 justify-center">
+                  <button onClick={() => changeEstado(e)} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 transition">Si</button>
+                  <button onClick={() => setConfirmingEstado(null)} className="text-[11px] text-gray-400 px-2 py-1 hover:text-black transition">No</button>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })}</div>
 
       <div className="grid grid-cols-4 gap-4 mb-8">
         <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Subtotal</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub)}</div></div>
@@ -472,8 +507,22 @@ export default function ReclamosPage() {
           window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
         }} className="text-sm text-gray-400 hover:text-black transition">WhatsApp</button>
         <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} className="text-sm text-gray-400 hover:text-black transition">Excel</button>
-        {role === "admin" && <button onClick={() => deleteReclamo(current.id)} className="text-sm text-gray-300 hover:text-red-500 transition ml-auto">Eliminar</button>}
+        {role === "admin" && <button onClick={() => setShowDeleteConfirm(true)} className="text-sm text-gray-300 hover:text-red-500 transition ml-auto">Eliminar</button>}
       </div>
+
+      {/* Delete confirm modal */}
+      {showDeleteConfirm && current && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm font-medium mb-1">Eliminar reclamo</p>
+            <p className="text-sm text-gray-500 mb-5">¿Seguro que deseas eliminar {current.nro_reclamo}? Esta acción no se puede deshacer.</p>
+            <div className="flex items-center gap-3 justify-end">
+              <button onClick={() => setShowDeleteConfirm(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+              <button onClick={() => deleteReclamo(current.id)} className="text-sm bg-red-600 text-white px-5 py-2 rounded-full hover:bg-red-700 transition">Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit mode */}
       {editMode && (

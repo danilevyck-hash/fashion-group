@@ -24,6 +24,8 @@ export async function GET() {
   const vigilanciaPct = totalCxc > 0 ? (vigilancia / totalCxc) * 100 : 0;
   const vencidoPct = totalCxc > 0 ? (vencido / totalCxc) * 100 : 0;
 
+  const { data: uploads } = await supabaseServer.from("cxc_uploads").select("uploaded_at, company_key").order("uploaded_at", { ascending: false }).limit(1);
+
   return NextResponse.json({
     totalCxc,
     vencidoMas121: vencido,
@@ -31,5 +33,7 @@ export async function GET() {
     corrientePct: Math.round(corrientePct),
     vigilanciaPct: Math.round(vigilanciaPct),
     vencidoPct: Math.round(vencidoPct),
+    lastUpload: uploads?.[0]?.uploaded_at || null,
+    lastUploadEmpresa: uploads?.[0]?.company_key || null,
   });
 }

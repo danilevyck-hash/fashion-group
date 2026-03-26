@@ -8,7 +8,7 @@ const ROLE_LABELS: Record<string, string> = { admin: "Administrador", upload: "S
 
 function fmt(n: number) { return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
-interface CxcSummary { totalCxc: number; vencidoMas121: number; clientesCriticos: number; corrientePct: number; vigilanciaPct: number; vencidoPct: number; }
+interface CxcSummary { totalCxc: number; vencidoMas121: number; clientesCriticos: number; corrientePct: number; vigilanciaPct: number; vencidoPct: number; lastUpload: string | null; lastUploadEmpresa: string | null; }
 
 const CARDS = [
   { title: "Guía de Transporte", description: "Registro y gestión de guías de envío", href: "/guias", icon: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg> },
@@ -72,6 +72,9 @@ export default function PlantillasPage() {
             <div style={{ flex: cxc.vigilanciaPct, background: "#facc15" }} />
             <div style={{ flex: cxc.vencidoPct, background: "#f87171" }} className="rounded-r-full" />
           </div>
+          {cxc.lastUpload && (
+            <p className="text-[10px] text-gray-400 mt-2">Última carga: {new Date(cxc.lastUpload).toLocaleDateString("es-PA")}{cxc.lastUploadEmpresa ? ` (${cxc.lastUploadEmpresa})` : ""}</p>
+          )}
         </button>
       )}
 
