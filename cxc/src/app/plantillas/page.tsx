@@ -16,12 +16,14 @@ export default function PlantillasPage() {
   const [role, setRole] = useState("");
   const [cxc, setCxc] = useState<CxcSummary | null>(null);
   const [stats, setStats] = useState<HomeStats | null>(null);
+  const [darkMode, setDarkMode] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const r = sessionStorage.getItem("cxc_role") || "";
     if (!r) { router.push("/"); return; }
     setRole(r); setAuthChecked(true);
+    setDarkMode(localStorage.getItem("fg_dark_mode") === "1");
   }, [router]);
 
   const loadCxc = useCallback(async () => { try { const res = await fetch("/api/cxc-summary"); if (res.ok) setCxc(await res.json()); } catch { /* */ } }, []);
@@ -44,6 +46,7 @@ export default function PlantillasPage() {
           <p className="text-sm text-gray-400 mt-2">Sistema Interno</p>
         </div>
         <div className="flex items-center gap-4">
+          <button onClick={() => { const next = !darkMode; setDarkMode(next); if (next) { document.documentElement.classList.add("dark"); localStorage.setItem("fg_dark_mode", "1"); } else { document.documentElement.classList.remove("dark"); localStorage.setItem("fg_dark_mode", "0"); } }} title={darkMode ? "Modo claro" : "Modo oscuro"} className="text-sm text-gray-400 hover:text-black transition">{darkMode ? "☀" : "◑"}</button>
           <span className="text-sm text-gray-400">{ROLE_LABELS[role] || role}</span>
           <button onClick={() => { sessionStorage.removeItem("cxc_role"); router.push("/"); }} className="text-sm text-gray-400 hover:text-black transition">Salir</button>
         </div>

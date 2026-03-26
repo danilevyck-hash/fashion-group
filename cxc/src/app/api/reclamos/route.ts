@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { logActivity } from "@/lib/log-activity";
 
 export async function GET() {
   const { data, error } = await supabaseServer
@@ -108,5 +109,6 @@ export async function POST(req: NextRequest) {
     .eq("id", reclamo.id)
     .single();
 
+  await logActivity("system", "reclamo_creado", "reclamo", reclamo.id, `${empresa} — Factura ${nro_factura}`);
   return NextResponse.json({ ...(full || reclamo), items_warning: itemsWarning || undefined });
 }

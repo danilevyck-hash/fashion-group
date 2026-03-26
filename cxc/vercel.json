@@ -1,8 +1,6 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/cheques",
-      "schedule": "0 13 * * *"
-    }
+    { "path": "/api/cron/cheques", "schedule": "0 13 * * *" },
+    { "path": "/api/cron/backup", "schedule": "0 14 * * *" }
   ]
 }
