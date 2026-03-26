@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import * as XLSX from "xlsx";
+import XLSX from "xlsx-js-style";
 
 interface Cliente {
   id: string;

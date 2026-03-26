@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { Resend } from "resend";
-import * as XLSX from "xlsx";
+import XLSX from "xlsx-js-style";
 
 function getResend() { return new Resend(process.env.RESEND_API_KEY); }
 

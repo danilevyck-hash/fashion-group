@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import * as XLSX from "xlsx";
+import XLSX from "xlsx-js-style";
 
 function fmtDate(d: string) { if (!d) return ""; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }
 function addr(r: number, c: number) { return XLSX.utils.encode_cell({ r, c }); }
