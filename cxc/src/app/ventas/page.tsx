@@ -281,14 +281,15 @@ export default function VentasPage() {
     );
   };
 
-  return (
+  try { return renderContent(); } catch (e) { return <div className="p-8 text-red-500">Error al renderizar: {String(e)}</div>; }
+  function renderContent() { return (
     <div>
       <AppHeader module="Ventas" />
       <div className="max-w-7xl mx-auto px-6 py-8">
 
         {/* Year selector */}
         <div className="flex items-center gap-2 mb-8">
-          {(años.length > 0 ? años : [new Date().getFullYear()]).map((y) => (
+          {((años || []).length > 0 ? años : [new Date().getFullYear()]).map((y) => (
             <button key={y} onClick={() => setSelectedYear(y)}
               className={`px-4 py-1.5 text-sm rounded-full transition ${selectedYear === y ? "bg-black text-white font-medium" : "text-gray-400 hover:text-black"}`}>
               {y}
@@ -595,5 +596,5 @@ export default function VentasPage() {
         )}
       </div>
     </div>
-  );
+  ); }
 }
