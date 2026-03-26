@@ -13,6 +13,7 @@ import KpiCards from "./components/KpiCards";
 import CompanySummary from "./components/CompanySummary";
 import ClientTable from "./components/ClientTable";
 import { SkeletonRow } from "./components/Skeleton";
+import { generatePDFResumen, generatePDFDetallado } from "@/lib/pdf-cxc";
 import useAdminData from "./hooks/useAdminData";
 
 // ── Helpers ──────────────────────────────────────────────
@@ -83,90 +84,7 @@ function buildEmailBody(client: ConsolidatedClient) {
   return lines.join("\n");
 }
 
-// ── PDF generation (pure client-side) ────────────────────
-
-function generatePDF(data: ConsolidatedClient[], title: string, detailed: boolean = false, companyKeys?: string[]) {
-  const w = window.open("", "_blank");
-  if (!w) return;
-
-  let rows: string;
-
-  if (detailed && companyKeys) {
-    rows = data.map((c) => {
-      const mainRow = `
-        <tr style="background:#f9f9f9">
-          <td style="padding:6px 8px;border-bottom:1px solid #ddd;font-weight:600" colspan="1">${c.nombre_normalized}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right;color:#15803d;font-weight:600">${fmt(c.current)}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right;color:#ca8a04;font-weight:600">${fmt(c.watch)}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right;color:#dc2626;font-weight:600">${fmt(c.overdue)}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid #ddd;text-align:right;font-weight:700">${fmt(c.total)}</td>
-        </tr>`;
-      const companyRows = companyKeys
-        .filter((k) => c.companies[k] && c.companies[k].total !== 0)
-        .map((k) => {
-          const d = c.companies[k];
-          const co = COMPANIES.find((x) => x.key === k);
-          const cur = d.d0_30 + d.d31_60 + d.d61_90;
-          const wat = d.d91_120;
-          const ove = d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365;
-          return `<tr>
-            <td style="padding:2px 8px 2px 24px;border-bottom:1px solid #f0f0f0;font-size:11px;color:#666">${co?.name || k}</td>
-            <td style="padding:2px 8px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:11px;color:#15803d">${fmt(cur)}</td>
-            <td style="padding:2px 8px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:11px;color:#ca8a04">${fmt(wat)}</td>
-            <td style="padding:2px 8px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:11px;color:#dc2626">${fmt(ove)}</td>
-            <td style="padding:2px 8px;border-bottom:1px solid #f0f0f0;text-align:right;font-size:11px">${fmt(d.total)}</td>
-          </tr>`;
-        }).join("");
-      return mainRow + companyRows;
-    }).join("");
-  } else {
-    rows = data.map((c) => `
-      <tr>
-        <td style="padding:4px 8px;border-bottom:1px solid #eee">${c.nombre_normalized}</td>
-        <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;color:#15803d">${fmt(c.current)}</td>
-        <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;color:#ca8a04">${fmt(c.watch)}</td>
-        <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;color:#dc2626">${fmt(c.overdue)}</td>
-        <td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;font-weight:600">${fmt(c.total)}</td>
-      </tr>
-    `).join("");
-  }
-
-  const totalCxc = data.reduce((s, c) => s + c.total, 0);
-  const totalCurrent = data.reduce((s, c) => s + c.current, 0);
-  const totalWatch = data.reduce((s, c) => s + c.watch, 0);
-  const totalOverdue = data.reduce((s, c) => s + c.overdue, 0);
-
-  w.document.write(`<!DOCTYPE html><html><head><title>${title}</title>
-    <style>body{font-family:-apple-system,sans-serif;margin:40px;color:#111}
-    table{width:100%;border-collapse:collapse;font-size:12px}
-    th{text-align:left;padding:6px 8px;border-bottom:2px solid #111;font-size:11px;text-transform:uppercase;color:#666}
-    .right{text-align:right}
-    h1{font-size:18px;margin:0} h2{font-size:13px;color:#666;margin:4px 0 20px}
-    .footer{margin-top:16px;font-size:11px;color:#999;text-align:center}
-    .totals td{font-weight:700;border-top:2px solid #111;padding:6px 8px}
-    @media print{body{margin:20px}}
-    </style></head><body>
-    <h1>CXC — Fashion Group</h1>
-    <h2>${title}${detailed ? " (Detallado)" : ""} &middot; ${new Date().toLocaleDateString("es-PA")} &middot; ${data.length} clientes</h2>
-    <table>
-      <thead><tr>
-        <th>Cliente</th><th class="right">Corriente 0-90d</th><th class="right">Vigilancia 91-120d</th><th class="right">Vencido 121d+</th><th class="right">Total</th>
-      </tr></thead>
-      <tbody>${rows}
-        <tr class="totals">
-          <td>TOTAL</td>
-          <td class="right" style="color:#15803d">${fmt(totalCurrent)}</td>
-          <td class="right" style="color:#ca8a04">${fmt(totalWatch)}</td>
-          <td class="right" style="color:#dc2626">${fmt(totalOverdue)}</td>
-          <td class="right">${fmt(totalCxc)}</td>
-        </tr>
-      </tbody>
-    </table>
-    <div class="footer">Politica: 0-90d corriente &middot; 91-120d vigilancia &middot; 121d+ vencido</div>
-    <script>window.onload=function(){window.print()}</script>
-    </body></html>`);
-  w.document.close();
-}
+// ── PDF generation (via jsPDF) ────────────────────
 
 function exportCSV(data: ConsolidatedClient[], label?: string, riskLabel?: string, companyLabel?: string) {
   const date = new Date().toISOString().slice(0, 10);
@@ -465,6 +383,19 @@ export default function AdminDashboard() {
     if (!error) loadData();
   }
 
+  function buildExportSubtitle() {
+    const parts: string[] = [];
+    if (riskFilter !== "all") {
+      const labels: Record<string, string> = { current: "Corriente", watch: "Vigilancia", overdue: "Vencido" };
+      parts.push(labels[riskFilter] || "");
+    }
+    if (companyFilter !== "all") {
+      const co = COMPANIES.find((c) => c.key === companyFilter);
+      if (co) parts.push(co.name);
+    }
+    return parts.length > 0 ? parts.join(" — ") : undefined;
+  }
+
   // ── Render ────────────────────────────────────────────
 
   if (loadError) {
@@ -493,12 +424,17 @@ export default function AdminDashboard() {
           <div className="relative">
             <button
               onClick={() => setShowExport(!showExport)}
-              className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition"
+              className="text-sm bg-gray-900 text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800 transition flex items-center gap-2"
             >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Exportar
             </button>
-            {showExport && (
-              <div className="absolute right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg z-10">
+            {showExport && (<>
+              <div className="fixed inset-0 z-10" onClick={() => setShowExport(false)} />
+              <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-72 py-1">
+                <div className="px-3 py-2 border-b border-gray-100">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wider">Se exportaran {filtered.length} clientes</p>
+                </div>
                 <button
                   onClick={() => {
                     const riskL = riskFilter === "all" ? "" : riskFilter === "current" ? "corriente" : riskFilter === "watch" ? "vigilancia" : "vencido";
@@ -507,43 +443,44 @@ export default function AdminDashboard() {
                     exportCSV(filtered, [riskL, coL].filter(Boolean).join("_") || undefined, riskLabel || undefined, coL || undefined);
                     setShowExport(false);
                   }}
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                  className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition flex items-start gap-3"
                 >
-                  CSV (Excel)
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  <div>
+                    <div className="text-sm font-medium text-gray-800">CSV (Excel)</div>
+                    <div className="text-[11px] text-gray-400 mt-0.5">Hoja de calculo con aging detallado</div>
+                  </div>
                 </button>
                 <button
                   onClick={() => {
-                    const riskLabel = riskFilter === "all" ? "Todos los clientes"
-                      : riskFilter === "current" ? "Clientes Corrientes"
-                      : riskFilter === "watch" ? "Clientes en Vigilancia"
-                      : "Clientes Vencidos";
-                    const coLabel = companyFilter !== "all"
-                      ? COMPANIES.find((c) => c.key === companyFilter)?.name || ""
-                      : "";
-                    const label = coLabel ? `${riskLabel} — ${coLabel}` : riskLabel;
-                    generatePDF(filtered, label);
+                    const sub = buildExportSubtitle();
+                    generatePDFResumen(filtered, sub);
                     setShowExport(false);
                   }}
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                  className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition flex items-start gap-3"
                 >
-                  PDF Resumen
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><rect x="6" y="3" width="12" height="18" rx="1"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/><line x1="9" y1="15" x2="12" y2="15"/></svg>
+                  <div>
+                    <div className="text-sm font-medium text-gray-800">PDF Resumen</div>
+                    <div className="text-[11px] text-gray-400 mt-0.5">Vista general, listo para imprimir</div>
+                  </div>
                 </button>
-                {companyFilter === "all" && <button
+                <button
                   onClick={() => {
-                    const riskLabel = riskFilter === "all" ? "Todos los clientes"
-                      : riskFilter === "current" ? "Clientes Corrientes"
-                      : riskFilter === "watch" ? "Clientes en Vigilancia"
-                      : "Clientes Vencidos";
-                    const keys = roleCompanies.map((c) => c.key);
-                    generatePDF(filtered, riskLabel, true, keys);
+                    const sub = buildExportSubtitle();
+                    generatePDFDetallado(filtered, roleCompanies, sub);
                     setShowExport(false);
                   }}
-                  className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
+                  className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition flex items-start gap-3"
                 >
-                  PDF Detallado
-                </button>}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><line x1="8" y1="9" x2="10" y2="9"/></svg>
+                  <div>
+                    <div className="text-sm font-medium text-gray-800">PDF Detallado</div>
+                    <div className="text-[11px] text-gray-400 mt-0.5">Desglose completo por empresa y aging</div>
+                  </div>
+                </button>
               </div>
-            )}
+            </>)}
           </div>
       </div>
 
