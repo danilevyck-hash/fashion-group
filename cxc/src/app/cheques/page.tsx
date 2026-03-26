@@ -125,20 +125,33 @@ export default function ChequesPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-3 gap-8 mb-8">
-        <div>
-          <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Total Pendiente</div>
-          <div className="text-2xl font-semibold tabular-nums">${fmt(totalPendiente)}</div>
-        </div>
-        <div>
-          <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Cheques Pendientes</div>
-          <div className="text-2xl font-semibold">{pendientes.length}</div>
-        </div>
-        <div>
-          <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Próximo Depósito</div>
-          <div className="text-2xl font-semibold">{proximo ? fmtDate(proximo) : "—"}</div>
-        </div>
-      </div>
+      {(() => {
+        const now = new Date(); const wk = new Date(now.getTime() + 7 * 86400000); const todayS = now.toISOString().slice(0, 10); const wkS = wk.toISOString().slice(0, 10);
+        const vencenSemana = pendientes.filter((c) => c.fecha_deposito >= todayS && c.fecha_deposito <= wkS);
+        return (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+            <div className="bg-gray-50 rounded-xl p-4">
+              <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Total a cobrar</div>
+              <div className="text-xl font-semibold tabular-nums">${fmt(totalPendiente)}</div>
+              <div className="text-xs text-gray-400 mt-0.5">{pendientes.length} cheques</div>
+            </div>
+            <div className={`rounded-xl p-4 ${vencenSemana.length > 0 ? "bg-amber-50" : "bg-gray-50"}`}>
+              <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Vencen esta semana</div>
+              <div className={`text-xl font-semibold tabular-nums ${vencenSemana.length > 0 ? "text-amber-600" : ""}`}>{vencenSemana.length}</div>
+              <div className="text-xs text-gray-400 mt-0.5">${fmt(vencenSemana.reduce((s, c) => s + (Number(c.monto) || 0), 0))}</div>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4">
+              <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Próximo depósito</div>
+              <div className="text-xl font-semibold">{proximo ? fmtDate(proximo) : "—"}</div>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4">
+              <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Depositados</div>
+              <div className="text-xl font-semibold tabular-nums text-green-600">{depositados.length}</div>
+              <div className="text-xs text-gray-400 mt-0.5">${fmt(depositados.reduce((s, c) => s + (Number(c.monto) || 0), 0))}</div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Form */}
       {showForm && (

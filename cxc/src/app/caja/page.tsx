@@ -607,6 +607,10 @@ export default function CajaPage() {
             className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
             Imprimir
           </button>
+          <button onClick={async () => {
+            const res = await fetch("/api/caja/export-excel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ periodo_id: current.id }) });
+            if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `CajaMenuda-Periodo${current.numero}.xlsx`; a.click(); URL.revokeObjectURL(url); }
+          }} title="Exportar gastos a Excel" className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-full transition">↓ Excel</button>
           {isOpen && (
             <button onClick={() => closePeriodo(current.id)}
               className="text-sm text-gray-400 hover:text-black transition">
