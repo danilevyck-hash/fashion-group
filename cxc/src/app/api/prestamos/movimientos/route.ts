@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   // Determine estado based on concepto and monto
   let estado = "aprobado";
-  if ((concepto === "Préstamo" || concepto === "Cargo por daño") && Number(monto) >= 500) {
+  if ((concepto === "Préstamo" || concepto === "Responsabilidad por daño") && Number(monto) >= 500) {
     estado = "pendiente_aprobacion";
   }
 

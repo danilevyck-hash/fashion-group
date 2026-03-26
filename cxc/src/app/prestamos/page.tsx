@@ -43,8 +43,8 @@ function fmt(n: number) { return (n ?? 0).toLocaleString("en-US", { minimumFract
 
 function calcEmpleado(emp: Empleado) {
   const movs = emp.prestamos_movimientos || [];
-  const prestado = movs.filter(m => (m.concepto === "Préstamo" || m.concepto === "Cargo por daño") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
-  const pagado = movs.filter(m => (m.concepto === "Pago" || m.concepto === "Abono extra") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
+  const prestado = movs.filter(m => (m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
+  const pagado = movs.filter(m => (m.concepto === "Pago" || m.concepto === "Abono extra" || m.concepto === "Pago de responsabilidad") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
   const saldo = prestado - pagado;
   const pct = prestado > 0 ? (pagado / prestado) * 100 : 0;
   const pendientes = movs.filter(m => m.estado === "pendiente_aprobacion").length;
@@ -377,14 +377,15 @@ export default function PrestamosPage() {
                   <option value="Préstamo">Préstamo</option>
                   <option value="Pago">Pago</option>
                   <option value="Abono extra">Abono extra</option>
-                  <option value="Cargo por daño">Cargo por daño</option>
+                  <option value="Responsabilidad por daño">Responsabilidad por daño</option>
+                  <option value="Pago de responsabilidad">Pago de responsabilidad</option>
                 </select>
               </div>
               <div>
                 <label className="text-xs text-gray-400 uppercase">Monto ($) *</label>
                 <input type="number" step="0.01" min="0.01" value={mMonto} onChange={e => setMMonto(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
               </div>
-              {(mConcepto === "Préstamo" || mConcepto === "Cargo por daño") && Number(mMonto) >= 500 && (
+              {(mConcepto === "Préstamo" || mConcepto === "Responsabilidad por daño") && Number(mMonto) >= 500 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
                   ⚠ Este préstamo requiere aprobación por el monto (≥ $500)
                 </div>

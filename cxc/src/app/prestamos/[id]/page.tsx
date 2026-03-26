@@ -56,9 +56,11 @@ export default function PrestamoDetallePage() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Movement modal
+  // Unified movement modal
   const [showMovModal, setShowMovModal] = useState(false);
+  const [movStep, setMovStep] = useState<"type" | "form">("type");
   const [mConcepto, setMConcepto] = useState("Préstamo");
+  const [mLabel, setMLabel] = useState("");
   const [mFecha, setMFecha] = useState(new Date().toISOString().slice(0, 10));
   const [mMonto, setMMonto] = useState("");
   const [mNotas, setMNotas] = useState("");
@@ -85,6 +87,7 @@ export default function PrestamoDetallePage() {
   const [showPagoConfirm, setShowPagoConfirm] = useState(false);
 
   // Danger zone
+  const [dangerOpen, setDangerOpen] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
   const [showClearConfirm, setShowClearConfirm] = useState(false);
@@ -120,16 +123,42 @@ export default function PrestamoDetallePage() {
   const movs = empleado.prestamos_movimientos || [];
   const sortedMovs = [...movs].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.created_at.localeCompare(a.created_at));
 
-  const prestado = movs.filter(m => (m.concepto === "Préstamo" || m.concepto === "Cargo por daño") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
-  const pagado = movs.filter(m => (m.concepto === "Pago" || m.concepto === "Abono extra") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
+  const prestado = movs.filter(m => (m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
+  const pagado = movs.filter(m => (m.concepto === "Pago" || m.concepto === "Abono extra" || m.concepto === "Pago de responsabilidad") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
   const saldo = prestado - pagado;
   const pct = prestado > 0 ? (pagado / prestado) * 100 : 0;
   const hasMovs = movs.length > 0;
 
+  // ── Movement type definitions ──
+  const movTypes = [
+    { key: "pago_quincenal", label: "Pago Quincenal", concepto: "Pago", icon: "💳", color: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:border-emerald-400", sign: "−" },
+    { key: "prestamo", label: "Préstamo", concepto: "Préstamo", icon: "➕", color: "bg-red-50 border-red-200 text-red-700 hover:border-red-400", sign: "+" },
+    { key: "pago_extra", label: "Pago Extra", concepto: "Pago", icon: "💰", color: "bg-green-50 border-green-200 text-green-700 hover:border-green-400", sign: "−" },
+    { key: "responsabilidad", label: "Responsabilidad por daño", concepto: "Responsabilidad por daño", icon: "⚠️", color: "bg-amber-50 border-amber-200 text-amber-700 hover:border-amber-400", sign: "+" },
+    { key: "abono_extra", label: "Abono Extra", concepto: "Abono extra", icon: "🔄", color: "bg-blue-50 border-blue-200 text-blue-700 hover:border-blue-400", sign: "−" },
+    { key: "pago_resp", label: "Pago de responsabilidad", concepto: "Pago de responsabilidad", icon: "✅", color: "bg-purple-50 border-purple-200 text-purple-700 hover:border-purple-400", sign: "−" },
+  ];
+
   // ── Movement handlers ──
-  function openNewMov(concepto: string) {
-    setMConcepto(concepto); setMFecha(new Date().toISOString().slice(0, 10));
-    setMMonto(""); setMNotas(""); setShowMovModal(true);
+  function openMovModal() {
+    setMovStep("type");
+    setShowMovModal(true);
+  }
+
+  function selectMovType(typeKey: string) {
+    const t = movTypes.find(x => x.key === typeKey);
+    if (!t) return;
+    setMConcepto(t.concepto);
+    setMLabel(t.label);
+    setMFecha(new Date().toISOString().slice(0, 10));
+    if (typeKey === "pago_quincenal" && empleado) {
+      setMMonto(String(empleado.deduccion_quincenal || ""));
+      setMNotas("Deducción quincenal");
+    } else {
+      setMMonto("");
+      setMNotas("");
+    }
+    setMovStep("form");
   }
 
   async function saveMov() {
@@ -287,7 +316,8 @@ export default function PrestamoDetallePage() {
     "Préstamo": "text-red-600",
     "Pago": "text-green-600",
     "Abono extra": "text-blue-600",
-    "Cargo por daño": "text-amber-600",
+    "Responsabilidad por daño": "text-amber-600",
+    "Pago de responsabilidad": "text-purple-600",
   };
 
   return (
@@ -354,10 +384,7 @@ export default function PrestamoDetallePage() {
         {/* Action buttons */}
         <div className="flex flex-wrap gap-3 mb-6">
           <button onClick={pagoQuincenal} className="bg-emerald-600 text-white px-5 py-2 rounded-full text-sm hover:bg-emerald-700 transition font-medium">Pago Quincenal · ${fmt(empleado.deduccion_quincenal)}</button>
-          <button onClick={() => openNewMov("Préstamo")} className="bg-black text-white px-5 py-2 rounded-full text-sm hover:bg-gray-800 transition">+ Préstamo</button>
-          <button onClick={() => openNewMov("Pago")} className="bg-black text-white px-5 py-2 rounded-full text-sm hover:bg-gray-800 transition">+ Pago</button>
-          <button onClick={() => openNewMov("Abono extra")} className="bg-black text-white px-5 py-2 rounded-full text-sm hover:bg-gray-800 transition">+ Abono extra</button>
-          <button onClick={() => openNewMov("Cargo por daño")} className="bg-amber-600 text-white px-5 py-2 rounded-full text-sm hover:bg-amber-700 transition">+ Cargo por daño</button>
+          <button onClick={openMovModal} className="bg-black text-white px-5 py-2 rounded-full text-sm hover:bg-gray-800 transition">+ Nuevo Movimiento</button>
         </div>
 
         {/* Movements table */}
@@ -417,13 +444,16 @@ export default function PrestamoDetallePage() {
           )}
         </div>
 
-        {/* ── Danger Zone ── */}
+        {/* ── Danger Zone (collapsible) ── */}
         {isAdmin && (
-          <div className="border border-red-200 bg-red-50/50 rounded-2xl p-6 mt-12">
-            <h3 className="text-sm font-medium text-red-700 uppercase tracking-wide mb-4 flex items-center gap-2">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-500"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              Danger Zone
-            </h3>
+          <div className="mt-12">
+            <button onClick={() => setDangerOpen(!dangerOpen)} className="flex items-center gap-2 text-xs text-red-400 hover:text-red-600 transition">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+              Zona de acciones peligrosas
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`transition-transform ${dangerOpen ? "rotate-180" : ""}`}><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {dangerOpen && (
+            <div className="border border-red-200 bg-red-50/50 rounded-2xl p-6 mt-2">
             <div className="space-y-3">
               {/* Delete Employee */}
               <div className="flex items-center justify-between">
@@ -476,6 +506,8 @@ export default function PrestamoDetallePage() {
               )}
             </div>
           </div>
+            )}
+          </div>
         )}
 
         {/* Also show Force Archive for director (outside danger zone) */}
@@ -494,45 +526,59 @@ export default function PrestamoDetallePage() {
         )}
       </div>
 
-      {/* ── Modal: New Movement ── */}
+      {/* ── Modal: New Movement (type selector + form) ── */}
       {showMovModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
-            <h2 className="font-medium mb-4">Nuevo {mConcepto}</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-gray-400 uppercase">Fecha *</label>
-                <input type="date" value={mFecha} onChange={e => setMFecha(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4">
+            {movStep === "type" ? (<>
+              <h2 className="font-medium mb-4">Nuevo Movimiento</h2>
+              <div className="grid grid-cols-2 gap-2">
+                {movTypes.map((t) => (
+                  <button key={t.key} onClick={() => selectMovType(t.key)} className={`border rounded-xl px-3 py-3 text-left transition ${t.color}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">{t.icon}</span>
+                      <span className="text-xs font-medium">{t.label}</span>
+                    </div>
+                    <span className="text-[10px] opacity-60">Signo: {t.sign}</span>
+                  </button>
+                ))}
               </div>
-              <div>
-                <label className="text-xs text-gray-400 uppercase">Concepto</label>
-                <select value={mConcepto} onChange={e => setMConcepto(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
-                  <option value="Préstamo">Préstamo</option>
-                  <option value="Pago">Pago</option>
-                  <option value="Abono extra">Abono extra</option>
-                  <option value="Cargo por daño">Cargo por daño</option>
-                </select>
+              <div className="mt-4">
+                <button onClick={() => setShowMovModal(false)} className="w-full py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
               </div>
-              <div>
-                <label className="text-xs text-gray-400 uppercase">Monto ($) *</label>
-                <input type="number" step="0.01" min="0.01" value={mMonto} onChange={e => setMMonto(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
+            </>) : (<>
+              <div className="flex items-center gap-2 mb-4">
+                <button onClick={() => setMovStep("type")} className="text-gray-400 hover:text-black transition">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <h2 className="font-medium">{mLabel}</h2>
               </div>
-              {(mConcepto === "Préstamo" || mConcepto === "Cargo por daño") && Number(mMonto) >= 500 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
-                  ⚠ Este préstamo requiere aprobación por el monto (≥ $500)
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-gray-400 uppercase">Fecha *</label>
+                  <input type="date" value={mFecha} onChange={e => setMFecha(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
                 </div>
-              )}
-              <div>
-                <label className="text-xs text-gray-400 uppercase">Notas</label>
-                <textarea value={mNotas} onChange={e => setMNotas(e.target.value)} rows={2} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
+                <div>
+                  <label className="text-xs text-gray-400 uppercase">Monto ($) *</label>
+                  <input type="number" step="0.01" min="0.01" value={mMonto} onChange={e => setMMonto(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
+                </div>
+                {(mConcepto === "Préstamo" || mConcepto === "Responsabilidad por daño") && Number(mMonto) >= 500 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+                    ⚠ Este movimiento requiere aprobación por el monto (≥ $500)
+                  </div>
+                )}
+                <div>
+                  <label className="text-xs text-gray-400 uppercase">Notas</label>
+                  <textarea value={mNotas} onChange={e => setMNotas(e.target.value)} rows={2} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
+                </div>
               </div>
-            </div>
-            <div className="flex gap-2 mt-6">
-              <button onClick={() => setShowMovModal(false)} className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
-              <button onClick={saveMov} disabled={savingMov} className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50">
-                {savingMov ? "Guardando..." : "Registrar"}
-              </button>
-            </div>
+              <div className="flex gap-2 mt-6">
+                <button onClick={() => setShowMovModal(false)} className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
+                <button onClick={saveMov} disabled={savingMov} className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50">
+                  {savingMov ? "Guardando..." : "Registrar"}
+                </button>
+              </div>
+            </>)}
           </div>
         </div>
       )}
@@ -603,7 +649,8 @@ export default function PrestamoDetallePage() {
                   <option value="Préstamo">Préstamo</option>
                   <option value="Pago">Pago</option>
                   <option value="Abono extra">Abono extra</option>
-                  <option value="Cargo por daño">Cargo por daño</option>
+                  <option value="Responsabilidad por daño">Responsabilidad por daño</option>
+                  <option value="Pago de responsabilidad">Pago de responsabilidad</option>
                 </select>
               </div>
               <div>

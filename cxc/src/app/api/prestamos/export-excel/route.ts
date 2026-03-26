@@ -35,10 +35,10 @@ export async function GET(req: NextRequest) {
   const empleados = (data || []).filter((emp) => {
     const movs = emp.prestamos_movimientos || [];
     const prestado = movs
-      .filter((m: { concepto: string; estado: string }) => (m.concepto === "Préstamo" || m.concepto === "Cargo por daño") && m.estado === "aprobado")
+      .filter((m: { concepto: string; estado: string }) => (m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño") && m.estado === "aprobado")
       .reduce((s: number, m: { monto: number }) => s + Number(m.monto), 0);
     const pagado = movs
-      .filter((m: { concepto: string; estado: string }) => (m.concepto === "Pago" || m.concepto === "Abono extra") && m.estado === "aprobado")
+      .filter((m: { concepto: string; estado: string }) => (m.concepto === "Pago" || m.concepto === "Abono extra" || m.concepto === "Pago de responsabilidad") && m.estado === "aprobado")
       .reduce((s: number, m: { monto: number }) => s + Number(m.monto), 0);
     return prestado - pagado > 0;
   });
