@@ -545,6 +545,24 @@ export default function AdminDashboard() {
         />
       </div>
 
+      {/* Activity logs */}
+      {userRole === "admin" && (
+        <div className="mb-4">
+          <button onClick={async () => { if (showActivity) { setShowActivity(false); return; } const res = await fetch("/api/activity-logs"); if (res.ok) setActivityLogs(await res.json()); setShowActivity(true); }} className="text-xs text-gray-400 hover:text-black transition flex items-center gap-1">{showActivity ? "▲" : "▼"} Actividad reciente</button>
+          {showActivity && (
+            <div className="mt-3">{activityLogs.length === 0 ? <p className="text-sm text-gray-300 py-4 text-center">Sin actividad registrada</p> : (
+              <div className="space-y-1">{activityLogs.map((log) => {
+                const diff = Date.now() - new Date(log.created_at).getTime();
+                const m = Math.floor(diff / 60000); const h = Math.floor(diff / 3600000); const d = Math.floor(diff / 86400000);
+                const ago = d > 0 ? `${d}d` : h > 0 ? `${h}h` : `${m}m`;
+                const labels: Record<string, string> = { reclamo_creado: "Nuevo reclamo", reclamo_editado: "Editado", reclamo_eliminado: "Eliminado", csv_subido: "CSV subido" };
+                return <div key={log.id} className="flex items-center gap-3 py-2 border-b border-gray-50 text-xs"><span className="text-gray-300 w-12 flex-shrink-0">{ago}</span><span className="font-medium text-gray-700 w-28 flex-shrink-0">{labels[log.action] || log.action}</span><span className="text-gray-400 truncate">{log.details}</span></div>;
+              })}</div>
+            )}</div>
+          )}
+        </div>
+      )}
+
       {/* Upload history toggle */}
       <div className="mb-4">
         <button onClick={() => setShowUploadHistory(!showUploadHistory)} className="text-xs text-gray-400 hover:text-black transition flex items-center gap-1">{showUploadHistory ? "▲" : "▼"} Historial de cargas</button>
@@ -599,23 +617,6 @@ export default function AdminDashboard() {
         onSaveEdit={handleSaveEdit}
       />
 
-      {/* Activity logs */}
-      {userRole === "admin" && (
-        <div className="mt-8 border-t border-gray-100 pt-6">
-          <button onClick={async () => { if (showActivity) { setShowActivity(false); return; } const res = await fetch("/api/activity-logs"); if (res.ok) setActivityLogs(await res.json()); setShowActivity(true); }} className="text-xs text-gray-400 hover:text-black transition flex items-center gap-1">{showActivity ? "▲" : "▼"} Actividad reciente</button>
-          {showActivity && (
-            <div className="mt-3">{activityLogs.length === 0 ? <p className="text-sm text-gray-300 py-4 text-center">Sin actividad registrada</p> : (
-              <div className="space-y-1">{activityLogs.map((log) => {
-                const diff = Date.now() - new Date(log.created_at).getTime();
-                const m = Math.floor(diff / 60000); const h = Math.floor(diff / 3600000); const d = Math.floor(diff / 86400000);
-                const ago = d > 0 ? `${d}d` : h > 0 ? `${h}h` : `${m}m`;
-                const labels: Record<string, string> = { reclamo_creado: "Nuevo reclamo", reclamo_editado: "Editado", reclamo_eliminado: "Eliminado", csv_subido: "CSV subido" };
-                return <div key={log.id} className="flex items-center gap-3 py-2 border-b border-gray-50 text-xs"><span className="text-gray-300 w-12 flex-shrink-0">{ago}</span><span className="font-medium text-gray-700 w-28 flex-shrink-0">{labels[log.action] || log.action}</span><span className="text-gray-400 truncate">{log.details}</span></div>;
-              })}</div>
-            )}</div>
-          )}
-        </div>
-      )}
     </div>
     </div>
   );
