@@ -4,7 +4,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 export async function GET() {
   const { data, error } = await supabaseServer
     .from("guia_transporte")
-    .select("*, guia_items(bultos)")
+    .select("*, guia_items(bultos, facturas, cliente)")
     .order("numero", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
