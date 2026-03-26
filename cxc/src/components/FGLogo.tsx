@@ -27,7 +27,7 @@ export default function FGLogo({ variant = "horizontal", theme = "light", size =
     </svg>
   );
 
-  if (variant === "icon") return <Icon s={size} />;
+  if (variant === "icon") return <div className="dark:invert"><Icon s={size} /></div>;
 
   if (variant === "horizontal") {
     const iconSize = size;
@@ -41,7 +41,7 @@ export default function FGLogo({ variant = "horizontal", theme = "light", size =
     const ls2 = (iconSize * 0.174).toFixed(1);
 
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: Math.round(iconSize * 0.478) }}>
+      <div className="dark:invert" style={{ display: "flex", alignItems: "center", gap: Math.round(iconSize * 0.478) }}>
         <Icon s={iconSize} />
         <svg width="1" height={iconSize} viewBox={`0 0 1 ${iconSize}`}>
           <line x1="0.5" y1="0" x2="0.5" y2={iconSize} stroke={divColor} strokeWidth="0.5"/>
@@ -71,7 +71,7 @@ export default function FGLogo({ variant = "horizontal", theme = "light", size =
   const divW = Math.round(nameW * 0.77);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: Math.round(size * 0.28) }}>
+    <div className="dark:invert" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: Math.round(size * 0.28) }}>
       <Icon s={boxSize} />
       <svg width={nameW} height={nameH} viewBox={`0 0 ${nameW} ${nameH}`} fill="none">
         <text x={nameW / 2} y={ny1}

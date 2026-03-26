@@ -230,6 +230,8 @@ export default function AdminDashboard() {
     }
     setUserRole(r);
     loadData();
+    const q = new URLSearchParams(window.location.search).get("search");
+    if (q) setSearch(q);
   }, [router, loadData]);
 
   // ── Sorting ──────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 
@@ -132,6 +132,9 @@ export default function ContactPanel({
         )}
       </div>
 
+      {/* Internal note */}
+      <ClientNote clientName={client.nombre_normalized} />
+
       {/* Per-company breakdown */}
       {visibleCompanies.length > 0 && (
         <>
@@ -177,6 +180,24 @@ export default function ContactPanel({
           </table>
         </>
       )}
+    </div>
+  );
+}
+
+function ClientNote({ clientName }: { clientName: string }) {
+  const [note, setNote] = useState("");
+  useEffect(() => {
+    try { const saved = JSON.parse(localStorage.getItem("fg_client_notes") || "{}"); setNote(saved[clientName] || ""); } catch { /* */ }
+  }, [clientName]);
+  function save(v: string) {
+    setNote(v);
+    try { const all = JSON.parse(localStorage.getItem("fg_client_notes") || "{}"); all[clientName] = v; localStorage.setItem("fg_client_notes", JSON.stringify(all)); } catch { /* */ }
+  }
+  return (
+    <div className="mt-3 mb-3">
+      <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">Nota interna</div>
+      <textarea value={note} onChange={(e) => save(e.target.value)} placeholder="Ej: Acuerdo de pago, cliente VIP..." rows={2}
+        className="w-full border border-gray-100 rounded-lg p-2 text-xs outline-none focus:border-gray-300 resize-none text-gray-600 placeholder:text-gray-300" />
     </div>
   );
 }

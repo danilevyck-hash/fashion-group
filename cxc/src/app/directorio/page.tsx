@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import FGLogo from "@/components/FGLogo";
+import * as XLSX from "xlsx";
 
 interface Cliente {
   id: string;
@@ -152,6 +152,17 @@ export default function DirectorioPage() {
           <button onClick={() => window.open("/api/directorio?format=csv")} className="text-sm text-gray-400 hover:text-black transition">
             Exportar CSV
           </button>
+          <button onClick={() => {
+            const rows: string[][] = [["FASHION GROUP — Directorio de Clientes"], [], ["Nombre", "Empresa", "Teléfono", "Celular", "Correo", "Contacto", "Notas"]];
+            for (const c of clientes) rows.push([c.nombre, c.empresa, c.telefono, c.celular, c.correo, c.contacto, c.notas]);
+            const ws = XLSX.utils.aoa_to_sheet(rows);
+            ws["!cols"] = [{ wch: 32 }, { wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 28 }, { wch: 20 }, { wch: 20 }];
+            ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Directorio");
+            const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+            const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+            const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Directorio-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url);
+          }} title="Exportar a Excel" className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-full transition">↓ Excel</button>
           <button onClick={() => setShowNew(true)}
             className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
             Nuevo Contacto
@@ -269,6 +280,8 @@ export default function DirectorioPage() {
                           <div className="flex gap-3">
                             <button onClick={(e) => { e.stopPropagation(); setEditing(c.id); setEditData(c); }}
                               className="text-sm text-gray-400 hover:text-black transition">Editar</button>
+                            <button onClick={(e) => { e.stopPropagation(); router.push(`/admin?search=${encodeURIComponent(c.nombre)}`); }}
+                              title="Ver posición CXC de este cliente" className="text-xs text-gray-400 hover:text-black transition">Ver en CXC →</button>
                             {role === "admin" && (
                               <button onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
                                 className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>

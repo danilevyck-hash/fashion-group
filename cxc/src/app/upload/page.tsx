@@ -22,6 +22,9 @@ export default function UploadPage() {
   const [message, setMessage] = useState<{ text: string; type: "ok" | "err" } | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [userRole, setUserRole] = useState<string>("");
+  const [csvPreview, setCsvPreview] = useState<{ headers: string[]; rows: string[][]; totalRows: number; companyKey: string; valid: boolean; error: string } | null>(null);
+  const [pendingText, setPendingText] = useState("");
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   // David sees only Boston, admin/upload see all 7
   const uploadCompanies = userRole === "david"
@@ -172,6 +175,17 @@ export default function UploadPage() {
     });
   }
 
+  function parseCSVPreview(text: string, companyKey: string) {
+    const lines = text.split("\n").filter((l) => l.trim());
+    if (lines.length < 2) return { valid: false, error: "El archivo está vacío.", headers: [] as string[], rows: [] as string[][], totalRows: 0, companyKey };
+    const sep = lines[0].includes(";") ? ";" : ",";
+    const headers = lines[0].split(sep).map((h) => h.trim());
+    const required = ["CODIGO", "NOMBRE", "TOTAL"];
+    const missing = required.filter((r) => !headers.some((h) => h.toUpperCase().includes(r)));
+    if (missing.length > 0) return { valid: false, error: `Faltan columnas: ${missing.join(", ")}. Verifica que sea el reporte CxC separado por '${sep}'.`, headers, rows: [] as string[][], totalRows: lines.length - 1, companyKey };
+    return { valid: true, error: "", headers, rows: lines.slice(1, 6).map((l) => l.split(sep).map((v) => v.trim())), totalRows: lines.length - 1, companyKey };
+  }
+
   function uploadAge(dateStr: string): "fresh" | "warning" | "stale" {
     const days = (Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24);
     if (days > 15) return "stale";
@@ -236,9 +250,13 @@ export default function UploadPage() {
                   type="file"
                   accept=".csv,.txt"
                   className="hidden"
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const f = e.target.files?.[0];
-                    if (f) handleUpload(co.key, f);
+                    if (!f) return;
+                    const text = await f.text();
+                    setCsvPreview(parseCSVPreview(text, co.key));
+                    setPendingText(text); setPendingFile(f);
+                    e.target.value = "";
                   }}
                 />
                 <button
@@ -257,6 +275,28 @@ export default function UploadPage() {
           );
         })}
       </div>
+
+      {/* CSV Preview */}
+      {csvPreview && (
+        <div className="mt-6 border border-gray-100 rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div><p className="text-sm font-medium">{uploadCompanies.find((c) => c.key === csvPreview.companyKey)?.name || csvPreview.companyKey}</p><p className="text-xs text-gray-400 mt-0.5">{csvPreview.totalRows.toLocaleString()} registros detectados</p></div>
+            {csvPreview.valid ? <span className="text-xs bg-green-50 text-green-600 px-3 py-1 rounded-full font-medium">✓ Formato válido</span> : <span className="text-xs bg-red-50 text-red-600 px-3 py-1 rounded-full font-medium">✗ Error de formato</span>}
+          </div>
+          {csvPreview.error && <p className="text-sm text-red-500 mb-4 bg-red-50 rounded-lg p-3">{csvPreview.error}</p>}
+          {csvPreview.valid && csvPreview.rows.length > 0 && (
+            <div className="overflow-x-auto mb-4">
+              <p className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2">Primeras {csvPreview.rows.length} filas</p>
+              <table className="w-full text-xs"><thead><tr className="border-b border-gray-100">{csvPreview.headers.slice(0, 6).map((h, i) => <th key={i} className="text-left pb-2 pr-4 font-medium text-gray-400 whitespace-nowrap">{h}</th>)}{csvPreview.headers.length > 6 && <th className="text-left pb-2 text-gray-300">+{csvPreview.headers.length - 6} más</th>}</tr></thead>
+              <tbody>{csvPreview.rows.map((row, i) => <tr key={i} className="border-b border-gray-50">{row.slice(0, 6).map((cell, j) => <td key={j} className="py-1.5 pr-4 text-gray-600 whitespace-nowrap max-w-[120px] truncate">{cell}</td>)}</tr>)}</tbody></table>
+            </div>
+          )}
+          <div className="flex gap-3">
+            {csvPreview.valid && pendingFile && <button onClick={async () => { await handleUpload(csvPreview.companyKey, pendingFile); setCsvPreview(null); setPendingText(""); setPendingFile(null); }} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition">Confirmar y subir</button>}
+            <button onClick={() => { setCsvPreview(null); setPendingText(""); setPendingFile(null); }} className="text-sm text-gray-400 hover:text-black transition border border-gray-200 px-4 py-2 rounded-full">Cancelar</button>
+          </div>
+        </div>
+      )}
     </div>
     </div>
   );
