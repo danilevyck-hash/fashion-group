@@ -58,7 +58,7 @@ export default function ReportePage() {
   // Filter employees with pending balance
   const filtered = empleados.filter(emp => {
     const movs = emp.prestamos_movimientos || [];
-    const prestado = movs.filter(m => m.concepto === "Préstamo" && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
+    const prestado = movs.filter(m => (m.concepto === "Préstamo" || m.concepto === "Cargo por daño") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
     const pagado = movs.filter(m => (m.concepto === "Pago" || m.concepto === "Abono extra") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
     return prestado - pagado > 0;
   });

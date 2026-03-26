@@ -81,6 +81,9 @@ export default function PrestamoDetallePage() {
   const [emNotas, setEmNotas] = useState("");
   const [savingEditMov, setSavingEditMov] = useState(false);
 
+  // Pago quincenal confirm
+  const [showPagoConfirm, setShowPagoConfirm] = useState(false);
+
   // Danger zone
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
@@ -117,7 +120,7 @@ export default function PrestamoDetallePage() {
   const movs = empleado.prestamos_movimientos || [];
   const sortedMovs = [...movs].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.created_at.localeCompare(a.created_at));
 
-  const prestado = movs.filter(m => m.concepto === "Préstamo" && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
+  const prestado = movs.filter(m => (m.concepto === "Préstamo" || m.concepto === "Cargo por daño") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
   const pagado = movs.filter(m => (m.concepto === "Pago" || m.concepto === "Abono extra") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
   const saldo = prestado - pagado;
   const pct = prestado > 0 ? (pagado / prestado) * 100 : 0;
@@ -187,10 +190,16 @@ export default function PrestamoDetallePage() {
   }
 
   // ── Pago quincenal automático ──
-  async function pagoQuincenal() {
+  function pagoQuincenal() {
     if (!empleado || !empleado.deduccion_quincenal || empleado.deduccion_quincenal <= 0) {
       showToast("Este empleado no tiene deducción quincenal configurada"); return;
     }
+    setShowPagoConfirm(true);
+  }
+
+  async function confirmarPagoQuincenal() {
+    if (!empleado) return;
+    setShowPagoConfirm(false);
     try {
       const res = await fetch("/api/prestamos/movimientos", {
         method: "POST",
@@ -278,6 +287,7 @@ export default function PrestamoDetallePage() {
     "Préstamo": "text-red-600",
     "Pago": "text-green-600",
     "Abono extra": "text-blue-600",
+    "Cargo por daño": "text-amber-600",
   };
 
   return (
@@ -347,6 +357,7 @@ export default function PrestamoDetallePage() {
           <button onClick={() => openNewMov("Préstamo")} className="bg-black text-white px-5 py-2 rounded-full text-sm hover:bg-gray-800 transition">+ Préstamo</button>
           <button onClick={() => openNewMov("Pago")} className="bg-black text-white px-5 py-2 rounded-full text-sm hover:bg-gray-800 transition">+ Pago</button>
           <button onClick={() => openNewMov("Abono extra")} className="bg-black text-white px-5 py-2 rounded-full text-sm hover:bg-gray-800 transition">+ Abono extra</button>
+          <button onClick={() => openNewMov("Cargo por daño")} className="bg-amber-600 text-white px-5 py-2 rounded-full text-sm hover:bg-amber-700 transition">+ Cargo por daño</button>
         </div>
 
         {/* Movements table */}
@@ -499,13 +510,14 @@ export default function PrestamoDetallePage() {
                   <option value="Préstamo">Préstamo</option>
                   <option value="Pago">Pago</option>
                   <option value="Abono extra">Abono extra</option>
+                  <option value="Cargo por daño">Cargo por daño</option>
                 </select>
               </div>
               <div>
                 <label className="text-xs text-gray-400 uppercase">Monto ($) *</label>
                 <input type="number" step="0.01" min="0.01" value={mMonto} onChange={e => setMMonto(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
               </div>
-              {mConcepto === "Préstamo" && Number(mMonto) >= 500 && (
+              {(mConcepto === "Préstamo" || mConcepto === "Cargo por daño") && Number(mMonto) >= 500 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
                   ⚠ Este préstamo requiere aprobación por el monto (≥ $500)
                 </div>
@@ -561,6 +573,20 @@ export default function PrestamoDetallePage() {
         </div>
       )}
 
+      {/* ── Modal: Pago Quincenal Confirm ── */}
+      {showPagoConfirm && empleado && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4">
+            <h2 className="font-medium mb-3">Confirmar Pago Quincenal</h2>
+            <p className="text-sm text-gray-500">¿Registrar pago quincenal de <strong className="text-black">${fmt(empleado.deduccion_quincenal)}</strong> para <strong className="text-black">{empleado.nombre}</strong>?</p>
+            <div className="flex gap-2 mt-6">
+              <button onClick={() => setShowPagoConfirm(false)} className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
+              <button onClick={confirmarPagoQuincenal} className="flex-1 py-2 bg-emerald-600 text-white rounded-full text-sm hover:bg-emerald-700 transition">Confirmar Pago</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Modal: Edit Movement ── */}
       {showEditMovModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -577,6 +603,7 @@ export default function PrestamoDetallePage() {
                   <option value="Préstamo">Préstamo</option>
                   <option value="Pago">Pago</option>
                   <option value="Abono extra">Abono extra</option>
+                  <option value="Cargo por daño">Cargo por daño</option>
                 </select>
               </div>
               <div>
