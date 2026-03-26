@@ -302,9 +302,12 @@ export default function AdminDashboard() {
     }
 
     result.sort((a, b) => {
-      let va: number | string, vb: number | string;
-      if (sortKey === "name") { va = a.nombre_normalized; vb = b.nombre_normalized; }
-      else if (sortKey === "current") { va = a.current; vb = b.current; }
+      if (sortKey === "name") {
+        const cmp = a.nombre_normalized.localeCompare(b.nombre_normalized, "es", { sensitivity: "base" });
+        return sortDir === "asc" ? cmp : -cmp;
+      }
+      let va: number, vb: number;
+      if (sortKey === "current") { va = a.current; vb = b.current; }
       else if (sortKey === "watch") { va = a.watch; vb = b.watch; }
       else if (sortKey === "overdue") { va = a.overdue; vb = b.overdue; }
       else { va = a.total; vb = b.total; }
