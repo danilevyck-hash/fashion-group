@@ -107,10 +107,10 @@ export default function VentasPage() {
         fetch(`/api/ventas?año=${year - 1}`),
         fetch(`/api/ventas/metas?año=${year}`),
       ]);
-      if (añosRes.ok) setAños(await añosRes.json());
-      if (ventasRes.ok) setVentas(await ventasRes.json());
-      if (ventasAntRes.ok) setVentasAnt(await ventasAntRes.json());
-      if (metasRes.ok) setMetas(await metasRes.json());
+      if (añosRes.ok) { const d = await añosRes.json(); setAños(Array.isArray(d) ? d : []); }
+      if (ventasRes.ok) { const d = await ventasRes.json(); setVentas(Array.isArray(d) ? d : []); }
+      if (ventasAntRes.ok) { const d = await ventasAntRes.json(); setVentasAnt(Array.isArray(d) ? d : []); }
+      if (metasRes.ok) { const d = await metasRes.json(); setMetas(Array.isArray(d) ? d : []); }
     } catch { /* */ }
     setLoading(false);
   }, []);
@@ -130,7 +130,7 @@ export default function VentasPage() {
 
   // Load metas for selected empresa
   useEffect(() => {
-    const empMetas = metas.filter((m) => m.empresa === metaEmpresa && m.año === metaAño);
+    const empMetas = (metas || []).filter((m) => m.empresa === metaEmpresa && m.año === metaAño);
     const vals = Array(12).fill(0);
     empMetas.forEach((m) => { if (m.mes >= 1 && m.mes <= 12) vals[m.mes - 1] = m.meta; });
     setMetaValues(vals);
@@ -140,36 +140,40 @@ export default function VentasPage() {
 
   const currentMonth = new Date().getMonth() + 1;
 
-  // KPI computations
-  const ytdVentas = ventas.filter((v) => v.mes <= currentMonth);
+  // KPI computations (defensive: treat arrays as possibly empty)
+  const safeVentas = ventas || [];
+  const safeVentasAnt = ventasAnt || [];
+  const safeMetas = metas || [];
+
+  const ytdVentas = safeVentas.filter((v) => v.mes <= currentMonth);
   const ytdTotal = ytdVentas.reduce((s, v) => s + ventasNetas(v), 0);
-  const ytdAntTotal = ventasAnt.filter((v) => v.mes <= currentMonth).reduce((s, v) => s + ventasNetas(v), 0);
+  const ytdAntTotal = safeVentasAnt.filter((v) => v.mes <= currentMonth).reduce((s, v) => s + ventasNetas(v), 0);
   const ytdChange = ytdAntTotal > 0 ? ((ytdTotal - ytdAntTotal) / ytdAntTotal) * 100 : 0;
   const ytdDelta = ytdTotal - ytdAntTotal;
 
   // Best month
   const monthTotals = Array.from({ length: 12 }, (_, i) => ({
     mes: i + 1,
-    total: ventas.filter((v) => v.mes === i + 1).reduce((s, v) => s + ventasNetas(v), 0),
+    total: safeVentas.filter((v) => v.mes === i + 1).reduce((s, v) => s + ventasNetas(v), 0),
   })).filter((m) => m.total > 0);
-  const bestMonth = monthTotals.sort((a, b) => b.total - a.total)[0];
+  const bestMonth = monthTotals.length > 0 ? [...monthTotals].sort((a, b) => b.total - a.total)[0] : undefined;
 
   // Meta YTD
-  const metaYTD = metas.filter((m) => m.mes <= currentMonth).reduce((s, m) => s + m.meta, 0);
+  const metaYTD = safeMetas.filter((m) => m.mes <= currentMonth).reduce((s, m) => s + m.meta, 0);
   const metaPct = metaYTD > 0 ? (ytdTotal / metaYTD) * 100 : 0;
 
   // Chart data
   const chartData = MESES.map((label, i) => {
     const mes = i + 1;
-    const actual = ventas.filter((v) => v.mes === mes).reduce((s, v) => s + ventasNetas(v), 0) || null;
-    const anterior = ventasAnt.filter((v) => v.mes === mes).reduce((s, v) => s + ventasNetas(v), 0) || null;
-    const meta = metas.filter((m) => m.mes === mes).reduce((s, m) => s + m.meta, 0) || null;
+    const actual = safeVentas.filter((v) => v.mes === mes).reduce((s, v) => s + ventasNetas(v), 0) || null;
+    const anterior = safeVentasAnt.filter((v) => v.mes === mes).reduce((s, v) => s + ventasNetas(v), 0) || null;
+    const meta = safeMetas.filter((m) => m.mes === mes).reduce((s, m) => s + m.meta, 0) || null;
     return { mes: label, actual, anterior, meta };
   });
 
   // Table: company rows sorted by total desc
   const empresaRows = EMPRESAS.map((emp) => {
-    const empVentas = ventas.filter((v) => v.empresa === emp);
+    const empVentas = safeVentas.filter((v) => v.empresa === emp);
     const months = Array.from({ length: 12 }, (_, i) => {
       const mv = empVentas.filter((v) => v.mes === i + 1);
       return mv.length > 0 ? mv.reduce((s, v) => s + ventasNetas(v), 0) : null;
@@ -318,8 +322,8 @@ export default function VentasPage() {
               <div className="border border-gray-200 rounded-xl px-4 py-4">
                 <div className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Mejor Mes</div>
                 {bestMonth ? (<>
-                  <div className="text-xl font-semibold mt-0.5 tabular-nums">${fmt(bestMonth.total)}</div>
-                  <div className="text-[11px] text-gray-400 mt-0.5">{MESES_FULL[bestMonth.mes - 1]}</div>
+                  <div className="text-xl font-semibold mt-0.5 tabular-nums">${fmt(bestMonth?.total ?? 0)}</div>
+                  <div className="text-[11px] text-gray-400 mt-0.5">{bestMonth?.mes ? MESES_FULL[bestMonth.mes - 1] : ''}</div>
                 </>) : <div className="text-sm text-gray-300 mt-1">Sin datos</div>}
               </div>
               <div className="border border-gray-200 rounded-xl px-4 py-4">
@@ -337,7 +341,7 @@ export default function VentasPage() {
           )}
 
           {/* Chart — admin only */}
-          {isAdmin && ventas.length > 0 && (
+          {isAdmin && safeVentas.length > 0 && (
             <div className="border border-gray-100 rounded-2xl p-6 mb-8">
               <div className="text-[11px] text-gray-500 uppercase tracking-wider font-medium mb-4">Ventas Mensuales</div>
               <RechartsComponents chartData={chartData} selectedYear={selectedYear} fmtK={fmtK} CustomTooltip={CustomTooltip} />
@@ -387,7 +391,7 @@ export default function VentasPage() {
                               <span className="text-xs font-medium text-gray-500">Top clientes —</span>
                               <div className="flex gap-1">
                                 {MESES.map((m, i) => {
-                                  const hasData = ventas.some((v) => v.empresa === row.empresa && v.mes === i + 1);
+                                  const hasData = safeVentas.some((v) => v.empresa === row.empresa && v.mes === i + 1);
                                   if (!hasData) return null;
                                   return (
                                     <button key={i} onClick={(e) => { e.stopPropagation(); setExpandedMes(i + 1); }}
@@ -428,12 +432,12 @@ export default function VentasPage() {
                     <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
                       <td className="px-3 py-2.5 sticky left-0 bg-gray-50 z-[1]">TOTAL</td>
                       {MESES.map((_, i) => {
-                        const total = ventas.filter((v) => v.mes === i + 1).reduce((s, v) => s + ventasNetas(v), 0);
+                        const total = safeVentas.filter((v) => v.mes === i + 1).reduce((s, v) => s + ventasNetas(v), 0);
                         return <td key={i} className={`text-right px-2 py-2.5 tabular-nums ${i + 1 === currentMonth ? "bg-blue-50/50" : ""}`}>{total > 0 ? fmtK(total) : "—"}</td>;
                       })}
                       <td className="text-right px-3 py-2.5 tabular-nums">${fmt(groupTotal)}</td>
                       <td className="text-right px-3 py-2.5">100%</td>
-                      <td className="text-right px-3 py-2.5 tabular-nums">{(() => { const tb = ventas.reduce((s, v) => s + v.ventas_brutas, 0); const tc = ventas.reduce((s, v) => s + v.costo_total, 0); return tb > 0 ? `${((tb - tc) / tb * 100).toFixed(1)}%` : "—"; })()}</td>
+                      <td className="text-right px-3 py-2.5 tabular-nums">{(() => { const tb = safeVentas.reduce((s, v) => s + v.ventas_brutas, 0); const tc = safeVentas.reduce((s, v) => s + v.costo_total, 0); return tb > 0 ? `${((tb - tc) / tb * 100).toFixed(1)}%` : "—"; })()}</td>
                     </tr>
                   </tbody>
                 </table>
