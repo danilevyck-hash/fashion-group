@@ -158,6 +158,16 @@ export default function PlantillasPage() {
             <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
           </button>
         )}
+
+        {/* Préstamos — admin/director/contabilidad */}
+        {!isSecretaria && (
+          <button onClick={() => router.push("/prestamos")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
+            <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8"/><path d="M8 12h8"/></svg></div>
+            <div className="text-sm font-medium">Préstamos a Colaboradores</div>
+            <div className="text-xs text-gray-400 mt-0.5">Control de préstamos y deducciones</div>
+            <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
+          </button>
+        )}
       </div>
     </div>
   );
