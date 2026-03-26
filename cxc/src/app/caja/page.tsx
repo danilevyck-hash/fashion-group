@@ -247,7 +247,10 @@ export default function CajaPage() {
         <AppHeader module="Caja Menuda" />
         <div className="max-w-5xl mx-auto px-6 py-8">
         <div className="flex items-end justify-between mb-10">
-          <h1 className="text-xl font-semibold tracking-tight">Caja Menuda</h1>
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">Caja Menuda</h1>
+            <p className="text-sm text-gray-400 mt-1">Fondo rotativo para gastos menores</p>
+          </div>
           {!hasOpenPeriod && (
             <button onClick={createPeriodo}
               className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
@@ -280,7 +283,7 @@ export default function CajaPage() {
               {periodos.map((p) => {
                 const saldo = p.fondo_inicial - p.total_gastado;
                 return (
-                  <tr key={p.id} onClick={() => loadDetail(p.id)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
+                  <tr key={p.id} onClick={() => loadDetail(p.id)} className="border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer">
                     <td className="py-3.5 font-medium">{p.numero}</td>
                     <td className="py-3.5 text-gray-500">{fmtDate(p.fecha_apertura)}</td>
                     <td className="py-3.5 text-gray-500">{p.fecha_cierre ? fmtDate(p.fecha_cierre) : "—"}</td>
@@ -296,15 +299,18 @@ export default function CajaPage() {
                     <td className={`py-3.5 text-right tabular-nums font-medium ${saldo < 0 ? "text-red-600" : ""}`}>
                       ${fmt(saldo)}
                     </td>
-                    <td className="py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-3.5 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => { loadDetail(p.id).then(() => setView("print")); }}
-                        className="text-sm text-gray-400 hover:text-black transition mr-3">Imprimir</button>
-                      {p.estado === "abierto" && (
-                        <button onClick={() => closePeriodo(p.id)} className="text-sm text-gray-400 hover:text-black transition mr-3">Cerrar</button>
-                      )}
-                      {p.estado === "cerrado" && role === "admin" && (
-                        <button onClick={() => deletePeriodo(p.id)} className="text-sm text-gray-300 hover:text-black transition">Eliminar</button>
-                      )}
+                        className="text-sm text-gray-500 hover:text-black transition">Imprimir</button>
+                      {p.estado === "abierto" && (<>
+                        <span className="text-gray-200">·</span>
+                        <button onClick={() => closePeriodo(p.id)} className="text-sm text-gray-500 hover:text-black transition">Cerrar</button>
+                      </>)}
+                      {p.estado === "cerrado" && role === "admin" && (<>
+                        <span className="text-gray-200">·</span>
+                        <button onClick={() => deletePeriodo(p.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>
+                      </>)}
+                      <span className="text-gray-300 ml-2">›</span>
                     </td>
                   </tr>
                 );

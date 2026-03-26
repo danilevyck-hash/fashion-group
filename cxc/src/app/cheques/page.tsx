@@ -256,18 +256,20 @@ export default function ChequesPage() {
                     {c.estado === "depositado" && <span className="text-[11px] bg-black text-white px-2 py-0.5 rounded-full">Depositado</span>}
                     {c.estado === "vencido" && <span className="text-[11px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Vencido</span>}
                   </td>
-                  <td className="py-3 text-right">
-                    {(c.estado === "pendiente" || c.estado === "vencido") && (
-                      <button onClick={() => depositar(c.id)} className="text-sm text-gray-400 hover:text-black transition mr-3">Depositar</button>
-                    )}
-                    {c.whatsapp && (
+                  <td className="py-3 text-right flex items-center justify-end gap-2">
+                    {(c.estado === "pendiente" || c.estado === "vencido") && (<>
+                      <button onClick={() => depositar(c.id)} className="text-sm text-gray-500 hover:text-black transition">Depositar</button>
+                      <span className="text-gray-200">·</span>
+                    </>)}
+                    {c.whatsapp && (<>
                       <button onClick={() => {
                         const msg = `Hola, le escribo de Fashion Group respecto al cheque N° ${c.numero_cheque} por $${fmt(c.monto)} con fecha de depósito ${fmtDate(c.fecha_deposito)}. ${c.estado === "pendiente" ? "Queda pendiente de depósito." : ""} Gracias.`;
                         window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
-                      }} className="text-sm text-gray-400 hover:text-green-600 transition mr-3">WA</button>
-                    )}
-                    <button onClick={() => startEdit(c)} className="text-sm text-gray-400 hover:text-black transition mr-3">Editar</button>
-                    {role === "admin" && <button onClick={() => deleteCheque(c.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>}
+                      }} className="text-sm text-gray-500 hover:text-green-600 transition">WA</button>
+                      <span className="text-gray-200">·</span>
+                    </>)}
+                    <button onClick={() => startEdit(c)} className="text-sm text-gray-500 hover:text-black transition">Editar</button>
+                    {role === "admin" && <><span className="text-gray-200">·</span><button onClick={() => deleteCheque(c.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button></>}
                   </td>
                 </tr>
               );

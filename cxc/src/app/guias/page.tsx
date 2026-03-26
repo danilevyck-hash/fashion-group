@@ -325,6 +325,7 @@ export default function GuiasPage() {
         <div className="flex items-end justify-between mb-10">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Guías de Transporte</h1>
+            <p className="text-sm text-gray-400 mt-1">Registro de envíos con transportistas</p>
           </div>
           <div className="flex items-center gap-4">
             <button onClick={() => { resetForm(); setFormNumero(nextNumero); setView("form"); }}
@@ -401,9 +402,10 @@ export default function GuiasPage() {
                   <td className="py-3.5 text-gray-500">{fmtDate(g.fecha)}</td>
                   <td className="py-3.5">{g.transportista}</td>
                   <td className="py-3.5 text-right tabular-nums">{g.total_bultos}</td>
-                  <td className="py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => startEdit(g.id)} className="text-sm text-gray-400 hover:text-black transition mr-3">Editar</button>
-                    <button onClick={() => deleteGuia(g.id)} className="text-sm text-gray-300 hover:text-black transition">Eliminar</button>
+                  <td className="py-3.5 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => startEdit(g.id)} className="text-sm text-gray-500 hover:text-black transition">Editar</button>
+                    <span className="text-gray-200">·</span>
+                    <button onClick={() => deleteGuia(g.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>
                   </td>
                 </tr>
               ))}

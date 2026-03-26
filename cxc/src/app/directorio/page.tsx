@@ -234,9 +234,18 @@ export default function DirectorioPage() {
       {loading ? (
         <div>{[...Array(5)].map((_, i) => <div key={i} className="animate-pulse flex gap-4 py-3 border-b border-gray-100"><div className="h-3 bg-gray-100 rounded w-1/3" /><div className="h-3 bg-gray-100 rounded w-1/5 ml-auto" /><div className="h-3 bg-gray-100 rounded w-1/5" /></div>)}</div>
       ) : filtered.length === 0 && !search ? (
-        <div className="text-center py-20">
-          <p className="text-sm font-medium text-gray-700 mb-1">No hay contactos</p>
-          <p className="text-sm text-gray-400 mb-6">Importa un CSV o agrega un contacto manualmente</p>
+        <div className="flex flex-col items-center py-20 text-center">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-gray-200 mb-4">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+          </svg>
+          <p className="text-sm font-medium text-gray-500 mb-1">No hay contactos registrados</p>
+          <p className="text-xs text-gray-400 mb-4">Importa un CSV o agrega tu primer contacto</p>
+          <button onClick={() => setShowNew(true)} className="text-sm bg-black text-white px-6 py-2.5 rounded-full hover:bg-gray-800 transition">
+            + Nuevo Contacto
+          </button>
         </div>
       ) : (
         <>

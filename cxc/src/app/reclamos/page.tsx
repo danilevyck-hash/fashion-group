@@ -278,7 +278,7 @@ export default function ReclamosPage() {
                     </div>
                     <div className="flex items-center gap-2 mb-4">
                       <p className="text-xs text-gray-400">{c?.nombre || "Sin contacto"}</p>
-                      {hasAlert && <span className="text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full">Alerta</span>}
+                      {hasAlert && <span className="text-[10px] bg-red-50 text-red-500 px-2 py-0.5 rounded-full font-medium border border-red-100">Alerta</span>}
                     </div>
                     <div className="flex gap-6">
                       <div><p className="text-2xl font-semibold tabular-nums">{open.length}</p><p className="text-xs text-gray-400 mt-0.5">facturas</p></div>
@@ -529,13 +529,16 @@ export default function ReclamosPage() {
         <span className={`text-xs px-3 py-1 rounded-full ${EC[current.estado] || "bg-gray-100 text-gray-500"}`}>{current.estado}</span>
       </div>
 
-      <div className="flex gap-1 mb-8">{ESTADOS.map((e, i) => {
+      <div className="flex items-center gap-0 mb-8">{ESTADOS.map((e, i) => {
         const active = ESTADOS.indexOf(current.estado) >= i;
         const isCurrent = current.estado === e;
+        const isFirst = i === 0;
+        const isLast = i === ESTADOS.length - 1;
+        const rounding = isFirst ? "rounded-l-full" : isLast ? "rounded-r-full" : "";
         return (
           <div key={e} className="flex-1 relative">
             <button onClick={() => { if (!isCurrent) setConfirmingEstado(confirmingEstado === e ? null : e); }}
-              className={`w-full py-2 text-xs text-center rounded transition ${active ? "bg-black text-white" : "bg-gray-100 text-gray-400 hover:bg-gray-200"} ${isCurrent ? "ring-1 ring-black" : ""}`}>
+              className={`w-full h-8 text-xs text-center transition px-4 py-2 ${rounding} ${active ? "bg-black text-white" : "bg-gray-100 text-gray-400 hover:bg-gray-200"} ${isCurrent ? "ring-1 ring-black" : ""}`}>
               {e}
             </button>
             {confirmingEstado === e && !isCurrent && (
@@ -555,7 +558,7 @@ export default function ReclamosPage() {
         <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Subtotal</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub)}</div></div>
         <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Import. 10%</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * 0.10)}</div></div>
         <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * 0.077)}</div></div>
-        <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Total</div><div className="text-base font-bold tabular-nums mt-1">${fmt(sub * 1.177)}</div></div>
+        <div className="bg-gray-900 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Total</div><div className="text-xl font-semibold tabular-nums mt-1 text-white">${fmt(sub * 1.177)}</div></div>
       </div>
 
       {items.length > 0 && (

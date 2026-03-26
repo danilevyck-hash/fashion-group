@@ -51,7 +51,7 @@ export default function CompanySummary({
             <div key={co.key} className="flex items-center gap-3">
               <div className="w-36 text-xs truncate">{co.name}</div>
               <div className="flex-1 h-4 bg-gray-100 rounded overflow-hidden">
-                <div className="h-full bg-black rounded" style={{ width: `${pct}%` }} />
+                <div className="h-full rounded" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #1B3A5C, #2E5E8E)" }} />
               </div>
               <div className="w-28 text-xs text-right font-medium">${fmt(val)}</div>
               {co.vendedorPhone ? (
