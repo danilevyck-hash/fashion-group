@@ -61,6 +61,12 @@ export default function ReclamosPage() {
   const [filterEstado, setFilterEstado] = useState("all");
   const [confirmingEstado, setConfirmingEstado] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [sortCol, setSortCol] = useState<"fecha" | "dias" | "total" | "estado">("fecha");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [showAplicadaModal, setShowAplicadaModal] = useState(false);
+  const [aplicadaNc, setAplicadaNc] = useState("");
+  const [aplicadaMonto, setAplicadaMonto] = useState("");
 
   // Form
   const [fEmpresa, setFEmpresa] = useState("");
@@ -69,6 +75,11 @@ export default function ReclamosPage() {
   const [fPedido, setFPedido] = useState("");
   const [fNotas, setFNotas] = useState("");
   const [fItems, setFItems] = useState<RItem[]>([emptyItem()]);
+  const [savedReclamoId, setSavedReclamoId] = useState<string | null>(null);
+  const [savedNroReclamo, setSavedNroReclamo] = useState("");
+  const [formFotos, setFormFotos] = useState<Foto[]>([]);
+  const [uploadingFormFoto, setUploadingFormFoto] = useState(false);
+  const formFotoRef = useRef<HTMLInputElement>(null);
 
   // Detail
   const [nota, setNota] = useState("");
@@ -116,7 +127,7 @@ export default function ReclamosPage() {
 
   function getC(empresa: string) { return contactos.find((c) => c.empresa === empresa) || null; }
 
-  function resetForm() { setFEmpresa(""); setFFecha(new Date().toISOString().slice(0, 10)); setFFactura(""); setFPedido(""); setFNotas(""); setFItems([emptyItem()]); setError(null); }
+  function resetForm() { setFEmpresa(""); setFFecha(new Date().toISOString().slice(0, 10)); setFFactura(""); setFPedido(""); setFNotas(""); setFItems([emptyItem()]); setError(null); setSavedReclamoId(null); setSavedNroReclamo(""); setFormFotos([]); }
 
   function updateItem(idx: number, field: string, val: string | number) {
     setFItems((prev) => prev.map((item, i) => { if (i !== idx) return item; const u = { ...item, [field]: val }; u.subtotal = (u.cantidad || 0) * (u.precio_unitario || 0); return u; }));
@@ -133,7 +144,7 @@ export default function ReclamosPage() {
     setSaving(true); setError(null);
     try {
       const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: fFactura, nro_orden_compra: fPedido, fecha_reclamo: fFecha, notas: fNotas, items }) });
-      if (res.ok) { const saved = await res.json(); resetForm(); loadReclamos(); if (saved.id) await loadDetail(saved.id); }
+      if (res.ok) { const saved = await res.json(); setSavedReclamoId(saved.id); setSavedNroReclamo(saved.nro_reclamo || ""); setFormFotos([]); loadReclamos(); }
       else { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); }
     } catch { setError("Error de conexión."); } setSaving(false);
   }
@@ -148,6 +159,16 @@ export default function ReclamosPage() {
 
 
   function toggleSelect(id: string) { setSelectedIds((p) => p.includes(id) ? p.filter((x) => x !== id) : [...p, id]); }
+
+  function toggleSort(col: typeof sortCol) { if (sortCol === col) setSortDir((d) => d === "asc" ? "desc" : "asc"); else { setSortCol(col); setSortDir("desc"); } }
+
+  async function downloadEmpresaExcel(empresa: string, ev: React.MouseEvent) {
+    ev.stopPropagation();
+    const ids = reclamos.filter((r) => r.empresa === empresa).map((r) => r.id);
+    if (!ids.length) return;
+    const res = await fetch("/api/reclamos/export-excel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
+    if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Reclamos-${empresa}-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url); }
+  }
 
   function startEdit() {
     if (!current) return;
@@ -212,7 +233,34 @@ export default function ReclamosPage() {
             </div>
           )}
 
-          {loading ? <div>{[...Array(3)].map((_, i) => <div key={i} className="animate-pulse h-24 bg-gray-50 rounded-2xl mb-4" />)}</div> : (
+          {/* Global search */}
+          <div className="mb-6">
+            <input type="text" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} placeholder="Buscar por N° factura, N° reclamo o empresa..." className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition max-w-md" />
+          </div>
+
+          {globalSearch.trim() ? (() => {
+            const q = globalSearch.toLowerCase();
+            const results = reclamos.filter((r) => (r.nro_factura || "").toLowerCase().includes(q) || (r.nro_reclamo || "").toLowerCase().includes(q) || (r.empresa || "").toLowerCase().includes(q) || (r.notas || "").toLowerCase().includes(q));
+            return (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm text-gray-500">{results.length} resultados para &quot;{globalSearch}&quot;</p>
+                  <button onClick={() => setGlobalSearch("")} className="text-xs text-gray-400 hover:text-black transition">× Limpiar</button>
+                </div>
+                {results.length === 0 ? <p className="text-center text-gray-300 text-sm py-12">Sin resultados</p> : (
+                  <table className="w-full text-sm"><thead><tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
+                    <th className="text-left pb-3 font-medium">Empresa</th><th className="text-left pb-3 font-medium">Factura</th><th className="text-left pb-3 font-medium">N° Reclamo</th><th className="text-left pb-3 font-medium">Fecha</th><th className="text-left pb-3 font-medium">Estado</th><th className="text-right pb-3 font-medium">Total</th>
+                  </tr></thead><tbody>{results.map((r) => (
+                    <tr key={r.id} onClick={() => { setActiveEmpresa(r.empresa); loadDetail(r.id); }} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
+                      <td className="py-3 text-gray-500">{r.empresa}</td><td className="py-3 font-medium">{r.nro_factura}</td><td className="py-3 text-xs text-gray-400">{r.nro_reclamo}</td><td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
+                      <td className="py-3"><span className={`text-[11px] px-2 py-0.5 rounded-full ${EC[r.estado] || "bg-gray-100 text-gray-500"}`}>{r.estado}</span></td>
+                      <td className="py-3 text-right tabular-nums">${fmt(calcSub(r.reclamo_items ?? []) * 1.177)}</td>
+                    </tr>
+                  ))}</tbody></table>
+                )}
+              </div>
+            );
+          })() : loading ? <div>{[...Array(3)].map((_, i) => <div key={i} className="animate-pulse h-24 bg-gray-50 rounded-2xl mb-4" />)}</div> : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {EMPRESAS.map((empresa) => {
                 const ers = reclamos.filter((r) => r.empresa === empresa);
@@ -222,7 +270,9 @@ export default function ReclamosPage() {
                 const c = getC(empresa);
                 return (
                   <div key={empresa} onClick={() => { setActiveEmpresa(empresa); setSelectionMode(false); setSelectedIds([]); setSearch(""); setFilterEstado("all"); }}
-                    className="border border-gray-100 rounded-2xl p-6 cursor-pointer hover:border-gray-300 transition">
+                    className="relative border border-gray-100 rounded-2xl p-6 cursor-pointer hover:border-gray-300 transition">
+                    <button onClick={(ev) => downloadEmpresaExcel(empresa, ev)} title="Descargar todos los reclamos de esta empresa en Excel"
+                      className="absolute top-4 right-4 text-gray-300 hover:text-black transition text-xs border border-gray-100 hover:border-gray-300 rounded-lg px-2 py-1">↓ Excel</button>
                     <div className="flex items-start justify-between mb-4">
                       <div><p className="text-sm font-semibold">{empresa}</p><p className="text-xs text-gray-400 mt-0.5">{c?.nombre || "Sin contacto"}</p></div>
                       {hasAlert && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full">Alerta</span>}
@@ -250,7 +300,17 @@ export default function ReclamosPage() {
       return true;
     });
     const c = getC(activeEmpresa);
-    const allSelectableIds = empresaRecs.filter((r) => r.estado !== "Aplicada").map((r) => r.id);
+    const sortedRecs = [...empresaRecs].sort((a, b) => {
+      let av: number | string = 0, bv: number | string = 0;
+      if (sortCol === "fecha") { av = a.fecha_reclamo || ""; bv = b.fecha_reclamo || ""; }
+      if (sortCol === "dias") { av = daysSince(a.fecha_reclamo); bv = daysSince(b.fecha_reclamo); }
+      if (sortCol === "total") { av = calcSub(a.reclamo_items ?? []) * 1.177; bv = calcSub(b.reclamo_items ?? []) * 1.177; }
+      if (sortCol === "estado") { av = ESTADOS.indexOf(a.estado); bv = ESTADOS.indexOf(b.estado); }
+      if (av < bv) return sortDir === "asc" ? -1 : 1;
+      if (av > bv) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    const allSelectableIds = sortedRecs.filter((r) => r.estado !== "Aplicada").map((r) => r.id);
     const allSelected = allSelectableIds.length > 0 && allSelectableIds.every((id) => selectedIds.includes(id));
 
     return (
@@ -294,13 +354,18 @@ export default function ReclamosPage() {
           <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="border-b border-gray-200 py-2 text-sm outline-none w-full max-w-xs" />
         </div>
 
-        {empresaRecs.length === 0 ? <p className="text-center text-gray-300 text-sm py-20">Sin reclamos</p> : (
+        {sortedRecs.length === 0 ? <p className="text-center text-gray-300 text-sm py-20">Sin reclamos</p> : (
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
               {selectionMode && <th className="pb-3 w-8"></th>}
-              <th className="text-left pb-3 font-medium">Factura</th><th className="text-left pb-3 font-medium">N° Reclamo</th><th className="text-left pb-3 font-medium">Fecha</th><th className="text-right pb-3 font-medium">Antigüedad</th><th className="text-left pb-3 font-medium">Estado</th><th className="text-right pb-3 font-medium">Total</th><th className="text-right pb-3 font-medium"></th>
+              <th className="text-left pb-3 font-medium">Factura</th><th className="text-left pb-3 font-medium">N° Reclamo</th>
+              <th onClick={() => toggleSort("fecha")} className="text-left pb-3 font-medium cursor-pointer hover:text-black select-none">Fecha {sortCol === "fecha" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
+              <th onClick={() => toggleSort("dias")} className="text-right pb-3 font-medium cursor-pointer hover:text-black select-none">Antigüedad {sortCol === "dias" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
+              <th onClick={() => toggleSort("estado")} className="text-left pb-3 font-medium cursor-pointer hover:text-black select-none">Estado {sortCol === "estado" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
+              <th onClick={() => toggleSort("total")} className="text-right pb-3 font-medium cursor-pointer hover:text-black select-none">Total {sortCol === "total" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
+              <th className="text-right pb-3 font-medium"></th>
             </tr></thead>
-            <tbody>{empresaRecs.map((r) => { const days = daysSince(r.fecha_reclamo); const total = calcSub(r.reclamo_items ?? []) * 1.177; const canSelect = r.estado !== "Aplicada"; return (
+            <tbody>{sortedRecs.map((r) => { const days = daysSince(r.fecha_reclamo); const total = calcSub(r.reclamo_items ?? []) * 1.177; const canSelect = r.estado !== "Aplicada"; return (
               <tr key={r.id} onClick={() => selectionMode ? (canSelect && toggleSelect(r.id)) : loadDetail(r.id)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
                 {selectionMode && <td className="py-3"><input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!canSelect} className="accent-black disabled:opacity-30" /></td>}
                 <td className="py-3 font-medium">{r.nro_factura}</td><td className="py-3"><span className="text-gray-500 text-xs">{r.nro_reclamo}</span></td><td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
@@ -395,11 +460,46 @@ export default function ReclamosPage() {
             <div className="text-lg font-semibold">Total: ${fmt(fSubtotal * 1.177)}</div>
           </div>
         </div>
-        {error && <p className="text-red-500 text-sm mt-6 mb-4">{error}</p>}
-        <div className="flex items-center gap-6 mt-6">
-          <button onClick={saveReclamo} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">{saving ? "Guardando..." : "Guardar Reclamo"}</button>
-          <button onClick={() => { resetForm(); setView("list"); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
-        </div>
+        {savedReclamoId ? (
+          <div className="mt-8 border-t border-gray-100 pt-6">
+            <div className="flex items-center gap-3 mb-6 p-4 bg-gray-50 rounded-xl">
+              <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center flex-shrink-0"><svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round"/></svg></div>
+              <div><p className="text-sm font-medium">{savedNroReclamo} guardado</p><p className="text-xs text-gray-400">Agrega fotos de evidencia si tienes (opcional)</p></div>
+            </div>
+            <div className="mb-6">
+              <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Fotos de evidencia</div>
+              {formFotos.length > 0 && (
+                <div className="flex gap-3 flex-wrap mb-3">{formFotos.map((f) => (
+                  <div key={f.id} className="relative">
+                    <img src={f.url} alt="" className="w-20 h-20 object-cover rounded-xl border border-gray-100" />
+                    <button onClick={async () => { await fetch(`/api/reclamos/${savedReclamoId}/fotos`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ foto_id: f.id, storage_path: f.storage_path }) }); setFormFotos((p) => p.filter((x) => x.id !== f.id)); }}
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
+                  </div>
+                ))}</div>
+              )}
+              {formFotos.length < 3 && (<>
+                <input ref={formFotoRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                  const file = e.target.files?.[0]; if (!file || !savedReclamoId) return;
+                  setUploadingFormFoto(true); const fd = new FormData(); fd.append("file", file);
+                  const res = await fetch(`/api/reclamos/${savedReclamoId}/fotos`, { method: "POST", body: fd });
+                  if (res.ok) { const data = await res.json(); setFormFotos((p) => [...p, data]); }
+                  setUploadingFormFoto(false); if (formFotoRef.current) formFotoRef.current.value = "";
+                }} />
+                <button onClick={() => formFotoRef.current?.click()} disabled={uploadingFormFoto} className="text-sm text-gray-400 hover:text-black transition disabled:opacity-40">{uploadingFormFoto ? "Subiendo..." : "+ Agregar foto"}</button>
+              </>)}
+            </div>
+            <button onClick={() => { const id = savedReclamoId; resetForm(); loadReclamos(); if (id) loadDetail(id); }} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition">Ver reclamo →</button>
+            <button onClick={() => resetForm()} className="text-sm text-gray-400 hover:text-black transition ml-4">Crear otro reclamo</button>
+          </div>
+        ) : (
+          <div className="mt-8">
+            {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+            <div className="flex items-center gap-6">
+              <button onClick={saveReclamo} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">{saving ? "Guardando..." : "Guardar Reclamo"}</button>
+              <button onClick={() => { resetForm(); setView("list"); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -439,7 +539,7 @@ export default function ReclamosPage() {
               <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-10 text-center">
                 <p className="text-[11px] text-gray-500 mb-1.5">Cambiar a {e}?</p>
                 <div className="flex gap-1 justify-center">
-                  <button onClick={() => changeEstado(e)} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 transition">Si</button>
+                  <button onClick={() => { if (e === "Aplicada") { setShowAplicadaModal(true); setConfirmingEstado(null); } else changeEstado(e); }} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 transition">Si</button>
                   <button onClick={() => setConfirmingEstado(null)} className="text-[11px] text-gray-400 px-2 py-1 hover:text-black transition">No</button>
                 </div>
               </div>
@@ -497,7 +597,7 @@ export default function ReclamosPage() {
       </div>
 
       <div className="flex gap-3 flex-wrap mb-4">
-        <button onClick={startEdit} className="text-sm text-gray-400 hover:text-black transition">Editar</button>
+        <button onClick={startEdit} title="Editar todos los campos de este reclamo" className="text-sm text-gray-400 hover:text-black transition">Editar</button>
         <button onClick={() => {
           const c = getC(current.empresa);
           if (!c?.whatsapp) { alert("No hay contacto WhatsApp para esta empresa."); return; }
@@ -505,9 +605,9 @@ export default function ReclamosPage() {
           const total = calcSub(current.reclamo_items ?? []) * 1.177;
           const msg = `Hola ${nombre}, te escribo de parte de Fashion Group para dar seguimiento al reclamo ${current.nro_reclamo}.\n\nFactura: ${current.nro_factura}\nTotal a acreditar: $${fmt(total)}\nEstado: ${current.estado}\nFecha: ${fmtDate(current.fecha_reclamo)}\n\n¿Nos puedes confirmar el estado? Gracias.`;
           window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
-        }} className="text-sm text-gray-400 hover:text-black transition">WhatsApp</button>
-        <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} className="text-sm text-gray-400 hover:text-black transition">Excel</button>
-        {role === "admin" && <button onClick={() => setShowDeleteConfirm(true)} className="text-sm text-gray-300 hover:text-red-500 transition ml-auto">Eliminar</button>}
+        }} title="Enviar recordatorio por WhatsApp" className="text-sm text-gray-400 hover:text-black transition">WhatsApp</button>
+        <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} title="Descargar este reclamo en formato Excel" className="text-sm text-gray-400 hover:text-black transition">Excel</button>
+        {role === "admin" && <button onClick={() => setShowDeleteConfirm(true)} title="Eliminar permanentemente este reclamo" className="text-sm text-gray-300 hover:text-red-500 transition ml-auto">Eliminar</button>}
       </div>
 
       {/* Delete confirm modal */}
@@ -557,6 +657,29 @@ export default function ReclamosPage() {
           <div className="flex items-center gap-6">
             <button onClick={saveEdit} disabled={editSaving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">{editSaving ? "Guardando..." : "Guardar cambios"}</button>
             <button onClick={() => setEditMode(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Aplicada modal */}
+      {showAplicadaModal && current && (
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setShowAplicadaModal(false)}>
+          <div className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold mb-1">Marcar como Aplicada</h3>
+            <p className="text-sm text-gray-400 mb-6">Registra los datos de la nota de crédito recibida.</p>
+            <div className="space-y-4 mb-6">
+              <div><label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 block mb-1">N° Nota de Crédito *</label><input type="text" value={aplicadaNc} onChange={(e) => setAplicadaNc(e.target.value)} placeholder="Ej. NC-2026-0034" className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black" autoFocus /></div>
+              <div><label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 block mb-1">Monto aplicado *</label><input type="number" step="0.01" value={aplicadaMonto} onChange={(e) => setAplicadaMonto(e.target.value)} placeholder="0.00" className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black" /></div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={async () => {
+                if (!aplicadaNc.trim() || !aplicadaMonto) return;
+                await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "Aplicada" }) });
+                await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seguimiento_nota: `Aplicada — N/C ${aplicadaNc} por $${parseFloat(aplicadaMonto).toFixed(2)}`, autor: role }) });
+                setShowAplicadaModal(false); setAplicadaNc(""); setAplicadaMonto(""); await loadDetail(current.id); loadReclamos();
+              }} disabled={!aplicadaNc.trim() || !aplicadaMonto} className="flex-1 bg-black text-white px-4 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">Confirmar</button>
+              <button onClick={() => { setShowAplicadaModal(false); setConfirmingEstado(null); }} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-full text-sm hover:bg-gray-50 transition">Cancelar</button>
+            </div>
           </div>
         </div>
       )}
