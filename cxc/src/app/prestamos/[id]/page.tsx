@@ -72,6 +72,15 @@ export default function PrestamoDetallePage() {
   const [fNotas, setFNotas] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // Edit movement modal
+  const [showEditMovModal, setShowEditMovModal] = useState(false);
+  const [editMovId, setEditMovId] = useState("");
+  const [emFecha, setEmFecha] = useState("");
+  const [emConcepto, setEmConcepto] = useState("");
+  const [emMonto, setEmMonto] = useState("");
+  const [emNotas, setEmNotas] = useState("");
+  const [savingEditMov, setSavingEditMov] = useState(false);
+
   // Danger zone
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState("");
@@ -104,6 +113,7 @@ export default function PrestamoDetallePage() {
 
   const isAdmin = role === "admin";
   const isAdminOrDirector = role === "admin" || role === "director";
+  const canEdit = role === "admin" || role === "contabilidad";
   const movs = empleado.prestamos_movimientos || [];
   const sortedMovs = [...movs].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.created_at.localeCompare(a.created_at));
 
@@ -149,6 +159,53 @@ export default function PrestamoDetallePage() {
     });
     if (res.ok) { showToast("Movimiento aprobado"); loadEmpleado(); }
     else showToast("Error al aprobar");
+  }
+
+  // ── Edit movement ──
+  function openEditMov(m: Movimiento) {
+    setEditMovId(m.id);
+    setEmFecha(m.fecha);
+    setEmConcepto(m.concepto);
+    setEmMonto(String(m.monto));
+    setEmNotas(m.notas || "");
+    setShowEditMovModal(true);
+  }
+
+  async function saveEditMov() {
+    if (!emFecha || !emMonto || Number(emMonto) <= 0) { showToast("Completa todos los campos"); return; }
+    setSavingEditMov(true);
+    try {
+      const res = await fetch(`/api/prestamos/movimientos/${editMovId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fecha: emFecha, concepto: emConcepto, monto: Number(emMonto), notas: emNotas || null }),
+      });
+      if (res.ok) { showToast("Movimiento actualizado"); setShowEditMovModal(false); loadEmpleado(); }
+      else { const err = await res.json(); showToast(err.error || "Error"); }
+    } catch { showToast("Error de conexión"); }
+    setSavingEditMov(false);
+  }
+
+  // ── Pago quincenal automático ──
+  async function pagoQuincenal() {
+    if (!empleado || !empleado.deduccion_quincenal || empleado.deduccion_quincenal <= 0) {
+      showToast("Este empleado no tiene deducción quincenal configurada"); return;
+    }
+    try {
+      const res = await fetch("/api/prestamos/movimientos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          empleado_id: id,
+          fecha: new Date().toISOString().slice(0, 10),
+          concepto: "Pago",
+          monto: empleado.deduccion_quincenal,
+          notas: "Deducción quincenal",
+        }),
+      });
+      if (res.ok) { showToast(`Pago quincenal de $${fmt(empleado.deduccion_quincenal)} registrado`); loadEmpleado(); }
+      else { const err = await res.json(); showToast(err.error || "Error"); }
+    } catch { showToast("Error de conexión"); }
   }
 
   // ── Employee edit ──
@@ -285,7 +342,8 @@ export default function PrestamoDetallePage() {
         </div>
 
         {/* Action buttons */}
-        <div className="flex gap-3 mb-6">
+        <div className="flex flex-wrap gap-3 mb-6">
+          <button onClick={pagoQuincenal} className="bg-emerald-600 text-white px-5 py-2 rounded-full text-sm hover:bg-emerald-700 transition font-medium">Pago Quincenal · ${fmt(empleado.deduccion_quincenal)}</button>
           <button onClick={() => openNewMov("Préstamo")} className="bg-black text-white px-5 py-2 rounded-full text-sm hover:bg-gray-800 transition">+ Préstamo</button>
           <button onClick={() => openNewMov("Pago")} className="bg-black text-white px-5 py-2 rounded-full text-sm hover:bg-gray-800 transition">+ Pago</button>
           <button onClick={() => openNewMov("Abono extra")} className="bg-black text-white px-5 py-2 rounded-full text-sm hover:bg-gray-800 transition">+ Abono extra</button>
@@ -327,6 +385,11 @@ export default function PrestamoDetallePage() {
                         <div className="flex items-center gap-1">
                           {m.estado === "pendiente_aprobacion" && isAdminOrDirector && (
                             <button onClick={() => approveMov(m.id)} className="text-xs bg-green-600 text-white px-3 py-1 rounded-full hover:bg-green-700 transition">Aprobar</button>
+                          )}
+                          {canEdit && (
+                            <button onClick={() => openEditMov(m)} className="p-1.5 hover:bg-blue-50 rounded-lg transition text-gray-400 hover:text-blue-500" title="Editar">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                            </button>
                           )}
                           {isAdmin && (
                             <button onClick={() => deleteMov(m.id)} className="p-1.5 hover:bg-red-50 rounded-lg transition text-gray-400 hover:text-red-500" title="Eliminar">
@@ -492,6 +555,43 @@ export default function PrestamoDetallePage() {
               <button onClick={() => setShowEditModal(false)} className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
               <button onClick={saveEdit} disabled={savingEdit} className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50">
                 {savingEdit ? "Guardando..." : "Guardar Cambios"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Edit Movement ── */}
+      {showEditMovModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+            <h2 className="font-medium mb-4">Editar Movimiento</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-gray-400 uppercase">Fecha *</label>
+                <input type="date" value={emFecha} onChange={e => setEmFecha(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 uppercase">Concepto</label>
+                <select value={emConcepto} onChange={e => setEmConcepto(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
+                  <option value="Préstamo">Préstamo</option>
+                  <option value="Pago">Pago</option>
+                  <option value="Abono extra">Abono extra</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 uppercase">Monto ($) *</label>
+                <input type="number" step="0.01" min="0.01" value={emMonto} onChange={e => setEmMonto(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
+              </div>
+              <div>
+                <label className="text-xs text-gray-400 uppercase">Notas</label>
+                <textarea value={emNotas} onChange={e => setEmNotas(e.target.value)} rows={2} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button onClick={() => setShowEditMovModal(false)} className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
+              <button onClick={saveEditMov} disabled={savingEditMov} className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50">
+                {savingEditMov ? "Guardando..." : "Guardar Cambios"}
               </button>
             </div>
           </div>
