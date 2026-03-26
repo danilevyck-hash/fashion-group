@@ -292,7 +292,7 @@ export default function UploadPage() {
             </div>
           )}
           <div className="flex gap-3">
-            {csvPreview.valid && pendingFile && <button onClick={async () => { await handleUpload(csvPreview.companyKey, pendingFile); setCsvPreview(null); setPendingText(""); setPendingFile(null); }} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition">Confirmar y subir</button>}
+            {csvPreview.valid && pendingFile && <button disabled={uploading !== null} onClick={async () => { await handleUpload(csvPreview.companyKey, pendingFile); setCsvPreview(null); setPendingText(""); setPendingFile(null); }} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">{uploading ? (<><svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Subiendo...</>) : "Confirmar y subir"}</button>}
             <button onClick={() => { setCsvPreview(null); setPendingText(""); setPendingFile(null); }} className="text-sm text-gray-400 hover:text-black transition border border-gray-200 px-4 py-2 rounded-full">Cancelar</button>
           </div>
         </div>
