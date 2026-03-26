@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 const EMPRESAS = ["Vistana International", "Fashion Wear", "Fashion Shoes", "Active Shoes", "Active Wear", "Joystep", "Confecciones Boston", "Multifashion"];
@@ -210,7 +210,7 @@ export default function VentasPage() {
     setSavingMetas(false);
   }
 
-  const csvSummary = useMemo(() => {
+  const csvSummary = (() => {
     if (!csvParsed) return null;
     const facturas = csvParsed.filter((r) => r.tipo.trim().replace(/\s+/g, " ") === "Factura");
     const ncs = csvParsed.filter((r) => { const t = r.tipo.trim().replace(/\s+/g, " ").toLowerCase(); return t.includes("crédito") || t.includes("credito"); });
@@ -220,7 +220,7 @@ export default function VentasPage() {
       ventasBrutas: facturas.reduce((s, r) => s + r.subtotal, 0),
       nc: ncs.reduce((s, r) => s + Math.abs(r.subtotal), 0),
     };
-  }, [csvParsed]);
+  })();
 
   // Manual form preview
   const manualNetas = (parseFloat(fVentas) || 0) - (parseFloat(fNC) || 0) + (parseFloat(fND) || 0);
