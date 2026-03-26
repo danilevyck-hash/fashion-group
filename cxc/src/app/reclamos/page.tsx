@@ -270,12 +270,15 @@ export default function ReclamosPage() {
                 const c = getC(empresa);
                 return (
                   <div key={empresa} onClick={() => { setActiveEmpresa(empresa); setSelectionMode(false); setSelectedIds([]); setSearch(""); setFilterEstado("all"); }}
-                    className="relative border border-gray-100 rounded-2xl p-6 cursor-pointer hover:border-gray-300 transition">
-                    <button onClick={(ev) => downloadEmpresaExcel(empresa, ev)} title="Descargar todos los reclamos de esta empresa en Excel"
-                      className="absolute top-4 right-4 text-gray-300 hover:text-black transition text-xs border border-gray-100 hover:border-gray-300 rounded-lg px-2 py-1">↓ Excel</button>
-                    <div className="flex items-start justify-between mb-4">
-                      <div><p className="text-sm font-semibold">{empresa}</p><p className="text-xs text-gray-400 mt-0.5">{c?.nombre || "Sin contacto"}</p></div>
-                      {hasAlert && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full">Alerta</span>}
+                    className="border border-gray-100 rounded-2xl p-6 cursor-pointer hover:border-gray-300 transition">
+                    <div className="flex items-start justify-between mb-1">
+                      <p className="text-sm font-semibold">{empresa}</p>
+                      <button onClick={(ev) => downloadEmpresaExcel(empresa, ev)} title="Descargar todos los reclamos de esta empresa en Excel"
+                        className="text-gray-400 hover:text-black transition text-xs border border-gray-200 px-3 py-1 rounded-full flex-shrink-0">↓ Excel</button>
+                    </div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <p className="text-xs text-gray-400">{c?.nombre || "Sin contacto"}</p>
+                      {hasAlert && <span className="text-[10px] bg-red-50 text-red-600 px-2 py-0.5 rounded-full">Alerta</span>}
                     </div>
                     <div className="flex gap-6">
                       <div><p className="text-2xl font-semibold tabular-nums">{open.length}</p><p className="text-xs text-gray-400 mt-0.5">facturas</p></div>
