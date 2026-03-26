@@ -56,7 +56,7 @@ export default function PlantillasPage() {
 
       {/* CXC Card */}
       {isAdminOrDirector && cxc && (
-        <button onClick={() => router.push("/admin")} className="w-full text-left border border-gray-100 rounded-2xl p-5 mb-4 hover:border-gray-300 transition">
+        <button onClick={() => router.push("/admin")} className="w-full text-left border border-gray-100 rounded-2xl p-5 mb-4 hover:border-gray-300 transition cursor-pointer group">
           <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-3">Panel CXC</div>
           <div className="flex gap-8 flex-wrap">
             <div><div className="text-xl font-semibold tabular-nums whitespace-nowrap">${fmt(cxc.totalCxc)}</div><div className="text-xs text-gray-400 mt-0.5">Total CXC</div></div>
@@ -81,6 +81,9 @@ export default function PlantillasPage() {
               {(() => { const d = Math.floor((Date.now() - new Date(cxc.lastUpload).getTime()) / 86400000); return d > 7 ? <span className="text-[10px] text-amber-500 font-medium">· desactualizados ({d}d)</span> : null; })()}
             </div>
           )}
+          <div className="mt-2 flex justify-end">
+            <span className="text-[11px] text-gray-400 group-hover:text-gray-600 transition">Ver panel →</span>
+          </div>
         </button>
       )}
 

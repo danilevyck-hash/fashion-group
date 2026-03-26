@@ -216,7 +216,7 @@ export default function AdminDashboard() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [showExport, setShowExport] = useState(false);
   const [userRole, setUserRole] = useState<string>("admin");
-  const [showUploadHistory, setShowUploadHistory] = useState(false);
+  const [showUploadHistory, setShowUploadHistory] = useState(true);
   const [activityLogs, setActivityLogs] = useState<{id:string;action:string;details:string;created_at:string}[]>([]);
   const [showActivity, setShowActivity] = useState(false);
 
@@ -533,6 +533,17 @@ export default function AdminDashboard() {
       </div>
 
       <UploadFreshness roleCompanies={roleCompanies} uploads={uploads} />
+
+      {/* Search bar */}
+      <div className="mb-6">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar cliente..."
+          className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black w-full max-w-md"
+        />
+      </div>
 
       {/* Upload history toggle */}
       <div className="mb-4">

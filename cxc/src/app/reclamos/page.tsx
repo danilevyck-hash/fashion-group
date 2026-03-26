@@ -96,6 +96,7 @@ export default function ReclamosPage() {
 
   // Contactos (read-only, for WhatsApp)
   const [contactos, setContactos] = useState<Contacto[]>([]);
+  const [toast, setToast] = useState<string | null>(null);
 
   // Auth
   useEffect(() => {
@@ -150,7 +151,7 @@ export default function ReclamosPage() {
   }
 
   async function addNota() { if (!current || !nota.trim()) return; await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seguimiento_nota: nota, autor: role }) }); setNota(""); await loadDetail(current.id); }
-  async function changeEstado(e: string) { if (!current || current.estado === e) return; setConfirmingEstado(null); await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: e }) }); await loadDetail(current.id); loadReclamos(); }
+  async function changeEstado(e: string) { if (!current || current.estado === e) return; setConfirmingEstado(null); await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: e }) }); setToast(`Estado actualizado a ${e}`); setTimeout(() => setToast(null), 3000); await loadDetail(current.id); loadReclamos(); }
   async function deleteReclamo(id: string) { setShowDeleteConfirm(false); await fetch(`/api/reclamos/${id}`, { method: "DELETE" }); setCurrent(null); setView("list"); loadReclamos(); }
 
 
@@ -198,14 +199,25 @@ export default function ReclamosPage() {
     if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Reclamos-${activeEmpresa || "export"}-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url); }
   }
 
-  function sendSelectedWA() {
+  function sendBulkWA(ids: string[]) {
     if (!activeEmpresa) return;
     const c = getC(activeEmpresa);
     if (!c?.whatsapp) { alert("No hay contacto con WhatsApp para esta empresa."); return; }
-    const sel = reclamos.filter((r) => selectedIds.includes(r.id));
-    const lines = sel.map((r) => `• ${r.nro_reclamo} | Factura ${r.nro_factura} | $${fmt(calcSub(r.reclamo_items ?? []) * 1.177)} | Hace ${daysSince(r.fecha_reclamo)} días`).join("\n");
-    const msg = `Hola ${(c.nombre_contacto || c.nombre || "equipo")}, buenos días. Le escribo de parte de Fashion Group para dar seguimiento:\n\n${lines}\n\n¿Nos puede confirmar el estado? Gracias.`;
+    const sel = reclamos.filter((r) => ids.includes(r.id));
+    if (!sel.length) { alert("No hay reclamos para enviar."); return; }
+    const nombre = c.nombre_contacto || c.nombre || "equipo";
+    const lines = sel.map((r) => {
+      const factura = (r.nro_factura || "").length > 30 ? (r.nro_factura || "").slice(0, 27) + "..." : (r.nro_factura || "");
+      const total = calcSub(r.reclamo_items ?? []) * 1.177;
+      return `📋 ${r.nro_reclamo} | Factura: ${factura} | $${fmt(total)} | ${r.estado}`;
+    }).join("\n");
+    const grandTotal = sel.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * 1.177, 0);
+    const msg = `Hola ${nombre}, te escribimos de parte de Fashion Group.\n\nTe enviamos el resumen de reclamos pendientes de ${activeEmpresa}:\n\n${lines}\n\nTotal a acreditar: $${fmt(grandTotal)}\n\nPor favor confirmar recepción y estado de cada reclamo.\nGracias.`;
     window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
+  }
+
+  function sendSelectedWA() {
+    sendBulkWA(selectedIds);
   }
 
 
@@ -270,7 +282,7 @@ export default function ReclamosPage() {
                 const c = getC(empresa);
                 return (
                   <div key={empresa} onClick={() => { setActiveEmpresa(empresa); setSelectionMode(false); setSelectedIds([]); setSearch(""); setFilterEstado("all"); }}
-                    className="border border-gray-100 rounded-2xl p-6 cursor-pointer hover:border-gray-300 transition">
+                    className={`border border-gray-100 rounded-2xl p-6 cursor-pointer hover:border-gray-300 transition ${open.length === 0 ? "opacity-50" : ""}`}>
                     <div className="flex items-start justify-between mb-1">
                       <p className="text-sm font-semibold">{empresa}</p>
                       <button onClick={(ev) => downloadEmpresaExcel(empresa, ev)} title="Descargar todos los reclamos de esta empresa en Excel"
@@ -334,6 +346,7 @@ export default function ReclamosPage() {
               </>}
               <button onClick={() => { setSelectionMode(false); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
             </>) : (<>
+              {allSelectableIds.length > 0 && <button onClick={() => sendBulkWA(allSelectableIds)} className="text-sm text-gray-400 hover:text-black transition" title="Seleccionar todos y enviar por WhatsApp">WhatsApp todo</button>}
               <button onClick={() => { setSelectionMode(true); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition">Seleccionar</button>
               <button onClick={() => { resetForm(); setFEmpresa(activeEmpresa); setView("form"); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">Nuevo Reclamo</button>
             </>)}
@@ -553,8 +566,9 @@ export default function ReclamosPage() {
           </div>
         );
       })}</div>
+      <p className="text-[11px] text-gray-400 mt-1">Último cambio: {(() => { const d = current.created_at ? new Date(current.created_at) : null; if (!d) return "—"; return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; })()}</p>
 
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-4 gap-4 mb-8 mt-6">
         <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Subtotal</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub)}</div></div>
         <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Import. 10%</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * 0.10)}</div></div>
         <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * 0.077)}</div></div>
@@ -664,6 +678,12 @@ export default function ReclamosPage() {
             <button onClick={saveEdit} disabled={editSaving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">{editSaving ? "Guardando..." : "Guardar cambios"}</button>
             <button onClick={() => setEditMode(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
           </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-50">
+          ✓ {toast}
         </div>
       )}
 
