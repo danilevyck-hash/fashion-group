@@ -3,37 +3,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import dynamic from "next/dynamic";
-
-const RechartsComponents = dynamic(
-  () => import("recharts").then((mod) => {
-    const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = mod;
-    // Return a wrapper component that receives chart props
-    function ChartWrapper(props: {
-      chartData: { mes: string; actual: number | null; anterior: number | null; meta: number | null }[];
-      selectedYear: number;
-      fmtK: (n: number) => string;
-      CustomTooltip: React.ComponentType<any>;
-    }) {
-      return (
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={props.chartData} barCategoryGap="20%">
-            <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-            <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-            <YAxis tickFormatter={props.fmtK} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-            <Tooltip content={<props.CustomTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="actual" name={String(props.selectedYear)} fill="#1B3A5C" radius={[3, 3, 0, 0]} />
-            <Bar dataKey="anterior" name={String(props.selectedYear - 1)} fill="#D1D5DB" radius={[3, 3, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      );
-    }
-    return ChartWrapper;
-  }),
-  { ssr: false, loading: () => <div className="animate-pulse h-[260px] bg-gray-100 rounded-xl" /> }
-);
-
 const EMPRESAS = ["Vistana International", "Fashion Wear", "Fashion Shoes", "Active Shoes", "Active Wear", "Joystep", "Confecciones Boston", "Multifashion"];
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const MESES_FULL = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -162,15 +131,6 @@ export default function VentasPage() {
   const metaYTD = safeMetas.filter((m) => m.mes <= currentMonth).reduce((s, m) => s + m.meta, 0);
   const metaPct = metaYTD > 0 ? (ytdTotal / metaYTD) * 100 : 0;
 
-  // Chart data
-  const chartData = MESES.map((label, i) => {
-    const mes = i + 1;
-    const actual = safeVentas.filter((v) => v.mes === mes).reduce((s, v) => s + ventasNetas(v), 0) || null;
-    const anterior = safeVentasAnt.filter((v) => v.mes === mes).reduce((s, v) => s + ventasNetas(v), 0) || null;
-    const meta = safeMetas.filter((m) => m.mes === mes).reduce((s, m) => s + m.meta, 0) || null;
-    return { mes: label, actual, anterior, meta };
-  });
-
   // Table: company rows sorted by total desc
   const empresaRows = EMPRESAS.map((emp) => {
     const empVentas = safeVentas.filter((v) => v.empresa === emp);
@@ -266,21 +226,6 @@ export default function VentasPage() {
   const manualNetas = (parseFloat(fVentas) || 0) - (parseFloat(fNC) || 0) + (parseFloat(fND) || 0);
   const manualMargen = (parseFloat(fVentas) || 0) > 0 ? (((parseFloat(fVentas) || 0) - (parseFloat(fCosto) || 0)) / (parseFloat(fVentas) || 0)) * 100 : 0;
 
-  // Custom tooltip for chart
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload) return null;
-    return (
-      <div className="bg-white border border-gray-200 rounded-lg shadow-lg p-3 text-xs">
-        <p className="font-medium mb-1">{label}</p>
-        {payload.map((p: any) => (
-          <p key={p.dataKey} style={{ color: p.color }}>
-            {p.name}: ${fmt(p.value || 0)}
-          </p>
-        ))}
-      </div>
-    );
-  };
-
   return (
     <div>
       <AppHeader module="Ventas" />
@@ -337,14 +282,6 @@ export default function VentasPage() {
                   <div className="text-[11px] text-gray-300 mt-1">Sin metas</div>
                 )}
               </div>
-            </div>
-          )}
-
-          {/* Chart — admin only */}
-          {isAdmin && safeVentas.length > 0 && (
-            <div className="border border-gray-100 rounded-2xl p-6 mb-8">
-              <div className="text-[11px] text-gray-500 uppercase tracking-wider font-medium mb-4">Ventas Mensuales</div>
-              <RechartsComponents chartData={chartData} selectedYear={selectedYear} fmtK={fmtK} CustomTooltip={CustomTooltip} />
             </div>
           )}
 
