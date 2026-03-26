@@ -168,17 +168,21 @@ function generatePDF(data: ConsolidatedClient[], title: string, detailed: boolea
   w.document.close();
 }
 
-function exportCSV(data: ConsolidatedClient[], label?: string) {
-  const header = "Cliente,Corriente 0-90d,Vigilancia 91-120d,Vencido 121d+,Total,Correo,Telefono,Celular\n";
-  const rows = data.map((c) =>
-    `"${c.nombre_normalized}",${c.current.toFixed(2)},${c.watch.toFixed(2)},${c.overdue.toFixed(2)},${c.total.toFixed(2)},"${c.correo}","${c.telefono}","${c.celular}"`
-  ).join("\n");
-  const blob = new Blob([header + rows], { type: "text/csv" });
+function exportCSV(data: ConsolidatedClient[], label?: string, riskLabel?: string, companyLabel?: string) {
+  const date = new Date().toISOString().slice(0, 10);
+  const meta = `"Reporte CXC Fashion Group — ${date}${companyLabel ? ` — ${companyLabel}` : ""}${riskLabel ? ` — ${riskLabel}` : ""} — ${data.length} registros"\n`;
+  const header = "Cliente,0-30d,31-60d,61-90d,91-120d,121d+,Total,Estado,Correo,Telefono,Celular,Contacto\n";
+  const rows = data.map((c) => {
+    const estado = c.overdue > 0 ? "Vencido" : c.watch > 0 ? "Vigilancia" : "Corriente";
+    return `"${c.nombre_normalized}",${(c.d0_30 ?? c.current).toFixed(2)},${(c.d31_60 ?? 0).toFixed(2)},${(c.d61_90 ?? 0).toFixed(2)},${(c.d91_120 ?? c.watch).toFixed(2)},${(c.d121_plus ?? c.overdue).toFixed(2)},${c.total.toFixed(2)},"${estado}","${c.correo}","${c.telefono}","${c.celular}","${c.contacto}"`;
+  }).join("\n");
+  const BOM = "\uFEFF";
+  const blob = new Blob([BOM + meta + header + rows], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   const suffix = label ? `_${label.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase()}` : "";
-  a.download = `cxc_fashion_group${suffix}_${new Date().toISOString().slice(0, 10)}.csv`;
+  a.download = `CXC${suffix}_${date}.csv`;
   a.click();
   URL.revokeObjectURL(url);
 }
@@ -298,7 +302,14 @@ export default function AdminDashboard() {
 
     if (search) {
       const q = normalizeName(search);
-      result = result.filter((c) => c.nombre_normalized.includes(q));
+      const qLower = search.toLowerCase();
+      result = result.filter((c) =>
+        c.nombre_normalized.includes(q) ||
+        (c.correo && c.correo.toLowerCase().includes(qLower)) ||
+        (c.telefono && c.telefono.includes(search)) ||
+        (c.celular && c.celular.includes(search)) ||
+        (c.contacto && c.contacto.toLowerCase().includes(qLower))
+      );
     }
 
     result.sort((a, b) => {
@@ -311,9 +322,9 @@ export default function AdminDashboard() {
       else if (sortKey === "watch") { va = a.watch; vb = b.watch; }
       else if (sortKey === "overdue") { va = a.overdue; vb = b.overdue; }
       else { va = a.total; vb = b.total; }
-      if (va < vb) return sortDir === "asc" ? -1 : 1;
-      if (va > vb) return sortDir === "asc" ? 1 : -1;
-      return 0;
+      if (va !== vb) return sortDir === "asc" ? va - vb : vb - va;
+      // Stable tiebreaker: sort by name when numeric values are equal
+      return a.nombre_normalized.localeCompare(b.nombre_normalized, "es", { sensitivity: "base" });
     });
 
     return result;
@@ -492,7 +503,8 @@ export default function AdminDashboard() {
                   onClick={() => {
                     const riskL = riskFilter === "all" ? "" : riskFilter === "current" ? "corriente" : riskFilter === "watch" ? "vigilancia" : "vencido";
                     const coL = companyFilter !== "all" ? COMPANIES.find((c) => c.key === companyFilter)?.name || "" : "";
-                    exportCSV(filtered, [riskL, coL].filter(Boolean).join("_") || undefined);
+                    const riskLabel = riskFilter === "all" ? "" : riskFilter === "current" ? "Corriente" : riskFilter === "watch" ? "Vigilancia" : "Vencido";
+                    exportCSV(filtered, [riskL, coL].filter(Boolean).join("_") || undefined, riskLabel || undefined, coL || undefined);
                     setShowExport(false);
                   }}
                   className="block w-full text-left px-4 py-2 text-sm hover:bg-gray-50"
