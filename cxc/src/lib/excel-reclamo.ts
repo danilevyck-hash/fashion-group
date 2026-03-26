@@ -1,154 +1,121 @@
 import * as XLSX from "xlsx";
 
-type CellStyle = {
-  font?: { bold?: boolean; sz?: number; color?: { rgb: string }; italic?: boolean };
-  fill?: { fgColor: { rgb: string } };
-  alignment?: { horizontal?: string; vertical?: string };
-  border?: Record<string, { style: string; color: { rgb: string } }>;
-  numFmt?: string;
+function fmtDate(d: string) { if (!d) return ""; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }
+function addr(r: number, c: number) { return XLSX.utils.encode_cell({ r, c }); }
+
+const B = { top: { style: "thin", color: { rgb: "E8E8E8" } }, bottom: { style: "thin", color: { rgb: "E8E8E8" } }, left: { style: "thin", color: { rgb: "E8E8E8" } }, right: { style: "thin", color: { rgb: "E8E8E8" } } };
+
+const ESTADO_COLORS: Record<string, { bg: string; fg: string }> = {
+  "Enviado": { bg: "EFF6FF", fg: "1D4ED8" },
+  "En Revisión": { bg: "FFF7ED", fg: "C2410C" },
+  "N/C Aprobada": { bg: "F0FDF4", fg: "15803D" },
+  "Aplicada": { bg: "F9FAFB", fg: "374151" },
 };
 
-type Cell = { v: string | number | null; t: string; s?: CellStyle; z?: string };
-
-function fmtDate(d: string) { if (!d) return ""; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }
-
-const B = { top: { style: "thin", color: { rgb: "E0E0E0" } }, bottom: { style: "thin", color: { rgb: "E0E0E0" } }, left: { style: "thin", color: { rgb: "E0E0E0" } }, right: { style: "thin", color: { rgb: "E0E0E0" } } };
-
-function headerBand(v: string, sz = 14, italic = false): Cell {
-  return { v, t: "s", s: { font: { bold: !italic, sz, color: { rgb: "FFFFFF" }, italic }, fill: { fgColor: { rgb: "1A1A1A" } }, alignment: { horizontal: "left", vertical: "center" } } };
+function bandCell(v: string, bg: string, fg: string, sz: number, bold: boolean, italic = false) {
+  return { v, t: "s", s: { font: { bold, sz, color: { rgb: fg }, italic, name: "Calibri" }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: "left", vertical: "center" } } };
 }
-function label(v: string): Cell {
-  return { v, t: "s", s: { font: { sz: 9, color: { rgb: "999999" } }, alignment: { horizontal: "left" } } };
+function lbl(v: string) { return { v, t: "s", s: { font: { sz: 9, color: { rgb: "888888" }, name: "Calibri" }, alignment: { horizontal: "left" } } }; }
+function val(v: string, bold = false) { return { v, t: "s", s: { font: { bold, sz: 10, color: { rgb: "111111" }, name: "Calibri" }, alignment: { horizontal: "left" } } }; }
+function estadoCell(estado: string) {
+  const c = ESTADO_COLORS[estado] || { bg: "F9FAFB", fg: "374151" };
+  return { v: estado, t: "s", s: { font: { sz: 10, color: { rgb: c.fg }, name: "Calibri" }, fill: { fgColor: { rgb: c.bg } }, alignment: { horizontal: "left" }, border: B } };
 }
-function val(v: string | number, bold = false): Cell {
-  return { v: String(v), t: "s", s: { font: { bold, sz: 10 }, alignment: { horizontal: "left" } } };
+function hdr(v: string, right = false) {
+  return { v, t: "s", s: { font: { bold: true, sz: 9, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: "111111" } }, alignment: { horizontal: right ? "right" : "left", vertical: "center" }, border: B } };
 }
-function thCell(v: string): Cell {
-  return { v, t: "s", s: { font: { bold: true, sz: 9, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "1A1A1A" } }, alignment: { horizontal: "left", vertical: "center" }, border: B } };
+function td(v: string, alt: boolean, opts: { center?: boolean; italic?: boolean; sz?: number; fg?: string } = {}) {
+  return { v, t: "s", s: { font: { sz: opts.sz || 10, color: { rgb: opts.fg || "333333" }, italic: opts.italic, name: "Calibri" }, fill: { fgColor: { rgb: alt ? "FAFAFA" : "FFFFFF" } }, alignment: { horizontal: opts.center ? "center" : "left" }, border: B } };
 }
-function thRight(v: string): Cell {
-  return { ...thCell(v), s: { ...thCell(v).s!, alignment: { horizontal: "right", vertical: "center" } } };
+function tdN(v: number, alt: boolean, bold = false, sz = 10) {
+  return { v, t: "n", z: '"$"#,##0.00', s: { font: { sz, bold, color: { rgb: "111111" }, name: "Calibri" }, fill: { fgColor: { rgb: alt ? "FAFAFA" : "FFFFFF" } }, alignment: { horizontal: "right" }, border: B } };
 }
-function td(v: string | number | null, alt: boolean): Cell {
-  const bg = alt ? "FAFAFA" : "FFFFFF";
-  return { v: v ?? "", t: "s", s: { font: { sz: 10 }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: "left" }, border: B } };
-}
-function tdNum(v: number, alt: boolean): Cell {
-  const bg = alt ? "FAFAFA" : "FFFFFF";
-  return { v, t: "n", z: '"$"#,##0.00', s: { font: { sz: 10 }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: "right" }, border: B } };
-}
-function totLabel(v: string): Cell {
-  return { v, t: "s", s: { font: { sz: 10, color: { rgb: "444444" } }, fill: { fgColor: { rgb: "F9F9F9" } }, alignment: { horizontal: "right" }, border: B } };
-}
-function totVal(v: number): Cell {
-  return { v, t: "n", z: '"$"#,##0.00', s: { font: { sz: 10 }, fill: { fgColor: { rgb: "F9F9F9" } }, alignment: { horizontal: "right" }, border: B } };
-}
-function totalBand(v: string): Cell {
-  return { v, t: "s", s: { font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "1A1A1A" } }, alignment: { horizontal: "left", vertical: "center" } } };
-}
-function totalBandNum(v: number): Cell {
-  return { v, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "1A1A1A" } }, alignment: { horizontal: "right", vertical: "center" } } };
-}
-
-function addr(r: number, c: number) { return XLSX.utils.encode_cell({ r, c }); }
 
 export function buildReclamoSheet(rec: Record<string, unknown>, items: Record<string, unknown>[]): XLSX.WorkSheet {
   const ws: XLSX.WorkSheet = {};
-  ws["!ref"] = "A1"; // will be updated
-
+  const rows: number[] = []; // track row heights
   let r = 0;
-  // Row 0: Title
-  ws[addr(r, 0)] = headerBand("FASHION GROUP", 14);
-  for (let c = 1; c <= 6; c++) ws[addr(r, c)] = headerBand("", 14);
-  r++;
-  // Row 1: Subtitle
-  ws[addr(r, 0)] = headerBand("Reclamo a Proveedor", 10, true);
-  for (let c = 1; c <= 6; c++) ws[addr(r, c)] = headerBand("", 10, true);
-  r++;
-  // Row 2: spacer
-  r++;
 
-  // Rows 3-6: Info grid
-  ws[addr(r, 0)] = label("N° Reclamo"); ws[addr(r, 1)] = val(String(rec.nro_reclamo || ""), true);
-  ws[addr(r, 4)] = label("Empresa"); ws[addr(r, 5)] = val(String(rec.empresa || ""), true);
-  r++;
-  ws[addr(r, 0)] = label("Proveedor"); ws[addr(r, 1)] = val(String(rec.proveedor || ""));
-  ws[addr(r, 4)] = label("Marca"); ws[addr(r, 5)] = val(String(rec.marca || ""));
-  r++;
-  ws[addr(r, 0)] = label("N° Factura"); ws[addr(r, 1)] = val(String(rec.nro_factura || ""), true);
-  ws[addr(r, 4)] = label("Fecha"); ws[addr(r, 5)] = val(fmtDate(String(rec.fecha_reclamo || "")));
-  r++;
-  ws[addr(r, 0)] = label("Estado"); ws[addr(r, 1)] = val(String(rec.estado || ""));
-  ws[addr(r, 4)] = label("N° Pedido"); ws[addr(r, 5)] = val(String(rec.nro_orden_compra || "—"));
-  r++;
-  // Spacer
-  r++;
+  // Row 0: Title
+  for (let c = 0; c <= 6; c++) ws[addr(r, c)] = bandCell(c === 0 ? "FASHION GROUP" : "", "000000", "FFFFFF", 16, true);
+  rows[r] = 32; r++;
+
+  // Row 1: Subtitle
+  for (let c = 0; c <= 6; c++) ws[addr(r, c)] = bandCell(c === 0 ? "Reclamo a Proveedor" : "", "1A1A1A", "AAAAAA", 10, false, true);
+  rows[r] = 18; r++;
+
+  // Row 2: spacer
+  rows[r] = 6; r++;
+
+  // Rows 3-6: Metadata
+  ws[addr(r, 0)] = lbl("N° Reclamo"); ws[addr(r, 1)] = val(String(rec.nro_reclamo || ""), true);
+  ws[addr(r, 4)] = lbl("Empresa"); ws[addr(r, 5)] = val(String(rec.empresa || ""), true);
+  rows[r] = 18; r++;
+
+  ws[addr(r, 0)] = lbl("Proveedor"); ws[addr(r, 1)] = val(String(rec.proveedor || ""));
+  ws[addr(r, 4)] = lbl("Marca"); ws[addr(r, 5)] = val(String(rec.marca || ""));
+  rows[r] = 18; r++;
+
+  ws[addr(r, 0)] = lbl("N° Factura"); ws[addr(r, 1)] = val(String(rec.nro_factura || ""), true);
+  ws[addr(r, 4)] = lbl("Fecha"); ws[addr(r, 5)] = val(fmtDate(String(rec.fecha_reclamo || "")));
+  rows[r] = 18; r++;
+
+  ws[addr(r, 0)] = lbl("Estado"); ws[addr(r, 1)] = estadoCell(String(rec.estado || ""));
+  ws[addr(r, 4)] = lbl("N° Pedido"); ws[addr(r, 5)] = val(String(rec.nro_orden_compra || "—"));
+  rows[r] = 18; r++;
+
+  // Divider
+  rows[r] = 8; r++;
 
   // Table header
   const thRow = r;
-  ws[addr(r, 0)] = thCell("Código"); ws[addr(r, 1)] = thCell("Descripción"); ws[addr(r, 2)] = thCell("Talla");
-  ws[addr(r, 3)] = thRight("Cant."); ws[addr(r, 4)] = thRight("Precio Unit."); ws[addr(r, 5)] = thRight("Subtotal"); ws[addr(r, 6)] = thCell("Motivo");
-  r++;
+  ws[addr(r, 0)] = hdr("Código"); ws[addr(r, 1)] = hdr("Descripción"); ws[addr(r, 2)] = hdr("Talla");
+  ws[addr(r, 3)] = hdr("Cant.", true); ws[addr(r, 4)] = hdr("Precio Unit.", true); ws[addr(r, 5)] = hdr("Subtotal", true); ws[addr(r, 6)] = hdr("Motivo");
+  rows[r] = 20; r++;
 
   // Items
   let subtotal = 0;
   for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-    const alt = i % 2 === 0;
-    const cant = Number(item.cantidad) || 0;
-    const precio = Number(item.precio_unitario) || 0;
-    const sub = cant * precio;
+    const item = items[i]; const alt = i % 2 === 0;
+    const cant = Number(item.cantidad) || 0; const precio = Number(item.precio_unitario) || 0; const sub = cant * precio;
     subtotal += sub;
-    ws[addr(r, 0)] = td(String(item.referencia || ""), alt);
-    ws[addr(r, 1)] = td(String(item.descripcion || ""), alt);
-    ws[addr(r, 2)] = td(String(item.talla || ""), alt);
-    ws[addr(r, 3)] = tdNum(cant, alt);
-    ws[addr(r, 4)] = tdNum(precio, alt);
-    ws[addr(r, 5)] = tdNum(sub, alt);
-    ws[addr(r, 6)] = td(String(item.motivo || ""), alt);
-    r++;
+    ws[addr(r, 0)] = td(String(item.referencia || ""), alt, { fg: "333333" });
+    ws[addr(r, 1)] = td(String(item.descripcion || ""), alt, { fg: "111111" });
+    ws[addr(r, 2)] = td(String(item.talla || ""), alt, { center: true, fg: "555555" });
+    ws[addr(r, 3)] = tdN(cant, alt);
+    ws[addr(r, 4)] = tdN(precio, alt);
+    ws[addr(r, 5)] = tdN(sub, alt, true);
+    ws[addr(r, 6)] = td(String(item.motivo || ""), alt, { italic: true, sz: 9, fg: "666666" });
+    rows[r] = 18; r++;
   }
 
   // Spacer
-  r++;
+  rows[r] = 8; r++;
 
   // Totals
-  const imp = subtotal * 0.10;
-  const itbms = subtotal * 0.077;
-  const total = subtotal + imp + itbms;
+  const imp = subtotal * 0.10; const itbms = subtotal * 0.077; const total = subtotal + imp + itbms;
+  const totLbl = (v: string) => ({ v, t: "s", s: { font: { sz: 9, color: { rgb: "888888" }, name: "Calibri" }, alignment: { horizontal: "right" } } });
+  const totNum = (v: number) => ({ v, t: "n", z: '"$"#,##0.00', s: { font: { sz: 10, name: "Calibri" }, alignment: { horizontal: "right" } } });
 
-  ws[addr(r, 5)] = totLabel("Subtotal:"); ws[addr(r, 6)] = totVal(subtotal); r++;
-  ws[addr(r, 5)] = totLabel("Importación (10%):"); ws[addr(r, 6)] = totVal(imp); r++;
-  ws[addr(r, 5)] = totLabel("ITBMS (7% s/imp.):"); ws[addr(r, 6)] = totVal(itbms); r++;
+  ws[addr(r, 5)] = totLbl("Subtotal:"); ws[addr(r, 6)] = totNum(subtotal); rows[r] = 16; r++;
+  ws[addr(r, 5)] = totLbl("Importación (10%):"); ws[addr(r, 6)] = totNum(imp); rows[r] = 16; r++;
+  ws[addr(r, 5)] = totLbl("ITBMS (7% s/imp.):"); ws[addr(r, 6)] = totNum(itbms); rows[r] = 16; r++;
 
-  // Total band
+  // Final total
   const totalRow = r;
-  for (let c = 0; c <= 4; c++) ws[addr(r, c)] = totalBand(c === 0 ? "TOTAL A ACREDITAR" : "");
-  ws[addr(r, 5)] = totalBandNum(total); ws[addr(r, 6)] = totalBand("");
-  r++;
+  for (let c = 0; c <= 4; c++) ws[addr(r, c)] = bandCell(c === 0 ? "TOTAL A ACREDITAR" : "", "000000", "FFFFFF", 11, true);
+  ws[addr(r, 5)] = bandCell("", "000000", "FFFFFF", 11, true);
+  ws[addr(r, 6)] = { v: total, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 13, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: "000000" } }, alignment: { horizontal: "right", vertical: "center" } } };
+  rows[r] = 26; r++;
 
-  // Set ref
   ws["!ref"] = `A1:G${r}`;
-
-  // Merges
   ws["!merges"] = [
-    { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }, // title
-    { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } }, // subtitle
-    { s: { r: totalRow, c: 0 }, e: { r: totalRow, c: 4 } }, // total label
+    { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
+    { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } },
+    { s: { r: totalRow, c: 0 }, e: { r: totalRow, c: 4 } },
   ];
-
-  // Column widths
-  ws["!cols"] = [
-    { wch: 18 }, { wch: 32 }, { wch: 10 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 24 },
-  ];
-
-  // Row heights
-  ws["!rows"] = [];
-  ws["!rows"][0] = { hpt: 28 };
-  ws["!rows"][1] = { hpt: 18 };
-  ws["!rows"][2] = { hpt: 6 };
-  ws["!rows"][thRow] = { hpt: 22 };
-  ws["!rows"][totalRow] = { hpt: 24 };
+  ws["!cols"] = [{ wch: 16 }, { wch: 30 }, { wch: 9 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 26 }];
+  ws["!rows"] = rows.map((h) => ({ hpt: h }));
 
   return ws;
 }
