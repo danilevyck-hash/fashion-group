@@ -97,8 +97,16 @@ export default function CajaPage() {
     setCategorias(loadCategorias());
     loadPeriodos();
     fetch("/api/caja/responsables").then((r) => r.ok ? r.json() : []).then((data) => {
-      setResponsables((data || []).map((r: { nombre: string }) => r.nombre));
-    }).catch(() => {});
+      const names = (data || []).map((r: { nombre: string }) => r.nombre);
+      if (names.length > 0) {
+        setResponsables(names);
+        localStorage.setItem("fg_responsables", JSON.stringify(names));
+      } else {
+        try { const cached = JSON.parse(localStorage.getItem("fg_responsables") || "[]"); if (cached.length > 0) setResponsables(cached); } catch { /* */ }
+      }
+    }).catch(() => {
+      try { const cached = JSON.parse(localStorage.getItem("fg_responsables") || "[]"); if (cached.length > 0) setResponsables(cached); } catch { /* */ }
+    });
   }, []);
 
   const loadPeriodos = useCallback(async () => {
@@ -535,7 +543,7 @@ export default function CajaPage() {
                       <td className="py-2 pr-1"><input type="date" value={editGasto.fecha || ""} onChange={(e) => setEditGasto({ ...editGasto, fecha: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
                       <td className="py-2 pr-1"><input type="text" value={editGasto.descripcion || ""} onChange={(e) => setEditGasto({ ...editGasto, descripcion: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
                       <td className="py-2 pr-1"><input type="text" value={editGasto.proveedor || ""} onChange={(e) => setEditGasto({ ...editGasto, proveedor: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
-                      <td className="py-2 pr-1"><select value={editGasto.responsable || ""} onChange={(e) => setEditGasto({ ...editGasto, responsable: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"><option value="">—</option>{["Daniel", "Angela"].map((r) => <option key={r} value={r}>{r}</option>)}</select></td>
+                      <td className="py-2 pr-1"><select value={editGasto.responsable || ""} onChange={(e) => setEditGasto({ ...editGasto, responsable: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"><option value="">—</option>{responsables.map((r) => <option key={r} value={r}>{r}</option>)}</select></td>
                       <td className="py-2 pr-1"><select value={editGasto.categoria || "Varios"} onChange={(e) => setEditGasto({ ...editGasto, categoria: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent">{categorias.map((c) => <option key={c} value={c}>{c}</option>)}</select></td>
                       <td className="py-2 pr-1"><input type="text" value={editGasto.nro_factura || ""} onChange={(e) => setEditGasto({ ...editGasto, nro_factura: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
                       <td className="py-2 pr-1"><input type="number" step="0.01" value={editGasto.subtotal ?? ""} onChange={(e) => setEditGasto({ ...editGasto, subtotal: parseFloat(e.target.value) || 0 })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent text-right" /></td>

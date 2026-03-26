@@ -13,6 +13,7 @@ interface Cheque {
   monto: number;
   fecha_deposito: string;
   notas: string;
+  whatsapp: string;
   estado: string;
   fecha_depositado: string | null;
   created_at: string;
@@ -46,6 +47,7 @@ export default function ChequesPage() {
   const [fMonto, setFMonto] = useState("");
   const [fFecha, setFFecha] = useState(todayStr());
   const [fNotas, setFNotas] = useState("");
+  const [fWhatsapp, setFWhatsapp] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -66,18 +68,18 @@ export default function ChequesPage() {
   if (!authChecked) return null;
 
   function resetForm() {
-    setFCliente(""); setFEmpresa(""); setFBanco(""); setFNumero(""); setFMonto(""); setFFecha(todayStr()); setFNotas(""); setEditingId(null); setError(null);
+    setFCliente(""); setFEmpresa(""); setFBanco(""); setFNumero(""); setFMonto(""); setFFecha(todayStr()); setFNotas(""); setFWhatsapp(""); setEditingId(null); setError(null);
   }
 
   function startEdit(c: Cheque) {
     setFCliente(c.cliente); setFEmpresa(c.empresa); setFBanco(c.banco); setFNumero(c.numero_cheque);
-    setFMonto(String(c.monto)); setFFecha(c.fecha_deposito); setFNotas(c.notas); setEditingId(c.id); setShowForm(true);
+    setFMonto(String(c.monto)); setFFecha(c.fecha_deposito); setFNotas(c.notas); setFWhatsapp(c.whatsapp || ""); setEditingId(c.id); setShowForm(true);
   }
 
   async function saveCheque() {
     if (!fCliente || !fEmpresa || !fBanco || !fNumero || !fMonto || !fFecha) { setError("Completa todos los campos obligatorios."); return; }
     setSaving(true); setError(null);
-    const body = { cliente: fCliente, empresa: fEmpresa, banco: fBanco, numero_cheque: fNumero, monto: parseFloat(fMonto), fecha_deposito: fFecha, notas: fNotas };
+    const body = { cliente: fCliente, empresa: fEmpresa, banco: fBanco, numero_cheque: fNumero, monto: parseFloat(fMonto), fecha_deposito: fFecha, notas: fNotas, whatsapp: fWhatsapp };
     try {
       const url = editingId ? `/api/cheques/${editingId}` : "/api/cheques";
       const method = editingId ? "PUT" : "POST";
@@ -173,7 +175,11 @@ export default function ChequesPage() {
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha Depósito *</label>
               <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition" />
             </div>
-            <div className="col-span-2 flex flex-col gap-1">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">WhatsApp</label>
+              <input type="text" value={fWhatsapp} onChange={(e) => setFWhatsapp(e.target.value)} placeholder="+507 6000-0000" className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition" />
+            </div>
+            <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Notas</label>
               <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition resize-none" />
             </div>
@@ -240,6 +246,12 @@ export default function ChequesPage() {
                   <td className="py-3 text-right">
                     {(c.estado === "pendiente" || c.estado === "vencido") && (
                       <button onClick={() => depositar(c.id)} className="text-sm text-gray-400 hover:text-black transition mr-3">Depositar</button>
+                    )}
+                    {c.whatsapp && (
+                      <button onClick={() => {
+                        const msg = `Hola, le escribo de Fashion Group respecto al cheque N° ${c.numero_cheque} por $${fmt(c.monto)} con fecha de depósito ${fmtDate(c.fecha_deposito)}. ${c.estado === "pendiente" ? "Queda pendiente de depósito." : ""} Gracias.`;
+                        window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
+                      }} className="text-sm text-gray-400 hover:text-green-600 transition mr-3">WA</button>
                     )}
                     <button onClick={() => startEdit(c)} className="text-sm text-gray-400 hover:text-black transition mr-3">Editar</button>
                     {role === "admin" && <button onClick={() => deleteCheque(c.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>}

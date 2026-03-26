@@ -558,7 +558,7 @@ export default function GuiasPage() {
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
         <div className="flex items-center gap-6">
-          <button onClick={saveGuia} disabled={saving}
+          <button onClick={saveGuia} disabled={saving || !items.some((i) => i.cliente)}
             className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
             {saving ? "Guardando..." : editingId ? "Guardar Cambios" : "Guardar y Imprimir"}
           </button>
