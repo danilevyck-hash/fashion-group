@@ -94,7 +94,7 @@ export function buildReclamoSheet(rec: Record<string, unknown>, items: Record<st
 
   ws[addr(r, 5)] = tLbl("Subtotal:"); ws[addr(r, 6)] = tVal(subtotal); h[r] = 16; r++;
   ws[addr(r, 5)] = tLbl("Importación (10%):"); ws[addr(r, 6)] = tVal(imp); h[r] = 16; r++;
-  ws[addr(r, 5)] = tLbl("ITBMS (7% s/imp.):"); ws[addr(r, 6)] = tVal(itbms); h[r] = 16; r++;
+  ws[addr(r, 5)] = tLbl("ITBMS (7%):"); ws[addr(r, 6)] = tVal(itbms); h[r] = 16; r++;
 
   // Final total
   const totalRow = r;
