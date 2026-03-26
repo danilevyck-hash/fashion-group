@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 
-const ROLE_LABELS: Record<string, string> = { admin: "Administrador", upload: "Secretaria", director: "Director", david: "David" };
+const ROLE_LABELS: Record<string, string> = { admin: "Administrador", upload: "Secretaria", director: "Director", david: "David", contabilidad: "Contabilidad" };
 function fmt(n: number) { return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 const fmtDate = (d: string) => { const dt = new Date(d); return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; };
 
@@ -15,6 +15,7 @@ export default function PlantillasPage() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
   const [role, setRole] = useState("");
+  const [modulos, setModulos] = useState<string[]>([]);
   const [cxc, setCxc] = useState<CxcSummary | null>(null);
   const [stats, setStats] = useState<HomeStats | null>(null);
   const [darkMode, setDarkMode] = useState(false);
@@ -25,6 +26,12 @@ export default function PlantillasPage() {
     if (!r) { router.push("/"); return; }
     setRole(r); setAuthChecked(true);
     setDarkMode(localStorage.getItem("fg_dark_mode") === "1");
+
+    // Load module permissions for this role
+    fetch(`/api/admin/usuarios?role=${encodeURIComponent(r)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data?.modulos) setModulos(data.modulos); })
+      .catch(() => { /* fallback: modulos stays empty, admin sees all anyway */ });
   }, [router]);
 
   const loadCxc = useCallback(async () => { try { const res = await fetch("/api/cxc-summary"); if (res.ok) setCxc(await res.json()); } catch { /* */ } }, []);
@@ -36,8 +43,9 @@ export default function PlantillasPage() {
 
   if (!authChecked) return null;
 
-  const isSecretaria = role === "upload" || role === "secretaria";
-  const isAdminOrDirector = role === "admin" || role === "director";
+  // Permission check: admin always has access to everything
+  const hasAccess = (mod: string) => role === "admin" || modulos.includes(mod);
+  const isAdmin = role === "admin";
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-12">
@@ -55,7 +63,7 @@ export default function PlantillasPage() {
       </div>
 
       {/* CXC Card */}
-      {isAdminOrDirector && cxc && (
+      {hasAccess("cxc") && cxc && (
         <button onClick={() => router.push("/admin")} className="w-full text-left border border-gray-100 rounded-2xl p-5 mb-4 hover:border-gray-300 transition cursor-pointer group">
           <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-3">Panel CXC</div>
           <div className="flex gap-8 flex-wrap">
@@ -88,7 +96,7 @@ export default function PlantillasPage() {
       )}
 
       {/* Admin: Usuarios link */}
-      {role === "admin" && (
+      {isAdmin && (
         <button onClick={() => router.push("/admin/usuarios")} className="w-full text-left border border-gray-100 rounded-2xl p-4 mb-4 hover:border-gray-300 transition cursor-pointer group flex items-center gap-3">
           <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center text-gray-700"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
           <div>
@@ -102,67 +110,78 @@ export default function PlantillasPage() {
       {/* Module cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Guías */}
-        <button onClick={() => router.push("/guias")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
-          <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
-          <div className="text-sm font-medium">Guía de Transporte</div>
-          <div className="text-xs text-gray-400 mt-0.5">Registro y gestión de guías de envío</div>
-          {stats && <p className="text-[11px] text-gray-400 mt-2">{stats.guiasEsteMes} {stats.guiasEsteMes === 1 ? 'guía' : 'guías'} este mes</p>}
-          <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
-        </button>
+        {hasAccess("guias") && (
+          <button onClick={() => router.push("/guias")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
+            <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg></div>
+            <div className="text-sm font-medium">Guía de Transporte</div>
+            <div className="text-xs text-gray-400 mt-0.5">Registro y gestión de guías de envío</div>
+            {stats && <p className="text-[11px] text-gray-400 mt-2">{stats.guiasEsteMes} {stats.guiasEsteMes === 1 ? 'guía' : 'guías'} este mes</p>}
+            <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
+          </button>
+        )}
 
         {/* Carga */}
-        <button onClick={() => router.push("/upload")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
-          <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
-          <div className="text-sm font-medium">Carga de Archivos</div>
-          <div className="text-xs text-gray-400 mt-0.5">Importar CSV de cuentas por cobrar</div>
-          {isSecretaria && <p className="text-[11px] text-amber-600 mt-2 font-medium">⚠ Recordar hacerlo todos los lunes</p>}
-          <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
-        </button>
+        {hasAccess("upload") && (
+          <button onClick={() => router.push("/upload")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
+            <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+            <div className="text-sm font-medium">Carga de Archivos</div>
+            <div className="text-xs text-gray-400 mt-0.5">Importar CSV de cuentas por cobrar</div>
+            <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
+          </button>
+        )}
 
         {/* Caja */}
-        <button onClick={() => router.push("/caja")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
-          <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/><path d="M6 14h4"/></svg></div>
-          <div className="text-sm font-medium">Caja Menuda</div>
-          <div className="text-xs text-gray-400 mt-0.5">Control de gastos y fondo rotativo</div>
-          {stats && stats.cajaDisponible !== null && (
-            <p className={`text-[11px] mt-2 font-medium ${stats.cajaFondo && stats.cajaDisponible / stats.cajaFondo < 0.2 ? "text-red-500" : stats.cajaFondo && stats.cajaDisponible / stats.cajaFondo < 0.5 ? "text-amber-500" : "text-gray-400"}`}>
-              ${stats.cajaDisponible.toFixed(2)} disponibles
-            </p>
-          )}
-          <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
-        </button>
+        {hasAccess("caja") && (
+          <button onClick={() => router.push("/caja")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
+            <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 10h20"/><path d="M6 14h4"/></svg></div>
+            <div className="text-sm font-medium">Caja Menuda</div>
+            <div className="text-xs text-gray-400 mt-0.5">Control de gastos y fondo rotativo</div>
+            {stats && stats.cajaDisponible !== null && (
+              <p className={`text-[11px] mt-2 font-medium ${stats.cajaFondo && stats.cajaDisponible / stats.cajaFondo < 0.2 ? "text-red-500" : stats.cajaFondo && stats.cajaDisponible / stats.cajaFondo < 0.5 ? "text-amber-500" : "text-gray-400"}`}>
+                ${stats.cajaDisponible.toFixed(2)} disponibles
+              </p>
+            )}
+            <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
+          </button>
+        )}
 
         {/* Reclamos */}
-        <button onClick={() => router.push("/reclamos")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
-          <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg></div>
-          <div className="text-sm font-medium">Reclamos a Proveedores</div>
-          <div className="text-xs text-gray-400 mt-0.5">Gestión de reclamos y notas de crédito</div>
-          {stats && <p className={`text-[11px] mt-2 font-medium ${stats.reclamosPendientes > 0 ? "text-amber-500" : "text-gray-400"}`}>{stats.reclamosPendientes} pendientes</p>}
-          <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
-        </button>
+        {hasAccess("reclamos") && (
+          <button onClick={() => router.push("/reclamos")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
+            <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg></div>
+            <div className="text-sm font-medium">Reclamos a Proveedores</div>
+            <div className="text-xs text-gray-400 mt-0.5">Gestión de reclamos y notas de crédito</div>
+            {stats && <p className={`text-[11px] mt-2 font-medium ${stats.reclamosPendientes > 0 ? "text-amber-500" : "text-gray-400"}`}>{stats.reclamosPendientes} pendientes</p>}
+            <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
+          </button>
+        )}
 
         {/* Cheques */}
-        <button onClick={() => router.push("/cheques")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
-          <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg></div>
-          <div className="text-sm font-medium">Cheques Posfechados</div>
-          <div className="text-xs text-gray-400 mt-0.5">Registro de cheques con recordatorios</div>
-          {stats && <p className={`text-[11px] mt-2 font-medium ${stats.vencenHoy > 0 ? "text-red-500" : stats.vencenEstaSemana > 0 ? "text-amber-500" : "text-gray-400"}`}>
-            {stats.vencenHoy > 0 ? `${stats.vencenHoy} vencen hoy` : stats.vencenEstaSemana > 0 ? `${stats.vencenEstaSemana} vencen esta semana` : "Al día"}
-          </p>}
-          <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
-        </button>
+        {hasAccess("cheques") && (
+          <button onClick={() => router.push("/cheques")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
+            <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12l2 2 4-4"/></svg></div>
+            <div className="text-sm font-medium">Cheques Posfechados</div>
+            <div className="text-xs text-gray-400 mt-0.5">Registro de cheques con recordatorios</div>
+            {stats && <p className={`text-[11px] mt-2 font-medium ${stats.vencenHoy > 0 ? "text-red-500" : stats.vencenEstaSemana > 0 ? "text-amber-500" : "text-gray-400"}`}>
+              {stats.vencenHoy > 0 ? `${stats.vencenHoy} vencen hoy` : stats.vencenEstaSemana > 0 ? `${stats.vencenEstaSemana} vencen esta semana` : "Al día"}
+            </p>}
+            <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
+          </button>
+        )}
 
         {/* Directorio */}
-        <button onClick={() => router.push("/directorio")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
-          <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-          <div className="text-sm font-medium">Directorio de Clientes</div>
-          <div className="text-xs text-gray-400 mt-0.5">Base de datos de clientes y contactos</div>
-          {stats && <p className="text-[11px] text-gray-400 mt-2">{stats.totalClientes} clientes</p>}
-          <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
-        </button>
+        {hasAccess("directorio") && (
+          <button onClick={() => router.push("/directorio")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
+            <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <div className="text-sm font-medium">Directorio de Clientes</div>
+            <div className="text-xs text-gray-400 mt-0.5">Base de datos de clientes y contactos</div>
+            {stats && <p className="text-[11px] text-gray-400 mt-2">{stats.totalClientes} clientes</p>}
+            <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
+          </button>
+        )}
 
-        {/* Ventas — admin/director only */}
-        {isAdminOrDirector && (
+        {/* Ventas */}
+        {hasAccess("ventas") && (
           <button onClick={() => router.push("/ventas")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
             <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg></div>
             <div className="text-sm font-medium">Ventas Mensuales</div>
@@ -171,8 +190,8 @@ export default function PlantillasPage() {
           </button>
         )}
 
-        {/* Préstamos — admin/director/contabilidad */}
-        {!isSecretaria && (
+        {/* Préstamos */}
+        {hasAccess("prestamos") && (
           <button onClick={() => router.push("/prestamos")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
             <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8"/><path d="M8 12h8"/></svg></div>
             <div className="text-sm font-medium">Préstamos a Colaboradores</div>

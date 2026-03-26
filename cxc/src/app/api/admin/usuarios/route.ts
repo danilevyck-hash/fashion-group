@@ -24,8 +24,9 @@ const DEFAULT_MODULES: Record<string, string[]> = {
   upload: ["upload", "guias", "caja", "reclamos", "cheques", "directorio"],
 };
 
-export async function GET() {
-  // Ensure table exists (idempotent)
+export async function GET(req: NextRequest) {
+  const queryRole = req.nextUrl.searchParams.get("role");
+
   // Get stored permissions
   const { data: perms, error } = await supabaseServer
     .from("role_permissions")
@@ -33,6 +34,9 @@ export async function GET() {
 
   if (error && error.code === "42P01") {
     // Table doesn't exist yet — return defaults
+    if (queryRole) {
+      return NextResponse.json({ modulos: DEFAULT_MODULES[queryRole] || [] });
+    }
     const roles = SYSTEM_ROLES.map((r) => ({
       role: r.key,
       label: r.label,
@@ -46,6 +50,12 @@ export async function GET() {
 
   // Merge stored perms with system roles
   const permMap = new Map((perms || []).map((p: { role: string; modulos: string[]; activo: boolean }) => [p.role, p]));
+
+  // Single role query — return just modulos array
+  if (queryRole) {
+    const stored = permMap.get(queryRole) as { modulos: string[] } | undefined;
+    return NextResponse.json({ modulos: stored ? stored.modulos : (DEFAULT_MODULES[queryRole] || []) });
+  }
 
   const roles = SYSTEM_ROLES.map((r) => {
     const stored = permMap.get(r.key) as { role: string; modulos: string[]; activo: boolean } | undefined;
