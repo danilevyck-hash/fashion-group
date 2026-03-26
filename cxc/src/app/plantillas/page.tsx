@@ -148,6 +148,16 @@ export default function PlantillasPage() {
           {stats && <p className="text-[11px] text-gray-400 mt-2">{stats.totalClientes} clientes</p>}
           <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
         </button>
+
+        {/* Ventas — admin/director only */}
+        {isAdminOrDirector && (
+          <button onClick={() => router.push("/ventas")} className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm transition bg-white group w-full min-h-[140px]">
+            <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center mb-3 text-gray-700"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg></div>
+            <div className="text-sm font-medium">Ventas Mensuales</div>
+            <div className="text-xs text-gray-400 mt-0.5">Facturacion y margen por empresa</div>
+            <span className="absolute bottom-4 right-5 text-gray-400 group-hover:text-gray-700 transition text-lg font-medium">→</span>
+          </button>
+        )}
       </div>
     </div>
   );

@@ -1,0 +1,31 @@
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/supabase-server";
+
+export async function GET(req: NextRequest) {
+  const año = req.nextUrl.searchParams.get("año");
+  const empresa = req.nextUrl.searchParams.get("empresa");
+  if (!año) return NextResponse.json({ error: "año required" }, { status: 400 });
+
+  let q = supabaseServer.from("ventas_mensuales").select("*").eq("año", parseInt(año));
+  if (empresa) q = q.eq("empresa", empresa);
+  q = q.order("mes", { ascending: true });
+
+  const { data, error } = await q;
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
+}
+
+export async function POST(req: NextRequest) {
+  const body = await req.json();
+  const { empresa, año, mes, ventas_brutas, notas_credito, notas_debito, costo_total } = body;
+  if (!empresa || !año || !mes) return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+
+  const { data, error } = await supabaseServer
+    .from("ventas_mensuales")
+    .upsert({ empresa, año, mes, ventas_brutas: ventas_brutas || 0, notas_credito: notas_credito || 0, notas_debito: notas_debito || 0, costo_total: costo_total || 0, updated_at: new Date().toISOString() }, { onConflict: "empresa,año,mes" })
+    .select()
+    .single();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json(data);
+}
