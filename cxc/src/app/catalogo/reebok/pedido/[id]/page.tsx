@@ -150,13 +150,12 @@ export default function OrderDetailPage() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div className="flex-1">
-          <Link href="/catalogo/reebok" className="text-xs text-gray-400 hover:text-gray-600 transition">← Catálogo</Link>
           <div className="flex items-center gap-3 mt-1" ref={nameRef}>
             <span className="text-sm font-mono text-gray-400">{order.order_number}</span>
             <div className="relative flex-1">
               <input value={clientName} onChange={e => setClientName(e.target.value)}
                 onFocus={() => { if (suggestions.length) setShowSugg(true); }}
-                className="text-xl font-light border-b border-transparent hover:border-gray-200 focus:border-black outline-none transition w-full" />
+                className="text-xl font-semibold border-b border-transparent hover:border-gray-200 focus:border-black outline-none transition w-full bg-transparent" />
               {showSugg && suggestions.length > 0 && (
                 <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg overflow-hidden">
                   {suggestions.slice(0, 5).map((c, i) => (
@@ -218,24 +217,23 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      <Link href="/catalogo/reebok" className="text-xs text-gray-400 hover:text-black transition">← Seguir agregando productos</Link>
-
-      {/* Totals */}
-      <div className="mt-6 mb-6 text-sm text-gray-500">
-        {totalBultos} bultos · {totalPiezas} piezas · <span className="text-black font-medium">${fmt(totalMoney)}</span>
-      </div>
-
-      {/* Actions */}
-      <div className="flex flex-col gap-2">
-        <button onClick={saveOrder} disabled={saving} className="w-full bg-black text-white py-3 rounded text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
-          {saving ? "Guardando..." : "Guardar cambios"}
-        </button>
-        <div className="grid grid-cols-2 gap-2">
-          <button onClick={downloadPDF} className="border border-gray-200 text-black py-2.5 rounded text-sm hover:border-gray-400 transition">PDF</button>
-          <button onClick={confirmOrder} disabled={saving || !items.length} className="bg-red-600 text-white py-2.5 rounded text-sm hover:bg-red-700 transition disabled:opacity-40">Confirmar y enviar</button>
+        <div className="mt-6 mb-6 text-sm text-gray-500">
+          {totalBultos} bultos · {totalPiezas} piezas · <span className="text-black font-medium">${fmt(totalMoney)}</span>
         </div>
-        <button onClick={deleteOrder} className="text-xs text-gray-400 hover:text-red-500 transition mt-4 py-1">Eliminar pedido</button>
-      </div>
+
+        <div className="flex flex-col gap-2">
+          <Link href="/catalogo/reebok" className="w-full border border-gray-300 text-black py-3 rounded text-sm font-medium hover:border-gray-500 transition text-center block">
+            ← Seguir agregando productos
+          </Link>
+          <button onClick={saveOrder} disabled={saving} className="w-full bg-black text-white py-3 rounded text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
+            {saving ? "Guardando..." : "Guardar cambios"}
+          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={downloadPDF} className="border border-gray-200 text-black py-2.5 rounded text-sm hover:border-gray-400 transition">PDF</button>
+            <button onClick={confirmOrder} disabled={saving || !items.length} className="bg-red-600 text-white py-2.5 rounded text-sm hover:bg-red-700 transition disabled:opacity-40">Confirmar y enviar</button>
+          </div>
+          <button onClick={deleteOrder} className="text-xs text-gray-400 hover:text-red-500 transition mt-2 py-1">Eliminar pedido</button>
+        </div>
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2 rounded-full text-sm z-50">{toast}</div>}
     </div>
