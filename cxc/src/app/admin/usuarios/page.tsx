@@ -33,6 +33,8 @@ const ROLE_LABELS: Record<string, string> = {
   david: "David",
   upload: "Secretaria",
   vendedor: "Vendedor",
+  bodega: "Bodega",
+  secretaria: "Secretaria",
   cliente: "Cliente",
 };
 
@@ -56,7 +58,7 @@ export default function UsuariosPage() {
   const [editUserId, setEditUserId] = useState<string | null>(null);
   const [uName, setUName] = useState("");
   const [uPassword, setUPassword] = useState("");
-  const [uRole, setURole] = useState("staff");
+  const [uRole, setURole] = useState("vendedor");
   const [uCompany, setUCompany] = useState("");
   const [uModules, setUModules] = useState<string[]>([]);
   const [savingUser, setSavingUser] = useState(false);
@@ -179,7 +181,7 @@ export default function UsuariosPage() {
   }
 
   function openNewUser() {
-    setEditUserId(null); setUName(""); setUPassword(""); setURole("staff"); setUCompany(""); setUModules([]);
+    setEditUserId(null); setUName(""); setUPassword(""); setURole("vendedor"); setUCompany(""); setUModules([]);
     setShowUserModal(true);
   }
   function openEditUser(u: FgUser) {
@@ -312,8 +314,10 @@ export default function UsuariosPage() {
                   <label className="text-[11px] text-gray-400 uppercase block mb-1">Rol</label>
                   <select value={uRole} onChange={e => setURole(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
                     <option value="admin">Admin</option>
-                    <option value="staff">Staff</option>
                     <option value="vendedor">Vendedor</option>
+                    <option value="contabilidad">Contabilidad</option>
+                    <option value="bodega">Bodega</option>
+                    <option value="secretaria">Secretaria</option>
                     <option value="cliente">Cliente</option>
                   </select>
                 </div>

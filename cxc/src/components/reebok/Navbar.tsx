@@ -14,7 +14,7 @@ export default function Navbar() {
     setRole(sessionStorage.getItem("cxc_role") || "");
   }, []);
 
-  const isManager = role === "admin" || role === "vendedor" || role === "staff";
+  const isManager = role === "admin" || role === "vendedor";
   const showSystem = role && role !== "cliente";
 
   return (

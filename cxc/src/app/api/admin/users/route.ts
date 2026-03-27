@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const { data: user, error } = await supabaseServer
     .from("fg_users")
-    .insert({ name, password, role: role || "staff", associated_company: associated_company || null })
+    .insert({ name, password, role: role || "vendedor", associated_company: associated_company || null })
     .select()
     .single();
 
