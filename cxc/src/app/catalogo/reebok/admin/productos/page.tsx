@@ -242,7 +242,7 @@ export default function AdminProductos() {
                   </td>
                   <td className="py-2 px-2">
                     <div className="flex gap-2">
-                      <Link href={`/admin/productos/nuevo?id=${p.id}`} className="text-blue-600 hover:underline text-xs">Editar</Link>
+                      <Link href={`/catalogo/reebok/admin/productos/nuevo?id=${p.id}`} className="text-blue-600 hover:underline text-xs">Editar</Link>
                       <button onClick={() => deleteProduct(p.id)} className="text-red-600 hover:underline text-xs">Eliminar</button>
                     </div>
                   </td>
