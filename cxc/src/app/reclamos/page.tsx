@@ -183,12 +183,103 @@ export default function ReclamosPage() {
     if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Reclamos-${empresa}-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url); }
   }
 
-  async function downloadEmpresaPdf(empresa: string, ev: React.MouseEvent) {
+  function buildReclamosPdfHtml(reclamosArr: Reclamo[], titulo: string) {
+    const rows = reclamosArr.map((r) => {
+      const items = r.reclamo_items || [];
+      const sub = calcSub(items);
+      const total = sub * 1.177;
+      const itemsDesc = items.map((i) => `${i.descripcion || "Item"} x ${Number(i.cantidad) || 0}`).join(", ");
+      return `<tr><td>${r.nro_reclamo}</td><td>${fmtDate(r.fecha_reclamo)}</td><td>${r.nro_factura || ""}</td><td><span class="badge ${r.estado === "Resuelto con NC" ? "badge-green" : r.estado === "Rechazado" ? "badge-red" : "badge-blue"}">${r.estado}</span></td><td>${itemsDesc}</td><td class="right">$${fmt(total)}</td></tr>`;
+    }).join("");
+    const grandTotal = reclamosArr.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * 1.177, 0);
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titulo}</title><style>
+      @media print { @page { margin: 15mm; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 11px; color: #1a1a1a; }
+      .header { background: #1b3a5c; color: white; padding: 16px 24px; text-align: center; margin-bottom: 8px; }
+      .header h1 { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+      .header p { font-size: 11px; opacity: 0.85; }
+      .date-line { text-align: center; color: #888; font-size: 10px; margin-bottom: 16px; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+      th { background: #1b3a5c; color: white; padding: 6px 8px; text-align: left; font-size: 10px; text-transform: uppercase; font-weight: 600; }
+      td { padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 11px; }
+      tr:nth-child(even) { background: #f8f9f9; }
+      .right { text-align: right; }
+      .total-row { font-weight: 700; background: #e8e8e8 !important; }
+      .badge { padding: 2px 8px; border-radius: 9px; font-size: 10px; }
+      .badge-green { background: #dcfce7; color: #166534; }
+      .badge-red { background: #fee2e2; color: #991b1b; }
+      .badge-blue { background: #dbeafe; color: #1e40af; }
+      .footer { display: flex; justify-content: space-between; color: #999; font-size: 9px; margin-top: 24px; padding-top: 8px; border-top: 1px solid #eee; }
+    </style></head><body>
+    <div class="header"><h1>FASHION GROUP</h1><p>Reclamos — ${titulo}</p></div>
+    <div class="date-line">Exportado el ${new Date().toLocaleDateString("es-HN")}</div>
+    <table><thead><tr><th>N° Reclamo</th><th>Fecha</th><th>Factura</th><th>Estado</th><th>Items</th><th class="right">Total</th></tr></thead>
+    <tbody>${rows}<tr class="total-row"><td colspan="5" class="right">TOTAL</td><td class="right">$${fmt(grandTotal)}</td></tr></tbody></table>
+    <div class="footer"><span>Generado el ${new Date().toLocaleDateString("es-HN")}</span></div>
+    <script>window.onload=function(){window.print();}</script>
+    </body></html>`;
+  }
+
+  function buildSingleReclamoPdfHtml(r: Reclamo) {
+    const items = r.reclamo_items || [];
+    const sub = calcSub(items);
+    const itemRows = items.map((i) => `<tr><td>${i.referencia || ""}</td><td>${i.descripcion || ""}</td><td>${i.talla || ""}</td><td class="right">${Number(i.cantidad) || 0}</td><td class="right">$${fmt(i.precio_unitario)}</td><td class="right">$${fmt((Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0))}</td><td>${i.motivo || ""}</td></tr>`).join("");
+    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Reclamo ${r.nro_reclamo}</title><style>
+      @media print { @page { margin: 15mm; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 11px; color: #1a1a1a; }
+      .header { background: #1b3a5c; color: white; padding: 16px 24px; text-align: center; margin-bottom: 8px; }
+      .header h1 { font-size: 18px; font-weight: 700; margin-bottom: 2px; }
+      .header p { font-size: 11px; opacity: 0.85; }
+      .meta { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 16px 0; padding: 12px; background: #f8f9f9; border-radius: 8px; }
+      .meta-item { font-size: 11px; }
+      .meta-label { font-size: 9px; text-transform: uppercase; color: #888; letter-spacing: 0.5px; }
+      table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+      th { background: #1b3a5c; color: white; padding: 6px 8px; text-align: left; font-size: 10px; text-transform: uppercase; font-weight: 600; }
+      td { padding: 6px 8px; border-bottom: 1px solid #eee; font-size: 11px; }
+      tr:nth-child(even) { background: #f8f9f9; }
+      .right { text-align: right; }
+      .totals { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin: 16px 0; }
+      .total-box { border: 1px solid #eee; border-radius: 8px; padding: 10px; text-align: center; }
+      .total-box.dark { background: #1b3a5c; color: white; }
+      .total-label { font-size: 9px; text-transform: uppercase; color: #888; }
+      .total-box.dark .total-label { color: #aaa; }
+      .total-val { font-size: 16px; font-weight: 600; margin-top: 4px; }
+      .footer { color: #999; font-size: 9px; margin-top: 24px; padding-top: 8px; border-top: 1px solid #eee; }
+    </style></head><body>
+    <div class="header"><h1>FASHION GROUP</h1><p>Reclamo ${r.nro_reclamo} — ${r.empresa}</p></div>
+    <div class="meta">
+      <div class="meta-item"><div class="meta-label">Empresa</div>${r.empresa}</div>
+      <div class="meta-item"><div class="meta-label">Proveedor</div>${r.proveedor}</div>
+      <div class="meta-item"><div class="meta-label">Marca</div>${r.marca}</div>
+      <div class="meta-item"><div class="meta-label">Factura</div>${r.nro_factura || "—"}</div>
+      <div class="meta-item"><div class="meta-label">Orden de Compra</div>${r.nro_orden_compra || "—"}</div>
+      <div class="meta-item"><div class="meta-label">Fecha / Estado</div>${fmtDate(r.fecha_reclamo)} — ${r.estado}</div>
+    </div>
+    <div class="totals">
+      <div class="total-box"><div class="total-label">Subtotal</div><div class="total-val">$${fmt(sub)}</div></div>
+      <div class="total-box"><div class="total-label">Import. 10%</div><div class="total-val">$${fmt(sub * 0.10)}</div></div>
+      <div class="total-box"><div class="total-label">ITBMS</div><div class="total-val">$${fmt(sub * 0.077)}</div></div>
+      <div class="total-box dark"><div class="total-label">Total</div><div class="total-val">$${fmt(sub * 1.177)}</div></div>
+    </div>
+    <table><thead><tr><th>Código</th><th>Descripción</th><th>Talla</th><th class="right">Cant.</th><th class="right">Precio U.</th><th class="right">Subtotal</th><th>Motivo</th></tr></thead><tbody>${itemRows}</tbody></table>
+    ${r.notas ? `<p style="margin-top:12px;color:#666;">Notas: ${r.notas}</p>` : ""}
+    <div class="footer">Generado el ${new Date().toLocaleDateString("es-HN")}</div>
+    <script>window.onload=function(){window.print();}</script>
+    </body></html>`;
+  }
+
+  function openPdfWindow(html: string) {
+    const w = window.open("", "_blank");
+    if (w) { w.document.write(html); w.document.close(); }
+  }
+
+  function downloadEmpresaPdf(empresa: string, ev: React.MouseEvent) {
     ev.stopPropagation();
-    const ids = reclamos.filter((r) => r.empresa === empresa).map((r) => r.id);
-    if (!ids.length) return;
-    const res = await fetch("/api/reclamos/export-pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
-    if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Reclamos-${empresa}-${new Date().toISOString().slice(0, 10)}.pdf`; a.click(); URL.revokeObjectURL(url); }
+    const empReclamos = reclamos.filter((r) => r.empresa === empresa);
+    if (!empReclamos.length) return;
+    openPdfWindow(buildReclamosPdfHtml(empReclamos, empresa));
   }
 
   function startEdit() {
@@ -219,10 +310,11 @@ export default function ReclamosPage() {
     if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Reclamos-${activeEmpresa || "export"}-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url); }
   }
 
-  async function downloadSelectedPdf() {
+  function downloadSelectedPdf() {
     if (!selectedIds.length) return;
-    const res = await fetch("/api/reclamos/export-pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: selectedIds }) });
-    if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Reclamos-${activeEmpresa || "export"}-${new Date().toISOString().slice(0, 10)}.pdf`; a.click(); URL.revokeObjectURL(url); }
+    const sel = reclamos.filter((r) => selectedIds.includes(r.id));
+    if (!sel.length) return;
+    openPdfWindow(buildReclamosPdfHtml(sel, activeEmpresa || "Selección"));
   }
 
   function sendBulkWA(ids: string[]) {
@@ -613,7 +705,7 @@ export default function ReclamosPage() {
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
       <button onClick={() => { setCurrent(null); setView("list"); }} className="text-sm text-gray-400 hover:text-black transition mb-8 block">← Reclamos</button>
 
-      <div className="flex items-start justify-between mb-6">
+      <div className="flex items-start justify-between mb-4">
         <div>
           <h1 className="text-xl font-light tracking-tight">{current.nro_reclamo}</h1>
           <p className="text-sm text-gray-400 mt-1">{current.empresa} — {current.marca} — {current.proveedor}</p>
@@ -621,6 +713,34 @@ export default function ReclamosPage() {
           <p className="text-sm text-gray-400">{fmtDate(current.fecha_reclamo)} — {days} días</p>
         </div>
         <span className={`text-xs px-3 py-1 rounded-full ${EC[current.estado] || "bg-gray-100 text-gray-500"}`}>{current.estado}</span>
+      </div>
+
+      {/* Quick action buttons */}
+      <div className="flex items-center gap-2 mb-6 flex-wrap">
+        <button onClick={startEdit} className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+          Editar
+        </button>
+        <button onClick={() => {
+          const c = getC(current.empresa);
+          if (!c?.whatsapp) { alert("No hay contacto WhatsApp para esta empresa."); return; }
+          const nombre = c.nombre_contacto || c.nombre || "equipo";
+          const total = calcSub(current.reclamo_items ?? []) * 1.177;
+          const msg = `Hola ${nombre}, te escribo de parte de Fashion Group para dar seguimiento al reclamo ${current.nro_reclamo}.\n\nFactura: ${current.nro_factura}\nTotal a acreditar: $${fmt(total)}\nEstado: ${current.estado}\nFecha: ${fmtDate(current.fecha_reclamo)}\n\n¿Nos puedes confirmar el estado? Gracias.`;
+          window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
+        }} className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          WhatsApp
+        </button>
+        <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Excel
+        </button>
+        <button onClick={() => openPdfWindow(buildSingleReclamoPdfHtml(current))} className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          PDF
+        </button>
+        {role === "admin" && <button onClick={() => setShowDeleteConfirm(true)} className="text-xs border border-red-100 px-3 py-1.5 rounded-full text-red-300 hover:text-red-600 hover:border-red-300 transition ml-auto">Eliminar</button>}
       </div>
 
       <div className="flex items-center gap-1 mb-8 flex-wrap gap-y-2">{ESTADOS.map((e) => {
@@ -704,7 +824,7 @@ export default function ReclamosPage() {
           window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
         }} title="Enviar recordatorio por WhatsApp" className="text-sm text-gray-400 hover:text-black transition">WhatsApp</button>
         <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} title="Descargar este reclamo en formato Excel" className="text-sm text-gray-400 hover:text-black transition">Excel</button>
-        <button onClick={async () => { const res = await fetch("/api/reclamos/export-pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [current.id] }) }); if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Reclamo-${current.nro_reclamo}.pdf`; a.click(); URL.revokeObjectURL(url); } }} title="Descargar este reclamo en formato PDF" className="text-sm text-gray-400 hover:text-black transition">PDF</button>
+        <button onClick={() => openPdfWindow(buildSingleReclamoPdfHtml(current))} title="Descargar este reclamo en formato PDF" className="text-sm text-gray-400 hover:text-black transition">PDF</button>
         {role === "admin" && <button onClick={() => setShowDeleteConfirm(true)} title="Eliminar permanentemente este reclamo" className="text-sm text-gray-300 hover:text-red-500 transition ml-auto">Eliminar</button>}
       </div>
 
