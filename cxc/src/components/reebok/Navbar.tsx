@@ -50,11 +50,12 @@ export default function Navbar() {
 
           {/* Active order indicator */}
           {isManager && activeId && activeClient && (
-            <div className="flex items-center gap-1.5 ml-2">
-              <Link href={`/catalogo/reebok/pedido/${activeId}`} className="text-xs text-gray-500 hover:text-black transition">
+            <div className="flex items-center gap-1.5 ml-2 min-w-0">
+              <Link href={`/catalogo/reebok/pedido/${activeId}`} className="text-[11px] text-gray-500 hover:text-black transition truncate max-w-[140px] sm:max-w-[200px]"
+                title={`Para: ${activeClient}`}>
                 Para: <span className="font-medium text-black">{activeClient}</span>
               </Link>
-              <button onClick={clearActive} className="text-gray-300 hover:text-gray-500 transition text-xs">×</button>
+              <button onClick={clearActive} className="text-gray-300 hover:text-gray-500 transition text-xs flex-shrink-0">×</button>
             </div>
           )}
 

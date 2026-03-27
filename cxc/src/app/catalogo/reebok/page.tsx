@@ -16,6 +16,7 @@ function Home() {
   const [search, setSearch] = useState("");
   const [gender, setGender] = useState(searchParams.get("gender") || "");
   const [category, setCategory] = useState("");
+  const [onlyOferta, setOnlyOferta] = useState(false);
   const [inventoryMap, setInventoryMap] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<string | null>(null);
 
@@ -52,6 +53,7 @@ function Home() {
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => !gender || p.gender === gender)
     .filter(p => !category || p.category === category)
+    .filter(p => !onlyOferta || p.on_sale)
     .sort((a, b) => (a.category === "footwear" ? 0 : 1) - (b.category === "footwear" ? 0 : 1));
 
   return (
@@ -80,8 +82,12 @@ function Home() {
           <option value="apparel">Ropa</option>
           <option value="accessories">Accesorios</option>
         </select>
-        {(search || gender || category) && (
-          <button onClick={() => { setSearch(""); setGender(""); setCategory(""); }} className="text-xs text-gray-400 hover:text-black transition">Limpiar</button>
+        <button onClick={() => setOnlyOferta(!onlyOferta)}
+          className={`text-xs px-3 py-1.5 rounded-full transition font-medium ${onlyOferta ? "bg-orange-500 text-white" : "border border-gray-200 text-gray-500 hover:border-gray-400"}`}>
+          Oferta
+        </button>
+        {(search || gender || category || onlyOferta) && (
+          <button onClick={() => { setSearch(""); setGender(""); setCategory(""); setOnlyOferta(false); }} className="text-xs text-gray-400 hover:text-black transition">Limpiar</button>
         )}
         <span className="text-xs text-gray-400 ml-auto">{filtered.length} productos</span>
       </div>
