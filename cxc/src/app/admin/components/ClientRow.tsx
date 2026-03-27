@@ -46,11 +46,16 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
               </svg>
             )}
             <span className="truncate">{client.nombre_normalized}</span>
-            {daysSinceContact !== null && (
-              <span className={`hidden sm:inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${daysSinceContact <= 7 ? "bg-emerald-100 text-emerald-700" : daysSinceContact <= 30 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`} title={`Contactado hace ${daysSinceContact} dias via ${lastContact?.method}`}>
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                {daysSinceContact}d
-              </span>
+            {daysSinceContact !== null ? (
+              daysSinceContact > 30 ? (
+                <span className="hidden sm:inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 flex-shrink-0">30d+</span>
+              ) : (
+                <span className={`hidden sm:inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${daysSinceContact <= 7 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`} title={`Contactado hace ${daysSinceContact} dias via ${lastContact?.method}`}>
+                  {daysSinceContact}d
+                </span>
+              )
+            ) : (
+              <span className="hidden sm:inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 flex-shrink-0">Sin contacto</span>
             )}
           </div>
           <div className="hidden sm:block col-span-1 text-right tabular-nums text-emerald-700">{fmt(client.d0_30)}</div>
@@ -72,11 +77,16 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
               </svg>
             )}
             <span className="truncate">{client.nombre_normalized}</span>
-            {daysSinceContact !== null && (
-              <span className={`hidden sm:inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${daysSinceContact <= 7 ? "bg-emerald-100 text-emerald-700" : daysSinceContact <= 30 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`} title={`Contactado hace ${daysSinceContact} dias via ${lastContact?.method}`}>
-                <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-                {daysSinceContact}d
-              </span>
+            {daysSinceContact !== null ? (
+              daysSinceContact > 30 ? (
+                <span className="hidden sm:inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 flex-shrink-0">30d+</span>
+              ) : (
+                <span className={`hidden sm:inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${daysSinceContact <= 7 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`} title={`Contactado hace ${daysSinceContact} dias via ${lastContact?.method}`}>
+                  {daysSinceContact}d
+                </span>
+              )
+            ) : (
+              <span className="hidden sm:inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 flex-shrink-0">Sin contacto</span>
             )}
           </div>
           <div className="hidden sm:block col-span-2 text-right tabular-nums text-emerald-700">{fmt(client.current)}</div>

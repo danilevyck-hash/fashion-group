@@ -2,7 +2,27 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import AppHeader from "@/components/AppHeader";
+
+const RechartsChart = dynamic(() => import("recharts").then((mod) => {
+  const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = mod;
+  return function Chart({ data, year }: { data: { mes: string; actual: number | null; anterior: number | null }[]; year: number }) {
+    return (
+      <ResponsiveContainer width="100%" height={300}>
+        <BarChart data={data} barCategoryGap="20%">
+          <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+          <XAxis dataKey="mes" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+          <YAxis tickFormatter={(v: number) => v >= 1000 ? `$${(v/1000).toFixed(0)}k` : `$${v}`} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+          <Tooltip formatter={(v) => `$${Number(v).toLocaleString()}`} />
+          <Legend wrapperStyle={{ fontSize: 11 }} />
+          <Bar dataKey="actual" name={String(year)} fill="#1B3A5C" radius={[3,3,0,0]} />
+          <Bar dataKey="anterior" name={String(year - 1)} fill="#D1D5DB" radius={[3,3,0,0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    );
+  };
+}), { ssr: false, loading: () => <div className="animate-pulse h-[300px] bg-gray-100 rounded-xl" /> });
 const EMPRESAS = ["Vistana International", "Fashion Wear", "Fashion Shoes", "Active Shoes", "Active Wear", "Joystep", "Confecciones Boston", "Multifashion"];
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const MESES_FULL = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -32,6 +52,7 @@ export default function VentasPage() {
   const [loadingClientes, setLoadingClientes] = useState(false);
   const [activeTab, setActiveTab] = useState<"manual" | "csv" | "metas">("manual");
   const [toast, setToast] = useState<string | null>(null);
+  const [showChart, setShowChart] = useState(true);
 
   // Form state — manual entry
   const [fEmpresa, setFEmpresa] = useState(EMPRESAS[0]);
@@ -146,6 +167,14 @@ export default function VentasPage() {
   }).sort((a, b) => b.total - a.total);
 
   const groupTotal = empresaRows.reduce((s, r) => s + r.total, 0);
+
+  // Chart data
+  const chartData = MESES.map((label, i) => {
+    const mes = i + 1;
+    const actual = safeVentas.filter(v => v.mes === mes).reduce((s, v) => s + ventasNetas(v), 0) || null;
+    const anterior = safeVentasAnt.filter(v => v.mes === mes).reduce((s, v) => s + ventasNetas(v), 0) || null;
+    return { mes: label, actual, anterior };
+  });
 
   // CSV parser
   function parseCSV(text: string) {
@@ -285,6 +314,21 @@ export default function VentasPage() {
             </div>
           )}
 
+          {/* Chart */}
+          {isAdmin && safeVentas.length > 0 && (
+            <div className="mb-8">
+              <button onClick={() => setShowChart(!showChart)} className="text-xs text-gray-400 hover:text-gray-700 transition flex items-center gap-1.5 mb-3">
+                <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${showChart ? "rotate-90" : ""}`} fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg>
+                {showChart ? "Ocultar" : "Ver"} gráfica
+              </button>
+              {showChart && (
+                <div className="border border-gray-100 rounded-2xl p-6">
+                  <RechartsChart data={chartData} year={selectedYear} />
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Table — admin only */}
           {isAdmin && (
             <div className="border border-gray-200 rounded-xl overflow-hidden mb-8">
@@ -342,7 +386,7 @@ export default function VentasPage() {
                             {loadingClientes ? (
                               <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="animate-pulse h-4 bg-gray-200 rounded w-2/3" />)}</div>
                             ) : clientes.length === 0 ? (
-                              <p className="text-xs text-gray-400">Sin datos de clientes para este periodo</p>
+                              <p className="text-xs text-gray-400">Sin datos de clientes para este periodo — sube un CSV con desglose por cliente para ver el top</p>
                             ) : (
                               <table className="w-full text-xs max-w-lg">
                                 <thead><tr className="border-b border-gray-200 text-gray-400"><th className="text-left py-1 w-8">#</th><th className="text-left py-1">Cliente</th><th className="text-right py-1">Ventas</th><th className="text-right py-1">%</th></tr></thead>

@@ -39,9 +39,17 @@ export default function ContactPanel({
     });
   }
 
+  const [noteSaved, setNoteSaved] = useState(false);
+
   function saveEdit() {
     onSaveEdit(client.nombre_normalized, editData);
     setEditing(false);
+  }
+
+  // CAMBIO 7: Phone validation helper
+  function phoneWarning(v: string) {
+    const digits = (v || "").replace(/[^0-9]/g, "");
+    return digits.length > 0 && digits.length < 7;
   }
 
   function copyEmail(email: string) {
@@ -77,10 +85,16 @@ export default function ContactPanel({
             <div className="grid grid-cols-2 gap-2 max-w-lg" onClick={(e) => e.stopPropagation()}>
               <input className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300" placeholder="Correo"
                 value={editData.correo} onChange={(e) => setEditData({ ...editData, correo: e.target.value })} />
-              <input className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300" placeholder="Telefono"
-                value={editData.telefono} onChange={(e) => setEditData({ ...editData, telefono: e.target.value })} />
-              <input className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300" placeholder="WhatsApp / Celular"
-                value={editData.celular} onChange={(e) => setEditData({ ...editData, celular: e.target.value })} />
+              <div>
+                <input className={`border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300 w-full ${phoneWarning(editData.telefono) ? "border-red-300" : "border-gray-200"}`} placeholder="Telefono"
+                  value={editData.telefono} onChange={(e) => setEditData({ ...editData, telefono: e.target.value })} />
+                {phoneWarning(editData.telefono) && <span className="text-[10px] text-red-500">Número incompleto</span>}
+              </div>
+              <div>
+                <input className={`border rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300 w-full ${phoneWarning(editData.celular) ? "border-red-300" : "border-gray-200"}`} placeholder="WhatsApp / Celular"
+                  value={editData.celular} onChange={(e) => setEditData({ ...editData, celular: e.target.value })} />
+                {phoneWarning(editData.celular) && <span className="text-[10px] text-red-500">Número incompleto</span>}
+              </div>
               <input className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300" placeholder="Nombre contacto"
                 value={editData.contacto} onChange={(e) => setEditData({ ...editData, contacto: e.target.value })} />
               <div className="col-span-2 flex gap-2 mt-1">
@@ -202,21 +216,39 @@ export default function ContactPanel({
 
 function ClientNote({ clientName }: { clientName: string }) {
   const [note, setNote] = useState("");
+  const [focused, setFocused] = useState(false);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [showSaved, setShowSaved] = useState(false);
   useEffect(() => {
-    try { const saved = JSON.parse(localStorage.getItem("fg_client_notes") || "{}"); setNote(saved[clientName] || ""); } catch { /* */ }
+    try {
+      const all = JSON.parse(localStorage.getItem("fg_client_notes") || "{}");
+      setNote(all[clientName]?.text || all[clientName] || "");
+      setSavedAt(all[clientName]?.ts || null);
+    } catch { /* */ }
   }, [clientName]);
-  function save(v: string) {
-    setNote(v);
-    try { const all = JSON.parse(localStorage.getItem("fg_client_notes") || "{}"); all[clientName] = v; localStorage.setItem("fg_client_notes", JSON.stringify(all)); } catch { /* */ }
+  function save() {
+    const now = Date.now();
+    try { const all = JSON.parse(localStorage.getItem("fg_client_notes") || "{}"); all[clientName] = { text: note, ts: now }; localStorage.setItem("fg_client_notes", JSON.stringify(all)); } catch { /* */ }
+    setSavedAt(now);
+    setShowSaved(true);
+    setTimeout(() => setShowSaved(false), 2000);
   }
+  const agoMin = savedAt ? Math.floor((Date.now() - savedAt) / 60000) : null;
   return (
     <div className="mt-4 mb-2">
       <div className="text-[11px] uppercase tracking-wider text-gray-400 mb-1.5 font-medium flex items-center gap-1.5">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         Nota interna
+        {showSaved && <span className="text-green-600 normal-case tracking-normal font-normal ml-1">Nota guardada</span>}
       </div>
-      <textarea value={note} onChange={(e) => save(e.target.value)} placeholder="Ej: Acuerdo de pago, cliente VIP..." rows={2}
+      <textarea value={note} onChange={(e) => setNote(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => { setFocused(false); save(); }}
+        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); } }}
+        placeholder="Ej: Acuerdo de pago, cliente VIP..." rows={2}
         className="w-full border border-gray-200 rounded-lg p-2.5 text-xs outline-none focus:ring-1 focus:ring-gray-300 resize-none text-gray-600 placeholder:text-gray-300" />
+      <div className="flex items-center gap-2 mt-0.5">
+        {focused && <span className="text-[10px] text-gray-300">Presiona Enter para guardar</span>}
+        {savedAt && agoMin !== null && <span className="text-[10px] text-gray-300 ml-auto">Guardado {agoMin < 1 ? "ahora" : `hace ${agoMin} min`}</span>}
+      </div>
     </div>
   );
 }

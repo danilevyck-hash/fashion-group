@@ -165,9 +165,11 @@ export default function PrestamosPage() {
   }
 
   // ── Movement modal handlers ──
+  const [movStep, setMovStep] = useState<"employee" | "form">("form");
   function openNewMov() {
     setMEmpleadoId(""); setMFecha(new Date().toISOString().slice(0, 10));
     setMConcepto("Préstamo"); setMMonto(""); setMNotas("");
+    setMovStep("employee");
     setShowMovModal(true);
   }
   async function saveMov() {
@@ -358,6 +360,27 @@ export default function PrestamosPage() {
       {showMovModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+            {movStep === "employee" && !mEmpleadoId ? (<>
+              <h2 className="font-medium mb-4">Seleccionar Empleado</h2>
+              <div className="space-y-1 max-h-80 overflow-y-auto">
+                {empleados.filter(e => e.activo).map(emp => {
+                  const c = calcEmpleado(emp);
+                  return (
+                    <button key={emp.id} onClick={() => { setMEmpleadoId(emp.id); setMovStep("form"); }}
+                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 transition flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-medium">{emp.nombre}</div>
+                        <div className="text-xs text-gray-400">{emp.empresa || "Sin empresa"}</div>
+                      </div>
+                      <div className="text-xs text-gray-500 tabular-nums">Saldo: ${fmt(c.saldo)}</div>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-4">
+                <button onClick={() => setShowMovModal(false)} className="w-full py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
+              </div>
+            </>) : (<>
             <h2 className="font-medium mb-4">Nuevo Movimiento</h2>
             <div className="space-y-4">
               <div>
@@ -401,6 +424,7 @@ export default function PrestamosPage() {
                 {savingMov ? "Guardando..." : "Registrar"}
               </button>
             </div>
+            </>)}
           </div>
         </div>
       )}

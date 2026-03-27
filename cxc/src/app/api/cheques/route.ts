@@ -13,11 +13,11 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas } = body;
+  const { cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas, whatsapp } = body;
 
   const { data, error } = await supabaseServer
     .from("cheques")
-    .insert({ cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas: notas || "" })
+    .insert({ cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas: notas || "", whatsapp: whatsapp || "", estado: "pendiente" })
     .select()
     .single();
 

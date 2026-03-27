@@ -24,7 +24,45 @@ interface Guia {
   observaciones: string;
   total_bultos: number;
   item_count: number;
+  monto_total: number;
+  estado: string;
   guia_items?: GuiaItem[];
+}
+
+const ESTADO_OPTIONS = ["Preparando", "En tránsito", "Entregada", "Con novedad"] as const;
+
+function estadoBadge(estado: string) {
+  const colors: Record<string, string> = {
+    "Preparando": "bg-gray-100 text-gray-600",
+    "En tránsito": "bg-blue-50 text-blue-600",
+    "Entregada": "bg-green-50 text-green-600",
+    "Con novedad": "bg-red-50 text-red-600",
+  };
+  return colors[estado] || "bg-gray-100 text-gray-600";
+}
+
+function clientesSummary(items: GuiaItem[]): string {
+  if (!items || items.length === 0) return "";
+  const uniqueClientes = [...new Set(items.map((i) => i.cliente).filter(Boolean))];
+  if (uniqueClientes.length === 0) return "";
+  if (uniqueClientes.length === 1) return uniqueClientes[0];
+  return `${uniqueClientes[0]} y ${uniqueClientes.length - 1} más`;
+}
+
+function fmtMoney(n: number) {
+  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function getMonthOptions(): { value: string; label: string }[] {
+  const options: { value: string; label: string }[] = [];
+  const now = new Date();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const label = d.toLocaleDateString("es", { year: "numeric", month: "long" });
+    options.push({ value, label: label.charAt(0).toUpperCase() + label.slice(1) });
+  }
+  return options;
 }
 
 // ── Default lists (merged with localStorage on load) ──
@@ -113,6 +151,14 @@ export default function GuiasPage() {
   const [nextNumero, setNextNumero] = useState(1);
   const [formNumero, setFormNumero] = useState(1);
   const [saving, setSaving] = useState(false);
+
+  // New fields
+  const [montoTotal, setMontoTotal] = useState(0);
+  const [estado, setEstado] = useState("Preparando");
+
+  // Month filter
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const [monthFilter, setMonthFilter] = useState(currentMonth);
 
   // Print state
   const [printGuia, setPrintGuia] = useState<Guia | null>(null);
@@ -212,6 +258,8 @@ export default function GuiasPage() {
     }
     setPlaca(g.placa || "");
     setObservaciones(g.observaciones || "");
+    setMontoTotal(g.monto_total || 0);
+    setEstado(g.estado || "Preparando");
     const guiaItems = (g.guia_items || []) as GuiaItem[];
     setItems(guiaItems.length > 0 ? guiaItems.map((item: GuiaItem, i: number) => ({ ...item, orden: i + 1 })) : [emptyItem(1, defaultEmpresa)]);
     setError(null);
@@ -226,6 +274,8 @@ export default function GuiasPage() {
     setTransportistaOtro("");
     setPlaca("");
     setObservaciones("");
+    setMontoTotal(0);
+    setEstado("Preparando");
     setItems([emptyItem(1, defaultEmpresa)]);
     setFormNumero(nextNumero);
     setValidationErrors(new Set());
@@ -296,6 +346,8 @@ export default function GuiasPage() {
         transportista: transp,
         placa,
         observaciones,
+        monto_total: montoTotal,
+        estado,
         items: validItems,
       }),
     });
@@ -321,7 +373,7 @@ export default function GuiasPage() {
     return (
       <div>
         <AppHeader module="Guías de Transporte" />
-        <div className="max-w-5xl mx-auto px-6 py-8">
+        <div className="max-w-6xl mx-auto px-6 py-8">
         <div className="flex items-end justify-between mb-10">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Guías de Transporte</h1>
@@ -378,37 +430,74 @@ export default function GuiasPage() {
             </button>
           </div>
         ) : (<>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por transportista, cliente o factura..."
-            className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black w-full max-w-sm mb-6"
-          />
+          <div className="flex items-end gap-6 mb-6">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar por transportista, cliente o factura..."
+              className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black w-full max-w-sm"
+            />
+            <div className="flex items-center gap-2 shrink-0">
+              <label className="text-xs text-gray-400 uppercase tracking-widest">Mes</label>
+              <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}
+                className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
+                {getMonthOptions().map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </div>
+          </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
                 <th className="text-left pb-3 font-medium">N°</th>
                 <th className="text-left pb-3 font-medium">Fecha</th>
                 <th className="text-left pb-3 font-medium">Transportista</th>
+                <th className="text-left pb-3 font-medium">Clientes</th>
                 <th className="text-right pb-3 font-medium">Bultos</th>
+                <th className="text-right pb-3 font-medium">Monto Total</th>
+                <th className="text-left pb-3 font-medium">Estado</th>
                 <th className="text-right pb-3 font-medium"></th>
               </tr>
             </thead>
             <tbody>
-              {guias.filter((g) => { if (!search) return true; const q = search.toLowerCase(); return g.transportista.toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).map((g) => (
-                <tr key={g.id} onClick={() => viewGuia(g.id)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
-                  <td className="py-3.5 font-medium">{g.numero}</td>
-                  <td className="py-3.5 text-gray-500">{fmtDate(g.fecha)}</td>
-                  <td className="py-3.5">{g.transportista}</td>
-                  <td className="py-3.5 text-right tabular-nums">{g.total_bultos}</td>
-                  <td className="py-3.5 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                    <button onClick={() => startEdit(g.id)} className="text-sm text-gray-500 hover:text-black transition">Editar</button>
-                    <span className="text-gray-200">·</span>
-                    <button onClick={() => deleteGuia(g.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>
-                  </td>
-                </tr>
-              ))}
+              {(() => {
+                const filtered = guias
+                  .filter((g) => g.fecha && g.fecha.slice(0, 7) === monthFilter)
+                  .filter((g) => { if (!search) return true; const q = search.toLowerCase(); return g.transportista.toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); });
+                return (<>
+                  {filtered.map((g) => (
+                    <tr key={g.id} onClick={() => viewGuia(g.id)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
+                      <td className="py-3.5 font-medium">{g.numero}</td>
+                      <td className="py-3.5 text-gray-500">{fmtDate(g.fecha)}</td>
+                      <td className="py-3.5">{g.transportista}</td>
+                      <td className="py-3.5 text-gray-500 text-sm">{clientesSummary(g.guia_items || [])}</td>
+                      <td className="py-3.5 text-right tabular-nums">{g.total_bultos}</td>
+                      <td className="py-3.5 text-right tabular-nums">${fmtMoney(g.monto_total || 0)}</td>
+                      <td className="py-3.5">
+                        <span className={`inline-block text-xs px-2.5 py-0.5 rounded-full font-medium ${estadoBadge(g.estado || "Preparando")}`}>
+                          {g.estado || "Preparando"}
+                        </span>
+                      </td>
+                      <td className="py-3.5 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => startEdit(g.id)} className="text-sm text-gray-500 hover:text-black transition">Editar</button>
+                        <span className="text-gray-200">·</span>
+                        <button onClick={() => deleteGuia(g.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>
+                      </td>
+                    </tr>
+                  ))}
+                  {filtered.length > 0 && (
+                    <tr className="border-t border-gray-300 bg-gray-50/60 font-medium">
+                      <td className="py-3.5" colSpan={4}>
+                        <span className="text-xs uppercase tracking-widest text-gray-400">Totales del mes</span>
+                        <span className="ml-3 text-sm">{filtered.length} guía{filtered.length !== 1 ? "s" : ""}</span>
+                      </td>
+                      <td className="py-3.5 text-right tabular-nums">{filtered.reduce((s, g) => s + (g.total_bultos || 0), 0)}</td>
+                      <td className="py-3.5 text-right tabular-nums">${fmtMoney(filtered.reduce((s, g) => s + (g.monto_total || 0), 0))}</td>
+                      <td colSpan={2}></td>
+                    </tr>
+                  )}
+                </>);
+              })()}
             </tbody>
           </table>
         </>)}
@@ -466,6 +555,19 @@ export default function GuiasPage() {
               <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Observaciones</label>
               <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
                 rows={1} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Monto Total</label>
+              <input type="number" min={0} step="0.01" value={montoTotal || ""} onChange={(e) => setMontoTotal(parseFloat(e.target.value) || 0)}
+                placeholder="0.00"
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Estado</label>
+              <select value={estado} onChange={(e) => setEstado(e.target.value)}
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
+                {ESTADO_OPTIONS.map((e) => <option key={e} value={e}>{e}</option>)}
+              </select>
             </div>
           </div>
         </div>

@@ -26,13 +26,20 @@ interface CajaGasto {
   nro_factura: string;
   responsable: string;
   categoria: string;
+  empresa: string;
   subtotal: number;
   itbms: number;
   total: number;
   nombre?: string; // legacy
 }
 
-const CATEGORIAS_DEFAULT = ["Papelería y oficina", "Transporte", "Mantenimiento", "Varios"];
+const CATEGORIAS_DEFAULT = ["Transporte", "Papelería", "Alimentación", "Limpieza", "Mensajería", "Servicios varios", "Otro"];
+
+const EMPRESAS = [
+  "Vistana International", "Fashion Shoes", "Fashion Wear",
+  "Active Shoes", "Active Wear", "Confecciones Boston",
+  "Multifashion", "Joystep", "Otro / General",
+];
 
 function loadCategorias(): string[] {
   if (typeof window === "undefined") return CATEGORIAS_DEFAULT;
@@ -64,7 +71,7 @@ export default function CajaPage() {
   const [current, setCurrent] = useState<CajaPeriodo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [role, setRole] = useState("");
-  const [lowBalanceWarning, setLowBalanceWarning] = useState(false);
+  // lowBalanceWarning is now computed inline in detail view
   const [categorias, setCategorias] = useState(CATEGORIAS_DEFAULT);
   const [showManageCat, setShowManageCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
@@ -81,11 +88,15 @@ export default function CajaPage() {
   const [gNroFactura, setGNroFactura] = useState("");
   const [gSubtotal, setGSubtotal] = useState("");
   const [gItbmsPct, setGItbmsPct] = useState("0");
-  const [gCategoria, setGCategoria] = useState("Varios");
+  const [gCategoria, setGCategoria] = useState("Transporte");
+  const [gCategoriaOtro, setGCategoriaOtro] = useState("");
   const [gResponsable, setGResponsable] = useState("");
+  const [gEmpresa, setGEmpresa] = useState("");
+  const [gEmpresaOtro, setGEmpresaOtro] = useState("");
   const [addingGasto, setAddingGasto] = useState(false);
   const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
   const [editGasto, setEditGasto] = useState<Partial<CajaGasto>>({});
+  const [showResumen, setShowResumen] = useState(false);
 
   const subtotalNum = parseFloat(gSubtotal) || 0;
   const itbmsNum = subtotalNum * (parseFloat(gItbmsPct) / 100);
@@ -150,7 +161,6 @@ export default function CajaPage() {
       const data = await res.json();
       const gastos = data.caja_gastos || [];
       data.total_gastado = gastos.reduce((s: number, g: CajaGasto) => s + (g.total || 0), 0);
-      setLowBalanceWarning(data.total_gastado > (data.fondo_inicial || 200) * 0.80);
       setCurrent(data);
       setView("detail");
     }
@@ -189,6 +199,8 @@ export default function CajaPage() {
     setAddingGasto(true);
     setError(null);
     try {
+      const resolvedCategoria = gCategoria === "Otro" ? (gCategoriaOtro.trim() || "Otro") : gCategoria;
+      const resolvedEmpresa = gEmpresa === "Otro / General" ? (gEmpresaOtro.trim() || "Otro / General") : gEmpresa;
       const res = await fetch("/api/caja/gastos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -199,7 +211,8 @@ export default function CajaPage() {
           proveedor: gProveedor,
           nro_factura: gNroFactura,
           responsable: gResponsable,
-          categoria: gCategoria,
+          categoria: resolvedCategoria,
+          empresa: resolvedEmpresa,
           subtotal: subtotalNum,
           itbms: itbmsNum,
           total: totalNum,
@@ -208,7 +221,7 @@ export default function CajaPage() {
       if (!res.ok) throw new Error();
       setGFecha(new Date().toISOString().split("T")[0]);
       setGDescripcion(""); setGProveedor(""); setGNroFactura(""); setGSubtotal(""); setGItbmsPct("0");
-      setGCategoria("Varios"); setGResponsable("");
+      setGCategoria("Transporte"); setGCategoriaOtro(""); setGResponsable(""); setGEmpresa(""); setGEmpresaOtro("");
       await loadDetail(current.id);
       loadPeriodos();
     } catch {
@@ -310,7 +323,7 @@ export default function CajaPage() {
                         <span className="text-gray-200">·</span>
                         <button onClick={() => deletePeriodo(p.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>
                       </>)}
-                      <span className="text-gray-300 ml-2">›</span>
+                      <button onClick={() => loadDetail(p.id)} className="text-gray-300 hover:text-black ml-2 transition">›</button>
                     </td>
                   </tr>
                 );
@@ -388,16 +401,99 @@ export default function CajaPage() {
           );
         })()}
 
+        {/* Resumen de gastos por categoria y empresa — CAMBIO 31 */}
+        {gastos.length > 0 && (() => {
+          const catTotalsR: Record<string, number> = {};
+          const empTotalsR: Record<string, number> = {};
+          for (const g of gastos) {
+            const cat = g.categoria || "Varios";
+            catTotalsR[cat] = (catTotalsR[cat] || 0) + g.total;
+            const emp = g.empresa || "Sin asignar";
+            empTotalsR[emp] = (empTotalsR[emp] || 0) + g.total;
+          }
+          const grandTotal = gastos.reduce((s, g) => s + g.total, 0);
+          const catEntries = Object.entries(catTotalsR).sort((a, b) => b[1] - a[1]);
+          const empEntries = Object.entries(empTotalsR).sort((a, b) => b[1] - a[1]);
+          return (
+            <div className="mb-6">
+              <button onClick={() => setShowResumen(!showResumen)}
+                className="text-xs uppercase tracking-widest text-gray-400 hover:text-black transition flex items-center gap-1 mb-3">
+                <span className={`inline-block transition-transform ${showResumen ? "rotate-90" : ""}`}>›</span>
+                Resumen de gastos
+              </button>
+              {showResumen && (
+                <div className="grid grid-cols-2 gap-8">
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-2 font-medium">Por categoría</div>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-400">
+                          <th className="text-left pb-2 font-medium">Categoría</th>
+                          <th className="text-right pb-2 font-medium">Monto</th>
+                          <th className="text-right pb-2 font-medium">%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {catEntries.map(([cat, total]) => (
+                          <tr key={cat} className="border-b border-gray-100">
+                            <td className="py-1.5">{cat}</td>
+                            <td className="py-1.5 text-right tabular-nums">${fmt(total)}</td>
+                            <td className="py-1.5 text-right tabular-nums text-gray-400">{grandTotal > 0 ? ((total / grandTotal) * 100).toFixed(1) : "0.0"}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div>
+                    <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-2 font-medium">Por empresa</div>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-400">
+                          <th className="text-left pb-2 font-medium">Empresa</th>
+                          <th className="text-right pb-2 font-medium">Monto</th>
+                          <th className="text-right pb-2 font-medium">%</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {empEntries.map(([emp, total]) => (
+                          <tr key={emp} className="border-b border-gray-100">
+                            <td className="py-1.5">{emp}</td>
+                            <td className="py-1.5 text-right tabular-nums">${fmt(total)}</td>
+                            <td className="py-1.5 text-right tabular-nums text-gray-400">{grandTotal > 0 ? ((total / grandTotal) * 100).toFixed(1) : "0.0"}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
-        {lowBalanceWarning && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 flex items-center gap-3">
-            <span className="text-amber-500 text-base">⚠️</span>
-            <p className="text-sm text-amber-700">
-              Saldo bajo — menos del 20% del fondo disponible. Considera solicitar reposición.
-            </p>
-          </div>
-        )}
+        {/* Low balance alert — CAMBIO 32 */}
+        {(() => {
+          const pctUsed = current.fondo_inicial > 0 ? (saldo / current.fondo_inicial) * 100 : 100;
+          if (pctUsed < 10) return (
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-6 flex items-center gap-3">
+              <span className="text-red-500 text-base">&#9888;</span>
+              <p className="text-sm text-red-700">
+                Saldo bajo — quedan ${fmt(saldo)} de ${fmt(current.fondo_inicial)} ({pctUsed.toFixed(0)}%). Considera reabastecer el fondo.
+              </p>
+            </div>
+          );
+          if (pctUsed < 20) return (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 flex items-center gap-3">
+              <span className="text-amber-500 text-base">&#9888;</span>
+              <p className="text-sm text-amber-700">
+                Saldo bajo — quedan ${fmt(saldo)} de ${fmt(current.fondo_inicial)} ({pctUsed.toFixed(0)}%). Considera reabastecer el fondo.
+              </p>
+            </div>
+          );
+          return null;
+        })()}
 
         {/* Add expense form */}
         {isOpen && (
@@ -426,10 +522,14 @@ export default function CajaPage() {
               </div>
               <div>
                 <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Categoría</label>
-                <select value={gCategoria} onChange={(e) => setGCategoria(e.target.value)}
+                <select value={gCategoria} onChange={(e) => { setGCategoria(e.target.value); if (e.target.value !== "Otro") setGCategoriaOtro(""); }}
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
                   {categorias.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
+                {gCategoria === "Otro" && (
+                  <input type="text" value={gCategoriaOtro} onChange={(e) => setGCategoriaOtro(e.target.value)} placeholder="Especificar categoría"
+                    className="w-full border-b border-gray-200 py-1 text-xs outline-none focus:border-black transition mt-1" />
+                )}
                 <button onClick={() => setShowManageCat(!showManageCat)} className="text-[10px] text-gray-300 hover:text-gray-500 mt-1 block">
                   Gestionar categorías
                 </button>
@@ -464,7 +564,7 @@ export default function CajaPage() {
                 )}
               </div>
             </div>
-            <div className="grid grid-cols-5 gap-3 items-end">
+            <div className="grid grid-cols-6 gap-3 items-end">
               <div>
                 <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">
                   Responsable
@@ -494,6 +594,18 @@ export default function CajaPage() {
                 )}
               </div>
               <div>
+                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Empresa</label>
+                <select value={gEmpresa} onChange={(e) => { setGEmpresa(e.target.value); if (e.target.value !== "Otro / General") setGEmpresaOtro(""); }}
+                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
+                  <option value="">—</option>
+                  {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
+                </select>
+                {gEmpresa === "Otro / General" && (
+                  <input type="text" value={gEmpresaOtro} onChange={(e) => setGEmpresaOtro(e.target.value)} placeholder="Especificar empresa"
+                    className="w-full border-b border-gray-200 py-1 text-xs outline-none focus:border-black transition mt-1" />
+                )}
+              </div>
+              <div>
                 <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Sub-total</label>
                 <input type="number" step="0.01" value={gSubtotal} onChange={(e) => setGSubtotal(e.target.value)}
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
@@ -511,7 +623,7 @@ export default function CajaPage() {
                 <input type="text" readOnly value={`$${fmt(totalNum)}`}
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent tabular-nums" />
               </div>
-              <div className="col-span-2">
+              <div>
                 <button onClick={addGasto} disabled={addingGasto || !gDescripcion || subtotalNum <= 0}
                   className="bg-black text-white px-6 py-1.5 rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40">
                   Agregar
@@ -532,6 +644,7 @@ export default function CajaPage() {
                 <th className="text-left pb-3 font-medium">Proveedor</th>
                 <th className="text-left pb-3 font-medium">Responsable</th>
                 <th className="text-left pb-3 font-medium">Categoría</th>
+                <th className="text-left pb-3 font-medium">Empresa</th>
                 <th className="text-left pb-3 font-medium">N° Factura</th>
                 <th className="text-right pb-3 font-medium">Sub-total</th>
                 <th className="text-right pb-3 font-medium">ITBMS</th>
@@ -541,7 +654,7 @@ export default function CajaPage() {
             </thead>
             <tbody>
               {gastos.length === 0 ? (
-                <tr><td colSpan={10} className="py-12 text-center text-gray-300 text-sm">Sin gastos registrados</td></tr>
+                <tr><td colSpan={11} className="py-12 text-center text-gray-300 text-sm">Sin gastos registrados</td></tr>
               ) : (
                 <>
                   {gastos.map((g) => editingGastoId === g.id ? (
@@ -551,6 +664,7 @@ export default function CajaPage() {
                       <td className="py-2 pr-1"><input type="text" value={editGasto.proveedor || ""} onChange={(e) => setEditGasto({ ...editGasto, proveedor: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
                       <td className="py-2 pr-1"><select value={editGasto.responsable || ""} onChange={(e) => setEditGasto({ ...editGasto, responsable: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"><option value="">—</option>{responsables.map((r) => <option key={r} value={r}>{r}</option>)}</select></td>
                       <td className="py-2 pr-1"><select value={editGasto.categoria || "Varios"} onChange={(e) => setEditGasto({ ...editGasto, categoria: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent">{categorias.map((c) => <option key={c} value={c}>{c}</option>)}</select></td>
+                      <td className="py-2 pr-1"><select value={editGasto.empresa || ""} onChange={(e) => setEditGasto({ ...editGasto, empresa: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"><option value="">—</option>{EMPRESAS.map((emp) => <option key={emp} value={emp}>{emp}</option>)}</select></td>
                       <td className="py-2 pr-1"><input type="text" value={editGasto.nro_factura || ""} onChange={(e) => setEditGasto({ ...editGasto, nro_factura: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
                       <td className="py-2 pr-1"><input type="number" step="0.01" value={editGasto.subtotal ?? ""} onChange={(e) => setEditGasto({ ...editGasto, subtotal: parseFloat(e.target.value) || 0 })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent text-right" /></td>
                       <td className="py-2 pr-1"><input type="number" step="0.01" value={editGasto.itbms ?? ""} onChange={(e) => setEditGasto({ ...editGasto, itbms: parseFloat(e.target.value) || 0 })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent text-right" /></td>
@@ -564,18 +678,19 @@ export default function CajaPage() {
                       <td className="py-3 text-gray-500">{g.proveedor || "—"}</td>
                       <td className="py-3 text-gray-500">{g.responsable || "—"}</td>
                       <td className="py-3 text-gray-500">{g.categoria || "Varios"}</td>
+                      <td className="py-3 text-gray-500">{g.empresa || "—"}</td>
                       <td className="py-3 text-gray-500">{g.nro_factura || "—"}</td>
                       <td className="py-3 text-right tabular-nums">${fmt(g.subtotal)}</td>
                       <td className="py-3 text-right tabular-nums text-gray-500">${fmt(g.itbms)}</td>
                       <td className="py-3 text-right tabular-nums font-medium">${fmt(g.total)}</td>
                       <td className="py-3 text-center text-xs">
-                        <button onClick={() => { setEditingGastoId(g.id); setEditGasto({ fecha: g.fecha, descripcion: g.descripcion || g.nombre, proveedor: g.proveedor || "", nro_factura: g.nro_factura || "", responsable: g.responsable || "", categoria: g.categoria || "Varios", subtotal: g.subtotal, itbms: g.itbms }); }} className="text-gray-400 hover:text-black transition mr-1">Editar</button>
+                        <button onClick={() => { setEditingGastoId(g.id); setEditGasto({ fecha: g.fecha, descripcion: g.descripcion || g.nombre, proveedor: g.proveedor || "", nro_factura: g.nro_factura || "", responsable: g.responsable || "", categoria: g.categoria || "Varios", empresa: g.empresa || "", subtotal: g.subtotal, itbms: g.itbms }); }} className="text-gray-400 hover:text-black transition mr-1">Editar</button>
                         <button onClick={() => deleteGasto(g.id)} className="text-gray-300 hover:text-red-500 transition">×</button>
                       </td>
                     </tr>
                   ))}
                   <tr className="border-t border-gray-300">
-                    <td colSpan={6} className="py-3 text-right text-xs uppercase tracking-widest text-gray-400">Totales</td>
+                    <td colSpan={7} className="py-3 text-right text-xs uppercase tracking-widest text-gray-400">Totales</td>
                     <td className="py-3 text-right tabular-nums font-medium">${fmt(totalSubtotal)}</td>
                     <td className="py-3 text-right tabular-nums font-medium">${fmt(totalItbms)}</td>
                     <td className="py-3 text-right tabular-nums font-semibold">${fmt(totalGastado)}</td>
@@ -661,6 +776,7 @@ export default function CajaPage() {
                 <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Proveedor</th>
                 <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Responsable</th>
                 <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Categoría</th>
+                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Empresa</th>
                 <th className="border border-gray-300 px-2 py-1.5 font-medium text-right">Sub-total</th>
                 <th className="border border-gray-300 px-2 py-1.5 font-medium text-right">ITBMS</th>
                 <th className="border border-gray-300 px-2 py-1.5 font-medium text-right">Total</th>
@@ -674,13 +790,14 @@ export default function CajaPage() {
                   <td className="border border-gray-300 px-2 py-1">{g.proveedor || "—"}</td>
                   <td className="border border-gray-300 px-2 py-1">{g.responsable || "—"}</td>
                   <td className="border border-gray-300 px-2 py-1">{g.categoria || "Varios"}</td>
+                  <td className="border border-gray-300 px-2 py-1">{g.empresa || "—"}</td>
                   <td className="border border-gray-300 px-2 py-1 text-right">${fmt(g.subtotal)}</td>
                   <td className="border border-gray-300 px-2 py-1 text-right">${fmt(g.itbms)}</td>
                   <td className="border border-gray-300 px-2 py-1 text-right">${fmt(g.total)}</td>
                 </tr>
               ))}
               <tr className="font-bold">
-                <td colSpan={5} className="border border-gray-300 px-2 py-1.5 text-right uppercase">Totales</td>
+                <td colSpan={6} className="border border-gray-300 px-2 py-1.5 text-right uppercase">Totales</td>
                 <td className="border border-gray-300 px-2 py-1.5 text-right">${fmt(totalSubtotal)}</td>
                 <td className="border border-gray-300 px-2 py-1.5 text-right">${fmt(totalItbms)}</td>
                 <td className="border border-gray-300 px-2 py-1.5 text-right">${fmt(totalGastado)}</td>

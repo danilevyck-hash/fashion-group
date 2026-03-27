@@ -7,6 +7,8 @@ export async function GET() {
     .select("*, guia_items(bultos, facturas, cliente)")
     .order("numero", { ascending: false });
 
+  /* monto_total and estado come from the DB columns directly */
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const result = (data || []).map((g) => ({
@@ -20,7 +22,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { fecha, transportista, placa, observaciones, items } = body;
+  const { fecha, transportista, placa, observaciones, items, monto_total, estado } = body;
 
   // Auto-increment numero
   const { data: last } = await supabaseServer
@@ -34,7 +36,7 @@ export async function POST(req: NextRequest) {
 
   const { data: guia, error: guiaErr } = await supabaseServer
     .from("guia_transporte")
-    .insert({ numero, fecha, transportista, placa, observaciones })
+    .insert({ numero, fecha, transportista, placa, observaciones, monto_total: monto_total || 0, estado: estado || "Preparando" })
     .select()
     .single();
 

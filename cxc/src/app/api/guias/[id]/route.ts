@@ -22,12 +22,12 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const { id } = params;
   const body = await req.json();
-  const { fecha, transportista, placa, observaciones, items } = body;
+  const { fecha, transportista, placa, observaciones, items, monto_total, estado } = body;
 
   // Update header
   const { error: guiaErr } = await supabaseServer
     .from("guia_transporte")
-    .update({ fecha, transportista, placa, observaciones })
+    .update({ fecha, transportista, placa, observaciones, monto_total: monto_total || 0, estado: estado || "Preparando" })
     .eq("id", id);
 
   if (guiaErr) return NextResponse.json({ error: guiaErr.message }, { status: 500 });

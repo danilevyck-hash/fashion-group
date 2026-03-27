@@ -19,7 +19,7 @@ const ALL_MODULES = [
 const DEFAULT_MODULES: Record<string, string[]> = {
   admin: ALL_MODULES,
   director: ALL_MODULES,
-  contabilidad: ["prestamos"],
+  contabilidad: ["prestamos", "ventas"],
   david: ["cxc"],
   upload: ["upload", "guias", "caja", "reclamos", "cheques", "directorio"],
 };

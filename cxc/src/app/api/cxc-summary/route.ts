@@ -24,7 +24,10 @@ export async function GET() {
   const vigilanciaPct = totalCxc > 0 ? (vigilancia / totalCxc) * 100 : 0;
   const vencidoPct = totalCxc > 0 ? (vencido / totalCxc) * 100 : 0;
 
-  const { data: uploads } = await supabaseServer.from("cxc_uploads").select("uploaded_at, company_key").order("uploaded_at", { ascending: false }).limit(1);
+  const { data: uploads } = await supabaseServer.from("cxc_uploads").select("uploaded_at, company_key").order("uploaded_at", { ascending: false });
+
+  // CAMBIO 4: Count unique companies with data
+  const empresasSet = new Set((rows || []).map((r: { company_key: string }) => r.company_key));
 
   return NextResponse.json({
     totalCxc,
@@ -35,5 +38,6 @@ export async function GET() {
     vencidoPct: Math.round(vencidoPct),
     lastUpload: uploads?.[0]?.uploaded_at || null,
     lastUploadEmpresa: uploads?.[0]?.company_key || null,
+    empresasCount: empresasSet.size,
   });
 }

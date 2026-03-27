@@ -11,6 +11,7 @@ interface Cliente {
   empresa: string;
   telefono: string;
   celular: string;
+  whatsapp: string;
   correo: string;
   contacto: string;
   notas: string;
@@ -28,7 +29,7 @@ export default function DirectorioPage() {
   const [editing, setEditing] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Cliente>>({});
   const [showNew, setShowNew] = useState(false);
-  const [newData, setNewData] = useState({ nombre: "", empresa: "", telefono: "", celular: "", correo: "", contacto: "", notas: "" });
+  const [newData, setNewData] = useState({ nombre: "", empresa: "", whatsapp: "", correo: "", contacto: "", notas: "" });
   const [toast, setToast] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
@@ -69,7 +70,7 @@ export default function DirectorioPage() {
       body: JSON.stringify(newData),
     });
     if (res.ok) {
-      setNewData({ nombre: "", empresa: "", telefono: "", celular: "", correo: "", contacto: "", notas: "" });
+      setNewData({ nombre: "", empresa: "", whatsapp: "", correo: "", contacto: "", notas: "" });
       setShowNew(false);
       loadClientes();
     }
@@ -186,13 +187,9 @@ export default function DirectorioPage() {
                 className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
             </div>
             <div>
-              <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Teléfono</label>
-              <input type="text" value={newData.telefono} onChange={(e) => setNewData({ ...newData, telefono: e.target.value })}
-                className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Celular</label>
-              <input type="text" value={newData.celular} onChange={(e) => setNewData({ ...newData, celular: e.target.value })}
+              <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">WhatsApp</label>
+              <input type="text" value={newData.whatsapp} onChange={(e) => setNewData({ ...newData, whatsapp: e.target.value })}
+                placeholder="+507 6000-0000"
                 className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
             </div>
             <div>
@@ -254,7 +251,7 @@ export default function DirectorioPage() {
               <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
                 <th className="text-left pb-3 font-medium">Nombre</th>
                 <th className="text-left pb-3 font-medium">Empresa</th>
-                <th className="text-left pb-3 font-medium">Teléfono</th>
+                <th className="text-left pb-3 font-medium">WhatsApp</th>
                 <th className="text-left pb-3 font-medium">Correo</th>
                 <th className="text-left pb-3 font-medium">Contacto</th>
                 <th className="text-right pb-3 font-medium"></th>
@@ -274,7 +271,12 @@ export default function DirectorioPage() {
                       >
                         <div className="font-medium">{c.nombre}</div>
                         <div className="text-gray-500">{c.empresa}</div>
-                        <div className="text-gray-500">{c.telefono}</div>
+                        <div className="text-gray-500">{c.whatsapp ? (
+                          <a href={`https://wa.me/${(c.whatsapp).replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-800">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a3.04 3.04 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
+                            {c.whatsapp}
+                          </a>
+                        ) : <span className="text-gray-300">—</span>}</div>
                         <div className="text-gray-500">{c.correo}</div>
                         <div className="text-gray-500">{c.contacto}</div>
                         <div className="text-right text-gray-300 text-xs">{isExpanded ? "▼" : "▶"}</div>
@@ -283,7 +285,7 @@ export default function DirectorioPage() {
                       {/* Expanded detail */}
                       {isExpanded && !isEditing && (
                         <div className="bg-gray-50 px-4 py-3 mb-1 rounded-lg text-sm">
-                          {c.celular && <div className="text-gray-500 mb-1">Celular: {c.celular}</div>}
+                          {c.telefono && <div className="text-gray-500 mb-1">Teléfono: {c.telefono}</div>}
                           {c.notas && <div className="text-gray-500 mb-1">Notas: {c.notas}</div>}
                           <div className="text-gray-400 text-xs mb-3">Creado: {new Date(c.created_at).toLocaleDateString("es-PA")}</div>
                           <div className="flex gap-3">
@@ -303,7 +305,7 @@ export default function DirectorioPage() {
                       {isExpanded && isEditing && (
                         <div className="bg-gray-50 px-4 py-3 mb-1 rounded-lg" onClick={(e) => e.stopPropagation()}>
                           <div className="grid grid-cols-2 gap-3">
-                            {(["nombre", "empresa", "telefono", "celular", "correo", "contacto", "notas"] as const).map((field) => (
+                            {(["nombre", "empresa", "whatsapp", "correo", "contacto", "notas"] as const).map((field) => (
                               <div key={field}>
                                 <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">{field}</label>
                                 <input type="text" value={(editData as Record<string, string>)[field] || ""}

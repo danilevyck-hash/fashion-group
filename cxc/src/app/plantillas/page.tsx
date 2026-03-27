@@ -22,11 +22,26 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
+const ROLE_NAMES: Record<string, string> = { admin: "Daniel", director: "Director", upload: "Secretaria", david: "David", contabilidad: "Contabilidad" };
 const ROLE_LABELS: Record<string, string> = { admin: "Administrador", upload: "Secretaria", director: "Director", david: "David", contabilidad: "Contabilidad" };
 function fmt(n: number) { return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 const fmtDate = (d: string) => { const dt = new Date(d); return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; };
 
-interface CxcSummary { totalCxc: number; vencidoMas121: number; clientesCriticos: number; corrientePct: number; vigilanciaPct: number; vencidoPct: number; lastUpload: string | null; lastUploadEmpresa: string | null; }
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h >= 6 && h < 12) return "Buenos días";
+  if (h >= 12 && h < 19) return "Buenas tardes";
+  return "Buenas noches";
+}
+
+function getDateLabel() {
+  const d = new Date();
+  const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+  const meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+  return `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`;
+}
+
+interface CxcSummary { totalCxc: number; vencidoMas121: number; clientesCriticos: number; corrientePct: number; vigilanciaPct: number; vencidoPct: number; lastUpload: string | null; lastUploadEmpresa: string | null; empresasCount?: number; }
 interface HomeStats { reclamosPendientes: number; vencenEstaSemana: number; vencenHoy: number; cajaDisponible: number | null; cajaFondo: number | null; guiasEsteMes: number; totalClientes: number; }
 
 interface ModuleDef {
@@ -37,7 +52,6 @@ interface ModuleDef {
   icon: ReactNode;
 }
 
-// ── Icons as functions (to avoid duplication) ──
 const icons: Record<string, ReactNode> = {
   guias: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>,
   upload: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
@@ -62,17 +76,14 @@ const ALL_MODULES: ModuleDef[] = [
 
 const DEFAULT_ORDER = ALL_MODULES.map(m => m.id);
 
-// ── Sortable Card Component ──
 function SortableModuleCard({ mod, onClick, subtitle }: { mod: ModuleDef; onClick: () => void; subtitle?: ReactNode }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: mod.id });
-
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.4 : 1,
     zIndex: isDragging ? 50 : "auto" as const,
   };
-
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}
       className="relative text-left border border-gray-100 rounded-2xl p-5 hover:border-gray-300 hover:shadow-sm bg-white group w-full min-h-[140px] cursor-grab active:cursor-grabbing touch-none select-none"
@@ -88,7 +99,6 @@ function SortableModuleCard({ mod, onClick, subtitle }: { mod: ModuleDef; onClic
   );
 }
 
-// ── Overlay Card (the floating one while dragging) ──
 function OverlayCard({ mod }: { mod: ModuleDef }) {
   return (
     <div className="relative text-left border border-gray-200 rounded-2xl p-5 bg-white w-full min-h-[140px] shadow-2xl scale-105 opacity-90 rotate-[2deg]">
@@ -110,20 +120,21 @@ export default function PlantillasPage() {
   const [cxc, setCxc] = useState<CxcSummary | null>(null);
   const [stats, setStats] = useState<HomeStats | null>(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
-  );
+  // CAMBIO 1: Only enable TouchSensor on desktop (>=640px) to avoid scroll conflicts on mobile
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } });
+  const sensors = useSensors(...(isDesktop ? [pointerSensor, touchSensor] : [pointerSensor]));
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    setIsDesktop(window.innerWidth >= 640);
     const r = sessionStorage.getItem("cxc_role") || "";
     if (!r) { router.push("/"); return; }
     setRole(r); setAuthChecked(true);
     setDarkMode(localStorage.getItem("fg_dark_mode") === "1");
 
-    // Load saved order
     try {
       const saved = localStorage.getItem(`module_order_${r}`);
       if (saved) {
@@ -132,7 +143,6 @@ export default function PlantillasPage() {
       }
     } catch { /* */ }
 
-    // Load module permissions
     fetch(`/api/admin/usuarios?role=${encodeURIComponent(r)}`)
       .then(res => res.ok ? res.json() : null)
       .then(data => { if (data?.modulos) setModulos(data.modulos); })
@@ -151,15 +161,12 @@ export default function PlantillasPage() {
   const hasAccess = (mod: string) => role === "admin" || modulos.includes(mod);
   const isAdmin = role === "admin";
 
-  // Visible modules in saved order
   const visibleModules = moduleOrder
     .filter(id => hasAccess(id) && ALL_MODULES.some(m => m.id === id))
     .map(id => ALL_MODULES.find(m => m.id === id)!);
-  // Add any new modules not in saved order
   ALL_MODULES.forEach(m => {
     if (hasAccess(m.id) && !visibleModules.some(v => v.id === m.id)) visibleModules.push(m);
   });
-
   const visibleIds = visibleModules.map(m => m.id);
 
   function handleDragStart(event: DragStartEvent) {
@@ -171,16 +178,11 @@ export default function PlantillasPage() {
     setActiveId(null);
     const { active, over } = event;
     if (!over || active.id === over.id) return;
-
     const oldIndex = visibleIds.indexOf(String(active.id));
     const newIndex = visibleIds.indexOf(String(over.id));
     if (oldIndex === -1 || newIndex === -1) return;
-
     const newVisible = arrayMove(visibleIds, oldIndex, newIndex);
-    // Build full order: keep non-visible modules in place, replace visible portion
-    const newOrder = [...moduleOrder];
-    // Remove all visible from order, then insert at beginning
-    const filtered = newOrder.filter(id => !newVisible.includes(id));
+    const filtered = moduleOrder.filter(id => !newVisible.includes(id));
     const finalOrder = [...newVisible, ...filtered];
     setModuleOrder(finalOrder);
     localStorage.setItem(`module_order_${role}`, JSON.stringify(finalOrder));
@@ -188,7 +190,6 @@ export default function PlantillasPage() {
 
   const activeModule = activeId ? ALL_MODULES.find(m => m.id === activeId) : null;
 
-  // Stats subtitles per module
   function getSubtitle(id: string): ReactNode {
     if (!stats) return null;
     switch (id) {
@@ -216,7 +217,13 @@ export default function PlantillasPage() {
         </div>
       </div>
 
-      {/* CXC Card — fixed, not draggable */}
+      {/* CAMBIO 6: Contextual greeting */}
+      <div className="mb-8">
+        <h1 className="text-2xl font-light text-gray-800">{getGreeting()}, {ROLE_NAMES[role] || role}</h1>
+        <p className="text-sm text-gray-400 mt-1">{getDateLabel()}</p>
+      </div>
+
+      {/* CXC Card */}
       {hasAccess("cxc") && cxc && (
         <button onClick={() => router.push("/admin")} className="w-full text-left border border-gray-100 rounded-2xl p-5 mb-4 hover:border-gray-300 transition cursor-pointer group">
           <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-3">Panel CXC</div>
@@ -235,11 +242,12 @@ export default function PlantillasPage() {
             <span className="text-[10px] text-amber-500">Vigilancia {Math.round(cxc.vigilanciaPct)}%</span>
             <span className="text-[10px] text-red-400">Vencido {Math.round(cxc.vencidoPct)}%</span>
           </div>
+          {/* CAMBIO 4: Show empresas count + upload date */}
           {cxc.lastUpload && (
             <div className="mt-2 flex items-center gap-2 flex-wrap">
-              <span className="text-[10px] text-gray-400">Datos al</span>
+              {cxc.empresasCount && <span className="text-[10px] text-gray-500 font-medium">{cxc.empresasCount} empresa{cxc.empresasCount > 1 ? "s" : ""}</span>}
+              <span className="text-[10px] text-gray-400">· datos al</span>
               <span className="text-[10px] text-gray-500 font-medium">{fmtDate(cxc.lastUpload)}</span>
-              {cxc.lastUploadEmpresa && <span className="text-[10px] text-gray-300">· {cxc.lastUploadEmpresa}</span>}
               {(() => { const d = Math.floor((Date.now() - new Date(cxc.lastUpload).getTime()) / 86400000); return d > 7 ? <span className="text-[10px] text-amber-500 font-medium">· desactualizados ({d}d)</span> : null; })()}
             </div>
           )}
@@ -249,7 +257,7 @@ export default function PlantillasPage() {
         </button>
       )}
 
-      {/* Admin: Usuarios link — fixed, not draggable */}
+      {/* Admin: Usuarios link */}
       {isAdmin && (
         <button onClick={() => router.push("/admin/usuarios")} className="w-full text-left border border-gray-100 rounded-2xl p-4 mb-4 hover:border-gray-300 transition cursor-pointer group flex items-center gap-3">
           <div className="bg-gray-100 rounded-xl p-2.5 w-10 h-10 flex items-center justify-center text-gray-700"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
@@ -285,6 +293,9 @@ export default function PlantillasPage() {
           {activeModule ? <OverlayCard mod={activeModule} /> : null}
         </DragOverlay>
       </DndContext>
+
+      {/* CAMBIO 2: Drag hint — desktop only */}
+      <p className="hidden sm:block text-[11px] text-gray-300 text-center mt-2">Mantén presionado para reordenar</p>
     </div>
   );
 }

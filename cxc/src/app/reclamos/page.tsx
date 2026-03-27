@@ -26,10 +26,12 @@ const EMPRESAS_MAP: Record<string, { proveedor: string; marca: string }> = {
   "Active Wear": { proveedor: "Latin Fitness Group", marca: "Reebok" },
 };
 const EMPRESAS = Object.keys(EMPRESAS_MAP);
-const MOTIVOS = ["Faltante de Mercancía", "Mercancía Dañada", "Mercancía Manchada", "Mercancía Incorrecta", "Sobrante de Mercancía", "Discrepancia de Precio", "Mercancía Defectuosa"];
+const DEFAULT_MOTIVOS = ["Mercancía defectuosa", "Talla incorrecta", "Cantidad incorrecta", "Producto no recibido", "Daño en transporte", "Error de facturación"];
 const TALLAS = ["XS", "S", "M", "L", "XL", "XXL", "OS", "Otros"];
-const ESTADOS = ["Enviado", "En Revisión", "N/C Aprobada", "Aplicada"];
-const EC: Record<string, string> = { "Enviado": "bg-blue-50 text-blue-700", "En Revisión": "bg-yellow-50 text-yellow-700", "N/C Aprobada": "bg-green-50 text-green-700", "Aplicada": "bg-gray-100 text-gray-500" };
+const ESTADOS = ["Borrador", "Enviado", "En revisión", "Resuelto con NC", "Rechazado"];
+const EC: Record<string, string> = { "Borrador": "bg-gray-100 text-gray-600", "Enviado": "bg-blue-50 text-blue-700", "En revisión": "bg-yellow-50 text-yellow-700", "Resuelto con NC": "bg-green-50 text-green-700", "Rechazado": "bg-red-50 text-red-600" };
+function loadCustomMotivos(): string[] { try { return JSON.parse(localStorage.getItem("fg_custom_motivos") || "[]"); } catch { return []; } }
+function saveCustomMotivo(m: string) { const cur = loadCustomMotivos(); if (!cur.includes(m)) { cur.push(m); localStorage.setItem("fg_custom_motivos", JSON.stringify(cur)); } }
 
 function emptyItem(): RItem { return { referencia: "", descripcion: "", talla: "", cantidad: 1, precio_unitario: 0, subtotal: 0, motivo: "", nro_factura: "", nro_orden_compra: "" }; }
 function fmt(n: number | undefined | null) { return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -98,6 +100,16 @@ export default function ReclamosPage() {
   const [contactos, setContactos] = useState<Contacto[]>([]);
   const [toast, setToast] = useState<string | null>(null);
 
+  // Custom motivos
+  const [customMotivos, setCustomMotivos] = useState<string[]>([]);
+  const [addingMotivo, setAddingMotivo] = useState<number | null>(null);
+  const [addingEditMotivo, setAddingEditMotivo] = useState<number | null>(null);
+  const [newMotivoText, setNewMotivoText] = useState("");
+  const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
+
+  // Historial collapse state per empresa
+  const [expandedHistorial, setExpandedHistorial] = useState<Record<string, boolean>>({});
+
   // Auth
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role") || "";
@@ -115,14 +127,14 @@ export default function ReclamosPage() {
     try { const res = await fetch("/api/reclamos/contactos"); if (res.ok) setContactos(await res.json()); } catch { /* */ }
   }, []);
 
-  useEffect(() => { if (authChecked) { loadReclamos(); loadContactos(); } }, [authChecked, loadReclamos, loadContactos]);
+  useEffect(() => { if (authChecked) { loadReclamos(); loadContactos(); setCustomMotivos(loadCustomMotivos()); } }, [authChecked, loadReclamos, loadContactos]);
 
   if (!authChecked) return null;
 
   // ── Helpers ──
   const empInfo = fEmpresa ? EMPRESAS_MAP[fEmpresa] : null;
   const fSubtotal = fItems.reduce((s, i) => s + (i.subtotal || 0), 0);
-  const pendientes = reclamos.filter((r) => r.estado !== "Aplicada");
+  const pendientes = reclamos.filter((r) => r.estado !== "Resuelto con NC" && r.estado !== "Rechazado");
   const totalPendiente = pendientes.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * 1.177, 0);
   const alertas = pendientes.filter((r) => daysSince(r.fecha_reclamo) > 45).length;
 
@@ -272,10 +284,10 @@ export default function ReclamosPage() {
                 </div>
                 {results.length === 0 ? <p className="text-center text-gray-300 text-sm py-12">Sin resultados</p> : (
                   <table className="w-full text-sm"><thead><tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
-                    <th className="text-left pb-3 font-medium">Empresa</th><th className="text-left pb-3 font-medium">Factura</th><th className="text-left pb-3 font-medium">N° Reclamo</th><th className="text-left pb-3 font-medium">Fecha</th><th className="text-left pb-3 font-medium">Estado</th><th className="text-right pb-3 font-medium">Total</th>
+                    <th className="text-left pb-3 font-medium">N° Reclamo</th><th className="text-left pb-3 font-medium">Empresa</th><th className="text-left pb-3 font-medium">Factura</th><th className="text-left pb-3 font-medium">Fecha</th><th className="text-left pb-3 font-medium">Estado</th><th className="text-right pb-3 font-medium">Total</th>
                   </tr></thead><tbody>{results.map((r) => (
                     <tr key={r.id} onClick={() => { setActiveEmpresa(r.empresa); loadDetail(r.id); }} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
-                      <td className="py-3 text-gray-500">{r.empresa}</td><td className="py-3 font-medium">{r.nro_factura}</td><td className="py-3 text-xs text-gray-400">{r.nro_reclamo}</td><td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
+                      <td className="py-3 font-medium text-xs">{r.nro_reclamo}</td><td className="py-3 text-gray-500">{r.empresa}</td><td className="py-3 text-gray-500">{r.nro_factura}</td><td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
                       <td className="py-3"><span className={`text-[11px] px-2 py-0.5 rounded-full ${EC[r.estado] || "bg-gray-100 text-gray-500"}`}>{r.estado}</span></td>
                       <td className="py-3 text-right tabular-nums">${fmt(calcSub(r.reclamo_items ?? []) * 1.177)}</td>
                     </tr>
@@ -287,7 +299,7 @@ export default function ReclamosPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {EMPRESAS.map((empresa) => {
                 const ers = reclamos.filter((r) => r.empresa === empresa);
-                const open = ers.filter((r) => r.estado !== "Aplicada");
+                const open = ers.filter((r) => r.estado !== "Resuelto con NC" && r.estado !== "Rechazado");
                 const tot = open.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * 1.177, 0);
                 const hasAlert = open.some((r) => daysSince(r.fecha_reclamo) > 45);
                 const c = getC(empresa);
@@ -307,6 +319,33 @@ export default function ReclamosPage() {
                       <div><p className="text-2xl font-semibold tabular-nums">{open.length}</p><p className="text-xs text-gray-400 mt-0.5">facturas</p></div>
                       <div><p className="text-2xl font-semibold tabular-nums">${fmt(tot)}</p><p className="text-xs text-gray-400 mt-0.5">pendiente</p></div>
                     </div>
+                    {/* Historial */}
+                    {ers.length > 0 && (
+                      <div className="mt-4 border-t border-gray-100 pt-3" onClick={(ev) => ev.stopPropagation()}>
+                        <button onClick={() => setExpandedHistorial((p) => ({ ...p, [empresa]: !p[empresa] }))} className="text-[11px] text-gray-400 hover:text-black transition flex items-center gap-1 w-full">
+                          <span className="transition-transform" style={{ display: "inline-block", transform: expandedHistorial[empresa] ? "rotate(90deg)" : "rotate(0deg)" }}>&#9654;</span> Historial ({ers.length})
+                        </button>
+                        {expandedHistorial[empresa] && (
+                          <div className="mt-2 space-y-1.5">
+                            {ers.slice(0, 5).map((r) => (
+                              <div key={r.id} onClick={() => { setActiveEmpresa(empresa); loadDetail(r.id); }} className="flex items-center justify-between text-[11px] py-1 px-2 rounded-lg hover:bg-gray-50 cursor-pointer transition">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-gray-700">{r.nro_reclamo}</span>
+                                  <span className="text-gray-400">{fmtDate(r.fecha_reclamo)}</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className={`px-1.5 py-0.5 rounded-full ${EC[r.estado] || "bg-gray-100 text-gray-500"}`}>{r.estado}</span>
+                                  <span className="tabular-nums text-gray-500">${fmt(calcSub(r.reclamo_items ?? []) * 1.177)}</span>
+                                </div>
+                              </div>
+                            ))}
+                            {ers.length > 5 && (
+                              <button onClick={() => { setActiveEmpresa(empresa); setSearch(""); setFilterEstado("all"); }} className="text-[11px] text-gray-400 hover:text-black transition mt-1 block">Ver todos &rarr;</button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -336,7 +375,7 @@ export default function ReclamosPage() {
       if (av > bv) return sortDir === "asc" ? 1 : -1;
       return 0;
     });
-    const allSelectableIds = sortedRecs.filter((r) => r.estado !== "Aplicada").map((r) => r.id);
+    const allSelectableIds = sortedRecs.filter((r) => r.estado !== "Resuelto con NC" && r.estado !== "Rechazado").map((r) => r.id);
     const allSelected = allSelectableIds.length > 0 && allSelectableIds.every((id) => selectedIds.includes(id));
 
     return (
@@ -381,17 +420,17 @@ export default function ReclamosPage() {
           <table className="w-full text-sm">
             <thead><tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
               {selectionMode && <th className="pb-3 w-8"></th>}
-              <th className="text-left pb-3 font-medium">Factura</th><th className="text-left pb-3 font-medium">N° Reclamo</th>
+              <th className="text-left pb-3 font-medium">N° Reclamo</th><th className="text-left pb-3 font-medium">Factura</th>
               <th onClick={() => toggleSort("fecha")} className="text-left pb-3 font-medium cursor-pointer hover:text-black select-none">Fecha {sortCol === "fecha" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
               <th onClick={() => toggleSort("dias")} className="text-right pb-3 font-medium cursor-pointer hover:text-black select-none">Antigüedad {sortCol === "dias" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
               <th onClick={() => toggleSort("estado")} className="text-left pb-3 font-medium cursor-pointer hover:text-black select-none">Estado {sortCol === "estado" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
               <th onClick={() => toggleSort("total")} className="text-right pb-3 font-medium cursor-pointer hover:text-black select-none">Total {sortCol === "total" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
               <th className="text-right pb-3 font-medium"></th>
             </tr></thead>
-            <tbody>{sortedRecs.map((r) => { const days = daysSince(r.fecha_reclamo); const total = calcSub(r.reclamo_items ?? []) * 1.177; const isOpen = r.estado !== "Aplicada"; return (
+            <tbody>{sortedRecs.map((r) => { const days = daysSince(r.fecha_reclamo); const total = calcSub(r.reclamo_items ?? []) * 1.177; const isOpen = r.estado !== "Resuelto con NC" && r.estado !== "Rechazado"; return (
               <tr key={r.id} onClick={() => selectionMode ? (isOpen && toggleSelect(r.id)) : loadDetail(r.id)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
                 {selectionMode && <td className="py-3"><input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!isOpen} className="accent-black disabled:opacity-30" /></td>}
-                <td className="py-3 font-medium">{r.nro_factura}</td><td className="py-3"><span className="text-gray-500 text-xs">{r.nro_reclamo}</span></td><td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
+                <td className="py-3 font-medium text-xs">{r.nro_reclamo}</td><td className="py-3 text-gray-500">{r.nro_factura}</td><td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
                 <td className={`py-3 text-right tabular-nums ${days > 60 && isOpen ? "text-red-600 font-medium" : days > 30 && isOpen ? "text-amber-600" : "text-gray-400"}`}>{days}d</td>
                 <td className="py-3"><span className={`text-[11px] px-2 py-0.5 rounded-full ${EC[r.estado] || "bg-gray-100 text-gray-500"}`}>{r.estado}</span></td>
                 <td className="py-3 text-right tabular-nums">${fmt(total)}</td>
@@ -472,7 +511,17 @@ export default function ReclamosPage() {
                 </td>
                 <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-center" /></td>
                 <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-right" /></td>
-                <td className="py-2 pr-1"><select value={item.motivo} onChange={(e) => updateItem(idx, "motivo", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent"><option value="">—</option>{MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}</select></td>
+                <td className="py-2 pr-1">
+                  {addingMotivo === idx ? (
+                    <div className="flex items-center gap-1">
+                      <input type="text" value={newMotivoText} onChange={(e) => setNewMotivoText(e.target.value)} placeholder="Nuevo motivo..." className="w-full border-b border-gray-200 py-1 text-sm outline-none" autoFocus onKeyDown={(e) => { if (e.key === "Enter" && newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateItem(idx, "motivo", newMotivoText.trim()); setNewMotivoText(""); setAddingMotivo(null); } }} />
+                      <button onClick={() => { if (newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateItem(idx, "motivo", newMotivoText.trim()); } setNewMotivoText(""); setAddingMotivo(null); }} className="text-xs text-gray-400 hover:text-black">OK</button>
+                      <button onClick={() => { setNewMotivoText(""); setAddingMotivo(null); }} className="text-xs text-gray-300 hover:text-black">x</button>
+                    </div>
+                  ) : (
+                    <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingMotivo(idx); setNewMotivoText(""); } else updateItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent"><option value="">--</option>{MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}<option value="__add__">+ Agregar motivo</option></select>
+                  )}
+                </td>
                 <td className="py-2 text-right tabular-nums text-gray-500 text-xs">${fmt((item.cantidad || 0) * (item.precio_unitario || 0))}</td>
                 <td className="py-2 text-center">{fItems.length > 1 && <button onClick={() => setFItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm">×</button>}</td>
               </tr>))}</tbody>
@@ -552,23 +601,19 @@ export default function ReclamosPage() {
         <span className={`text-xs px-3 py-1 rounded-full ${EC[current.estado] || "bg-gray-100 text-gray-500"}`}>{current.estado}</span>
       </div>
 
-      <div className="flex items-center gap-0 mb-8">{ESTADOS.map((e, i) => {
-        const active = ESTADOS.indexOf(current.estado) >= i;
+      <div className="flex items-center gap-1 mb-8 flex-wrap">{ESTADOS.map((e) => {
         const isCurrent = current.estado === e;
-        const isFirst = i === 0;
-        const isLast = i === ESTADOS.length - 1;
-        const rounding = isFirst ? "rounded-l-full" : isLast ? "rounded-r-full" : "";
         return (
-          <div key={e} className="flex-1 relative">
+          <div key={e} className="relative">
             <button onClick={() => { if (!isCurrent) setConfirmingEstado(confirmingEstado === e ? null : e); }}
-              className={`w-full h-8 text-xs text-center transition px-4 py-2 ${rounding} ${active ? "bg-black text-white" : "bg-gray-100 text-gray-400 hover:bg-gray-200"} ${isCurrent ? "ring-1 ring-black" : ""}`}>
+              className={`h-8 text-xs text-center transition px-4 py-2 rounded-full ${isCurrent ? `${EC[e] || "bg-gray-100 text-gray-500"} ring-1 ring-current font-medium` : "bg-gray-100 text-gray-400 hover:bg-gray-200"}`}>
               {e}
             </button>
             {confirmingEstado === e && !isCurrent && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-10 text-center">
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-10 text-center" style={{ minWidth: 140 }}>
                 <p className="text-[11px] text-gray-500 mb-1.5">Cambiar a {e}?</p>
                 <div className="flex gap-1 justify-center">
-                  <button onClick={() => { if (e === "Aplicada") { setShowAplicadaModal(true); setConfirmingEstado(null); } else changeEstado(e); }} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 transition">Si</button>
+                  <button onClick={() => { if (e === "Resuelto con NC") { setShowAplicadaModal(true); setConfirmingEstado(null); } else changeEstado(e); }} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 transition">Si</button>
                   <button onClick={() => setConfirmingEstado(null)} className="text-[11px] text-gray-400 px-2 py-1 hover:text-black transition">No</button>
                 </div>
               </div>
@@ -678,7 +723,17 @@ export default function ReclamosPage() {
                 <td className="py-2 pr-1"><input type="text" value={item.talla} onChange={(e) => updateEditItem(idx, "talla", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none" style={{minWidth:50}} /></td>
                 <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateEditItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-center" /></td>
                 <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateEditItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-right" /></td>
-                <td className="py-2 pr-1"><select value={item.motivo} onChange={(e) => updateEditItem(idx, "motivo", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent"><option value="">—</option>{MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}</select></td>
+                <td className="py-2 pr-1">
+                  {addingEditMotivo === idx ? (
+                    <div className="flex items-center gap-1">
+                      <input type="text" value={newMotivoText} onChange={(e) => setNewMotivoText(e.target.value)} placeholder="Nuevo motivo..." className="w-full border-b border-gray-200 py-1 text-sm outline-none" autoFocus onKeyDown={(e) => { if (e.key === "Enter" && newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateEditItem(idx, "motivo", newMotivoText.trim()); setNewMotivoText(""); setAddingEditMotivo(null); } }} />
+                      <button onClick={() => { if (newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateEditItem(idx, "motivo", newMotivoText.trim()); } setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-400 hover:text-black">OK</button>
+                      <button onClick={() => { setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-300 hover:text-black">x</button>
+                    </div>
+                  ) : (
+                    <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingEditMotivo(idx); setNewMotivoText(""); } else updateEditItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent"><option value="">--</option>{MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}<option value="__add__">+ Agregar motivo</option></select>
+                  )}
+                </td>
                 <td className="py-2 text-right tabular-nums text-gray-500 text-xs">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>
                 <td className="py-2 text-center">{editItems.length > 1 && <button onClick={() => setEditItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm">×</button>}</td>
               </tr>))}</tbody></table>
@@ -701,7 +756,7 @@ export default function ReclamosPage() {
       {showAplicadaModal && current && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setShowAplicadaModal(false)}>
           <div className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-semibold mb-1">Marcar como Aplicada</h3>
+            <h3 className="text-base font-semibold mb-1">Resuelto con Nota de Crédito</h3>
             <p className="text-sm text-gray-400 mb-6">Registra los datos de la nota de crédito recibida.</p>
             <div className="space-y-4 mb-6">
               <div><label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 block mb-1">N° Nota de Crédito *</label><input type="text" value={aplicadaNc} onChange={(e) => setAplicadaNc(e.target.value)} placeholder="Ej. NC-2026-0034" className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black" autoFocus /></div>
@@ -710,8 +765,8 @@ export default function ReclamosPage() {
             <div className="flex gap-3">
               <button onClick={async () => {
                 if (!aplicadaNc.trim() || !aplicadaMonto) return;
-                await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "Aplicada" }) });
-                await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seguimiento_nota: `Aplicada — N/C ${aplicadaNc} por $${parseFloat(aplicadaMonto).toFixed(2)}`, autor: role }) });
+                await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "Resuelto con NC" }) });
+                await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seguimiento_nota: `Resuelto con NC — N/C ${aplicadaNc} por $${parseFloat(aplicadaMonto).toFixed(2)}`, autor: role }) });
                 setShowAplicadaModal(false); setAplicadaNc(""); setAplicadaMonto(""); await loadDetail(current.id); loadReclamos();
               }} disabled={!aplicadaNc.trim() || !aplicadaMonto} className="flex-1 bg-black text-white px-4 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">Confirmar</button>
               <button onClick={() => { setShowAplicadaModal(false); setConfirmingEstado(null); }} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-full text-sm hover:bg-gray-50 transition">Cancelar</button>
