@@ -4,8 +4,16 @@ import { useState, useEffect, useCallback } from "react";
 import { Product } from "@/components/reebok/supabase";
 import NewOrderModal from "./NewOrderModal";
 
+function getCachedQty(productId: string): number {
+  try {
+    const cached = JSON.parse(localStorage.getItem("reebok_order_items") || "[]");
+    const item = cached.find((i: { product_id: string }) => i.product_id === productId);
+    return item ? item.quantity : 0;
+  } catch { return 0; }
+}
+
 export default function ProductCard({ product, stock = 0 }: { product: Product; stock?: number }) {
-  const [qty, setQty] = useState(0); // 0 = not in order
+  const [qty, setQty] = useState(() => getCachedQty(product.id));
   const [busy, setBusy] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
 
@@ -19,19 +27,23 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
       const res = await fetch(`/api/catalogo/reebok/orders/${id}`);
       if (!res.ok) { setQty(0); return; }
       const order = await res.json();
-      const item = (order.reebok_order_items || []).find((i: { product_id: string }) => i.product_id === product.id);
+      const items = order.reebok_order_items || [];
+      localStorage.setItem("reebok_order_items", JSON.stringify(items));
+      const item = items.find((i: { product_id: string }) => i.product_id === product.id);
       setQty(item ? item.quantity : 0);
     } catch { setQty(0); }
   }, [product.id]);
 
   useEffect(() => { checkOrder(); }, [checkOrder]);
 
-  // Listen for order changes from other cards
+  // Listen for order changes — read from localStorage cache (no API call)
   useEffect(() => {
-    function handler() { checkOrder(); }
+    function handler() {
+      setQty(getCachedQty(product.id));
+    }
     window.addEventListener("reebok-order-changed", handler);
     return () => window.removeEventListener("reebok-order-changed", handler);
-  }, [checkOrder]);
+  }, [product.id]);
 
   async function updateOrder(newQty: number) {
     const activeOrderId = localStorage.getItem("reebok_active_order_id");
@@ -46,7 +58,6 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
 
       let newItems;
       if (newQty <= 0) {
-        // Remove from order
         newItems = items.filter(i => i.product_id !== product.id);
       } else if (idx >= 0) {
         newItems = items.map((i, j) => j === idx ? { ...i, quantity: newQty } : i);
@@ -58,6 +69,7 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: newItems }),
       });
       if (putRes.ok) {
+        localStorage.setItem("reebok_order_items", JSON.stringify(newItems));
         setQty(newQty <= 0 ? 0 : newQty);
         if (newQty > 0 && idx < 0) window.dispatchEvent(new CustomEvent("reebok-toast", { detail: "Agregado" }));
         window.dispatchEvent(new Event("reebok-order-changed"));
@@ -103,7 +115,6 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
           </p>
 
           {inOrder ? (
-            /* In order — show qty controls */
             <div className="mt-2">
               <div className="flex items-center justify-between bg-green-50 rounded px-1">
                 <button onClick={() => updateOrder(qty - 1)} disabled={busy}
@@ -121,7 +132,6 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
               </div>
             </div>
           ) : (
-            /* Not in order — show add button */
             <button onClick={handleAdd} disabled={busy}
               className="w-full mt-2 py-2.5 rounded text-xs font-medium uppercase tracking-wider transition bg-black text-white hover:bg-gray-800 disabled:opacity-40 min-h-[44px]">
               {busy ? "..." : "Agregar"}

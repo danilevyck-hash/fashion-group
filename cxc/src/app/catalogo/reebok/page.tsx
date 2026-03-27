@@ -36,7 +36,7 @@ export default function ReebokLanding() {
       {showNewOrder && (
         <NewOrderModal
           onClose={() => setShowNewOrder(false)}
-          onCreated={(id) => { setShowNewOrder(false); router.push(`/catalogo/reebok/pedido/${id}`); }}
+          onCreated={() => { setShowNewOrder(false); router.push("/catalogo/reebok/productos"); }}
         />
       )}
     </div>

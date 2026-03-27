@@ -1,9 +1,16 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Product } from "@/components/reebok/supabase";
 import ProductCard from "@/components/reebok/ProductCard";
+
+function getOrderCount(): number {
+  try {
+    const items = JSON.parse(localStorage.getItem("reebok_order_items") || "[]");
+    return items.reduce((s: number, i: { quantity: number }) => s + (i.quantity || 0), 0);
+  } catch { return 0; }
+}
 
 export default function ProductosPage() {
   return <Suspense><Productos /></Suspense>;
@@ -11,6 +18,7 @@ export default function ProductosPage() {
 
 function Productos() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -19,11 +27,40 @@ function Productos() {
   const [onlyOferta, setOnlyOferta] = useState(false);
   const [inventoryMap, setInventoryMap] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<string | null>(null);
+  const [orderCount, setOrderCount] = useState(0);
+  const [orderId, setOrderId] = useState("");
 
   useEffect(() => {
     function handler(e: Event) { setToast((e as CustomEvent).detail); setTimeout(() => setToast(null), 1500); }
     window.addEventListener("reebok-toast", handler);
     return () => window.removeEventListener("reebok-toast", handler);
+  }, []);
+
+  // Load order state on mount
+  useEffect(() => {
+    const id = localStorage.getItem("reebok_active_order_id") || "";
+    setOrderId(id);
+    if (id) {
+      setOrderCount(getOrderCount());
+      // Also fetch from API to sync cache
+      fetch(`/api/catalogo/reebok/orders/${id}`).then(r => r.ok ? r.json() : null).then(order => {
+        if (order) {
+          const items = order.reebok_order_items || [];
+          localStorage.setItem("reebok_order_items", JSON.stringify(items));
+          setOrderCount(items.reduce((s: number, i: { quantity: number }) => s + (i.quantity || 0), 0));
+        }
+      }).catch(() => {});
+    }
+  }, []);
+
+  // Listen for order changes
+  useEffect(() => {
+    function handler() {
+      setOrderId(localStorage.getItem("reebok_active_order_id") || "");
+      setOrderCount(getOrderCount());
+    }
+    window.addEventListener("reebok-order-changed", handler);
+    return () => window.removeEventListener("reebok-order-changed", handler);
   }, []);
 
   useEffect(() => {
@@ -100,12 +137,23 @@ function Productos() {
       ) : filtered.length === 0 ? (
         <p className="text-center py-20 text-gray-400 text-sm">No se encontraron productos</p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 ${orderCount > 0 ? "pb-24" : ""}`}>
           {filtered.map(p => <ProductCard key={p.id} product={p} stock={inventoryMap[p.id] || 0} />)}
         </div>
       )}
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2 rounded-full text-sm z-50">{toast}</div>}
+
+      {/* Floating order bar */}
+      {orderCount > 0 && orderId && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 p-4 bg-white border-t border-gray-100 shadow-lg">
+          <button onClick={() => router.push(`/catalogo/reebok/pedido/${orderId}`)}
+            className="w-full bg-black text-white py-3.5 rounded text-sm font-medium flex items-center justify-between px-4">
+            <span>Ver pedido</span>
+            <span>{orderCount} bulto{orderCount !== 1 ? "s" : ""} →</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
