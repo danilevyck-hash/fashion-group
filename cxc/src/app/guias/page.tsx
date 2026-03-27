@@ -527,13 +527,13 @@ export default function GuiasPage() {
           <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Información General</div>
           <div className="grid grid-cols-2 gap-x-12 gap-y-6">
             <div>
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Fecha *</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Fecha <span className="text-red-500">*</span></label>
               <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
                 className={inputClass("fecha", "w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition")} />
             </div>
             <div>
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
-                Transportista *
+                Transportista <span className="text-red-500">*</span>
                 <AddNewInline placeholder="Nombre" onAdd={addTransportista} />
               </label>
               <select value={transportista} onChange={(e) => setTransportista(e.target.value)}
@@ -591,23 +591,23 @@ export default function GuiasPage() {
 
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
-                <th className="pb-3 font-medium w-10 text-left">#</th>
-                <th className="pb-3 font-medium text-left">
-                  Cliente *
+              <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
+                <th className="py-3 px-4 font-normal w-10 text-left">#</th>
+                <th className="py-3 px-4 font-normal text-left">
+                  Cliente <span className="text-red-500">*</span>
                   <AddNewInline placeholder="Cliente" onAdd={(v) => { addCliente(v); }} />
                 </th>
-                <th className="pb-3 font-medium text-left">
-                  Dirección *
+                <th className="py-3 px-4 font-normal text-left">
+                  Dirección <span className="text-red-500">*</span>
                   <AddNewInline placeholder="Ciudad" onAdd={(v) => { addDireccion(v); }} />
                 </th>
-                <th className="pb-3 font-medium text-left">
+                <th className="py-3 px-4 font-normal text-left">
                   Empresa
                   <AddNewInline placeholder="Empresa" onAdd={(v) => { addEmpresa(v); }} />
                 </th>
-                <th className="pb-3 font-medium text-left">Factura(s) *</th>
-                <th className="pb-3 font-medium w-20 text-center">Bultos *</th>
-                <th className="pb-3 w-8"></th>
+                <th className="py-3 px-4 font-normal text-left">Factura(s) <span className="text-red-500">*</span></th>
+                <th className="py-3 px-4 font-normal w-20 text-center">Bultos <span className="text-red-500">*</span></th>
+                <th className="py-3 w-8"></th>
               </tr>
             </thead>
             <tbody>
@@ -657,13 +657,13 @@ export default function GuiasPage() {
         {/* Footer */}
         <div className="mb-10">
           <div className="flex items-center gap-2">
-            <span className="text-xs uppercase tracking-widest text-gray-400">Total de bultos:</span>
+            <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Total de bultos:</span>
             <span className="text-lg font-semibold tabular-nums">{totalBultos}</span>
           </div>
         </div>
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center gap-6">
           <button onClick={saveGuia} disabled={saving || !items.some((i) => i.cliente)}
             className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
             {saving ? "Guardando..." : editingId ? "Guardar Cambios" : "Guardar y Imprimir"}
@@ -683,8 +683,8 @@ export default function GuiasPage() {
     const bultos = guiaItems.reduce((s, i) => s + (i.bultos || 0), 0);
 
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12">
-        <div className="flex gap-4 mb-8 no-print">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
+        <div className="flex flex-wrap gap-4 mb-8 no-print">
           <button onClick={() => setView("list")} className="text-sm text-gray-400 hover:text-black transition">← Volver</button>
           <button onClick={() => window.print()} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
             Imprimir

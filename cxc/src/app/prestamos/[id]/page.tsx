@@ -330,7 +330,7 @@ export default function PrestamoDetallePage() {
         ]}
       />
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         {/* Header */}
         <div className="flex items-start justify-between mb-6">
           <div>

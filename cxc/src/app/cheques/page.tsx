@@ -283,33 +283,33 @@ export default function ChequesPage() {
           <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">{editingId ? "Editar Cheque" : "Nuevo Cheque"}</div>
           <div className="grid grid-cols-2 gap-x-8 gap-y-4">
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Cliente *</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Cliente <span className="text-red-500">*</span></label>
               <input type="text" value={fCliente} onChange={(e) => setFCliente(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition" />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa *</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa <span className="text-red-500">*</span></label>
               <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition">
                 <option value="">Seleccionar...</option>
                 {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Banco *</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Banco <span className="text-red-500">*</span></label>
               <select value={fBanco} onChange={(e) => setFBanco(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition">
                 <option value="">Seleccionar...</option>
                 {BANCOS.map((b) => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Cheque *</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Cheque <span className="text-red-500">*</span></label>
               <input type="text" value={fNumero} onChange={(e) => setFNumero(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition" />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Monto *</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Monto <span className="text-red-500">*</span></label>
               <input type="number" step="0.01" value={fMonto} onChange={(e) => setFMonto(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition" />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha Depósito *</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha Depósito <span className="text-red-500">*</span></label>
               <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition" />
             </div>
             <div className="flex flex-col gap-1">

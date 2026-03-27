@@ -261,7 +261,7 @@ export default function VentasPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
 
         {/* Year selector */}
-        <div className="flex items-center gap-2 mb-8">
+        <div className="flex flex-wrap items-center gap-2 mb-8">
           {(años.length > 0 ? años : [new Date().getFullYear()]).map((y) => (
             <button key={y} onClick={() => setSelectedYear(y)}
               className={`px-4 py-1.5 text-sm rounded-full transition ${selectedYear === y ? "bg-black text-white font-medium" : "text-gray-400 hover:text-black"}`}>
@@ -336,33 +336,33 @@ export default function VentasPage() {
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-3 py-2.5 font-medium text-gray-500 sticky left-0 bg-gray-50 z-[1] min-w-[140px]">Empresa</th>
+                      <th className="text-left px-4 py-3 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal sticky left-0 bg-gray-50 z-[1] min-w-[140px]">Empresa</th>
                       {MESES.map((m, i) => (
-                        <th key={m} className={`text-right px-2 py-2.5 font-medium text-gray-500 min-w-[70px] ${i + 1 === currentMonth ? "bg-blue-50" : ""}`}>{m}</th>
+                        <th key={m} className={`text-right px-2 py-3 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal min-w-[70px] ${i + 1 === currentMonth ? "bg-blue-50" : ""}`}>{m}</th>
                       ))}
-                      <th className="text-right px-3 py-2.5 font-medium text-gray-700 min-w-[90px]">Total</th>
-                      <th className="text-right px-3 py-2.5 font-medium text-gray-500 min-w-[50px]">%</th>
-                      <th className="text-right px-3 py-2.5 font-medium text-gray-500 min-w-[60px]">Margen</th>
+                      <th className="text-right px-4 py-3 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal min-w-[90px]">Total</th>
+                      <th className="text-right px-4 py-3 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal min-w-[50px]">%</th>
+                      <th className="text-right px-4 py-3 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal min-w-[60px]">Margen</th>
                     </tr>
                   </thead>
                   <tbody>
                     {empresaRows.map((row) => (<>
                       <tr key={row.empresa} onClick={() => setExpandedEmpresa(expandedEmpresa === row.empresa ? null : row.empresa)}
-                        className="border-b border-gray-100 hover:bg-gray-50/70 transition cursor-pointer">
-                        <td className="px-3 py-2.5 font-medium text-gray-800 sticky left-0 bg-white z-[1]">
+                        className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
+                        <td className="px-4 py-3 font-medium text-gray-800 sticky left-0 bg-white z-[1]">
                           <span className="flex items-center gap-1.5">
                             <svg width="8" height="8" viewBox="0 0 10 10" className={`text-gray-400 transition-transform ${expandedEmpresa === row.empresa ? "rotate-90" : ""}`} fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg>
                             {row.empresa}
                           </span>
                         </td>
                         {row.months.map((v, i) => (
-                          <td key={i} className={`text-right px-2 py-2.5 tabular-nums ${v === null ? "text-gray-200" : "text-gray-700"} ${i + 1 === currentMonth ? "bg-blue-50/50" : ""}`}>
+                          <td key={i} className={`text-right px-2 py-3 tabular-nums ${v === null ? "text-gray-200" : "text-gray-700"} ${i + 1 === currentMonth ? "bg-blue-50/50" : ""}`}>
                             {v !== null ? fmtK(v) : "—"}
                           </td>
                         ))}
-                        <td className="text-right px-3 py-2.5 tabular-nums font-semibold">${fmt(row.total)}</td>
-                        <td className="text-right px-3 py-2.5 tabular-nums text-gray-400">{groupTotal > 0 ? `${((row.total / groupTotal) * 100).toFixed(0)}%` : "—"}</td>
-                        <td className={`text-right px-3 py-2.5 tabular-nums ${row.margen > 30 ? "text-emerald-600" : row.margen > 20 ? "text-amber-600" : "text-gray-400"}`}>{row.margen.toFixed(1)}%</td>
+                        <td className="text-right px-4 py-3 tabular-nums font-semibold">${fmt(row.total)}</td>
+                        <td className="text-right px-4 py-3 tabular-nums text-gray-400">{groupTotal > 0 ? `${((row.total / groupTotal) * 100).toFixed(0)}%` : "—"}</td>
+                        <td className={`text-right px-4 py-3 tabular-nums ${row.margen > 30 ? "text-emerald-600" : row.margen > 20 ? "text-amber-600" : "text-gray-400"}`}>{row.margen.toFixed(1)}%</td>
                       </tr>
                       {/* Client drill-down */}
                       {expandedEmpresa === row.empresa && (
@@ -389,16 +389,16 @@ export default function VentasPage() {
                               <p className="text-xs text-gray-400">Sin datos de clientes para este periodo — sube un CSV con desglose por cliente para ver el top</p>
                             ) : (
                               <table className="w-full text-xs max-w-lg">
-                                <thead><tr className="border-b border-gray-200 text-gray-400"><th className="text-left py-1 w-8">#</th><th className="text-left py-1">Cliente</th><th className="text-right py-1">Ventas</th><th className="text-right py-1">%</th></tr></thead>
+                                <thead><tr className="border-b border-gray-200"><th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal w-8">#</th><th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Cliente</th><th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Ventas</th><th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">%</th></tr></thead>
                                 <tbody>
                                   {clientes.map((c, i) => {
                                     const empTotal = clientes.reduce((s, x) => s + x.ventas, 0);
                                     return (
-                                      <tr key={c.cliente} className="border-b border-gray-100">
-                                        <td className="py-1.5 text-gray-300">{i + 1}</td>
-                                        <td className="py-1.5 font-medium">{c.cliente}</td>
-                                        <td className="py-1.5 text-right tabular-nums">${fmt(c.ventas)}</td>
-                                        <td className="py-1.5 text-right tabular-nums text-gray-400">{empTotal > 0 ? `${((c.ventas / empTotal) * 100).toFixed(1)}%` : ""}</td>
+                                      <tr key={c.cliente} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                        <td className="py-3 px-4 text-gray-300">{i + 1}</td>
+                                        <td className="py-3 px-4 font-medium">{c.cliente}</td>
+                                        <td className="py-3 px-4 text-right tabular-nums">${fmt(c.ventas)}</td>
+                                        <td className="py-3 px-4 text-right tabular-nums text-gray-400">{empTotal > 0 ? `${((c.ventas / empTotal) * 100).toFixed(1)}%` : ""}</td>
                                       </tr>
                                     );
                                   })}
@@ -429,7 +429,7 @@ export default function VentasPage() {
           {/* Data Entry Section */}
           <div className="border border-gray-200 rounded-xl p-6">
             <div className="flex items-center gap-4 mb-6">
-              <h2 className="text-sm font-semibold">Cargar Datos</h2>
+              <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Cargar Datos</h2>
               <div className="flex gap-1">
                 {(["manual", "csv", "metas"] as const).map((tab) => (
                   <button key={tab} onClick={() => setActiveTab(tab)}
@@ -570,7 +570,8 @@ export default function VentasPage() {
 
         {/* Toast */}
         {toast && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-50">
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-50 flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             {toast}
           </div>
         )}
