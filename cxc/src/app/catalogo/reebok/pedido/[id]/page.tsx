@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
 interface Order { id: string; order_number: string; client_name: string; vendor_name: string; comment: string; total: number; reebok_order_items: OrderItem[]; created_at: string; }
 interface SearchResult { id: string; sku: string; name: string; price: number; image_url: string; }
+interface DirClient { nombre: string; empresa: string; correo: string; }
 
 const P = 12;
 function fmt(n: number) { return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
@@ -24,7 +25,12 @@ export default function OrderDetailPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  // Search
+  // Client autocomplete (FIX 1)
+  const [clientSuggestions, setClientSuggestions] = useState<DirClient[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const clientRef = useRef<HTMLDivElement>(null);
+
+  // Product search
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
@@ -41,12 +47,40 @@ export default function OrderDetailPage() {
         setItems(data.reebok_order_items || []);
         setClientName(data.client_name || "");
         setComment(data.comment || "");
+        // FIX 2: Auto-set as active order
+        localStorage.setItem("reebok_active_order_id", data.id);
+        localStorage.setItem("reebok_active_order_number", data.order_number);
       } else router.push("/catalogo/reebok/pedidos");
     } catch { router.push("/catalogo/reebok/pedidos"); }
     setLoading(false);
   }, [id, router]);
 
   useEffect(() => { load(); }, [load]);
+
+  // FIX 1: Client name autocomplete
+  useEffect(() => {
+    if (clientName.length < 2) { setClientSuggestions([]); return; }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/catalogo/reebok/clientes-search?q=${encodeURIComponent(clientName)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setClientSuggestions(data || []);
+          setShowSuggestions((data || []).length > 0);
+        }
+      } catch { /* */ }
+    }, 300);
+    return () => clearTimeout(t);
+  }, [clientName]);
+
+  // Close suggestions on click outside
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (clientRef.current && !clientRef.current.contains(e.target as Node)) setShowSuggestions(false);
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   // Product search
   useEffect(() => {
@@ -55,10 +89,7 @@ export default function OrderDetailPage() {
       setSearching(true);
       try {
         const res = await fetch(`/api/catalogo/reebok/products?search=${encodeURIComponent(search)}&active=true`);
-        if (res.ok) {
-          const data = await res.json();
-          setResults((data || []).slice(0, 6));
-        }
+        if (res.ok) setResults(((await res.json()) || []).slice(0, 6));
       } catch { /* */ }
       setSearching(false);
     }, 300);
@@ -74,10 +105,7 @@ export default function OrderDetailPage() {
   function updateItem(idx: number, field: string, value: number) {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it));
   }
-
-  function removeItem(idx: number) {
-    setItems(prev => prev.filter((_, i) => i !== idx));
-  }
+  function removeItem(idx: number) { setItems(prev => prev.filter((_, i) => i !== idx)); }
 
   function addProduct(p: SearchResult) {
     const existing = items.findIndex(i => i.product_id === p.id);
@@ -104,10 +132,12 @@ export default function OrderDetailPage() {
     setSaving(false);
   }
 
+  // FIX 4: PDF with autoTable as function
   async function downloadPDF() {
     if (!order) return;
     const { jsPDF } = await import("jspdf");
-    await import("jspdf-autotable");
+    const autoTableModule = await import("jspdf-autotable");
+    const autoTable = autoTableModule.default;
     const doc = new jsPDF("portrait");
 
     doc.setFillColor(204, 0, 0);
@@ -120,8 +150,7 @@ export default function OrderDetailPage() {
     doc.text("Fashion Group", 196, 17, { align: "right" });
 
     const rows = items.map(i => [i.sku || "", i.name || "", String(i.quantity), String(i.quantity * P), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * P * Number(i.unit_price))}`]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: 28,
       head: [["SKU", "Producto", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
       body: rows,
@@ -159,6 +188,7 @@ export default function OrderDetailPage() {
     if (!confirm("¿Eliminar este pedido permanentemente?")) return;
     await fetch(`/api/catalogo/reebok/orders/${id}`, { method: "DELETE" });
     localStorage.removeItem("reebok_active_order_id");
+    localStorage.removeItem("reebok_active_order_number");
     router.push("/catalogo/reebok/pedidos");
   }
 
@@ -166,12 +196,27 @@ export default function OrderDetailPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
-        <div>
+        <div className="flex-1">
           <Link href="/catalogo/reebok/pedidos" className="text-xs text-gray-400 hover:text-gray-700 transition">← Pedidos</Link>
           <div className="flex items-center gap-3 mt-1">
             <span className="font-mono text-sm font-bold text-reebok-red">{order.order_number}</span>
-            <input value={clientName} onChange={e => setClientName(e.target.value)}
-              className="text-xl font-bold border-b border-transparent hover:border-gray-300 focus:border-black outline-none transition py-0.5" />
+            {/* FIX 1: Client name with autocomplete */}
+            <div className="relative flex-1" ref={clientRef}>
+              <input value={clientName} onChange={e => { setClientName(e.target.value); }}
+                onFocus={() => { if (clientSuggestions.length > 0) setShowSuggestions(true); }}
+                className="text-xl font-bold border-b border-transparent hover:border-gray-300 focus:border-black outline-none transition py-0.5 w-full" />
+              {showSuggestions && clientSuggestions.length > 0 && (
+                <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                  {clientSuggestions.slice(0, 5).map((c, i) => (
+                    <button key={i} onClick={() => { setClientName(c.nombre); setShowSuggestions(false); }}
+                      className="w-full text-left px-3 py-2 hover:bg-gray-50 transition text-sm border-b border-gray-50 last:border-0">
+                      <span className="font-medium">{c.nombre}</span>
+                      {c.empresa && <span className="text-xs text-gray-400 ml-2">{c.empresa}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
           <p className="text-xs text-gray-400 mt-1">{new Date(order.created_at).toLocaleDateString("es-PA")}</p>
         </div>
@@ -179,7 +224,7 @@ export default function OrderDetailPage() {
 
       {/* Items table */}
       {items.length > 0 && (
-        <div className="border border-gray-200 rounded-xl overflow-hidden mb-6">
+        <div className="border border-gray-200 rounded-xl overflow-hidden mb-4">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
@@ -209,7 +254,8 @@ export default function OrderDetailPage() {
                   </td>
                   <td className="px-3 py-2 text-center text-xs text-gray-400">{item.quantity * P}</td>
                   <td className="px-3 py-2 text-right">
-                    <input type="number" step="0.01" min={0} value={item.unit_price} onChange={e => updateItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
+                    {/* FIX 3: step=1, min=0 */}
+                    <input type="number" step={1} min={0} value={item.unit_price} onChange={e => updateItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
                       className="w-16 text-right border border-gray-200 rounded px-1 py-1 text-xs" />
                   </td>
                   <td className="px-3 py-2 text-right tabular-nums text-xs font-medium">${fmt(item.quantity * P * Number(item.unit_price))}</td>
@@ -225,27 +271,32 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* Add product */}
-      <div className="mb-6 relative">
-        <label className="text-[11px] text-gray-400 uppercase block mb-1">Agregar producto</label>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por SKU o nombre..."
-          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-gray-300" />
-        {searching && <span className="absolute right-3 top-8 text-xs text-gray-300">Buscando...</span>}
-        {results.length > 0 && (
-          <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-            {results.map(p => (
-              <button key={p.id} onClick={() => addProduct(p)} className="w-full text-left px-3 py-2 hover:bg-gray-50 transition flex items-center gap-3 border-b border-gray-50 last:border-0">
-                <div className="w-8 h-8 bg-gray-100 rounded overflow-hidden flex-shrink-0">
-                  {p.image_url ? <img src={p.image_url} alt="" className="w-full h-full object-contain" /> : null}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium truncate">{p.name}</div>
-                  <div className="text-[10px] text-gray-400">{p.sku} · ${fmt(p.price || 0)}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
+      {/* FIX 2+5: Add product section */}
+      <div className="mb-6">
+        <div className="flex items-center gap-3 mb-2">
+          <label className="text-[11px] text-gray-400 uppercase">Agregar producto</label>
+          <Link href="/catalogo/reebok" className="text-xs text-reebok-red hover:underline">➕ Ver catálogo completo</Link>
+        </div>
+        <div className="relative">
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por SKU o nombre..."
+            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-gray-300" />
+          {searching && <span className="absolute right-3 top-3 text-xs text-gray-300">Buscando...</span>}
+          {results.length > 0 && (
+            <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+              {results.map(p => (
+                <button key={p.id} onClick={() => addProduct(p)} className="w-full text-left px-3 py-2 hover:bg-gray-50 transition flex items-center gap-3 border-b border-gray-50 last:border-0">
+                  <div className="w-8 h-8 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                    {p.image_url ? <img src={p.image_url} alt="" className="w-full h-full object-contain" /> : null}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium truncate">{p.name}</div>
+                    <div className="text-[10px] text-gray-400">{p.sku} · ${fmt(p.price || 0)}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Comment */}

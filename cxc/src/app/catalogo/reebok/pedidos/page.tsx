@@ -130,7 +130,6 @@ export default function PedidosPage() {
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center gap-2 justify-end">
                       <Link href={`/catalogo/reebok/pedido/${o.id}`} className="text-xs text-blue-600 hover:underline">Abrir</Link>
-                      {activeId !== o.id && <button onClick={() => activate(o.id)} className="text-xs text-green-600 hover:underline">Activar</button>}
                       <button onClick={() => deleteOrder(o.id)} className="text-xs text-gray-400 hover:text-red-500">Eliminar</button>
                     </div>
                   </td>

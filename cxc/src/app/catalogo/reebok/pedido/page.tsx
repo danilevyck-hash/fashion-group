@@ -44,7 +44,6 @@ export default function Pedido() {
 
   function selectClient(c: DirClient) {
     setClientName(c.nombre)
-    if (c.correo) setClientEmail(c.correo)
     setShowSuggestions(false)
     setSuggestions([])
   }
