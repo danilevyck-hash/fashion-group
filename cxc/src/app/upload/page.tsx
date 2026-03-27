@@ -20,7 +20,7 @@ export default function UploadPage() {
   const [uploads, setUploads] = useState<Record<string, UploadStatus>>({});
   const [uploading, setUploading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "ok" | "err" } | null>(null);
-  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const uploadRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [userRole, setUserRole] = useState<string>("");
   const [csvPreview, setCsvPreview] = useState<{ headers: string[]; rows: string[][]; totalRows: number; companyKey: string; valid: boolean; error: string } | null>(null);
   const [pendingText, setPendingText] = useState("");
@@ -157,7 +157,7 @@ export default function UploadPage() {
       setMessage({ text: `Error: ${msg}`, type: "err" });
     } finally {
       setUploading(null);
-      const ref = fileRefs.current[companyKey];
+      const ref = uploadRefs.current[companyKey];
       if (ref) ref.value = "";
     }
   }
@@ -262,44 +262,40 @@ export default function UploadPage() {
               </div>
 
               <div>
-                <label
-                  className={`text-sm px-4 py-2 rounded border transition inline-block cursor-pointer ${
+                <input
+                  type="file"
+                  accept=".csv,.txt"
+                  className="hidden"
+                  ref={(el) => { uploadRefs.current[co.key] = el; }}
+                  disabled={uploading !== null}
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (!f) return;
+                    try {
+                      const text = await f.text();
+                      const preview = parseCSVPreview(text, co.key);
+                      setCsvPreview(preview);
+                      setPendingText(text);
+                      setPendingFile(f);
+                    } catch (err) {
+                      console.error("CSV parse error:", err);
+                      setMessage({ text: `Error al leer archivo: ${err}`, type: "err" });
+                    }
+                    e.target.value = "";
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => uploadRefs.current[co.key]?.click()}
+                  disabled={uploading !== null}
+                  className={`text-sm px-4 py-2 rounded border transition ${
                     uploading === co.key
                       ? "border-gray-200 text-gray-400 cursor-wait"
-                      : uploading !== null
-                      ? "border-gray-200 text-gray-400 pointer-events-none"
                       : "border-black text-black hover:bg-black hover:text-white"
                   }`}
                 >
                   {uploading === co.key ? "Cargando..." : "Cargar CSV"}
-                  <input
-                    type="file"
-                    accept=".csv,.txt"
-                    className="sr-only"
-                    disabled={uploading !== null}
-                    onChange={async (e) => {
-                      const f = e.target.files?.[0];
-                      console.log("[CSV Upload] onChange fired:", f?.name, f?.size, "bytes");
-                      if (!f) { console.log("[CSV Upload] No file selected"); return; }
-                      try {
-                        const text = await f.text();
-                        console.log("[CSV Upload] File read OK, length:", text.length, "first 100 chars:", text.substring(0, 100));
-                        const preview = parseCSVPreview(text, co.key);
-                        console.log("[CSV Upload] parseCSVPreview result:", JSON.stringify({ valid: preview.valid, error: preview.error, headers: preview.headers.length, rows: preview.rows.length, totalRows: preview.totalRows }));
-                        setCsvPreview(preview);
-                        console.log("[CSV Upload] setCsvPreview called");
-                        setPendingText(text);
-                        setPendingFile(f);
-                        console.log("[CSV Upload] All state set, preview should render");
-                      } catch (err) {
-                        console.error("[CSV Upload] Error:", err);
-                        setMessage({ text: `Error al leer archivo: ${err}`, type: "err" });
-                      }
-                      // Reset so same file can be re-selected
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
+                </button>
               </div>
             </div>
           );
