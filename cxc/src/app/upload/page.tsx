@@ -67,7 +67,11 @@ export default function UploadPage() {
     setMessage(null);
 
     try {
-      const text = await file.text();
+      const text = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => resolve(ev.target?.result as string || "");
+        reader.readAsText(file, "latin1");
+      });
       const parsed = Papa.parse(text, {
         delimiter: ";",
         header: true,
@@ -275,7 +279,11 @@ export default function UploadPage() {
                     onChange={async (e) => {
                       const f = e.target.files?.[0];
                       if (!f) return;
-                      const text = await f.text();
+                      const text = await new Promise<string>((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => resolve(ev.target?.result as string || "");
+                        reader.readAsText(f, "latin1");
+                      });
                       const preview = parseCSVPreview(text, co.key);
                       setCsvPreview(preview);
                       setPendingText(text);
