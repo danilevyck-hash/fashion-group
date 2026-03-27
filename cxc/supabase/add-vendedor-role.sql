@@ -1,7 +1,7 @@
 -- Add vendedor role and catalogo_reebok module to role_permissions
 INSERT INTO role_permissions (role, modulos, activo) VALUES
   ('vendedor', ARRAY['catalogo_reebok','cxc','directorio'], true)
-ON CONFLICT (role) DO NOTHING;
+ON CONFLICT (role) DO UPDATE SET modulos = ARRAY['catalogo_reebok','cxc','directorio'];
 
 -- Add catalogo_reebok to admin and director roles
 UPDATE role_permissions SET modulos = array_append(modulos, 'catalogo_reebok')

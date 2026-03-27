@@ -7,6 +7,8 @@ import { useState } from 'react'
 export default function Pedido() {
   const { items, removeFromCart, updateQuantity, clearCart } = useCart()
   const [exporting, setExporting] = useState('')
+  const [clientName, setClientName] = useState('')
+  const [clientEmail, setClientEmail] = useState('')
   const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '50760000000'
 
   const PIEZAS_POR_BULTO = 12
@@ -134,23 +136,46 @@ export default function Pedido() {
     setExporting('')
   }
 
+  const sendOrderEmail = async () => {
+    try {
+      await fetch('/api/catalogo/reebok/send-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName: clientName || 'Sin nombre',
+          clientEmail: clientEmail || undefined,
+          items: items.map(item => ({
+            productName: item.productName,
+            productId: item.productId,
+            quantity: item.quantity,
+            piezas: item.quantity * PIEZAS_POR_BULTO,
+            price: item.price,
+            subtotal: item.price ? item.price * item.quantity * PIEZAS_POR_BULTO : 0,
+          })),
+          totalBultos, totalPiezas, total,
+        }),
+      })
+    } catch { /* email send is best-effort */ }
+  }
+
   const handleWhatsApp = async () => {
     setExporting('whatsapp')
     try {
+      // Send email simultaneously
+      sendOrderEmail()
+
       const doc = await generatePDF()
       const pdfBlob = doc.output('blob')
       const pdfFile = new File([pdfBlob], 'pedido-reebok.pdf', { type: 'application/pdf' })
 
-      // Try Web Share API (works on mobile — shares PDF directly to WhatsApp)
       if (navigator.share && navigator.canShare?.({ files: [pdfFile] })) {
         await navigator.share({
           title: 'Pedido Reebok',
-          text: `Pedido: ${totalBultos} bultos — $${total.toFixed(2)}`,
+          text: `Pedido de ${clientName || 'cliente'}: ${totalBultos} bultos — $${total.toFixed(2)}`,
           files: [pdfFile],
         })
       } else {
-        // Fallback for desktop: open WhatsApp with text
-        let msg = 'Hola! Quiero hacer un pedido:\n\n'
+        let msg = `Hola! Soy ${clientName || 'cliente'}. Quiero hacer un pedido:\n\n`
         items.forEach((item, i) => {
           msg += `${i + 1}. ${item.productName} — ${item.quantity} bultos (${item.quantity * PIEZAS_POR_BULTO} pzs)`
           if (item.price) msg += ` — $${(item.price * item.quantity * PIEZAS_POR_BULTO).toFixed(2)}`
@@ -180,6 +205,20 @@ export default function Pedido() {
     <div className="max-w-3xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-2">Tu pedido</h1>
       <p className="text-gray-500 mb-6">{totalBultos} bultos ({totalPiezas} piezas) — <span className="text-reebok-red font-bold">${total.toFixed(2)}</span></p>
+
+      {/* Client info */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+        <div>
+          <label className="text-[11px] text-gray-400 uppercase tracking-wider block mb-1">Nombre del cliente *</label>
+          <input type="text" value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Nombre completo"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-gray-300" />
+        </div>
+        <div>
+          <label className="text-[11px] text-gray-400 uppercase tracking-wider block mb-1">Email <span className="normal-case text-gray-300">(opcional)</span></label>
+          <input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)} placeholder="email@ejemplo.com"
+            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-gray-300" />
+        </div>
+      </div>
 
       <div className="space-y-3 mb-8">
         {items.map(item => (

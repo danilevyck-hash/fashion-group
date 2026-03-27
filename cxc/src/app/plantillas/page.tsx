@@ -156,7 +156,7 @@ export default function PlantillasPage() {
   const loadStats = useCallback(async () => { try { const res = await fetch("/api/home-stats"); if (res.ok) setStats(await res.json()); } catch { /* */ } }, []);
 
   useEffect(() => {
-    if (authChecked) { loadStats(); if (role === "admin" || role === "director") loadCxc(); }
+    if (authChecked) { loadStats(); if (role === "admin" || role === "director" || role === "vendedor") loadCxc(); }
   }, [authChecked, role, loadCxc, loadStats]);
 
   if (!authChecked) return null;
