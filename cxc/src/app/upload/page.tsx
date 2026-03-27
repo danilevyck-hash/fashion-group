@@ -277,20 +277,26 @@ export default function UploadPage() {
                     accept=".csv,.txt"
                     className="sr-only"
                     disabled={uploading !== null}
-                    onClick={(e) => { (e.target as HTMLInputElement).value = ""; }}
                     onChange={async (e) => {
                       const f = e.target.files?.[0];
-                      if (!f) return;
+                      console.log("[CSV Upload] onChange fired:", f?.name, f?.size, "bytes");
+                      if (!f) { console.log("[CSV Upload] No file selected"); return; }
                       try {
                         const text = await f.text();
+                        console.log("[CSV Upload] File read OK, length:", text.length, "first 100 chars:", text.substring(0, 100));
                         const preview = parseCSVPreview(text, co.key);
+                        console.log("[CSV Upload] parseCSVPreview result:", JSON.stringify({ valid: preview.valid, error: preview.error, headers: preview.headers.length, rows: preview.rows.length, totalRows: preview.totalRows }));
                         setCsvPreview(preview);
+                        console.log("[CSV Upload] setCsvPreview called");
                         setPendingText(text);
                         setPendingFile(f);
+                        console.log("[CSV Upload] All state set, preview should render");
                       } catch (err) {
-                        console.error("CSV parse error:", err);
+                        console.error("[CSV Upload] Error:", err);
                         setMessage({ text: `Error al leer archivo: ${err}`, type: "err" });
                       }
+                      // Reset so same file can be re-selected
+                      e.target.value = "";
                     }}
                   />
                 </label>
