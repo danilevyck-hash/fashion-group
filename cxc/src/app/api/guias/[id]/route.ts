@@ -65,6 +65,20 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json(data);
 }
 
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const body = await req.json();
+  const allowed = ["placa", "observaciones", "estado", "nombre_entregador", "cedula_entregador", "firma_transportista"];
+  const update: Record<string, unknown> = {};
+  for (const key of allowed) {
+    if (body[key] !== undefined) update[key] = body[key];
+  }
+  if (Object.keys(update).length === 0) return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+
+  const { error } = await supabaseServer.from("guia_transporte").update(update).eq("id", params.id);
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ ok: true });
+}
+
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   const { id } = params;
 

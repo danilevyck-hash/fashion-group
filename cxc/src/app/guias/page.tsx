@@ -30,10 +30,13 @@ interface Guia {
   guia_items?: GuiaItem[];
 }
 
-const ESTADO_OPTIONS = ["Preparando", "En tránsito", "Entregada", "Con novedad"] as const;
+const ESTADO_OPTIONS = ["Pendiente Bodega", "Listo para Imprimir", "Impreso", "En tránsito", "Entregada", "Con novedad"] as const;
 
 function estadoBadge(estado: string) {
   const colors: Record<string, string> = {
+    "Pendiente Bodega": "bg-amber-50 text-amber-600",
+    "Listo para Imprimir": "bg-green-50 text-green-600",
+    "Impreso": "bg-gray-100 text-gray-500",
     "Preparando": "bg-gray-100 text-gray-600",
     "En tránsito": "bg-blue-50 text-blue-600",
     "Entregada": "bg-green-50 text-green-600",
@@ -348,7 +351,7 @@ export default function GuiasPage() {
         placa,
         observaciones,
         monto_total: montoTotal,
-        estado,
+        estado: editingId ? estado : "Pendiente Bodega",
         items: validItems,
       }),
     });
@@ -357,12 +360,25 @@ export default function GuiasPage() {
       setError(null);
       const guia = await res.json();
       const guiaId = guia.id || editingId;
+
+      // Send email notification for new guias
+      if (!editingId) {
+        const totalB = validItems.reduce((s: number, i: { bultos: number }) => s + (i.bultos || 0), 0);
+        fetch("/api/guias/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subject: `📦 Nueva Guía #${guia.numero} — Pendiente Bodega`,
+            body: `<h2>Guía #${guia.numero}</h2><p><strong>Transportista:</strong> ${transp}</p><p><strong>Total bultos:</strong> ${totalB}</p><p>Pendiente de completar en bodega.</p>`,
+          }),
+        }).catch(() => {});
+      }
+
       const fullRes = await fetch(`/api/guias/${guiaId}`);
       if (fullRes.ok) setPrintGuia(await fullRes.json());
       resetForm();
       loadGuias();
-      setView("print");
-      setTimeout(() => window.print(), 600);
+      setView("list");
     } else {
       setError("Error al guardar. Verifica los datos.");
     }
@@ -457,7 +473,6 @@ export default function GuiasPage() {
                 <th className="text-left py-3 px-4 font-normal">Transportista</th>
                 <th className="text-left py-3 px-4 font-normal">Clientes</th>
                 <th className="text-right py-3 px-4 font-normal">Bultos</th>
-                <th className="text-right py-3 px-4 font-normal">Monto Total</th>
                 <th className="text-left py-3 px-4 font-normal">Estado</th>
                 <th className="text-right py-3 px-4 font-normal"></th>
               </tr>
@@ -475,15 +490,20 @@ export default function GuiasPage() {
                       <td className="py-3 px-4">{g.transportista}</td>
                       <td className="py-3 px-4 text-gray-500 text-sm">{clientesSummary(g.guia_items || [])}</td>
                       <td className="py-3 px-4 text-right tabular-nums">{g.total_bultos}</td>
-                      <td className="py-3 px-4 text-right tabular-nums">${fmtMoney(g.monto_total || 0)}</td>
                       <td className="py-3 px-4">
-                        <span className={`inline-block text-xs px-2.5 py-0.5 rounded-full font-medium ${estadoBadge(g.estado || "Preparando")}`}>
-                          {g.estado || "Preparando"}
+                        <span className={`inline-block text-xs px-2.5 py-0.5 rounded-full font-medium ${estadoBadge(g.estado || "Pendiente Bodega")}`}>
+                          {g.estado || "Pendiente Bodega"}
                         </span>
                       </td>
                       <td className="py-3 px-4 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                        {(g.estado === "Pendiente Bodega" || !g.estado) && (
+                          <a href={`/guias/bodega/${g.id}`} className="text-xs text-amber-600 hover:underline">📱 Bodega</a>
+                        )}
+                        {g.estado === "Listo para Imprimir" && (
+                          <button onClick={() => { viewGuia(g.id); }} className="text-xs text-green-600 hover:underline">🖨️ Imprimir</button>
+                        )}
+                        {g.estado === "Impreso" && <span className="text-xs text-gray-400">✓ Impreso</span>}
                         <button onClick={() => startEdit(g.id)} className="text-sm text-gray-500 hover:text-black transition">Editar</button>
-                        <span className="text-gray-200">·</span>
                         <button onClick={() => deleteGuia(g.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>
                       </td>
                     </tr>
@@ -495,7 +515,6 @@ export default function GuiasPage() {
                         <span className="ml-3 text-sm">{filtered.length} guía{filtered.length !== 1 ? "s" : ""}</span>
                       </td>
                       <td className="py-3 px-4 text-right tabular-nums">{filtered.reduce((s, g) => s + (g.total_bultos || 0), 0)}</td>
-                      <td className="py-3 px-4 text-right tabular-nums">${fmtMoney(filtered.reduce((s, g) => s + (g.monto_total || 0), 0))}</td>
                       <td colSpan={2}></td>
                     </tr>
                   )}
@@ -559,12 +578,6 @@ export default function GuiasPage() {
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Observaciones</label>
               <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
                 rows={1} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
-            </div>
-            <div>
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Monto Total</label>
-              <input type="number" min={0} step="0.01" value={montoTotal || ""} onChange={(e) => setMontoTotal(parseFloat(e.target.value) || 0)}
-                placeholder="0.00"
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
             </div>
             <div>
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Estado</label>
