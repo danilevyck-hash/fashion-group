@@ -270,9 +270,11 @@ export default function UploadPage() {
                     const f = e.target.files?.[0];
                     if (!f) return;
                     const text = await f.text();
-                    setCsvPreview(parseCSVPreview(text, co.key));
-                    setPendingText(text); setPendingFile(f);
-                    e.target.value = "";
+                    const preview = parseCSVPreview(text, co.key);
+                    setCsvPreview(preview);
+                    setPendingText(text);
+                    setPendingFile(f);
+                    setTimeout(() => { e.target.value = ""; }, 100);
                   }}
                 />
                 <button
