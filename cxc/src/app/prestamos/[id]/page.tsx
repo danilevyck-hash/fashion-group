@@ -45,6 +45,54 @@ function progressColorText(pct: number) {
   return "text-red-600";
 }
 
+function getQuincenaRange() {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  if (now.getDate() <= 15) {
+    return { start: new Date(y, m, 1), end: new Date(y, m, 15), label: `1 al 15 de ${MESES_FULL[m + 1]} ${y}` };
+  } else {
+    return { start: new Date(y, m, 16), end: new Date(y, m + 1, 0), label: `16 al ${new Date(y, m + 1, 0).getDate()} de ${MESES_FULL[m + 1]} ${y}` };
+  }
+}
+
+const MESES_FULL = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+const MESES_DET = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+function hasDeduccionEnQuincena(movs: Movimiento[], qStart: Date, qEnd: Date): boolean {
+  const tolerance = 3 * 86400000;
+  return movs.some(m => {
+    if (m.estado !== "aprobado") return false;
+    if (m.concepto !== "Pago" && m.concepto !== "Abono extra") return false;
+    const fecha = new Date(m.fecha + "T12:00:00");
+    return fecha.getTime() >= qStart.getTime() - tolerance && fecha.getTime() <= qEnd.getTime() + tolerance;
+  });
+}
+
+function getLast12Quincenas(): { label: string; start: Date; end: Date }[] {
+  const result: { label: string; start: Date; end: Date }[] = [];
+  const now = new Date();
+  let y = now.getFullYear(), m = now.getMonth();
+  let isSecond = now.getDate() > 15;
+
+  for (let i = 0; i < 12; i++) {
+    const mes = MESES_DET[m + 1];
+    if (isSecond) {
+      result.push({ label: `${mes} ${y} 2da`, start: new Date(y, m, 16), end: new Date(y, m + 1, 0) });
+    } else {
+      result.push({ label: `${mes} ${y} 1ra`, start: new Date(y, m, 1), end: new Date(y, m, 15) });
+    }
+    if (isSecond) {
+      isSecond = false;
+    } else {
+      isSecond = true;
+      m--;
+      if (m < 0) { m = 11; y--; }
+    }
+  }
+  return result;
+}
+
 export default function PrestamoDetallePage() {
   const router = useRouter();
   const params = useParams();
@@ -380,6 +428,49 @@ export default function PrestamoDetallePage() {
             <div className={`h-full ${progressColor(pct)} rounded-full transition-all`} style={{ width: `${Math.min(pct, 100)}%` }} />
           </div>
         </div>
+
+        {/* Historial Deducciones */}
+        {empleado.deduccion_quincenal > 0 && (
+          <div className="mb-8">
+            <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Historial de Deducciones (últimos 6 meses)</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100">
+                    <th className="text-left py-2 px-3 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Quincena</th>
+                    <th className="text-right py-2 px-3 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Esperada</th>
+                    <th className="text-right py-2 px-3 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Aplicada</th>
+                    <th className="text-left py-2 px-3 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {getLast12Quincenas().map((q, i) => {
+                    const tolerance = 3 * 86400000;
+                    const pago = movs.find(m =>
+                      m.estado === "aprobado" &&
+                      (m.concepto === "Pago" || m.concepto === "Abono extra") &&
+                      new Date(m.fecha + "T12:00:00").getTime() >= q.start.getTime() - tolerance &&
+                      new Date(m.fecha + "T12:00:00").getTime() <= q.end.getTime() + tolerance
+                    );
+                    return (
+                      <tr key={i} className={i % 2 === 1 ? "bg-gray-50/50" : ""}>
+                        <td className="py-2 px-3">{q.label}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">${fmt(empleado.deduccion_quincenal)}</td>
+                        <td className="py-2 px-3 text-right tabular-nums">{pago ? `$${fmt(pago.monto)}` : "—"}</td>
+                        <td className="py-2 px-3">
+                          {pago
+                            ? <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">✓</span>
+                            : <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-full">⚠ No aplicada</span>
+                          }
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Action buttons */}
         <div className="flex flex-wrap gap-3 mb-6">

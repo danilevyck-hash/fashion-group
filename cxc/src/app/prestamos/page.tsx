@@ -57,6 +57,28 @@ function progressColor(pct: number) {
   return "bg-red-500";
 }
 
+function getQuincenaRange() {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  if (now.getDate() <= 15) {
+    return { start: new Date(y, m, 1), end: new Date(y, m, 15), label: `1 al 15 de ${MESES[m + 1]} ${y}` };
+  } else {
+    return { start: new Date(y, m, 16), end: new Date(y, m + 1, 0), label: `16 al ${new Date(y, m + 1, 0).getDate()} de ${MESES[m + 1]} ${y}` };
+  }
+}
+
+const MESES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+function hasDeduccionEnQuincena(movs: Movimiento[], qStart: Date, qEnd: Date): boolean {
+  const tolerance = 3 * 86400000; // 3 days in ms
+  return movs.some(m => {
+    if (m.estado !== "aprobado") return false;
+    if (m.concepto !== "Pago" && m.concepto !== "Abono extra") return false;
+    const fecha = new Date(m.fecha + "T12:00:00");
+    return fecha.getTime() >= qStart.getTime() - tolerance && fecha.getTime() <= qEnd.getTime() + tolerance;
+  });
+}
+
 export default function PrestamosPage() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
@@ -119,6 +141,13 @@ export default function PrestamosPage() {
   const totalSaldo = allCalcs.filter(c => c.emp.activo).reduce((s, c) => s + c.saldo, 0);
   const empleadosActivos = empleados.filter(e => e.activo).length;
   const totalPendientes = allCalcs.reduce((s, c) => s + c.pendientes, 0);
+
+  const quincena = getQuincenaRange();
+  const empleadosConDeduccion = allCalcs.filter(c => c.emp.activo && c.emp.deduccion_quincenal > 0);
+  const empleadosDeducidos = empleadosConDeduccion.filter(c => hasDeduccionEnQuincena(c.emp.prestamos_movimientos || [], quincena.start, quincena.end));
+  const deduccionesAplicadas = empleadosDeducidos.length;
+  const deduccionesTotal = empleadosConDeduccion.length;
+  const deduccionesCompletas = deduccionesTotal > 0 && deduccionesAplicadas === deduccionesTotal;
 
   // Filtered
   const filtered = allCalcs.filter(c => {
@@ -201,7 +230,7 @@ export default function PrestamosPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
           <div className="bg-gray-50 rounded-xl p-4">
             <div className="text-xs text-gray-400 uppercase tracking-wide">Total Prestado</div>
             <div className="text-2xl font-semibold mt-1 tabular-nums">${fmt(totalPrestado)}</div>
@@ -213,6 +242,13 @@ export default function PrestamosPage() {
           <div className="bg-gray-50 rounded-xl p-4">
             <div className="text-xs text-gray-400 uppercase tracking-wide">Empleados Activos</div>
             <div className="text-2xl font-semibold mt-1 tabular-nums">{empleadosActivos}</div>
+          </div>
+          <div className={`rounded-xl p-4 ${deduccionesCompletas ? "bg-green-50" : "bg-amber-50"}`}>
+            <div className="text-xs text-gray-400 uppercase tracking-wide">Deducciones Quincena</div>
+            <div className={`text-2xl font-semibold mt-1 tabular-nums ${deduccionesCompletas ? "text-green-600" : "text-amber-600"}`}>
+              {deduccionesAplicadas} / {deduccionesTotal}
+            </div>
+            <div className="text-[11px] text-gray-400 mt-1">Quincena del {quincena.label}</div>
           </div>
         </div>
 
@@ -275,6 +311,7 @@ export default function PrestamosPage() {
                   <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Saldo</th>
                   <th className="py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal w-32">Progreso</th>
                   <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Notas</th>
+                  <th className="py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Deducción</th>
                   <th className="py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Acciones</th>
                 </tr>
               </thead>
@@ -300,6 +337,13 @@ export default function PrestamosPage() {
                       </div>
                     </td>
                     <td className="py-3 px-4 text-gray-400 text-xs max-w-[120px] truncate" title={emp.notas || ""}>{emp.notas || "—"}</td>
+                    <td className="py-3 px-4">
+                      {emp.deduccion_quincenal > 0 ? (
+                        hasDeduccionEnQuincena(emp.prestamos_movimientos || [], quincena.start, quincena.end)
+                          ? <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">✓ Deducida</span>
+                          : <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-full">⚠ Pendiente</span>
+                      ) : null}
+                    </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-1">
                         <button onClick={(e) => { e.stopPropagation(); openEditEmp(emp); }} className="p-1.5 hover:bg-gray-100 rounded-lg transition" title="Editar">

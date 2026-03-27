@@ -183,6 +183,14 @@ export default function ReclamosPage() {
     if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Reclamos-${empresa}-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url); }
   }
 
+  async function downloadEmpresaPdf(empresa: string, ev: React.MouseEvent) {
+    ev.stopPropagation();
+    const ids = reclamos.filter((r) => r.empresa === empresa).map((r) => r.id);
+    if (!ids.length) return;
+    const res = await fetch("/api/reclamos/export-pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
+    if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Reclamos-${empresa}-${new Date().toISOString().slice(0, 10)}.pdf`; a.click(); URL.revokeObjectURL(url); }
+  }
+
   function startEdit() {
     if (!current) return;
     setEditEmpresa(current.empresa); setEditFactura(current.nro_factura || ""); setEditPedido(current.nro_orden_compra || "");
@@ -209,6 +217,12 @@ export default function ReclamosPage() {
     if (!selectedIds.length) return;
     const res = await fetch("/api/reclamos/export-excel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: selectedIds }) });
     if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Reclamos-${activeEmpresa || "export"}-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url); }
+  }
+
+  async function downloadSelectedPdf() {
+    if (!selectedIds.length) return;
+    const res = await fetch("/api/reclamos/export-pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: selectedIds }) });
+    if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Reclamos-${activeEmpresa || "export"}-${new Date().toISOString().slice(0, 10)}.pdf`; a.click(); URL.revokeObjectURL(url); }
   }
 
   function sendBulkWA(ids: string[]) {
@@ -308,8 +322,12 @@ export default function ReclamosPage() {
                     className={`border border-gray-100 rounded-2xl p-6 cursor-pointer hover:border-gray-300 transition ${open.length === 0 ? "opacity-50" : ""}`}>
                     <div className="flex items-start justify-between mb-1">
                       <p className="text-sm font-semibold">{empresa}</p>
-                      <button onClick={(ev) => downloadEmpresaExcel(empresa, ev)} title="Descargar todos los reclamos de esta empresa en Excel"
-                        className="text-gray-400 hover:text-black transition text-xs border border-gray-200 px-3 py-1 rounded-full flex-shrink-0">↓ Excel</button>
+                      <div className="flex gap-1.5">
+                        <button onClick={(ev) => downloadEmpresaPdf(empresa, ev)} title="Descargar todos los reclamos de esta empresa en PDF"
+                          className="text-gray-400 hover:text-black transition text-xs border border-gray-200 px-3 py-1 rounded-full flex-shrink-0">↓ PDF</button>
+                        <button onClick={(ev) => downloadEmpresaExcel(empresa, ev)} title="Descargar todos los reclamos de esta empresa en Excel"
+                          className="text-gray-400 hover:text-black transition text-xs border border-gray-200 px-3 py-1 rounded-full flex-shrink-0">↓ Excel</button>
+                      </div>
                     </div>
                     <div className="flex items-center gap-2 mb-4">
                       <p className="text-xs text-gray-400">{c?.nombre || "Sin contacto"}</p>
@@ -390,7 +408,11 @@ export default function ReclamosPage() {
             {selectionMode ? (<>
               <span className="text-sm text-gray-400">{selectedIds.length} seleccionados</span>
               <button onClick={() => allSelected ? setSelectedIds([]) : setSelectedIds(allSelectableIds)} className="text-sm text-gray-400 hover:text-black transition">{allSelected ? "Deseleccionar todo" : "Seleccionar todo"}</button>
-              {selectedIds.length > 0 && <button onClick={() => sendBulkWA(selectedIds)} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">WhatsApp</button>}
+              {selectedIds.length > 0 && <>
+                <button onClick={downloadSelectedPdf} className="text-sm text-gray-400 hover:text-black transition border border-gray-200 px-4 py-2 rounded-full">↓ PDF</button>
+                <button onClick={downloadSelectedExcel} className="text-sm text-gray-400 hover:text-black transition border border-gray-200 px-4 py-2 rounded-full">↓ Excel</button>
+                <button onClick={() => sendBulkWA(selectedIds)} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">WhatsApp</button>
+              </>}
               <button onClick={() => { setSelectionMode(false); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
             </>) : (<>
               <button onClick={() => { setSelectionMode(true); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition">Seleccionar</button>
@@ -682,6 +704,7 @@ export default function ReclamosPage() {
           window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
         }} title="Enviar recordatorio por WhatsApp" className="text-sm text-gray-400 hover:text-black transition">WhatsApp</button>
         <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} title="Descargar este reclamo en formato Excel" className="text-sm text-gray-400 hover:text-black transition">Excel</button>
+        <button onClick={async () => { const res = await fetch("/api/reclamos/export-pdf", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [current.id] }) }); if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Reclamo-${current.nro_reclamo}.pdf`; a.click(); URL.revokeObjectURL(url); } }} title="Descargar este reclamo en formato PDF" className="text-sm text-gray-400 hover:text-black transition">PDF</button>
         {role === "admin" && <button onClick={() => setShowDeleteConfirm(true)} title="Eliminar permanentemente este reclamo" className="text-sm text-gray-300 hover:text-red-500 transition ml-auto">Eliminar</button>}
       </div>
 
