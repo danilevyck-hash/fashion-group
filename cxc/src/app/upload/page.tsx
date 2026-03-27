@@ -263,21 +263,31 @@ export default function UploadPage() {
 
               <div>
                 <input
-                  ref={(el) => { fileRefs.current[co.key] = el; }}
+                  id={`file-${co.key}`}
                   type="file"
                   accept=".csv,.txt"
                   className="hidden"
                   onChange={async (e) => {
                     const f = e.target.files?.[0];
                     if (!f) return;
-                    const text = await f.text();
-                    setCsvPreview(parseCSVPreview(text, co.key));
-                    setPendingText(text); setPendingFile(f);
+                    try {
+                      const text = await f.text();
+                      const preview = parseCSVPreview(text, co.key);
+                      setCsvPreview(preview);
+                      setPendingText(text);
+                      setPendingFile(f);
+                    } catch (err) {
+                      console.error("CSV parse error:", err);
+                      setMessage({ text: `Error al leer archivo: ${err}`, type: "err" });
+                    }
                     e.target.value = "";
                   }}
                 />
                 <button
-                  onClick={() => fileRefs.current[co.key]?.click()}
+                  onClick={() => {
+                    const input = document.getElementById(`file-${co.key}`) as HTMLInputElement;
+                    input?.click();
+                  }}
                   disabled={uploading !== null}
                   className={`text-sm px-4 py-2 rounded border transition ${
                     uploading === co.key
