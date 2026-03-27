@@ -385,6 +385,7 @@ export default function GuiasPage() {
               className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
               Nueva Guía
             </button>
+            <a href="/guias/nueva-movil" className="text-xs border border-gray-200 px-3 py-1.5 rounded-full hover:border-gray-400 transition flex items-center gap-1">📱 iPad</a>
             <button
               onClick={() => setShowHelp(!showHelp)}
               className="w-8 h-8 rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100 text-sm flex items-center justify-center transition"

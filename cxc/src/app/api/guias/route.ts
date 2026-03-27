@@ -22,7 +22,7 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { fecha, transportista, placa, observaciones, items, monto_total, estado } = body;
+  const { fecha, transportista, placa, observaciones, items, monto_total, estado, firma_transportista } = body;
 
   // Auto-increment numero
   const { data: last } = await supabaseServer
@@ -34,9 +34,12 @@ export async function POST(req: NextRequest) {
 
   const numero = (last?.numero || 0) + 1;
 
+  const insertData: Record<string, unknown> = { numero, fecha, transportista, placa, observaciones, monto_total: monto_total || 0, estado: estado || "Preparando" };
+  if (firma_transportista) insertData.firma_transportista = firma_transportista;
+
   const { data: guia, error: guiaErr } = await supabaseServer
     .from("guia_transporte")
-    .insert({ numero, fecha, transportista, placa, observaciones, monto_total: monto_total || 0, estado: estado || "Preparando" })
+    .insert(insertData)
     .select()
     .single();
 
