@@ -152,8 +152,9 @@ export default function UploadPage() {
       });
       loadUploads();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error desconocido";
-      setMessage({ text: msg, type: "err" });
+      console.error("Upload error:", err);
+      const msg = err instanceof Error ? err.message : JSON.stringify(err);
+      setMessage({ text: `Error: ${msg}`, type: "err" });
     } finally {
       setUploading(null);
       const ref = fileRefs.current[companyKey];
