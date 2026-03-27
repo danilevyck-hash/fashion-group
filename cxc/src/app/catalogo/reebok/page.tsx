@@ -23,6 +23,18 @@ function Home() {
   const [inventoryMap, setInventoryMap] = useState<Record<string, number>>({})
   const [exporting, setExporting] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
+
+  // Listen for toast events from ProductCard
+  useEffect(() => {
+    function handler(e: Event) {
+      const msg = (e as CustomEvent).detail;
+      setToast(msg);
+      setTimeout(() => setToast(null), 2000);
+    }
+    window.addEventListener('reebok-toast', handler);
+    return () => window.removeEventListener('reebok-toast', handler);
+  }, [])
 
   useEffect(() => {
     Promise.all([
@@ -324,6 +336,7 @@ function Home() {
           <Link href="catalogo/reebok/admin" className="hover:text-gray-600 transition-colors">Admin</Link>
         </div>
       </footer>
+      {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2.5 rounded-full text-sm z-50 shadow-lg">{toast}</div>}
     </div>
   )
 }

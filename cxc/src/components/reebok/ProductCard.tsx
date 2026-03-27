@@ -2,26 +2,65 @@
 
 import { useState } from 'react'
 import { Product } from '@/components/reebok/supabase'
-import { useCart } from './CartProvider'
+import { useRouter } from 'next/navigation'
 
 export default function ProductCard({ product, stock = 0 }: { product: Product; stock?: number }) {
-  const { addToCart } = useCart()
+  const router = useRouter()
   const [qty, setQty] = useState(1)
-  const [added, setAdded] = useState(false)
+  const [status, setStatus] = useState<'idle' | 'adding' | 'added' | 'no-order'>('idle')
 
   const genderLabel = product.gender === 'male' ? 'Hombre' : product.gender === 'female' ? 'Mujer' : product.gender === 'kids' ? 'Ninos' : ''
 
-  const handleAdd = () => {
-    addToCart({
-      productId: product.id,
-      productName: product.name,
-      color: product.color || '',
-      size: 'UNICA',
-      quantity: qty,
-      imageUrl: product.image_url || '',
-      price: product.price,
-    })
-    setAdded(true)
+  const handleAdd = async () => {
+    const activeOrderId = localStorage.getItem('reebok_active_order_id')
+    const activeOrderNumber = localStorage.getItem('reebok_active_order_number') || ''
+
+    if (!activeOrderId) {
+      setStatus('no-order')
+      return
+    }
+
+    setStatus('adding')
+    try {
+      // Fetch current order to get items
+      const res = await fetch(`/api/catalogo/reebok/orders/${activeOrderId}`)
+      if (!res.ok) { setStatus('no-order'); return }
+      const order = await res.json()
+      const existingItems = order.reebok_order_items || []
+
+      // Check if product already exists
+      const existingIdx = existingItems.findIndex((i: { product_id: string }) => i.product_id === product.id)
+      let newItems
+      if (existingIdx >= 0) {
+        newItems = existingItems.map((i: { product_id: string; quantity: number }, idx: number) =>
+          idx === existingIdx ? { ...i, quantity: i.quantity + qty } : i
+        )
+      } else {
+        newItems = [...existingItems, {
+          product_id: product.id,
+          sku: product.sku || '',
+          name: product.name,
+          image_url: product.image_url || '',
+          quantity: qty,
+          unit_price: product.price || 0,
+        }]
+      }
+
+      const putRes = await fetch(`/api/catalogo/reebok/orders/${activeOrderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: newItems }),
+      })
+
+      if (putRes.ok) {
+        setStatus('added')
+        // Show toast via custom event
+        window.dispatchEvent(new CustomEvent('reebok-toast', { detail: `Agregado a ${activeOrderNumber}` }))
+        setTimeout(() => setStatus('idle'), 2000)
+      }
+    } catch {
+      setStatus('no-order')
+    }
   }
 
   return (
@@ -46,7 +85,7 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
         <p className="text-xs text-gray-500 mt-0.5">{genderLabel}</p>
         <div className="flex items-center justify-between mt-1">
           <p className="text-sm font-bold text-reebok-red">
-            {product.price ? `$${product.price.toFixed(2)}` : 'Consultar precio'}
+            {product.price ? `$${product.price.toFixed(0)}` : 'Consultar'}
           </p>
           <span className={`text-[10px] font-medium ${stock > 0 ? 'text-green-600' : 'text-red-400'}`}>
             {stock > 0 ? `${stock} disp.` : 'Agotado'}
@@ -55,19 +94,35 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
 
         <div className="flex items-center gap-2 mt-2">
           <div className="flex items-center border rounded">
-            <button onClick={() => { setQty(Math.max(1, qty - 1)); setAdded(false) }} className="w-7 h-7 flex items-center justify-center text-sm hover:bg-gray-100">-</button>
+            <button onClick={() => { setQty(Math.max(1, qty - 1)); setStatus('idle') }} className="w-7 h-7 flex items-center justify-center text-sm hover:bg-gray-100">-</button>
             <span className="w-8 text-center text-sm font-medium">{qty}</span>
-            <button onClick={() => { setQty(qty + 1); setAdded(false) }} className="w-7 h-7 flex items-center justify-center text-sm hover:bg-gray-100">+</button>
+            <button onClick={() => { setQty(qty + 1); setStatus('idle') }} className="w-7 h-7 flex items-center justify-center text-sm hover:bg-gray-100">+</button>
           </div>
           <button
             onClick={handleAdd}
+            disabled={status === 'adding'}
             className={`flex-1 py-1.5 rounded text-xs font-bold uppercase transition-colors ${
-              added ? 'bg-green-500 text-white' : 'bg-reebok-red text-white hover:bg-red-700'
+              status === 'added' ? 'bg-green-500 text-white' :
+              status === 'adding' ? 'bg-gray-300 text-gray-500' :
+              'bg-reebok-red text-white hover:bg-red-700'
             }`}
           >
-            {added ? 'Agregado!' : 'Agregar'}
+            {status === 'added' ? 'Agregado!' : status === 'adding' ? '...' : 'Agregar'}
           </button>
         </div>
+
+        {/* No active order prompt */}
+        {status === 'no-order' && (
+          <div className="mt-2 bg-gray-50 rounded p-2 text-center">
+            <p className="text-[10px] text-gray-500 mb-1">No hay pedido activo</p>
+            <div className="flex gap-1">
+              <button onClick={() => router.push('/catalogo/reebok/pedidos')} className="flex-1 text-[10px] bg-reebok-red text-white py-1 rounded hover:bg-red-700 transition">
+                Nuevo pedido
+              </button>
+              <button onClick={() => setStatus('idle')} className="text-[10px] text-gray-400 px-2">✕</button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
