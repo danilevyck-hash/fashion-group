@@ -274,7 +274,7 @@ export default function UploadPage() {
                   <input
                     type="file"
                     accept=".csv,.txt"
-                    className="hidden"
+                    className="sr-only"
                     disabled={uploading !== null}
                     onChange={async (e) => {
                       const f = e.target.files?.[0];
