@@ -233,6 +233,7 @@ export default function CajaPage() {
 
   async function deleteGasto(gastoId: string) {
     if (!current) return;
+    if (!confirm("¿Eliminar?")) return;
     await fetch(`/api/caja/gastos/${gastoId}`, { method: "DELETE" });
     await loadDetail(current.id);
     loadPeriodos();
@@ -419,49 +420,49 @@ export default function CajaPage() {
           return (
             <div className="mb-6">
               <button onClick={() => setShowResumen(!showResumen)}
-                className="text-xs uppercase tracking-widest text-gray-400 hover:text-black transition flex items-center gap-1 mb-3">
+                className="text-[11px] uppercase tracking-[0.05em] text-gray-400 hover:text-black transition flex items-center gap-1 mb-3">
                 <span className={`inline-block transition-transform ${showResumen ? "rotate-90" : ""}`}>›</span>
                 Resumen de gastos
               </button>
               {showResumen && (
                 <div className="grid grid-cols-2 gap-8">
                   <div>
-                    <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-2 font-medium">Por categoría</div>
+                    <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2">Por categoría</div>
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-400">
-                          <th className="text-left pb-2 font-medium">Categoría</th>
-                          <th className="text-right pb-2 font-medium">Monto</th>
-                          <th className="text-right pb-2 font-medium">%</th>
+                        <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
+                          <th className="text-left py-3 px-4 font-normal">Categoría</th>
+                          <th className="text-right py-3 px-4 font-normal">Monto</th>
+                          <th className="text-right py-3 px-4 font-normal">%</th>
                         </tr>
                       </thead>
                       <tbody>
                         {catEntries.map(([cat, total]) => (
-                          <tr key={cat} className="border-b border-gray-100">
-                            <td className="py-1.5">{cat}</td>
-                            <td className="py-1.5 text-right tabular-nums">${fmt(total)}</td>
-                            <td className="py-1.5 text-right tabular-nums text-gray-400">{grandTotal > 0 ? ((total / grandTotal) * 100).toFixed(1) : "0.0"}%</td>
+                          <tr key={cat} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                            <td className="py-3 px-4">{cat}</td>
+                            <td className="py-3 px-4 text-right tabular-nums">${fmt(total)}</td>
+                            <td className="py-3 px-4 text-right tabular-nums text-gray-400">{grandTotal > 0 ? ((total / grandTotal) * 100).toFixed(1) : "0.0"}%</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                   <div>
-                    <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-2 font-medium">Por empresa</div>
+                    <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2">Por empresa</div>
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-400">
-                          <th className="text-left pb-2 font-medium">Empresa</th>
-                          <th className="text-right pb-2 font-medium">Monto</th>
-                          <th className="text-right pb-2 font-medium">%</th>
+                        <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
+                          <th className="text-left py-3 px-4 font-normal">Empresa</th>
+                          <th className="text-right py-3 px-4 font-normal">Monto</th>
+                          <th className="text-right py-3 px-4 font-normal">%</th>
                         </tr>
                       </thead>
                       <tbody>
                         {empEntries.map(([emp, total]) => (
-                          <tr key={emp} className="border-b border-gray-100">
-                            <td className="py-1.5">{emp}</td>
-                            <td className="py-1.5 text-right tabular-nums">${fmt(total)}</td>
-                            <td className="py-1.5 text-right tabular-nums text-gray-400">{grandTotal > 0 ? ((total / grandTotal) * 100).toFixed(1) : "0.0"}%</td>
+                          <tr key={emp} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                            <td className="py-3 px-4">{emp}</td>
+                            <td className="py-3 px-4 text-right tabular-nums">${fmt(total)}</td>
+                            <td className="py-3 px-4 text-right tabular-nums text-gray-400">{grandTotal > 0 ? ((total / grandTotal) * 100).toFixed(1) : "0.0"}%</td>
                           </tr>
                         ))}
                       </tbody>
@@ -503,27 +504,27 @@ export default function CajaPage() {
             <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Agregar Gasto</div>
             <div className="grid grid-cols-5 gap-3 items-end mb-3">
               <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Fecha</label>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Fecha</label>
                 <input type="date" value={gFecha} onChange={(e) => setGFecha(e.target.value)}
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Descripción *</label>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Descripción <span className="text-red-500">*</span></label>
                 <input type="text" value={gDescripcion} onChange={(e) => setGDescripcion(e.target.value)} placeholder="Qué se compró"
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Proveedor</label>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Proveedor</label>
                 <input type="text" value={gProveedor} onChange={(e) => setGProveedor(e.target.value)} placeholder="Dónde se compró"
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">N° Factura</label>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">N° Factura</label>
                 <input type="text" value={gNroFactura} onChange={(e) => setGNroFactura(e.target.value)} placeholder="Opcional"
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Categoría</label>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Categoría</label>
                 <select value={gCategoria} onChange={(e) => { setGCategoria(e.target.value); if (e.target.value !== "Otro") setGCategoriaOtro(""); }}
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
                   {categorias.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -568,7 +569,7 @@ export default function CajaPage() {
             </div>
             <div className="grid grid-cols-6 gap-3 items-end">
               <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
                   Responsable
                   {!showAddResponsable && (
                     <button onClick={() => setShowAddResponsable(true)} className="text-gray-300 hover:text-gray-500 transition text-xs ml-1">＋</button>
@@ -596,7 +597,7 @@ export default function CajaPage() {
                 )}
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Empresa</label>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Empresa</label>
                 <select value={gEmpresa} onChange={(e) => { setGEmpresa(e.target.value); if (e.target.value !== "Otro / General") setGEmpresaOtro(""); }}
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
                   <option value="">—</option>
@@ -608,12 +609,12 @@ export default function CajaPage() {
                 )}
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Sub-total</label>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Sub-total</label>
                 <input type="number" step="0.01" value={gSubtotal} onChange={(e) => setGSubtotal(e.target.value)}
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">ITBMS</label>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">ITBMS</label>
                 <select value={gItbmsPct} onChange={(e) => setGItbmsPct(e.target.value)}
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
                   <option value="0">0%</option>
@@ -621,7 +622,7 @@ export default function CajaPage() {
                 </select>
               </div>
               <div>
-                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Total</label>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Total</label>
                 <input type="text" readOnly value={`$${fmt(totalNum)}`}
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent tabular-nums" />
               </div>
@@ -727,7 +728,7 @@ export default function CajaPage() {
           </div>
         )}
 
-        <div className="flex items-center gap-6 mt-8">
+        <div className="flex flex-wrap items-center gap-6 mt-8">
           <button onClick={() => setView("print")}
             className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
             Imprimir
@@ -756,8 +757,8 @@ export default function CajaPage() {
     const saldo = current.fondo_inicial - totalGastado;
 
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12">
-        <div className="flex gap-4 mb-8 no-print">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
+        <div className="flex flex-wrap gap-4 mb-8 no-print">
           <button onClick={() => setView("detail")} className="text-sm text-gray-400 hover:text-black transition">← Volver</button>
           <button onClick={() => window.print()} className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
             Imprimir

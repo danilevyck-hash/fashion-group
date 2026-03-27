@@ -439,7 +439,7 @@ export default function GuiasPage() {
               className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black w-full max-w-sm"
             />
             <div className="flex items-center gap-2 shrink-0">
-              <label className="text-xs text-gray-400 uppercase tracking-widest">Mes</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Mes</label>
               <select value={monthFilter} onChange={(e) => setMonthFilter(e.target.value)}
                 className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
                 {getMonthOptions().map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
