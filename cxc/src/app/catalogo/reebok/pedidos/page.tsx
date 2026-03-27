@@ -60,15 +60,15 @@ export default function PedidosPage() {
           </thead>
           <tbody>
             {filtered.map(o => (
-              <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+              <tr key={o.id} onClick={() => router.push(`/catalogo/reebok/pedido/${o.id}`)}
+                className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer min-h-[56px]">
                 <td className="py-3 font-mono text-xs text-gray-400">{o.order_number}</td>
                 <td className="py-3 font-medium">{o.client_name}</td>
                 <td className="py-3 text-gray-500 text-xs">{new Date(o.created_at).toLocaleDateString("es-PA")}</td>
                 <td className="py-3 text-center text-gray-400 text-xs">{o.item_count}</td>
                 <td className="py-3 text-right tabular-nums">${fmt(o.total)}</td>
                 <td className="py-3 text-right">
-                  <Link href={`/catalogo/reebok/pedido/${o.id}`} className="text-xs text-gray-500 hover:text-black transition mr-3">Abrir</Link>
-                  <button onClick={() => deleteOrder(o.id)} className="text-xs text-gray-300 hover:text-red-500 transition">Eliminar</button>
+                  <button onClick={(e) => { e.stopPropagation(); deleteOrder(o.id); }} className="text-xs text-gray-300 hover:text-red-500 transition">Eliminar</button>
                 </td>
               </tr>
             ))}
