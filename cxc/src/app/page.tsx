@@ -30,7 +30,7 @@ export default function LoginPage() {
       }
 
       sessionStorage.setItem("cxc_role", data.role);
-      router.push("/plantillas");
+      router.push(data.role === "cliente" ? "/catalogo/reebok" : "/plantillas");
     } catch {
       setError("Error de conexión");
     } finally {

@@ -22,8 +22,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-const ROLE_NAMES: Record<string, string> = { admin: "Daniel", director: "Director", upload: "Secretaria", david: "David", contabilidad: "Contabilidad", vendedor: "Vendedor" };
-const ROLE_LABELS: Record<string, string> = { admin: "Administrador", upload: "Secretaria", director: "Director", david: "David", contabilidad: "Contabilidad", vendedor: "Vendedor" };
+const ROLE_NAMES: Record<string, string> = { admin: "Daniel", director: "Director", upload: "Secretaria", david: "David", contabilidad: "Contabilidad", vendedor: "Vendedor", cliente: "Cliente" };
+const ROLE_LABELS: Record<string, string> = { admin: "Administrador", upload: "Secretaria", director: "Director", david: "David", contabilidad: "Contabilidad", vendedor: "Vendedor", cliente: "Cliente" };
 function fmt(n: number) { return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 const fmtDate = (d: string) => { const dt = new Date(d); return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; };
 
@@ -134,6 +134,7 @@ export default function PlantillasPage() {
     setIsDesktop(window.innerWidth >= 640);
     const r = sessionStorage.getItem("cxc_role") || "";
     if (!r) { router.push("/"); return; }
+    if (r === "cliente") { router.push("/catalogo/reebok"); return; }
     setRole(r); setAuthChecked(true);
     setDarkMode(localStorage.getItem("fg_dark_mode") === "1");
 
