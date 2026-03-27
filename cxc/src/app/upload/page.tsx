@@ -263,20 +263,14 @@ export default function UploadPage() {
               </div>
 
               <div>
-                <label
-                  className={`text-sm px-4 py-2 rounded border transition cursor-pointer ${
-                    uploading === co.key
-                      ? "border-gray-200 text-gray-400 cursor-wait"
-                      : "border-black text-black hover:bg-black hover:text-white"
-                  }`}
-                >
+                <label style={{fontSize:'14px',padding:'8px 16px',borderRadius:'4px',border:'1px solid black',cursor:'pointer',display:'inline-block'}}>
                   {uploading === co.key ? "Cargando..." : "Cargar CSV"}
                   <input
                     type="file"
                     accept=".csv,.txt"
-                    className="sr-only"
-                    disabled={uploading !== null}
+                    style={{display:'none'}}
                     onChange={async (e) => {
+                      alert('onChange fired! file: ' + e.target.files?.[0]?.name);
                       const f = e.target.files?.[0];
                       if (!f) return;
                       const text = await new Promise<string>((resolve) => {
