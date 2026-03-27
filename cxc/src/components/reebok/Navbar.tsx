@@ -1,61 +1,80 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { useCart } from './CartProvider'
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import NewOrderModal from "./NewOrderModal";
 
 export default function Navbar() {
-  const { getCartCount } = useCart()
-  const count = getCartCount()
-  const [role, setRole] = useState('')
-  const [hasSystem, setHasSystem] = useState(false)
+  const router = useRouter();
+  const [role, setRole] = useState("");
+  const [activeId, setActiveId] = useState("");
+  const [activeClient, setActiveClient] = useState("");
+  const [showNewOrder, setShowNewOrder] = useState(false);
 
   useEffect(() => {
-    const r = sessionStorage.getItem('cxc_role') || ''
-    setRole(r)
-    setHasSystem(!!sessionStorage.getItem('fg_user_id') || !!r)
-  }, [])
+    setRole(sessionStorage.getItem("cxc_role") || "");
+    setActiveId(localStorage.getItem("reebok_active_order_id") || "");
+    setActiveClient(localStorage.getItem("reebok_active_order_client") || "");
+  }, []);
 
-  const showManage = role === 'admin' || role === 'vendedor' || role === 'staff'
+  // Listen for storage changes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveId(localStorage.getItem("reebok_active_order_id") || "");
+      setActiveClient(localStorage.getItem("reebok_active_order_client") || "");
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const isManager = role === "admin" || role === "vendedor" || role === "staff";
+  const showSystem = role && role !== "cliente";
+
+  function clearActive() {
+    localStorage.removeItem("reebok_active_order_id");
+    localStorage.removeItem("reebok_active_order_number");
+    localStorage.removeItem("reebok_active_order_client");
+    setActiveId(""); setActiveClient("");
+  }
 
   return (
-    <nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
-      <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-4 sm:gap-6">
-          {hasSystem && role !== 'cliente' && (
-            <Link href="/plantillas" className="text-xs text-gray-400 hover:text-gray-700 transition">← Sistema</Link>
+    <>
+      <nav className="sticky top-0 z-50 bg-white border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 h-12 flex items-center gap-4">
+          {showSystem && (
+            <Link href="/plantillas" className="text-[11px] text-gray-400 hover:text-gray-600 transition flex-shrink-0">← Sistema</Link>
           )}
-          <Link href="/catalogo/reebok">
-            <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-7" />
+          <Link href="/catalogo/reebok" className="flex-shrink-0">
+            <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-6" />
           </Link>
-          {showManage && (
-            <>
-              <Link href="/catalogo/reebok/pedidos" className="text-xs text-gray-500 hover:text-reebok-dark transition font-medium">
-                Pedidos
+
+          {/* Active order indicator */}
+          {isManager && activeId && activeClient && (
+            <div className="flex items-center gap-1.5 ml-2">
+              <Link href={`/catalogo/reebok/pedido/${activeId}`} className="text-xs text-gray-500 hover:text-black transition">
+                Para: <span className="font-medium text-black">{activeClient}</span>
               </Link>
-              <Link href="/catalogo/reebok/clientes" className="text-xs text-gray-500 hover:text-reebok-dark transition font-medium">
-                Clientes
-              </Link>
-            </>
+              <button onClick={clearActive} className="text-gray-300 hover:text-gray-500 transition text-xs">×</button>
+            </div>
           )}
-          {role === 'admin' && (
-            <Link href="/catalogo/reebok/admin/productos" className="text-xs text-gray-500 hover:text-reebok-dark transition font-medium">
-              Admin
-            </Link>
+
+          <div className="flex-1" />
+
+          {isManager && (
+            <div className="flex items-center gap-3">
+              <Link href="/catalogo/reebok/pedidos" className="text-xs text-gray-500 hover:text-black transition">Pedidos</Link>
+              <button onClick={() => setShowNewOrder(true)} className="text-xs bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800 transition">+ Nuevo</button>
+            </div>
           )}
         </div>
+      </nav>
 
-        <Link href="/catalogo/reebok/pedidos" className="relative p-2">
-          <svg className="w-6 h-6 text-reebok-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-          </svg>
-          {count > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 bg-reebok-red text-white text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center px-1">
-              {count}
-            </span>
-          )}
-        </Link>
-      </div>
-    </nav>
-  )
+      {showNewOrder && (
+        <NewOrderModal
+          onClose={() => setShowNewOrder(false)}
+          onCreated={(id) => { setShowNewOrder(false); router.push(`/catalogo/reebok/pedido/${id}`); }}
+        />
+      )}
+    </>
+  );
 }
