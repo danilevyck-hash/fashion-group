@@ -30,6 +30,8 @@ interface Guia {
   receptor_nombre?: string;
   cedula?: string;
   firma_base64?: string;
+  entregado_por?: string;
+  numero_guia_transp?: string;
   guia_items?: GuiaItem[];
 }
 
@@ -133,6 +135,7 @@ export default function GuiasPage() {
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [transportista, setTransportista] = useState("");
   const [transportistaOtro, setTransportistaOtro] = useState("");
+  const [entregadoPor, setEntregadoPor] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [items, setItems] = useState<GuiaItem[]>([emptyItem(1, DEFAULT_EMPRESAS[0])]);
   const [nextNumero, setNextNumero] = useState(1);
@@ -150,7 +153,9 @@ export default function GuiasPage() {
   const [bPlaca, setBPlaca] = useState("");
   const [bReceptor, setBReceptor] = useState("");
   const [bCedula, setBCedula] = useState("");
+  const [bNumGuia, setBNumGuia] = useState("");
   const [bSaving, setBSaving] = useState(false);
+  const [showPending, setShowPending] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef(false);
 
@@ -308,6 +313,7 @@ export default function GuiasPage() {
       setBPlaca(g.placa || "");
       setBReceptor(g.receptor_nombre || "");
       setBCedula(g.cedula || "");
+      setBNumGuia(g.numero_guia_transp || "");
       setView("print");
     }
   }
@@ -326,6 +332,7 @@ export default function GuiasPage() {
       setTransportista("__other__");
       setTransportistaOtro(g.transportista);
     }
+    setEntregadoPor(g.entregado_por || "");
     setObservaciones(g.observaciones || "");
     const guiaItems = (g.guia_items || []) as GuiaItem[];
     setItems(guiaItems.length > 0 ? guiaItems.map((item: GuiaItem, i: number) => ({ ...item, orden: i + 1 })) : [emptyItem(1, defaultEmpresa)]);
@@ -339,6 +346,7 @@ export default function GuiasPage() {
     setFecha(new Date().toISOString().slice(0, 10));
     setTransportista("");
     setTransportistaOtro("");
+    setEntregadoPor("");
     setObservaciones("");
     setItems([emptyItem(1, defaultEmpresa)]);
     setFormNumero(nextNumero);
@@ -366,6 +374,7 @@ export default function GuiasPage() {
 
     if (!fecha) errors.add("fecha");
     if (!transp) errors.add("transportista");
+    if (!entregadoPor) errors.add("entregadoPor");
 
     const validItems = items.filter((i) => i.cliente || i.direccion || i.facturas || i.bultos > 0);
     if (validItems.length === 0) errors.add("items-empty");
@@ -408,6 +417,7 @@ export default function GuiasPage() {
       body: JSON.stringify({
         fecha,
         transportista: transp,
+        entregado_por: entregadoPor,
         observaciones,
         estado: "Pendiente Bodega",
         items: validItems,
@@ -443,6 +453,7 @@ export default function GuiasPage() {
   async function confirmarDespacho() {
     if (!printGuia) return;
     if (!bPlaca.trim()) { showToast("Ingresa la placa del vehículo"); return; }
+    if (!bNumGuia.trim()) { showToast("Ingresa el N° de guía del transportista"); return; }
     if (!bReceptor.trim()) { showToast("Ingresa el nombre del receptor"); return; }
     if (!bCedula.trim()) { showToast("Ingresa la cédula del receptor"); return; }
     if (isCanvasBlank()) { showToast("Se requiere la firma del receptor"); return; }
@@ -454,6 +465,7 @@ export default function GuiasPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         placa: bPlaca.trim(),
+        numero_guia_transp: bNumGuia.trim(),
         receptor_nombre: bReceptor.trim(),
         cedula: bCedula.trim(),
         firma_base64,
@@ -480,6 +492,7 @@ export default function GuiasPage() {
         setBPlaca(updated.placa || "");
         setBReceptor(updated.receptor_nombre || "");
         setBCedula(updated.cedula || "");
+        setBNumGuia(updated.numero_guia_transp || "");
       }
       loadGuias();
     } else {
@@ -506,6 +519,19 @@ export default function GuiasPage() {
             </button>
           </div>
         </div>
+
+        {role === "bodega" && (() => {
+          const pendingCount = guias.filter(g => !g.placa).length;
+          if (pendingCount === 0) return null;
+          return (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700 mb-6 flex items-center justify-between">
+              <span>📦 Tenés {pendingCount} guía{pendingCount !== 1 ? "s" : ""} pendiente{pendingCount !== 1 ? "s" : ""} de despachar</span>
+              <button onClick={() => setShowPending(!showPending)} className="text-xs font-medium text-amber-600 hover:text-amber-800 underline">
+                {showPending ? "Ver todas" : "Ver pendientes"}
+              </button>
+            </div>
+          );
+        })()}
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
@@ -561,7 +587,8 @@ export default function GuiasPage() {
               {(() => {
                 const filtered = guias
                   .filter((g) => g.fecha && g.fecha.slice(0, 7) === monthFilter)
-                  .filter((g) => { if (!search) return true; const q = search.toLowerCase(); return g.transportista.toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); });
+                  .filter((g) => { if (!search) return true; const q = search.toLowerCase(); return g.transportista.toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); })
+                  .filter((g) => !showPending || !g.placa);
                 return (<>
                   {filtered.map((g) => (
                     <tr key={g.id} onClick={() => viewGuia(g.id)} className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
@@ -575,7 +602,7 @@ export default function GuiasPage() {
                       <td className="py-3 px-4 text-right tabular-nums">{g.total_bultos}</td>
                       <td className="py-3 px-4 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => startEdit(g.id)} className="text-sm text-gray-500 hover:text-black transition">Editar</button>
-                        <button onClick={() => deleteGuia(g.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>
+                        {(role === "admin" || role === "secretaria") && <button onClick={() => deleteGuia(g.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>}
                       </td>
                     </tr>
                   ))}
@@ -639,6 +666,15 @@ export default function GuiasPage() {
                   onChange={(e) => setTransportistaOtro(e.target.value)}
                   className={inputClass("transportista", "w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition mt-3")} />
               )}
+            </div>
+            <div>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Entregado por <span className="text-red-500">*</span></label>
+              <select value={entregadoPor} onChange={(e) => setEntregadoPor(e.target.value)}
+                className={inputClass("entregadoPor", "w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none")}>
+                <option value="">Seleccionar...</option>
+                <option value="Julio">Julio</option>
+                <option value="Rodrigo">Rodrigo</option>
+              </select>
             </div>
           </div>
         </div>
@@ -772,10 +808,15 @@ export default function GuiasPage() {
         {canComplete && (
           <div className="no-print mb-8 border border-amber-200 bg-amber-50 rounded-2xl p-6">
             <h2 className="text-sm font-medium mb-4">Completar despacho — Bodega</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Placa / Vehículo *</label>
                 <input type="text" value={bPlaca} onChange={(e) => setBPlaca(e.target.value)}
+                  className="w-full border-b border-gray-300 py-2 text-sm outline-none focus:border-black transition bg-transparent" />
+              </div>
+              <div>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">N° Guía Transportista *</label>
+                <input type="text" value={bNumGuia} onChange={(e) => setBNumGuia(e.target.value)}
                   className="w-full border-b border-gray-300 py-2 text-sm outline-none focus:border-black transition bg-transparent" />
               </div>
               <div>
@@ -827,6 +868,16 @@ export default function GuiasPage() {
               <span className="font-medium">PLACA / VEHÍCULO:</span>
               <span className="border-b border-gray-300 flex-1 text-center">{g.placa || "\u00A0"}</span>
             </div>
+            <div className="flex gap-2">
+              <span className="font-medium">ENTREGADO POR:</span>
+              <span className="border-b border-gray-300 flex-1 text-center">{g.entregado_por || "\u00A0"}</span>
+            </div>
+            {g.numero_guia_transp && (
+              <div className="flex gap-2">
+                <span className="font-medium">N° GUÍA TRANSP.:</span>
+                <span className="border-b border-gray-300 flex-1 text-center">{g.numero_guia_transp}</span>
+              </div>
+            )}
           </div>
 
           <hr className="border-gray-300 mb-4" />
@@ -852,7 +903,7 @@ export default function GuiasPage() {
                   <td className="border border-gray-300 px-2 py-1">{item.empresa}</td>
                   <td className="border border-gray-300 px-2 py-1">{item.facturas}</td>
                   <td className="border border-gray-300 px-2 py-1 text-center">{item.bultos || ""}</td>
-                  <td className="border border-gray-300 px-2 py-1">&nbsp;</td>
+                  <td className="border border-gray-300 px-2 py-1">{g.numero_guia_transp || "\u00A0"}</td>
                 </tr>
               ))}
               <tr className="font-bold bg-gray-50">
