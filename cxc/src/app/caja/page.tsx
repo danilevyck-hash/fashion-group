@@ -258,10 +258,10 @@ export default function CajaPage() {
     return (
       <div>
         <AppHeader module="Caja Menuda" />
-        <div className="max-w-5xl mx-auto px-6 py-8">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex items-end justify-between mb-10">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">Caja Menuda</h1>
+            <h1 className="text-xl font-light tracking-tight">Caja Menuda</h1>
             <p className="text-sm text-gray-400 mt-1">Fondo rotativo para gastos menores</p>
           </div>
           {!hasOpenPeriod && (
@@ -275,44 +275,45 @@ export default function CajaPage() {
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
         {loading ? (
-          <div>{[...Array(5)].map((_, i) => <div key={i} className="animate-pulse flex gap-4 py-3 border-b border-gray-100"><div className="h-3 bg-gray-100 rounded w-1/3" /><div className="h-3 bg-gray-100 rounded w-1/5 ml-auto" /><div className="h-3 bg-gray-100 rounded w-1/5" /><div className="h-3 bg-gray-100 rounded w-1/6" /></div>)}</div>
+          <div>{[...Array(5)].map((_, i) => <div key={i} className="flex gap-4 py-3 px-4 border-b border-gray-50"><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /></div>)}</div>
         ) : periodos.length === 0 ? (
           <p className="text-gray-300 text-sm text-center py-20">No hay períodos registrados</p>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
-                <th className="text-left pb-3 font-medium">N°</th>
-                <th className="text-left pb-3 font-medium">Apertura</th>
-                <th className="text-left pb-3 font-medium">Cierre</th>
-                <th className="text-left pb-3 font-medium">Estado</th>
-                <th className="text-right pb-3 font-medium">Fondo</th>
-                <th className="text-right pb-3 font-medium">Gastado</th>
-                <th className="text-right pb-3 font-medium">Saldo</th>
-                <th className="text-right pb-3 font-medium"></th>
+              <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
+                <th className="text-left py-3 px-4 font-normal">N°</th>
+                <th className="text-left py-3 px-4 font-normal">Apertura</th>
+                <th className="text-left py-3 px-4 font-normal">Cierre</th>
+                <th className="text-left py-3 px-4 font-normal">Estado</th>
+                <th className="text-right py-3 px-4 font-normal">Fondo</th>
+                <th className="text-right py-3 px-4 font-normal">Gastado</th>
+                <th className="text-right py-3 px-4 font-normal">Saldo</th>
+                <th className="text-right py-3 px-4 font-normal"></th>
               </tr>
             </thead>
             <tbody>
               {periodos.map((p) => {
                 const saldo = p.fondo_inicial - p.total_gastado;
                 return (
-                  <tr key={p.id} onClick={() => loadDetail(p.id)} className="border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer">
-                    <td className="py-3.5 font-medium">{p.numero}</td>
-                    <td className="py-3.5 text-gray-500">{fmtDate(p.fecha_apertura)}</td>
-                    <td className="py-3.5 text-gray-500">{p.fecha_cierre ? fmtDate(p.fecha_cierre) : "—"}</td>
-                    <td className="py-3.5">
+                  <tr key={p.id} onClick={() => loadDetail(p.id)} className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
+                    <td className="py-3 px-4 font-medium">{p.numero}</td>
+                    <td className="py-3 px-4 text-gray-500">{fmtDate(p.fecha_apertura)}</td>
+                    <td className="py-3 px-4 text-gray-500">{p.fecha_cierre ? fmtDate(p.fecha_cierre) : "—"}</td>
+                    <td className="py-3 px-4">
                       {p.estado === "abierto" ? (
                         <span className="text-[11px] bg-black text-white px-2.5 py-0.5 rounded-full">Abierto</span>
                       ) : (
                         <span className="text-[11px] bg-gray-200 text-gray-500 px-2.5 py-0.5 rounded-full">Cerrado</span>
                       )}
                     </td>
-                    <td className="py-3.5 text-right tabular-nums text-gray-400">${fmt(p.fondo_inicial)}</td>
-                    <td className="py-3.5 text-right tabular-nums">${fmt(p.total_gastado)}</td>
-                    <td className={`py-3.5 text-right tabular-nums font-medium ${saldo < 0 ? "text-red-600" : ""}`}>
+                    <td className="py-3 px-4 text-right tabular-nums text-gray-400">${fmt(p.fondo_inicial)}</td>
+                    <td className="py-3 px-4 text-right tabular-nums">${fmt(p.total_gastado)}</td>
+                    <td className={`py-3 px-4 text-right tabular-nums font-medium ${saldo < 0 ? "text-red-600" : ""}`}>
                       ${fmt(saldo)}
                     </td>
-                    <td className="py-3.5 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                    <td className="py-3 px-4 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                       <button onClick={() => { loadDetail(p.id).then(() => setView("print")); }}
                         className="text-sm text-gray-500 hover:text-black transition">Imprimir</button>
                       {p.estado === "abierto" && (<>
@@ -330,6 +331,7 @@ export default function CajaPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
       </div>
@@ -346,14 +348,14 @@ export default function CajaPage() {
     const isOpen = current.estado === "abierto";
 
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
         <button onClick={() => { setView("list"); setCurrent(null); }}
           className="text-sm text-gray-400 hover:text-black transition mb-8 block">
           ← Períodos
         </button>
 
-        <div className="flex items-center gap-4 mb-8">
-          <h1 className="text-2xl font-semibold tracking-tight">Período N° {current.numero}</h1>
+        <div className="flex flex-wrap items-center gap-4 mb-8">
+          <h1 className="text-xl font-light tracking-tight">Período N° {current.numero}</h1>
           <span className="text-sm text-gray-400">{fmtDate(current.fecha_apertura)}</span>
           {isOpen ? (
             <span className="text-[11px] bg-black text-white px-2.5 py-0.5 rounded-full">Abierto</span>
@@ -365,15 +367,15 @@ export default function CajaPage() {
         {/* Summary */}
         <div className="grid grid-cols-3 gap-8 mb-10">
           <div>
-            <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Fondo</div>
+            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">Fondo</div>
             <div className="text-2xl font-semibold tabular-nums">${fmt(current.fondo_inicial)}</div>
           </div>
           <div>
-            <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Gastado</div>
+            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">Gastado</div>
             <div className="text-2xl font-semibold tabular-nums">${fmt(totalGastado)}</div>
           </div>
           <div>
-            <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Saldo</div>
+            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">Saldo</div>
             <div className={`text-2xl font-semibold tabular-nums ${saldo < 0 ? "text-red-600" : ""}`}>${fmt(saldo)}</div>
           </div>
         </div>
@@ -498,7 +500,7 @@ export default function CajaPage() {
         {/* Add expense form */}
         {isOpen && (
           <div className="mb-10">
-            <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Agregar Gasto</div>
+            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Agregar Gasto</div>
             <div className="grid grid-cols-5 gap-3 items-end mb-3">
               <div>
                 <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Fecha</label>
@@ -635,20 +637,21 @@ export default function CajaPage() {
 
         {/* Expenses table */}
         <div className="mb-10">
-          <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Gastos</div>
+          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Gastos</div>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
-                <th className="text-left pb-3 font-medium">Fecha</th>
-                <th className="text-left pb-3 font-medium">Descripción</th>
-                <th className="text-left pb-3 font-medium">Proveedor</th>
-                <th className="text-left pb-3 font-medium">Responsable</th>
-                <th className="text-left pb-3 font-medium">Categoría</th>
-                <th className="text-left pb-3 font-medium">Empresa</th>
-                <th className="text-left pb-3 font-medium">N° Factura</th>
-                <th className="text-right pb-3 font-medium">Sub-total</th>
-                <th className="text-right pb-3 font-medium">ITBMS</th>
-                <th className="text-right pb-3 font-medium">Total</th>
+              <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
+                <th className="text-left py-3 px-4 font-normal">Fecha</th>
+                <th className="text-left py-3 px-4 font-normal">Descripción</th>
+                <th className="text-left py-3 px-4 font-normal">Proveedor</th>
+                <th className="text-left py-3 px-4 font-normal">Responsable</th>
+                <th className="text-left py-3 px-4 font-normal">Categoría</th>
+                <th className="text-left py-3 px-4 font-normal">Empresa</th>
+                <th className="text-left py-3 px-4 font-normal">N° Factura</th>
+                <th className="text-right py-3 px-4 font-normal">Sub-total</th>
+                <th className="text-right py-3 px-4 font-normal">ITBMS</th>
+                <th className="text-right py-3 px-4 font-normal">Total</th>
                 <th className="w-16"></th>
               </tr>
             </thead>
@@ -672,34 +675,35 @@ export default function CajaPage() {
                       <td className="py-2 text-center text-xs"><button onClick={saveEditGasto} className="text-gray-500 hover:text-black mr-1">✓</button><button onClick={() => setEditingGastoId(null)} className="text-gray-300 hover:text-black">×</button></td>
                     </tr>
                   ) : (
-                    <tr key={g.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition">
-                      <td className="py-3 text-gray-500">{fmtDate(g.fecha)}</td>
-                      <td className="py-3">{g.descripcion || g.nombre}</td>
-                      <td className="py-3 text-gray-500">{g.proveedor || "—"}</td>
-                      <td className="py-3 text-gray-500">{g.responsable || "—"}</td>
-                      <td className="py-3 text-gray-500">{g.categoria || "Varios"}</td>
-                      <td className="py-3 text-gray-500">{g.empresa || "—"}</td>
-                      <td className="py-3 text-gray-500">{g.nro_factura || "—"}</td>
-                      <td className="py-3 text-right tabular-nums">${fmt(g.subtotal)}</td>
-                      <td className="py-3 text-right tabular-nums text-gray-500">${fmt(g.itbms)}</td>
-                      <td className="py-3 text-right tabular-nums font-medium">${fmt(g.total)}</td>
-                      <td className="py-3 text-center text-xs">
+                    <tr key={g.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="py-3 px-4 text-gray-500">{fmtDate(g.fecha)}</td>
+                      <td className="py-3 px-4">{g.descripcion || g.nombre}</td>
+                      <td className="py-3 px-4 text-gray-500">{g.proveedor || "—"}</td>
+                      <td className="py-3 px-4 text-gray-500">{g.responsable || "—"}</td>
+                      <td className="py-3 px-4 text-gray-500">{g.categoria || "Varios"}</td>
+                      <td className="py-3 px-4 text-gray-500">{g.empresa || "—"}</td>
+                      <td className="py-3 px-4 text-gray-500">{g.nro_factura || "—"}</td>
+                      <td className="py-3 px-4 text-right tabular-nums">${fmt(g.subtotal)}</td>
+                      <td className="py-3 px-4 text-right tabular-nums text-gray-500">${fmt(g.itbms)}</td>
+                      <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(g.total)}</td>
+                      <td className="py-3 px-4 text-center text-xs">
                         <button onClick={() => { setEditingGastoId(g.id); setEditGasto({ fecha: g.fecha, descripcion: g.descripcion || g.nombre, proveedor: g.proveedor || "", nro_factura: g.nro_factura || "", responsable: g.responsable || "", categoria: g.categoria || "Varios", empresa: g.empresa || "", subtotal: g.subtotal, itbms: g.itbms }); }} className="text-gray-400 hover:text-black transition mr-1">Editar</button>
                         <button onClick={() => deleteGasto(g.id)} className="text-gray-300 hover:text-red-500 transition">×</button>
                       </td>
                     </tr>
                   ))}
                   <tr className="border-t border-gray-300">
-                    <td colSpan={7} className="py-3 text-right text-xs uppercase tracking-widest text-gray-400">Totales</td>
-                    <td className="py-3 text-right tabular-nums font-medium">${fmt(totalSubtotal)}</td>
-                    <td className="py-3 text-right tabular-nums font-medium">${fmt(totalItbms)}</td>
-                    <td className="py-3 text-right tabular-nums font-semibold">${fmt(totalGastado)}</td>
+                    <td colSpan={7} className="py-3 px-4 text-right text-[11px] uppercase tracking-[0.05em] text-gray-400">Totales</td>
+                    <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(totalSubtotal)}</td>
+                    <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(totalItbms)}</td>
+                    <td className="py-3 px-4 text-right tabular-nums font-semibold">${fmt(totalGastado)}</td>
                     <td></td>
                   </tr>
                 </>
               )}
             </tbody>
           </table>
+          </div>
         </div>
 
         {/* Reposicion */}

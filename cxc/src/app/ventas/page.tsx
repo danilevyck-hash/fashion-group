@@ -411,14 +411,14 @@ export default function VentasPage() {
                     </>))}
                     {/* TOTAL row */}
                     <tr className="border-t-2 border-gray-300 bg-gray-50 font-semibold">
-                      <td className="px-3 py-2.5 sticky left-0 bg-gray-50 z-[1]">TOTAL</td>
+                      <td className="px-4 py-3 sticky left-0 bg-gray-50 z-[1]">TOTAL</td>
                       {MESES.map((_, i) => {
                         const total = safeVentas.filter((v) => v.mes === i + 1).reduce((s, v) => s + ventasNetas(v), 0);
-                        return <td key={i} className={`text-right px-2 py-2.5 tabular-nums ${i + 1 === currentMonth ? "bg-blue-50/50" : ""}`}>{total > 0 ? fmtK(total) : "—"}</td>;
+                        return <td key={i} className={`text-right px-2 py-3 tabular-nums ${i + 1 === currentMonth ? "bg-blue-50/50" : ""}`}>{total > 0 ? fmtK(total) : "—"}</td>;
                       })}
-                      <td className="text-right px-3 py-2.5 tabular-nums">${fmt(groupTotal)}</td>
-                      <td className="text-right px-3 py-2.5">100%</td>
-                      <td className="text-right px-3 py-2.5 tabular-nums">{(() => { const tb = safeVentas.reduce((s, v) => s + v.ventas_brutas, 0); const tc = safeVentas.reduce((s, v) => s + v.costo_total, 0); return tb > 0 ? `${((tb - tc) / tb * 100).toFixed(1)}%` : "—"; })()}</td>
+                      <td className="text-right px-4 py-3 tabular-nums">${fmt(groupTotal)}</td>
+                      <td className="text-right px-4 py-3">100%</td>
+                      <td className="text-right px-4 py-3 tabular-nums">{(() => { const tb = safeVentas.reduce((s, v) => s + v.ventas_brutas, 0); const tc = safeVentas.reduce((s, v) => s + v.costo_total, 0); return tb > 0 ? `${((tb - tc) / tb * 100).toFixed(1)}%` : "—"; })()}</td>
                     </tr>
                   </tbody>
                 </table>
