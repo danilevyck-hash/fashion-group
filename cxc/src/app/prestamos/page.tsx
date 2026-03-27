@@ -88,6 +88,7 @@ export default function PrestamosPage() {
   const [mMonto, setMMonto] = useState("");
   const [mNotas, setMNotas] = useState("");
   const [savingMov, setSavingMov] = useState(false);
+  const [movStep, setMovStep] = useState("form");
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
@@ -165,7 +166,6 @@ export default function PrestamosPage() {
   }
 
   // ── Movement modal handlers ──
-  const [movStep, setMovStep] = useState<"employee" | "form">("form");
   function openNewMov() {
     setMEmpleadoId(""); setMFecha(new Date().toISOString().slice(0, 10));
     setMConcepto("Préstamo"); setMMonto(""); setMNotas("");
