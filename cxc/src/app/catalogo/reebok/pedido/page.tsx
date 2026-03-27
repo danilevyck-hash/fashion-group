@@ -60,7 +60,50 @@ export default function Pedido() {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
-  // CHANGE 2: Only "Enviar Pedido" via email
+  const handleDownloadPDF = async () => {
+    setSending(true)
+    try {
+      const { jsPDF } = await import('jspdf')
+      await import('jspdf-autotable')
+      const doc = new jsPDF('portrait')
+      doc.setFillColor(204, 0, 0)
+      doc.rect(0, 0, 210, 20, 'F')
+      doc.setFontSize(14); doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold')
+      doc.text('REEBOK PANAMA — Pedido', 14, 13)
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8)
+      doc.text(new Date().toLocaleDateString('es-PA'), 196, 13, { align: 'right' })
+
+      doc.setTextColor(26, 26, 26); doc.setFontSize(10)
+      doc.text(`Cliente: ${clientName || 'Sin nombre'}`, 14, 28)
+
+      const rows = items.map(item => [
+        item.productId.substring(0, 12),
+        item.productName,
+        item.quantity.toString(),
+        `${item.quantity * PIEZAS_POR_BULTO}`,
+        item.price ? `$${item.price.toFixed(2)}` : '-',
+        item.price ? `$${(item.price * item.quantity * PIEZAS_POR_BULTO).toFixed(2)}` : '-',
+      ]);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (doc as any).autoTable({
+        startY: 34,
+        head: [['SKU', 'Producto', 'Bultos', 'Piezas', 'Precio/u', 'Subtotal']],
+        body: rows,
+        styles: { cellPadding: 3, fontSize: 8 },
+        headStyles: { fillColor: [204, 0, 0] },
+        columnStyles: { 3: { halign: 'center' }, 4: { halign: 'right' }, 5: { halign: 'right' } },
+      })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const finalY = (doc as any).lastAutoTable.finalY + 10
+      doc.setFontSize(11); doc.setFont('helvetica', 'bold')
+      doc.text(`Total: ${totalBultos} bultos (${totalPiezas} piezas)`, 14, finalY)
+      doc.setTextColor(204, 0, 0)
+      doc.text(`$${total.toFixed(2)}`, 196, finalY, { align: 'right' })
+      doc.save(`pedido-reebok-${clientName || 'pedido'}.pdf`)
+    } catch (err) { console.error(err); alert('Error al generar PDF') }
+    setSending(false)
+  }
+
   const handleSendOrder = async () => {
     if (!clientName.trim()) { alert('Ingresa el nombre del cliente'); return }
     setSending(true)
@@ -197,6 +240,11 @@ export default function Pedido() {
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           {sending ? 'Enviando...' : 'Enviar Pedido'}
+        </button>
+
+        <button onClick={handleDownloadPDF} disabled={sending}
+          className="w-full border border-reebok-red text-reebok-red py-3 rounded-lg text-sm font-medium hover:bg-reebok-red hover:text-white transition-colors disabled:opacity-50">
+          Descargar PDF
         </button>
 
         <button onClick={clearCart} className="w-full border border-gray-300 text-gray-600 py-3 rounded-lg text-sm hover:bg-gray-50 transition-colors">

@@ -209,6 +209,22 @@ export default function UploadPage() {
         </div>
       </div>
 
+      {/* Upload guide */}
+      <details className="mb-6 bg-blue-50 border border-blue-200 rounded-xl overflow-hidden">
+        <summary className="px-4 py-3 text-xs text-blue-700 cursor-pointer hover:bg-blue-100 transition flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          <span className="font-medium">Cómo sacar el reporte en Switch</span>
+        </summary>
+        <div className="px-4 pb-3 text-xs text-blue-600 leading-relaxed">
+          <ol className="list-decimal list-inside space-y-1 mt-1">
+            <li><strong>Reporte</strong> → Estado de cuenta cliente</li>
+            <li><strong>Generar</strong> → Antigüedad de deuda</li>
+            <li><strong>Descargar</strong> el archivo CSV</li>
+            <li>Seleccionar la empresa correspondiente abajo y subir el archivo</li>
+          </ol>
+        </div>
+      </details>
+
       {message && (
         <div
           className={`mb-6 px-4 py-3 rounded text-sm ${

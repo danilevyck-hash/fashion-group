@@ -1,18 +1,33 @@
 'use client'
 
 import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { useCart } from './CartProvider'
 
 export default function Navbar() {
   const { getCartCount } = useCart()
   const count = getCartCount()
+  const [role, setRole] = useState('')
+
+  useEffect(() => {
+    setRole(sessionStorage.getItem('cxc_role') || '')
+  }, [])
+
+  const showClientes = role === 'admin' || role === 'vendedor'
 
   return (
     <nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-        <Link href="/catalogo/reebok">
-          <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-7" />
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link href="/catalogo/reebok">
+            <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-7" />
+          </Link>
+          {showClientes && (
+            <Link href="/catalogo/reebok/clientes" className="text-xs text-gray-500 hover:text-reebok-dark transition font-medium">
+              Clientes
+            </Link>
+          )}
+        </div>
 
         <Link href="/catalogo/reebok/pedido" className="relative p-2">
           <svg className="w-6 h-6 text-reebok-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
