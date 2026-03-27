@@ -164,7 +164,7 @@ export default function ReclamosPage() {
 
   async function addNota() { if (!current || !nota.trim()) return; await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seguimiento_nota: nota, autor: role }) }); setNota(""); await loadDetail(current.id); }
   async function changeEstado(e: string) { if (!current || current.estado === e) return; setConfirmingEstado(null); await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: e }) }); setToast(`Estado actualizado a ${e}`); setTimeout(() => setToast(null), 3000); await loadDetail(current.id); loadReclamos(); }
-  async function deleteReclamo(id: string) { setShowDeleteConfirm(false); await fetch(`/api/reclamos/${id}`, { method: "DELETE" }); setCurrent(null); setView("list"); loadReclamos(); }
+  async function deleteReclamo(id: string) { if (!confirm("¿Seguro que deseas eliminar este reclamo?")) return; setShowDeleteConfirm(false); await fetch(`/api/reclamos/${id}`, { method: "DELETE" }); setCurrent(null); setView("list"); loadReclamos(); }
 
 
   async function uploadFoto(file: File) { if (!current) return; const fd = new FormData(); fd.append("file", file); await fetch(`/api/reclamos/${current.id}/fotos`, { method: "POST", body: fd }); await loadDetail(current.id); }
@@ -251,10 +251,10 @@ export default function ReclamosPage() {
       return (
         <div>
           <AppHeader module="Reclamos a Proveedores" />
-          <div className="max-w-5xl mx-auto px-6 py-8">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
           <div className="flex items-end justify-between mb-8">
             <div>
-              <h1 className="text-xl font-semibold tracking-tight">Reclamos</h1>
+              <h1 className="text-xl font-light tracking-tight">Reclamos</h1>
               <p className="text-sm text-gray-400 mt-1">Selecciona una empresa</p>
             </div>
             <button onClick={() => { resetForm(); setView("form"); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">Nuevo Reclamo</button>
@@ -379,14 +379,14 @@ export default function ReclamosPage() {
     const allSelected = allSelectableIds.length > 0 && allSelectableIds.every((id) => selectedIds.includes(id));
 
     return (
-      <div className="max-w-6xl mx-auto px-6 py-12">
-        <div className="flex items-end justify-between mb-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+        <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
           <div>
             <button onClick={() => setActiveEmpresa(null)} className="text-sm text-gray-400 hover:text-black transition mb-2 block">← Empresas</button>
-            <h1 className="text-2xl font-semibold tracking-tight">{activeEmpresa}</h1>
+            <h1 className="text-xl font-light tracking-tight">{activeEmpresa}</h1>
             {c && <p className="text-xs text-gray-400 mt-1">Contacto: {(c.nombre_contacto || c.nombre || "equipo")} | {c.correo}</p>}
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {selectionMode ? (<>
               <span className="text-sm text-gray-400">{selectedIds.length} seleccionados</span>
               <button onClick={() => allSelected ? setSelectedIds([]) : setSelectedIds(allSelectableIds)} className="text-sm text-gray-400 hover:text-black transition">{allSelected ? "Deseleccionar todo" : "Seleccionar todo"}</button>
@@ -449,9 +449,9 @@ export default function ReclamosPage() {
   // ── FORM VIEW ──
   if (view === "form") {
     return (
-      <div className="max-w-6xl mx-auto px-6 py-12">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
         <button onClick={() => setView("list")} className="text-sm text-gray-400 hover:text-black transition mb-8 block">← Reclamos</button>
-        <h1 className="text-2xl font-semibold tracking-tight mb-10">Nuevo Reclamo</h1>
+        <h1 className="text-xl font-light tracking-tight mb-10">Nuevo Reclamo</h1>
         <div className="mb-10">
           <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Información General</div>
           <div className="grid grid-cols-3 gap-x-12 gap-y-5 mb-6">
@@ -588,12 +588,12 @@ export default function ReclamosPage() {
   const days = daysSince(current.fecha_reclamo);
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-12">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
       <button onClick={() => { setCurrent(null); setView("list"); }} className="text-sm text-gray-400 hover:text-black transition mb-8 block">← Reclamos</button>
 
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{current.nro_reclamo}</h1>
+          <h1 className="text-xl font-light tracking-tight">{current.nro_reclamo}</h1>
           <p className="text-sm text-gray-400 mt-1">{current.empresa} — {current.marca} — {current.proveedor}</p>
           <p className="text-sm text-gray-400">Factura: {current.nro_factura}{current.nro_orden_compra ? ` | PO: ${current.nro_orden_compra}` : ""}</p>
           <p className="text-sm text-gray-400">{fmtDate(current.fecha_reclamo)} — {days} días</p>
@@ -601,7 +601,7 @@ export default function ReclamosPage() {
         <span className={`text-xs px-3 py-1 rounded-full ${EC[current.estado] || "bg-gray-100 text-gray-500"}`}>{current.estado}</span>
       </div>
 
-      <div className="flex items-center gap-1 mb-8 flex-wrap">{ESTADOS.map((e) => {
+      <div className="flex items-center gap-1 mb-8 flex-wrap gap-y-2">{ESTADOS.map((e) => {
         const isCurrent = current.estado === e;
         return (
           <div key={e} className="relative">
@@ -748,7 +748,7 @@ export default function ReclamosPage() {
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-50">
-          ✓ {toast}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline-block mr-1.5 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>{toast}
         </div>
       )}
 

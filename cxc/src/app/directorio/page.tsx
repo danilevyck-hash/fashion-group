@@ -129,13 +129,13 @@ export default function DirectorioPage() {
   return (
     <div>
       <AppHeader module="Directorio de Clientes" />
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
       <div className="flex items-end justify-between mb-10">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Directorio</h1>
+          <h1 className="text-xl font-light tracking-tight">Directorio</h1>
           <p className="text-sm text-gray-400 mt-1">Contactos del grupo</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <input
             ref={importRef}
             type="file"
@@ -174,7 +174,7 @@ export default function DirectorioPage() {
       {/* New contact form */}
       {showNew && (
         <div className="border border-gray-100 rounded-2xl p-6 mb-8">
-          <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Nuevo Contacto</div>
+          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Nuevo Contacto</div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Nombre *</label>
@@ -229,32 +229,33 @@ export default function DirectorioPage() {
 
       {/* Table */}
       {loading ? (
-        <div>{[...Array(5)].map((_, i) => <div key={i} className="animate-pulse flex gap-4 py-3 border-b border-gray-100"><div className="h-3 bg-gray-100 rounded w-1/3" /><div className="h-3 bg-gray-100 rounded w-1/5 ml-auto" /><div className="h-3 bg-gray-100 rounded w-1/5" /></div>)}</div>
+        <div>{[...Array(5)].map((_, i) => <div key={i} className="flex gap-4 py-3 px-4 border-b border-gray-50"><div className="h-3 bg-gray-100 rounded animate-pulse w-1/3" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /></div>)}</div>
       ) : filtered.length === 0 && !search ? (
         <div className="flex flex-col items-center py-20 text-center">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-gray-200 mb-4">
+          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-gray-200 mb-5">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
             <circle cx="9" cy="7" r="4"/>
             <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
             <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
           </svg>
-          <p className="text-sm font-medium text-gray-500 mb-1">No hay contactos registrados</p>
-          <p className="text-xs text-gray-400 mb-4">Importa un CSV o agrega tu primer contacto</p>
-          <button onClick={() => setShowNew(true)} className="text-sm bg-black text-white px-6 py-2.5 rounded-full hover:bg-gray-800 transition">
-            + Nuevo Contacto
+          <p className="text-sm font-medium text-gray-600 mb-1">Nada por aqui aun</p>
+          <p className="text-xs text-gray-400 mb-6 max-w-xs">Tu directorio esta vacio. Importa un archivo CSV con tus contactos o agrega el primero manualmente.</p>
+          <button onClick={() => setShowNew(true)} className="text-sm bg-black text-white px-6 py-2.5 rounded-full hover:bg-gray-800 transition font-medium">
+            Nuevo Contacto
           </button>
         </div>
       ) : (
         <>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
-                <th className="text-left pb-3 font-medium">Nombre</th>
-                <th className="text-left pb-3 font-medium">Empresa</th>
-                <th className="text-left pb-3 font-medium">WhatsApp</th>
-                <th className="text-left pb-3 font-medium">Correo</th>
-                <th className="text-left pb-3 font-medium">Contacto</th>
-                <th className="text-right pb-3 font-medium"></th>
+              <tr className="border-b border-gray-200">
+                <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Nombre</th>
+                <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Empresa</th>
+                <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">WhatsApp</th>
+                <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Correo</th>
+                <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Contacto</th>
+                <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal"></th>
               </tr>
             </thead>
             <tbody>
@@ -262,7 +263,7 @@ export default function DirectorioPage() {
                 const isExpanded = expanded === c.id;
                 const isEditing = editing === c.id;
                 return (
-                  <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50/50 transition align-top">
+                  <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors align-top">
                     <td colSpan={6} className="p-0">
                       {/* Main row */}
                       <div
@@ -327,6 +328,7 @@ export default function DirectorioPage() {
               })}
             </tbody>
           </table>
+          </div>
           {filtered.length === 0 && search && (
             <p className="text-center text-gray-300 text-sm py-12">Sin resultados para &quot;{search}&quot;</p>
           )}
@@ -335,7 +337,8 @@ export default function DirectorioPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-6 right-6 bg-black text-white px-4 py-2 rounded-full text-sm shadow-lg">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2.5 rounded-full text-sm shadow-lg flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           {toast}
         </div>
       )}

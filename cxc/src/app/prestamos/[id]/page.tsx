@@ -727,7 +727,7 @@ export default function PrestamoDetallePage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-4 right-4 bg-black text-white px-4 py-2 rounded-lg text-sm z-50 shadow-lg">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2.5 rounded-full text-sm z-50 shadow-lg flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           {toast}
         </div>
       )}

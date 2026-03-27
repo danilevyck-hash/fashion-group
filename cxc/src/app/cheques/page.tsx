@@ -213,13 +213,13 @@ export default function ChequesPage() {
   return (
     <div>
       <AppHeader module="Cheques Posfechados" />
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
       <div className="flex items-end justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Cheques Posfechados</h1>
+          <h1 className="text-xl font-light tracking-tight">Cheques Posfechados</h1>
           <p className="text-sm text-gray-400 mt-1">Gestión de cheques recibidos</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button onClick={exportPendientes} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-full transition">
             ↓ Exportar pendientes
           </button>
@@ -280,7 +280,7 @@ export default function ChequesPage() {
       {/* Form */}
       {showForm && (
         <div className="bg-gray-50 rounded-2xl p-6 mb-8">
-          <div className="text-sm font-medium mb-4">{editingId ? "Editar Cheque" : "Nuevo Cheque"}</div>
+          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">{editingId ? "Editar Cheque" : "Nuevo Cheque"}</div>
           <div className="grid grid-cols-2 gap-x-8 gap-y-4">
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Cliente *</label>
@@ -374,20 +374,20 @@ export default function ChequesPage() {
               </div>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
-                    <th className="text-left pb-2 font-medium">Cliente</th>
-                    <th className="text-right pb-2 font-medium">Cant. cheques</th>
-                    <th className="text-right pb-2 font-medium">Monto total</th>
-                    <th className="text-right pb-2 font-medium">Último cheque</th>
+                  <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
+                    <th className="text-left py-3 px-4 font-normal">Cliente</th>
+                    <th className="text-right py-3 px-4 font-normal">Cant. cheques</th>
+                    <th className="text-right py-3 px-4 font-normal">Monto total</th>
+                    <th className="text-right py-3 px-4 font-normal">Último cheque</th>
                   </tr>
                 </thead>
                 <tbody>
                   {resumenClientes.map((r) => (
-                    <tr key={r.cliente} className="border-b border-gray-100">
-                      <td className="py-2 font-medium">{r.cliente}</td>
-                      <td className="py-2 text-right tabular-nums">{r.count}</td>
-                      <td className="py-2 text-right tabular-nums">${fmt(r.total)}</td>
-                      <td className="py-2 text-right text-gray-500">{fmtDate(r.ultimo)}</td>
+                    <tr key={r.cliente} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                      <td className="py-3 px-4 font-medium">{r.cliente}</td>
+                      <td className="py-3 px-4 text-right tabular-nums">{r.count}</td>
+                      <td className="py-3 px-4 text-right tabular-nums">${fmt(r.total)}</td>
+                      <td className="py-3 px-4 text-right text-gray-500">{fmtDate(r.ultimo)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -401,7 +401,7 @@ export default function ChequesPage() {
       {rebotandoId && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => { setRebotandoId(null); setMotivoRebote(""); }}>
           <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="text-sm font-medium mb-4">Marcar como Rebotado</div>
+            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Marcar como Rebotado</div>
             <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Motivo (opcional)</label>
             <textarea
               value={motivoRebote}
@@ -420,7 +420,7 @@ export default function ChequesPage() {
 
       {/* Table */}
       {loading ? (
-        <div>{[...Array(4)].map((_, i) => <div key={i} className="animate-pulse flex gap-4 py-3 border-b border-gray-100"><div className="h-3 bg-gray-100 rounded w-1/4" /><div className="h-3 bg-gray-100 rounded w-1/6 ml-auto" /></div>)}</div>
+        <div>{[...Array(5)].map((_, i) => <div key={i} className="flex gap-4 py-3 px-4 border-b border-gray-50"><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/8" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /></div>)}</div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-20">
           <p className="text-sm font-medium text-gray-700 mb-1">No hay cheques registrados</p>
@@ -428,17 +428,18 @@ export default function ChequesPage() {
           <button onClick={() => setShowForm(true)} className="text-sm bg-black text-white px-6 py-2.5 rounded-full hover:bg-gray-800 transition">Registrar cheque</button>
         </div>
       ) : (
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
-              <th className="text-left pb-3 font-medium">Fecha Depósito</th>
-              <th className="text-left pb-3 font-medium">Cliente</th>
-              <th className="text-left pb-3 font-medium">Empresa</th>
-              <th className="text-left pb-3 font-medium">Banco</th>
-              <th className="text-left pb-3 font-medium">N° Cheque</th>
-              <th className="text-right pb-3 font-medium">Monto</th>
-              <th className="text-left pb-3 font-medium">Estado</th>
-              <th className="text-right pb-3 font-medium"></th>
+            <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
+              <th className="text-left py-3 px-4 font-normal">Fecha Depósito</th>
+              <th className="text-left py-3 px-4 font-normal">Cliente</th>
+              <th className="text-left py-3 px-4 font-normal">Empresa</th>
+              <th className="text-left py-3 px-4 font-normal">Banco</th>
+              <th className="text-left py-3 px-4 font-normal">N° Cheque</th>
+              <th className="text-right py-3 px-4 font-normal">Monto</th>
+              <th className="text-left py-3 px-4 font-normal">Estado</th>
+              <th className="text-right py-3 px-4 font-normal"></th>
             </tr>
           </thead>
           <tbody>
@@ -448,14 +449,14 @@ export default function ChequesPage() {
               const isDep = c.estado === "depositado";
               const isRebotado = c.estado === "rebotado";
               return (
-                <tr key={c.id} className={`border-b border-gray-100 transition ${isToday ? "bg-yellow-50 border-l-4 border-l-yellow-400" : isVencido ? "bg-red-50/30" : isRebotado ? "bg-red-50/20" : ""} ${isDep || isVencido ? "text-gray-400" : ""}`}>
-                  <td className="py-3">{fmtDate(c.fecha_deposito)}</td>
-                  <td className="py-3 font-medium">{c.cliente}</td>
-                  <td className="py-3 text-gray-500">{c.empresa}</td>
-                  <td className="py-3 text-gray-500">{c.banco}</td>
-                  <td className="py-3 text-gray-500">{c.numero_cheque}</td>
-                  <td className="py-3 text-right tabular-nums font-medium">${fmt(c.monto)}</td>
-                  <td className="py-3">
+                <tr key={c.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${isToday ? "bg-yellow-50 border-l-4 border-l-yellow-400" : isVencido ? "bg-red-50/30" : isRebotado ? "bg-red-50/20" : ""} ${isDep || isVencido ? "text-gray-400" : ""}`}>
+                  <td className="py-3 px-4">{fmtDate(c.fecha_deposito)}</td>
+                  <td className="py-3 px-4 font-medium">{c.cliente}</td>
+                  <td className="py-3 px-4 text-gray-500">{c.empresa}</td>
+                  <td className="py-3 px-4 text-gray-500">{c.banco}</td>
+                  <td className="py-3 px-4 text-gray-500">{c.numero_cheque}</td>
+                  <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(c.monto)}</td>
+                  <td className="py-3 px-4">
                     {c.estado === "pendiente" && <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Pendiente</span>}
                     {c.estado === "depositado" && <span className="text-[11px] bg-black text-white px-2 py-0.5 rounded-full">Depositado</span>}
                     {c.estado === "vencido" && <span className="text-[11px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Vencido</span>}
@@ -463,7 +464,7 @@ export default function ChequesPage() {
                       <span className="text-[11px] bg-red-600 text-white px-2 py-0.5 rounded-full" title={c.motivo_rebote || ""}>Rebotado</span>
                     )}
                   </td>
-                  <td className="py-3 text-right flex items-center justify-end gap-2">
+                  <td className="py-3 px-4 text-right flex items-center justify-end gap-2">
                     {(c.estado === "pendiente" || c.estado === "vencido") && (<>
                       <button onClick={() => depositar(c.id)} className="text-sm text-gray-500 hover:text-black transition">Depositar</button>
                       <span className="text-gray-200">·</span>
@@ -485,6 +486,7 @@ export default function ChequesPage() {
             })}
           </tbody>
         </table>
+        </div>
       )}
     </div>
     </div>

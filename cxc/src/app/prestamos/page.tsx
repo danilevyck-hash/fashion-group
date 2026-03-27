@@ -199,7 +199,7 @@ export default function PrestamosPage() {
     <div className="min-h-screen bg-white">
       <AppHeader module="Préstamos a Colaboradores" />
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div className="bg-gray-50 rounded-xl p-4">
@@ -259,7 +259,7 @@ export default function PrestamosPage() {
 
         {/* Table */}
         {loading ? (
-          <div className="text-center py-20 text-gray-400 text-sm">Cargando...</div>
+          <div>{[...Array(5)].map((_, i) => <div key={i} className="flex gap-4 py-3 px-4 border-b border-gray-50"><div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /></div>)}</div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-20 text-gray-400 text-sm">No se encontraron empleados</div>
         ) : (
@@ -267,31 +267,31 @@ export default function PrestamosPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
-                  <th className="text-left py-3 px-3 text-xs uppercase text-gray-400">Empleado</th>
-                  <th className="text-left py-3 px-3 text-xs uppercase text-gray-400">Empresa</th>
-                  <th className="text-right py-3 px-3 text-xs uppercase text-gray-400">Ded. Quincenal</th>
-                  <th className="text-right py-3 px-3 text-xs uppercase text-gray-400">Total Prestado</th>
-                  <th className="text-right py-3 px-3 text-xs uppercase text-gray-400">Pagado</th>
-                  <th className="text-right py-3 px-3 text-xs uppercase text-gray-400">Saldo</th>
-                  <th className="py-3 px-3 text-xs uppercase text-gray-400 w-32">Progreso</th>
-                  <th className="text-left py-3 px-3 text-xs uppercase text-gray-400">Notas</th>
-                  <th className="py-3 px-3 text-xs uppercase text-gray-400">Acciones</th>
+                  <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Empleado</th>
+                  <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Empresa</th>
+                  <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Ded. Quincenal</th>
+                  <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Total Prestado</th>
+                  <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Pagado</th>
+                  <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Saldo</th>
+                  <th className="py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal w-32">Progreso</th>
+                  <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Notas</th>
+                  <th className="py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map(({ emp, prestado, pagado, saldo, pct, pendientes }, i) => (
-                  <tr key={emp.id} onClick={() => router.push(`/prestamos/${emp.id}`)} className={`${i % 2 === 1 ? "bg-gray-50" : ""} ${!emp.activo ? "opacity-50" : ""} cursor-pointer hover:bg-gray-100 transition`}>
-                    <td className="py-3 px-3">
+                  <tr key={emp.id} onClick={() => router.push(`/prestamos/${emp.id}`)} className={`${i % 2 === 1 ? "bg-gray-50/50" : ""} ${!emp.activo ? "opacity-50" : ""} cursor-pointer hover:bg-gray-50 transition-colors`}>
+                    <td className="py-3 px-4">
                       <span className="font-medium">{emp.nombre}</span>
                       {!emp.activo && <span className="ml-2 text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-full">Archivado</span>}
                       {pendientes > 0 && <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{pendientes} pendiente{pendientes > 1 ? "s" : ""}</span>}
                     </td>
-                    <td className="py-3 px-3 text-gray-500">{emp.empresa || "—"}</td>
-                    <td className="py-3 px-3 text-right tabular-nums">${fmt(emp.deduccion_quincenal)}</td>
-                    <td className="py-3 px-3 text-right tabular-nums">${fmt(prestado)}</td>
-                    <td className="py-3 px-3 text-right tabular-nums">${fmt(pagado)}</td>
-                    <td className="py-3 px-3 text-right tabular-nums font-medium">${fmt(saldo)}</td>
-                    <td className="py-3 px-3">
+                    <td className="py-3 px-4 text-gray-500">{emp.empresa || "—"}</td>
+                    <td className="py-3 px-4 text-right tabular-nums">${fmt(emp.deduccion_quincenal)}</td>
+                    <td className="py-3 px-4 text-right tabular-nums">${fmt(prestado)}</td>
+                    <td className="py-3 px-4 text-right tabular-nums">${fmt(pagado)}</td>
+                    <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(saldo)}</td>
+                    <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div className={`h-full ${progressColor(pct)} rounded-full transition-all`} style={{ width: `${Math.min(pct, 100)}%` }} />
@@ -299,8 +299,8 @@ export default function PrestamosPage() {
                         <span className="text-xs text-gray-400 tabular-nums w-10 text-right">{pct.toFixed(0)}%</span>
                       </div>
                     </td>
-                    <td className="py-3 px-3 text-gray-400 text-xs max-w-[120px] truncate" title={emp.notas || ""}>{emp.notas || "—"}</td>
-                    <td className="py-3 px-3">
+                    <td className="py-3 px-4 text-gray-400 text-xs max-w-[120px] truncate" title={emp.notas || ""}>{emp.notas || "—"}</td>
+                    <td className="py-3 px-4">
                       <div className="flex items-center gap-1">
                         <button onClick={(e) => { e.stopPropagation(); openEditEmp(emp); }} className="p-1.5 hover:bg-gray-100 rounded-lg transition" title="Editar">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
@@ -431,7 +431,7 @@ export default function PrestamosPage() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed bottom-4 right-4 bg-black text-white px-4 py-2 rounded-lg text-sm z-50 shadow-lg">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2.5 rounded-full text-sm z-50 shadow-lg flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
           {toast}
         </div>
       )}

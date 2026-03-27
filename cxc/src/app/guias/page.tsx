@@ -373,13 +373,13 @@ export default function GuiasPage() {
     return (
       <div>
         <AppHeader module="Guías de Transporte" />
-        <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex items-end justify-between mb-10">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">Guías de Transporte</h1>
+            <h1 className="text-xl font-light tracking-tight">Guías de Transporte</h1>
             <p className="text-sm text-gray-400 mt-1">Registro de envíos con transportistas</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <button onClick={() => { resetForm(); setFormNumero(nextNumero); setView("form"); }}
               className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
               Nueva Guía
@@ -411,7 +411,7 @@ export default function GuiasPage() {
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
         {loading ? (
-          <div>{[...Array(5)].map((_, i) => <div key={i} className="animate-pulse flex gap-4 py-3 border-b border-gray-100"><div className="h-3 bg-gray-100 rounded w-1/3" /><div className="h-3 bg-gray-100 rounded w-1/5 ml-auto" /><div className="h-3 bg-gray-100 rounded w-1/5" /><div className="h-3 bg-gray-100 rounded w-1/6" /></div>)}</div>
+          <div>{[...Array(5)].map((_, i) => <div key={i} className="flex gap-4 py-3 px-4 border-b border-gray-50"><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/4" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /></div>)}</div>
         ) : guias.length === 0 ? (
           <div className="text-center py-20">
             <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -446,17 +446,18 @@ export default function GuiasPage() {
               </select>
             </div>
           </div>
+          <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
-                <th className="text-left pb-3 font-medium">N°</th>
-                <th className="text-left pb-3 font-medium">Fecha</th>
-                <th className="text-left pb-3 font-medium">Transportista</th>
-                <th className="text-left pb-3 font-medium">Clientes</th>
-                <th className="text-right pb-3 font-medium">Bultos</th>
-                <th className="text-right pb-3 font-medium">Monto Total</th>
-                <th className="text-left pb-3 font-medium">Estado</th>
-                <th className="text-right pb-3 font-medium"></th>
+              <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
+                <th className="text-left py-3 px-4 font-normal">N°</th>
+                <th className="text-left py-3 px-4 font-normal">Fecha</th>
+                <th className="text-left py-3 px-4 font-normal">Transportista</th>
+                <th className="text-left py-3 px-4 font-normal">Clientes</th>
+                <th className="text-right py-3 px-4 font-normal">Bultos</th>
+                <th className="text-right py-3 px-4 font-normal">Monto Total</th>
+                <th className="text-left py-3 px-4 font-normal">Estado</th>
+                <th className="text-right py-3 px-4 font-normal"></th>
               </tr>
             </thead>
             <tbody>
@@ -466,19 +467,19 @@ export default function GuiasPage() {
                   .filter((g) => { if (!search) return true; const q = search.toLowerCase(); return g.transportista.toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); });
                 return (<>
                   {filtered.map((g) => (
-                    <tr key={g.id} onClick={() => viewGuia(g.id)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
-                      <td className="py-3.5 font-medium">{g.numero}</td>
-                      <td className="py-3.5 text-gray-500">{fmtDate(g.fecha)}</td>
-                      <td className="py-3.5">{g.transportista}</td>
-                      <td className="py-3.5 text-gray-500 text-sm">{clientesSummary(g.guia_items || [])}</td>
-                      <td className="py-3.5 text-right tabular-nums">{g.total_bultos}</td>
-                      <td className="py-3.5 text-right tabular-nums">${fmtMoney(g.monto_total || 0)}</td>
-                      <td className="py-3.5">
+                    <tr key={g.id} onClick={() => viewGuia(g.id)} className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
+                      <td className="py-3 px-4 font-medium">{g.numero}</td>
+                      <td className="py-3 px-4 text-gray-500">{fmtDate(g.fecha)}</td>
+                      <td className="py-3 px-4">{g.transportista}</td>
+                      <td className="py-3 px-4 text-gray-500 text-sm">{clientesSummary(g.guia_items || [])}</td>
+                      <td className="py-3 px-4 text-right tabular-nums">{g.total_bultos}</td>
+                      <td className="py-3 px-4 text-right tabular-nums">${fmtMoney(g.monto_total || 0)}</td>
+                      <td className="py-3 px-4">
                         <span className={`inline-block text-xs px-2.5 py-0.5 rounded-full font-medium ${estadoBadge(g.estado || "Preparando")}`}>
                           {g.estado || "Preparando"}
                         </span>
                       </td>
-                      <td className="py-3.5 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                      <td className="py-3 px-4 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => startEdit(g.id)} className="text-sm text-gray-500 hover:text-black transition">Editar</button>
                         <span className="text-gray-200">·</span>
                         <button onClick={() => deleteGuia(g.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>
@@ -487,12 +488,12 @@ export default function GuiasPage() {
                   ))}
                   {filtered.length > 0 && (
                     <tr className="border-t border-gray-300 bg-gray-50/60 font-medium">
-                      <td className="py-3.5" colSpan={4}>
-                        <span className="text-xs uppercase tracking-widest text-gray-400">Totales del mes</span>
+                      <td className="py-3 px-4" colSpan={4}>
+                        <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Totales del mes</span>
                         <span className="ml-3 text-sm">{filtered.length} guía{filtered.length !== 1 ? "s" : ""}</span>
                       </td>
-                      <td className="py-3.5 text-right tabular-nums">{filtered.reduce((s, g) => s + (g.total_bultos || 0), 0)}</td>
-                      <td className="py-3.5 text-right tabular-nums">${fmtMoney(filtered.reduce((s, g) => s + (g.monto_total || 0), 0))}</td>
+                      <td className="py-3 px-4 text-right tabular-nums">{filtered.reduce((s, g) => s + (g.total_bultos || 0), 0)}</td>
+                      <td className="py-3 px-4 text-right tabular-nums">${fmtMoney(filtered.reduce((s, g) => s + (g.monto_total || 0), 0))}</td>
                       <td colSpan={2}></td>
                     </tr>
                   )}
@@ -500,6 +501,7 @@ export default function GuiasPage() {
               })()}
             </tbody>
           </table>
+          </div>
         </>)}
       </div>
       </div>
@@ -509,12 +511,12 @@ export default function GuiasPage() {
   // ── FORM VIEW ──
   if (view === "form") {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
         <button onClick={() => { setView("list"); resetForm(); }} className="text-sm text-gray-400 hover:text-black transition mb-8 block">
           ← Guías
         </button>
-        <div className="flex items-baseline gap-4 mb-10">
-          <h1 className="text-2xl font-semibold tracking-tight">
+        <div className="flex flex-wrap items-baseline gap-4 mb-10">
+          <h1 className="text-xl font-light tracking-tight">
             {editingId ? "Editar" : "Nueva"} Guía de Transporte
           </h1>
           <span className="text-sm text-gray-400">N° {formNumero}</span>
@@ -522,15 +524,15 @@ export default function GuiasPage() {
 
         {/* Header fields */}
         <div className="mb-10">
-          <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Información General</div>
+          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Información General</div>
           <div className="grid grid-cols-2 gap-x-12 gap-y-6">
             <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Fecha *</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Fecha *</label>
               <input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)}
                 className={inputClass("fecha", "w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition")} />
             </div>
             <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
                 Transportista *
                 <AddNewInline placeholder="Nombre" onAdd={addTransportista} />
               </label>
@@ -547,23 +549,23 @@ export default function GuiasPage() {
               )}
             </div>
             <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Placa / Vehículo</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Placa / Vehículo</label>
               <input type="text" value={placa} onChange={(e) => setPlaca(e.target.value)}
                 className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Observaciones</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Observaciones</label>
               <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
                 rows={1} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Monto Total</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Monto Total</label>
               <input type="number" min={0} step="0.01" value={montoTotal || ""} onChange={(e) => setMontoTotal(parseFloat(e.target.value) || 0)}
                 placeholder="0.00"
                 className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
             </div>
             <div>
-              <label className="text-xs text-gray-400 uppercase tracking-widest block mb-2">Estado</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Estado</label>
               <select value={estado} onChange={(e) => setEstado(e.target.value)}
                 className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
                 {ESTADO_OPTIONS.map((e) => <option key={e} value={e}>{e}</option>)}
@@ -574,7 +576,7 @@ export default function GuiasPage() {
 
         {/* Items table */}
         <div className="mb-10">
-          <div className="text-xs uppercase tracking-widest text-gray-400 mb-4">Detalle de Envío</div>
+          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Detalle de Envío</div>
 
           <datalist id="clientes-list">
             {clientes.map((c) => <option key={c} value={c} />)}

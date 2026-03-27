@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import ClientRow from "./ClientRow";
@@ -59,6 +59,11 @@ export default function ClientTable({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(0);
+  const pageSize = 25;
+
+  // Reset page when filters change
+  useEffect(() => { setPage(0); }, [riskFilter, companyFilter, search]);
 
   const countCurrent = roleClients.filter((c) => c.overdue === 0 && c.watch === 0).length;
   const countWatch = roleClients.filter((c) => c.watch > 0).length;
@@ -232,41 +237,69 @@ export default function ClientTable({
           </div>
         )}
 
-        {filtered.map((client) => {
-          const isExpanded = expanded === client.nombre_normalized;
-          const isSelected = selectedNames.has(client.nombre_normalized);
-          return (
-            <div key={client.nombre_normalized} className={isSelected ? "bg-emerald-50/50" : ""}>
-              <ClientRow
-                client={client}
-                isExpanded={isExpanded}
-                onToggle={() => {
-                  if (selectionMode) { toggleSelection(client.nombre_normalized); }
-                  else { setExpanded(isExpanded ? null : client.nombre_normalized); }
-                }}
-                userRole={userRole}
-                contactLog={contactLog}
-                selectionMode={selectionMode}
-                isSelected={isSelected}
-                onQuickWA={() => { onOpenWhatsApp(client); onMarkContacted(client.nombre_normalized, "whatsapp"); }}
-                onQuickEmail={() => { onOpenEmail(client); onMarkContacted(client.nombre_normalized, "email"); }}
-              />
-              {isExpanded && !selectionMode && (
-                <ContactPanel
+        {(() => {
+          const paged = filtered.slice(page * pageSize, (page + 1) * pageSize);
+          return paged.map((client) => {
+            const isExpanded = expanded === client.nombre_normalized;
+            const isSelected = selectedNames.has(client.nombre_normalized);
+            return (
+              <div key={client.nombre_normalized} className={isSelected ? "bg-emerald-50/50" : ""}>
+                <ClientRow
                   client={client}
+                  isExpanded={isExpanded}
+                  onToggle={() => {
+                    if (selectionMode) { toggleSelection(client.nombre_normalized); }
+                    else { setExpanded(isExpanded ? null : client.nombre_normalized); }
+                  }}
+                  userRole={userRole}
                   contactLog={contactLog}
-                  onOpenWhatsApp={onOpenWhatsApp}
-                  onOpenEmail={onOpenEmail}
-                  onMarkContacted={onMarkContacted}
-                  onSaveEdit={onSaveEdit}
-                  companyFilter={companyFilter}
-                  roleCompanies={roleCompanies}
+                  selectionMode={selectionMode}
+                  isSelected={isSelected}
+                  onQuickWA={() => { onOpenWhatsApp(client); onMarkContacted(client.nombre_normalized, "whatsapp"); }}
+                  onQuickEmail={() => { onOpenEmail(client); onMarkContacted(client.nombre_normalized, "email"); }}
                 />
-              )}
-            </div>
-          );
-        })}
+                {isExpanded && !selectionMode && (
+                  <ContactPanel
+                    client={client}
+                    contactLog={contactLog}
+                    onOpenWhatsApp={onOpenWhatsApp}
+                    onOpenEmail={onOpenEmail}
+                    onMarkContacted={onMarkContacted}
+                    onSaveEdit={onSaveEdit}
+                    companyFilter={companyFilter}
+                    roleCompanies={roleCompanies}
+                  />
+                )}
+              </div>
+            );
+          });
+        })()}
       </div>
+
+      {/* Pagination controls */}
+      {filtered.length > pageSize && (
+        <div className="flex items-center justify-between mt-3 px-1">
+          <span className="text-[11px] text-gray-400">
+            Mostrando {page * pageSize + 1}-{Math.min((page + 1) * pageSize, filtered.length)} de {filtered.length} clientes
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Anterior
+            </button>
+            <button
+              onClick={() => setPage((p) => p + 1)}
+              disabled={(page + 1) * pageSize >= filtered.length}
+              className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-3 text-[11px] text-gray-400 text-center">
         {filtered.length} clientes &middot; Politica: 0-90d corriente &middot; 91-120d vigilancia &middot; 121d+ vencido

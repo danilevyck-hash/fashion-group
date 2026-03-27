@@ -1,0 +1,149 @@
+"use client";
+
+import { useEffect, useRef, ReactNode } from "react";
+
+// ── ESTÉTICA 5: Skeleton Loaders ──
+export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
+  return (
+    <div className="space-y-0">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex gap-4 py-3 px-4 border-b border-gray-50">
+          {Array.from({ length: cols }).map((_, j) => (
+            <div key={j} className={`h-3 bg-gray-100 rounded animate-pulse ${j === 0 ? "w-1/3" : "w-1/5"}`} />
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function SkeletonKPI({ count = 3 }: { count?: number }) {
+  return (
+    <div className={`grid grid-cols-2 sm:grid-cols-${count} gap-4 mb-6`}>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="bg-gray-50 rounded-xl p-4 space-y-2">
+          <div className="h-2.5 bg-gray-100 rounded animate-pulse w-20" />
+          <div className="h-6 bg-gray-100 rounded animate-pulse w-24" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── ESTÉTICA 2: Empty States ──
+export function EmptyState({
+  icon,
+  title = "Nada por aquí aún",
+  subtitle,
+  actionLabel,
+  onAction,
+}: {
+  icon?: ReactNode;
+  title?: string;
+  subtitle?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center py-20 text-center">
+      {icon || (
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-gray-200 mb-4">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M12 8v4m0 4h.01" />
+        </svg>
+      )}
+      <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
+      {subtitle && <p className="text-xs text-gray-400 mb-4 max-w-xs">{subtitle}</p>}
+      {actionLabel && onAction && (
+        <button onClick={onAction} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
+          {actionLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── ESTÉTICA 6: Toast Component ──
+export function Toast({ message, type = "success" }: { message: string | null; type?: "success" | "error" }) {
+  if (!message) return null;
+  return (
+    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-full text-sm shadow-lg z-50 flex items-center gap-2 ${
+      type === "error" ? "bg-red-900 text-white" : "bg-black text-white"
+    }`}>
+      {type === "error" ? (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      ) : (
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      )}
+      {message}
+    </div>
+  );
+}
+
+// ── ESTÉTICA 7: Modal Component ──
+export function Modal({
+  open,
+  onClose,
+  title,
+  children,
+  maxWidth = "max-w-md",
+}: {
+  open: boolean;
+  onClose: () => void;
+  title?: string;
+  children: ReactNode;
+  maxWidth?: string;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    // Focus first input
+    setTimeout(() => {
+      const input = ref.current?.querySelector("input, textarea, select") as HTMLElement;
+      input?.focus();
+    }, 100);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+      <div ref={ref} className={`bg-white sm:rounded-2xl rounded-t-2xl p-6 ${maxWidth} w-full mx-0 sm:mx-4 shadow-2xl max-h-[90vh] overflow-y-auto`}>
+        {title && <h2 className="text-base font-medium mb-4">{title}</h2>}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── ESTÉTICA 8: Badge Component ──
+const BADGE_COLORS: Record<string, string> = {
+  green: "bg-emerald-50 text-emerald-700",
+  yellow: "bg-amber-50 text-amber-700",
+  red: "bg-red-50 text-red-700",
+  gray: "bg-gray-100 text-gray-500",
+  blue: "bg-blue-50 text-blue-700",
+  purple: "bg-purple-50 text-purple-700",
+  orange: "bg-orange-50 text-orange-700",
+};
+
+export function Badge({ children, color = "gray" }: { children: ReactNode; color?: keyof typeof BADGE_COLORS | string }) {
+  const cls = BADGE_COLORS[color] || BADGE_COLORS.gray;
+  return <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium inline-flex items-center ${cls}`}>{children}</span>;
+}
+
+// ── ESTÉTICA 10: Money Formatter ──
+export function fmtMoney(n: number | null | undefined): string {
+  const v = Number(n) || 0;
+  return `$${v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+export function MoneyCell({ value, className = "" }: { value: number; className?: string }) {
+  const v = Number(value) || 0;
+  const color = v < 0 ? "text-red-500" : v === 0 ? "text-gray-400" : "";
+  return <span className={`tabular-nums ${color} ${className}`}>{fmtMoney(v)}</span>;
+}

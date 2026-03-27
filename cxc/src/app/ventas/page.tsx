@@ -258,7 +258,7 @@ export default function VentasPage() {
   return (
     <div>
       <AppHeader module="Ventas" />
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
 
         {/* Year selector */}
         <div className="flex items-center gap-2 mb-8">
@@ -271,7 +271,7 @@ export default function VentasPage() {
         </div>
 
         {loading ? (
-          <div className="space-y-4">{[...Array(4)].map((_, i) => <div key={i} className="animate-pulse h-16 bg-gray-100 rounded-xl" />)}</div>
+          <div>{[...Array(5)].map((_, i) => <div key={i} className="flex gap-4 py-3 px-4 border-b border-gray-50"><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/12" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/12" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/12" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/12" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/12" /></div>)}</div>
         ) : (<>
 
           {/* KPIs — admin only */}
