@@ -8,6 +8,7 @@ import { ALL_COMPANIES, getCompaniesForRole } from "@/lib/companies";
 import { normalizeName } from "@/lib/normalize";
 import { resolveAlias } from "@/lib/aliases";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import { hasModuleAccess } from "@/lib/auth-check";
 
 interface UploadStatus {
@@ -68,11 +69,7 @@ export default function UploadPage() {
     setMessage(null);
 
     try {
-      const text = await new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = (ev) => resolve(ev.target?.result as string || "");
-        reader.readAsText(file, "latin1");
-      });
+      const text = await readFileAsText(file);
       const parsed = Papa.parse(text, {
         delimiter: ";",
         header: true,
@@ -178,6 +175,16 @@ export default function UploadPage() {
     });
   }
 
+  async function readFileAsText(file: File): Promise<string> {
+    if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      return XLSX.utils.sheet_to_csv(sheet, { FS: ";" });
+    }
+    return file.text();
+  }
+
   function parseCSVPreview(text: string, companyKey: string) {
     const lines = text.split("\n").filter((l) => l.trim());
     if (lines.length < 2) return { valid: false, error: "El archivo está vacío.", headers: [] as string[], rows: [] as string[][], totalRows: 0, companyKey };
@@ -268,16 +275,12 @@ export default function UploadPage() {
                   {uploading === co.key ? "Cargando..." : "Cargar CSV"}
                   <input
                     type="file"
-                    accept=".csv,.txt"
+                    accept=".csv,.txt,.xlsx,.xls"
                     style={{display:'none'}}
                     onChange={async (e) => {
                       const f = e.target.files?.[0];
                       if (!f) return;
-                      const text = await new Promise<string>((resolve) => {
-                        const reader = new FileReader();
-                        reader.onload = (ev) => resolve(ev.target?.result as string || "");
-                        reader.readAsText(f, "latin1");
-                      });
+                      const text = await readFileAsText(f);
                       const preview = parseCSVPreview(text, co.key);
                       setCsvPreview(preview);
                       setPendingText(text);
