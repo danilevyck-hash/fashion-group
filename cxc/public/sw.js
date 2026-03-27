@@ -1,4 +1,3 @@
-// Self-unregistering service worker — clears all caches
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => {
   e.waitUntil(
@@ -6,4 +5,3 @@ self.addEventListener('activate', (e) => {
       .then(() => self.clients.claim())
   );
 });
-self.addEventListener('fetch', () => {});
