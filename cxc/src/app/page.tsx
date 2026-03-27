@@ -30,6 +30,9 @@ export default function LoginPage() {
       }
 
       sessionStorage.setItem("cxc_role", data.role);
+      if (data.userId) sessionStorage.setItem("fg_user_id", data.userId);
+      if (data.userName) sessionStorage.setItem("fg_user_name", data.userName);
+      if (data.modules) sessionStorage.setItem("fg_modules", JSON.stringify(data.modules));
       router.push(data.role === "cliente" ? "/catalogo/reebok" : "/plantillas");
     } catch {
       setError("Error de conexión");

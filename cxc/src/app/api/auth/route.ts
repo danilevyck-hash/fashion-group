@@ -4,7 +4,38 @@ import { supabaseServer } from "@/lib/supabase-server";
 export async function POST(req: NextRequest) {
   const { password } = await req.json();
 
-  // 1. Check Supabase role_passwords table first
+  // 1. Check fg_users table first (new system)
+  try {
+    const { data: user } = await supabaseServer
+      .from("fg_users")
+      .select("id, name, role, active")
+      .eq("password", password)
+      .eq("active", true)
+      .single();
+
+    if (user) {
+      // Get enabled modules
+      const { data: mods } = await supabaseServer
+        .from("fg_user_modules")
+        .select("module_key")
+        .eq("user_id", user.id)
+        .eq("enabled", true);
+
+      const modules = (mods || []).map((m: { module_key: string }) => m.module_key);
+
+      return NextResponse.json({
+        authenticated: true,
+        role: user.role,
+        userId: user.id,
+        userName: user.name,
+        modules,
+      });
+    }
+  } catch {
+    // fg_users table may not exist yet — continue to legacy
+  }
+
+  // 2. Legacy: Check role_passwords table
   let role: string | null = null;
   try {
     const { data } = await supabaseServer
@@ -13,11 +44,9 @@ export async function POST(req: NextRequest) {
       .eq("password", password)
       .single();
     if (data) role = data.role;
-  } catch {
-    // Table may not exist — continue to env vars
-  }
+  } catch { /* */ }
 
-  // 2. Fall back to env vars if not found in DB
+  // 3. Legacy: Fall back to env vars
   if (!role) {
     const envRoles: Record<string, string> = {};
     if (process.env.ADMIN_PASSWORD) envRoles[process.env.ADMIN_PASSWORD] = "admin";
@@ -34,7 +63,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
   }
 
-  // 3. Check if role is active
+  // 4. Check if legacy role is active
   try {
     const { data } = await supabaseServer
       .from("role_permissions")

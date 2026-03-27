@@ -11,14 +11,24 @@ export default function ReebokAuthGuard({ children }: { children: React.ReactNod
 
   useEffect(() => {
     const role = sessionStorage.getItem("cxc_role") || "";
-    if (!role || !ALLOWED_ROLES.includes(role)) {
-      router.push("/");
-    } else {
+
+    // New system: check fg_modules for 'reebok'
+    try {
+      const mods = sessionStorage.getItem("fg_modules");
+      if (mods) {
+        const arr = JSON.parse(mods);
+        if (Array.isArray(arr) && arr.includes("reebok")) { setAuthorized(true); return; }
+      }
+    } catch { /* */ }
+
+    // Legacy: check role
+    if (role && ALLOWED_ROLES.includes(role)) {
       setAuthorized(true);
+    } else {
+      router.push("/");
     }
   }, [router]);
 
   if (!authorized) return null;
-
   return <>{children}</>;
 }

@@ -46,6 +46,20 @@ export default function UsuariosPage() {
   // Danger zone
   const [showDeactivate, setShowDeactivate] = useState<string | null>(null);
 
+  // New user system
+  interface FgUser { id: string; name: string; password: string; role: string; active: boolean; associated_company: string; modules: string[]; }
+  const [fgUsers, setFgUsers] = useState<FgUser[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [editUserId, setEditUserId] = useState<string | null>(null);
+  const [uName, setUName] = useState("");
+  const [uPassword, setUPassword] = useState("");
+  const [uRole, setURole] = useState("staff");
+  const [uCompany, setUCompany] = useState("");
+  const [uModules, setUModules] = useState<string[]>([]);
+  const [savingUser, setSavingUser] = useState(false);
+  const [showUserPw, setShowUserPw] = useState<Record<string, boolean>>({});
+
   // Password management
   const [passwords, setPasswords] = useState<Record<string, { password: string; updated_at: string }>>({});
   const [showPwModal, setShowPwModal] = useState<string | null>(null);
@@ -82,7 +96,16 @@ export default function UsuariosPage() {
     } catch { /* */ }
   }, []);
 
-  useEffect(() => { if (authChecked) { loadRoles(); loadPasswords(); } }, [authChecked, loadRoles, loadPasswords]);
+  const loadFgUsers = useCallback(async () => {
+    setLoadingUsers(true);
+    try {
+      const res = await fetch("/api/admin/users");
+      if (res.ok) setFgUsers(await res.json());
+    } catch { /* */ }
+    setLoadingUsers(false);
+  }, []);
+
+  useEffect(() => { if (authChecked) { loadRoles(); loadPasswords(); loadFgUsers(); } }, [authChecked, loadRoles, loadPasswords, loadFgUsers]);
 
   if (!authChecked) return null;
 
@@ -153,6 +176,34 @@ export default function UsuariosPage() {
     setSavingPw(false);
   }
 
+  function openNewUser() {
+    setEditUserId(null); setUName(""); setUPassword(""); setURole("staff"); setUCompany(""); setUModules([]);
+    setShowUserModal(true);
+  }
+  function openEditUser(u: FgUser) {
+    setEditUserId(u.id); setUName(u.name); setUPassword(u.password); setURole(u.role); setUCompany(u.associated_company || ""); setUModules(u.modules || []);
+    setShowUserModal(true);
+  }
+  async function saveUser() {
+    if (!uName.trim() || !uPassword.trim()) { showToast("Nombre y contraseña requeridos"); return; }
+    setSavingUser(true);
+    try {
+      const body = { id: editUserId, name: uName.trim(), password: uPassword.trim(), role: uRole, associated_company: uCompany || null, modules: uModules };
+      const method = editUserId ? "PUT" : "POST";
+      const res = await fetch("/api/admin/users", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      if (res.ok) { showToast(editUserId ? "Usuario actualizado" : "Usuario creado"); setShowUserModal(false); loadFgUsers(); }
+      else { const err = await res.json(); showToast(err.error || "Error"); }
+    } catch { showToast("Error de conexión"); }
+    setSavingUser(false);
+  }
+  async function toggleUserActive(id: string, active: boolean) {
+    await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, active }) });
+    loadFgUsers();
+  }
+  function toggleUserModule(key: string) {
+    setUModules(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  }
+
   function selectAll(role: string) {
     const roleData = roles.find(r => r.role === role);
     if (!roleData) return;
@@ -188,6 +239,111 @@ export default function UsuariosPage() {
           </div>
           <button onClick={() => router.push("/plantillas")} className="border border-gray-200 px-4 py-2 rounded-full text-sm hover:border-gray-400 transition">Volver</button>
         </div>
+
+        {/* ══ NEW: fg_users section ══ */}
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-medium uppercase tracking-wide text-gray-400">Usuarios del Sistema</h2>
+            </div>
+            <button onClick={openNewUser} className="text-sm bg-black text-white px-4 py-2 rounded-full hover:bg-gray-800 transition">+ Nuevo Usuario</button>
+          </div>
+          {loadingUsers ? (
+            <div className="text-center py-8 text-gray-400 text-sm">Cargando...</div>
+          ) : fgUsers.length === 0 ? (
+            <div className="text-center py-8 text-gray-400 text-sm">No hay usuarios. Crea el primero.</div>
+          ) : (
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Nombre</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Rol</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Empresa</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Módulos</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Contraseña</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Estado</th>
+                    <th className="px-4 py-2.5"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fgUsers.map(u => (
+                    <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                      <td className="px-4 py-3 font-medium">{u.name}</td>
+                      <td className="px-4 py-3 text-gray-500">{u.role}</td>
+                      <td className="px-4 py-3 text-gray-500">{u.associated_company || "—"}</td>
+                      <td className="px-4 py-3"><span className="text-xs text-gray-400">{(u.modules || []).length} módulos</span></td>
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-xs">{showUserPw[u.id] ? u.password : "••••••"}</span>
+                        <button onClick={() => setShowUserPw(p => ({ ...p, [u.id]: !p[u.id] }))} className="text-[10px] text-gray-400 hover:text-gray-600 ml-1">{showUserPw[u.id] ? "ocultar" : "ver"}</button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full ${u.active ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>{u.active ? "Activo" : "Inactivo"}</span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <button onClick={() => openEditUser(u)} className="text-xs text-blue-600 hover:underline mr-2">Editar</button>
+                        <button onClick={() => toggleUserActive(u.id, !u.active)} className="text-xs text-gray-400 hover:text-black">{u.active ? "Desactivar" : "Activar"}</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* ══ User modal ══ */}
+        {showUserModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <h2 className="font-medium mb-4">{editUserId ? "Editar Usuario" : "Nuevo Usuario"}</h2>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[11px] text-gray-400 uppercase block mb-1">Nombre *</label>
+                  <input value={uName} onChange={e => setUName(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+                </div>
+                <div>
+                  <label className="text-[11px] text-gray-400 uppercase block mb-1">Contraseña *</label>
+                  <input value={uPassword} onChange={e => setUPassword(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition font-mono" />
+                </div>
+                <div>
+                  <label className="text-[11px] text-gray-400 uppercase block mb-1">Rol</label>
+                  <select value={uRole} onChange={e => setURole(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
+                    <option value="admin">Admin</option>
+                    <option value="staff">Staff</option>
+                    <option value="vendedor">Vendedor</option>
+                    <option value="cliente">Cliente</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[11px] text-gray-400 uppercase block mb-1">Empresa (opcional)</label>
+                  <input value={uCompany} onChange={e => setUCompany(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+                </div>
+                <div>
+                  <label className="text-[11px] text-gray-400 uppercase block mb-1">Módulos</label>
+                  <div className="grid grid-cols-2 gap-1 mt-1">
+                    {MODULES.map(m => (
+                      <label key={m.key} className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-xs ${uModules.includes(m.key) ? "bg-green-50" : "hover:bg-gray-50"}`}>
+                        <input type="checkbox" checked={uModules.includes(m.key)} onChange={() => toggleUserModule(m.key)} className="accent-black w-3.5 h-3.5" />
+                        {m.label}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 mt-6">
+                <button onClick={() => setShowUserModal(false)} className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
+                <button onClick={saveUser} disabled={savingUser} className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50">
+                  {savingUser ? "Guardando..." : "Guardar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <hr className="mb-8 border-gray-100" />
+
+        <h2 className="text-sm font-medium uppercase tracking-wide text-gray-400 mb-4">Roles del Sistema (legacy)</h2>
 
         {/* Info banner */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-6 text-xs text-blue-700">
