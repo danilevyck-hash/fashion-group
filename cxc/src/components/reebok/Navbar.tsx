@@ -11,11 +11,13 @@ export default function Navbar() {
   const [hasSystem, setHasSystem] = useState(false)
 
   useEffect(() => {
-    setRole(sessionStorage.getItem('cxc_role') || '')
-    setHasSystem(!!sessionStorage.getItem('fg_user_id') || !!sessionStorage.getItem('cxc_role'))
+    const r = sessionStorage.getItem('cxc_role') || ''
+    setRole(r)
+    setHasSystem(!!sessionStorage.getItem('fg_user_id') || !!r)
   }, [])
 
-  const showClientes = role === 'admin' || role === 'vendedor'
+  // Clientes visible to admin, vendedor, staff (not cliente)
+  const showClientes = role === 'admin' || role === 'vendedor' || role === 'staff'
 
   return (
     <nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">

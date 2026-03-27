@@ -21,7 +21,7 @@ const MODULES = [
   { key: "ventas", label: "Ventas Mensuales" },
   { key: "cheques", label: "Cheques Posfechados" },
   { key: "upload", label: "Carga de Archivos" },
-  { key: "catalogo_reebok", label: "Catálogo Reebok" },
+  { key: "reebok", label: "Catálogo Reebok" },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
