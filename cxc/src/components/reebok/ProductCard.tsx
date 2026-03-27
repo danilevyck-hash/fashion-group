@@ -4,16 +4,16 @@ import { useState } from 'react'
 import { Product } from '@/components/reebok/supabase'
 import { useRouter } from 'next/navigation'
 
-export default function ProductCard({ product, stock = 0 }: { product: Product; stock?: number }) {
+export default function ProductCard({ product, stock = 0, orderQty = 0 }: { product: Product; stock?: number; orderQty?: number }) {
   const router = useRouter()
-  const [qty, setQty] = useState(1)
-  const [status, setStatus] = useState<'idle' | 'adding' | 'added' | 'no-order'>('idle')
+  const [qty, setQty] = useState(orderQty > 0 ? orderQty : 1)
+  const [status, setStatus] = useState<'idle' | 'adding' | 'added' | 'no-order'>(orderQty > 0 ? 'added' : 'idle')
 
   const genderLabel = product.gender === 'male' ? 'Hombre' : product.gender === 'female' ? 'Mujer' : product.gender === 'kids' ? 'Ninos' : ''
 
   const handleAdd = async () => {
     const activeOrderId = localStorage.getItem('reebok_active_order_id')
-    const activeOrderNumber = localStorage.getItem('reebok_active_order_number') || ''
+    const activeOrderClient = localStorage.getItem('reebok_active_order_client') || localStorage.getItem('reebok_active_order_number') || 'pedido'
 
     if (!activeOrderId) {
       setStatus('no-order')
@@ -55,7 +55,7 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
       if (putRes.ok) {
         setStatus('added')
         // Show toast via custom event
-        window.dispatchEvent(new CustomEvent('reebok-toast', { detail: `Agregado a ${activeOrderNumber}` }))
+        window.dispatchEvent(new CustomEvent('reebok-toast', { detail: `Agregado a ${activeOrderClient}` }))
         setTimeout(() => setStatus('idle'), 2000)
       }
     } catch {
@@ -107,7 +107,7 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
               'bg-reebok-red text-white hover:bg-red-700'
             }`}
           >
-            {status === 'added' ? 'Agregado!' : status === 'adding' ? '...' : 'Agregar'}
+            {status === 'added' ? (orderQty > 0 ? `En pedido (${qty})` : 'Agregado!') : status === 'adding' ? '...' : 'Agregar'}
           </button>
         </div>
 

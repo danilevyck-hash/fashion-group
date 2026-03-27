@@ -6,7 +6,6 @@ import Link from "next/link";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
 interface Order { id: string; order_number: string; client_name: string; vendor_name: string; comment: string; total: number; reebok_order_items: OrderItem[]; created_at: string; }
-interface SearchResult { id: string; sku: string; name: string; price: number; image_url: string; }
 interface DirClient { nombre: string; empresa: string; correo: string; }
 
 const P = 12;
@@ -30,10 +29,6 @@ export default function OrderDetailPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const clientRef = useRef<HTMLDivElement>(null);
 
-  // Product search
-  const [search, setSearch] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 3000); };
 
@@ -50,6 +45,7 @@ export default function OrderDetailPage() {
         // FIX 2: Auto-set as active order
         localStorage.setItem("reebok_active_order_id", data.id);
         localStorage.setItem("reebok_active_order_number", data.order_number);
+        localStorage.setItem("reebok_active_order_client", data.client_name || "");
       } else router.push("/catalogo/reebok/pedidos");
     } catch { router.push("/catalogo/reebok/pedidos"); }
     setLoading(false);
@@ -82,19 +78,6 @@ export default function OrderDetailPage() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // Product search
-  useEffect(() => {
-    if (search.length < 2) { setResults([]); return; }
-    const t = setTimeout(async () => {
-      setSearching(true);
-      try {
-        const res = await fetch(`/api/catalogo/reebok/products?search=${encodeURIComponent(search)}&active=true`);
-        if (res.ok) setResults(((await res.json()) || []).slice(0, 6));
-      } catch { /* */ }
-      setSearching(false);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [search]);
 
   if (loading || !order) return null;
 
@@ -106,17 +89,6 @@ export default function OrderDetailPage() {
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it));
   }
   function removeItem(idx: number) { setItems(prev => prev.filter((_, i) => i !== idx)); }
-
-  function addProduct(p: SearchResult) {
-    const existing = items.findIndex(i => i.product_id === p.id);
-    if (existing >= 0) {
-      setItems(prev => prev.map((it, i) => i === existing ? { ...it, quantity: it.quantity + 1 } : it));
-    } else {
-      setItems(prev => [...prev, { product_id: p.id, sku: p.sku, name: p.name, image_url: p.image_url, quantity: 1, unit_price: p.price || 0 }]);
-    }
-    setSearch(""); setResults([]);
-    showToast(`${p.name} agregado`);
-  }
 
   async function saveOrder() {
     setSaving(true);
@@ -132,14 +104,36 @@ export default function OrderDetailPage() {
     setSaving(false);
   }
 
-  // FIX 4: PDF with autoTable as function
+  async function fetchImageB64(url: string): Promise<string | null> {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      });
+    } catch { return null; }
+  }
+
   async function downloadPDF() {
     if (!order) return;
+    showToast("Generando PDF...");
     const { jsPDF } = await import("jspdf");
     const autoTableModule = await import("jspdf-autotable");
     const autoTable = autoTableModule.default;
     const doc = new jsPDF("portrait");
 
+    // Pre-fetch images
+    const imageMap: Record<number, string> = {};
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].image_url) {
+        const b64 = await fetchImageB64(items[i].image_url);
+        if (b64) imageMap[i] = b64;
+      }
+    }
+
+    // Header
     doc.setFillColor(204, 0, 0);
     doc.rect(0, 0, 210, 22, "F");
     doc.setFontSize(14); doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold");
@@ -149,14 +143,22 @@ export default function OrderDetailPage() {
     doc.text(new Date(order.created_at).toLocaleDateString("es-PA"), 196, 10, { align: "right" });
     doc.text("Fashion Group", 196, 17, { align: "right" });
 
-    const rows = items.map(i => [i.sku || "", i.name || "", String(i.quantity), String(i.quantity * P), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * P * Number(i.unit_price))}`]);
+    const rows = items.map(i => ["", i.sku || "", i.name || "", String(i.quantity), String(i.quantity * P), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * P * Number(i.unit_price))}`]);
     autoTable(doc, {
       startY: 28,
-      head: [["SKU", "Producto", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
+      head: [["Foto", "SKU", "Producto", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
       body: rows,
-      styles: { fontSize: 8, cellPadding: 3 },
+      styles: { fontSize: 8, cellPadding: 2, minCellHeight: 18 },
       headStyles: { fillColor: [204, 0, 0] },
-      columnStyles: { 2: { halign: "center" }, 3: { halign: "center" }, 4: { halign: "right" }, 5: { halign: "right" } },
+      columnStyles: { 0: { cellWidth: 20 }, 3: { halign: "center" }, 4: { halign: "center" }, 5: { halign: "right" }, 6: { halign: "right" } },
+      didDrawCell: (data: { row: { index: number; section: string }; column: { index: number }; cell: { x: number; y: number } }) => {
+        if (data.column.index === 0 && data.row.section === "body") {
+          const img = imageMap[data.row.index];
+          if (img) {
+            try { doc.addImage(img, "JPEG", data.cell.x + 1, data.cell.y + 1, 15, 15); } catch { /* skip */ }
+          }
+        }
+      },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fy = (doc as any).lastAutoTable.finalY + 8;
@@ -167,6 +169,7 @@ export default function OrderDetailPage() {
     if (comment) { doc.setFontSize(8); doc.setTextColor(100); doc.setFont("helvetica", "normal"); doc.text(`Nota: ${comment}`, 14, fy + 8); }
 
     doc.save(`${order.order_number}.pdf`);
+    showToast("PDF descargado");
   }
 
   async function confirmOrder() {
@@ -271,33 +274,10 @@ export default function OrderDetailPage() {
         </div>
       )}
 
-      {/* FIX 2+5: Add product section */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <label className="text-[11px] text-gray-400 uppercase">Agregar producto</label>
-          <Link href="/catalogo/reebok" className="text-xs text-reebok-red hover:underline">➕ Ver catálogo completo</Link>
-        </div>
-        <div className="relative">
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por SKU o nombre..."
-            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-gray-300" />
-          {searching && <span className="absolute right-3 top-3 text-xs text-gray-300">Buscando...</span>}
-          {results.length > 0 && (
-            <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
-              {results.map(p => (
-                <button key={p.id} onClick={() => addProduct(p)} className="w-full text-left px-3 py-2 hover:bg-gray-50 transition flex items-center gap-3 border-b border-gray-50 last:border-0">
-                  <div className="w-8 h-8 bg-gray-100 rounded overflow-hidden flex-shrink-0">
-                    {p.image_url ? <img src={p.image_url} alt="" className="w-full h-full object-contain" /> : null}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium truncate">{p.name}</div>
-                    <div className="text-[10px] text-gray-400">{p.sku} · ${fmt(p.price || 0)}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Add products */}
+      <Link href="/catalogo/reebok" className="block mb-6 w-full border-2 border-dashed border-reebok-red text-reebok-red py-3 rounded-lg text-sm font-medium text-center hover:bg-red-50 transition">
+        ➕ Agregar productos desde el catálogo
+      </Link>
 
       {/* Comment */}
       <div className="mb-6">

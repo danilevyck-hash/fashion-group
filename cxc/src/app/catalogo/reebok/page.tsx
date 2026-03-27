@@ -24,6 +24,21 @@ function Home() {
   const [exporting, setExporting] = useState('')
   const [showExportMenu, setShowExportMenu] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [orderItemMap, setOrderItemMap] = useState<Record<string, number>>({})
+
+  // Load active order items to show quantities on product cards
+  useEffect(() => {
+    const activeId = localStorage.getItem('reebok_active_order_id')
+    if (activeId) {
+      fetch(`/api/catalogo/reebok/orders/${activeId}`).then(r => r.ok ? r.json() : null).then(data => {
+        if (data?.reebok_order_items) {
+          const map: Record<string, number> = {}
+          data.reebok_order_items.forEach((i: { product_id: string; quantity: number }) => { map[i.product_id] = i.quantity })
+          setOrderItemMap(map)
+        }
+      }).catch(() => {})
+    }
+  }, [])
 
   // Listen for toast events from ProductCard
   useEffect(() => {
@@ -324,7 +339,7 @@ function Home() {
           <div className="text-center py-20 text-gray-500">No se encontraron productos</div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filtered.map(p => <ProductCard key={p.id} product={p} stock={inventoryMap[p.id] || 0} />)}
+            {filtered.map(p => <ProductCard key={p.id} product={p} stock={inventoryMap[p.id] || 0} orderQty={orderItemMap[p.id] || 0} />)}
           </div>
         )}
       </div>
