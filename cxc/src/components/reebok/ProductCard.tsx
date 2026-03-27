@@ -1,44 +1,82 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Product } from "@/components/reebok/supabase";
 import NewOrderModal from "./NewOrderModal";
 
 export default function ProductCard({ product, stock = 0 }: { product: Product; stock?: number }) {
-  const [status, setStatus] = useState<"idle" | "adding" | "added">("idle");
+  const [qty, setQty] = useState(0); // 0 = not in order
+  const [busy, setBusy] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
 
   const genderLabel = product.gender === "male" ? "Hombre" : product.gender === "female" ? "Mujer" : product.gender === "kids" ? "Ninos" : "";
 
-  const handleAdd = async () => {
-    const activeOrderId = localStorage.getItem("reebok_active_order_id");
-    if (!activeOrderId) { setShowNewOrder(true); return; }
+  // Check if product is in active order on mount
+  const checkOrder = useCallback(async () => {
+    const id = localStorage.getItem("reebok_active_order_id");
+    if (!id) { setQty(0); return; }
+    try {
+      const res = await fetch(`/api/catalogo/reebok/orders/${id}`);
+      if (!res.ok) { setQty(0); return; }
+      const order = await res.json();
+      const item = (order.reebok_order_items || []).find((i: { product_id: string }) => i.product_id === product.id);
+      setQty(item ? item.quantity : 0);
+    } catch { setQty(0); }
+  }, [product.id]);
 
-    setStatus("adding");
+  useEffect(() => { checkOrder(); }, [checkOrder]);
+
+  // Listen for order changes from other cards
+  useEffect(() => {
+    function handler() { checkOrder(); }
+    window.addEventListener("reebok-order-changed", handler);
+    return () => window.removeEventListener("reebok-order-changed", handler);
+  }, [checkOrder]);
+
+  async function updateOrder(newQty: number) {
+    const activeOrderId = localStorage.getItem("reebok_active_order_id");
+    if (!activeOrderId) return;
+    setBusy(true);
     try {
       const res = await fetch(`/api/catalogo/reebok/orders/${activeOrderId}`);
-      if (!res.ok) { setShowNewOrder(true); setStatus("idle"); return; }
+      if (!res.ok) { setBusy(false); return; }
       const order = await res.json();
-      const items = order.reebok_order_items || [];
-      const idx = items.findIndex((i: { product_id: string }) => i.product_id === product.id);
-      const newItems = idx >= 0
-        ? items.map((i: { product_id: string; quantity: number }, j: number) => j === idx ? { ...i, quantity: i.quantity + 1 } : i)
-        : [...items, { product_id: product.id, sku: product.sku || "", name: product.name, image_url: product.image_url || "", quantity: 1, unit_price: product.price || 0 }];
+      const items = (order.reebok_order_items || []) as { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number }[];
+      const idx = items.findIndex(i => i.product_id === product.id);
+
+      let newItems;
+      if (newQty <= 0) {
+        // Remove from order
+        newItems = items.filter(i => i.product_id !== product.id);
+      } else if (idx >= 0) {
+        newItems = items.map((i, j) => j === idx ? { ...i, quantity: newQty } : i);
+      } else {
+        newItems = [...items, { product_id: product.id, sku: product.sku || "", name: product.name, image_url: product.image_url || "", quantity: newQty, unit_price: product.price || 0 }];
+      }
 
       const putRes = await fetch(`/api/catalogo/reebok/orders/${activeOrderId}`, {
         method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: newItems }),
       });
       if (putRes.ok) {
-        setStatus("added");
-        window.dispatchEvent(new CustomEvent("reebok-toast", { detail: "Agregado" }));
-        setTimeout(() => setStatus("idle"), 1500);
+        setQty(newQty <= 0 ? 0 : newQty);
+        if (newQty > 0 && idx < 0) window.dispatchEvent(new CustomEvent("reebok-toast", { detail: "Agregado" }));
+        window.dispatchEvent(new Event("reebok-order-changed"));
       }
-    } catch { setStatus("idle"); }
-  };
+    } catch { /* */ }
+    setBusy(false);
+  }
+
+  function handleAdd() {
+    const activeOrderId = localStorage.getItem("reebok_active_order_id");
+    if (!activeOrderId) { setShowNewOrder(true); return; }
+    updateOrder(qty + 1);
+  }
+
+  const inOrder = qty > 0;
 
   return (
     <>
-      <div className="bg-white overflow-hidden group">
+      <div className="bg-white overflow-hidden">
         <div className="aspect-square bg-gray-50 relative overflow-hidden">
           {product.on_sale && (
             <span className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">OFERTA</span>
@@ -63,19 +101,39 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
           <p className="text-base font-semibold text-black mt-1.5">
             {product.price ? `$${product.price.toFixed(0)}` : "Consultar"}
           </p>
-          <button onClick={handleAdd} disabled={status === "adding"}
-            className={`w-full mt-2 py-2 rounded text-xs font-medium uppercase tracking-wider transition ${
-              status === "added" ? "bg-green-600 text-white" : status === "adding" ? "bg-gray-200 text-gray-400" : "bg-black text-white hover:bg-gray-800"
-            }`}>
-            {status === "added" ? "Agregado" : status === "adding" ? "..." : "Agregar"}
-          </button>
+
+          {inOrder ? (
+            /* In order — show qty controls */
+            <div className="mt-2">
+              <div className="flex items-center justify-between bg-green-50 rounded px-1">
+                <button onClick={() => updateOrder(qty - 1)} disabled={busy}
+                  className="w-11 h-11 flex items-center justify-center text-green-700 text-lg font-medium hover:bg-green-100 rounded transition disabled:opacity-40">
+                  {qty === 1 ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  ) : "−"}
+                </button>
+                <div className="text-center">
+                  <span className="text-sm font-semibold text-green-700 tabular-nums">{qty}</span>
+                  <span className="text-[9px] text-green-600 ml-1">bultos</span>
+                </div>
+                <button onClick={() => updateOrder(qty + 1)} disabled={busy}
+                  className="w-11 h-11 flex items-center justify-center text-green-700 text-lg font-medium hover:bg-green-100 rounded transition disabled:opacity-40">+</button>
+              </div>
+            </div>
+          ) : (
+            /* Not in order — show add button */
+            <button onClick={handleAdd} disabled={busy}
+              className="w-full mt-2 py-2.5 rounded text-xs font-medium uppercase tracking-wider transition bg-black text-white hover:bg-gray-800 disabled:opacity-40 min-h-[44px]">
+              {busy ? "..." : "Agregar"}
+            </button>
+          )}
         </div>
       </div>
 
       {showNewOrder && (
         <NewOrderModal
           onClose={() => setShowNewOrder(false)}
-          onCreated={() => { setShowNewOrder(false); handleAdd(); }}
+          onCreated={() => { setShowNewOrder(false); setTimeout(() => updateOrder(1), 300); }}
           autoAddProduct={{ product_id: product.id, sku: product.sku || "", name: product.name, image_url: product.image_url || "", unit_price: product.price || 0 }}
         />
       )}
