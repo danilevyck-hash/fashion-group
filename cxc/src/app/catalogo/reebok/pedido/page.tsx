@@ -2,148 +2,75 @@
 
 import Link from 'next/link'
 import { useCart } from '@/components/reebok/CartProvider'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
+
+interface DirClient { nombre: string; empresa: string; correo: string; whatsapp: string }
 
 export default function Pedido() {
   const { items, removeFromCart, updateQuantity, clearCart } = useCart()
-  const [exporting, setExporting] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
   const [clientName, setClientName] = useState('')
   const [clientEmail, setClientEmail] = useState('')
-  const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '50760000000'
+
+  // Autocomplete state
+  const [suggestions, setSuggestions] = useState<DirClient[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const PIEZAS_POR_BULTO = 12
   const total = items.reduce((sum, item) => sum + (item.price || 0) * item.quantity * PIEZAS_POR_BULTO, 0)
   const totalBultos = items.reduce((sum, item) => sum + item.quantity, 0)
   const totalPiezas = totalBultos * PIEZAS_POR_BULTO
 
-  const generatePDF = async () => {
-    const { jsPDF } = await import('jspdf')
-    const { default: autoTable } = await import('jspdf-autotable')
-    const doc = new jsPDF('portrait')
+  // CHANGE 1: Autocomplete from directorio
+  function handleNameChange(value: string) {
+    setClientName(value)
+    if (searchTimeout) clearTimeout(searchTimeout)
+    if (value.length < 2) { setSuggestions([]); setShowSuggestions(false); return }
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/catalogo/reebok/clientes-search?q=${encodeURIComponent(value)}`)
+        if (res.ok) {
+          const data = await res.json()
+          setSuggestions(data || [])
+          setShowSuggestions((data || []).length > 0)
+        }
+      } catch { /* */ }
+    }, 300)
+    setSearchTimeout(t)
+  }
 
-    // Header
-    doc.setFillColor(26, 26, 26)
-    doc.rect(0, 0, 210, 20, 'F')
-    doc.setFontSize(14)
-    doc.setTextColor(255, 255, 255)
-    doc.setFont('helvetica', 'bold')
-    doc.text('REEBOK PANAMA — Pedido', 14, 13)
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(8)
-    doc.text(new Date().toLocaleDateString('es-PA'), 196, 13, { align: 'right' })
+  function selectClient(c: DirClient) {
+    setClientName(c.nombre)
+    if (c.correo) setClientEmail(c.correo)
+    setShowSuggestions(false)
+    setSuggestions([])
+  }
 
-    // Load images
-    const imageMap: Record<number, string> = {}
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].imageUrl) {
-        try {
-          const res = await fetch(items[i].imageUrl)
-          const blob = await res.blob()
-          const b64: string = await new Promise(resolve => {
-            const reader = new FileReader()
-            reader.onloadend = () => resolve(reader.result as string)
-            reader.readAsDataURL(blob)
-          })
-          imageMap[i] = b64
-        } catch { /* skip */ }
+  // Close suggestions on click outside
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (inputRef.current && !inputRef.current.parentElement?.contains(e.target as Node)) {
+        setShowSuggestions(false)
       }
     }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
 
-    const rows = items.map(item => [
-      '', // photo placeholder
-      item.productId.substring(0, 12),
-      item.productName,
-      item.quantity.toString(),
-      `${item.quantity * PIEZAS_POR_BULTO}`,
-      item.price ? `$${item.price.toFixed(2)}` : '-',
-      item.price ? `$${(item.price * item.quantity * PIEZAS_POR_BULTO).toFixed(2)}` : '-',
-    ])
-
-    autoTable(doc, {
-      startY: 28,
-      head: [['Foto', 'SKU', 'Producto', 'Bultos', 'Piezas', 'Precio/u', 'Subtotal']],
-      body: rows,
-      columnStyles: { 0: { cellWidth: 25 }, 1: { cellWidth: 22 }, 2: { cellWidth: 50 }, 3: { cellWidth: 16, halign: 'center' }, 4: { cellWidth: 16, halign: 'center' }, 5: { cellWidth: 22, halign: 'right' }, 6: { cellWidth: 25, halign: 'right' } },
-      styles: { cellPadding: 3, fontSize: 8, minCellHeight: 22 },
-      headStyles: { fillColor: [204, 0, 0] },
-      didDrawCell: (data) => {
-        if (data.column.index === 0 && data.section === 'body') {
-          const img = imageMap[data.row.index]
-          if (img) doc.addImage(img, 'JPEG', data.cell.x + 2, data.cell.y + 2, 25, 20)
-        }
-      },
-    })
-
-    // Totals
-    const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10
-    doc.setFontSize(11)
-    doc.setTextColor(26, 26, 26)
-    doc.setFont('helvetica', 'bold')
-    doc.text(`Total: ${totalBultos} bultos (${totalPiezas} piezas)`, 14, finalY)
-    doc.setTextColor(204, 0, 0)
-    doc.text(`$${total.toFixed(2)}`, 196, finalY, { align: 'right' })
-
-    return doc
-  }
-
-  const handleDownloadPDF = async () => {
-    setExporting('pdf')
+  // CHANGE 2: Only "Enviar Pedido" via email
+  const handleSendOrder = async () => {
+    if (!clientName.trim()) { alert('Ingresa el nombre del cliente'); return }
+    setSending(true)
     try {
-      const doc = await generatePDF()
-      doc.save('pedido-reebok.pdf')
-    } catch (err) { console.error(err); alert('Error al generar PDF') }
-    setExporting('')
-  }
-
-  const handleDownloadExcel = async () => {
-    setExporting('excel')
-    try {
-      const ExcelJS = await import('exceljs')
-      const wb = new ExcelJS.Workbook()
-      const ws = wb.addWorksheet('Pedido')
-      ws.columns = [
-        { header: 'SKU', key: 'sku', width: 15 },
-        { header: 'Producto', key: 'name', width: 30 },
-        { header: 'Bultos', key: 'bultos', width: 10 },
-        { header: 'Piezas', key: 'piezas', width: 10 },
-        { header: 'Precio/u', key: 'price', width: 12 },
-        { header: 'Subtotal', key: 'subtotal', width: 15 },
-      ]
-      ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } }
-      ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCC0000' } }
-
-      items.forEach(item => {
-        ws.addRow({
-          sku: item.productId.substring(0, 12),
-          name: item.productName,
-          bultos: item.quantity,
-          piezas: item.quantity * PIEZAS_POR_BULTO,
-          price: item.price ? `$${item.price.toFixed(2)}` : '-',
-          subtotal: item.price ? `$${(item.price * item.quantity * PIEZAS_POR_BULTO).toFixed(2)}` : '-',
-        })
-      })
-
-      const totalRow = ws.addRow({ sku: '', name: 'TOTAL', bultos: totalBultos, piezas: totalPiezas, price: '', subtotal: `$${total.toFixed(2)}` })
-      totalRow.font = { bold: true }
-
-      const buf = await wb.xlsx.writeBuffer()
-      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = 'pedido-reebok.xlsx'; a.click()
-      URL.revokeObjectURL(url)
-    } catch (err) { console.error(err); alert('Error al generar Excel') }
-    setExporting('')
-  }
-
-  const sendOrderEmail = async () => {
-    try {
-      await fetch('/api/catalogo/reebok/send-order', {
+      const res = await fetch('/api/catalogo/reebok/send-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientName: clientName || 'Sin nombre',
-          clientEmail: clientEmail || undefined,
+          clientName: clientName.trim(),
+          clientEmail: clientEmail.trim() || undefined,
           items: items.map(item => ({
             productName: item.productName,
             productId: item.productId,
@@ -155,38 +82,34 @@ export default function Pedido() {
           totalBultos, totalPiezas, total,
         }),
       })
-    } catch { /* email send is best-effort */ }
+      if (res.ok) {
+        setSent(true)
+      } else {
+        const err = await res.json()
+        alert(err.error || 'Error al enviar pedido')
+      }
+    } catch { alert('Error de conexión') }
+    setSending(false)
   }
 
-  const handleWhatsApp = async () => {
-    setExporting('whatsapp')
-    try {
-      // Send email simultaneously
-      sendOrderEmail()
-
-      const doc = await generatePDF()
-      const pdfBlob = doc.output('blob')
-      const pdfFile = new File([pdfBlob], 'pedido-reebok.pdf', { type: 'application/pdf' })
-
-      if (navigator.share && navigator.canShare?.({ files: [pdfFile] })) {
-        await navigator.share({
-          title: 'Pedido Reebok',
-          text: `Pedido de ${clientName || 'cliente'}: ${totalBultos} bultos — $${total.toFixed(2)}`,
-          files: [pdfFile],
-        })
-      } else {
-        let msg = `Hola! Soy ${clientName || 'cliente'}. Quiero hacer un pedido:\n\n`
-        items.forEach((item, i) => {
-          msg += `${i + 1}. ${item.productName} — ${item.quantity} bultos (${item.quantity * PIEZAS_POR_BULTO} pzs)`
-          if (item.price) msg += ` — $${(item.price * item.quantity * PIEZAS_POR_BULTO).toFixed(2)}`
-          msg += '\n'
-        })
-        msg += `\nTotal: ${totalBultos} bultos (${totalPiezas} piezas) — $${total.toFixed(2)}`
-
-        window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`, '_blank')
-      }
-    } catch (err) { console.error(err); alert('Error') }
-    setExporting('')
+  if (sent) {
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-20 text-center">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+        <h1 className="text-2xl font-bold mb-2">Pedido enviado</h1>
+        <p className="text-gray-500 mb-6">Tu pedido de {totalBultos} bultos (${total.toFixed(2)}) ha sido enviado. Te contactaremos pronto.</p>
+        <div className="flex gap-3 justify-center">
+          <Link href="/catalogo/reebok" className="bg-reebok-red text-white px-6 py-3 rounded font-bold text-sm uppercase hover:bg-red-700 transition-colors">
+            Seguir comprando
+          </Link>
+          <button onClick={() => { clearCart(); setSent(false) }} className="border border-gray-300 text-gray-600 px-6 py-3 rounded text-sm hover:bg-gray-50 transition-colors">
+            Vaciar carrito
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (items.length === 0) {
@@ -194,7 +117,7 @@ export default function Pedido() {
       <div className="max-w-3xl mx-auto px-4 py-20 text-center">
         <h1 className="text-3xl font-bold mb-4">Tu pedido</h1>
         <p className="text-gray-500 mb-6">No tienes productos en tu pedido</p>
-        <Link href="/" className="inline-block bg-reebok-red text-white px-6 py-3 rounded font-bold text-sm uppercase hover:bg-red-700 transition-colors">
+        <Link href="/catalogo/reebok" className="inline-block bg-reebok-red text-white px-6 py-3 rounded font-bold text-sm uppercase hover:bg-red-700 transition-colors">
           Ver catalogo
         </Link>
       </div>
@@ -206,12 +129,28 @@ export default function Pedido() {
       <h1 className="text-3xl font-bold mb-2">Tu pedido</h1>
       <p className="text-gray-500 mb-6">{totalBultos} bultos ({totalPiezas} piezas) — <span className="text-reebok-red font-bold">${total.toFixed(2)}</span></p>
 
-      {/* Client info */}
+      {/* Client info with autocomplete */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
-        <div>
-          <label className="text-[11px] text-gray-400 uppercase tracking-wider block mb-1">Nombre del cliente *</label>
-          <input type="text" value={clientName} onChange={e => setClientName(e.target.value)} placeholder="Nombre completo"
+        <div className="relative" ref={inputRef}>
+          <label className="text-[11px] text-gray-400 uppercase tracking-wider block mb-1">Nombre del cliente <span className="text-red-500">*</span></label>
+          <input type="text" value={clientName} onChange={e => handleNameChange(e.target.value)}
+            onFocus={() => { if (suggestions.length > 0) setShowSuggestions(true) }}
+            placeholder="Nombre completo"
             className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-gray-300" />
+          {showSuggestions && suggestions.length > 0 && (
+            <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+              {suggestions.slice(0, 5).map((c, i) => (
+                <button key={i} onClick={() => selectClient(c)}
+                  className="w-full text-left px-3 py-2 hover:bg-gray-50 transition flex items-center justify-between border-b border-gray-50 last:border-0">
+                  <div>
+                    <div className="text-sm font-medium">{c.nombre}</div>
+                    {c.empresa && <div className="text-xs text-gray-400">{c.empresa}</div>}
+                  </div>
+                  {c.correo && <span className="text-[10px] text-gray-300 truncate ml-2 max-w-[120px]">{c.correo}</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           <label className="text-[11px] text-gray-400 uppercase tracking-wider block mb-1">Email <span className="normal-case text-gray-300">(opcional)</span></label>
@@ -250,35 +189,15 @@ export default function Pedido() {
       </div>
 
       <div className="flex flex-col gap-3">
-        {/* WhatsApp - main CTA */}
+        {/* Send order — main CTA */}
         <button
-          onClick={handleWhatsApp}
-          disabled={!!exporting}
-          className="w-full bg-green-500 text-white py-4 rounded-lg font-bold text-center text-sm uppercase tracking-wider hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          onClick={handleSendOrder}
+          disabled={sending || !clientName.trim()}
+          className="w-full bg-reebok-red text-white py-4 rounded-lg font-bold text-center text-sm uppercase tracking-wider hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
         >
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-          </svg>
-          {exporting === 'whatsapp' ? 'Generando...' : 'Enviar pedido por WhatsApp + PDF'}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          {sending ? 'Enviando...' : 'Enviar Pedido'}
         </button>
-
-        {/* Download buttons */}
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={handleDownloadPDF}
-            disabled={!!exporting}
-            className="border border-reebok-red text-reebok-red py-3 rounded-lg text-sm font-medium hover:bg-reebok-red hover:text-white transition-colors disabled:opacity-50"
-          >
-            {exporting === 'pdf' ? 'Generando...' : 'Descargar PDF'}
-          </button>
-          <button
-            onClick={handleDownloadExcel}
-            disabled={!!exporting}
-            className="border border-green-600 text-green-600 py-3 rounded-lg text-sm font-medium hover:bg-green-600 hover:text-white transition-colors disabled:opacity-50"
-          >
-            {exporting === 'excel' ? 'Generando...' : 'Descargar Excel'}
-          </button>
-        </div>
 
         <button onClick={clearCart} className="w-full border border-gray-300 text-gray-600 py-3 rounded-lg text-sm hover:bg-gray-50 transition-colors">
           Vaciar pedido

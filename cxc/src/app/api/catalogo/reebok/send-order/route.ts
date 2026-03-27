@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "RESEND_API_KEY not configured" }, { status: 500 });
   }
 
-  const to = ["daniel@fashiongr.com"];
+  const to = ["daniel@fashiongr.com", "respinosa1721@gmail.com"];
   if (clientEmail) to.push(clientEmail);
 
   try {
