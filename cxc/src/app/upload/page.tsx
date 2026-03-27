@@ -262,41 +262,38 @@ export default function UploadPage() {
               </div>
 
               <div>
-                <input
-                  id={`file-${co.key}`}
-                  type="file"
-                  accept=".csv,.txt"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    try {
-                      const text = await f.text();
-                      const preview = parseCSVPreview(text, co.key);
-                      setCsvPreview(preview);
-                      setPendingText(text);
-                      setPendingFile(f);
-                    } catch (err) {
-                      console.error("CSV parse error:", err);
-                      setMessage({ text: `Error al leer archivo: ${err}`, type: "err" });
-                    }
-                    e.target.value = "";
-                  }}
-                />
-                <button
-                  onClick={() => {
-                    const input = document.getElementById(`file-${co.key}`) as HTMLInputElement;
-                    input?.click();
-                  }}
-                  disabled={uploading !== null}
-                  className={`text-sm px-4 py-2 rounded border transition ${
+                <label
+                  className={`text-sm px-4 py-2 rounded border transition inline-block cursor-pointer ${
                     uploading === co.key
                       ? "border-gray-200 text-gray-400 cursor-wait"
+                      : uploading !== null
+                      ? "border-gray-200 text-gray-400 pointer-events-none"
                       : "border-black text-black hover:bg-black hover:text-white"
                   }`}
                 >
                   {uploading === co.key ? "Cargando..." : "Cargar CSV"}
-                </button>
+                  <input
+                    type="file"
+                    accept=".csv,.txt"
+                    className="sr-only"
+                    disabled={uploading !== null}
+                    onClick={(e) => { (e.target as HTMLInputElement).value = ""; }}
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      try {
+                        const text = await f.text();
+                        const preview = parseCSVPreview(text, co.key);
+                        setCsvPreview(preview);
+                        setPendingText(text);
+                        setPendingFile(f);
+                      } catch (err) {
+                        console.error("CSV parse error:", err);
+                        setMessage({ text: `Error al leer archivo: ${err}`, type: "err" });
+                      }
+                    }}
+                  />
+                </label>
               </div>
             </div>
           );

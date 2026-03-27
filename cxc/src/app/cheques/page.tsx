@@ -74,6 +74,25 @@ export default function ChequesPage() {
 
   useEffect(() => { if (authChecked) loadCheques(); }, [authChecked, loadCheques]);
 
+  // Resumen por cliente
+  const resumenClientes = useMemo(() => {
+    if (cheques.length === 0) return [];
+    const map = new Map<string, { cliente: string; count: number; total: number; ultimo: string }>();
+    for (const c of cheques) {
+      const existing = map.get(c.cliente);
+      if (existing) {
+        existing.count++;
+        existing.total += Number(c.monto) || 0;
+        if (c.fecha_deposito > existing.ultimo) existing.ultimo = c.fecha_deposito;
+      } else {
+        map.set(c.cliente, { cliente: c.cliente, count: 1, total: Number(c.monto) || 0, ultimo: c.fecha_deposito });
+      }
+    }
+    const arr = Array.from(map.values());
+    arr.sort((a, b) => resumenSort === "monto" ? b.total - a.total : b.count - a.count);
+    return arr;
+  }, [cheques, resumenSort]);
+
   if (!authChecked) return null;
 
   function resetForm() {
@@ -190,25 +209,6 @@ export default function ChequesPage() {
         c.cliente.toLowerCase().includes(searchLower)
       )
     : filteredByTab;
-
-  // Resumen por cliente
-  const resumenClientes = useMemo(() => {
-    if (cheques.length === 0) return [];
-    const map = new Map<string, { cliente: string; count: number; total: number; ultimo: string }>();
-    for (const c of cheques) {
-      const existing = map.get(c.cliente);
-      if (existing) {
-        existing.count++;
-        existing.total += Number(c.monto) || 0;
-        if (c.fecha_deposito > existing.ultimo) existing.ultimo = c.fecha_deposito;
-      } else {
-        map.set(c.cliente, { cliente: c.cliente, count: 1, total: Number(c.monto) || 0, ultimo: c.fecha_deposito });
-      }
-    }
-    const arr = Array.from(map.values());
-    arr.sort((a, b) => resumenSort === "monto" ? b.total - a.total : b.count - a.count);
-    return arr;
-  }, [cheques, resumenSort]);
 
   return (
     <div>

@@ -47,7 +47,13 @@ function loadCategorias(): string[] {
     const stored = JSON.parse(localStorage.getItem("fg_categorias") || "[]") as string[];
     const deleted = JSON.parse(localStorage.getItem("fg_categorias_deleted") || "[]") as string[];
     const defaults = CATEGORIAS_DEFAULT.filter((c) => !deleted.includes(c));
-    return [...defaults, ...stored.filter((s) => s && !defaults.includes(s))];
+    const merged = [...defaults, ...stored.filter((s) => s && !defaults.includes(s))];
+    // If everything was deleted, reset and return defaults
+    if (merged.length === 0) {
+      localStorage.removeItem("fg_categorias_deleted");
+      return CATEGORIAS_DEFAULT;
+    }
+    return merged;
   } catch { return CATEGORIAS_DEFAULT; }
 }
 
