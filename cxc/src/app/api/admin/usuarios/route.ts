@@ -8,11 +8,12 @@ const SYSTEM_ROLES = [
   { key: "contabilidad", label: "Contabilidad", password_env: "CONTABILIDAD_PASSWORD" },
   { key: "david", label: "David", password_env: "DAVID_PASSWORD" },
   { key: "upload", label: "Secretaria", password_env: "UPLOAD_PASSWORD" },
+  { key: "vendedor", label: "Vendedor", password_env: "VENDEDOR_PASSWORD" },
 ];
 
 // All modules in the system
 const ALL_MODULES = [
-  "cxc", "guias", "caja", "directorio", "reclamos", "prestamos", "ventas", "upload", "cheques",
+  "cxc", "guias", "caja", "directorio", "reclamos", "prestamos", "ventas", "upload", "cheques", "catalogo_reebok",
 ];
 
 // Default module access per role
@@ -22,6 +23,7 @@ const DEFAULT_MODULES: Record<string, string[]> = {
   contabilidad: ["prestamos", "ventas"],
   david: ["cxc"],
   upload: ["upload", "guias", "caja", "reclamos", "cheques", "directorio"],
+  vendedor: ["catalogo_reebok", "cxc", "directorio"],
 };
 
 export async function GET(req: NextRequest) {

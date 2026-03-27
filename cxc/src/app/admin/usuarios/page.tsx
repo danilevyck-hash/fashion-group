@@ -21,6 +21,7 @@ const MODULES = [
   { key: "ventas", label: "Ventas Mensuales" },
   { key: "cheques", label: "Cheques Posfechados" },
   { key: "upload", label: "Carga de Archivos" },
+  { key: "catalogo_reebok", label: "Catálogo Reebok" },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
@@ -29,6 +30,7 @@ const ROLE_LABELS: Record<string, string> = {
   contabilidad: "Contabilidad",
   david: "David",
   upload: "Secretaria",
+  vendedor: "Vendedor",
 };
 
 export default function UsuariosPage() {
@@ -174,6 +176,7 @@ export default function UsuariosPage() {
                         r.role === "director" ? "bg-gray-700" :
                         r.role === "contabilidad" ? "bg-blue-600" :
                         r.role === "david" ? "bg-purple-600" :
+                        r.role === "vendedor" ? "bg-emerald-600" :
                         "bg-gray-400"
                       }`}>
                         {r.label[0]}

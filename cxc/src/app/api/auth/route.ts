@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
   if (process.env.DAVID_PASSWORD) roles[process.env.DAVID_PASSWORD] = "david";
   if (process.env.UPLOAD_PASSWORD) roles[process.env.UPLOAD_PASSWORD] = "upload";
   if (process.env.CONTABILIDAD_PASSWORD) roles[process.env.CONTABILIDAD_PASSWORD] = "contabilidad";
+  if (process.env.VENDEDOR_PASSWORD) roles[process.env.VENDEDOR_PASSWORD] = "vendedor";
 
   const role = roles[password];
   if (!role) {

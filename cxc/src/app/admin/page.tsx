@@ -146,7 +146,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role");
-    if (r !== "admin" && r !== "director" && r !== "david") {
+    if (r !== "admin" && r !== "director" && r !== "david" && r !== "vendedor") {
       router.push("/");
       return;
     }

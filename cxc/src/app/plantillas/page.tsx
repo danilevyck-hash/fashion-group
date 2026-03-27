@@ -22,8 +22,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
-const ROLE_NAMES: Record<string, string> = { admin: "Daniel", director: "Director", upload: "Secretaria", david: "David", contabilidad: "Contabilidad" };
-const ROLE_LABELS: Record<string, string> = { admin: "Administrador", upload: "Secretaria", director: "Director", david: "David", contabilidad: "Contabilidad" };
+const ROLE_NAMES: Record<string, string> = { admin: "Daniel", director: "Director", upload: "Secretaria", david: "David", contabilidad: "Contabilidad", vendedor: "Vendedor" };
+const ROLE_LABELS: Record<string, string> = { admin: "Administrador", upload: "Secretaria", director: "Director", david: "David", contabilidad: "Contabilidad", vendedor: "Vendedor" };
 function fmt(n: number) { return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 const fmtDate = (d: string) => { const dt = new Date(d); return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`; };
 
@@ -61,6 +61,7 @@ const icons: Record<string, ReactNode> = {
   directorio: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
   ventas: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg>,
   prestamos: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>,
+  catalogo_reebok: <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>,
 };
 
 const ALL_MODULES: ModuleDef[] = [
@@ -72,6 +73,7 @@ const ALL_MODULES: ModuleDef[] = [
   { id: "directorio", label: "Directorio de Clientes", desc: "Base de datos de clientes y contactos", ruta: "/directorio", icon: icons.directorio },
   { id: "ventas", label: "Ventas Mensuales", desc: "Facturacion y margen por empresa", ruta: "/ventas", icon: icons.ventas },
   { id: "prestamos", label: "Préstamos a Colaboradores", desc: "Control de préstamos y deducciones", ruta: "/prestamos", icon: icons.prestamos },
+  { id: "catalogo_reebok", label: "Catálogo Reebok", desc: "Catálogo de productos y pedidos", ruta: "/catalogo/reebok", icon: icons.catalogo_reebok },
 ];
 
 const DEFAULT_ORDER = ALL_MODULES.map(m => m.id);
