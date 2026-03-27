@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { supabase } from "@/lib/supabase";
@@ -20,7 +20,7 @@ export default function UploadPage() {
   const [uploads, setUploads] = useState<Record<string, UploadStatus>>({});
   const [uploading, setUploading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "ok" | "err" } | null>(null);
-  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
   const [userRole, setUserRole] = useState<string>("");
   const [csvPreview, setCsvPreview] = useState<{ headers: string[]; rows: string[][]; totalRows: number; companyKey: string; valid: boolean; error: string } | null>(null);
   const [pendingText, setPendingText] = useState("");
@@ -156,8 +156,6 @@ export default function UploadPage() {
       setMessage({ text: msg, type: "err" });
     } finally {
       setUploading(null);
-      const ref = fileRefs.current[companyKey];
-      if (ref) ref.value = "";
     }
   }
 
@@ -261,33 +259,30 @@ export default function UploadPage() {
               </div>
 
               <div>
-                <input
-                  ref={(el) => { fileRefs.current[co.key] = el; }}
-                  type="file"
-                  accept=".csv,.txt"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    const text = await f.text();
-                    const preview = parseCSVPreview(text, co.key);
-                    setCsvPreview(preview);
-                    setPendingText(text);
-                    setPendingFile(f);
-                    setTimeout(() => { e.target.value = ""; }, 100);
-                  }}
-                />
-                <button
-                  onClick={() => fileRefs.current[co.key]?.click()}
-                  disabled={uploading !== null}
-                  className={`text-sm px-4 py-2 rounded border transition ${
+                <label
+                  className={`text-sm px-4 py-2 rounded border transition cursor-pointer ${
                     uploading === co.key
                       ? "border-gray-200 text-gray-400 cursor-wait"
                       : "border-black text-black hover:bg-black hover:text-white"
                   }`}
                 >
                   {uploading === co.key ? "Cargando..." : "Cargar CSV"}
-                </button>
+                  <input
+                    type="file"
+                    accept=".csv,.txt"
+                    className="hidden"
+                    disabled={uploading !== null}
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      const text = await f.text();
+                      const preview = parseCSVPreview(text, co.key);
+                      setCsvPreview(preview);
+                      setPendingText(text);
+                      setPendingFile(f);
+                    }}
+                  />
+                </label>
               </div>
             </div>
           );
