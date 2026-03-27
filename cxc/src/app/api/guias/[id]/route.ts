@@ -22,12 +22,23 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const { id } = params;
   const body = await req.json();
-  const { fecha, transportista, placa, observaciones, items, monto_total, estado } = body;
+  const { fecha, transportista, placa, observaciones, items, monto_total, estado, receptor_nombre, cedula, firma_base64 } = body;
 
   // Update header
+  const updateData: Record<string, unknown> = {};
+  if (fecha !== undefined) updateData.fecha = fecha;
+  if (transportista !== undefined) updateData.transportista = transportista;
+  if (placa !== undefined) updateData.placa = placa;
+  if (observaciones !== undefined) updateData.observaciones = observaciones;
+  if (monto_total !== undefined) updateData.monto_total = monto_total || 0;
+  if (estado !== undefined) updateData.estado = estado;
+  if (receptor_nombre !== undefined) updateData.receptor_nombre = receptor_nombre;
+  if (cedula !== undefined) updateData.cedula = cedula;
+  if (firma_base64 !== undefined) updateData.firma_base64 = firma_base64;
+
   const { error: guiaErr } = await supabaseServer
     .from("guia_transporte")
-    .update({ fecha, transportista, placa, observaciones, monto_total: monto_total || 0, estado: estado || "Preparando" })
+    .update(updateData)
     .eq("id", id);
 
   if (guiaErr) return NextResponse.json({ error: guiaErr.message }, { status: 500 });
@@ -67,7 +78,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  const allowed = ["placa", "observaciones", "estado", "nombre_entregador", "cedula_entregador", "firma_transportista"];
+  const allowed = ["placa", "observaciones", "estado", "receptor_nombre", "cedula", "firma_base64", "nombre_entregador", "cedula_entregador", "firma_transportista"];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
     if (body[key] !== undefined) update[key] = body[key];
