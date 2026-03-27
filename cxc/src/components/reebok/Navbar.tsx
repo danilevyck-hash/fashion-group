@@ -8,34 +8,14 @@ import NewOrderModal from "./NewOrderModal";
 export default function Navbar() {
   const router = useRouter();
   const [role, setRole] = useState("");
-  const [activeId, setActiveId] = useState("");
-  const [activeClient, setActiveClient] = useState("");
   const [showNewOrder, setShowNewOrder] = useState(false);
 
   useEffect(() => {
     setRole(sessionStorage.getItem("cxc_role") || "");
-    setActiveId(localStorage.getItem("reebok_active_order_id") || "");
-    setActiveClient(localStorage.getItem("reebok_active_order_client") || "");
-  }, []);
-
-  // Listen for storage changes
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveId(localStorage.getItem("reebok_active_order_id") || "");
-      setActiveClient(localStorage.getItem("reebok_active_order_client") || "");
-    }, 1000);
-    return () => clearInterval(interval);
   }, []);
 
   const isManager = role === "admin" || role === "vendedor" || role === "staff";
   const showSystem = role && role !== "cliente";
-
-  function clearActive() {
-    localStorage.removeItem("reebok_active_order_id");
-    localStorage.removeItem("reebok_active_order_number");
-    localStorage.removeItem("reebok_active_order_client");
-    setActiveId(""); setActiveClient("");
-  }
 
   return (
     <>
@@ -47,17 +27,6 @@ export default function Navbar() {
           <Link href="/catalogo/reebok" className="flex-shrink-0">
             <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-6" />
           </Link>
-
-          {/* Active order indicator */}
-          {isManager && activeId && activeClient && (
-            <div className="flex items-center gap-1.5 ml-2 min-w-0">
-              <Link href={`/catalogo/reebok/pedido/${activeId}`} className="text-[11px] text-gray-500 hover:text-black transition truncate max-w-[140px] sm:max-w-[200px]"
-                title={`Para: ${activeClient}`}>
-                Para: <span className="font-medium text-black">{activeClient}</span>
-              </Link>
-              <button onClick={clearActive} className="text-gray-300 hover:text-gray-500 transition text-xs flex-shrink-0">×</button>
-            </div>
-          )}
 
           <div className="flex-1" />
 

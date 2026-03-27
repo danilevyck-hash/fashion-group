@@ -35,9 +35,6 @@ export default function OrderDetailPage() {
       if (res.ok) {
         const d = await res.json();
         setOrder(d); setItems(d.reebok_order_items || []); setClientName(d.client_name || "");
-        localStorage.setItem("reebok_active_order_id", d.id);
-        localStorage.setItem("reebok_active_order_number", d.order_number);
-        localStorage.setItem("reebok_active_order_client", d.client_name || "");
       } else router.push("/catalogo/reebok/pedidos");
     } catch { router.push("/catalogo/reebok/pedidos"); }
     setLoading(false);
@@ -141,7 +138,6 @@ export default function OrderDetailPage() {
   async function deleteOrder() {
     if (!confirm("¿Eliminar este pedido?")) return;
     await fetch(`/api/catalogo/reebok/orders/${id}`, { method: "DELETE" });
-    localStorage.removeItem("reebok_active_order_id"); localStorage.removeItem("reebok_active_order_number"); localStorage.removeItem("reebok_active_order_client");
     router.push("/catalogo/reebok/pedidos");
   }
 
@@ -222,7 +218,7 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <Link href="/catalogo/reebok" className="w-full border border-gray-300 text-black py-3 rounded text-sm font-medium hover:border-gray-500 transition text-center block">
+          <Link href="/catalogo/reebok/productos" className="w-full border border-gray-300 text-black py-3 rounded text-sm font-medium hover:border-gray-500 transition text-center block">
             ← Seguir agregando productos
           </Link>
           <button onClick={saveOrder} disabled={saving} className="w-full bg-black text-white py-3 rounded text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
