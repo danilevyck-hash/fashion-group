@@ -270,7 +270,6 @@ export default function UploadPage() {
                     accept=".csv,.txt"
                     style={{display:'none'}}
                     onChange={async (e) => {
-                      alert('onChange fired! file: ' + e.target.files?.[0]?.name);
                       const f = e.target.files?.[0];
                       if (!f) return;
                       const text = await new Promise<string>((resolve) => {
@@ -291,24 +290,31 @@ export default function UploadPage() {
         })}
       </div>
 
-      {/* CSV Preview */}
+      {/* CSV Preview Overlay */}
       {csvPreview && (
-        <div className="mt-6 border border-gray-100 rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div><p className="text-sm font-medium">{uploadCompanies.find((c) => c.key === csvPreview.companyKey)?.name || csvPreview.companyKey}</p><p className="text-xs text-gray-400 mt-0.5">{csvPreview.totalRows.toLocaleString()} registros detectados</p></div>
-            {csvPreview.valid ? <span className="text-xs bg-green-50 text-green-600 px-3 py-1 rounded-full font-medium">✓ Formato válido</span> : <span className="text-xs bg-red-50 text-red-600 px-3 py-1 rounded-full font-medium">✗ Error de formato</span>}
-          </div>
-          {csvPreview.error && <p className="text-sm text-red-500 mb-4 bg-red-50 rounded-lg p-3">{csvPreview.error}</p>}
-          {csvPreview.valid && csvPreview.rows.length > 0 && (
-            <div className="overflow-x-auto mb-4">
-              <p className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2">Primeras {csvPreview.rows.length} filas</p>
-              <table className="w-full text-xs"><thead><tr className="border-b border-gray-100">{csvPreview.headers.slice(0, 6).map((h, i) => <th key={i} className="text-left pb-2 pr-4 font-medium text-gray-400 whitespace-nowrap">{h}</th>)}{csvPreview.headers.length > 6 && <th className="text-left pb-2 text-gray-300">+{csvPreview.headers.length - 6} más</th>}</tr></thead>
-              <tbody>{csvPreview.rows.map((row, i) => <tr key={i} className="border-b border-gray-50">{row.slice(0, 6).map((cell, j) => <td key={j} className="py-1.5 pr-4 text-gray-600 whitespace-nowrap max-w-[120px] truncate">{cell}</td>)}</tr>)}</tbody></table>
+        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <div style={{background:'white',borderRadius:'12px',padding:'24px',maxWidth:'600px',width:'90%',maxHeight:'80vh',overflowY:'auto'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
+              <div>
+                <p style={{fontWeight:600,fontSize:'14px'}}>{uploadCompanies.find((c) => c.key === csvPreview.companyKey)?.name}</p>
+                <p style={{color:'#888',fontSize:'12px'}}>{csvPreview.totalRows} registros detectados</p>
+              </div>
+              {csvPreview.valid
+                ? <span style={{background:'#f0fdf4',color:'#16a34a',padding:'4px 12px',borderRadius:'99px',fontSize:'12px'}}>✓ Formato válido</span>
+                : <span style={{background:'#fef2f2',color:'#dc2626',padding:'4px 12px',borderRadius:'99px',fontSize:'12px'}}>✗ Error</span>
+              }
             </div>
-          )}
-          <div className="flex gap-3">
-            {csvPreview.valid && pendingFile && <button onClick={async () => { await handleUpload(csvPreview.companyKey, pendingFile); setCsvPreview(null); setPendingText(""); setPendingFile(null); }} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition">Confirmar y subir</button>}
-            <button onClick={() => { setCsvPreview(null); setPendingText(""); setPendingFile(null); }} className="text-sm text-gray-400 hover:text-black transition border border-gray-200 px-4 py-2 rounded-full">Cancelar</button>
+            {csvPreview.error && <p style={{color:'red',fontSize:'13px',marginBottom:'12px'}}>{csvPreview.error}</p>}
+            <div style={{display:'flex',gap:'12px',marginTop:'16px'}}>
+              {csvPreview.valid && pendingFile && (
+                <button onClick={async () => { await handleUpload(csvPreview.companyKey, pendingFile); setCsvPreview(null); setPendingText(""); setPendingFile(null); }} style={{background:'black',color:'white',border:'none',padding:'10px 24px',borderRadius:'99px',cursor:'pointer',fontSize:'14px'}}>
+                  Confirmar y subir
+                </button>
+              )}
+              <button onClick={() => { setCsvPreview(null); setPendingText(""); setPendingFile(null); }} style={{background:'white',border:'1px solid #ddd',padding:'10px 16px',borderRadius:'99px',cursor:'pointer',fontSize:'14px',color:'#666'}}>
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
