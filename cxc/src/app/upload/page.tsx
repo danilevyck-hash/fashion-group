@@ -20,7 +20,7 @@ export default function UploadPage() {
   const [uploads, setUploads] = useState<Record<string, UploadStatus>>({});
   const [uploading, setUploading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "ok" | "err" } | null>(null);
-  const uploadRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [userRole, setUserRole] = useState<string>("");
   const [csvPreview, setCsvPreview] = useState<{ headers: string[]; rows: string[][]; totalRows: number; companyKey: string; valid: boolean; error: string } | null>(null);
   const [pendingText, setPendingText] = useState("");
@@ -152,12 +152,11 @@ export default function UploadPage() {
       });
       loadUploads();
     } catch (err: unknown) {
-      console.error("Upload error:", err);
-      const msg = err instanceof Error ? err.message : JSON.stringify(err);
-      setMessage({ text: `Error: ${msg}`, type: "err" });
+      const msg = err instanceof Error ? err.message : "Error desconocido";
+      setMessage({ text: msg, type: "err" });
     } finally {
       setUploading(null);
-      const ref = uploadRefs.current[companyKey];
+      const ref = fileRefs.current[companyKey];
       if (ref) ref.value = "";
     }
   }
@@ -263,30 +262,21 @@ export default function UploadPage() {
 
               <div>
                 <input
+                  ref={(el) => { fileRefs.current[co.key] = el; }}
                   type="file"
                   accept=".csv,.txt"
                   className="hidden"
-                  ref={(el) => { uploadRefs.current[co.key] = el; }}
-                  disabled={uploading !== null}
                   onChange={async (e) => {
                     const f = e.target.files?.[0];
                     if (!f) return;
-                    try {
-                      const text = await f.text();
-                      const preview = parseCSVPreview(text, co.key);
-                      setCsvPreview(preview);
-                      setPendingText(text);
-                      setPendingFile(f);
-                    } catch (err) {
-                      console.error("CSV parse error:", err);
-                      setMessage({ text: `Error al leer archivo: ${err}`, type: "err" });
-                    }
+                    const text = await f.text();
+                    setCsvPreview(parseCSVPreview(text, co.key));
+                    setPendingText(text); setPendingFile(f);
                     e.target.value = "";
                   }}
                 />
                 <button
-                  type="button"
-                  onClick={() => uploadRefs.current[co.key]?.click()}
+                  onClick={() => fileRefs.current[co.key]?.click()}
                   disabled={uploading !== null}
                   className={`text-sm px-4 py-2 rounded border transition ${
                     uploading === co.key
@@ -318,7 +308,7 @@ export default function UploadPage() {
             </div>
           )}
           <div className="flex gap-3">
-            {csvPreview.valid && pendingFile && <button disabled={uploading !== null} onClick={async () => { await handleUpload(csvPreview.companyKey, pendingFile); setCsvPreview(null); setPendingText(""); setPendingFile(null); }} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">{uploading ? (<><svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>Subiendo...</>) : "Confirmar y subir"}</button>}
+            {csvPreview.valid && pendingFile && <button onClick={async () => { await handleUpload(csvPreview.companyKey, pendingFile); setCsvPreview(null); setPendingText(""); setPendingFile(null); }} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition">Confirmar y subir</button>}
             <button onClick={() => { setCsvPreview(null); setPendingText(""); setPendingFile(null); }} className="text-sm text-gray-400 hover:text-black transition border border-gray-200 px-4 py-2 rounded-full">Cancelar</button>
           </div>
         </div>
