@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { hasModuleAccess } from "@/lib/auth-check";
@@ -27,22 +27,10 @@ interface Guia {
   item_count: number;
   monto_total: number;
   estado: string;
+  receptor_nombre?: string;
+  cedula?: string;
+  firma_base64?: string;
   guia_items?: GuiaItem[];
-}
-
-const ESTADO_OPTIONS = ["Pendiente Bodega", "Listo para Imprimir", "Impreso", "En tránsito", "Entregada", "Con novedad"] as const;
-
-function estadoBadge(estado: string) {
-  const colors: Record<string, string> = {
-    "Pendiente Bodega": "bg-amber-50 text-amber-600",
-    "Listo para Imprimir": "bg-green-50 text-green-600",
-    "Impreso": "bg-gray-100 text-gray-500",
-    "Preparando": "bg-gray-100 text-gray-600",
-    "En tránsito": "bg-blue-50 text-blue-600",
-    "Entregada": "bg-green-50 text-green-600",
-    "Con novedad": "bg-red-50 text-red-600",
-  };
-  return colors[estado] || "bg-gray-100 text-gray-600";
 }
 
 function clientesSummary(items: GuiaItem[]): string {
@@ -51,10 +39,6 @@ function clientesSummary(items: GuiaItem[]): string {
   if (uniqueClientes.length === 0) return "";
   if (uniqueClientes.length === 1) return uniqueClientes[0];
   return `${uniqueClientes[0]} y ${uniqueClientes.length - 1} más`;
-}
-
-function fmtMoney(n: number) {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function getMonthOptions(): { value: string; label: string }[] {
@@ -128,15 +112,15 @@ function AddNewInline({ onAdd, placeholder }: { onAdd: (v: string) => void; plac
 
 export default function GuiasPage() {
   const router = useRouter();
-  const [, setRole] = useState<string | null>(null);
+  const [role, setRole] = useState<string>("");
   const [authChecked, setAuthChecked] = useState(false);
   const [view, setView] = useState<View>("list");
   const [guias, setGuias] = useState<Guia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [showHelp, setShowHelp] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
+  const [toast, setToast] = useState<string | null>(null);
 
   // Dynamic lists
   const [transportistas, setTransportistas] = useState<string[]>(DEFAULT_TRANSPORTISTAS);
@@ -149,16 +133,11 @@ export default function GuiasPage() {
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [transportista, setTransportista] = useState("");
   const [transportistaOtro, setTransportistaOtro] = useState("");
-  const [placa, setPlaca] = useState("");
   const [observaciones, setObservaciones] = useState("");
   const [items, setItems] = useState<GuiaItem[]>([emptyItem(1, DEFAULT_EMPRESAS[0])]);
   const [nextNumero, setNextNumero] = useState(1);
   const [formNumero, setFormNumero] = useState(1);
   const [saving, setSaving] = useState(false);
-
-  // New fields
-  const [montoTotal, setMontoTotal] = useState(0);
-  const [estado, setEstado] = useState("Preparando");
 
   // Month filter
   const currentMonth = new Date().toISOString().slice(0, 7);
@@ -166,6 +145,16 @@ export default function GuiasPage() {
 
   // Print state
   const [printGuia, setPrintGuia] = useState<Guia | null>(null);
+
+  // Bodega completion state
+  const [bPlaca, setBPlaca] = useState("");
+  const [bReceptor, setBReceptor] = useState("");
+  const [bCedula, setBCedula] = useState("");
+  const [bSaving, setBSaving] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const isDrawingRef = useRef(false);
+
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   // Load dynamic lists from localStorage
   useEffect(() => {
@@ -219,7 +208,7 @@ export default function GuiasPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const r = sessionStorage.getItem("cxc_role");
-    if (!hasModuleAccess("guias", ["admin","upload","david","secretaria"])) {
+    if (!hasModuleAccess("guias", ["admin","upload","david","secretaria","bodega"])) {
       router.push("/");
     } else {
       setRole(r || "");
@@ -227,6 +216,79 @@ export default function GuiasPage() {
       loadGuias();
     }
   }, []);
+
+  // Canvas drawing setup
+  useEffect(() => {
+    if (view !== "print" || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+
+    function getPos(e: MouseEvent | TouchEvent) {
+      const rect = canvas.getBoundingClientRect();
+      if ("touches" in e) {
+        return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+      }
+      return { x: (e as MouseEvent).clientX - rect.left, y: (e as MouseEvent).clientY - rect.top };
+    }
+
+    function startDraw(e: MouseEvent | TouchEvent) {
+      e.preventDefault();
+      isDrawingRef.current = true;
+      const pos = getPos(e);
+      ctx!.beginPath();
+      ctx!.moveTo(pos.x, pos.y);
+    }
+    function draw(e: MouseEvent | TouchEvent) {
+      if (!isDrawingRef.current) return;
+      e.preventDefault();
+      const pos = getPos(e);
+      ctx!.lineTo(pos.x, pos.y);
+      ctx!.stroke();
+    }
+    function stopDraw() { isDrawingRef.current = false; }
+
+    canvas.addEventListener("mousedown", startDraw);
+    canvas.addEventListener("mousemove", draw);
+    canvas.addEventListener("mouseup", stopDraw);
+    canvas.addEventListener("mouseleave", stopDraw);
+    canvas.addEventListener("touchstart", startDraw, { passive: false });
+    canvas.addEventListener("touchmove", draw, { passive: false });
+    canvas.addEventListener("touchend", stopDraw);
+
+    return () => {
+      canvas.removeEventListener("mousedown", startDraw);
+      canvas.removeEventListener("mousemove", draw);
+      canvas.removeEventListener("mouseup", stopDraw);
+      canvas.removeEventListener("mouseleave", stopDraw);
+      canvas.removeEventListener("touchstart", startDraw);
+      canvas.removeEventListener("touchmove", draw);
+      canvas.removeEventListener("touchend", stopDraw);
+    };
+  }, [view, printGuia]);
+
+  function clearCanvas() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function isCanvasBlank(): boolean {
+    const canvas = canvasRef.current;
+    if (!canvas) return true;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return true;
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] !== 0) return false;
+    }
+    return true;
+  }
 
   if (!authChecked) return null;
 
@@ -241,7 +303,11 @@ export default function GuiasPage() {
   async function viewGuia(id: string) {
     const res = await fetch(`/api/guias/${id}`);
     if (res.ok) {
-      setPrintGuia(await res.json());
+      const g = await res.json();
+      setPrintGuia(g);
+      setBPlaca(g.placa || "");
+      setBReceptor(g.receptor_nombre || "");
+      setBCedula(g.cedula || "");
       setView("print");
     }
   }
@@ -260,10 +326,7 @@ export default function GuiasPage() {
       setTransportista("__other__");
       setTransportistaOtro(g.transportista);
     }
-    setPlaca(g.placa || "");
     setObservaciones(g.observaciones || "");
-    setMontoTotal(g.monto_total || 0);
-    setEstado(g.estado || "Preparando");
     const guiaItems = (g.guia_items || []) as GuiaItem[];
     setItems(guiaItems.length > 0 ? guiaItems.map((item: GuiaItem, i: number) => ({ ...item, orden: i + 1 })) : [emptyItem(1, defaultEmpresa)]);
     setError(null);
@@ -276,10 +339,7 @@ export default function GuiasPage() {
     setFecha(new Date().toISOString().slice(0, 10));
     setTransportista("");
     setTransportistaOtro("");
-    setPlaca("");
     setObservaciones("");
-    setMontoTotal(0);
-    setEstado("Preparando");
     setItems([emptyItem(1, defaultEmpresa)]);
     setFormNumero(nextNumero);
     setValidationErrors(new Set());
@@ -348,10 +408,8 @@ export default function GuiasPage() {
       body: JSON.stringify({
         fecha,
         transportista: transp,
-        placa,
         observaciones,
-        monto_total: montoTotal,
-        estado: editingId ? estado : "Pendiente Bodega",
+        estado: "Pendiente Bodega",
         items: validItems,
       }),
     });
@@ -359,7 +417,6 @@ export default function GuiasPage() {
     if (res.ok) {
       setError(null);
       const guia = await res.json();
-      const guiaId = guia.id || editingId;
 
       // Send email notification for new guias
       if (!editingId) {
@@ -374,8 +431,6 @@ export default function GuiasPage() {
         }).catch(() => {});
       }
 
-      const fullRes = await fetch(`/api/guias/${guiaId}`);
-      if (fullRes.ok) setPrintGuia(await fullRes.json());
       resetForm();
       loadGuias();
       setView("list");
@@ -383,6 +438,54 @@ export default function GuiasPage() {
       setError("Error al guardar. Verifica los datos.");
     }
     setSaving(false);
+  }
+
+  async function confirmarDespacho() {
+    if (!printGuia) return;
+    if (!bPlaca.trim()) { showToast("Ingresa la placa del vehículo"); return; }
+    if (!bReceptor.trim()) { showToast("Ingresa el nombre del receptor"); return; }
+    if (!bCedula.trim()) { showToast("Ingresa la cédula del receptor"); return; }
+    if (isCanvasBlank()) { showToast("Se requiere la firma del receptor"); return; }
+
+    setBSaving(true);
+    const firma_base64 = canvasRef.current?.toDataURL() || "";
+    const res = await fetch(`/api/guias/${printGuia.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        placa: bPlaca.trim(),
+        receptor_nombre: bReceptor.trim(),
+        cedula: bCedula.trim(),
+        firma_base64,
+        estado: "Completada",
+      }),
+    });
+
+    if (res.ok) {
+      const bultos = (printGuia.guia_items || []).reduce((s, i) => s + (i.bultos || 0), 0);
+      fetch("/api/guias/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject: `✅ Guía #${printGuia.numero} completada — Lista para imprimir`,
+          body: `<h2>Guía #${printGuia.numero}</h2><p><strong>Transportista:</strong> ${printGuia.transportista}</p><p><strong>Placa:</strong> ${bPlaca.trim()}</p><p><strong>Receptor:</strong> ${bReceptor.trim()}</p><p><strong>Total bultos:</strong> ${bultos}</p>`,
+        }),
+      }).catch(() => {});
+
+      showToast("Despacho confirmado");
+      const fullRes = await fetch(`/api/guias/${printGuia.id}`);
+      if (fullRes.ok) {
+        const updated = await fullRes.json();
+        setPrintGuia(updated);
+        setBPlaca(updated.placa || "");
+        setBReceptor(updated.receptor_nombre || "");
+        setBCedula(updated.cedula || "");
+      }
+      loadGuias();
+    } else {
+      showToast("Error al guardar");
+    }
+    setBSaving(false);
   }
 
   // ── LIST VIEW ──
@@ -401,30 +504,8 @@ export default function GuiasPage() {
               className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
               Nueva Guía
             </button>
-            <a href="/guias/nueva-movil" className="text-xs border border-gray-200 px-3 py-1.5 rounded-full hover:border-gray-400 transition flex items-center gap-1">📱 iPad</a>
-            <button
-              onClick={() => setShowHelp(!showHelp)}
-              className="w-8 h-8 rounded-full bg-gray-50 text-gray-400 hover:bg-gray-100 text-sm flex items-center justify-center transition"
-              title="Ayuda"
-            >
-              ?
-            </button>
           </div>
         </div>
-
-        {showHelp && (
-          <div className="bg-gray-50 rounded-2xl p-6 mb-8 text-sm">
-            <p className="font-medium mb-3">¿Cómo usar las Guías de Transporte?</p>
-            <ol className="space-y-2 text-gray-500 list-decimal list-inside">
-              <li>Haz clic en &quot;Nueva Guía&quot; para registrar un despacho</li>
-              <li>Selecciona el transportista y la fecha del envío</li>
-              <li>Agrega una fila por cada cliente que recibe mercancía</li>
-              <li>Indica las facturas incluidas y la cantidad de bultos</li>
-              <li>Guarda — se genera automáticamente el documento listo para imprimir</li>
-              <li>Desde la lista puedes ver, editar, imprimir o eliminar cualquier guía</li>
-            </ol>
-          </div>
-        )}
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
@@ -473,7 +554,6 @@ export default function GuiasPage() {
                 <th className="text-left py-3 px-4 font-normal">Transportista</th>
                 <th className="text-left py-3 px-4 font-normal">Clientes</th>
                 <th className="text-right py-3 px-4 font-normal">Bultos</th>
-                <th className="text-left py-3 px-4 font-normal">Estado</th>
                 <th className="text-right py-3 px-4 font-normal"></th>
               </tr>
             </thead>
@@ -485,24 +565,15 @@ export default function GuiasPage() {
                 return (<>
                   {filtered.map((g) => (
                     <tr key={g.id} onClick={() => viewGuia(g.id)} className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
-                      <td className="py-3 px-4 font-medium">{g.numero}</td>
+                      <td className="py-3 px-4 font-medium">
+                        <span className={`inline-block w-2 h-2 rounded-full mr-2 ${g.placa ? "bg-green-500" : "bg-amber-400"}`} />
+                        {g.numero}
+                      </td>
                       <td className="py-3 px-4 text-gray-500">{fmtDate(g.fecha)}</td>
                       <td className="py-3 px-4">{g.transportista}</td>
                       <td className="py-3 px-4 text-gray-500 text-sm">{clientesSummary(g.guia_items || [])}</td>
                       <td className="py-3 px-4 text-right tabular-nums">{g.total_bultos}</td>
-                      <td className="py-3 px-4">
-                        <span className={`inline-block text-xs px-2.5 py-0.5 rounded-full font-medium ${estadoBadge(g.estado || "Pendiente Bodega")}`}>
-                          {g.estado || "Pendiente Bodega"}
-                        </span>
-                      </td>
                       <td className="py-3 px-4 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                        {(g.estado === "Pendiente Bodega" || !g.estado) && (
-                          <a href={`/guias/bodega/${g.id}`} className="text-xs text-amber-600 hover:underline">📱 Bodega</a>
-                        )}
-                        {g.estado === "Listo para Imprimir" && (
-                          <button onClick={() => { viewGuia(g.id); }} className="text-xs text-green-600 hover:underline">🖨️ Imprimir</button>
-                        )}
-                        {g.estado === "Impreso" && <span className="text-xs text-gray-400">✓ Impreso</span>}
                         <button onClick={() => startEdit(g.id)} className="text-sm text-gray-500 hover:text-black transition">Editar</button>
                         <button onClick={() => deleteGuia(g.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>
                       </td>
@@ -515,7 +586,7 @@ export default function GuiasPage() {
                         <span className="ml-3 text-sm">{filtered.length} guía{filtered.length !== 1 ? "s" : ""}</span>
                       </td>
                       <td className="py-3 px-4 text-right tabular-nums">{filtered.reduce((s, g) => s + (g.total_bultos || 0), 0)}</td>
-                      <td colSpan={2}></td>
+                      <td></td>
                     </tr>
                   )}
                 </>);
@@ -568,23 +639,6 @@ export default function GuiasPage() {
                   onChange={(e) => setTransportistaOtro(e.target.value)}
                   className={inputClass("transportista", "w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition mt-3")} />
               )}
-            </div>
-            <div>
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Placa / Vehículo</label>
-              <input type="text" value={placa} onChange={(e) => setPlaca(e.target.value)}
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
-            </div>
-            <div>
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Observaciones</label>
-              <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
-                rows={1} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
-            </div>
-            <div>
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Estado</label>
-              <select value={estado} onChange={(e) => setEstado(e.target.value)}
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
-                {ESTADO_OPTIONS.map((e) => <option key={e} value={e}>{e}</option>)}
-              </select>
             </div>
           </div>
         </div>
@@ -669,6 +723,13 @@ export default function GuiasPage() {
           </button>
         </div>
 
+        {/* Observaciones */}
+        <div className="mb-10">
+          <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Observaciones (opcional)</label>
+          <textarea value={observaciones} onChange={(e) => setObservaciones(e.target.value)}
+            rows={2} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
+        </div>
+
         {/* Footer */}
         <div className="mb-10">
           <div className="flex items-center gap-2">
@@ -681,7 +742,7 @@ export default function GuiasPage() {
         <div className="flex flex-wrap items-center gap-6">
           <button onClick={saveGuia} disabled={saving || !items.some((i) => i.cliente)}
             className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
-            {saving ? "Guardando..." : editingId ? "Guardar Cambios" : "Guardar y Imprimir"}
+            {saving ? "Guardando..." : editingId ? "Guardar Cambios" : "Guardar Guía"}
           </button>
           <button onClick={() => { setView("list"); resetForm(); }} className="text-sm text-gray-400 hover:text-black transition">
             Cancelar
@@ -696,6 +757,7 @@ export default function GuiasPage() {
     const g = printGuia;
     const guiaItems = g.guia_items || [];
     const bultos = guiaItems.reduce((s, i) => s + (i.bultos || 0), 0);
+    const canComplete = (role === "bodega" || role === "admin") && !g.placa;
 
     return (
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
@@ -705,6 +767,45 @@ export default function GuiasPage() {
             Imprimir
           </button>
         </div>
+
+        {/* Bodega completion section */}
+        {canComplete && (
+          <div className="no-print mb-8 border border-amber-200 bg-amber-50 rounded-2xl p-6">
+            <h2 className="text-sm font-medium mb-4">Completar despacho — Bodega</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+              <div>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Placa / Vehículo *</label>
+                <input type="text" value={bPlaca} onChange={(e) => setBPlaca(e.target.value)}
+                  className="w-full border-b border-gray-300 py-2 text-sm outline-none focus:border-black transition bg-transparent" />
+              </div>
+              <div>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Nombre del receptor *</label>
+                <input type="text" value={bReceptor} onChange={(e) => setBReceptor(e.target.value)}
+                  className="w-full border-b border-gray-300 py-2 text-sm outline-none focus:border-black transition bg-transparent" />
+              </div>
+              <div>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Cédula del receptor *</label>
+                <input type="text" value={bCedula} onChange={(e) => setBCedula(e.target.value)}
+                  className="w-full border-b border-gray-300 py-2 text-sm outline-none focus:border-black transition bg-transparent" />
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2 block">Firma del receptor *</label>
+              <div className="relative inline-block">
+                <canvas ref={canvasRef} width={300} height={150}
+                  className="border border-gray-300 rounded bg-white touch-none" />
+                <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-300 text-sm pointer-events-none">Firme aquí</span>
+              </div>
+              <div>
+                <button onClick={clearCanvas} className="text-xs text-gray-400 hover:text-black transition mt-1">Limpiar firma</button>
+              </div>
+            </div>
+            <button onClick={confirmarDespacho} disabled={bSaving}
+              className="bg-black text-white px-6 py-3 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40 w-full sm:w-auto">
+              {bSaving ? "Guardando..." : "Confirmar despacho"}
+            </button>
+          </div>
+        )}
 
         <div id="print-document" className="border border-gray-200 rounded-lg p-8" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif" }}>
           <h1 className="text-center text-lg font-bold mb-6 uppercase tracking-wide">Guía de Transporte Interior</h1>
@@ -776,9 +877,16 @@ export default function GuiasPage() {
             </div>
             <div>
               <div className="font-medium uppercase mb-6">Recibido Conforme — Transportista</div>
-              <div className="mb-4">NOMBRE: <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span></div>
-              <div className="mb-4">CÉDULA: <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span></div>
-              <div>FIRMA: <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span></div>
+              {g.placa ? (<>
+                <div className="mb-4">PLACA: <span className="ml-1 font-medium">{g.placa}</span></div>
+                <div className="mb-4">NOMBRE: <span className="ml-1 font-medium">{g.receptor_nombre || ""}</span></div>
+                <div className="mb-4">CÉDULA: <span className="ml-1 font-medium">{g.cedula || ""}</span></div>
+                <div>FIRMA: {g.firma_base64 ? <img src={g.firma_base64} alt="Firma" style={{ height: 40 }} className="inline-block ml-1" /> : <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>}</div>
+              </>) : (<>
+                <div className="mb-4">NOMBRE: <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span></div>
+                <div className="mb-4">CÉDULA: <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span></div>
+                <div>FIRMA: <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span></div>
+              </>)}
               <div className="text-gray-400 mt-2 italic">Nombre, cédula y firma</div>
             </div>
           </div>
@@ -787,6 +895,13 @@ export default function GuiasPage() {
             La firma del transportista constituye aceptación expresa de la mercancía detallada en este documento, en la cantidad y condición indicadas. Cualquier faltante o daño no reportado al momento de la recepción será responsabilidad exclusiva del transportista.
           </div>
         </div>
+
+        {/* Toast */}
+        {toast && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2.5 rounded-full text-sm z-50 shadow-lg">
+            {toast}
+          </div>
+        )}
       </div>
     );
   }
