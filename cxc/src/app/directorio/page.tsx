@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { hasModuleAccess } from "@/lib/auth-check";
 import XLSX from "xlsx-js-style";
 
 interface Cliente {
@@ -36,10 +37,10 @@ export default function DirectorioPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const r = sessionStorage.getItem("cxc_role");
-    if (!r || (r !== "admin" && r !== "director" && r !== "upload")) {
+    if (!hasModuleAccess("directorio", ["admin","upload","vendedor","secretaria"])) {
       router.push("/");
     } else {
-      setRole(r);
+      setRole(r || "");
       setAuthChecked(true);
     }
   }, []);

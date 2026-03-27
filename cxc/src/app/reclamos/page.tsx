@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
+import { hasModuleAccess } from "@/lib/auth-check";
 import AppHeader from "@/components/AppHeader";
 
 // ── Types ──
@@ -113,7 +114,7 @@ export default function ReclamosPage() {
   // Auth
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role") || "";
-    if (!r) { router.push("/"); return; }
+    if (!hasModuleAccess("reclamos", ["admin","upload","secretaria"])) { router.push("/"); return; }
     setRole(r); setAuthChecked(true);
   }, [router]);
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { hasModuleAccess } from "@/lib/auth-check";
 
 interface GuiaItem {
   id?: string;
@@ -215,10 +216,10 @@ export default function GuiasPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const r = sessionStorage.getItem("cxc_role");
-    if (!r || (r !== "admin" && r !== "director" && r !== "upload")) {
+    if (!hasModuleAccess("guias", ["admin","upload","david","secretaria"])) {
       router.push("/");
     } else {
-      setRole(r);
+      setRole(r || "");
       setAuthChecked(true);
       loadGuias();
     }

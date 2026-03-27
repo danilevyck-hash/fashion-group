@@ -8,6 +8,7 @@ import { ALL_COMPANIES, getCompaniesForRole } from "@/lib/companies";
 import { normalizeName } from "@/lib/normalize";
 import { resolveAlias } from "@/lib/aliases";
 import Papa from "papaparse";
+import { hasModuleAccess } from "@/lib/auth-check";
 
 interface UploadStatus {
   company_key: string;
@@ -33,11 +34,11 @@ export default function UploadPage() {
 
   useEffect(() => {
     const role = sessionStorage.getItem("cxc_role");
-    if (!role) {
+    if (!hasModuleAccess("upload", ["admin","upload","secretaria"])) {
       router.push("/");
       return;
     }
-    setUserRole(role);
+    setUserRole(role || "");
     loadUploads();
   }, [router]);
 

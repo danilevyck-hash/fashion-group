@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { hasModuleAccess } from "@/lib/auth-check";
 
 interface RolePermission {
   role: string;
@@ -71,7 +72,7 @@ export default function UsuariosPage() {
 
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role") || "";
-    if (r !== "admin") { router.push("/plantillas"); return; }
+    if (!hasModuleAccess("usuarios", ["admin"])) { router.push("/plantillas"); return; }
     setAuthChecked(true);
   }, [router]);
 

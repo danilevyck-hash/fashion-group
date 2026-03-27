@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { hasModuleAccess } from "@/lib/auth-check";
 import { COMPANIES, getCompaniesForRole } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
@@ -146,11 +147,11 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role");
-    if (r !== "admin" && r !== "director" && r !== "david" && r !== "vendedor") {
+    if (!hasModuleAccess("cxc", ["admin","director","vendedor","david","contabilidad"])) {
       router.push("/");
       return;
     }
-    setUserRole(r);
+    setUserRole(r || "");
     loadData();
     const q = new URLSearchParams(window.location.search).get("search");
     if (q) setSearch(q);

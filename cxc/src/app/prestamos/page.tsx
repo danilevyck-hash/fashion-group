@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { hasModuleAccess } from "@/lib/auth-check";
 
 // ── Types ──
 interface Movimiento {
@@ -117,8 +118,7 @@ export default function PrestamosPage() {
   // Auth
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role") || "";
-    if (!r) { router.push("/"); return; }
-    if (r === "upload" || r === "secretaria") { router.push("/plantillas"); return; }
+    if (!hasModuleAccess("prestamos", ["admin","contabilidad"])) { router.push("/"); return; }
     setRole(r); setAuthChecked(true);
   }, [router]);
 

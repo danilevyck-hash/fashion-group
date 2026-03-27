@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
+import { hasModuleAccess } from "@/lib/auth-check";
 import XLSX from "xlsx-js-style";
 
 interface Cheque {
@@ -62,7 +63,7 @@ export default function ChequesPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const r = sessionStorage.getItem("cxc_role") || "";
-    if (!r || (r !== "admin" && r !== "director" && r !== "upload")) { router.push("/"); return; }
+    if (!hasModuleAccess("cheques", ["admin","upload","secretaria"])) { router.push("/"); return; }
     setRole(r); setAuthChecked(true);
   }, [router]);
 

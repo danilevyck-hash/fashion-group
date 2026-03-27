@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import { hasModuleAccess } from "@/lib/auth-check";
 import AppHeader from "@/components/AppHeader";
 
 const RechartsChart = dynamic(() => import("recharts").then((mod) => {
@@ -82,7 +83,7 @@ export default function VentasPage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const r = sessionStorage.getItem("cxc_role") || "";
-    if (!r) { router.push("/"); return; }
+    if (!hasModuleAccess("ventas", ["admin","director","contabilidad"])) { router.push("/"); return; }
     setRole(r); setAuthChecked(true);
   }, [router]);
 
