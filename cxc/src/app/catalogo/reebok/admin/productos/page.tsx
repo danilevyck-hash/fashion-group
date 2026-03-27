@@ -15,7 +15,7 @@ export default function AdminProductos() {
   const csvRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && sessionStorage.getItem('admin_auth') !== 'true') {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('cxc_role') !== 'admin') {
       router.push('/catalogo/reebok/admin')
       return
     }

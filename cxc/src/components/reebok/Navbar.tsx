@@ -27,6 +27,11 @@ export default function Navbar() {
               Clientes
             </Link>
           )}
+          {role === 'admin' && (
+            <Link href="/catalogo/reebok/admin/productos" className="text-xs text-gray-500 hover:text-reebok-dark transition font-medium">
+              Admin
+            </Link>
+          )}
         </div>
 
         <Link href="/catalogo/reebok/pedido" className="relative p-2">

@@ -34,7 +34,7 @@ export default function ImportarCSV() {
   ]
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && sessionStorage.getItem('admin_auth') !== 'true') {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('cxc_role') !== 'admin') {
       router.push('/catalogo/reebok/admin')
     }
   }, [router])
