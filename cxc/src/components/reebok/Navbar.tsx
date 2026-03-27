@@ -16,23 +16,27 @@ export default function Navbar() {
     setHasSystem(!!sessionStorage.getItem('fg_user_id') || !!r)
   }, [])
 
-  // Clientes visible to admin, vendedor, staff (not cliente)
-  const showClientes = role === 'admin' || role === 'vendedor' || role === 'staff'
+  const showManage = role === 'admin' || role === 'vendedor' || role === 'staff'
 
   return (
     <nav className="sticky top-0 z-50 bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4 sm:gap-6">
           {hasSystem && role !== 'cliente' && (
             <Link href="/plantillas" className="text-xs text-gray-400 hover:text-gray-700 transition">← Sistema</Link>
           )}
           <Link href="/catalogo/reebok">
             <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-7" />
           </Link>
-          {showClientes && (
-            <Link href="/catalogo/reebok/clientes" className="text-xs text-gray-500 hover:text-reebok-dark transition font-medium">
-              Clientes
-            </Link>
+          {showManage && (
+            <>
+              <Link href="/catalogo/reebok/pedidos" className="text-xs text-gray-500 hover:text-reebok-dark transition font-medium">
+                Pedidos
+              </Link>
+              <Link href="/catalogo/reebok/clientes" className="text-xs text-gray-500 hover:text-reebok-dark transition font-medium">
+                Clientes
+              </Link>
+            </>
           )}
           {role === 'admin' && (
             <Link href="/catalogo/reebok/admin/productos" className="text-xs text-gray-500 hover:text-reebok-dark transition font-medium">

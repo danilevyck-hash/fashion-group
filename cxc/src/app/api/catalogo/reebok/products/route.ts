@@ -8,6 +8,8 @@ export async function GET(req: NextRequest) {
   if (searchParams.get('active') === 'true') query = query.eq('active', true)
   if (searchParams.get('category')) query = query.eq('category', searchParams.get('category'))
   if (searchParams.get('gender')) query = query.eq('gender', searchParams.get('gender'))
+  const searchQ = searchParams.get('search')
+  if (searchQ) query = query.or(`name.ilike.%${searchQ}%,sku.ilike.%${searchQ}%`)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
