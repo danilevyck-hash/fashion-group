@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { hasModuleAccess } from "@/lib/auth-check";
 
@@ -189,7 +189,11 @@ export default function GuiasPage() {
   const router = useRouter();
   const [role, setRole] = useState<string>("");
   const [authChecked, setAuthChecked] = useState(false);
-  const [view, setView] = useState<View>("list");
+  const [view, _setView] = useState<View>("list");
+  function setView(v: View) {
+    _setView(v);
+    if (v === "list") window.history.pushState(null, "", "/guias");
+  }
   const [guias, setGuias] = useState<Guia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -229,6 +233,7 @@ export default function GuiasPage() {
   const [bNumGuia, setBNumGuia] = useState("");
   const [bSaving, setBSaving] = useState(false);
   const [showPending, setShowPending] = useState(false);
+  const [showPostDespacho, setShowPostDespacho] = useState(false);
 
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -299,6 +304,26 @@ export default function GuiasPage() {
     }
   }, []);
 
+  // Handle browser back/forward
+  useEffect(() => {
+    function onPopState() {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get("id");
+      if (id) {
+        viewGuia(id);
+      } else {
+        _setView("list");
+        setPrintGuia(null);
+      }
+    }
+    window.addEventListener("popstate", onPopState);
+    // On mount, check if URL has an id
+    const params = new URLSearchParams(window.location.search);
+    const urlId = params.get("id");
+    if (urlId && authChecked) viewGuia(urlId);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [authChecked]);
+
   // Canvas drawing setup for both canvases
   useEffect(() => {
     if (view !== "print") return;
@@ -326,7 +351,9 @@ export default function GuiasPage() {
       setBReceptor(g.receptor_nombre || "");
       setBCedula(g.cedula || "");
       setBNumGuia(g.numero_guia_transp || "");
-      setView("print");
+      setShowPostDespacho(false);
+      _setView("print");
+      window.history.pushState({ guiaId: id }, "", `/guias?id=${id}`);
     }
   }
 
@@ -400,6 +427,12 @@ export default function GuiasPage() {
       if (!item.facturas) {
         errors.add(`item-${idx}-facturas`);
       } else {
+        // Check separator format: must use ", " (comma + space)
+        if (item.facturas.includes(",") && !item.facturas.match(/^[^,]+(, [^,]+)*$/)) {
+          errors.add(`item-${idx}-facturas-separator`);
+        } else if (item.facturas.includes(";")) {
+          errors.add(`item-${idx}-facturas-separator`);
+        }
         const parts = item.facturas.split(",").map(s => s.trim()).filter(Boolean);
         if (parts.some(p => p.replace(/\D/g, "").length < 4)) errors.add(`item-${idx}-facturas-format`);
       }
@@ -415,7 +448,7 @@ export default function GuiasPage() {
   }
 
   function inputClass(key: string, base: string) {
-    return `${base} ${(validationErrors.has(key) || validationErrors.has(key + "-format")) ? "border-red-400" : ""}`;
+    return `${base} ${(validationErrors.has(key) || validationErrors.has(key + "-format") || validationErrors.has(key + "-separator")) ? "border-red-400" : ""}`;
   }
 
   async function saveGuia() {
@@ -472,6 +505,8 @@ export default function GuiasPage() {
     if (!printGuia) return;
     if (!bPlaca.trim()) { showToast("Ingresa la placa del vehículo"); return; }
     if (!bNumGuia.trim()) { showToast("Ingresa el N° de guía del transportista"); return; }
+    const guiaLines = bNumGuia.trim().split("\n").map(l => l.trim()).filter(Boolean);
+    if (guiaLines.some(l => /[,;]/.test(l) || /\w\s+\w/.test(l))) { showToast("Ingrese un número de guía por línea"); return; }
     if (!bReceptor.trim()) { showToast("Ingresa el nombre del receptor"); return; }
     if (!bCedula.trim()) { showToast("Ingresa la cédula del receptor"); return; }
     if (isCanvasClear(canvasRef.current)) { showToast("Se requiere la firma del receptor"); return; }
@@ -505,7 +540,6 @@ export default function GuiasPage() {
         }),
       }).catch(() => {});
 
-      showToast("Despacho confirmado");
       const fullRes = await fetch(`/api/guias/${printGuia.id}`);
       if (fullRes.ok) {
         const updated = await fullRes.json();
@@ -516,6 +550,7 @@ export default function GuiasPage() {
         setBNumGuia(updated.numero_guia_transp || "");
       }
       loadGuias();
+      setShowPostDespacho(true);
     } else {
       showToast("Error al guardar");
     }
@@ -764,8 +799,11 @@ export default function GuiasPage() {
                     <input type="text" value={item.facturas}
                       onChange={(e) => updateItem(idx, "facturas", e.target.value)}
                       className={inputClass(`item-${idx}-facturas`, "w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition")} />
-                    {validationErrors.has(`item-${idx}-facturas-format`) && (
-                      <p className="text-[9px] text-red-500 mt-0.5">Mín. 4 dígitos, separar con coma</p>
+                    {validationErrors.has(`item-${idx}-facturas-separator`) && (
+                      <p className="text-[9px] text-red-500 mt-0.5">Separar con coma y espacio (ej: FA-001, FA-002)</p>
+                    )}
+                    {validationErrors.has(`item-${idx}-facturas-format`) && !validationErrors.has(`item-${idx}-facturas-separator`) && (
+                      <p className="text-[9px] text-red-500 mt-0.5">Mín. 4 dígitos por factura</p>
                     )}
                   </td>
                   <td className="py-2 pr-2">
@@ -821,9 +859,10 @@ export default function GuiasPage() {
     const g = printGuia;
     const guiaItems = g.guia_items || [];
     const bultos = guiaItems.reduce((s, i) => s + (i.bultos || 0), 0);
-    const canComplete = (role === "bodega" || role === "admin") && !g.placa;
-    const canEdit = role === "admin" || role === "secretaria" || role === "bodega";
-    const canDelete = role === "admin" || role === "secretaria";
+    const isDispatched = !!g.placa;
+    const canComplete = (role === "bodega" || role === "admin") && !isDispatched;
+    const canEdit = (role === "admin" || role === "secretaria" || role === "bodega") && !isDispatched;
+    const canDelete = (role === "admin" || role === "secretaria") && !isDispatched;
 
     return (
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
@@ -848,9 +887,9 @@ export default function GuiasPage() {
                   className="w-full border-b border-gray-300 py-2 text-sm outline-none focus:border-black transition bg-transparent" />
               </div>
               <div>
-                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">N° Guía Transportista *</label>
-                <input type="text" value={bNumGuia} onChange={(e) => setBNumGuia(e.target.value)}
-                  className="w-full border-b border-gray-300 py-2 text-sm outline-none focus:border-black transition bg-transparent" />
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">N° Guía Transportista * <span className="normal-case tracking-normal text-[9px]">(uno por línea)</span></label>
+                <textarea value={bNumGuia} onChange={(e) => setBNumGuia(e.target.value)} rows={2}
+                  className="w-full border-b border-gray-300 py-2 text-sm outline-none focus:border-black transition bg-transparent resize-none" placeholder="Ej:&#10;GT-001&#10;GT-002" />
               </div>
               <div>
                 <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Nombre del receptor *</label>
@@ -891,6 +930,21 @@ export default function GuiasPage() {
               className="bg-black text-white px-6 py-3 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40 w-full sm:w-auto">
               {bSaving ? "Guardando..." : "Confirmar despacho"}
             </button>
+          </div>
+        )}
+
+        {/* Post-dispatch actions */}
+        {showPostDespacho && (
+          <div className="no-print mb-8 border border-green-200 bg-green-50 rounded-2xl p-6 text-center">
+            <p className="text-sm font-medium text-green-800 mb-4">Despacho confirmado</p>
+            <div className="flex items-center justify-center gap-3">
+              <button onClick={() => window.print()} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition">
+                Imprimir
+              </button>
+              <button onClick={() => setShowPostDespacho(false)} className="border border-gray-300 px-6 py-2.5 rounded-full text-sm hover:border-gray-400 transition">
+                Omitir
+              </button>
+            </div>
           </div>
         )}
 
