@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { hasModuleAccess } from "@/lib/auth-check";
 
 interface Producto { id: string; nombre: string; genero: string; color: string; precio_panama: number; rrp: number; stock_comprado: number; }
 interface Cliente { id: string; nombre: string; }
@@ -26,6 +27,7 @@ function Dot({ color }: { color: string }) {
 export default function CamisetasPage() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
+  const [role, setRole] = useState("");
   const [tab, setTab] = useState<"resumen" | "cliente" | "stock">("resumen");
   const [productos, setProductos] = useState<Producto[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -42,9 +44,13 @@ export default function CamisetasPage() {
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2500); };
 
   useEffect(() => {
-    if (!sessionStorage.getItem("cxc_role")) { router.push("/"); return; }
+    const r = sessionStorage.getItem("cxc_role") || "";
+    if (!hasModuleAccess("camisetas", ["admin","vendedor","secretaria"])) { router.push("/"); return; }
+    setRole(r);
     setAuthChecked(true);
   }, [router]);
+
+  const isVendedor = role === "vendedor";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -131,29 +137,46 @@ export default function CamisetasPage() {
       .map(prod => ({ prod, paq: getPaq(cId, prod.id) }))
       .filter(x => x.paq > 0);
 
-    const body = clientPedidos.map(({ prod, paq }) => {
-      const tallas = TALLAS[prod.genero] || {};
-      const tallaStr = Object.entries(tallas).filter(([, v]) => v > 0).map(([k, v]) => `${k}:${v * paq}`).join(" ");
-      return [prod.nombre, prod.genero, String(paq), String(paq * PPQ), tallaStr, `$${fmt(prod.precio_panama)}`, `$${fmt(paq * PPQ * prod.precio_panama)}`];
-    });
-
     const tPaq = clientPedidos.reduce((s, x) => s + x.paq, 0);
     const tVal = clientPedidos.reduce((s, x) => s + x.paq * PPQ * x.prod.precio_panama, 0);
 
-    autoTable(doc, {
-      startY: 36,
-      head: [["Producto", "Género", "Paq", "Pzas", "Tallas", "Precio/u", "Subtotal"]],
-      body,
-      foot: [["Total", "", String(tPaq), String(tPaq * PPQ), "", "", `$${fmt(tVal)}`]],
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
-      footStyles: { fillColor: [245, 245, 245], textColor: [26, 26, 26], fontStyle: "bold" },
-    });
+    if (isVendedor) {
+      const body = clientPedidos.map(({ prod, paq }) => {
+        const tallas = TALLAS[prod.genero] || {};
+        const tallaStr = Object.entries(tallas).filter(([, v]) => v > 0).map(([k, v]) => `${k}:${v * paq}`).join(" ");
+        return [prod.nombre, prod.genero, String(paq), String(paq * PPQ), tallaStr];
+      });
+      autoTable(doc, {
+        startY: 36,
+        head: [["Producto", "Género", "Paq", "Pzas", "Tallas"]],
+        body,
+        foot: [["Total", "", String(tPaq), String(tPaq * PPQ), ""]],
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
+        footStyles: { fillColor: [245, 245, 245], textColor: [26, 26, 26], fontStyle: "bold" },
+      });
+    } else {
+      const body = clientPedidos.map(({ prod, paq }) => {
+        const tallas = TALLAS[prod.genero] || {};
+        const tallaStr = Object.entries(tallas).filter(([, v]) => v > 0).map(([k, v]) => `${k}:${v * paq}`).join(" ");
+        return [prod.nombre, prod.genero, String(paq), String(paq * PPQ), tallaStr, `$${fmt(prod.precio_panama)}`, `$${fmt(paq * PPQ * prod.precio_panama)}`];
+      });
+      autoTable(doc, {
+        startY: 36,
+        head: [["Producto", "Género", "Paq", "Pzas", "Tallas", "Precio/u", "Subtotal"]],
+        body,
+        foot: [["Total", "", String(tPaq), String(tPaq * PPQ), "", "", `$${fmt(tVal)}`]],
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
+        footStyles: { fillColor: [245, 245, 245], textColor: [26, 26, 26], fontStyle: "bold" },
+      });
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fy = (doc as any).lastAutoTable.finalY + 10;
     doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
-    doc.text("Precios en USD · Sujeto a disponibilidad", 14, fy);
+    if (!isVendedor) doc.text("Precios en USD · Sujeto a disponibilidad", 14, fy);
+    else doc.text("Sujeto a disponibilidad", 14, fy);
 
     doc.save(`Camisetas-${cl.nombre.replace(/\s+/g, "-")}.pdf`);
     showToast("PDF descargado");
@@ -179,7 +202,8 @@ export default function CamisetasPage() {
         {/* Inline stats */}
         {!loading && (
           <p className="text-sm text-gray-500 mt-3">
-            {gPaq.toLocaleString()} paq&ensp;·&ensp;{(gPaq * PPQ).toLocaleString()} pzas&ensp;·&ensp;{fmtK(gVal)}
+            {gPaq.toLocaleString()} paq&ensp;·&ensp;{(gPaq * PPQ).toLocaleString()} pzas
+            {!isVendedor && <>&ensp;·&ensp;{fmtK(gVal)}</>}
             {sobrev > 0 && <span className="text-red-600 ml-1">&ensp;·&ensp;{sobrev} sobrevendidos</span>}
           </p>
         )}
@@ -213,14 +237,14 @@ export default function CamisetasPage() {
                     ))}
                     <th className="py-2 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right border-l border-gray-100">Paq</th>
                     <th className="py-2 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right">Pzas</th>
-                    <th className="py-2 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right">Valor</th>
+                    {!isVendedor && <th className="py-2 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right">Valor</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {GENERO_ORDER.map((gen, gi) => {
                     const genProds = sortedProductos.filter(p => p.genero === gen);
                     return [
-                      gi > 0 && <tr key={`s-${gen}`}><td colSpan={sortedClientes.length + 4} className="h-px bg-gray-100" /></tr>,
+                      gi > 0 && <tr key={`s-${gen}`}><td colSpan={sortedClientes.length + (isVendedor ? 3 : 4)} className="h-px bg-gray-100" /></tr>,
                       ...genProds.map(prod => {
                         const tPaq = prodTotalPaq(prod.id);
                         return (
@@ -254,7 +278,7 @@ export default function CamisetasPage() {
                             })}
                             <td className="py-1.5 px-3 text-right tabular-nums font-medium border-l border-gray-100">{tPaq}</td>
                             <td className="py-1.5 px-3 text-right tabular-nums text-gray-500">{tPaq * PPQ}</td>
-                            <td className="py-1.5 px-3 text-right tabular-nums">${fmt(tPaq * PPQ * prod.precio_panama)}</td>
+                            {!isVendedor && <td className="py-1.5 px-3 text-right tabular-nums">${fmt(tPaq * PPQ * prod.precio_panama)}</td>}
                           </tr>
                         );
                       }),
@@ -265,7 +289,7 @@ export default function CamisetasPage() {
                     {sortedClientes.map(c => { const t = clientTotal(c.id); return <td key={c.id} className="py-2 px-1 text-center tabular-nums text-[10px] text-gray-500">{t || ""}</td>; })}
                     <td className="py-2 px-3 text-right tabular-nums font-medium border-l border-gray-100">{gPaq}</td>
                     <td className="py-2 px-3 text-right tabular-nums text-gray-500">{gPaq * PPQ}</td>
-                    <td className="py-2 px-3 text-right tabular-nums font-medium">${fmt(gVal)}</td>
+                    {!isVendedor && <td className="py-2 px-3 text-right tabular-nums font-medium">${fmt(gVal)}</td>}
                   </tr>
                 </tbody>
               </table>
@@ -315,7 +339,7 @@ export default function CamisetasPage() {
                       <div className="flex items-center justify-between">
                         <div>
                           <h2 className="text-2xl font-light">{cl.nombre}</h2>
-                          <p className="text-sm text-gray-500 mt-1">{tPaq} paq · {tPaq * PPQ} pzas · ${fmt(tVal)}</p>
+                          <p className="text-sm text-gray-500 mt-1">{tPaq} paq · {tPaq * PPQ} pzas{!isVendedor && <> · ${fmt(tVal)}</>}</p>
                         </div>
                         <button onClick={() => deleteClient(cl.id, cl.nombre)} className="text-xs text-gray-400 hover:text-red-500 transition">Eliminar cliente</button>
                       </div>
@@ -344,7 +368,7 @@ export default function CamisetasPage() {
                                       className="w-12 text-center border-b border-gray-200 text-xs py-0.5 outline-none focus:border-black tabular-nums" />
                                     <span className="text-xs text-gray-400 tabular-nums w-10">{paq > 0 ? `${paq * PPQ}pz` : "— pz"}</span>
                                     <span className="text-[10px] text-gray-400 font-mono w-32 hidden sm:block">{tallaStr || "—"}</span>
-                                    <span className="text-xs tabular-nums w-16 text-right">{paq > 0 ? `$${fmt(paq * PPQ * prod.precio_panama)}` : "—"}</span>
+                                    {!isVendedor && <span className="text-xs tabular-nums w-16 text-right">{paq > 0 ? `$${fmt(paq * PPQ * prod.precio_panama)}` : "—"}</span>}
                                   </div>
                                 );
                               })}
@@ -381,7 +405,7 @@ export default function CamisetasPage() {
                       <div>
                         <span className="text-sm">{prod.nombre}</span>
                         <span className="text-[10px] text-gray-400 ml-1">{prod.genero}</span>
-                        <div className="text-[10px] text-gray-400">${fmt(prod.precio_panama)} · RRP ${fmt(prod.rrp)}</div>
+                        {!isVendedor && <div className="text-[10px] text-gray-400">${fmt(prod.precio_panama)} · RRP ${fmt(prod.rrp)}</div>}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-1">
