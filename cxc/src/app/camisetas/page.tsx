@@ -17,11 +17,13 @@ const TALLAS: Record<string, Record<string, number>> = {
 };
 const COLOR_MAP: Record<string, string> = { ROJA: "#CC0000", BLANCA: "#d4d4d4", "AZUL NAVY": "#001F5B" };
 const GENERO_ORDER = ["HOMBRE", "MUJER", "NIÑO"];
+const GENERO_BADGE: Record<string, string> = { HOMBRE: "bg-blue-100 text-blue-700", MUJER: "bg-pink-100 text-pink-700", NIÑO: "bg-amber-100 text-amber-700" };
 
 function fmt(n: number) { return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function fmtK(n: number) { return n >= 1000 ? `$${(n/1000).toFixed(1)}k` : `$${fmt(n)}`; }
-function Dot({ color }: { color: string }) {
-  return <span className="inline-block w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: COLOR_MAP[color] || "#ccc" }} />;
+function Dot({ color, size = "sm" }: { color: string; size?: "sm" | "md" }) {
+  const s = size === "md" ? "w-3 h-3" : "w-1.5 h-1.5";
+  return <span className={`inline-block ${s} rounded-full flex-shrink-0`} style={{ background: COLOR_MAP[color] || "#ccc" }} />;
 }
 
 export default function CamisetasPage() {
@@ -40,6 +42,13 @@ export default function CamisetasPage() {
   const [newClientName, setNewClientName] = useState("");
   const [showNewClient, setShowNewClient] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
+
+  // Nuevo Pedido modal
+  const [showNuevo, setShowNuevo] = useState(false);
+  const [nuevoStep, setNuevoStep] = useState<"cliente" | "productos">("cliente");
+  const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevoQtys, setNuevoQtys] = useState<Record<string, number>>({});
+  const [nuevoSaving, setNuevoSaving] = useState(false);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2500); };
 
@@ -78,7 +87,6 @@ export default function CamisetasPage() {
   const sobrev = sortedProductos.filter(p => prodTotalPaq(p.id) > Math.floor(p.stock_comprado / PPQ)).length;
 
   async function savePedido(cId: string, pId: string, paq: number) {
-    // Update local state immediately
     setPedidos(prev => {
       const idx = prev.findIndex(p => p.cliente_id === cId && p.producto_id === pId);
       if (paq <= 0) {
@@ -88,14 +96,12 @@ export default function CamisetasPage() {
       return [...prev, { id: "", cliente_id: cId, producto_id: pId, paquetes: paq }];
     });
     setEditCell(null);
-
-    // Save to API
     const res = await fetch("/api/camisetas/pedido", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: cId, producto_id: pId, paquetes: paq }) });
     if (res.ok) {
       showToast("Guardado");
     } else {
       showToast("Error al guardar");
-      load(); // reload on error to restore correct state
+      load();
     }
   }
   async function addClient() {
@@ -147,12 +153,9 @@ export default function CamisetasPage() {
         return [prod.nombre, prod.genero, String(paq), String(paq * PPQ), tallaStr];
       });
       autoTable(doc, {
-        startY: 36,
-        head: [["Producto", "Género", "Paq", "Pzas", "Tallas"]],
-        body,
+        startY: 36, head: [["Producto", "Género", "Paq", "Pzas", "Tallas"]], body,
         foot: [["Total", "", String(tPaq), String(tPaq * PPQ), ""]],
-        styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
+        styles: { fontSize: 8, cellPadding: 2 }, headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
         footStyles: { fillColor: [245, 245, 245], textColor: [26, 26, 26], fontStyle: "bold" },
       });
     } else {
@@ -162,12 +165,9 @@ export default function CamisetasPage() {
         return [prod.nombre, prod.genero, String(paq), String(paq * PPQ), tallaStr, `$${fmt(prod.precio_panama)}`, `$${fmt(paq * PPQ * prod.precio_panama)}`];
       });
       autoTable(doc, {
-        startY: 36,
-        head: [["Producto", "Género", "Paq", "Pzas", "Tallas", "Precio/u", "Subtotal"]],
-        body,
+        startY: 36, head: [["Producto", "Género", "Paq", "Pzas", "Tallas", "Precio/u", "Subtotal"]], body,
         foot: [["Total", "", String(tPaq), String(tPaq * PPQ), "", "", `$${fmt(tVal)}`]],
-        styles: { fontSize: 8, cellPadding: 2 },
-        headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
+        styles: { fontSize: 8, cellPadding: 2 }, headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
         footStyles: { fillColor: [245, 245, 245], textColor: [26, 26, 26], fontStyle: "bold" },
       });
     }
@@ -182,10 +182,43 @@ export default function CamisetasPage() {
     showToast("PDF descargado");
   }
 
+  // ── Nuevo Pedido handlers ──
+  function openNuevo() {
+    setNuevoNombre(""); setNuevoQtys({}); setNuevoStep("cliente"); setShowNuevo(true);
+  }
+  const nuevoExisting = nuevoNombre.trim() ? clientes.find(c => c.nombre.toLowerCase() === nuevoNombre.trim().toLowerCase()) : null;
+  const nuevoTotalPaq = Object.values(nuevoQtys).reduce((s, v) => s + v, 0);
+  const nuevoTotalPzas = nuevoTotalPaq * PPQ;
+  const nuevoTotalVal = sortedProductos.reduce((s, p) => s + (nuevoQtys[p.id] || 0) * PPQ * p.precio_panama, 0);
+
+  async function saveNuevo() {
+    if (nuevoTotalPaq === 0) return;
+    setNuevoSaving(true);
+    try {
+      let clienteId = nuevoExisting?.id;
+      if (!clienteId) {
+        const res = await fetch("/api/camisetas/clientes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre: nuevoNombre.trim() }) });
+        if (res.ok) { const c = await res.json(); clienteId = c.id; }
+      }
+      if (clienteId) {
+        for (const [prodId, paq] of Object.entries(nuevoQtys)) {
+          if (paq > 0) {
+            await fetch("/api/camisetas/pedido", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: clienteId, producto_id: prodId, paquetes: paq }) });
+          }
+        }
+        await load();
+        setShowNuevo(false);
+        setTab("resumen");
+        showToast(`Pedido de ${nuevoNombre.trim()} guardado`);
+      }
+    } catch { showToast("Error al guardar"); }
+    setNuevoSaving(false);
+  }
+
   const tabs = [
-    { key: "resumen" as const, label: "Resumen" },
-    { key: "cliente" as const, label: "Por Cliente" },
-    { key: "stock" as const, label: "Stock" },
+    { key: "resumen" as const, label: "📊 Resumen" },
+    { key: "cliente" as const, label: "👤 Por Cliente" },
+    { key: "stock" as const, label: "📦 Stock" },
   ];
 
   return (
@@ -195,9 +228,16 @@ export default function CamisetasPage() {
         {/* Nav */}
         <Link href="/plantillas" className="text-xs text-gray-400 hover:text-gray-600 transition">← Inicio</Link>
 
-        {/* Title */}
-        <h1 className="text-3xl font-light tracking-tight mt-4">Camisetas Reebok</h1>
-        <p className="text-sm text-gray-400 mt-1">Selección Panamá · {new Date().toLocaleDateString("es-PA")}</p>
+        {/* Title + Nuevo Pedido */}
+        <div className="flex items-start justify-between mt-4">
+          <div>
+            <h1 className="text-3xl font-light tracking-tight">Camisetas Reebok</h1>
+            <p className="text-sm text-gray-400 mt-1">Selección Panamá · {new Date().toLocaleDateString("es-PA")}</p>
+          </div>
+          <button onClick={openNuevo} className="bg-black text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition flex-shrink-0">
+            + Nuevo Pedido
+          </button>
+        </div>
 
         {/* Inline stats */}
         {!loading && (
@@ -209,10 +249,10 @@ export default function CamisetasPage() {
         )}
 
         {/* Tabs */}
-        <div className="flex gap-8 mt-6 border-b border-gray-200">
+        <div className="flex gap-6 mt-6 border-b border-gray-200">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`pb-3 text-sm transition ${tab === t.key ? "text-black border-b-2 border-red-600" : "text-gray-400 hover:text-gray-600"}`}>
+              className={`pb-3 text-sm transition ${tab === t.key ? "text-black font-medium border-b-2 border-black" : "text-gray-400 hover:text-gray-600"}`}>
               {t.label}
             </button>
           ))}
@@ -225,42 +265,45 @@ export default function CamisetasPage() {
           ) : tab === "resumen" ? (
             /* ═══ RESUMEN ═══ */
             <div className="overflow-x-auto -mx-6 px-6">
-              <p className="text-[10px] text-gray-400 mb-2">Haz click en cualquier número para editar</p>
-              <table className="text-xs w-max min-w-full">
+              <p className="text-[10px] text-gray-400 mb-3">Haz click en cualquier celda para editar</p>
+              <table className="text-xs w-max min-w-full border-collapse">
                 <thead>
                   <tr>
-                    <th className="sticky left-0 z-10 bg-white text-left py-2 pr-4 text-[10px] uppercase tracking-widest text-gray-400 font-normal min-w-[180px]">Producto</th>
+                    <th className="sticky left-0 z-10 bg-white text-left py-3 pr-4 text-[10px] uppercase tracking-widest text-gray-400 font-normal min-w-[180px] border-b border-gray-200">Producto</th>
                     {sortedClientes.map(c => (
-                      <th key={c.id} className="py-2 px-1 text-[10px] text-gray-400 font-normal text-center whitespace-nowrap min-w-[48px]">
-                        <button onClick={() => { setSelectedClient(c.id); setTab("cliente"); }} className="hover:text-black transition">{c.nombre}</button>
+                      <th key={c.id} className="py-2 px-1 text-[10px] text-gray-400 font-normal text-center min-w-[44px] border-b border-gray-200" style={{ height: 60 }}>
+                        <button onClick={() => { setSelectedClient(c.id); setTab("cliente"); }}
+                          className="hover:text-black transition whitespace-nowrap origin-bottom-left inline-block"
+                          style={{ transform: "rotate(-45deg)", transformOrigin: "center", fontSize: "9px" }}>{c.nombre}</button>
                       </th>
                     ))}
-                    <th className="py-2 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right border-l border-gray-100">Paq</th>
-                    <th className="py-2 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right">Pzas</th>
-                    {!isVendedor && <th className="py-2 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right">Valor</th>}
+                    <th className="py-3 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right border-l border-gray-200 border-b border-gray-200 bg-gray-50">Paq</th>
+                    <th className="py-3 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right border-b border-gray-200 bg-gray-50">Pzas</th>
+                    {!isVendedor && <th className="py-3 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right border-b border-gray-200 bg-gray-50">Valor</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {GENERO_ORDER.map((gen, gi) => {
                     const genProds = sortedProductos.filter(p => p.genero === gen);
                     return [
-                      gi > 0 && <tr key={`s-${gen}`}><td colSpan={sortedClientes.length + (isVendedor ? 3 : 4)} className="h-px bg-gray-100" /></tr>,
-                      ...genProds.map(prod => {
+                      gi > 0 && <tr key={`s-${gen}`}><td colSpan={sortedClientes.length + (isVendedor ? 3 : 4)} className="h-1" /></tr>,
+                      ...genProds.map((prod, pi) => {
                         const tPaq = prodTotalPaq(prod.id);
+                        const isOdd = pi % 2 === 1;
                         return (
-                          <tr key={prod.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="sticky left-0 z-10 bg-white py-1.5 pr-4">
+                          <tr key={prod.id} className={`${isOdd ? "bg-gray-50/60" : ""} hover:bg-blue-50/40 transition-colors`}>
+                            <td className={`sticky left-0 z-10 ${isOdd ? "bg-gray-50" : "bg-white"} py-2 pr-4 border-b border-gray-100`}>
                               <span className="flex items-center gap-2">
                                 <Dot color={prod.color} />
-                                <span>{prod.nombre}</span>
-                                <span className="text-[10px] text-gray-400">{prod.genero}</span>
+                                <span className="font-medium">{prod.nombre}</span>
+                                <span className="text-[9px] text-gray-400">{prod.genero}</span>
                               </span>
                             </td>
                             {sortedClientes.map(c => {
                               const paq = getPaq(c.id, prod.id);
                               const editing = editCell?.cId === c.id && editCell?.pId === prod.id;
                               return (
-                                <td key={c.id} className="py-1 px-1 text-center border-b border-gray-50">
+                                <td key={c.id} className="py-1 px-0.5 text-center border-b border-gray-100">
                                   {editing ? (
                                     <input type="number" min={0} value={editVal} onChange={e => setEditVal(parseInt(e.target.value) || 0)}
                                       onBlur={() => savePedido(c.id, prod.id, editVal)}
@@ -268,28 +311,28 @@ export default function CamisetasPage() {
                                       className="w-10 text-center border-b border-black text-xs py-0.5 outline-none bg-transparent" autoFocus />
                                   ) : paq > 0 ? (
                                     <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(paq); }}
-                                      className="tabular-nums hover:text-red-600 transition border-b border-dotted border-gray-300">{paq}</button>
+                                      className="inline-block bg-gray-800 text-white rounded px-1.5 py-0.5 text-[10px] tabular-nums font-medium hover:bg-red-600 transition min-w-[22px]">{paq}</button>
                                   ) : (
                                     <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(0); }}
-                                      className="text-gray-300 hover:text-gray-500 hover:cursor-cell transition">—</button>
+                                      className="text-gray-200 hover:text-gray-400 hover:cursor-cell transition text-[10px]">—</button>
                                   )}
                                 </td>
                               );
                             })}
-                            <td className="py-1.5 px-3 text-right tabular-nums font-medium border-l border-gray-100">{tPaq}</td>
-                            <td className="py-1.5 px-3 text-right tabular-nums text-gray-500">{tPaq * PPQ}</td>
-                            {!isVendedor && <td className="py-1.5 px-3 text-right tabular-nums">${fmt(tPaq * PPQ * prod.precio_panama)}</td>}
+                            <td className="py-2 px-3 text-right tabular-nums font-semibold border-l border-gray-200 border-b border-gray-100 bg-gray-50/60">{tPaq}</td>
+                            <td className="py-2 px-3 text-right tabular-nums text-gray-500 border-b border-gray-100 bg-gray-50/60">{tPaq * PPQ}</td>
+                            {!isVendedor && <td className="py-2 px-3 text-right tabular-nums border-b border-gray-100 bg-gray-50/60">${fmt(tPaq * PPQ * prod.precio_panama)}</td>}
                           </tr>
                         );
                       }),
                     ];
                   })}
-                  <tr className="border-t border-gray-200">
-                    <td className="sticky left-0 z-10 bg-white py-2 pr-4 font-medium">Total</td>
-                    {sortedClientes.map(c => { const t = clientTotal(c.id); return <td key={c.id} className="py-2 px-1 text-center tabular-nums text-[10px] text-gray-500">{t || ""}</td>; })}
-                    <td className="py-2 px-3 text-right tabular-nums font-medium border-l border-gray-100">{gPaq}</td>
-                    <td className="py-2 px-3 text-right tabular-nums text-gray-500">{gPaq * PPQ}</td>
-                    {!isVendedor && <td className="py-2 px-3 text-right tabular-nums font-medium">${fmt(gVal)}</td>}
+                  <tr className="border-t-2 border-gray-300">
+                    <td className="sticky left-0 z-10 bg-white py-3 pr-4 font-semibold">Total</td>
+                    {sortedClientes.map(c => { const t = clientTotal(c.id); return <td key={c.id} className="py-3 px-1 text-center tabular-nums text-[10px] font-medium text-gray-500">{t || ""}</td>; })}
+                    <td className="py-3 px-3 text-right tabular-nums font-bold border-l border-gray-200 bg-gray-50">{gPaq}</td>
+                    <td className="py-3 px-3 text-right tabular-nums text-gray-500 font-medium bg-gray-50">{gPaq * PPQ}</td>
+                    {!isVendedor && <td className="py-3 px-3 text-right tabular-nums font-bold bg-gray-50">${fmt(gVal)}</td>}
                   </tr>
                 </tbody>
               </table>
@@ -426,6 +469,84 @@ export default function CamisetasPage() {
           )}
         </div>
       </div>
+
+      {/* ═══ NUEVO PEDIDO MODAL ═══ */}
+      {showNuevo && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNuevo(false)}>
+          <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            {nuevoStep === "cliente" ? (<>
+              <h2 className="text-lg font-medium mb-4">Nuevo Pedido</h2>
+              <div>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Nombre del cliente</label>
+                <input value={nuevoNombre} onChange={e => setNuevoNombre(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && nuevoNombre.trim()) setNuevoStep("productos"); }}
+                  placeholder="Ej: City Mall" autoFocus
+                  className="w-full border-b border-gray-200 py-3 text-lg outline-none focus:border-black transition" />
+              </div>
+              {nuevoExisting && (
+                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+                  Este cliente ya existe — se agregarán productos a su pedido
+                </div>
+              )}
+              {nuevoNombre.trim() && !nuevoExisting && clientes.filter(c => c.nombre.toLowerCase().includes(nuevoNombre.trim().toLowerCase())).length > 0 && (
+                <div className="mt-2 space-y-1">
+                  {clientes.filter(c => c.nombre.toLowerCase().includes(nuevoNombre.trim().toLowerCase())).slice(0, 3).map(c => (
+                    <button key={c.id} onClick={() => setNuevoNombre(c.nombre)} className="block w-full text-left text-xs text-gray-500 hover:text-black py-1 px-2 rounded hover:bg-gray-50 transition">
+                      {c.nombre}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2 mt-6">
+                <button onClick={() => setShowNuevo(false)} className="flex-1 py-2.5 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
+                <button onClick={() => setNuevoStep("productos")} disabled={!nuevoNombre.trim()}
+                  className="flex-1 py-2.5 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40">
+                  Continuar →
+                </button>
+              </div>
+            </>) : (<>
+              <div className="flex items-center gap-2 mb-4">
+                <button onClick={() => setNuevoStep("cliente")} className="text-gray-400 hover:text-black transition">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <h2 className="text-lg font-medium">Pedido para {nuevoNombre.trim()}</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {sortedProductos.map(prod => {
+                  const q = nuevoQtys[prod.id] || 0;
+                  return (
+                    <div key={prod.id} className={`border rounded-xl p-3 transition ${q > 0 ? "border-black bg-gray-50" : "border-gray-200"}`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Dot color={prod.color} size="md" />
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium truncate">{prod.nombre}</div>
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${GENERO_BADGE[prod.genero] || "bg-gray-100 text-gray-600"}`}>{prod.genero}</span>
+                        </div>
+                      </div>
+                      {!isVendedor && <div className="text-[10px] text-gray-400 mb-2">${fmt(prod.precio_panama)}/u</div>}
+                      <input type="number" min={0} step={1} value={q}
+                        onChange={e => setNuevoQtys(prev => ({ ...prev, [prod.id]: parseInt(e.target.value) || 0 }))}
+                        className="w-full text-center border border-gray-200 rounded-lg py-2 text-sm outline-none focus:border-black transition tabular-nums" />
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Running total */}
+              <div className="mt-4 bg-gray-50 rounded-xl px-4 py-3 text-sm">
+                <span className="font-medium">{nuevoTotalPaq}</span> paq · <span>{nuevoTotalPzas}</span> pzas
+                {!isVendedor && <> · <span className="font-medium">${fmt(nuevoTotalVal)}</span></>}
+              </div>
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => setShowNuevo(false)} className="flex-1 py-2.5 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
+                <button onClick={saveNuevo} disabled={nuevoSaving || nuevoTotalPaq === 0}
+                  className="flex-1 py-2.5 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40">
+                  {nuevoSaving ? "Guardando..." : "Guardar Pedido"}
+                </button>
+              </div>
+            </>)}
+          </div>
+        </div>
+      )}
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2.5 rounded-full text-sm z-50">{toast}</div>}
     </div>
