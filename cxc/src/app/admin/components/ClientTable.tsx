@@ -184,26 +184,6 @@ export default function ClientTable({
       {/* Client table */}
       <div className="border border-gray-200 rounded-xl overflow-hidden">
         {/* Sticky sortable header */}
-        {userRole === "david" ? (
-        <div className="grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[10px] sm:text-[11px] font-medium text-gray-500 uppercase tracking-wider select-none sticky top-11 z-[5]">
-          {selectionMode && <div className="col-span-1" />}
-          <div className={`${selectionMode ? "col-span-3 sm:col-span-2" : "col-span-4 sm:col-span-3"} cursor-pointer hover:text-gray-900 transition`} onClick={() => toggleSort("name")}>
-            Cliente{sortArrow("name")}
-          </div>
-          <div className="hidden sm:block col-span-1 text-right" data-tooltip="Deuda con 0 a 30 dias">0-30</div>
-          <div className="hidden sm:block col-span-1 text-right" data-tooltip="Deuda con 31 a 60 dias">31-60</div>
-          <div className="hidden sm:block col-span-1 text-right" data-tooltip="Deuda con 61 a 90 dias">61-90</div>
-          <div className="hidden sm:block col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Vigilancia: 91 a 120 dias" onClick={() => toggleSort("watch")}>
-            91-120{sortArrow("watch")}
-          </div>
-          <div className="col-span-4 sm:col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Vencido: mas de 121 dias" onClick={() => toggleSort("overdue")}>
-            121d+{sortArrow("overdue")}
-          </div>
-          <div className="col-span-4 sm:col-span-2 text-right cursor-pointer hover:text-gray-900 transition" onClick={() => toggleSort("total")}>
-            Total{sortArrow("total")}
-          </div>
-        </div>
-        ) : (
         <div className="grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[10px] sm:text-[11px] font-medium text-gray-500 uppercase tracking-wider select-none sticky top-11 z-[5]">
           {selectionMode && <div className="col-span-1" />}
           <div className={`${selectionMode ? "col-span-4 sm:col-span-3" : "col-span-5 sm:col-span-4"} cursor-pointer hover:text-gray-900 transition`} onClick={() => toggleSort("name")}>
@@ -222,7 +202,6 @@ export default function ClientTable({
             Total{sortArrow("total")}
           </div>
         </div>
-        )}
 
         {filtered.length === 0 && (
           <div className="px-4 py-12 text-center">

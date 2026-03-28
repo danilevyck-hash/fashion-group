@@ -69,7 +69,7 @@ export interface ConsolidatedClient {
   current: number;    // 0-90
   watch: number;      // 91-120
   overdue: number;    // 121+
-  // Granular buckets for David's view
+  // Granular aging buckets
   d0_30: number;
   d31_60: number;
   d61_90: number;

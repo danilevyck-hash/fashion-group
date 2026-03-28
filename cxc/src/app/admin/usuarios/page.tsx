@@ -31,7 +31,6 @@ const ROLE_LABELS: Record<string, string> = {
   admin: "Administrador",
   director: "Director",
   contabilidad: "Contabilidad",
-  david: "David",
   upload: "Secretaria",
   vendedor: "Vendedor",
   bodega: "Bodega",
@@ -372,7 +371,6 @@ export default function UsuariosPage() {
                         r.role === "admin" ? "bg-black" :
                         r.role === "director" ? "bg-gray-700" :
                         r.role === "contabilidad" ? "bg-blue-600" :
-                        r.role === "david" ? "bg-purple-600" :
                         r.role === "vendedor" ? "bg-emerald-600" :
                         r.role === "cliente" ? "bg-orange-500" :
                         "bg-gray-400"

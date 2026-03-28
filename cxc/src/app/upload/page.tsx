@@ -26,10 +26,7 @@ export default function UploadPage() {
   const [pendingText, setPendingText] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
-  // David sees only Boston, admin/upload see all 7
-  const uploadCompanies = role === "david"
-    ? getCompaniesForRole("david")
-    : ALL_COMPANIES;
+  const uploadCompanies = ALL_COMPANIES;
 
   useEffect(() => { if (authChecked) loadUploads(); }, [authChecked]);
 
