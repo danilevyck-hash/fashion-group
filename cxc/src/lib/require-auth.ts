@@ -17,7 +17,7 @@ export function getSession(req: NextRequest): SessionPayload | null {
   const raw = req.cookies.get(COOKIE_NAME)?.value;
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(Buffer.from(raw, "base64").toString("utf-8"));
+    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf-8"));
     if (!parsed.role) return null;
     return parsed as SessionPayload;
   } catch {

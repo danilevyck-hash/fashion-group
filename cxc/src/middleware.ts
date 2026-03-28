@@ -45,7 +45,7 @@ export function middleware(req: NextRequest) {
 
   // Validate session is parseable
   try {
-    const parsed = JSON.parse(Buffer.from(session, "base64").toString("utf-8"));
+    const parsed = JSON.parse(Buffer.from(session, "base64url").toString("utf-8"));
     if (!parsed.role) throw new Error("no role");
   } catch {
     // Invalid cookie — clear it and redirect

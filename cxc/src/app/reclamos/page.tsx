@@ -158,9 +158,13 @@ function ReclamosPage() {
 
   const loadReclamos = useCallback(async () => {
     setLoading(true);
-    try { const res = await fetch("/api/reclamos"); if (res.ok) { const d = await res.json(); setReclamos(Array.isArray(d) ? d : []); } }
-    catch { /* */ } setLoading(false);
-  }, []);
+    try {
+      const res = await fetch("/api/reclamos");
+      if (res.status === 401) { sessionStorage.clear(); router.push("/"); return; }
+      if (res.ok) { const d = await res.json(); setReclamos(Array.isArray(d) ? d : []); }
+    } catch { /* */ }
+    setLoading(false);
+  }, [router]);
 
   const loadContactos = useCallback(async () => {
     try { const res = await fetch("/api/reclamos/contactos"); if (res.ok) setContactos(await res.json()); } catch { /* */ }

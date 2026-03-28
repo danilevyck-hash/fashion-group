@@ -6,7 +6,7 @@ const COOKIE_NAME = "cxc_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 function setSessionCookie(res: NextResponse, payload: Record<string, unknown>) {
-  const value = Buffer.from(JSON.stringify(payload)).toString("base64");
+  const value = Buffer.from(JSON.stringify(payload)).toString("base64url");
   res.cookies.set(COOKIE_NAME, value, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
