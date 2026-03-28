@@ -78,7 +78,68 @@ export default function CamisetasPage() {
   async function addClient() {
     if (!newClientName.trim()) return;
     const res = await fetch("/api/camisetas/clientes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre: newClientName.trim() }) });
-    if (res.ok) { setNewClientName(""); setShowNewClient(false); showToast("Cliente creado"); load(); }
+    if (res.ok) {
+      const created = await res.json();
+      setNewClientName(""); setShowNewClient(false); showToast("Cliente creado");
+      await load();
+      setSelectedClient(created.id);
+    }
+  }
+  async function deleteClient(id: string, nombre: string) {
+    if (!confirm(`¿Eliminar ${nombre}? Se borrarán todos sus pedidos.`)) return;
+    const res = await fetch(`/api/camisetas/clientes/${id}`, { method: "DELETE" });
+    if (res.ok) { setSelectedClient(null); showToast("Cliente eliminado"); load(); }
+    else showToast("Error al eliminar");
+  }
+
+  async function downloadClientPDF(cId: string) {
+    const cl = clientes.find(c => c.id === cId);
+    if (!cl) return;
+    showToast("Generando PDF...");
+    const { jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+    const doc = new jsPDF("portrait");
+
+    doc.setFillColor(26, 26, 26);
+    doc.rect(0, 0, 210, 18, "F");
+    doc.setFontSize(10); doc.setTextColor(255); doc.setFont("helvetica", "bold");
+    doc.text("Fashion Group — Camisetas de la Selección", 14, 12);
+    doc.setFontSize(7); doc.setFont("helvetica", "normal");
+    doc.text(new Date().toLocaleDateString("es-PA"), 196, 12, { align: "right" });
+
+    doc.setTextColor(26); doc.setFontSize(16); doc.setFont("helvetica", "bold");
+    doc.text(cl.nombre, 14, 30);
+
+    const clientPedidos = sortedProductos
+      .map(prod => ({ prod, paq: getPaq(cId, prod.id) }))
+      .filter(x => x.paq > 0);
+
+    const body = clientPedidos.map(({ prod, paq }) => {
+      const tallas = TALLAS[prod.genero] || {};
+      const tallaStr = Object.entries(tallas).filter(([, v]) => v > 0).map(([k, v]) => `${k}:${v * paq}`).join(" ");
+      return [prod.nombre, prod.genero, String(paq), String(paq * PPQ), tallaStr, `$${fmt(prod.precio_panama)}`, `$${fmt(paq * PPQ * prod.precio_panama)}`];
+    });
+
+    const tPaq = clientPedidos.reduce((s, x) => s + x.paq, 0);
+    const tVal = clientPedidos.reduce((s, x) => s + x.paq * PPQ * x.prod.precio_panama, 0);
+
+    autoTable(doc, {
+      startY: 36,
+      head: [["Producto", "Género", "Paq", "Pzas", "Tallas", "Precio/u", "Subtotal"]],
+      body,
+      foot: [["Total", "", String(tPaq), String(tPaq * PPQ), "", "", `$${fmt(tVal)}`]],
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
+      footStyles: { fillColor: [245, 245, 245], textColor: [26, 26, 26], fontStyle: "bold" },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fy = (doc as any).lastAutoTable.finalY + 10;
+    doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
+    doc.text("Precios en USD · Sujeto a disponibilidad", 14, fy);
+
+    doc.save(`Camisetas-${cl.nombre.replace(/\s+/g, "-")}.pdf`);
+    showToast("PDF descargado");
   }
 
   const tabs = [
@@ -123,6 +184,7 @@ export default function CamisetasPage() {
           ) : tab === "resumen" ? (
             /* ═══ RESUMEN ═══ */
             <div className="overflow-x-auto -mx-6 px-6">
+              <p className="text-[10px] text-gray-400 mb-2">Haz click en cualquier número para editar</p>
               <table className="text-xs w-max min-w-full">
                 <thead>
                   <tr>
@@ -165,10 +227,10 @@ export default function CamisetasPage() {
                                       className="w-10 text-center border-b border-black text-xs py-0.5 outline-none bg-transparent" autoFocus />
                                   ) : paq > 0 ? (
                                     <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(paq); }}
-                                      className="tabular-nums hover:text-red-600 transition">{paq}</button>
+                                      className="tabular-nums hover:text-red-600 transition border-b border-dotted border-gray-300">{paq}</button>
                                   ) : (
                                     <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(0); }}
-                                      className="text-gray-300 hover:text-gray-500 transition">—</button>
+                                      className="text-gray-300 hover:text-gray-500 hover:cursor-cell transition">—</button>
                                   )}
                                 </td>
                               );
@@ -226,46 +288,63 @@ export default function CamisetasPage() {
                 {!selectedClient ? (
                   <p className="text-gray-400 text-sm py-20 text-center">Selecciona un cliente</p>
                 ) : (() => {
-                  const cl = clientes.find(c => c.id === selectedClient)!;
-                  const cp = pedidos.filter(p => p.cliente_id === selectedClient && p.paquetes > 0).map(p => ({ ...p, prod: productos.find(pr => pr.id === p.producto_id)! })).filter(p => p.prod);
-                  const tPaq = cp.reduce((s, p) => s + p.paquetes, 0);
-                  const tVal = cp.reduce((s, p) => s + p.paquetes * PPQ * p.prod.precio_panama, 0);
+                  const cl = clientes.find(c => c.id === selectedClient);
+                  if (!cl) return null;
+                  const tPaq = pedidos.filter(p => p.cliente_id === selectedClient).reduce((s, p) => s + p.paquetes, 0);
+                  const tVal = pedidos.filter(p => p.cliente_id === selectedClient).reduce((s, p) => { const pr = productos.find(x => x.id === p.producto_id); return s + p.paquetes * PPQ * (pr?.precio_panama || 0); }, 0);
 
                   return (
                     <div>
-                      <h2 className="text-2xl font-light">{cl.nombre}</h2>
-                      <p className="text-sm text-gray-500 mt-1">{tPaq} paq · {tPaq * PPQ} pzas · ${fmt(tVal)}</p>
-
-                      {cp.length === 0 ? (
-                        <p className="text-gray-400 text-sm mt-8">Sin pedidos</p>
-                      ) : (
-                        <div className="mt-6">
-                          {GENERO_ORDER.map(gen => {
-                            const items = cp.filter(p => p.prod.genero === gen);
-                            if (items.length === 0) return null;
-                            return (
-                              <div key={gen} className="mb-4">
-                                <div className="text-[10px] uppercase tracking-widest text-gray-400 py-2">{gen}</div>
-                                {items.map(({ prod, paquetes, producto_id }) => {
-                                  const tallas = TALLAS[prod.genero] || {};
-                                  const tallaStr = Object.entries(tallas).filter(([, v]) => v > 0).map(([k, v]) => `${k}:${v * paquetes}`).join(" ");
-                                  return (
-                                    <div key={producto_id} className="flex items-center py-2 border-b border-gray-100 gap-3">
-                                      <Dot color={prod.color} />
-                                      <span className="text-sm flex-1">{prod.nombre}</span>
-                                      <input type="number" min={0} value={paquetes}
-                                        onChange={e => savePedido(selectedClient, producto_id, parseInt(e.target.value) || 0)}
-                                        className="w-12 text-center border-b border-gray-200 text-xs py-0.5 outline-none focus:border-black tabular-nums" />
-                                      <span className="text-xs text-gray-400 tabular-nums w-10">{paquetes * PPQ}pz</span>
-                                      <span className="text-[10px] text-gray-400 font-mono w-32 hidden sm:block">{tallaStr}</span>
-                                      <span className="text-xs tabular-nums w-16 text-right">${fmt(paquetes * PPQ * prod.precio_panama)}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            );
-                          })}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h2 className="text-2xl font-light">{cl.nombre}</h2>
+                          <p className="text-sm text-gray-500 mt-1">{tPaq} paq · {tPaq * PPQ} pzas · ${fmt(tVal)}</p>
                         </div>
+                        <button onClick={() => deleteClient(cl.id, cl.nombre)} className="text-xs text-gray-400 hover:text-red-500 transition">Eliminar cliente</button>
+                      </div>
+
+                      <div className="mt-6">
+                        {GENERO_ORDER.map(gen => {
+                          const genProds = sortedProductos.filter(p => p.genero === gen);
+                          if (genProds.length === 0) return null;
+                          return (
+                            <div key={gen} className="mb-4">
+                              <div className="text-[10px] uppercase tracking-widest text-gray-400 py-2">{gen}</div>
+                              {genProds.map(prod => {
+                                const paq = getPaq(selectedClient, prod.id);
+                                const tallas = TALLAS[prod.genero] || {};
+                                const tallaStr = paq > 0 ? Object.entries(tallas).filter(([, v]) => v > 0).map(([k, v]) => `${k}:${v * paq}`).join(" ") : "";
+                                return (
+                                  <div key={prod.id} className={`flex items-center py-2 border-b border-gray-100 gap-3 ${paq === 0 ? "opacity-40" : ""}`}>
+                                    <Dot color={prod.color} />
+                                    <span className="text-sm flex-1">{prod.nombre}</span>
+                                    <input type="number" min={0} step={1} value={paq}
+                                      onChange={e => {
+                                        const v = parseInt(e.target.value) || 0;
+                                        setPedidos(prev => {
+                                          const idx = prev.findIndex(p => p.cliente_id === selectedClient && p.producto_id === prod.id);
+                                          if (idx >= 0) return prev.map((p, i) => i === idx ? { ...p, paquetes: v } : p);
+                                          return [...prev, { id: "", cliente_id: selectedClient, producto_id: prod.id, paquetes: v }];
+                                        });
+                                      }}
+                                      onBlur={e => savePedido(selectedClient, prod.id, parseInt(e.target.value) || 0)}
+                                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                                      className="w-12 text-center border-b border-gray-200 text-xs py-0.5 outline-none focus:border-black tabular-nums" />
+                                    <span className="text-xs text-gray-400 tabular-nums w-10">{paq > 0 ? `${paq * PPQ}pz` : "— pz"}</span>
+                                    <span className="text-[10px] text-gray-400 font-mono w-32 hidden sm:block">{tallaStr || "—"}</span>
+                                    <span className="text-xs tabular-nums w-16 text-right">{paq > 0 ? `$${fmt(paq * PPQ * prod.precio_panama)}` : "—"}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {tPaq > 0 && (
+                        <button onClick={() => downloadClientPDF(selectedClient)} className="mt-4 border border-gray-200 px-4 py-2 rounded-full text-sm hover:border-gray-400 transition">
+                          Descargar PDF
+                        </button>
                       )}
                     </div>
                   );
