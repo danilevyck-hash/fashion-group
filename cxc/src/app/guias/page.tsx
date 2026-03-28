@@ -111,39 +111,38 @@ export default function GuiasPage() {
   // ── PRINT / DETAIL VIEW ──
   if (s.view === "print" && s.printGuia) {
     return (
-      <GuiaDetail
-        guia={s.printGuia}
-        role={role}
-        bPlaca={s.bPlaca}
-        setBPlaca={s.setBPlaca}
-        bReceptor={s.bReceptor}
-        setBReceptor={s.setBReceptor}
-        bCedula={s.bCedula}
-        setBCedula={s.setBCedula}
-        bSaving={s.bSaving}
-        showPostDespacho={s.showPostDespacho}
-        setShowPostDespacho={s.setShowPostDespacho}
-        toast={s.toast}
-        onBack={() => s.setView("list")}
-        onEdit={s.startEdit}
-        onDelete={s.requestDeleteGuia}
-        onConfirmarDespacho={s.confirmarDespacho}
-        showToast={s.showToast}
-      />
+      <>
+        <GuiaDetail
+          guia={s.printGuia}
+          role={role}
+          bPlaca={s.bPlaca}
+          setBPlaca={s.setBPlaca}
+          bReceptor={s.bReceptor}
+          setBReceptor={s.setBReceptor}
+          bCedula={s.bCedula}
+          setBCedula={s.setBCedula}
+          bSaving={s.bSaving}
+          showPostDespacho={s.showPostDespacho}
+          setShowPostDespacho={s.setShowPostDespacho}
+          toast={s.toast}
+          onBack={() => s.setView("list")}
+          onEdit={s.startEdit}
+          onDelete={s.requestDeleteGuia}
+          onConfirmarDespacho={s.confirmarDespacho}
+          showToast={s.showToast}
+        />
+        <ConfirmModal
+          open={!!s.confirmDeleteId}
+          onClose={() => s.setConfirmDeleteId(null)}
+          onConfirm={s.confirmDeleteGuia}
+          title="Eliminar guía"
+          message="¿Eliminar esta guía? Esta acción no se puede deshacer."
+          confirmLabel="Eliminar"
+          destructive
+        />
+      </>
     );
   }
 
-  return (
-    <>
-      <ConfirmModal
-        open={!!s.confirmDeleteId}
-        onClose={() => s.setConfirmDeleteId(null)}
-        onConfirm={s.confirmDeleteGuia}
-        title="Eliminar guía"
-        message="¿Eliminar esta guía? Esta acción no se puede deshacer."
-        confirmLabel="Eliminar"
-        destructive
-      />
-    </>
-  );
+  return null;
 }
