@@ -3,6 +3,7 @@
 import { fmtDate } from "@/lib/format";
 import type { Guia, GuiaItem } from "./types";
 import { clientesSummary, getMonthOptions } from "./constants";
+import { SkeletonTable, EmptyState } from "@/components/ui";
 
 interface GuiasListProps {
   guias: Guia[];
@@ -74,46 +75,14 @@ export default function GuiasList({
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
         {loading ? (
-          <div>
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex gap-4 py-3 px-4 border-b border-gray-50">
-                <div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" />
-                <div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" />
-                <div className="h-3 bg-gray-100 rounded animate-pulse w-1/4" />
-                <div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" />
-                <div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" />
-              </div>
-            ))}
-          </div>
+          <SkeletonTable rows={5} cols={5} />
         ) : guias.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="w-12 h-12 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                className="text-gray-400"
-              >
-                <rect x="1" y="3" width="15" height="13" rx="2" />
-                <path d="M16 8h4l3 5v3h-7V8z" />
-                <circle cx="5.5" cy="18.5" r="2.5" />
-                <circle cx="18.5" cy="18.5" r="2.5" />
-              </svg>
-            </div>
-            <p className="text-sm font-medium text-gray-700 mb-1">No hay guías registradas</p>
-            <p className="text-sm text-gray-400 mb-6">
-              Crea tu primera guía para registrar un despacho
-            </p>
-            <button
-              onClick={onNewGuia}
-              className="text-sm bg-black text-white px-6 py-2.5 rounded-full hover:bg-gray-800 transition"
-            >
-              Crear primera guía
-            </button>
-          </div>
+          <EmptyState
+            title="No hay guías registradas"
+            subtitle="Crea tu primera guía para registrar un despacho"
+            actionLabel="+ Nueva Guía"
+            onAction={onNewGuia}
+          />
         ) : (
           <>
             <div className="flex items-end gap-6 mb-6">

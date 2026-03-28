@@ -6,7 +6,7 @@ import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { EMPRESAS } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast } from "@/components/ui";
+import { Toast, SkeletonTable } from "@/components/ui";
 
 const RechartsChart = dynamic(() => import("recharts").then((mod) => {
   const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = mod;
@@ -262,7 +262,7 @@ export default function VentasPage() {
         </div>
 
         {loading ? (
-          <div>{[...Array(5)].map((_, i) => <div key={i} className="flex gap-4 py-3 px-4 border-b border-gray-50"><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/12" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/12" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/12" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/12" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/12" /></div>)}</div>
+          <SkeletonTable rows={5} cols={6} />
         ) : (<>
 
           {/* KPIs — admin only */}

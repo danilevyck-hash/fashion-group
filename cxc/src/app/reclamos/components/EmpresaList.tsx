@@ -3,6 +3,7 @@
 import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
 import { ESTADOS, EC, daysSince, calcSub, buildReclamosPdfHtml, openPdfWindow } from "./constants";
+import { EmptyState } from "@/components/ui";
 
 interface Props {
   role: string;
@@ -160,7 +161,7 @@ export default function EmpresaList({
         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="border-b border-gray-200 py-2 text-sm outline-none w-full max-w-xs" />
       </div>
 
-      {sortedRecs.length === 0 ? <p className="text-center text-gray-300 text-sm py-20">Sin reclamos</p> : (
+      {sortedRecs.length === 0 ? <EmptyState title="Sin reclamos" subtitle="No hay reclamos registrados para esta empresa" /> : (
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">

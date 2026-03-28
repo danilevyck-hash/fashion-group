@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { EmptyState } from "@/components/ui";
 
 interface Movimiento {
   id: string;
@@ -159,7 +160,7 @@ export default function ReportePage() {
         {loading ? (
           <div className="text-center py-20 text-gray-400 text-sm">Cargando...</div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 text-gray-400 text-sm">No hay empleados con saldo pendiente</div>
+          <EmptyState title="Sin saldos pendientes" subtitle="No hay empleados con préstamos activos" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

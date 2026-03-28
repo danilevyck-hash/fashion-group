@@ -5,7 +5,7 @@ import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState } from "@/components/ui";
 
 interface Producto { id: string; nombre: string; genero: string; color: string; precio_panama: number; rrp: number; stock_comprado: number; }
 interface Cliente { id: string; nombre: string; estado?: string; }
@@ -263,7 +263,7 @@ export default function CamisetasPage() {
 
         <div className="mt-6">
           {loading ? (
-            <div className="space-y-3 py-8">{[...Array(6)].map((_, i) => <div key={i} className="h-6 bg-gray-100 rounded animate-pulse" />)}</div>
+            <SkeletonTable rows={6} cols={4} />
 
           ) : tab === "resumen" ? (
             /* ═══ RESUMEN ═══ */
@@ -394,7 +394,7 @@ export default function CamisetasPage() {
 
               <div className="flex-1 min-w-0">
                 {!selectedClient ? (
-                  <p className="text-gray-400 text-sm py-20 text-center">Selecciona un cliente</p>
+                  <EmptyState title="Selecciona un cliente" subtitle="Elige un cliente de la lista para ver y editar su pedido" />
                 ) : (() => {
                   const cl = clientes.find(c => c.id === selectedClient);
                   if (!cl) return null;

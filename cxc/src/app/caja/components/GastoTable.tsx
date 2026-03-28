@@ -3,6 +3,7 @@
 import { fmt, fmtDate } from "@/lib/format";
 import { CajaGasto } from "./types";
 import { CAJA_EMPRESAS } from "./GastoForm";
+import { EmptyState } from "@/components/ui";
 
 interface Props {
   gastos: CajaGasto[];
@@ -58,11 +59,11 @@ export default function GastoTable({
           <tbody>
             {gastos.length === 0 ? (
               <tr>
-                <td
-                  colSpan={11}
-                  className="py-12 text-center text-gray-400 text-sm"
-                >
-                  Sin gastos registrados
+                <td colSpan={11}>
+                  <EmptyState
+                    title="Sin gastos registrados"
+                    subtitle="Agrega el primer gasto de este período"
+                  />
                 </td>
               </tr>
             ) : (

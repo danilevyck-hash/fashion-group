@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState } from "@/components/ui";
 import XLSX from "xlsx-js-style";
 
 interface Cliente {
@@ -219,21 +219,14 @@ export default function DirectorioPage() {
 
       {/* Table */}
       {loading ? (
-        <div>{[...Array(5)].map((_, i) => <div key={i} className="flex gap-4 py-3 px-4 border-b border-gray-50"><div className="h-3 bg-gray-100 rounded animate-pulse w-1/3" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /></div>)}</div>
+        <SkeletonTable rows={5} cols={5} />
       ) : filtered.length === 0 && !search ? (
-        <div className="flex flex-col items-center py-20 text-center">
-          <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-gray-200 mb-5">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
-          <p className="text-sm font-medium text-gray-600 mb-1">Nada por aqui aun</p>
-          <p className="text-xs text-gray-400 mb-6 max-w-xs">Tu directorio esta vacio. Importa un archivo CSV con tus contactos o agrega el primero manualmente.</p>
-          <button onClick={() => setShowNew(true)} className="text-sm bg-black text-white px-6 py-2.5 rounded-full hover:bg-gray-800 transition font-medium">
-            Nuevo Contacto
-          </button>
-        </div>
+        <EmptyState
+          title="Directorio vacío"
+          subtitle="Agrega tu primer cliente al directorio"
+          actionLabel="+ Nuevo Cliente"
+          onAction={() => setShowNew(true)}
+        />
       ) : (
         <>
           <div className="overflow-x-auto">

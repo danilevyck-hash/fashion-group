@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
+import { SkeletonTable, EmptyState, Toast } from "@/components/ui";
 import XLSX from "xlsx-js-style";
 import { fmt, fmtDate } from "@/lib/format";
 import { EMPRESAS } from "@/lib/companies";
@@ -55,6 +56,9 @@ export default function ChequesPage() {
   const [fNotas, setFNotas] = useState("");
   const [fWhatsapp, setFWhatsapp] = useState("");
   const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+
+  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
 
   const loadCheques = useCallback(async () => {
     setLoading(true);
@@ -102,7 +106,7 @@ export default function ChequesPage() {
       const url = editingId ? `/api/cheques/${editingId}` : "/api/cheques";
       const method = editingId ? "PUT" : "POST";
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (res.ok) { resetForm(); setShowForm(false); loadCheques(); }
+      if (res.ok) { resetForm(); setShowForm(false); loadCheques(); showToast(editingId ? "Cheque actualizado" : "Cheque guardado"); }
       else { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); }
     } catch { setError("Error de conexión."); }
     setSaving(false);
@@ -124,6 +128,7 @@ export default function ChequesPage() {
     if (!confirm("¿Eliminar este cheque?")) return;
     await fetch(`/api/cheques/${id}`, { method: "DELETE" });
     loadCheques();
+    showToast("Cheque eliminado");
   }
 
   function exportPendientes() {
@@ -410,13 +415,14 @@ export default function ChequesPage() {
 
       {/* Table */}
       {loading ? (
-        <div>{[...Array(5)].map((_, i) => <div key={i} className="flex gap-4 py-3 px-4 border-b border-gray-50"><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/8" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /></div>)}</div>
+        <SkeletonTable rows={5} cols={6} />
       ) : filtered.length === 0 ? (
-        <div className="text-center py-20">
-          <p className="text-sm font-medium text-gray-700 mb-1">No hay cheques registrados</p>
-          <p className="text-sm text-gray-400 mb-6">Registra el primer cheque posfechado recibido</p>
-          <button onClick={() => setShowForm(true)} className="text-sm bg-black text-white px-6 py-2.5 rounded-full hover:bg-gray-800 transition">Registrar cheque</button>
-        </div>
+        <EmptyState
+          title="No hay cheques registrados"
+          subtitle="Registra el primer cheque posfechado"
+          actionLabel="+ Nuevo Cheque"
+          onAction={() => setShowForm(true)}
+        />
       ) : (
         <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -478,6 +484,8 @@ export default function ChequesPage() {
         </table>
         </div>
       )}
+      <Toast message={error} type="error" />
+      <Toast message={toast} />
     </div>
     </div>
   );

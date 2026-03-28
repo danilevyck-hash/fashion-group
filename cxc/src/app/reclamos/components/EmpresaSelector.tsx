@@ -4,6 +4,7 @@ import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
 import { EMPRESAS, EC, daysSince, calcSub, buildReclamosPdfHtml, openPdfWindow } from "./constants";
+import { SkeletonTable, EmptyState } from "@/components/ui";
 
 interface Props {
   role: string;
@@ -91,7 +92,7 @@ export default function EmpresaSelector({
                 <p className="text-sm text-gray-500">{results.length} resultados para &quot;{globalSearch}&quot;</p>
                 <button onClick={() => setGlobalSearch("")} className="text-xs text-gray-400 hover:text-black transition">× Limpiar</button>
               </div>
-              {results.length === 0 ? <p className="text-center text-gray-300 text-sm py-12">Sin resultados</p> : (
+              {results.length === 0 ? <EmptyState title="Sin resultados" subtitle={`No se encontraron resultados para "${globalSearch}"`} /> : (
                 <table className="w-full text-sm">
                   <thead><tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
                     <th className="text-left pb-3 font-medium">N° Reclamo</th>
@@ -118,7 +119,7 @@ export default function EmpresaSelector({
             </div>
           );
         })() : loading ? (
-          <div>{[...Array(3)].map((_, i) => <div key={i} className="animate-pulse h-24 bg-gray-50 rounded-2xl mb-4" />)}</div>
+          <SkeletonTable rows={3} cols={2} />
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {EMPRESAS.map((empresa) => {

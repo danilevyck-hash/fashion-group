@@ -2,6 +2,7 @@
 
 import { fmt, fmtDate } from "@/lib/format";
 import { Movimiento, CONCEPTO_COLORS } from "./types";
+import { EmptyState } from "@/components/ui";
 
 interface Props {
   sortedMovs: Movimiento[];
@@ -18,7 +19,7 @@ export default function MovimientoTable({ sortedMovs, isAdmin, isAdminOrDirector
     <div className="mb-8">
       <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Historial de Movimientos</h2>
       {sortedMovs.length === 0 ? (
-        <div className="text-center py-12 text-gray-400 text-sm">Sin movimientos registrados</div>
+        <EmptyState title="Sin movimientos registrados" subtitle="Registra el primer movimiento" />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

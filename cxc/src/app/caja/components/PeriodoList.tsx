@@ -2,6 +2,7 @@
 
 import { fmt, fmtDate } from "@/lib/format";
 import { CajaPeriodo } from "./types";
+import { SkeletonTable, EmptyState } from "@/components/ui";
 
 interface Props {
   periodos: CajaPeriodo[];
@@ -50,24 +51,14 @@ export default function PeriodoList({
       {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
       {loading ? (
-        <div>
-          {[...Array(5)].map((_, i) => (
-            <div
-              key={i}
-              className="flex gap-4 py-3 px-4 border-b border-gray-50"
-            >
-              <div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" />
-              <div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" />
-              <div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" />
-              <div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" />
-              <div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" />
-            </div>
-          ))}
-        </div>
+        <SkeletonTable rows={5} cols={4} />
       ) : periodos.length === 0 ? (
-        <p className="text-gray-400 text-sm text-center py-20">
-          No hay períodos registrados
-        </p>
+        <EmptyState
+          title="No hay períodos registrados"
+          subtitle="Crea un nuevo período de caja menuda"
+          actionLabel="+ Nuevo Período"
+          onAction={onCreatePeriodo}
+        />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

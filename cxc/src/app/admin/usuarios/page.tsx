@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState } from "@/components/ui";
 
 interface RolePermission {
   role: string;
@@ -250,9 +250,9 @@ export default function UsuariosPage() {
             <button onClick={openNewUser} className="text-sm bg-black text-white px-4 py-2 rounded-full hover:bg-gray-800 transition">+ Nuevo Usuario</button>
           </div>
           {loadingUsers ? (
-            <div className="text-center py-8 text-gray-400 text-sm">Cargando...</div>
+            <SkeletonTable rows={3} cols={4} />
           ) : fgUsers.length === 0 ? (
-            <div className="text-center py-8 text-gray-400 text-sm">No hay usuarios. Crea el primero.</div>
+            <EmptyState title="No hay usuarios" subtitle="Crea el primer usuario del sistema" actionLabel="+ Nuevo Usuario" onAction={openNewUser} />
           ) : (
             <div className="border border-gray-200 rounded-xl overflow-hidden">
               <table className="w-full text-sm">

@@ -6,7 +6,7 @@ import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { EMPRESAS } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState } from "@/components/ui";
 
 // ── Types ──
 interface Movimiento {
@@ -276,9 +276,9 @@ export default function PrestamosPage() {
 
         {/* Table */}
         {loading ? (
-          <div>{[...Array(5)].map((_, i) => <div key={i} className="flex gap-4 py-3 px-4 border-b border-gray-50"><div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /></div>)}</div>
+          <SkeletonTable rows={5} cols={5} />
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 text-gray-400 text-sm">No se encontraron empleados</div>
+          <EmptyState title="No se encontraron empleados" subtitle="Registra el primer empleado para gestionar préstamos" actionLabel="+ Nuevo Empleado" onAction={openNewEmp} />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
