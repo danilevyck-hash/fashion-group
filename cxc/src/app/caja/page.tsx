@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { hasModuleAccess } from "@/lib/auth-check";
 
@@ -70,9 +70,41 @@ function fmtDate(d: string) {
 
 type View = "list" | "detail" | "print";
 
-export default function CajaPage() {
+export default function CajaPageWrapper() {
+  return <Suspense><CajaPage /></Suspense>;
+}
+
+function CajaPage() {
   const router = useRouter();
-  const [view, setView] = useState<View>("list");
+  const searchParams = useSearchParams();
+  const [view, _setView] = useState<View>((searchParams.get("view") as View) || "list");
+  const [urlId] = useState(searchParams.get("id") || "");
+
+  function setView(v: View, id?: string) {
+    _setView(v);
+    if (v === "list") {
+      window.history.pushState(null, "", "/caja");
+    } else if (id) {
+      window.history.pushState(null, "", `/caja?view=${v}&id=${id}`);
+    }
+  }
+
+  // Handle browser back/forward
+  useEffect(() => {
+    function onPopState() {
+      const params = new URLSearchParams(window.location.search);
+      const v = (params.get("view") as View) || "list";
+      const id = params.get("id") || "";
+      _setView(v);
+      if (id && v !== "list") {
+        loadDetail(id);
+      } else {
+        setCurrent(null);
+      }
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
   const [periodos, setPeriodos] = useState<CajaPeriodo[]>([]);
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState<CajaPeriodo | null>(null);
@@ -170,9 +202,16 @@ export default function CajaPage() {
       const gastos = data.caja_gastos || [];
       data.total_gastado = gastos.reduce((s: number, g: CajaGasto) => s + (g.total || 0), 0);
       setCurrent(data);
-      setView("detail");
+      setView("detail", id);
     }
   }
+
+  // Load from URL on mount
+  useEffect(() => {
+    if (urlId && (view === "detail" || view === "print")) {
+      loadDetail(urlId).then(() => { if (view === "print") _setView("print"); });
+    }
+  }, [urlId]);
 
   async function closePeriodo(id: string) {
     if (!confirm("¿Cerrar este período? No podrá agregar más gastos.")) return;
@@ -186,7 +225,7 @@ export default function CajaPage() {
     const res = await fetch(`/api/caja/periodos/${id}`, { method: "DELETE" });
     if (res.ok) {
       loadPeriodos();
-      if (current?.id === id) { setCurrent(null); setView("list"); }
+      if (current?.id === id) { setCurrent(null); setView("list", undefined); }
     } else {
       setError("Error al eliminar período");
     }
@@ -323,7 +362,7 @@ export default function CajaPage() {
                       ${fmt(saldo)}
                     </td>
                     <td className="py-3 px-4 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => { loadDetail(p.id).then(() => setView("print")); }}
+                      <button onClick={() => { loadDetail(p.id).then(() => setView("print", p.id)); }}
                         className="text-sm text-gray-500 hover:text-black transition">Imprimir</button>
                       {p.estado === "abierto" && (<>
                         <span className="text-gray-200">·</span>
@@ -358,7 +397,7 @@ export default function CajaPage() {
 
     return (
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
-        <button onClick={() => { setView("list"); setCurrent(null); }}
+        <button onClick={() => { setView("list", undefined); setCurrent(null); }}
           className="text-sm text-gray-400 hover:text-black transition mb-8 block">
           ← Períodos
         </button>
@@ -737,7 +776,7 @@ export default function CajaPage() {
         )}
 
         <div className="flex flex-wrap items-center gap-6 mt-8">
-          <button onClick={() => setView("print")}
+          <button onClick={() => current && setView("print", current.id)}
             className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
             Imprimir
           </button>
@@ -767,7 +806,7 @@ export default function CajaPage() {
     return (
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
         <div className="flex flex-wrap gap-4 mb-8 no-print">
-          <button onClick={() => setView("detail")} className="text-sm text-gray-400 hover:text-black transition">← Volver</button>
+          <button onClick={() => current && setView("detail", current.id)} className="text-sm text-gray-400 hover:text-black transition">← Volver</button>
           <button onClick={() => window.print()} className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
             Imprimir
           </button>

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 import { hasModuleAccess } from "@/lib/auth-check";
 import AppHeader from "@/components/AppHeader";
@@ -43,13 +43,21 @@ function calcSub(items: RItem[]) { return items.reduce((s, i) => s + (Number(i.c
 const SUPA_URL = typeof window !== "undefined" ? (process.env.NEXT_PUBLIC_SUPABASE_URL || "") : "";
 
 // ── Component ──
-export default function ReclamosPage() {
+export default function ReclamosPageWrapper() {
+  return <Suspense><ReclamosPage /></Suspense>;
+}
+
+type RView = "list" | "form" | "detail";
+
+function ReclamosPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // ALL hooks first
   const [authChecked, setAuthChecked] = useState(false);
   const [role, setRole] = useState("");
-  const [view, setView] = useState<"list" | "form" | "detail">("list");
+  const [view, _setView] = useState<RView>((searchParams.get("view") as RView) || "list");
+  const [urlId] = useState(searchParams.get("id") || "");
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +116,36 @@ export default function ReclamosPage() {
   const [newMotivoText, setNewMotivoText] = useState("");
   const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
 
+  function setView(v: RView, id?: string) {
+    _setView(v);
+    if (v === "list") {
+      window.history.pushState(null, "", "/reclamos");
+    } else if (v === "form" && id) {
+      window.history.pushState(null, "", `/reclamos?view=form&id=${id}`);
+    } else if (v === "form") {
+      window.history.pushState(null, "", "/reclamos?view=form");
+    } else if (v === "detail" && id) {
+      window.history.pushState(null, "", `/reclamos?view=detail&id=${id}`);
+    }
+  }
+
+  // Handle browser back/forward
+  useEffect(() => {
+    function onPopState() {
+      const params = new URLSearchParams(window.location.search);
+      const v = (params.get("view") as RView) || "list";
+      const id = params.get("id") || "";
+      _setView(v);
+      if (v === "detail" && id) {
+        loadReclamo(id);
+      } else if (v === "list") {
+        setCurrent(null);
+      }
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   // Historial collapse state per empresa
   const [expandedHistorial, setExpandedHistorial] = useState<Record<string, boolean>>({});
 
@@ -148,8 +186,16 @@ export default function ReclamosPage() {
   }
 
   async function loadDetail(id: string) {
-    try { const res = await fetch(`/api/reclamos/${id}`); if (res.ok) { const d = await res.json(); if (d?.id) { setCurrent(d); setView("detail"); } } } catch { /* */ }
+    try { const res = await fetch(`/api/reclamos/${id}`); if (res.ok) { const d = await res.json(); if (d?.id) { setCurrent(d); setView("detail", d.id); } } } catch { /* */ }
   }
+
+  // Alias for popstate handler
+  const loadReclamo = loadDetail;
+
+  // Load from URL on mount
+  useEffect(() => {
+    if (urlId && view === "detail") loadDetail(urlId);
+  }, [urlId]);
 
   async function saveReclamo() {
     if (!fEmpresa || !fFecha || !fFactura) { setError("Completa empresa, factura y fecha."); return; }
