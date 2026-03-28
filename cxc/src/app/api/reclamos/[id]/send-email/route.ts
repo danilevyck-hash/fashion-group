@@ -71,18 +71,20 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       { filename: `${rec.nro_reclamo}-${rec.empresa}.xlsx`, content: Buffer.from(excelBuffer) },
     ];
 
-    // Download and attach fotos
+    // Download and attach fotos in parallel
     const fotos = (rec.reclamo_fotos || []) as { storage_path: string }[];
-    for (let i = 0; i < fotos.length; i++) {
+    const downloads = await Promise.all(fotos.map(async (foto, i) => {
       try {
-        const { data: fileData, error: dlErr } = await supabaseServer.storage.from("reclamo-fotos").download(fotos[i].storage_path);
+        const { data: fileData, error: dlErr } = await supabaseServer.storage.from("reclamo-fotos").download(foto.storage_path);
         if (!dlErr && fileData) {
           const ab = await fileData.arrayBuffer();
-          const ext = fotos[i].storage_path.split(".").pop() || "jpg";
-          attachments.push({ filename: `evidencia-${i + 1}.${ext}`, content: Buffer.from(ab) });
+          const ext = foto.storage_path.split(".").pop() || "jpg";
+          return { filename: `evidencia-${i + 1}.${ext}`, content: Buffer.from(ab) };
         }
       } catch { /* skip */ }
-    }
+      return null;
+    }));
+    for (const dl of downloads) { if (dl) attachments.push(dl); }
 
     // Build HTML
     const total = subtotal * 1.177;

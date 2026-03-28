@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export async function GET() {
-  const { data: rows, error } = await supabaseServer.from("cxc_rows").select("*");
+  const { data: rows, error } = await supabaseServer.from("cxc_rows").select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365");
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
   let totalCxc = 0, corriente = 0, vigilancia = 0, vencido = 0;
