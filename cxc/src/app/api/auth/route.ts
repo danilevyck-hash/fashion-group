@@ -5,6 +5,22 @@ import bcrypt from "bcryptjs";
 const COOKIE_NAME = "cxc_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
+// Rate limiting: max 5 attempts per IP per minute
+const attempts = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 5;
+const RATE_WINDOW = 60_000; // 1 minute
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = attempts.get(ip);
+  if (!entry || now > entry.resetAt) {
+    attempts.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
+    return false;
+  }
+  entry.count++;
+  return entry.count > RATE_LIMIT;
+}
+
 function setSessionCookie(res: NextResponse, payload: Record<string, unknown>) {
   const value = Buffer.from(JSON.stringify(payload)).toString("base64url");
   res.cookies.set(COOKIE_NAME, value, {
@@ -21,6 +37,12 @@ function isHash(s: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  // Rate limiting
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+  if (isRateLimited(ip)) {
+    return NextResponse.json({ error: "Demasiados intentos. Espera un minuto." }, { status: 429 });
+  }
+
   const { password } = await req.json();
 
   // 1. Check fg_users table (supports both hashed and plaintext during migration)
@@ -60,7 +82,7 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch {
-    // fg_users table may not exist yet — continue to legacy
+    // fg_users table may not exist yet — continue to role_passwords
   }
 
   // 2. Legacy: Check role_passwords table (supports both hashed and plaintext)
@@ -84,24 +106,11 @@ export async function POST(req: NextRequest) {
     }
   } catch { /* */ }
 
-  // 3. Legacy: Fall back to env vars (always plaintext)
-  if (!role) {
-    const envRoles: Record<string, string> = {};
-    if (process.env.ADMIN_PASSWORD) envRoles[process.env.ADMIN_PASSWORD] = "admin";
-    if (process.env.DIRECTOR_PASSWORD) envRoles[process.env.DIRECTOR_PASSWORD] = "director";
-    if (process.env.DAVID_PASSWORD) envRoles[process.env.DAVID_PASSWORD] = "david";
-    if (process.env.UPLOAD_PASSWORD) envRoles[process.env.UPLOAD_PASSWORD] = "upload";
-    if (process.env.CONTABILIDAD_PASSWORD) envRoles[process.env.CONTABILIDAD_PASSWORD] = "contabilidad";
-    if (process.env.VENDEDOR_PASSWORD) envRoles[process.env.VENDEDOR_PASSWORD] = "vendedor";
-    if (process.env.CLIENTE_PASSWORD) envRoles[process.env.CLIENTE_PASSWORD] = "cliente";
-    role = envRoles[password] || null;
-  }
-
   if (!role) {
     return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
   }
 
-  // 4. Check if legacy role is active
+  // 3. Check if legacy role is active
   try {
     const { data } = await supabaseServer
       .from("role_permissions")
