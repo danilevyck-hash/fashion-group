@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast, SkeletonTable, EmptyState, ConfirmModal } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState, ConfirmModal, StatusBadge } from "@/components/ui";
 
 interface Producto { id: string; nombre: string; genero: string; color: string; precio_panama: number; rrp: number; stock_comprado: number; }
 interface Cliente { id: string; nombre: string; estado?: string; }
@@ -29,7 +28,7 @@ function Dot({ color, size = "sm" }: { color: string; size?: "sm" | "md" }) {
 
 export default function CamisetasPage() {
   const { authChecked, role } = useAuth({ moduleKey: "camisetas", allowedRoles: ["admin","director"] });
-  const [tab, setTab] = useState<"resumen" | "cliente" | "stock">("resumen");
+  const [tab, setTab] = useState<"resumen" | "cliente" | "stock">("cliente");
   const [productos, setProductos] = useState<Producto[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
@@ -42,6 +41,7 @@ export default function CamisetasPage() {
   const [showNewClient, setShowNewClient] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [showMatrix, setShowMatrix] = useState(false);
 
   // Nuevo Pedido modal
   const [showNuevo, setShowNuevo] = useState(false);
@@ -78,6 +78,16 @@ export default function CamisetasPage() {
   const gPaq = pedidos.reduce((s, p) => s + p.paquetes, 0);
   const gVal = pedidos.reduce((s, p) => { const pr = productos.find(x => x.id === p.producto_id); return s + p.paquetes * PPQ * (pr?.precio_panama || 0); }, 0);
   const sobrev = sortedProductos.filter(p => prodTotalPaq(p.id) > Math.floor(p.stock_comprado / PPQ)).length;
+  const pendientesCount = clientes.filter(c => c.estado !== "Entregado").length;
+
+  const filteredClients = sortedClientes
+    .filter(c => !clientSearch || c.nombre.toLowerCase().includes(clientSearch.toLowerCase()))
+    .sort((a, b) => {
+      const aEnt = a.estado === "Entregado" ? 1 : 0;
+      const bEnt = b.estado === "Entregado" ? 1 : 0;
+      if (aEnt !== bEnt) return aEnt - bEnt;
+      return clientTotal(b.id) - clientTotal(a.id);
+    });
 
   async function savePedido(cId: string, pId: string, paq: number) {
     setPedidos(prev => {
@@ -218,9 +228,9 @@ export default function CamisetasPage() {
   }
 
   const tabs = [
-    { key: "resumen" as const, label: "📊 Resumen" },
-    { key: "cliente" as const, label: "👤 Por Cliente" },
-    { key: "stock" as const, label: "📦 Stock" },
+    { key: "resumen" as const, label: "Resumen" },
+    { key: "cliente" as const, label: "Por Cliente" },
+    { key: "stock" as const, label: "Stock" },
   ];
 
   return (
@@ -228,31 +238,48 @@ export default function CamisetasPage() {
       <AppHeader module="Camisetas" />
       <div className="max-w-6xl mx-auto px-6 py-8">
 
-        {/* Nav */}
-        <Link href="/plantillas" className="text-xs text-gray-400 hover:text-gray-600 transition">← Inicio</Link>
-
         {/* Title + Nuevo Pedido */}
-        <div className="flex items-start justify-between mt-4">
+        <div className="flex items-start justify-between mt-4 mb-2">
           <div>
-            <h1 className="text-3xl font-light tracking-tight">Camisetas Reebok</h1>
-            <p className="text-sm text-gray-400 mt-1">Selección Panamá · {new Date().toLocaleDateString("es-PA")}</p>
+            <h1 className="text-xl font-light tracking-tight">Camisetas Selección</h1>
+            <p className="text-sm text-gray-400 mt-1">Pre-órdenes Selección Panamá</p>
           </div>
-          <button onClick={openNuevo} className="bg-black text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition flex-shrink-0">
+          <button onClick={openNuevo} className="bg-black text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition flex-shrink-0 min-h-[44px]">
             + Nuevo Pedido
           </button>
         </div>
 
-        {/* Inline stats */}
+        {/* Stats cards */}
         {!loading && (
-          <p className="text-sm text-gray-500 mt-3">
-            {gPaq.toLocaleString()} paq&ensp;·&ensp;{(gPaq * PPQ).toLocaleString()} pzas
-            {!isVendedor && <>&ensp;·&ensp;{fmtK(gVal)}</>}
-            {sobrev > 0 && <span className="text-red-600 ml-1">&ensp;·&ensp;{sobrev} sobrevendidos</span>}
-          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div className="border border-amber-200 bg-amber-50 rounded-xl p-3">
+              <div className="text-[10px] text-amber-600 uppercase tracking-widest">Pendientes</div>
+              <div className="text-xl font-semibold text-amber-700 mt-1">{pendientesCount}</div>
+              <div className="text-[10px] text-amber-500">de entrega</div>
+            </div>
+            <div className="border border-gray-100 rounded-xl p-3">
+              <div className="text-[10px] text-gray-400 uppercase tracking-widest">Paquetes</div>
+              <div className="text-xl font-semibold mt-1">{gPaq.toLocaleString()}</div>
+              <div className="text-[10px] text-gray-400">{(gPaq * PPQ).toLocaleString()} piezas</div>
+            </div>
+            {!isVendedor && (
+              <div className="border border-gray-100 rounded-xl p-3">
+                <div className="text-[10px] text-gray-400 uppercase tracking-widest">Monto Total</div>
+                <div className="text-xl font-semibold mt-1">{fmtK(gVal)}</div>
+              </div>
+            )}
+            {sobrev > 0 && (
+              <div className="border border-red-200 bg-red-50 rounded-xl p-3">
+                <div className="text-[10px] text-red-600 uppercase tracking-widest">Sobrevendidos</div>
+                <div className="text-xl font-semibold text-red-600 mt-1">{sobrev}</div>
+                <div className="text-[10px] text-red-500">productos</div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Tabs */}
-        <div className="flex gap-6 mt-6 border-b border-gray-200">
+        <div className="flex gap-6 border-b border-gray-200">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
               className={`pb-3 text-sm transition ${tab === t.key ? "text-black font-medium border-b-2 border-black" : "text-gray-400 hover:text-gray-600"}`}>
@@ -267,192 +294,238 @@ export default function CamisetasPage() {
 
           ) : tab === "resumen" ? (
             /* ═══ RESUMEN ═══ */
-            <div className="overflow-x-auto -mx-6 px-6">
-              <p className="text-[10px] text-gray-400 mb-3">Haz click en cualquier celda para editar</p>
-              <table className="text-xs w-max min-w-full border-collapse">
-                <thead>
-                  <tr>
-                    <th className="sticky left-0 z-10 bg-white text-left py-3 pr-4 text-[10px] uppercase tracking-widest text-gray-400 font-normal min-w-[180px] border-b border-gray-200">Producto</th>
-                    {sortedClientes.map(c => {
-                      const cVal = clientValor(c.id);
-                      const isEntregado = c.estado === "Entregado";
-                      return (
-                        <th key={c.id} className={`py-1 px-1 text-[10px] text-gray-400 font-normal text-center min-w-[44px] border-b border-gray-200 ${isEntregado ? "opacity-40" : ""}`} style={{ height: 70 }}>
-                          <button onClick={() => { setSelectedClient(c.id); setTab("cliente"); }}
-                            className="hover:text-black transition whitespace-nowrap inline-block"
-                            style={{ transform: "rotate(-45deg)", transformOrigin: "center", fontSize: "9px" }}>{c.nombre}</button>
-                          <div className="flex flex-col items-center gap-0.5 mt-0.5">
-                            <span className={`text-[8px] px-1 py-0 rounded-full ${isEntregado ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
-                              {isEntregado ? "✓" : "○"}
-                            </span>
-                            {!isVendedor && cVal > 0 && <span className="text-[8px] text-gray-400 tabular-nums">${(cVal/1000).toFixed(1)}k</span>}
-                          </div>
-                        </th>
-                      );
-                    })}
-                    <th className="py-3 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right border-l border-gray-200 border-b border-gray-200 bg-gray-50">Paq</th>
-                    <th className="py-3 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right border-b border-gray-200 bg-gray-50">Pzas</th>
-                    {!isVendedor && <th className="py-3 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right border-b border-gray-200 bg-gray-50">Valor</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {GENERO_ORDER.map((gen, gi) => {
-                    const genProds = sortedProductos.filter(p => p.genero === gen);
-                    return [
-                      gi > 0 && <tr key={`s-${gen}`}><td colSpan={sortedClientes.length + (isVendedor ? 3 : 4)} className="h-1" /></tr>,
-                      ...genProds.map((prod, pi) => {
-                        const tPaq = prodTotalPaq(prod.id);
-                        const isOdd = pi % 2 === 1;
-                        return (
-                          <tr key={prod.id} className={`${isOdd ? "bg-gray-50/60" : ""} hover:bg-blue-50/40 transition-colors`}>
-                            <td className={`sticky left-0 z-10 ${isOdd ? "bg-gray-50" : "bg-white"} py-2 pr-4 border-b border-gray-100`}>
-                              <span className="flex items-center gap-2">
-                                <Dot color={prod.color} />
-                                <span className="font-medium">{prod.nombre}</span>
-                                <span className="text-[9px] text-gray-400">{prod.genero}</span>
-                              </span>
-                            </td>
-                            {sortedClientes.map(c => {
-                              const paq = getPaq(c.id, prod.id);
-                              const editing = editCell?.cId === c.id && editCell?.pId === prod.id;
+            <div>
+              {/* Product summary cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
+                {sortedProductos.map(prod => {
+                  const tPaq = prodTotalPaq(prod.id);
+                  const comp = Math.floor(prod.stock_comprado / PPQ);
+                  const disp = comp - tPaq;
+                  return (
+                    <div key={prod.id} className="border border-gray-100 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Dot color={prod.color} size="md" />
+                        <span className="text-sm font-medium">{prod.nombre}</span>
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${GENERO_BADGE[prod.genero]}`}>{prod.genero}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div><div className="text-lg font-semibold">{tPaq}</div><div className="text-[10px] text-gray-400">vendidos</div></div>
+                        <div><div className="text-lg font-semibold">{comp}</div><div className="text-[10px] text-gray-400">comprados</div></div>
+                        <div><div className={`text-lg font-semibold ${disp < 0 ? "text-red-600" : ""}`}>{disp}</div><div className="text-[10px] text-gray-400">disponible</div></div>
+                      </div>
+                      {!isVendedor && <div className="text-xs text-gray-400 mt-2 text-center">${fmt(tPaq * PPQ * prod.precio_panama)}</div>}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Collapsible detailed matrix */}
+              <div>
+                <button onClick={() => setShowMatrix(!showMatrix)} className="text-sm text-gray-400 hover:text-black transition flex items-center gap-1 mb-3">
+                  <span style={{ transform: showMatrix ? "rotate(90deg)" : "rotate(0)", transition: "transform 0.2s" }}>▶</span>
+                  Tabla detallada por cliente
+                </button>
+                {showMatrix && (
+                  <div className="overflow-x-auto -mx-6 px-6">
+                    <p className="text-[10px] text-gray-400 mb-3">Haz click en cualquier celda para editar</p>
+                    <table className="text-xs w-max min-w-full border-collapse">
+                      <thead>
+                        <tr>
+                          <th className="sticky left-0 z-10 bg-white text-left py-3 pr-4 text-[10px] uppercase tracking-widest text-gray-400 font-normal min-w-[180px] border-b border-gray-200">Producto</th>
+                          {sortedClientes.map(c => {
+                            const cVal = clientValor(c.id);
+                            const isEntregado = c.estado === "Entregado";
+                            return (
+                              <th key={c.id} className={`py-1 px-1 text-[10px] text-gray-400 font-normal text-center min-w-[44px] border-b border-gray-200 ${isEntregado ? "opacity-40" : ""}`} style={{ height: 70 }}>
+                                <button onClick={() => { setSelectedClient(c.id); setTab("cliente"); }}
+                                  className="hover:text-black transition whitespace-nowrap inline-block"
+                                  style={{ transform: "rotate(-45deg)", transformOrigin: "center", fontSize: "9px" }}>{c.nombre}</button>
+                                <div className="flex flex-col items-center gap-0.5 mt-0.5">
+                                  <span className={`text-[8px] px-1 py-0 rounded-full ${isEntregado ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                                    {isEntregado ? "✓" : "○"}
+                                  </span>
+                                  {!isVendedor && cVal > 0 && <span className="text-[8px] text-gray-400 tabular-nums">${(cVal/1000).toFixed(1)}k</span>}
+                                </div>
+                              </th>
+                            );
+                          })}
+                          <th className="py-3 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right border-l border-gray-200 border-b border-gray-200 bg-gray-50">Paq</th>
+                          <th className="py-3 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right border-b border-gray-200 bg-gray-50">Pzas</th>
+                          {!isVendedor && <th className="py-3 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right border-b border-gray-200 bg-gray-50">Valor</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {GENERO_ORDER.map((gen, gi) => {
+                          const genProds = sortedProductos.filter(p => p.genero === gen);
+                          return [
+                            gi > 0 && <tr key={`s-${gen}`}><td colSpan={sortedClientes.length + (isVendedor ? 3 : 4)} className="h-1" /></tr>,
+                            ...genProds.map((prod, pi) => {
+                              const tPaq = prodTotalPaq(prod.id);
+                              const isOdd = pi % 2 === 1;
                               return (
-                                <td key={c.id} className="py-1 px-0.5 text-center border-b border-gray-100">
-                                  {editing ? (
-                                    <input type="number" min={0} value={editVal} onChange={e => setEditVal(parseInt(e.target.value) || 0)}
-                                      onBlur={() => savePedido(c.id, prod.id, editVal)}
-                                      onKeyDown={e => { if (e.key === "Enter") savePedido(c.id, prod.id, editVal); if (e.key === "Escape") setEditCell(null); }}
-                                      className="w-10 text-center border-b border-black text-xs py-0.5 outline-none bg-transparent" autoFocus />
-                                  ) : paq > 0 ? (
-                                    <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(paq); }}
-                                      className="inline-block bg-gray-800 text-white rounded px-1.5 py-0.5 text-[10px] tabular-nums font-medium hover:bg-red-600 transition min-w-[22px]">{paq}</button>
-                                  ) : (
-                                    <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(0); }}
-                                      className="text-gray-200 hover:text-gray-400 hover:cursor-cell transition text-[10px]">—</button>
-                                  )}
-                                </td>
+                                <tr key={prod.id} className={`${isOdd ? "bg-gray-50/60" : ""} hover:bg-blue-50/40 transition-colors`}>
+                                  <td className={`sticky left-0 z-10 ${isOdd ? "bg-gray-50" : "bg-white"} py-2 pr-4 border-b border-gray-100`}>
+                                    <span className="flex items-center gap-2">
+                                      <Dot color={prod.color} />
+                                      <span className="font-medium">{prod.nombre}</span>
+                                      <span className="text-[9px] text-gray-400">{prod.genero}</span>
+                                    </span>
+                                  </td>
+                                  {sortedClientes.map(c => {
+                                    const paq = getPaq(c.id, prod.id);
+                                    const editing = editCell?.cId === c.id && editCell?.pId === prod.id;
+                                    return (
+                                      <td key={c.id} className="py-1 px-0.5 text-center border-b border-gray-100">
+                                        {editing ? (
+                                          <input type="number" min={0} value={editVal} onChange={e => setEditVal(parseInt(e.target.value) || 0)}
+                                            onBlur={() => savePedido(c.id, prod.id, editVal)}
+                                            onKeyDown={e => { if (e.key === "Enter") savePedido(c.id, prod.id, editVal); if (e.key === "Escape") setEditCell(null); }}
+                                            className="w-10 text-center border-b border-black text-xs py-0.5 outline-none bg-transparent" autoFocus />
+                                        ) : paq > 0 ? (
+                                          <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(paq); }}
+                                            className="inline-block bg-gray-800 text-white rounded px-1.5 py-0.5 text-[10px] tabular-nums font-medium hover:bg-red-600 transition min-w-[22px]">{paq}</button>
+                                        ) : (
+                                          <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(0); }}
+                                            className="text-gray-200 hover:text-gray-400 hover:cursor-cell transition text-[10px]">—</button>
+                                        )}
+                                      </td>
+                                    );
+                                  })}
+                                  <td className="py-2 px-3 text-right tabular-nums font-semibold border-l border-gray-200 border-b border-gray-100 bg-gray-50/60">{tPaq}</td>
+                                  <td className="py-2 px-3 text-right tabular-nums text-gray-500 border-b border-gray-100 bg-gray-50/60">{tPaq * PPQ}</td>
+                                  {!isVendedor && <td className="py-2 px-3 text-right tabular-nums border-b border-gray-100 bg-gray-50/60">${fmt(tPaq * PPQ * prod.precio_panama)}</td>}
+                                </tr>
                               );
-                            })}
-                            <td className="py-2 px-3 text-right tabular-nums font-semibold border-l border-gray-200 border-b border-gray-100 bg-gray-50/60">{tPaq}</td>
-                            <td className="py-2 px-3 text-right tabular-nums text-gray-500 border-b border-gray-100 bg-gray-50/60">{tPaq * PPQ}</td>
-                            {!isVendedor && <td className="py-2 px-3 text-right tabular-nums border-b border-gray-100 bg-gray-50/60">${fmt(tPaq * PPQ * prod.precio_panama)}</td>}
-                          </tr>
-                        );
-                      }),
-                    ];
-                  })}
-                  <tr className="border-t-2 border-gray-300">
-                    <td className="sticky left-0 z-10 bg-white py-3 pr-4 font-semibold">Total</td>
-                    {sortedClientes.map(c => { const t = clientTotal(c.id); return <td key={c.id} className="py-3 px-1 text-center tabular-nums text-[10px] font-medium text-gray-500">{t || ""}</td>; })}
-                    <td className="py-3 px-3 text-right tabular-nums font-bold border-l border-gray-200 bg-gray-50">{gPaq}</td>
-                    <td className="py-3 px-3 text-right tabular-nums text-gray-500 font-medium bg-gray-50">{gPaq * PPQ}</td>
-                    {!isVendedor && <td className="py-3 px-3 text-right tabular-nums font-bold bg-gray-50">${fmt(gVal)}</td>}
-                  </tr>
-                </tbody>
-              </table>
+                            }),
+                          ];
+                        })}
+                        <tr className="border-t-2 border-gray-300">
+                          <td className="sticky left-0 z-10 bg-white py-3 pr-4 font-semibold">Total</td>
+                          {sortedClientes.map(c => { const t = clientTotal(c.id); return <td key={c.id} className="py-3 px-1 text-center tabular-nums text-[10px] font-medium text-gray-500">{t || ""}</td>; })}
+                          <td className="py-3 px-3 text-right tabular-nums font-bold border-l border-gray-200 bg-gray-50">{gPaq}</td>
+                          <td className="py-3 px-3 text-right tabular-nums text-gray-500 font-medium bg-gray-50">{gPaq * PPQ}</td>
+                          {!isVendedor && <td className="py-3 px-3 text-right tabular-nums font-bold bg-gray-50">${fmt(gVal)}</td>}
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
 
           ) : tab === "cliente" ? (
             /* ═══ POR CLIENTE ═══ */
-            <div className="flex gap-8 flex-col sm:flex-row">
-              <div className="w-full sm:w-48 flex-shrink-0">
-                <div className="flex items-center justify-between mb-2">
-                  <input value={clientSearch} onChange={e => setClientSearch(e.target.value)} placeholder="Buscar..."
-                    className="border-b border-gray-200 py-1.5 text-xs outline-none focus:border-black transition w-full bg-transparent" />
-                  <button onClick={() => setShowNewClient(!showNewClient)} className="text-gray-400 hover:text-black transition text-sm ml-2 flex-shrink-0">+</button>
-                </div>
-                {showNewClient && (
-                  <div className="flex gap-1 mb-2">
-                    <input value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder="Nombre" onKeyDown={e => { if (e.key === "Enter") addClient(); }}
-                      className="flex-1 border-b border-gray-200 py-1 text-xs outline-none focus:border-black" autoFocus />
-                    <button onClick={addClient} className="text-xs text-gray-500 hover:text-black">OK</button>
+            <div>
+              {!selectedClient ? (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <input value={clientSearch} onChange={e => setClientSearch(e.target.value)}
+                      placeholder="Buscar cliente..."
+                      className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+                    <button onClick={() => setShowNewClient(!showNewClient)} className="text-gray-400 hover:text-black transition text-sm ml-3 flex-shrink-0">+ Nuevo</button>
                   </div>
-                )}
-                <div className="space-y-0">
-                  {sortedClientes.filter(c => !clientSearch || c.nombre.toLowerCase().includes(clientSearch.toLowerCase())).map(c => {
-                    const active = selectedClient === c.id;
-                    const isEntregado = c.estado === "Entregado";
-                    return (
-                      <div key={c.id} className={`py-2 text-xs border-b border-gray-50 transition ${active ? "border-l-2 border-l-red-600 pl-2" : "pl-0 hover:bg-gray-50"}`}>
-                        <button onClick={() => setSelectedClient(c.id)} className="w-full text-left flex items-center justify-between">
-                          <span className={active ? "text-black" : "text-gray-600"}>{c.nombre}</span>
-                          <span className="text-gray-400 tabular-nums">{clientTotal(c.id) || ""}</span>
-                        </button>
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <span className={`text-[9px] px-1.5 py-0 rounded-full ${isEntregado ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
-                            {isEntregado ? "Entregado" : "Pendiente"}
-                          </span>
-                          <button onClick={(e) => { e.stopPropagation(); toggleEstado(c.id); }}
-                            className={`text-[9px] px-1.5 py-0 rounded-full border transition ${isEntregado ? "border-gray-300 text-gray-500 hover:border-gray-400" : "border-green-300 text-green-700 hover:border-green-500"}`}>
-                            {isEntregado ? "↩ Pendiente" : "✓ Entregado"}
-                          </button>
+                  {showNewClient && (
+                    <div className="flex gap-1 mb-4">
+                      <input value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder="Nombre del cliente" onKeyDown={e => { if (e.key === "Enter") addClient(); }}
+                        className="flex-1 border-b border-gray-200 py-1 text-sm outline-none focus:border-black" autoFocus />
+                      <button onClick={addClient} className="text-sm text-gray-500 hover:text-black px-2">OK</button>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {filteredClients.map(c => {
+                      const tPaq = clientTotal(c.id);
+                      const tVal = clientValor(c.id);
+                      const isEntregado = c.estado === "Entregado";
+                      return (
+                        <div key={c.id} onClick={() => setSelectedClient(c.id)}
+                          className={`border rounded-xl p-4 cursor-pointer hover:border-gray-300 transition ${isEntregado ? "opacity-60 border-gray-100" : "border-gray-200"}`}>
+                          <div className="flex items-start justify-between mb-2">
+                            <h3 className="text-sm font-medium">{c.nombre}</h3>
+                            <StatusBadge estado={isEntregado ? "Entregado" : "Pendiente"} />
+                          </div>
+                          <div className="flex gap-4 text-xs text-gray-500">
+                            <span>{tPaq} paq</span>
+                            <span>{tPaq * PPQ} pzas</span>
+                            {!isVendedor && <span className="font-medium">${fmt(tVal)}</span>}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : (() => {
+                const cl = clientes.find(c => c.id === selectedClient);
+                if (!cl) return null;
+                const tPaq = pedidos.filter(p => p.cliente_id === selectedClient).reduce((s, p) => s + p.paquetes, 0);
+                const tVal = pedidos.filter(p => p.cliente_id === selectedClient).reduce((s, p) => { const pr = productos.find(x => x.id === p.producto_id); return s + p.paquetes * PPQ * (pr?.precio_panama || 0); }, 0);
+                const isEntregado = cl.estado === "Entregado";
 
-              <div className="flex-1 min-w-0">
-                {!selectedClient ? (
-                  <EmptyState title="Selecciona un cliente" subtitle="Elige un cliente de la lista para ver y editar su pedido" />
-                ) : (() => {
-                  const cl = clientes.find(c => c.id === selectedClient);
-                  if (!cl) return null;
-                  const tPaq = pedidos.filter(p => p.cliente_id === selectedClient).reduce((s, p) => s + p.paquetes, 0);
-                  const tVal = pedidos.filter(p => p.cliente_id === selectedClient).reduce((s, p) => { const pr = productos.find(x => x.id === p.producto_id); return s + p.paquetes * PPQ * (pr?.precio_panama || 0); }, 0);
+                return (
+                  <div>
+                    {/* Back button */}
+                    <button onClick={() => setSelectedClient(null)} className="text-sm text-gray-400 hover:text-black transition mb-4">
+                      ← Clientes
+                    </button>
 
-                  return (
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h2 className="text-2xl font-light">{cl.nombre}</h2>
-                          <p className="text-sm text-gray-500 mt-1">{tPaq} paq · {tPaq * PPQ} pzas{!isVendedor && <> · ${fmt(tVal)}</>}</p>
-                        </div>
-                        <button onClick={() => setConfirmDeleteId(cl.id)} className="text-xs text-gray-400 hover:text-red-500 transition">Eliminar cliente</button>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h2 className="text-2xl font-light">{cl.nombre}</h2>
+                        <p className="text-sm text-gray-500 mt-1">{tPaq} paq · {tPaq * PPQ} pzas{!isVendedor && <> · ${fmt(tVal)}</>}</p>
                       </div>
+                    </div>
 
-                      <div className="mt-6">
-                        {GENERO_ORDER.map(gen => {
-                          const genProds = sortedProductos.filter(p => p.genero === gen);
-                          if (genProds.length === 0) return null;
-                          return (
-                            <div key={gen} className="mb-4">
-                              <div className="text-[10px] uppercase tracking-widest text-gray-400 py-2">{gen}</div>
-                              {genProds.map(prod => {
-                                const paq = getPaq(selectedClient, prod.id);
-                                const tallas = TALLAS[prod.genero] || {};
-                                const tallaStr = paq > 0 ? Object.entries(tallas).filter(([, v]) => v > 0).map(([k, v]) => `${k}:${v * paq}`).join(" ") : "";
-                                return (
-                                  <div key={prod.id} className={`flex items-center py-2 border-b border-gray-100 gap-3 ${paq === 0 ? "opacity-40" : ""}`}>
-                                    <Dot color={prod.color} />
-                                    <span className="text-sm flex-1">{prod.nombre}</span>
-                                    <input type="number" min={0} step={1} defaultValue={paq} key={`${selectedClient}-${prod.id}-${paq}`}
-                                      onBlur={e => {
-                                        const v = parseInt(e.target.value) || 0;
-                                        if (v !== paq) savePedido(selectedClient, prod.id, v);
-                                      }}
-                                      onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-                                      className="w-12 text-center border-b border-gray-200 text-xs py-0.5 outline-none focus:border-black tabular-nums" />
-                                    <span className="text-xs text-gray-400 tabular-nums w-10">{paq > 0 ? `${paq * PPQ}pz` : "— pz"}</span>
-                                    <span className="text-[10px] text-gray-400 font-mono w-32 hidden sm:block">{tallaStr || "—"}</span>
-                                    {!isVendedor && <span className="text-xs tabular-nums w-16 text-right">{paq > 0 ? `$${fmt(paq * PPQ * prod.precio_panama)}` : "—"}</span>}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          );
-                        })}
-                      </div>
-
+                    {/* Action buttons */}
+                    <div className="flex flex-wrap gap-2 mt-4">
                       {tPaq > 0 && (
-                        <button onClick={() => downloadClientPDF(selectedClient)} className="mt-4 border border-gray-200 px-4 py-2 rounded-full text-sm hover:border-gray-400 transition">
-                          Descargar PDF
+                        <button onClick={() => downloadClientPDF(selectedClient)} className="border border-gray-200 px-4 py-2 rounded-full text-sm hover:border-gray-400 transition">
+                          Imprimir Pedido
                         </button>
                       )}
+                      <button onClick={() => toggleEstado(cl.id)}
+                        className={`px-4 py-2 rounded-full text-sm transition ${isEntregado ? "border border-gray-200 text-gray-600 hover:border-gray-400" : "bg-green-600 text-white hover:bg-green-700"}`}>
+                        {isEntregado ? "Marcar como Pendiente" : "Marcar como Entregado"}
+                      </button>
+                      <button onClick={() => setConfirmDeleteId(cl.id)} className="border border-red-200 text-red-600 px-4 py-2 rounded-full text-sm hover:border-red-400 transition">
+                        Cancelar Pedido
+                      </button>
                     </div>
-                  );
-                })()}
-              </div>
+
+                    <div className="mt-6">
+                      {GENERO_ORDER.map(gen => {
+                        const genProds = sortedProductos.filter(p => p.genero === gen);
+                        if (genProds.length === 0) return null;
+                        return (
+                          <div key={gen} className="mb-4">
+                            <div className="text-[10px] uppercase tracking-widest text-gray-400 py-2">{gen}</div>
+                            {genProds.map(prod => {
+                              const paq = getPaq(selectedClient, prod.id);
+                              const tallas = TALLAS[prod.genero] || {};
+                              const tallaStr = paq > 0 ? Object.entries(tallas).filter(([, v]) => v > 0).map(([k, v]) => `${k}:${v * paq}`).join(" ") : "";
+                              return (
+                                <div key={prod.id} className={`flex items-center py-2 border-b border-gray-100 gap-3 ${paq === 0 ? "opacity-40" : ""}`}>
+                                  <Dot color={prod.color} />
+                                  <span className="text-sm flex-1">{prod.nombre}</span>
+                                  <input type="number" min={0} step={1} defaultValue={paq} key={`${selectedClient}-${prod.id}-${paq}`}
+                                    onBlur={e => {
+                                      const v = parseInt(e.target.value) || 0;
+                                      if (v !== paq) savePedido(selectedClient, prod.id, v);
+                                    }}
+                                    onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                                    className="w-12 text-center border-b border-gray-200 text-xs py-0.5 outline-none focus:border-black tabular-nums" />
+                                  <span className="text-xs text-gray-400 tabular-nums w-10">{paq > 0 ? `${paq * PPQ}pz` : "— pz"}</span>
+                                  <span className="text-[10px] text-gray-400 font-mono w-32 hidden sm:block">{tallaStr || "—"}</span>
+                                  {!isVendedor && <span className="text-xs tabular-nums w-16 text-right">{paq > 0 ? `$${fmt(paq * PPQ * prod.precio_panama)}` : "—"}</span>}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
           ) : (
