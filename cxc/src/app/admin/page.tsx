@@ -140,31 +140,6 @@ export default function AdminDashboard() {
 
   const roleCompanies = useMemo(() => getCompaniesForRole(userRole), [userRole]);
 
-  useEffect(() => {
-    if (!authChecked) return;
-    loadData();
-    const q = new URLSearchParams(window.location.search).get("search");
-    if (q) setSearch(q);
-  }, [authChecked, loadData]);
-
-  if (!authChecked) return null;
-
-  // ── Sorting ──────────────────────────────────────────
-
-  function toggleSort(key: SortKey) {
-    if (sortKey === key) {
-      setSortDir(sortDir === "desc" ? "asc" : "desc");
-    } else {
-      setSortKey(key);
-      setSortDir(key === "name" ? "asc" : "desc");
-    }
-  }
-
-  const sortArrow = (key: SortKey) => {
-    if (sortKey !== key) return " ↕";
-    return sortDir === "desc" ? " ↓" : " ↑";
-  };
-
   // ── Filtering + sorting ──────────────────────────────
 
   const filtered = useMemo(() => {
@@ -262,6 +237,31 @@ export default function AdminDashboard() {
       })
       .filter((c): c is ConsolidatedClient => c !== null && c.total > 0);
   }, [clients, roleCompanies]);
+
+  useEffect(() => {
+    if (!authChecked) return;
+    loadData();
+    const q = new URLSearchParams(window.location.search).get("search");
+    if (q) setSearch(q);
+  }, [authChecked, loadData]);
+
+  if (!authChecked) return null;
+
+  // ── Sorting ──────────────────────────────────────────
+
+  function toggleSort(key: SortKey) {
+    if (sortKey === key) {
+      setSortDir(sortDir === "desc" ? "asc" : "desc");
+    } else {
+      setSortKey(key);
+      setSortDir(key === "name" ? "asc" : "desc");
+    }
+  }
+
+  const sortArrow = (key: SortKey) => {
+    if (sortKey !== key) return " ↕";
+    return sortDir === "desc" ? " ↓" : " ↑";
+  };
 
   // ── Actions ──────────────────────────────────────────
 
