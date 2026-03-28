@@ -57,7 +57,7 @@ export default function CamisetasPage() {
     try {
       const res = await fetch("/api/camisetas");
       if (res.ok) { const d = await res.json(); setProductos(d.productos || []); setClientes(d.clientes || []); setPedidos(d.pedidos || []); }
-    } catch { /* */ }
+    } catch { setToast("Error de conexión"); setTimeout(() => setToast(null), 3000); }
     setLoading(false);
   }, []);
 

@@ -23,6 +23,8 @@ export function useCajaState(urlId: string, initialView: View) {
   const [categorias, setCategorias] = useState(CATEGORIAS_DEFAULT);
   const [showManageCat, setShowManageCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
+  const [showNewPeriodoModal, setShowNewPeriodoModal] = useState(false);
+  const [fondoInput, setFondoInput] = useState("200");
   const [responsables, setResponsables] = useState<string[]>([]);
   const [showAddResponsable, setShowAddResponsable] = useState(false);
   const [newResponsable, setNewResponsable] = useState("");
@@ -124,11 +126,15 @@ export function useCajaState(urlId: string, initialView: View) {
     }
   }, [urlId]);
 
-  async function createPeriodo() {
-    const input = window.prompt("Fondo inicial del período ($):", "200");
-    if (!input) return;
-    const fondo = parseFloat(input);
+  function createPeriodo() {
+    setFondoInput("200");
+    setShowNewPeriodoModal(true);
+  }
+
+  async function confirmCreatePeriodo() {
+    const fondo = parseFloat(fondoInput);
     if (isNaN(fondo) || fondo <= 0) return;
+    setShowNewPeriodoModal(false);
     setError(null);
     try {
       const res = await fetch("/api/caja/periodos", {
@@ -246,11 +252,12 @@ export function useCajaState(urlId: string, initialView: View) {
     view, setView, _setView,
     periodos, loading, current, setCurrent, error,
     categorias, setCategorias, showManageCat, setShowManageCat, newCatName, setNewCatName,
+    showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,
     responsables, setResponsables, showAddResponsable, setShowAddResponsable, newResponsable, setNewResponsable,
     addingGasto, subtotalNum, totalNum,
     editingGastoId, setEditingGastoId, editGasto, setEditGasto,
     formValues, formSetters,
-    loadDetail, createPeriodo, closePeriodo, deletePeriodo, aprobarReposicion,
+    loadDetail, createPeriodo, confirmCreatePeriodo, closePeriodo, deletePeriodo, aprobarReposicion,
     addGasto, deleteGasto, saveEditGasto, exportExcel,
   };
 }

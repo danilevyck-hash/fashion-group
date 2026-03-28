@@ -108,7 +108,7 @@ export default function PrestamosPage() {
     try {
       const res = await fetch(`/api/prestamos/empleados?archivados=${showArchived ? "1" : "0"}`);
       if (res.ok) setEmpleados(await res.json());
-    } catch { /* */ }
+    } catch { showToast("Error de conexión"); }
     setLoading(false);
   }, [showArchived]);
 

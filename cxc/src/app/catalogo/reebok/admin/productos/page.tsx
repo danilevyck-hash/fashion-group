@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import XLSX from 'xlsx-js-style'
 import { Product } from '@/components/reebok/supabase'
 import AdminNav from '@/components/reebok/AdminNav'
 
@@ -46,23 +47,6 @@ export default function AdminProductos() {
   const downloadTemplate = async () => {
     setUploading(true)
     try {
-      const ExcelJS = await import('exceljs')
-      const wb = new ExcelJS.Workbook()
-      const ws = wb.addWorksheet('Productos')
-      ws.columns = [
-        { header: 'CODIGO', key: 'sku', width: 15 },
-        { header: 'NOMBRE', key: 'name', width: 35 },
-        { header: 'PRECIO', key: 'price', width: 12 },
-        { header: 'GENERO', key: 'gender', width: 12 },
-        { header: 'CATEGORIA', key: 'category', width: 15 },
-        { header: 'EXISTENCIA', key: 'quantity', width: 12 },
-        { header: 'OFERTA', key: 'on_sale', width: 10 },
-        { header: 'ACTIVO', key: 'active', width: 10 },
-      ]
-      // Style header
-      ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } }
-      ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCC0000' } }
-
       // Fetch inventory
       const invRes = await fetch('/api/catalogo/reebok/inventory')
       const invData = await invRes.json()
@@ -73,24 +57,28 @@ export default function AdminProductos() {
         })
       }
 
-      // Fill with current products
-      products.forEach(p => {
+      const headerStyle = {
+        font: { bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: 'CC0000' }, patternType: 'solid' as const },
+      }
+      const headers = ['CODIGO', 'NOMBRE', 'PRECIO', 'GENERO', 'CATEGORIA', 'EXISTENCIA', 'OFERTA', 'ACTIVO']
+      const headerRow = headers.map(h => ({ v: h, s: headerStyle }))
+
+      const dataRows = products.map(p => {
         const gLabel = p.gender === 'male' ? 'Hombre' : p.gender === 'female' ? 'Mujer' : p.gender === 'kids' ? 'Ninos' : 'Unisex'
         const cLabel = p.category === 'footwear' ? 'Calzado' : p.category === 'apparel' ? 'Ropa' : 'Accesorios'
-        ws.addRow({
-          sku: p.sku,
-          name: p.name,
-          price: p.price || 0,
-          gender: gLabel,
-          category: cLabel,
-          quantity: invMap[p.id] || 0,
-          on_sale: p.on_sale ? 'Si' : 'No',
-          active: p.active ? 'Si' : 'No',
-        })
+        return [p.sku, p.name, p.price || 0, gLabel, cLabel, invMap[p.id] || 0, p.on_sale ? 'Si' : 'No', p.active ? 'Si' : 'No']
       })
 
-      const buf = await wb.xlsx.writeBuffer()
-      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const ws = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows])
+      ws['!cols'] = [
+        { wch: 15 }, { wch: 35 }, { wch: 12 }, { wch: 12 },
+        { wch: 15 }, { wch: 12 }, { wch: 10 }, { wch: 10 },
+      ]
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Productos')
+
+      const blob = new Blob([XLSX.write(wb, { type: 'array', bookType: 'xlsx' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url; a.download = 'plantilla-productos-reebok.xlsx'; a.click()
@@ -106,33 +94,32 @@ export default function AdminProductos() {
     setUploadResult(null)
 
     try {
-      const ExcelJS = await import('exceljs')
-      const wb = new ExcelJS.Workbook()
       const buffer = await file.arrayBuffer()
-      await wb.xlsx.load(buffer)
-      const ws = wb.worksheets[0]
+      const wb = XLSX.read(new Uint8Array(buffer), { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][]
 
       const items: { sku: string; name: string; price?: number; gender?: string; category?: string; quantity?: number; on_sale?: boolean; active?: boolean }[] = []
-      for (let r = 2; r <= ws.rowCount; r++) {
-        const row = ws.getRow(r)
-        const sku = row.getCell(1).value?.toString()?.trim()
-        const name = row.getCell(2).value?.toString()?.trim()
+      for (let r = 1; r < rows.length; r++) {
+        const row = rows[r]
+        const sku = row[0]?.toString()?.trim()
+        const name = row[1]?.toString()?.trim()
         if (!sku) continue
 
-        const gRaw = row.getCell(4).value?.toString()?.trim()?.toLowerCase() || ''
+        const gRaw = row[3]?.toString()?.trim()?.toLowerCase() || ''
         const gender = gRaw.includes('hombre') || gRaw === 'male' ? 'male' : gRaw.includes('mujer') || gRaw === 'female' ? 'female' : gRaw.includes('nino') || gRaw === 'kids' ? 'kids' : 'unisex'
-        const cRaw = row.getCell(5).value?.toString()?.trim()?.toLowerCase() || ''
+        const cRaw = row[4]?.toString()?.trim()?.toLowerCase() || ''
         const category = cRaw.includes('calzado') || cRaw === 'footwear' ? 'footwear' : cRaw.includes('ropa') || cRaw === 'apparel' ? 'apparel' : 'accessories'
-        const onSaleRaw = row.getCell(7).value?.toString()?.trim()?.toLowerCase() || ''
-        const activeRaw = row.getCell(8).value?.toString()?.trim()?.toLowerCase() || ''
+        const onSaleRaw = row[6]?.toString()?.trim()?.toLowerCase() || ''
+        const activeRaw = row[7]?.toString()?.trim()?.toLowerCase() || ''
 
         items.push({
           sku,
           name: name || '',
-          price: parseFloat(row.getCell(3).value?.toString() || '0') || undefined,
+          price: parseFloat(row[2]?.toString() || '0') || undefined,
           gender,
           category,
-          quantity: parseInt(row.getCell(6).value?.toString() || '0') || 0,
+          quantity: parseInt(row[5]?.toString() || '0') || 0,
           on_sale: onSaleRaw === 'si' || onSaleRaw === 'yes' || onSaleRaw === 'true',
           active: activeRaw !== 'no' && activeRaw !== 'false',
         })

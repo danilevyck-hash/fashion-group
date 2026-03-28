@@ -69,7 +69,7 @@ function ReclamosPage() {
     try {
       const res = await fetch(`/api/reclamos/${id}`);
       if (res.ok) { const d = await res.json(); if (d?.id) { setCurrent(d); setView("detail", d.id); } }
-    } catch { /* */ }
+    } catch { setToast("Error de conexión"); setTimeout(() => setToast(null), 3000); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -92,12 +92,12 @@ function ReclamosPage() {
       const res = await fetch("/api/reclamos");
       if (res.status === 401) { sessionStorage.clear(); router.push("/"); return; }
       if (res.ok) { const d = await res.json(); setReclamos(Array.isArray(d) ? d : []); }
-    } catch { /* */ }
+    } catch { setToast("Error de conexión"); setTimeout(() => setToast(null), 3000); }
     setLoading(false);
   }, [router]);
 
   const loadContactos = useCallback(async () => {
-    try { const res = await fetch("/api/reclamos/contactos"); if (res.ok) setContactos(await res.json()); } catch { /* */ }
+    try { const res = await fetch("/api/reclamos/contactos"); if (res.ok) setContactos(await res.json()); } catch { setToast("Error de conexión"); setTimeout(() => setToast(null), 3000); }
   }, []);
 
   useEffect(() => {
@@ -169,7 +169,7 @@ function ReclamosPage() {
       await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: editEmpresa, proveedor: EMPRESAS_MAP[editEmpresa]?.proveedor || current.proveedor, marca: EMPRESAS_MAP[editEmpresa]?.marca || current.marca, nro_factura: editFactura, nro_orden_compra: editPedido, fecha_reclamo: editFecha, notas: editNotas, estado: editEstado }) });
       await fetch(`/api/reclamos/${current.id}/items`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: editItems }) });
       setEditMode(false); await loadDetail(current.id); loadReclamos();
-    } catch { /* */ }
+    } catch { setToast("Error de conexión"); setTimeout(() => setToast(null), 3000); }
     setEditSaving(false);
   }
 

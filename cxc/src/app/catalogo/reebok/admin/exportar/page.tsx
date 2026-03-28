@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import XLSX from 'xlsx-js-style'
 import { Product, InventoryItem } from '@/components/reebok/supabase'
 import AdminNav from '@/components/reebok/AdminNav'
 
@@ -107,57 +108,33 @@ export default function Exportar() {
   const exportExcel = async () => {
     setExporting('excel')
     try {
-      const ExcelJS = await import('exceljs')
-      const wb = new ExcelJS.Workbook()
-      const ws = wb.addWorksheet('Catalogo')
-
-      ws.columns = [
-        { header: 'Foto', key: 'image', width: 15 },
-        { header: 'SKU', key: 'sku', width: 15 },
-        { header: 'Nombre', key: 'name', width: 30 },
-        { header: 'Color', key: 'color', width: 20 },
-        { header: 'Precio', key: 'price', width: 12 },
-        { header: 'Categoria', key: 'category', width: 15 },
-        { header: 'Genero', key: 'gender', width: 12 },
-        { header: 'Tallas', key: 'sizes', width: 30 },
-      ]
-
-      // Style header
-      ws.getRow(1).font = { bold: true }
-      ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCC0000' } }
-      ws.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } }
-
-      for (let i = 0; i < Math.min(filtered.length, 100); i++) {
-        const p = filtered[i]
-        const row = ws.addRow({
-          image: '',
-          sku: p.sku || '-',
-          name: p.name,
-          color: p.color || '-',
-          price: p.price ? `$${p.price}` : '-',
-          category: p.category,
-          gender: p.gender || '-',
-          sizes: getSizes(p.id) || '-',
-        })
-        row.height = 60
-
-        if (p.image_url) {
-          try {
-            const res = await fetch(p.image_url)
-            const blob = await res.blob()
-            const buffer = await blob.arrayBuffer()
-            const ext = p.image_url.toLowerCase().includes('.png') ? 'png' : 'jpeg'
-            const imageId = wb.addImage({ buffer, extension: ext })
-            ws.addImage(imageId, {
-              tl: { col: 0, row: i + 1 },
-              ext: { width: 80, height: 55 },
-            })
-          } catch { /* skip image */ }
-        }
+      const headerStyle = {
+        font: { bold: true, color: { rgb: 'FFFFFF' } },
+        fill: { fgColor: { rgb: 'CC0000' }, patternType: 'solid' as const },
       }
+      const headers = ['Foto', 'SKU', 'Nombre', 'Color', 'Precio', 'Categoria', 'Genero', 'Tallas']
+      const headerRow = headers.map(h => ({ v: h, s: headerStyle }))
 
-      const buf = await wb.xlsx.writeBuffer()
-      const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const dataRows = filtered.slice(0, 100).map(p => [
+        '',
+        p.sku || '-',
+        p.name,
+        p.color || '-',
+        p.price ? `$${p.price}` : '-',
+        p.category,
+        p.gender || '-',
+        getSizes(p.id) || '-',
+      ])
+
+      const ws = XLSX.utils.aoa_to_sheet([headerRow, ...dataRows])
+      ws['!cols'] = [
+        { wch: 15 }, { wch: 15 }, { wch: 30 }, { wch: 20 },
+        { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 30 },
+      ]
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, 'Catalogo')
+
+      const blob = new Blob([XLSX.write(wb, { type: 'array', bookType: 'xlsx' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url

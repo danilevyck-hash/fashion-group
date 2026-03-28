@@ -92,7 +92,7 @@ export default function VentasPage() {
       if (ventasRes.ok) { const d = await ventasRes.json(); setVentas(Array.isArray(d) ? d : []); }
       if (ventasAntRes.ok) { const d = await ventasAntRes.json(); setVentasAnt(Array.isArray(d) ? d : []); }
       if (metasRes.ok) { const d = await metasRes.json(); setMetas(Array.isArray(d) ? d : []); }
-    } catch { /* */ }
+    } catch { setToast("Error de conexión"); setTimeout(() => setToast(null), 3000); }
     setLoading(false);
   }, []);
 
@@ -197,7 +197,7 @@ export default function VentasPage() {
         body: JSON.stringify({ empresa: fEmpresa, año: fAño, mes: fMes, ventas_brutas: parseFloat(fVentas) || 0, notas_credito: parseFloat(fNC) || 0, notas_debito: parseFloat(fND) || 0, costo_total: parseFloat(fCosto) || 0 }),
       });
       if (res.ok) { showToast("Guardado"); loadData(selectedYear); setFVentas(""); setFCosto(""); }
-    } catch { /* */ }
+    } catch { showToast("Error de conexión"); }
     setSaving(false);
   }
 
@@ -216,7 +216,7 @@ export default function VentasPage() {
         setCsvParsed(null);
         loadData(selectedYear);
       }
-    } catch { /* */ }
+    } catch { showToast("Error de conexión"); }
     setCsvUploading(false);
   }
 
@@ -226,7 +226,7 @@ export default function VentasPage() {
     try {
       const res = await fetch("/api/ventas/metas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (res.ok) { showToast("Metas guardadas"); loadData(selectedYear); }
-    } catch { /* */ }
+    } catch { showToast("Error de conexión"); }
     setSavingMetas(false);
   }
 

@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { Modal } from "@/components/ui";
 
 import { View } from "./components/types";
 import { useCajaState } from "./hooks/useCajaState";
@@ -36,11 +37,12 @@ function CajaPage() {
     view, setView,
     periodos, loading, current, setCurrent, error,
     categorias, setCategorias, showManageCat, setShowManageCat, newCatName, setNewCatName,
+    showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,
     responsables, setResponsables, showAddResponsable, setShowAddResponsable, newResponsable, setNewResponsable,
     addingGasto, subtotalNum, totalNum,
     editingGastoId, setEditingGastoId, editGasto, setEditGasto,
     formValues, formSetters,
-    loadDetail, createPeriodo, closePeriodo, deletePeriodo, aprobarReposicion,
+    loadDetail, createPeriodo, confirmCreatePeriodo, closePeriodo, deletePeriodo, aprobarReposicion,
     addGasto, deleteGasto, saveEditGasto, exportExcel,
   } = useCajaState(urlId, initialView);
 
@@ -65,6 +67,41 @@ function CajaPage() {
           onClosePeriodo={closePeriodo}
           onDeletePeriodo={deletePeriodo}
         />
+        <Modal
+          open={showNewPeriodoModal}
+          onClose={() => setShowNewPeriodoModal(false)}
+          title="Nuevo período de caja"
+        >
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-gray-400 uppercase">Fondo inicial ($)</label>
+              <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={fondoInput}
+                onChange={(e) => setFondoInput(e.target.value)}
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition"
+                placeholder="200"
+              />
+            </div>
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setShowNewPeriodoModal(false)}
+                className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmCreatePeriodo}
+                disabled={!fondoInput || parseFloat(fondoInput) <= 0}
+                className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50"
+              >
+                Crear período
+              </button>
+            </div>
+          </div>
+        </Modal>
       </div>
     );
   }
