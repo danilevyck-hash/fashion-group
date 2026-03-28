@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireAuth } from "@/lib/require-auth";
 
 // All system roles
 const SYSTEM_ROLES = [
@@ -29,6 +30,9 @@ const DEFAULT_MODULES: Record<string, string[]> = {
 };
 
 export async function GET(req: NextRequest) {
+  const authError = requireAuth(req, ["admin"]);
+  if (authError) return authError;
+
   const queryRole = req.nextUrl.searchParams.get("role");
 
   // Get stored permissions
@@ -50,7 +54,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(roles);
   }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Error al cargar" }, { status: 500 });
 
   // Merge stored perms with system roles
   const permMap = new Map((perms || []).map((p: { role: string; modulos: string[]; activo: boolean }) => [p.role, p]));
@@ -75,6 +79,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authError = requireAuth(req, ["admin"]);
+  if (authError) return authError;
+
   const body = await req.json();
   const { role, modulos, activo } = body;
 
@@ -89,6 +96,6 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Error al guardar" }, { status: 500 });
   return NextResponse.json(data);
 }

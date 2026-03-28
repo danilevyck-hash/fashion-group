@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 
+const COOKIE_NAME = "cxc_session";
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+
+function setSessionCookie(res: NextResponse, payload: Record<string, unknown>) {
+  const value = Buffer.from(JSON.stringify(payload)).toString("base64");
+  res.cookies.set(COOKIE_NAME, value, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: COOKIE_MAX_AGE,
+  });
+}
+
 export async function POST(req: NextRequest) {
   const { password } = await req.json();
 
@@ -23,13 +37,17 @@ export async function POST(req: NextRequest) {
 
       const modules = (mods || []).map((m: { module_key: string }) => m.module_key);
 
-      return NextResponse.json({
+      const payload = {
         authenticated: true,
         role: user.role,
         userId: user.id,
         userName: user.name,
         modules,
-      });
+      };
+
+      const res = NextResponse.json(payload);
+      setSessionCookie(res, { role: user.role, userId: user.id, userName: user.name, modules });
+      return res;
     }
   } catch {
     // fg_users table may not exist yet — continue to legacy
@@ -75,5 +93,14 @@ export async function POST(req: NextRequest) {
     }
   } catch { /* */ }
 
-  return NextResponse.json({ role });
+  const res = NextResponse.json({ role });
+  setSessionCookie(res, { role });
+  return res;
+}
+
+// DELETE — logout (clear cookie)
+export async function DELETE() {
+  const res = NextResponse.json({ ok: true });
+  res.cookies.delete(COOKIE_NAME);
+  return res;
 }

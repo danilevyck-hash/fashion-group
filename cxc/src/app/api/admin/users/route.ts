@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireAuth } from "@/lib/require-auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const authError = requireAuth(req, ["admin"]);
+  if (authError) return authError;
+
   const { data: users, error } = await supabaseServer
     .from("fg_users")
     .select("*")
     .order("created_at", { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Error al cargar" }, { status: 500 });
 
-  // Get modules for each user
   const { data: allMods } = await supabaseServer
     .from("fg_user_modules")
     .select("user_id, module_key, enabled");
@@ -27,6 +30,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const authError = requireAuth(req, ["admin"]);
+  if (authError) return authError;
+
   const { name, password, role, associated_company, modules } = await req.json();
   if (!name || !password) return NextResponse.json({ error: "name and password required" }, { status: 400 });
 
@@ -36,9 +42,8 @@ export async function POST(req: NextRequest) {
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Error al crear usuario" }, { status: 500 });
 
-  // Insert modules
   if (modules && Array.isArray(modules) && modules.length > 0) {
     await supabaseServer.from("fg_user_modules").insert(
       modules.map((m: string) => ({ user_id: user.id, module_key: m, enabled: true }))
@@ -49,6 +54,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+  const authError = requireAuth(req, ["admin"]);
+  if (authError) return authError;
+
   const { id, name, password, role, associated_company, modules } = await req.json();
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
@@ -59,9 +67,8 @@ export async function PUT(req: NextRequest) {
   if (associated_company !== undefined) update.associated_company = associated_company;
 
   const { error } = await supabaseServer.from("fg_users").update(update).eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Error al actualizar" }, { status: 500 });
 
-  // Update modules if provided
   if (modules && Array.isArray(modules)) {
     await supabaseServer.from("fg_user_modules").delete().eq("user_id", id);
     if (modules.length > 0) {
@@ -75,6 +82,9 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const authError = requireAuth(req, ["admin"]);
+  if (authError) return authError;
+
   const { id, active } = await req.json();
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
@@ -83,6 +93,6 @@ export async function PATCH(req: NextRequest) {
     .update({ active, updated_at: new Date().toISOString() })
     .eq("id", id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Error al actualizar" }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
