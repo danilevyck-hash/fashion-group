@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast, SkeletonTable, EmptyState, ConfirmModal, StatusBadge } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState, ConfirmModal, StatusBadge, Modal } from "@/components/ui";
 
 interface Producto { id: string; nombre: string; genero: string; color: string; precio_panama: number; rrp: number; stock_comprado: number; }
 interface Cliente { id: string; nombre: string; estado?: string; }
@@ -42,6 +42,8 @@ export default function CamisetasPage() {
   const [clientSearch, setClientSearch] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [showMatrix, setShowMatrix] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
+  const [infoTab, setInfoTab] = useState<"precios" | "tallas">("precios");
 
   // Nuevo Pedido modal
   const [showNuevo, setShowNuevo] = useState(false);
@@ -244,9 +246,14 @@ export default function CamisetasPage() {
             <h1 className="text-xl font-light tracking-tight">Camisetas Selección</h1>
             <p className="text-sm text-gray-400 mt-1">Pre-órdenes Selección Panamá</p>
           </div>
-          <button onClick={openNuevo} className="bg-black text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition flex-shrink-0 min-h-[44px]">
-            + Nuevo Pedido
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={() => { setShowInfo(true); setInfoTab("precios"); }} className="border border-gray-200 text-gray-500 px-4 py-2.5 rounded-full text-sm hover:border-gray-400 hover:text-black transition flex-shrink-0 min-h-[44px]">
+              Info Producto
+            </button>
+            <button onClick={openNuevo} className="bg-black text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition flex-shrink-0 min-h-[44px]">
+              + Nuevo Pedido
+            </button>
+          </div>
         </div>
 
         {/* Stats cards */}
@@ -644,6 +651,58 @@ export default function CamisetasPage() {
           </div>
         </div>
       )}
+
+      {/* Info Producto Modal */}
+      <Modal open={showInfo} onClose={() => setShowInfo(false)} title="Info del Producto" maxWidth="max-w-lg">
+        <div className="flex gap-4 border-b border-gray-200 mb-4">
+          <button onClick={() => setInfoTab("precios")} className={`pb-2 text-sm transition ${infoTab === "precios" ? "text-black font-medium border-b-2 border-black" : "text-gray-400"}`}>Precios</button>
+          <button onClick={() => setInfoTab("tallas")} className={`pb-2 text-sm transition ${infoTab === "tallas" ? "text-black font-medium border-b-2 border-black" : "text-gray-400"}`}>Curvas de Tallas</button>
+        </div>
+        {infoTab === "precios" ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-400">
+                <th className="text-left pb-2 font-medium">Item</th>
+                <th className="text-left pb-2 font-medium">Género</th>
+                <th className="text-right pb-2 font-medium">Precio Panamá</th>
+                <th className="text-right pb-2 font-medium">RRP</th>
+              </tr></thead>
+              <tbody>
+                {GENERO_ORDER.flatMap(gen =>
+                  sortedProductos.filter(p => p.genero === gen).map(p => (
+                    <tr key={p.id} className="border-b border-gray-100">
+                      <td className="py-2 flex items-center gap-2"><Dot color={p.color} />{p.nombre}</td>
+                      <td className="py-2"><span className={`text-[10px] px-1.5 py-0.5 rounded-full ${GENERO_BADGE[p.genero]}`}>{p.genero}</span></td>
+                      <td className="py-2 text-right tabular-nums">${fmt(p.precio_panama)}</td>
+                      <td className="py-2 text-right tabular-nums">${fmt(p.rrp)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {GENERO_ORDER.map(gen => (
+              <div key={gen}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${GENERO_BADGE[gen]}`}>{gen}</span>
+                  <span className="text-xs text-gray-400">{PPQ} piezas por paquete</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(TALLAS[gen]).map(([talla, qty]) => (
+                    <div key={talla} className={`border rounded-lg px-3 py-2 text-center min-w-[48px] ${qty > 0 ? "border-gray-200" : "border-gray-100 opacity-40"}`}>
+                      <div className="text-xs font-medium">{talla}</div>
+                      <div className="text-lg font-semibold tabular-nums">{qty}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <button onClick={() => setShowInfo(false)} className="mt-4 w-full py-2.5 border border-gray-200 rounded-full text-sm hover:bg-gray-50 transition">Cerrar</button>
+      </Modal>
 
       <Toast message={toast} />
       <ConfirmModal
