@@ -60,7 +60,8 @@ export default function PeriodoList({
           onAction={onCreatePeriodo}
         />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <div className="min-w-[600px] px-4 sm:px-0">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
@@ -148,6 +149,7 @@ export default function PeriodoList({
               })}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>

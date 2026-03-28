@@ -162,7 +162,8 @@ export default function ReportePage() {
         ) : filtered.length === 0 ? (
           <EmptyState title="Sin saldos pendientes" subtitle="No hay empleados con préstamos activos" />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-4 sm:mx-0">
+            <div className="min-w-[600px] px-4 sm:px-0">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100">
@@ -187,6 +188,7 @@ export default function ReportePage() {
                 </tr>
               </tfoot>
             </table>
+            </div>
           </div>
         )}
 

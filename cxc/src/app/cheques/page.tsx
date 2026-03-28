@@ -425,7 +425,8 @@ export default function ChequesPage() {
           onAction={() => setShowForm(true)}
         />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <div className="min-w-[700px] px-4 sm:px-0">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
@@ -478,6 +479,7 @@ export default function ChequesPage() {
             })}
           </tbody>
         </table>
+          </div>
         </div>
       )}
       <Toast message={error} type="error" />

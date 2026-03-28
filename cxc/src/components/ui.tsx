@@ -55,7 +55,7 @@ export function EmptyState({
       <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
       {subtitle && <p className="text-xs text-gray-400 mb-4 max-w-xs">{subtitle}</p>}
       {actionLabel && onAction && (
-        <button onClick={onAction} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
+        <button onClick={onAction} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition min-h-[44px]">
           {actionLabel}
         </button>
       )}
@@ -152,7 +152,7 @@ export function ConfirmModal({
           <button
             onClick={onConfirm}
             disabled={loading}
-            className={`flex-1 px-4 py-2.5 rounded-full text-sm font-medium transition disabled:opacity-50 ${
+            className={`flex-1 px-4 py-2.5 rounded-full text-sm font-medium transition disabled:opacity-50 min-h-[44px] ${
               destructive
                 ? "bg-red-600 text-white hover:bg-red-700"
                 : "bg-black text-white hover:bg-gray-800"
@@ -160,7 +160,7 @@ export function ConfirmModal({
           >
             {loading ? "Procesando..." : confirmLabel}
           </button>
-          <button onClick={onClose} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-full text-sm hover:bg-gray-50 transition disabled:opacity-50">
+          <button onClick={onClose} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-full text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
             {cancelLabel}
           </button>
         </div>

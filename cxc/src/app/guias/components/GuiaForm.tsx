@@ -190,6 +190,8 @@ export default function GuiaForm({
           </p>
         )}
 
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="min-w-[800px] px-4 sm:px-0">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
@@ -309,6 +311,8 @@ export default function GuiaForm({
             ))}
           </tbody>
         </table>
+        </div>
+        </div>
         <button
           onClick={onAddRow}
           className="text-sm text-gray-400 hover:text-black transition mt-3"

@@ -21,7 +21,8 @@ export default function MovimientoTable({ sortedMovs, isAdmin, isAdminOrDirector
       {sortedMovs.length === 0 ? (
         <EmptyState title="Sin movimientos registrados" subtitle="Registra el primer movimiento" />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <div className="min-w-[600px] px-4 sm:px-0">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100">
@@ -64,6 +65,7 @@ export default function MovimientoTable({ sortedMovs, isAdmin, isAdminOrDirector
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
     </div>
