@@ -36,6 +36,9 @@ export const BOSTON_COMPANIES: Company[] = [
   ALL_COMPANIES.find((c) => c.key === "confecciones_boston")!,
 ];
 
+/** Display names used across modules (cheques, caja, prestamos, ventas, guias) */
+export const EMPRESAS = ALL_COMPANIES.map((c) => c.name);
+
 export function getCompaniesForRole(role: string): Company[] {
   if (role === "director") return ALL_COMPANIES;
   if (role === "admin") return ADMIN_COMPANIES;

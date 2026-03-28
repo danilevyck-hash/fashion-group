@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import { hasModuleAccess } from "@/lib/auth-check";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { Toast } from "@/components/ui";
+import { fmtDate } from "@/lib/format";
 
 interface GuiaItem {
   id?: string;
@@ -82,12 +84,6 @@ function saveList(key: string, defaults: string[], list: string[]) {
 
 function emptyItem(orden: number): GuiaItem {
   return { orden, cliente: "", direccion: "", empresa: "", facturas: "", bultos: 0, numero_guia_transp: "" };
-}
-
-function fmtDate(d: string) {
-  if (!d) return "";
-  const [y, m, day] = d.split("-");
-  return `${day}/${m}/${y}`;
 }
 
 type View = "list" | "form" | "print";
@@ -187,8 +183,7 @@ function clearCanvasEl(canvas: HTMLCanvasElement | null) {
 
 export default function GuiasPage() {
   const router = useRouter();
-  const [role, setRole] = useState<string>("");
-  const [authChecked, setAuthChecked] = useState(false);
+  const { authChecked, role } = useAuth({ moduleKey: "guias", allowedRoles: ["admin","upload","secretaria","director"] });
   const [view, _setView] = useState<View>("list");
   function setView(v: View) {
     _setView(v);
@@ -293,16 +288,8 @@ export default function GuiasPage() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const r = sessionStorage.getItem("cxc_role");
-    if (!hasModuleAccess("guias", ["admin","upload","david","secretaria","bodega"])) {
-      router.push("/");
-    } else {
-      setRole(r || "");
-      setAuthChecked(true);
-      loadGuias();
-    }
-  }, []);
+    if (authChecked) loadGuias();
+  }, [authChecked, loadGuias]);
 
   // Handle browser back/forward
   useEffect(() => {
@@ -1045,12 +1032,7 @@ export default function GuiasPage() {
           </div>
         )}
 
-        {/* Toast */}
-        {toast && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2.5 rounded-full text-sm z-50 shadow-lg">
-            {toast}
-          </div>
-        )}
+        <Toast message={toast} />
       </div>
     );
   }

@@ -1,18 +1,19 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { Toast } from "@/components/ui";
+import { EMPRESAS } from "@/lib/companies";
 
 interface GuiaItem { orden: number; cliente: string; direccion: string; empresa: string; facturas: string; bultos: number; }
 
 const TRANSPORTISTAS = ["RedNblue", "Mojica", "Transporte Sol", "Sanjur"];
 const CLIENTES = ["City Mall", "La Frontera Duty Free", "Jerusalem de Panama", "Plaza Los Angeles", "Golden Mall", "Multi Fashion Holding", "Kheriddine", "Bouti S.A.", "Jerusalem Duty Free", "Outlet Duty Free N2", "Outlet Duty Free N3", "Sporting Shoes N4"];
 const DIRECCIONES = ["Paso Canoas", "David", "Santiago", "Guabito", "Changinola"];
-const EMPRESAS = ["MultiFashion Holding", "Vistana International", "Fashion Shoes", "Fashion Wear", "Active Shoes", "Active Wear", "Confecciones Boston", "Joystep"];
 
 export default function NuevaGuiaMovil() {
-  const router = useRouter();
+  const { authChecked } = useAuth({ moduleKey: "guias", allowedRoles: ["admin","upload","secretaria","director"] });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
 
@@ -25,11 +26,6 @@ export default function NuevaGuiaMovil() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState<{ numero: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-
-  useEffect(() => {
-    const r = sessionStorage.getItem("cxc_role");
-    if (!r) router.push("/");
-  }, [router]);
 
   // Canvas drawing
   const getPos = useCallback((e: React.TouchEvent | React.MouseEvent) => {
@@ -66,6 +62,8 @@ export default function NuevaGuiaMovil() {
   }, [drawing, getPos]);
 
   const stopDraw = useCallback(() => setDrawing(false), []);
+
+  if (!authChecked) return null;
 
   function clearSignature() {
     const canvas = canvasRef.current;
@@ -289,7 +287,7 @@ export default function NuevaGuiaMovil() {
         </button>
       </div>
 
-      {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2.5 rounded-full text-sm z-50 shadow-lg">{toast}</div>}
+      <Toast message={toast} />
     </div>
   );
 }

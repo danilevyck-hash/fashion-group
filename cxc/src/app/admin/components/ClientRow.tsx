@@ -1,8 +1,5 @@
 import type { ConsolidatedClient } from "@/lib/types";
-
-function fmt(n: number) {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import { fmt } from "@/lib/format";
 
 function riskInfo(current: number, watch: number, overdue: number): { border: string; tooltip: string } {
   if (overdue > 0) return { border: "border-l-red-500", tooltip: "Vencido: tiene saldo mayor a 121 dias" };

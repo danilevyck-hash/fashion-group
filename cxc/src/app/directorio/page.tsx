@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import { hasModuleAccess } from "@/lib/auth-check";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { Toast } from "@/components/ui";
 import XLSX from "xlsx-js-style";
 
 interface Cliente {
@@ -21,8 +22,7 @@ interface Cliente {
 
 export default function DirectorioPage() {
   const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
-  const [role, setRole] = useState("");
+  const { authChecked, role } = useAuth({ moduleKey: "directorio", allowedRoles: ["admin","upload","secretaria","director","vendedor"] });
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -33,17 +33,6 @@ export default function DirectorioPage() {
   const [newData, setNewData] = useState({ nombre: "", empresa: "", whatsapp: "", correo: "", contacto: "", notas: "" });
   const [toast, setToast] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const r = sessionStorage.getItem("cxc_role");
-    if (!hasModuleAccess("directorio", ["admin","upload","vendedor","secretaria"])) {
-      router.push("/");
-    } else {
-      setRole(r || "");
-      setAuthChecked(true);
-    }
-  }, []);
 
   const loadClientes = useCallback(async () => {
     setLoading(true);
@@ -336,13 +325,7 @@ export default function DirectorioPage() {
         </>
       )}
 
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2.5 rounded-full text-sm shadow-lg flex items-center gap-2">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          {toast}
-        </div>
-      )}
+      <Toast message={toast} />
     </div>
     </div>
   );

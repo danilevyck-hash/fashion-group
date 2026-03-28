@@ -1,8 +1,5 @@
 import type { ConsolidatedClient } from "@/lib/types";
-
-function fmt(n: number) {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
+import { fmt } from "@/lib/format";
 
 interface Props {
   roleClients: ConsolidatedClient[];

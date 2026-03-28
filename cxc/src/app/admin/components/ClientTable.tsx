@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
+import { fmt } from "@/lib/format";
 import ClientRow from "./ClientRow";
 import ContactPanel from "./ContactPanel";
 
@@ -29,10 +30,6 @@ interface Props {
   onOpenEmail: (client: ConsolidatedClient) => void;
   onMarkContacted: (clientName: string, method: string) => void;
   onSaveEdit: (nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) => void;
-}
-
-function fmt(n: number) {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export default function ClientTable({

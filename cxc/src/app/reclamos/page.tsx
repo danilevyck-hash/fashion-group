@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
-import { hasModuleAccess } from "@/lib/auth-check";
 import AppHeader from "@/components/AppHeader";
+import { fmt, fmtDate } from "@/lib/format";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { Toast } from "@/components/ui";
 
 // ── Types ──
 interface RItem { referencia: string; descripcion: string; talla: string; cantidad: number; precio_unitario: number; subtotal: number; motivo: string; nro_factura: string; nro_orden_compra: string; }
@@ -35,8 +37,6 @@ function loadCustomMotivos(): string[] { try { return JSON.parse(localStorage.ge
 function saveCustomMotivo(m: string) { const cur = loadCustomMotivos(); if (!cur.includes(m)) { cur.push(m); localStorage.setItem("fg_custom_motivos", JSON.stringify(cur)); } }
 
 function emptyItem(): RItem { return { referencia: "", descripcion: "", talla: "", cantidad: 1, precio_unitario: 0, subtotal: 0, motivo: "", nro_factura: "", nro_orden_compra: "" }; }
-function fmt(n: number | undefined | null) { return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function fmtDate(d: string) { if (!d) return ""; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }
 function daysSince(d: string) { if (!d) return 0; return Math.floor((Date.now() - new Date(d).getTime()) / 86400000); }
 function calcSub(items: RItem[]) { return items.reduce((s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0), 0); }
 
@@ -54,8 +54,7 @@ function ReclamosPage() {
   const searchParams = useSearchParams();
 
   // ALL hooks first
-  const [authChecked, setAuthChecked] = useState(false);
-  const [role, setRole] = useState("");
+  const { authChecked, role } = useAuth({ moduleKey: "reclamos", allowedRoles: ["admin","upload","secretaria"] });
   const [view, _setView] = useState<RView>((searchParams.get("view") as RView) || "list");
   const [urlId] = useState(searchParams.get("id") || "");
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);
@@ -153,13 +152,6 @@ function ReclamosPage() {
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, [loadDetail]);
-
-  // Auth
-  useEffect(() => {
-    const r = sessionStorage.getItem("cxc_role") || "";
-    if (!hasModuleAccess("reclamos", ["admin","upload","secretaria"])) { router.push("/"); return; }
-    setRole(r); setAuthChecked(true);
-  }, [router]);
 
   const loadReclamos = useCallback(async () => {
     setLoading(true);
@@ -939,11 +931,7 @@ function ReclamosPage() {
         </div>
       )}
 
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-50">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="inline-block mr-1.5 -mt-0.5"><polyline points="20 6 9 17 4 12"/></svg>{toast}
-        </div>
-      )}
+      <Toast message={toast} />
 
       {/* Aplicada modal */}
       {showAplicadaModal && current && (

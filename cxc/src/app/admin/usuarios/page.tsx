@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import { hasModuleAccess } from "@/lib/auth-check";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { Toast } from "@/components/ui";
 
 interface RolePermission {
   role: string;
@@ -40,7 +41,7 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function UsuariosPage() {
   const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
+  const { authChecked } = useAuth({ moduleKey: "admin", allowedRoles: ["admin"] });
   const [roles, setRoles] = useState<RolePermission[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
@@ -72,12 +73,6 @@ export default function UsuariosPage() {
   const [savingPw, setSavingPw] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
-
-  useEffect(() => {
-    const r = sessionStorage.getItem("cxc_role") || "";
-    if (!hasModuleAccess("usuarios", ["admin"])) { router.push("/plantillas"); return; }
-    setAuthChecked(true);
-  }, [router]);
 
   const loadRoles = useCallback(async () => {
     setLoading(true);
@@ -525,12 +520,7 @@ export default function UsuariosPage() {
         </div>
       )}
 
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2.5 rounded-full text-sm z-50 shadow-lg flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          {toast}
-        </div>
-      )}
+      <Toast message={toast} />
     </div>
   );
 }

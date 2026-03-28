@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { hasModuleAccess } from "@/lib/auth-check";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { fmt } from "@/lib/format";
 import { COMPANIES, getCompaniesForRole } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
@@ -18,10 +18,6 @@ import { generatePDFResumen, generatePDFDetallado } from "@/lib/pdf-cxc";
 import useAdminData from "./hooks/useAdminData";
 
 // ── Helpers ──────────────────────────────────────────────
-
-function fmt(n: number) {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
 
 type RiskFilter = "all" | "current" | "watch" | "overdue";
 type SortKey = "name" | "current" | "watch" | "overdue" | "total";
@@ -130,7 +126,7 @@ function buildVendorMsg(vendorName: string, companyName: string, brand: string, 
 // ── Main Component ───────────────────────────────────────
 
 export default function AdminDashboard() {
-  const router = useRouter();
+  const { authChecked, role: userRole } = useAuth({ moduleKey: "admin", allowedRoles: ["admin"] });
   const { clients, uploads, contactLog, loading, loadError, loadData, setContactLog } = useAdminData();
   const [search, setSearch] = useState("");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
@@ -138,7 +134,6 @@ export default function AdminDashboard() {
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [showExport, setShowExport] = useState(false);
-  const [userRole, setUserRole] = useState<string>("admin");
   const [showUploadHistory, setShowUploadHistory] = useState(true);
   const [activityLogs, setActivityLogs] = useState<{id:string;action:string;details:string;created_at:string}[]>([]);
   const [showActivity, setShowActivity] = useState(false);
@@ -146,16 +141,13 @@ export default function AdminDashboard() {
   const roleCompanies = useMemo(() => getCompaniesForRole(userRole), [userRole]);
 
   useEffect(() => {
-    const r = sessionStorage.getItem("cxc_role");
-    if (!hasModuleAccess("cxc", ["admin","director","vendedor","david","contabilidad"])) {
-      router.push("/");
-      return;
-    }
-    setUserRole(r || "");
+    if (!authChecked) return;
     loadData();
     const q = new URLSearchParams(window.location.search).get("search");
     if (q) setSearch(q);
-  }, [router, loadData]);
+  }, [authChecked, loadData]);
+
+  if (!authChecked) return null;
 
   // ── Sorting ──────────────────────────────────────────
 

@@ -3,7 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import { hasModuleAccess } from "@/lib/auth-check";
+import { fmt, fmtDate } from "@/lib/format";
+import { EMPRESAS } from "@/lib/companies";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { Toast } from "@/components/ui";
 
 // ── Types ──
 interface Movimiento {
@@ -26,14 +29,6 @@ interface Empleado {
   created_at: string;
   prestamos_movimientos: Movimiento[];
 }
-
-const EMPRESAS = [
-  "Vistana International", "Fashion Shoes", "Fashion Wear", "Active Shoes",
-  "Active Wear", "Joystep", "Confecciones Boston", "Multifashion",
-];
-
-function fmt(n: number) { return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function fmtDate(d: string) { if (!d) return ""; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }
 
 function progressColor(pct: number) {
   if (pct >= 75) return "bg-green-500";
@@ -99,8 +94,7 @@ export default function PrestamoDetallePage() {
   const params = useParams();
   const id = params.id as string;
 
-  const [authChecked, setAuthChecked] = useState(false);
-  const [role, setRole] = useState("");
+  const { authChecked, role } = useAuth({ moduleKey: "prestamos", allowedRoles: ["admin","contabilidad"] });
   const [empleado, setEmpleado] = useState<Empleado | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
@@ -144,12 +138,6 @@ export default function PrestamoDetallePage() {
   const [showForceArchive, setShowForceArchive] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
-
-  useEffect(() => {
-    const r = sessionStorage.getItem("cxc_role") || "";
-    if (!hasModuleAccess("prestamos", ["admin","contabilidad"])) { router.push("/"); return; }
-    setRole(r); setAuthChecked(true);
-  }, [router]);
 
   const loadEmpleado = useCallback(async () => {
     setLoading(true);
@@ -816,12 +804,7 @@ export default function PrestamoDetallePage() {
         </div>
       )}
 
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2.5 rounded-full text-sm z-50 shadow-lg flex items-center gap-2"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          {toast}
-        </div>
-      )}
+      <Toast message={toast} />
     </div>
   );
 }

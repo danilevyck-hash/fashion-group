@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { hasModuleAccess } from "@/lib/auth-check";
 import AppHeader from "@/components/AppHeader";
+import { fmt } from "@/lib/format";
+import { EMPRESAS } from "@/lib/companies";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { Toast } from "@/components/ui";
 
 const RechartsChart = dynamic(() => import("recharts").then((mod) => {
   const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } = mod;
@@ -24,7 +26,6 @@ const RechartsChart = dynamic(() => import("recharts").then((mod) => {
     );
   };
 }), { ssr: false, loading: () => <div className="animate-pulse h-[300px] bg-gray-100 rounded-xl" /> });
-const EMPRESAS = ["Vistana International", "Fashion Wear", "Fashion Shoes", "Active Shoes", "Active Wear", "Joystep", "Confecciones Boston", "Multifashion"];
 const MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 const MESES_FULL = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
@@ -33,14 +34,10 @@ interface ClienteRecord { empresa: string; año: number; mes: number; cliente: s
 interface MetaRecord { empresa: string; año: number; mes: number; meta: number; }
 
 function ventasNetas(r: VentaRecord) { return r.ventas_brutas - r.notas_credito + r.notas_debito; }
-function fmt(n: number) { return n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
-function fmtD(n: number) { return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function fmtK(n: number) { if (Math.abs(n) >= 1000000) return `$${(n / 1000000).toFixed(1)}M`; if (Math.abs(n) >= 1000) return `$${(n / 1000).toFixed(0)}k`; return `$${fmt(n)}`; }
 
 export default function VentasPage() {
-  const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
-  const [role, setRole] = useState("");
+  const { authChecked, role } = useAuth({ moduleKey: "ventas", allowedRoles: ["admin","director","contabilidad"] });
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [ventas, setVentas] = useState<VentaRecord[]>([]);
   const [ventasAnt, setVentasAnt] = useState<VentaRecord[]>([]);
@@ -79,13 +76,6 @@ export default function VentasPage() {
   const [savingMetas, setSavingMetas] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const r = sessionStorage.getItem("cxc_role") || "";
-    if (!hasModuleAccess("ventas", ["admin","director","contabilidad"])) { router.push("/"); return; }
-    setRole(r); setAuthChecked(true);
-  }, [router]);
 
   const isAdmin = role === "admin" || role === "director";
 
@@ -478,7 +468,7 @@ export default function VentasPage() {
                     <input type="number" step="0.01" value={fCosto} onChange={(e) => setFCosto(e.target.value)} placeholder="0.00" className="w-full border-b border-gray-200 py-1.5 text-sm outline-none" />
                   </div>
                 </div>
-                {fVentas && <p className="text-xs text-gray-400 mb-4">Ventas Netas: ${fmtD(manualNetas)} | Margen: {manualMargen.toFixed(1)}%</p>}
+                {fVentas && <p className="text-xs text-gray-400 mb-4">Ventas Netas: ${fmt(manualNetas)} | Margen: {manualMargen.toFixed(1)}%</p>}
                 <button onClick={saveManual} disabled={saving || !fVentas} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
                   {saving ? "Guardando..." : "Guardar"}
                 </button>
@@ -526,7 +516,7 @@ export default function VentasPage() {
                 {csvSummary && (
                   <div className="bg-gray-50 rounded-xl p-4 mb-4">
                     <p className="text-xs text-gray-700 font-medium mb-1">{csvSummary.facturas} facturas | {csvSummary.ncs} notas de credito</p>
-                    <p className="text-xs text-gray-500">Ventas Brutas: ${fmtD(csvSummary.ventasBrutas)} | NC: ${fmtD(csvSummary.nc)} | Netas: ${fmtD(csvSummary.ventasBrutas - csvSummary.nc)}</p>
+                    <p className="text-xs text-gray-500">Ventas Brutas: ${fmt(csvSummary.ventasBrutas)} | NC: ${fmt(csvSummary.nc)} | Netas: ${fmt(csvSummary.ventasBrutas - csvSummary.nc)}</p>
                   </div>
                 )}
                 <button onClick={uploadCSV} disabled={csvUploading || !csvParsed?.length} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40 flex items-center gap-2">
@@ -570,12 +560,7 @@ export default function VentasPage() {
         </>)}
 
         {/* Toast */}
-        {toast && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-50 flex items-center gap-2">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            {toast}
-          </div>
-        )}
+        <Toast message={toast} />
       </div>
     </div>
   );

@@ -3,10 +3,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { fmt } from "@/lib/format";
 
 interface Order { id: string; order_number: string; client_name: string; total: number; item_count: number; created_at: string; }
-
-function fmt(n: number) { return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 export default function PedidosPage() {
   const router = useRouter();

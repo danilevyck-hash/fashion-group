@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { hasModuleAccess } from "@/lib/auth-check";
+import { fmt } from "@/lib/format";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { Toast } from "@/components/ui";
 
 interface Producto { id: string; nombre: string; genero: string; color: string; precio_panama: number; rrp: number; stock_comprado: number; }
 interface Cliente { id: string; nombre: string; estado?: string; }
@@ -19,7 +20,6 @@ const COLOR_MAP: Record<string, string> = { ROJA: "#CC0000", BLANCA: "#d4d4d4", 
 const GENERO_ORDER = ["HOMBRE", "MUJER", "NIÑO"];
 const GENERO_BADGE: Record<string, string> = { HOMBRE: "bg-blue-100 text-blue-700", MUJER: "bg-pink-100 text-pink-700", NIÑO: "bg-amber-100 text-amber-700" };
 
-function fmt(n: number) { return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function fmtK(n: number) { return n >= 1000 ? `$${(n/1000).toFixed(1)}k` : `$${fmt(n)}`; }
 function Dot({ color, size = "sm" }: { color: string; size?: "sm" | "md" }) {
   const s = size === "md" ? "w-3 h-3" : "w-1.5 h-1.5";
@@ -27,9 +27,7 @@ function Dot({ color, size = "sm" }: { color: string; size?: "sm" | "md" }) {
 }
 
 export default function CamisetasPage() {
-  const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
-  const [role, setRole] = useState("");
+  const { authChecked, role } = useAuth({ moduleKey: "camisetas", allowedRoles: ["admin","director"] });
   const [tab, setTab] = useState<"resumen" | "cliente" | "stock">("resumen");
   const [productos, setProductos] = useState<Producto[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -51,13 +49,6 @@ export default function CamisetasPage() {
   const [nuevoSaving, setNuevoSaving] = useState(false);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2500); };
-
-  useEffect(() => {
-    const r = sessionStorage.getItem("cxc_role") || "";
-    if (!hasModuleAccess("camisetas", ["admin","vendedor","secretaria"])) { router.push("/"); return; }
-    setRole(r);
-    setAuthChecked(true);
-  }, [router]);
 
   const isVendedor = role === "vendedor";
 
@@ -579,7 +570,7 @@ export default function CamisetasPage() {
         </div>
       )}
 
-      {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2.5 rounded-full text-sm z-50">{toast}</div>}
+      <Toast message={toast} />
     </div>
   );
 }

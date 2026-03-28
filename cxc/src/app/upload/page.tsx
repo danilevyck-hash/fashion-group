@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { supabase } from "@/lib/supabase";
 import { ALL_COMPANIES, getCompaniesForRole } from "@/lib/companies";
@@ -9,7 +8,7 @@ import { normalizeName } from "@/lib/normalize";
 import { resolveAlias } from "@/lib/aliases";
 import Papa from "papaparse";
 import * as XLSX from "xlsx-js-style";
-import { hasModuleAccess } from "@/lib/auth-check";
+import { useAuth } from "@/lib/hooks/useAuth";
 
 interface UploadStatus {
   company_key: string;
@@ -18,30 +17,23 @@ interface UploadStatus {
 }
 
 export default function UploadPage() {
-  const router = useRouter();
+  const { authChecked, role } = useAuth({ moduleKey: "upload", allowedRoles: ["admin","upload","secretaria","director"] });
   const [uploads, setUploads] = useState<Record<string, UploadStatus>>({});
   const [uploading, setUploading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "ok" | "err" } | null>(null);
 
-  const [userRole, setUserRole] = useState<string>("");
   const [csvPreview, setCsvPreview] = useState<{ headers: string[]; rows: string[][]; totalRows: number; companyKey: string; valid: boolean; error: string } | null>(null);
   const [pendingText, setPendingText] = useState("");
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   // David sees only Boston, admin/upload see all 7
-  const uploadCompanies = userRole === "david"
+  const uploadCompanies = role === "david"
     ? getCompaniesForRole("david")
     : ALL_COMPANIES;
 
-  useEffect(() => {
-    const role = sessionStorage.getItem("cxc_role");
-    if (!hasModuleAccess("upload", ["admin","upload","secretaria"])) {
-      router.push("/");
-      return;
-    }
-    setUserRole(role || "");
-    loadUploads();
-  }, [router]);
+  useEffect(() => { if (authChecked) loadUploads(); }, [authChecked]);
+
+  if (!authChecked) return null;
 
   async function loadUploads() {
     const { data } = await supabase

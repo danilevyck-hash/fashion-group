@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import { hasModuleAccess } from "@/lib/auth-check";
+import { fmt } from "@/lib/format";
+import { useAuth } from "@/lib/hooks/useAuth";
 
 interface Movimiento {
   id: string;
@@ -20,13 +21,11 @@ interface Empleado {
   prestamos_movimientos: Movimiento[];
 }
 
-function fmt(n: number) { return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-
 const MESES = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
 export default function ReportePage() {
   const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
+  const { authChecked } = useAuth({ moduleKey: "prestamos", allowedRoles: ["admin","contabilidad"] });
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -35,12 +34,6 @@ export default function ReportePage() {
   const [quincena, setQuincena] = useState(now.getDate() <= 15 ? "1" : "2");
   const [mes, setMes] = useState(String(now.getMonth() + 1));
   const [año, setAño] = useState(String(now.getFullYear()));
-
-  useEffect(() => {
-    const r = sessionStorage.getItem("cxc_role") || "";
-    if (!hasModuleAccess("prestamos", ["admin","contabilidad"])) { router.push("/"); return; }
-    setAuthChecked(true);
-  }, [router]);
 
   const loadData = useCallback(async () => {
     setLoading(true);

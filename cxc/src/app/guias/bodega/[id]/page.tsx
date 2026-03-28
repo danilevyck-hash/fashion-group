@@ -3,12 +3,15 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import { useAuth } from "@/lib/hooks/useAuth";
+import { Toast } from "@/components/ui";
 
 interface GuiaItem { cliente: string; direccion: string; empresa: string; facturas: string; bultos: number; }
 interface Guia { id: string; numero: number; fecha: string; transportista: string; guia_items: GuiaItem[]; }
 
 export default function BodegaPage() {
   const router = useRouter();
+  const { authChecked } = useAuth({ moduleKey: "guias", allowedRoles: ["admin","upload","secretaria","director"] });
   const params = useParams();
   const id = params.id as string;
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -23,11 +26,6 @@ export default function BodegaPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-
-  useEffect(() => {
-    const r = sessionStorage.getItem("cxc_role");
-    if (!r) { router.push("/"); return; }
-  }, [router]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -118,7 +116,7 @@ export default function BodegaPage() {
     setSaving(false);
   }
 
-  if (loading || !guia) return null;
+  if (!authChecked || loading || !guia) return null;
 
   if (saved) {
     return (
@@ -197,7 +195,7 @@ export default function BodegaPage() {
         {saving ? "Guardando..." : "Guardar y Enviar"}
       </button>
 
-      {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2.5 rounded-full text-sm z-50 shadow-lg">{toast}</div>}
+      <Toast message={toast} />
     </div>
   );
 }

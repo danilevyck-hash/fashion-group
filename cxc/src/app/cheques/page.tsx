@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import { hasModuleAccess } from "@/lib/auth-check";
 import XLSX from "xlsx-js-style";
+import { fmt, fmtDate } from "@/lib/format";
+import { EMPRESAS } from "@/lib/companies";
+import { useAuth } from "@/lib/hooks/useAuth";
 
 interface Cheque {
   id: string;
@@ -22,19 +23,14 @@ interface Cheque {
   created_at: string;
 }
 
-const EMPRESAS = ["Vistana International", "Fashion Shoes", "Fashion Wear", "Active Shoes", "Active Wear", "Joystep", "Multifashion"];
 const BANCOS = ["Banistmo", "BAC", "General", "Global", "Multibank", "Otro"];
 
-function fmt(n: number | undefined | null) { return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-function fmtDate(d: string) { if (!d) return ""; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 type Filter = "all" | "pendiente" | "depositado" | "vencido" | "rebotado" | "vencen_hoy" | "vencen_semana";
 
 export default function ChequesPage() {
-  const router = useRouter();
-  const [authChecked, setAuthChecked] = useState(false);
-  const [role, setRole] = useState("");
+  const { authChecked, role } = useAuth({ moduleKey: "cheques", allowedRoles: ["admin","upload","secretaria","director","contabilidad"] });
   const [cheques, setCheques] = useState<Cheque[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,13 +55,6 @@ export default function ChequesPage() {
   const [fNotas, setFNotas] = useState("");
   const [fWhatsapp, setFWhatsapp] = useState("");
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const r = sessionStorage.getItem("cxc_role") || "";
-    if (!hasModuleAccess("cheques", ["admin","upload","secretaria"])) { router.push("/"); return; }
-    setRole(r); setAuthChecked(true);
-  }, [router]);
 
   const loadCheques = useCallback(async () => {
     setLoading(true);

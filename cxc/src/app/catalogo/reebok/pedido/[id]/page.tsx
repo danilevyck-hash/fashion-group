@@ -3,13 +3,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import { fmt } from "@/lib/format";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
 interface Order { id: string; order_number: string; client_name: string; comment: string; total: number; reebok_order_items: OrderItem[]; created_at: string; }
 interface DirClient { nombre: string; empresa: string; }
 
 const P = 12;
-function fmt(n: number) { return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 export default function OrderDetailPage() {
   const router = useRouter();

@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import { hasModuleAccess } from "@/lib/auth-check";
+import { fmt, fmtDate } from "@/lib/format";
+import { EMPRESAS } from "@/lib/companies";
+import { useAuth } from "@/lib/hooks/useAuth";
 
 interface CajaPeriodo {
   id: string;
@@ -36,11 +38,7 @@ interface CajaGasto {
 
 const CATEGORIAS_DEFAULT = ["Transporte", "Papelería", "Alimentación", "Limpieza", "Mensajería", "Servicios varios", "Otro"];
 
-const EMPRESAS = [
-  "Vistana International", "Fashion Shoes", "Fashion Wear",
-  "Active Shoes", "Active Wear", "Confecciones Boston",
-  "Multifashion", "Joystep", "Otro / General",
-];
+const CAJA_EMPRESAS = [...EMPRESAS, "Multifashion", "Otro / General"];
 
 function loadCategorias(): string[] {
   if (typeof window === "undefined") return CATEGORIAS_DEFAULT;
@@ -58,16 +56,6 @@ function loadCategorias(): string[] {
   } catch { return CATEGORIAS_DEFAULT; }
 }
 
-function fmt(n: number) {
-  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function fmtDate(d: string) {
-  if (!d) return "";
-  const [y, m, day] = d.split("-");
-  return `${day}/${m}/${y}`;
-}
-
 type View = "list" | "detail" | "print";
 
 export default function CajaPageWrapper() {
@@ -75,7 +63,7 @@ export default function CajaPageWrapper() {
 }
 
 function CajaPage() {
-  const router = useRouter();
+  const { authChecked, role } = useAuth({ moduleKey: "caja", allowedRoles: ["admin","upload","secretaria","director"] });
   const searchParams = useSearchParams();
   const [view, _setView] = useState<View>((searchParams.get("view") as View) || "list");
   const [urlId] = useState(searchParams.get("id") || "");
@@ -109,7 +97,6 @@ function CajaPage() {
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState<CajaPeriodo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [role, setRole] = useState("");
   // lowBalanceWarning is now computed inline in detail view
   const [categorias, setCategorias] = useState(CATEGORIAS_DEFAULT);
   const [showManageCat, setShowManageCat] = useState(false);
@@ -142,9 +129,6 @@ function CajaPage() {
   const totalNum = subtotalNum + itbmsNum;
 
   useEffect(() => {
-    const r = sessionStorage.getItem("cxc_role");
-    if (!hasModuleAccess("caja", ["admin","upload","secretaria"])) { router.push("/"); return; }
-    if (r) setRole(r);
     setCategorias(loadCategorias());
     loadPeriodos();
     fetch("/api/caja/responsables").then((r) => r.ok ? r.json() : []).then((data) => {
@@ -298,6 +282,8 @@ function CajaPage() {
     setEditingGastoId(null); setEditGasto({});
     await loadDetail(current.id); loadPeriodos();
   }
+
+  if (!authChecked) return null;
 
   const hasOpenPeriod = periodos.some((p) => p.estado === "abierto");
 
@@ -648,7 +634,7 @@ function CajaPage() {
                 <select value={gEmpresa} onChange={(e) => { setGEmpresa(e.target.value); if (e.target.value !== "Otro / General") setGEmpresaOtro(""); }}
                   className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
                   <option value="">—</option>
-                  {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
+                  {CAJA_EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
                 </select>
                 {gEmpresa === "Otro / General" && (
                   <input type="text" value={gEmpresaOtro} onChange={(e) => setGEmpresaOtro(e.target.value)} placeholder="Especificar empresa"
@@ -715,7 +701,7 @@ function CajaPage() {
                       <td className="py-2 pr-1"><input type="text" value={editGasto.proveedor || ""} onChange={(e) => setEditGasto({ ...editGasto, proveedor: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
                       <td className="py-2 pr-1"><select value={editGasto.responsable || ""} onChange={(e) => setEditGasto({ ...editGasto, responsable: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"><option value="">—</option>{responsables.map((r) => <option key={r} value={r}>{r}</option>)}</select></td>
                       <td className="py-2 pr-1"><select value={editGasto.categoria || "Varios"} onChange={(e) => setEditGasto({ ...editGasto, categoria: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent">{categorias.map((c) => <option key={c} value={c}>{c}</option>)}</select></td>
-                      <td className="py-2 pr-1"><select value={editGasto.empresa || ""} onChange={(e) => setEditGasto({ ...editGasto, empresa: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"><option value="">—</option>{EMPRESAS.map((emp) => <option key={emp} value={emp}>{emp}</option>)}</select></td>
+                      <td className="py-2 pr-1"><select value={editGasto.empresa || ""} onChange={(e) => setEditGasto({ ...editGasto, empresa: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"><option value="">—</option>{CAJA_EMPRESAS.map((emp) => <option key={emp} value={emp}>{emp}</option>)}</select></td>
                       <td className="py-2 pr-1"><input type="text" value={editGasto.nro_factura || ""} onChange={(e) => setEditGasto({ ...editGasto, nro_factura: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
                       <td className="py-2 pr-1"><input type="number" step="0.01" value={editGasto.subtotal ?? ""} onChange={(e) => setEditGasto({ ...editGasto, subtotal: parseFloat(e.target.value) || 0 })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent text-right" /></td>
                       <td className="py-2 pr-1"><input type="number" step="0.01" value={editGasto.itbms ?? ""} onChange={(e) => setEditGasto({ ...editGasto, itbms: parseFloat(e.target.value) || 0 })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent text-right" /></td>
