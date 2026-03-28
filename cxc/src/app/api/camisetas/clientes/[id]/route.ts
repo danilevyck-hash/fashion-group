@@ -10,7 +10,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .update({ estado })
     .eq("id", params.id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json({ ok: true });
 }
 
@@ -26,8 +26,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   const { error } = await supabaseServer.from("camisetas_clientes").delete().eq("id", id);
   if (error) {
-    console.error("Error deleting client", id, error.message);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error("Error deleting client", id, error);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

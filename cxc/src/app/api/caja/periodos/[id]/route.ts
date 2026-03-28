@@ -10,7 +10,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     .eq("id", id)
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
   if (data?.caja_gastos) {
     data.caja_gastos.sort((a: { fecha: string; created_at: string }, b: { fecha: string; created_at: string }) =>
@@ -32,7 +32,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       .from("caja_periodos")
       .update({ repuesto: true, repuesto_at: new Date().toISOString() })
       .eq("id", id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
     return NextResponse.json({ ok: true });
   }
 
@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .select()
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json(data);
 }
 
@@ -55,6 +55,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     .from("caja_periodos")
     .delete()
     .eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json({ ok: true });
 }

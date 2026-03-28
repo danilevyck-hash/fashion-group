@@ -15,7 +15,7 @@ async function fetchReclamos(ids: string[]) {
     .select("*, reclamo_items(*)")
     .in("id", ids)
     .order("created_at", { ascending: false });
-  if (error) throw new Error(error.message);
+  if (error) { console.error(error); throw new Error("Error al cargar reclamos"); }
   return data || [];
 }
 
@@ -145,7 +145,7 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false });
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 });
     }
     if (!data || data.length === 0) {
       return NextResponse.json({ error: "No reclamos found" }, { status: 404 });

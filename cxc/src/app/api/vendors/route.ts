@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   if (companyKey) query = query.eq("company_key", companyKey);
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json(data);
 }
 
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       { onConflict: "company_key,client_name" }
     );
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json({ ok: true });
 }
 
@@ -39,6 +39,6 @@ export async function DELETE(req: NextRequest) {
     .eq("company_key", companyKey!)
     .eq("client_name", clientName!);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json({ ok: true });
 }

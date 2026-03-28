@@ -14,6 +14,6 @@ export async function POST(req: NextRequest) {
     .from("camisetas_pedidos")
     .upsert({ cliente_id, producto_id, paquetes }, { onConflict: "cliente_id,producto_id" });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json({ ok: true });
 }

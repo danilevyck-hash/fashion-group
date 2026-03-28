@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     .order("ventas", { ascending: false })
     .limit(10);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json(data);
 }
 
@@ -30,6 +30,6 @@ export async function POST(req: NextRequest) {
       empresa: r.empresa, año: r.año, mes: r.mes, cliente: r.cliente, ventas: r.ventas,
     })), { onConflict: "empresa,año,mes,cliente" });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json({ ok: true });
 }

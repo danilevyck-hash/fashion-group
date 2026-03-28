@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     .in("id", ids)
     .order("created_at", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
   const wb = XLSX.utils.book_new();
 

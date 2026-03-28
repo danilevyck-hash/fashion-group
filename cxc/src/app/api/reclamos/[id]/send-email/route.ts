@@ -9,6 +9,10 @@ function fmt(n: number) {
   return (n ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function esc(s: unknown): string {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const { id } = params;
@@ -84,14 +88,14 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     const total = subtotal * 1.177;
     const itemRowsHtml = items.map((item) => `
       <tr>
-        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0">${item.referencia}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0">${item.descripcion}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:center">${item.talla}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:center">${item.cantidad}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0">${esc(item.referencia)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0">${esc(item.descripcion)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:center">${esc(item.talla)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:center">${Number(item.cantidad) || 0}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:right">$${fmt(Number(item.precio_unitario))}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;text-align:right">$${fmt(Number(item.cantidad) * Number(item.precio_unitario))}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;color:#666">${item.motivo}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;color:#666">${item.nro_factura || ""}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;color:#666">${esc(item.motivo)}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0;color:#666">${esc(item.nro_factura)}</td>
       </tr>`).join("");
 
     const html = `
@@ -100,16 +104,16 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
           <h2 style="margin:0;font-size:18px">Fashion Group</h2>
           <p style="margin:4px 0 0;color:#666;font-size:13px">Reclamo a Proveedor</p>
         </div>
-        <p>Estimado/a ${contacto.nombre},</p>
+        <p>Estimado/a ${esc(contacto.nombre)},</p>
         <p>Por medio de la presente, le hacemos llegar el detalle del siguiente reclamo pendiente de resolución:</p>
         <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:13px">
-          <tr><td style="padding:6px 0;color:#666;width:140px">N° Reclamo</td><td style="font-weight:600">${rec.nro_reclamo}</td></tr>
-          <tr><td style="padding:6px 0;color:#666">Empresa</td><td>${rec.empresa}</td></tr>
-          <tr><td style="padding:6px 0;color:#666">Proveedor</td><td>${rec.proveedor}</td></tr>
-          <tr><td style="padding:6px 0;color:#666">Marca</td><td>${rec.marca}</td></tr>
-          <tr><td style="padding:6px 0;color:#666">Factura</td><td>${rec.nro_factura}</td></tr>
-          <tr><td style="padding:6px 0;color:#666">Fecha Reclamo</td><td>${rec.fecha_reclamo}</td></tr>
-          <tr><td style="padding:6px 0;color:#666">Estado</td><td>${rec.estado}</td></tr>
+          <tr><td style="padding:6px 0;color:#666;width:140px">N° Reclamo</td><td style="font-weight:600">${esc(rec.nro_reclamo)}</td></tr>
+          <tr><td style="padding:6px 0;color:#666">Empresa</td><td>${esc(rec.empresa)}</td></tr>
+          <tr><td style="padding:6px 0;color:#666">Proveedor</td><td>${esc(rec.proveedor)}</td></tr>
+          <tr><td style="padding:6px 0;color:#666">Marca</td><td>${esc(rec.marca)}</td></tr>
+          <tr><td style="padding:6px 0;color:#666">Factura</td><td>${esc(rec.nro_factura)}</td></tr>
+          <tr><td style="padding:6px 0;color:#666">Fecha Reclamo</td><td>${esc(rec.fecha_reclamo)}</td></tr>
+          <tr><td style="padding:6px 0;color:#666">Estado</td><td>${esc(rec.estado)}</td></tr>
           <tr><td style="padding:6px 0;color:#666">Total a acreditar</td><td style="font-weight:600">$${fmt(total)}</td></tr>
         </table>
         <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:0.05em;color:#666;margin:24px 0 8px">Detalle de Ítems</h3>
@@ -126,7 +130,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
           </tfoot>
         </table>
         ${fotos.length > 0 ? `<p style="color:#666;font-size:12px;margin-top:16px">Se adjuntan ${fotos.length} foto(s) de evidencia.</p>` : ""}
-        ${rec.notas ? `<p style="color:#666;font-size:12px">Notas: ${rec.notas}</p>` : ""}
+        ${rec.notas ? `<p style="color:#666;font-size:12px">Notas: ${esc(rec.notas)}</p>` : ""}
         <p style="margin-top:24px">Quedamos en espera de la nota de crédito correspondiente.</p>
         <p>Saludos,<br><strong>Fashion Group</strong></p>
         <div style="border-top:1px solid #eee;margin-top:32px;padding-top:12px;font-size:11px;color:#999">Este correo fue enviado desde el sistema interno de Fashion Group.</div>
@@ -140,7 +144,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       attachments,
     });
 
-    if (sendError) return NextResponse.json({ error: sendError.message }, { status: 500 });
+    if (sendError) { console.error("Resend error:", sendError.message); return NextResponse.json({ error: "Error al enviar correo" }, { status: 500 }); }
 
     await supabaseServer.from("reclamo_seguimiento").insert({
       reclamo_id: id,
@@ -150,6 +154,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error("send-email error:", err);
+    return NextResponse.json({ error: "Error interno al enviar correo" }, { status: 500 });
   }
 }

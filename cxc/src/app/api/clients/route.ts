@@ -3,6 +3,6 @@ import { supabaseServer } from "@/lib/supabase-server";
 
 export async function GET() {
   const { data, error } = await supabaseServer.from("cxc_rows").select("*");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json(data);
 }

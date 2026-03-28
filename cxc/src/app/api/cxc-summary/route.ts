@@ -3,7 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 
 export async function GET() {
   const { data: rows, error } = await supabaseServer.from("cxc_rows").select("*");
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
   let totalCxc = 0, corriente = 0, vigilancia = 0, vencido = 0;
   const criticalClients = new Set<string>();

@@ -7,7 +7,7 @@ export async function GET() {
     .select("año")
     .order("año", { ascending: false });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const years = [...new Set((data || []).map((r: any) => r.año as number))];

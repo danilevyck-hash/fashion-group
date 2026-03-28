@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     .from("directorio_clientes")
     .select("nombre, whatsapp, telefono, celular");
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
   const results = nameList.map(cxcName => {
     const match = (data || []).find(d =>

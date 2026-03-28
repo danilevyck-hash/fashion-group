@@ -24,6 +24,10 @@ function fmtDate(d: string) {
   return `${day}/${m}/${y}`;
 }
 
+function esc(s: unknown): string {
+  return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 async function sendEmail(to: string, subject: string, html: string) {
   const key = process.env.RESEND_API_KEY;
   if (!key) { console.log("RESEND_API_KEY not configured"); return false; }
@@ -46,13 +50,13 @@ function buildHtml(cheque: Record<string, unknown>, isToday: boolean) {
     <div style="font-family:-apple-system,sans-serif;max-width:500px;margin:0 auto;padding:24px">
       <h2 style="font-size:16px;margin:0 0 16px">${isToday ? "⚠️ Depositar HOY" : "Recordatorio: Depositar mañana"}</h2>
       <table style="width:100%;font-size:14px;border-collapse:collapse">
-        <tr><td style="padding:6px 0;color:#888">Cliente</td><td style="padding:6px 0;font-weight:500">${cheque.cliente}</td></tr>
-        <tr><td style="padding:6px 0;color:#888">Empresa</td><td style="padding:6px 0">${cheque.empresa}</td></tr>
-        <tr><td style="padding:6px 0;color:#888">Banco</td><td style="padding:6px 0">${cheque.banco}</td></tr>
-        <tr><td style="padding:6px 0;color:#888">N° Cheque</td><td style="padding:6px 0">${cheque.numero_cheque}</td></tr>
+        <tr><td style="padding:6px 0;color:#888">Cliente</td><td style="padding:6px 0;font-weight:500">${esc(cheque.cliente)}</td></tr>
+        <tr><td style="padding:6px 0;color:#888">Empresa</td><td style="padding:6px 0">${esc(cheque.empresa)}</td></tr>
+        <tr><td style="padding:6px 0;color:#888">Banco</td><td style="padding:6px 0">${esc(cheque.banco)}</td></tr>
+        <tr><td style="padding:6px 0;color:#888">N° Cheque</td><td style="padding:6px 0">${esc(cheque.numero_cheque)}</td></tr>
         <tr><td style="padding:6px 0;color:#888">Monto</td><td style="padding:6px 0;font-weight:600;font-size:18px">${fmtMonto(Number(cheque.monto))}</td></tr>
         <tr><td style="padding:6px 0;color:#888">Fecha Depósito</td><td style="padding:6px 0">${fmtDate(String(cheque.fecha_deposito))}</td></tr>
-        ${cheque.notas ? `<tr><td style="padding:6px 0;color:#888">Notas</td><td style="padding:6px 0">${cheque.notas}</td></tr>` : ""}
+        ${cheque.notas ? `<tr><td style="padding:6px 0;color:#888">Notas</td><td style="padding:6px 0">${esc(cheque.notas)}</td></tr>` : ""}
       </table>
       <p style="margin-top:20px;font-size:12px;color:#aaa">Fashion Group — Sistema de Cheques</p>
     </div>

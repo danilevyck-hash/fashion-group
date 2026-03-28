@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json(data);
   } catch (err) {
     console.error("Foto upload exception:", err);
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error(err); return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
 

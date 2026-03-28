@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
     .select("*")
     .eq("año", parseInt(año));
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json(data);
 }
 
@@ -24,6 +24,6 @@ export async function POST(req: NextRequest) {
       empresa: r.empresa, año: r.año, mes: r.mes, meta: r.meta,
     })), { onConflict: "empresa,año,mes" });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json({ ok: true });
 }

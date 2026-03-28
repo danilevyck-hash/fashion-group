@@ -18,6 +18,6 @@ export async function GET(req: NextRequest) {
 
   const { error } = await supabaseServer.storage.from("backups").upload(`${today}.json`, JSON.stringify(backup, null, 2), { contentType: "application/json", upsert: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json({ ok: true, date: today, records: { reclamos: reclamos?.length || 0, cheques: cheques?.length || 0 } });
 }

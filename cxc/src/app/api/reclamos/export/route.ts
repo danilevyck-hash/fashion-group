@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   if (estado) query = query.eq("estado", estado);
 
   const { data, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
   const header = "N° Reclamo;Empresa;Proveedor;Marca;N° Factura;N° Orden Compra;Fecha Reclamo;Estado;Referencia;Descripción;Talla;Cantidad;Precio Unit.;Subtotal Item;Importación (10%);ITBMS (7%);Total Item;Motivo;Notas";
   const rows: string[] = [];

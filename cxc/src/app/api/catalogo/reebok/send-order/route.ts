@@ -97,6 +97,6 @@ export async function POST(req: NextRequest) {
     if (!res.ok) { const err = await res.json(); return NextResponse.json({ error: err.message }, { status: 500 }); }
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 });
+    console.error(err); return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }

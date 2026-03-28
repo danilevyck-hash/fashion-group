@@ -9,7 +9,7 @@ export async function GET() {
 
   /* monto_total and estado come from the DB columns directly */
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
   const result = (data || []).map((g) => ({
     ...g,

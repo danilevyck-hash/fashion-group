@@ -22,6 +22,6 @@ export async function POST(req: NextRequest) {
     .from("fg_user_module_order")
     .upsert({ user_id: userId, module_order: moduleOrder || [] }, { onConflict: "user_id" });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json({ ok: true });
 }

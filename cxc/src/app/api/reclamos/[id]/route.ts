@@ -13,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     .eq("id", id)
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
   if (data?.reclamo_seguimiento) {
     data.reclamo_seguimiento.sort((a: { created_at: string }, b: { created_at: string }) =>
@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   if (Object.keys(updates).length > 1) {
     const { error } = await supabaseServer.from("reclamos").update(updates).eq("id", id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   }
 
   return NextResponse.json({ ok: true });
@@ -67,6 +67,6 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   }
 
   const { error } = await supabaseServer.from("reclamos").delete().eq("id", id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json({ ok: true });
 }

@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     .eq("activo", true)
     .order("nombre", { ascending: true });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
   // Filter to employees with pending balance
   const empleados = (data || []).filter((emp) => {
