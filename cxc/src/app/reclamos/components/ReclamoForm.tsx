@@ -67,7 +67,7 @@ export default function ReclamoForm({
 
       <div className="mb-10">
         <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Información General</div>
-        <div className="grid grid-cols-3 gap-x-12 gap-y-5 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-12 gap-y-5 mb-6">
           <div className="flex flex-col gap-1">
             <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa *</label>
             <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm text-black outline-none bg-transparent">

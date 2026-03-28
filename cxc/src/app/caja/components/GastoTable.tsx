@@ -60,7 +60,7 @@ export default function GastoTable({
               <tr>
                 <td
                   colSpan={11}
-                  className="py-12 text-center text-gray-300 text-sm"
+                  className="py-12 text-center text-gray-400 text-sm"
                 >
                   Sin gastos registrados
                 </td>

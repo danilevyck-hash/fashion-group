@@ -88,7 +88,7 @@ export default function GuiaDetail({
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
       <div className="flex flex-wrap gap-4 mb-8 no-print">
         <button onClick={onBack} className="text-sm text-gray-400 hover:text-black transition">
           ← Volver

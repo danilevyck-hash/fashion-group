@@ -249,7 +249,7 @@ export default function VentasPage() {
   return (
     <div>
       <AppHeader module="Ventas" />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
 
         {/* Year selector */}
         <div className="flex flex-wrap items-center gap-2 mb-8">
@@ -416,6 +416,8 @@ export default function VentasPage() {
               </div>
             </div>
           )}
+
+          {!isAdmin && <p className="text-sm text-gray-400 text-center py-8">Vista limitada para este rol.</p>}
 
           {/* Data Entry Section */}
           <div className="border border-gray-200 rounded-xl p-6">

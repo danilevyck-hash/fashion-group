@@ -79,7 +79,7 @@ export default function GuiaForm({
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
       <button
         onClick={onCancel}
         className="text-sm text-gray-400 hover:text-black transition mb-8 block"

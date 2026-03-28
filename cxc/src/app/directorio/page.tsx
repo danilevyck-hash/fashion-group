@@ -119,7 +119,7 @@ export default function DirectorioPage() {
   return (
     <div>
       <AppHeader module="Directorio de Clientes" />
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
       <div className="flex items-end justify-between mb-10">
         <div>
           <h1 className="text-xl font-light tracking-tight">Directorio</h1>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast } from "@/components/ui";
@@ -224,7 +225,8 @@ export default function CamisetasPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <AppHeader module="Camisetas" />
+      <div className="max-w-6xl mx-auto px-6 py-8">
 
         {/* Nav */}
         <Link href="/plantillas" className="text-xs text-gray-400 hover:text-gray-600 transition">← Inicio</Link>

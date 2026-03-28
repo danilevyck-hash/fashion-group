@@ -29,7 +29,7 @@ export default function PeriodoList({
   onDeletePeriodo,
 }: Props) {
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
       <div className="flex items-end justify-between mb-10">
         <div>
           <h1 className="text-xl font-light tracking-tight">Caja Menuda</h1>
@@ -65,7 +65,7 @@ export default function PeriodoList({
           ))}
         </div>
       ) : periodos.length === 0 ? (
-        <p className="text-gray-300 text-sm text-center py-20">
+        <p className="text-gray-400 text-sm text-center py-20">
           No hay períodos registrados
         </p>
       ) : (

@@ -120,7 +120,7 @@ export default function ReportePage() {
         ]}
       />
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-8">
         <h1 className="text-xl font-semibold mb-6">Reporte de Deducciones Quincenales</h1>
 
         {/* Period selector */}

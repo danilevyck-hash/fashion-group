@@ -48,7 +48,7 @@ export default function PeriodoDetailHeader({
       </div>
 
       {/* Summary cards */}
-      <div className="grid grid-cols-3 gap-8 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mb-10">
         <div>
           <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">
             Fondo

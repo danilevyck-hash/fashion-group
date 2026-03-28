@@ -112,7 +112,7 @@ export default function ReclamoDetail({
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
       <button onClick={onBack} className="text-sm text-gray-400 hover:text-black transition mb-8 block">← Reclamos</button>
 
       <div className="flex items-start justify-between mb-4">
@@ -294,7 +294,7 @@ export default function ReclamoDetail({
       {editMode && (
         <div className="border-t border-gray-100 pt-6">
           <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Editando Reclamo</div>
-          <div className="grid grid-cols-3 gap-x-12 gap-y-5 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-12 gap-y-5 mb-6">
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa</label>
               <select value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent">

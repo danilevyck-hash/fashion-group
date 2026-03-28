@@ -209,7 +209,7 @@ export default function PrestamosPage() {
     <div className="min-h-screen bg-white">
       <AppHeader module="Préstamos a Colaboradores" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
           <div className="bg-gray-50 rounded-xl p-4">

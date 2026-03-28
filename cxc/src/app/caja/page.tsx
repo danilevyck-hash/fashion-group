@@ -125,7 +125,7 @@ function CajaPage() {
     const pctUsed = current.fondo_inicial > 0 ? (saldo / current.fondo_inicial) * 100 : 100;
 
     return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
         <PeriodoDetailHeader
           current={current}
           totalGastado={totalGastado}
