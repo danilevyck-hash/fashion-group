@@ -72,8 +72,25 @@ export default function CamisetasPage() {
   const sobrev = sortedProductos.filter(p => prodTotalPaq(p.id) > Math.floor(p.stock_comprado / PPQ)).length;
 
   async function savePedido(cId: string, pId: string, paq: number) {
-    await fetch("/api/camisetas/pedido", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: cId, producto_id: pId, paquetes: paq }) });
-    setEditCell(null); showToast("Guardado"); load();
+    // Update local state immediately
+    setPedidos(prev => {
+      const idx = prev.findIndex(p => p.cliente_id === cId && p.producto_id === pId);
+      if (paq <= 0) {
+        return idx >= 0 ? prev.filter((_, i) => i !== idx) : prev;
+      }
+      if (idx >= 0) return prev.map((p, i) => i === idx ? { ...p, paquetes: paq } : p);
+      return [...prev, { id: "", cliente_id: cId, producto_id: pId, paquetes: paq }];
+    });
+    setEditCell(null);
+
+    // Save to API
+    const res = await fetch("/api/camisetas/pedido", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: cId, producto_id: pId, paquetes: paq }) });
+    if (res.ok) {
+      showToast("Guardado");
+    } else {
+      showToast("Error al guardar");
+      load(); // reload on error to restore correct state
+    }
   }
   async function addClient() {
     if (!newClientName.trim()) return;
@@ -318,16 +335,11 @@ export default function CamisetasPage() {
                                   <div key={prod.id} className={`flex items-center py-2 border-b border-gray-100 gap-3 ${paq === 0 ? "opacity-40" : ""}`}>
                                     <Dot color={prod.color} />
                                     <span className="text-sm flex-1">{prod.nombre}</span>
-                                    <input type="number" min={0} step={1} value={paq}
-                                      onChange={e => {
+                                    <input type="number" min={0} step={1} defaultValue={paq} key={`${selectedClient}-${prod.id}-${paq}`}
+                                      onBlur={e => {
                                         const v = parseInt(e.target.value) || 0;
-                                        setPedidos(prev => {
-                                          const idx = prev.findIndex(p => p.cliente_id === selectedClient && p.producto_id === prod.id);
-                                          if (idx >= 0) return prev.map((p, i) => i === idx ? { ...p, paquetes: v } : p);
-                                          return [...prev, { id: "", cliente_id: selectedClient, producto_id: prod.id, paquetes: v }];
-                                        });
+                                        if (v !== paq) savePedido(selectedClient, prod.id, v);
                                       }}
-                                      onBlur={e => savePedido(selectedClient, prod.id, parseInt(e.target.value) || 0)}
                                       onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                                       className="w-12 text-center border-b border-gray-200 text-xs py-0.5 outline-none focus:border-black tabular-nums" />
                                     <span className="text-xs text-gray-400 tabular-nums w-10">{paq > 0 ? `${paq * PPQ}pz` : "— pz"}</span>
