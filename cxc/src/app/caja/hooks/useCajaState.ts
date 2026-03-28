@@ -23,6 +23,9 @@ export function useCajaState(urlId: string, initialView: View) {
   const [categorias, setCategorias] = useState(CATEGORIAS_DEFAULT);
   const [showManageCat, setShowManageCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
+  const [confirmClosePeriodo, setConfirmClosePeriodo] = useState<string | null>(null);
+  const [confirmDeletePeriodoId, setConfirmDeletePeriodoId] = useState<string | null>(null);
+  const [confirmDeleteGastoId, setConfirmDeleteGastoId] = useState<string | null>(null);
   const [showNewPeriodoModal, setShowNewPeriodoModal] = useState(false);
   const [fondoInput, setFondoInput] = useState("200");
   const [responsables, setResponsables] = useState<string[]>([]);
@@ -151,15 +154,27 @@ export function useCajaState(urlId: string, initialView: View) {
     }
   }
 
-  async function closePeriodo(id: string) {
-    if (!confirm("¿Cerrar este período? No podrá agregar más gastos.")) return;
+  function requestClosePeriodo(id: string) {
+    setConfirmClosePeriodo(id);
+  }
+
+  async function doClosePeriodo() {
+    if (!confirmClosePeriodo) return;
+    const id = confirmClosePeriodo;
+    setConfirmClosePeriodo(null);
     await fetch(`/api/caja/periodos/${id}`, { method: "PATCH" });
     await loadDetail(id);
     loadPeriodos();
   }
 
-  async function deletePeriodo(id: string) {
-    if (!confirm("¿Eliminar este período y todos sus gastos?")) return;
+  function requestDeletePeriodo(id: string) {
+    setConfirmDeletePeriodoId(id);
+  }
+
+  async function doDeletePeriodo() {
+    if (!confirmDeletePeriodoId) return;
+    const id = confirmDeletePeriodoId;
+    setConfirmDeletePeriodoId(null);
     const res = await fetch(`/api/caja/periodos/${id}`, { method: "DELETE" });
     if (res.ok) {
       loadPeriodos();
@@ -209,9 +224,14 @@ export function useCajaState(urlId: string, initialView: View) {
     }
   }
 
-  async function deleteGasto(gastoId: string) {
-    if (!current) return;
-    if (!confirm("¿Eliminar?")) return;
+  function requestDeleteGasto(gastoId: string) {
+    setConfirmDeleteGastoId(gastoId);
+  }
+
+  async function doDeleteGasto() {
+    if (!current || !confirmDeleteGastoId) return;
+    const gastoId = confirmDeleteGastoId;
+    setConfirmDeleteGastoId(null);
     await fetch(`/api/caja/gastos/${gastoId}`, { method: "DELETE" });
     await loadDetail(current.id);
     loadPeriodos();
@@ -257,7 +277,13 @@ export function useCajaState(urlId: string, initialView: View) {
     addingGasto, subtotalNum, totalNum,
     editingGastoId, setEditingGastoId, editGasto, setEditGasto,
     formValues, formSetters,
-    loadDetail, createPeriodo, confirmCreatePeriodo, closePeriodo, deletePeriodo, aprobarReposicion,
-    addGasto, deleteGasto, saveEditGasto, exportExcel,
+    confirmClosePeriodo, setConfirmClosePeriodo,
+    confirmDeletePeriodoId, setConfirmDeletePeriodoId,
+    confirmDeleteGastoId, setConfirmDeleteGastoId,
+    loadDetail, createPeriodo, confirmCreatePeriodo,
+    requestClosePeriodo, doClosePeriodo,
+    requestDeletePeriodo, doDeletePeriodo,
+    aprobarReposicion,
+    addGasto, requestDeleteGasto, doDeleteGasto, saveEditGasto, exportExcel,
   };
 }

@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Modal } from "@/components/ui";
+import { Modal, ConfirmModal } from "@/components/ui";
 
 import { View } from "./components/types";
 import { useCajaState } from "./hooks/useCajaState";
@@ -42,8 +42,14 @@ function CajaPage() {
     addingGasto, subtotalNum, totalNum,
     editingGastoId, setEditingGastoId, editGasto, setEditGasto,
     formValues, formSetters,
-    loadDetail, createPeriodo, confirmCreatePeriodo, closePeriodo, deletePeriodo, aprobarReposicion,
-    addGasto, deleteGasto, saveEditGasto, exportExcel,
+    confirmClosePeriodo, setConfirmClosePeriodo,
+    confirmDeletePeriodoId, setConfirmDeletePeriodoId,
+    confirmDeleteGastoId, setConfirmDeleteGastoId,
+    loadDetail, createPeriodo, confirmCreatePeriodo,
+    requestClosePeriodo, doClosePeriodo,
+    requestDeletePeriodo, doDeletePeriodo,
+    aprobarReposicion,
+    addGasto, requestDeleteGasto, doDeleteGasto, saveEditGasto, exportExcel,
   } = useCajaState(urlId, initialView);
 
   if (!authChecked) return null;
@@ -64,8 +70,8 @@ function CajaPage() {
           onCreatePeriodo={createPeriodo}
           onLoadDetail={(id) => loadDetail(id)}
           onPrintPeriodo={(id) => loadDetail(id).then(() => setView("print", id))}
-          onClosePeriodo={closePeriodo}
-          onDeletePeriodo={deletePeriodo}
+          onClosePeriodo={requestClosePeriodo}
+          onDeletePeriodo={requestDeletePeriodo}
         />
         <Modal
           open={showNewPeriodoModal}
@@ -171,7 +177,7 @@ function CajaPage() {
           setEditingGastoId={setEditingGastoId}
           setEditGasto={setEditGasto}
           onSaveEdit={saveEditGasto}
-          onDeleteGasto={deleteGasto}
+          onDeleteGasto={requestDeleteGasto}
         />
 
         <PeriodoDetailFooter
@@ -179,7 +185,7 @@ function CajaPage() {
           totalGastado={totalGastado}
           isOpen={isOpen}
           onPrint={() => setView("print", current.id)}
-          onClose={() => closePeriodo(current.id)}
+          onClose={() => requestClosePeriodo(current.id)}
           onAprobarReposicion={aprobarReposicion}
           onExportExcel={exportExcel}
         />
@@ -187,5 +193,35 @@ function CajaPage() {
     );
   }
 
-  return null;
+  return (
+    <>
+      <ConfirmModal
+        open={!!confirmClosePeriodo}
+        onClose={() => setConfirmClosePeriodo(null)}
+        onConfirm={doClosePeriodo}
+        title="Cerrar período"
+        message="¿Cerrar este período? No podrá agregar más gastos."
+        confirmLabel="Cerrar período"
+        destructive
+      />
+      <ConfirmModal
+        open={!!confirmDeletePeriodoId}
+        onClose={() => setConfirmDeletePeriodoId(null)}
+        onConfirm={doDeletePeriodo}
+        title="Eliminar período"
+        message="¿Eliminar este período y todos sus gastos? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        destructive
+      />
+      <ConfirmModal
+        open={!!confirmDeleteGastoId}
+        onClose={() => setConfirmDeleteGastoId(null)}
+        onConfirm={doDeleteGasto}
+        title="Eliminar gasto"
+        message="¿Eliminar este gasto?"
+        confirmLabel="Eliminar"
+        destructive
+      />
+    </>
+  );
 }

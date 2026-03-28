@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { ConfirmModal } from "@/components/ui";
 import { useGuiasState } from "./components/useGuiasState";
 import GuiasList from "./components/GuiasList";
 import GuiaForm from "./components/GuiaForm";
@@ -125,12 +126,24 @@ export default function GuiasPage() {
         toast={s.toast}
         onBack={() => s.setView("list")}
         onEdit={s.startEdit}
-        onDelete={s.deleteGuia}
+        onDelete={s.requestDeleteGuia}
         onConfirmarDespacho={s.confirmarDespacho}
         showToast={s.showToast}
       />
     );
   }
 
-  return null;
+  return (
+    <>
+      <ConfirmModal
+        open={!!s.confirmDeleteId}
+        onClose={() => s.setConfirmDeleteId(null)}
+        onConfirm={s.confirmDeleteGuia}
+        title="Eliminar guía"
+        message="¿Eliminar esta guía? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        destructive
+      />
+    </>
+  );
 }

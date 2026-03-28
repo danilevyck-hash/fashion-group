@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
-import { SkeletonTable, EmptyState, Toast, StatusBadge } from "@/components/ui";
+import { SkeletonTable, EmptyState, Toast, StatusBadge, ConfirmModal } from "@/components/ui";
 import XLSX from "xlsx-js-style";
 import { fmt, fmtDate } from "@/lib/format";
 import { EMPRESAS } from "@/lib/companies";
@@ -41,6 +41,8 @@ export default function ChequesPage() {
   const [search, setSearch] = useState("");
   const [showResumen, setShowResumen] = useState(false);
   const [resumenSort, setResumenSort] = useState<"monto" | "count">("monto");
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Rebotado modal
   const [rebotandoId, setRebotandoId] = useState<string | null>(null);
@@ -125,7 +127,6 @@ export default function ChequesPage() {
   }
 
   async function deleteCheque(id: string) {
-    if (!confirm("¿Eliminar este cheque?")) return;
     await fetch(`/api/cheques/${id}`, { method: "DELETE" });
     loadCheques();
     showToast("Cheque eliminado");
@@ -470,7 +471,7 @@ export default function ChequesPage() {
                       <span className="text-gray-200">·</span>
                     </>)}
                     <button onClick={() => startEdit(c)} className="text-sm text-gray-500 hover:text-black transition">Editar</button>
-                    {role === "admin" && <><span className="text-gray-200">·</span><button onClick={() => deleteCheque(c.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button></>}
+                    {role === "admin" && <><span className="text-gray-200">·</span><button onClick={() => setConfirmDeleteId(c.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button></>}
                   </td>
                 </tr>
               );
@@ -481,6 +482,15 @@ export default function ChequesPage() {
       )}
       <Toast message={error} type="error" />
       <Toast message={toast} />
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={() => { deleteCheque(confirmDeleteId!); setConfirmDeleteId(null); }}
+        title="Eliminar cheque"
+        message="¿Seguro que deseas eliminar este cheque? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        destructive
+      />
     </div>
     </div>
   );

@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast } from "@/components/ui";
+import { Toast, ConfirmModal } from "@/components/ui";
 
 import { Empleado } from "../components/types";
 import EmpleadoHeader from "../components/EmpleadoHeader";
@@ -121,7 +121,7 @@ export default function PrestamoDetallePage() {
           canEdit={canEdit}
           onApprove={movForm.approveMov}
           onEdit={editMov.openEditMov}
-          onDelete={movForm.deleteMov}
+          onDelete={movForm.requestDeleteMov}
         />
 
         <DangerZone
@@ -216,6 +216,16 @@ export default function PrestamoDetallePage() {
         saldo={saldo}
         onClose={() => actions.setShowForceArchive(false)}
         onConfirm={actions.forceArchive}
+      />
+
+      <ConfirmModal
+        open={!!movForm.confirmDeleteMovId}
+        onClose={() => movForm.setConfirmDeleteMovId(null)}
+        onConfirm={movForm.doDeleteMov}
+        title="Eliminar movimiento"
+        message="¿Eliminar este movimiento? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        destructive
       />
 
       <Toast message={toast} />

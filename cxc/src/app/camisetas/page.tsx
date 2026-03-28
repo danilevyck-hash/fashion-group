@@ -5,7 +5,7 @@ import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast, SkeletonTable, EmptyState } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState, ConfirmModal } from "@/components/ui";
 
 interface Producto { id: string; nombre: string; genero: string; color: string; precio_panama: number; rrp: number; stock_comprado: number; }
 interface Cliente { id: string; nombre: string; estado?: string; }
@@ -41,6 +41,7 @@ export default function CamisetasPage() {
   const [newClientName, setNewClientName] = useState("");
   const [showNewClient, setShowNewClient] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   // Nuevo Pedido modal
   const [showNuevo, setShowNuevo] = useState(false);
@@ -106,8 +107,7 @@ export default function CamisetasPage() {
       setSelectedClient(created.id);
     }
   }
-  async function deleteClient(id: string, nombre: string) {
-    if (!confirm(`¿Eliminar ${nombre}? Se borrarán todos sus pedidos.`)) return;
+  async function deleteClient(id: string) {
     const res = await fetch(`/api/camisetas/clientes/${id}`, { method: "DELETE" });
     if (res.ok) { setSelectedClient(null); showToast("Cliente eliminado"); load(); }
     else { const err = await res.json().catch(() => null); showToast(err?.error || "Error al eliminar"); }
@@ -408,7 +408,7 @@ export default function CamisetasPage() {
                           <h2 className="text-2xl font-light">{cl.nombre}</h2>
                           <p className="text-sm text-gray-500 mt-1">{tPaq} paq · {tPaq * PPQ} pzas{!isVendedor && <> · ${fmt(tVal)}</>}</p>
                         </div>
-                        <button onClick={() => deleteClient(cl.id, cl.nombre)} className="text-xs text-gray-400 hover:text-red-500 transition">Eliminar cliente</button>
+                        <button onClick={() => setConfirmDeleteId(cl.id)} className="text-xs text-gray-400 hover:text-red-500 transition">Eliminar cliente</button>
                       </div>
 
                       <div className="mt-6">
@@ -573,6 +573,15 @@ export default function CamisetasPage() {
       )}
 
       <Toast message={toast} />
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={() => { deleteClient(confirmDeleteId!); setConfirmDeleteId(null); }}
+        title="Eliminar cliente"
+        message={`¿Seguro que deseas eliminar a ${clientes.find(c => c.id === confirmDeleteId)?.nombre ?? "este cliente"}? Se borrarán todos sus pedidos.`}
+        confirmLabel="Eliminar"
+        destructive
+      />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast, SkeletonTable, EmptyState } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState, ConfirmModal } from "@/components/ui";
 import XLSX from "xlsx-js-style";
 
 interface Cliente {
@@ -32,6 +32,7 @@ export default function DirectorioPage() {
   const [showNew, setShowNew] = useState(false);
   const [newData, setNewData] = useState({ nombre: "", empresa: "", whatsapp: "", correo: "", contacto: "", notas: "" });
   const [toast, setToast] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
 
   const loadClientes = useCallback(async () => {
@@ -76,7 +77,6 @@ export default function DirectorioPage() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("¿Eliminar este contacto?")) return;
     const res = await fetch(`/api/directorio/${id}`, { method: "DELETE" });
     if (res.ok) { setExpanded(null); loadClientes(); }
   }
@@ -278,7 +278,7 @@ export default function DirectorioPage() {
                             <button onClick={(e) => { e.stopPropagation(); router.push(`/admin?search=${encodeURIComponent(c.nombre)}`); }}
                               title="Ver posición CXC de este cliente" className="text-xs text-gray-400 hover:text-black transition">Ver en CXC →</button>
                             {role === "admin" && (
-                              <button onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
+                              <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(c.id); }}
                                 className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>
                             )}
                           </div>
@@ -319,6 +319,15 @@ export default function DirectorioPage() {
       )}
 
       <Toast message={toast} />
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={() => { handleDelete(confirmDeleteId!); setConfirmDeleteId(null); }}
+        title="Eliminar cliente"
+        message="Se eliminará este contacto del directorio."
+        confirmLabel="Eliminar"
+        destructive
+      />
     </div>
     </div>
   );

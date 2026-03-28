@@ -48,6 +48,9 @@ export function useGuiasState() {
   const currentMonth = new Date().toISOString().slice(0, 7);
   const [monthFilter, setMonthFilter] = useState(currentMonth);
 
+  // Confirm delete state
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
   // Detail / print state
   const [printGuia, setPrintGuia] = useState<Guia | null>(null);
   const [bPlaca, setBPlaca] = useState("");
@@ -107,9 +110,14 @@ export function useGuiasState() {
     }
   }, []);
 
-  async function deleteGuia(id: string) {
-    if (!confirm("¿Eliminar esta guía?")) return;
-    await fetch(`/api/guias/${id}`, { method: "DELETE" });
+  function requestDeleteGuia(id: string) {
+    setConfirmDeleteId(id);
+  }
+
+  async function confirmDeleteGuia() {
+    if (!confirmDeleteId) return;
+    await fetch(`/api/guias/${confirmDeleteId}`, { method: "DELETE" });
+    setConfirmDeleteId(null);
     loadGuias();
     setView("list");
   }
@@ -347,7 +355,8 @@ export function useGuiasState() {
     loadGuias,
     viewGuia,
     startEdit,
-    deleteGuia,
+    confirmDeleteId, setConfirmDeleteId,
+    requestDeleteGuia, confirmDeleteGuia,
     confirmarDespacho,
   };
 }

@@ -6,7 +6,7 @@ import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { EMPRESAS } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast, SkeletonTable, EmptyState } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState, ConfirmModal } from "@/components/ui";
 
 // ── Types ──
 interface Movimiento {
@@ -81,6 +81,9 @@ export default function PrestamosPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
   const [filterPendientes, setFilterPendientes] = useState(false);
+
+  // Confirm delete employee
+  const [confirmDeleteEmp, setConfirmDeleteEmp] = useState<Empleado | null>(null);
 
   // Modal: new/edit employee
   const [showEmpModal, setShowEmpModal] = useState(false);
@@ -168,8 +171,14 @@ export default function PrestamosPage() {
     } catch { showToast("Error de conexión"); }
     setSaving(false);
   }
-  async function deleteEmp(emp: Empleado) {
-    if (!confirm(`¿Eliminar a ${emp.nombre}?`)) return;
+  function requestDeleteEmp(emp: Empleado) {
+    setConfirmDeleteEmp(emp);
+  }
+
+  async function doDeleteEmp() {
+    if (!confirmDeleteEmp) return;
+    const emp = confirmDeleteEmp;
+    setConfirmDeleteEmp(null);
     const res = await fetch(`/api/prestamos/empleados/${emp.id}`, { method: "DELETE" });
     if (res.ok) { showToast("Empleado eliminado"); loadEmpleados(); }
     else { const err = await res.json(); showToast(err.error || "Error al eliminar"); }
@@ -331,7 +340,7 @@ export default function PrestamosPage() {
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
                         </button>
                         {isAdmin && (
-                          <button onClick={(e) => { e.stopPropagation(); deleteEmp(emp); }} className="p-1.5 hover:bg-red-50 rounded-lg transition text-gray-400 hover:text-red-500" title="Eliminar">
+                          <button onClick={(e) => { e.stopPropagation(); requestDeleteEmp(emp); }} className="p-1.5 hover:bg-red-50 rounded-lg transition text-gray-400 hover:text-red-500" title="Eliminar">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                           </button>
                         )}
@@ -453,6 +462,16 @@ export default function PrestamosPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={!!confirmDeleteEmp}
+        onClose={() => setConfirmDeleteEmp(null)}
+        onConfirm={doDeleteEmp}
+        title="Eliminar empleado"
+        message={`¿Eliminar a ${confirmDeleteEmp?.nombre}? Esta acción no se puede deshacer.`}
+        confirmLabel="Eliminar"
+        destructive
+      />
 
       <Toast message={toast} />
     </div>

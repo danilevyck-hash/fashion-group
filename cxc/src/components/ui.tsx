@@ -120,6 +120,55 @@ export function Modal({
   );
 }
 
+// ── ESTÉTICA 7b: Confirm Modal ──
+export function ConfirmModal({
+  open,
+  onClose,
+  onConfirm,
+  title = "¿Estás seguro?",
+  message,
+  confirmLabel = "Confirmar",
+  cancelLabel = "Cancelar",
+  destructive = false,
+  loading = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  title?: string;
+  message?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  destructive?: boolean;
+  loading?: boolean;
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white sm:rounded-2xl rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-medium mb-1">{title}</h3>
+        {message && <p className="text-sm text-gray-500 mb-6">{message}</p>}
+        <div className="flex gap-3 mt-4">
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className={`flex-1 px-4 py-2.5 rounded-full text-sm font-medium transition disabled:opacity-50 ${
+              destructive
+                ? "bg-red-600 text-white hover:bg-red-700"
+                : "bg-black text-white hover:bg-gray-800"
+            }`}
+          >
+            {loading ? "Procesando..." : confirmLabel}
+          </button>
+          <button onClick={onClose} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-full text-sm hover:bg-gray-50 transition disabled:opacity-50">
+            {cancelLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── ESTÉTICA 8: Badge Component ──
 const BADGE_COLORS: Record<string, string> = {
   green: "bg-emerald-50 text-emerald-700",

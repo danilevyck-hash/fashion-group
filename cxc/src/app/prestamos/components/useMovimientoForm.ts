@@ -19,6 +19,7 @@ export function useMovimientoForm({ empleadoId, deduccionQuincenal, onSuccess, s
   const [mMonto, setMMonto] = useState("");
   const [mNotas, setMNotas] = useState("");
   const [saving, setSaving] = useState(false);
+  const [confirmDeleteMovId, setConfirmDeleteMovId] = useState<string | null>(null);
 
   function openMovModal() { setMovStep("type"); setShowMovModal(true); }
 
@@ -52,8 +53,14 @@ export function useMovimientoForm({ empleadoId, deduccionQuincenal, onSuccess, s
     setSaving(false);
   }
 
-  async function deleteMov(movId: string) {
-    if (!confirm("¿Eliminar este movimiento?")) return;
+  function requestDeleteMov(movId: string) {
+    setConfirmDeleteMovId(movId);
+  }
+
+  async function doDeleteMov() {
+    if (!confirmDeleteMovId) return;
+    const movId = confirmDeleteMovId;
+    setConfirmDeleteMovId(null);
     const res = await fetch(`/api/prestamos/movimientos/${movId}`, { method: "DELETE" });
     if (res.ok) { showToast("Movimiento eliminado"); onSuccess(); }
     else showToast("Error al eliminar");
@@ -76,7 +83,10 @@ export function useMovimientoForm({ empleadoId, deduccionQuincenal, onSuccess, s
     mMonto, setMMonto,
     mNotas, setMNotas,
     saving,
-    openMovModal, selectMovType, saveMov, deleteMov, approveMov,
+    confirmDeleteMovId, setConfirmDeleteMovId,
+    openMovModal, selectMovType, saveMov,
+    requestDeleteMov, doDeleteMov,
+    approveMov,
   };
 }
 

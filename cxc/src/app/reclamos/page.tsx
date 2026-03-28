@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { ConfirmModal } from "@/components/ui";
 import { Reclamo, RItem, Foto, Contacto, RView } from "./components/types";
 import { EMPRESAS_MAP, calcSub, daysSince, emptyItem, loadCustomMotivos } from "./components/constants";
 import EmpresaSelector from "./components/EmpresaSelector";
@@ -34,6 +35,7 @@ function ReclamosPage() {
   const [search, setSearch] = useState(""); const [filterEstado, setFilterEstado] = useState("all");
   const [confirmingEstado, setConfirmingEstado] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState("");
   const [sortCol, setSortCol] = useState<"fecha" | "dias" | "total" | "estado">("fecha");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -143,10 +145,15 @@ function ReclamosPage() {
     setToast(`Estado actualizado a ${e}`); setTimeout(() => setToast(null), 3000);
     await loadDetail(current.id); loadReclamos();
   }
-  async function deleteReclamo(id: string) {
-    if (!confirm("¿Seguro que deseas eliminar este reclamo?")) return;
+  function requestDeleteReclamo(id: string) {
+    setConfirmDeleteId(id);
+  }
+
+  async function confirmDeleteReclamo() {
+    if (!confirmDeleteId) return;
     setShowDeleteConfirm(false);
-    await fetch(`/api/reclamos/${id}`, { method: "DELETE" });
+    await fetch(`/api/reclamos/${confirmDeleteId}`, { method: "DELETE" });
+    setConfirmDeleteId(null);
     setCurrent(null); setView("list"); loadReclamos();
   }
 
@@ -228,7 +235,7 @@ function ReclamosPage() {
         onBack={() => setActiveEmpresa(null)}
         onNewReclamo={() => { resetForm(); setFEmpresa(activeEmpresa); setView("form"); }}
         onLoadDetail={(id) => loadDetail(id)}
-        onDeleteReclamo={(id) => deleteReclamo(id)}
+        onDeleteReclamo={(id) => requestDeleteReclamo(id)}
       />
     );
   }
@@ -264,37 +271,48 @@ function ReclamosPage() {
   if (!current) return null;
 
   return (
-    <ReclamoDetail
-      current={current}
-      role={role}
-      contactos={contactos}
-      nota={nota} setNota={setNota}
-      editMode={editMode} setEditMode={setEditMode}
-      editEmpresa={editEmpresa} setEditEmpresa={setEditEmpresa}
-      editFactura={editFactura} setEditFactura={setEditFactura}
-      editPedido={editPedido} setEditPedido={setEditPedido}
-      editFecha={editFecha} setEditFecha={setEditFecha}
-      editNotas={editNotas} setEditNotas={setEditNotas}
-      editEstado={editEstado} setEditEstado={setEditEstado}
-      editItems={editItems} setEditItems={setEditItems}
-      editSaving={editSaving}
-      confirmingEstado={confirmingEstado} setConfirmingEstado={setConfirmingEstado}
-      showDeleteConfirm={showDeleteConfirm} setShowDeleteConfirm={setShowDeleteConfirm}
-      showAplicadaModal={showAplicadaModal} setShowAplicadaModal={setShowAplicadaModal}
-      aplicadaNc={aplicadaNc} setAplicadaNc={setAplicadaNc}
-      aplicadaMonto={aplicadaMonto} setAplicadaMonto={setAplicadaMonto}
-      toast={toast}
-      customMotivos={customMotivos} setCustomMotivos={setCustomMotivos}
-      addingEditMotivo={addingEditMotivo} setAddingEditMotivo={setAddingEditMotivo}
-      newMotivoText={newMotivoText} setNewMotivoText={setNewMotivoText}
-      onBack={() => { setCurrent(null); setView("list"); }}
-      onAddNota={addNota}
-      onChangeEstado={changeEstado}
-      onDeleteReclamo={deleteReclamo}
-      onSaveEdit={saveEdit}
-      onUploadFoto={uploadFoto}
-      onDeleteFoto={deleteFoto}
-      onAplicadaConfirm={handleAplicadaConfirm}
-    />
+    <>
+      <ReclamoDetail
+        current={current}
+        role={role}
+        contactos={contactos}
+        nota={nota} setNota={setNota}
+        editMode={editMode} setEditMode={setEditMode}
+        editEmpresa={editEmpresa} setEditEmpresa={setEditEmpresa}
+        editFactura={editFactura} setEditFactura={setEditFactura}
+        editPedido={editPedido} setEditPedido={setEditPedido}
+        editFecha={editFecha} setEditFecha={setEditFecha}
+        editNotas={editNotas} setEditNotas={setEditNotas}
+        editEstado={editEstado} setEditEstado={setEditEstado}
+        editItems={editItems} setEditItems={setEditItems}
+        editSaving={editSaving}
+        confirmingEstado={confirmingEstado} setConfirmingEstado={setConfirmingEstado}
+        showDeleteConfirm={showDeleteConfirm} setShowDeleteConfirm={setShowDeleteConfirm}
+        showAplicadaModal={showAplicadaModal} setShowAplicadaModal={setShowAplicadaModal}
+        aplicadaNc={aplicadaNc} setAplicadaNc={setAplicadaNc}
+        aplicadaMonto={aplicadaMonto} setAplicadaMonto={setAplicadaMonto}
+        toast={toast}
+        customMotivos={customMotivos} setCustomMotivos={setCustomMotivos}
+        addingEditMotivo={addingEditMotivo} setAddingEditMotivo={setAddingEditMotivo}
+        newMotivoText={newMotivoText} setNewMotivoText={setNewMotivoText}
+        onBack={() => { setCurrent(null); setView("list"); }}
+        onAddNota={addNota}
+        onChangeEstado={changeEstado}
+        onDeleteReclamo={requestDeleteReclamo}
+        onSaveEdit={saveEdit}
+        onUploadFoto={uploadFoto}
+        onDeleteFoto={deleteFoto}
+        onAplicadaConfirm={handleAplicadaConfirm}
+      />
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={confirmDeleteReclamo}
+        title="Eliminar reclamo"
+        message="¿Seguro que deseas eliminar este reclamo? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        destructive
+      />
+    </>
   );
 }
