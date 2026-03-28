@@ -22,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const { id } = params;
   const body = await req.json();
-  const { fecha, transportista, placa, observaciones, items, monto_total, estado, receptor_nombre, cedula, firma_base64, entregado_por, numero_guia_transp } = body;
+  const { fecha, transportista, placa, observaciones, items, monto_total, estado, receptor_nombre, cedula, firma_base64, firma_entregador_base64, entregado_por, numero_guia_transp } = body;
 
   // Update header
   const updateData: Record<string, unknown> = {};
@@ -37,6 +37,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (firma_base64 !== undefined) updateData.firma_base64 = firma_base64;
   if (entregado_por !== undefined) updateData.entregado_por = entregado_por;
   if (numero_guia_transp !== undefined) updateData.numero_guia_transp = numero_guia_transp;
+  if (firma_entregador_base64 !== undefined) updateData.firma_entregador_base64 = firma_entregador_base64;
 
   const { error: guiaErr } = await supabaseServer
     .from("guia_transporte")
@@ -80,7 +81,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const body = await req.json();
-  const allowed = ["placa", "observaciones", "estado", "receptor_nombre", "cedula", "firma_base64", "entregado_por", "numero_guia_transp", "nombre_entregador", "cedula_entregador", "firma_transportista"];
+  const allowed = ["placa", "observaciones", "estado", "receptor_nombre", "cedula", "firma_base64", "firma_entregador_base64", "entregado_por", "numero_guia_transp", "nombre_entregador", "cedula_entregador", "firma_transportista"];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
     if (body[key] !== undefined) update[key] = body[key];

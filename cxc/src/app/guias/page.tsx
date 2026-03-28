@@ -30,6 +30,7 @@ interface Guia {
   receptor_nombre?: string;
   cedula?: string;
   firma_base64?: string;
+  firma_entregador_base64?: string;
   entregado_por?: string;
   numero_guia_transp?: string;
   guia_items?: GuiaItem[];
@@ -60,7 +61,7 @@ function getMonthOptions(): { value: string; label: string }[] {
 const DEFAULT_TRANSPORTISTAS = ["RedNblue", "Mojica", "Transporte Sol", "Sanjur"];
 const DEFAULT_CLIENTES = ["City Mall", "La Frontera Duty Free", "Jerusalem de Panama", "Plaza Los Angeles", "Golden Mall", "Multi Fashion Holding", "Kheriddine", "Bouti S.A.", "Jerusalem Duty Free", "Outlet Duty Free N2", "Outlet Duty Free N3", "Sporting Shoes N4"];
 const DEFAULT_DIRECCIONES = ["Paso Canoas", "David", "Santiago", "Guabito", "Changinola"];
-const DEFAULT_EMPRESAS = ["MultiFashion Holding", "Vistana International", "Fashion Shoes", "Fashion Wear", "Active Shoes", "Active Wear", "Confecciones Boston", "Joystep"];
+const DEFAULT_EMPRESAS = ["Vistana International", "Fashion Shoes", "Fashion Wear", "Active Shoes", "Active Wear", "Confecciones Boston", "Joystep", "MultiFashion Holding"];
 
 function loadList(key: string, defaults: string[]): string[] {
   if (typeof window === "undefined") return defaults;
@@ -79,8 +80,8 @@ function saveList(key: string, defaults: string[], list: string[]) {
   localStorage.setItem(key, JSON.stringify(custom));
 }
 
-function emptyItem(orden: number, empresa: string): GuiaItem {
-  return { orden, cliente: "", direccion: "", empresa, facturas: "", bultos: 0, numero_guia_transp: "" };
+function emptyItem(orden: number): GuiaItem {
+  return { orden, cliente: "", direccion: "", empresa: "", facturas: "", bultos: 0, numero_guia_transp: "" };
 }
 
 function fmtDate(d: string) {
@@ -112,6 +113,78 @@ function AddNewInline({ onAdd, placeholder }: { onAdd: (v: string) => void; plac
   );
 }
 
+// ── Canvas drawing helper ──
+function setupCanvas(
+  canvas: HTMLCanvasElement,
+  isDrawingRef: React.MutableRefObject<boolean>,
+) {
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return () => {};
+
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+
+  function getPos(e: MouseEvent | TouchEvent) {
+    const rect = canvas.getBoundingClientRect();
+    if ("touches" in e) {
+      return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+    }
+    return { x: (e as MouseEvent).clientX - rect.left, y: (e as MouseEvent).clientY - rect.top };
+  }
+
+  function startDraw(e: MouseEvent | TouchEvent) {
+    e.preventDefault();
+    isDrawingRef.current = true;
+    const pos = getPos(e);
+    ctx!.beginPath();
+    ctx!.moveTo(pos.x, pos.y);
+  }
+  function draw(e: MouseEvent | TouchEvent) {
+    if (!isDrawingRef.current) return;
+    e.preventDefault();
+    const pos = getPos(e);
+    ctx!.lineTo(pos.x, pos.y);
+    ctx!.stroke();
+  }
+  function stopDraw() { isDrawingRef.current = false; }
+
+  canvas.addEventListener("mousedown", startDraw);
+  canvas.addEventListener("mousemove", draw);
+  canvas.addEventListener("mouseup", stopDraw);
+  canvas.addEventListener("mouseleave", stopDraw);
+  canvas.addEventListener("touchstart", startDraw, { passive: false });
+  canvas.addEventListener("touchmove", draw, { passive: false });
+  canvas.addEventListener("touchend", stopDraw);
+
+  return () => {
+    canvas.removeEventListener("mousedown", startDraw);
+    canvas.removeEventListener("mousemove", draw);
+    canvas.removeEventListener("mouseup", stopDraw);
+    canvas.removeEventListener("mouseleave", stopDraw);
+    canvas.removeEventListener("touchstart", startDraw);
+    canvas.removeEventListener("touchmove", draw);
+    canvas.removeEventListener("touchend", stopDraw);
+  };
+}
+
+function isCanvasClear(canvas: HTMLCanvasElement | null): boolean {
+  if (!canvas) return true;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return true;
+  const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] !== 0) return false;
+  }
+  return true;
+}
+
+function clearCanvasEl(canvas: HTMLCanvasElement | null) {
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+  if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
 export default function GuiasPage() {
   const router = useRouter();
   const [role, setRole] = useState<string>("");
@@ -137,7 +210,7 @@ export default function GuiasPage() {
   const [transportistaOtro, setTransportistaOtro] = useState("");
   const [entregadoPor, setEntregadoPor] = useState("");
   const [observaciones, setObservaciones] = useState("");
-  const [items, setItems] = useState<GuiaItem[]>([emptyItem(1, DEFAULT_EMPRESAS[0])]);
+  const [items, setItems] = useState<GuiaItem[]>([emptyItem(1)]);
   const [nextNumero, setNextNumero] = useState(1);
   const [formNumero, setFormNumero] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -156,8 +229,12 @@ export default function GuiasPage() {
   const [bNumGuia, setBNumGuia] = useState("");
   const [bSaving, setBSaving] = useState(false);
   const [showPending, setShowPending] = useState(false);
+
+  // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const isDrawingRef = useRef(false);
+  const canvasEntregadorRef = useRef<HTMLCanvasElement>(null);
+  const isDrawingEntregadorRef = useRef(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
@@ -222,87 +299,22 @@ export default function GuiasPage() {
     }
   }, []);
 
-  // Canvas drawing setup
+  // Canvas drawing setup for both canvases
   useEffect(() => {
-    if (view !== "print" || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 2;
-    ctx.lineCap = "round";
-
-    function getPos(e: MouseEvent | TouchEvent) {
-      const rect = canvas.getBoundingClientRect();
-      if ("touches" in e) {
-        return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
-      }
-      return { x: (e as MouseEvent).clientX - rect.left, y: (e as MouseEvent).clientY - rect.top };
-    }
-
-    function startDraw(e: MouseEvent | TouchEvent) {
-      e.preventDefault();
-      isDrawingRef.current = true;
-      const pos = getPos(e);
-      ctx!.beginPath();
-      ctx!.moveTo(pos.x, pos.y);
-    }
-    function draw(e: MouseEvent | TouchEvent) {
-      if (!isDrawingRef.current) return;
-      e.preventDefault();
-      const pos = getPos(e);
-      ctx!.lineTo(pos.x, pos.y);
-      ctx!.stroke();
-    }
-    function stopDraw() { isDrawingRef.current = false; }
-
-    canvas.addEventListener("mousedown", startDraw);
-    canvas.addEventListener("mousemove", draw);
-    canvas.addEventListener("mouseup", stopDraw);
-    canvas.addEventListener("mouseleave", stopDraw);
-    canvas.addEventListener("touchstart", startDraw, { passive: false });
-    canvas.addEventListener("touchmove", draw, { passive: false });
-    canvas.addEventListener("touchend", stopDraw);
-
-    return () => {
-      canvas.removeEventListener("mousedown", startDraw);
-      canvas.removeEventListener("mousemove", draw);
-      canvas.removeEventListener("mouseup", stopDraw);
-      canvas.removeEventListener("mouseleave", stopDraw);
-      canvas.removeEventListener("touchstart", startDraw);
-      canvas.removeEventListener("touchmove", draw);
-      canvas.removeEventListener("touchend", stopDraw);
-    };
+    if (view !== "print") return;
+    const cleanups: (() => void)[] = [];
+    if (canvasRef.current) cleanups.push(setupCanvas(canvasRef.current, isDrawingRef));
+    if (canvasEntregadorRef.current) cleanups.push(setupCanvas(canvasEntregadorRef.current, isDrawingEntregadorRef));
+    return () => cleanups.forEach(fn => fn());
   }, [view, printGuia]);
 
-  function clearCanvas() {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-  }
-
-  function isCanvasBlank(): boolean {
-    const canvas = canvasRef.current;
-    if (!canvas) return true;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return true;
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    for (let i = 3; i < data.length; i += 4) {
-      if (data[i] !== 0) return false;
-    }
-    return true;
-  }
-
   if (!authChecked) return null;
-
-  const defaultEmpresa = empresas[0] || DEFAULT_EMPRESAS[0];
 
   async function deleteGuia(id: string) {
     if (!confirm("¿Eliminar esta guía?")) return;
     await fetch(`/api/guias/${id}`, { method: "DELETE" });
     loadGuias();
+    setView("list");
   }
 
   async function viewGuia(id: string) {
@@ -335,7 +347,7 @@ export default function GuiasPage() {
     setEntregadoPor(g.entregado_por || "");
     setObservaciones(g.observaciones || "");
     const guiaItems = (g.guia_items || []) as GuiaItem[];
-    setItems(guiaItems.length > 0 ? guiaItems.map((item: GuiaItem, i: number) => ({ ...item, orden: i + 1 })) : [emptyItem(1, defaultEmpresa)]);
+    setItems(guiaItems.length > 0 ? guiaItems.map((item: GuiaItem, i: number) => ({ ...item, orden: i + 1 })) : [emptyItem(1)]);
     setError(null);
     setValidationErrors(new Set());
     setView("form");
@@ -348,13 +360,13 @@ export default function GuiasPage() {
     setTransportistaOtro("");
     setEntregadoPor("");
     setObservaciones("");
-    setItems([emptyItem(1, defaultEmpresa)]);
+    setItems([emptyItem(1)]);
     setFormNumero(nextNumero);
     setValidationErrors(new Set());
   }
 
   function addRow() {
-    setItems([...items, emptyItem(items.length + 1, defaultEmpresa)]);
+    setItems([...items, emptyItem(items.length + 1)]);
   }
 
   function removeRow(idx: number) {
@@ -384,7 +396,13 @@ export default function GuiasPage() {
       if (!hasData) return;
       if (!item.cliente) errors.add(`item-${idx}-cliente`);
       if (!item.direccion) errors.add(`item-${idx}-direccion`);
-      if (!item.facturas) errors.add(`item-${idx}-facturas`);
+      if (!item.empresa) errors.add(`item-${idx}-empresa`);
+      if (!item.facturas) {
+        errors.add(`item-${idx}-facturas`);
+      } else {
+        const parts = item.facturas.split(",").map(s => s.trim()).filter(Boolean);
+        if (parts.some(p => p.replace(/\D/g, "").length < 4)) errors.add(`item-${idx}-facturas-format`);
+      }
       if (!item.bultos || item.bultos <= 0) errors.add(`item-${idx}-bultos`);
     });
 
@@ -397,7 +415,7 @@ export default function GuiasPage() {
   }
 
   function inputClass(key: string, base: string) {
-    return `${base} ${validationErrors.has(key) ? "border-red-400" : ""}`;
+    return `${base} ${(validationErrors.has(key) || validationErrors.has(key + "-format")) ? "border-red-400" : ""}`;
   }
 
   async function saveGuia() {
@@ -456,10 +474,12 @@ export default function GuiasPage() {
     if (!bNumGuia.trim()) { showToast("Ingresa el N° de guía del transportista"); return; }
     if (!bReceptor.trim()) { showToast("Ingresa el nombre del receptor"); return; }
     if (!bCedula.trim()) { showToast("Ingresa la cédula del receptor"); return; }
-    if (isCanvasBlank()) { showToast("Se requiere la firma del receptor"); return; }
+    if (isCanvasClear(canvasRef.current)) { showToast("Se requiere la firma del receptor"); return; }
+    if (isCanvasClear(canvasEntregadorRef.current)) { showToast("Se requiere la firma del entregador"); return; }
 
     setBSaving(true);
     const firma_base64 = canvasRef.current?.toDataURL() || "";
+    const firma_entregador_base64 = canvasEntregadorRef.current?.toDataURL() || "";
     const res = await fetch(`/api/guias/${printGuia.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
@@ -469,6 +489,7 @@ export default function GuiasPage() {
         receptor_nombre: bReceptor.trim(),
         cedula: bCedula.trim(),
         firma_base64,
+        firma_entregador_base64,
         estado: "Completada",
       }),
     });
@@ -571,6 +592,7 @@ export default function GuiasPage() {
               </select>
             </div>
           </div>
+          <p className="text-[10px] text-gray-400 mb-3">📦 Pendiente = en espera de bodega · ✅ Despachada = lista para imprimir</p>
           <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -580,7 +602,7 @@ export default function GuiasPage() {
                 <th className="text-left py-3 px-4 font-normal">Transportista</th>
                 <th className="text-left py-3 px-4 font-normal">Clientes</th>
                 <th className="text-right py-3 px-4 font-normal">Bultos</th>
-                <th className="text-right py-3 px-4 font-normal"></th>
+                <th className="text-left py-3 px-4 font-normal">Estado</th>
               </tr>
             </thead>
             <tbody>
@@ -592,17 +614,16 @@ export default function GuiasPage() {
                 return (<>
                   {filtered.map((g) => (
                     <tr key={g.id} onClick={() => viewGuia(g.id)} className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
-                      <td className="py-3 px-4 font-medium">
-                        <span className={`inline-block w-2 h-2 rounded-full mr-2 ${g.placa ? "bg-green-500" : "bg-amber-400"}`} />
-                        {g.numero}
-                      </td>
+                      <td className="py-3 px-4 font-medium">{g.numero}</td>
                       <td className="py-3 px-4 text-gray-500">{fmtDate(g.fecha)}</td>
                       <td className="py-3 px-4">{g.transportista}</td>
                       <td className="py-3 px-4 text-gray-500 text-sm">{clientesSummary(g.guia_items || [])}</td>
                       <td className="py-3 px-4 text-right tabular-nums">{g.total_bultos}</td>
-                      <td className="py-3 px-4 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => startEdit(g.id)} className="text-sm text-gray-500 hover:text-black transition">Editar</button>
-                        {(role === "admin" || role === "secretaria") && <button onClick={() => deleteGuia(g.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>}
+                      <td className="py-3 px-4">
+                        {!g.placa
+                          ? <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">📦 Pendiente</span>
+                          : <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">✅ Despachada</span>
+                        }
                       </td>
                     </tr>
                   ))}
@@ -707,10 +728,13 @@ export default function GuiasPage() {
                   <AddNewInline placeholder="Ciudad" onAdd={(v) => { addDireccion(v); }} />
                 </th>
                 <th className="py-3 px-4 font-normal text-left">
-                  Empresa
+                  Empresa <span className="text-red-500">*</span>
                   <AddNewInline placeholder="Empresa" onAdd={(v) => { addEmpresa(v); }} />
                 </th>
-                <th className="py-3 px-4 font-normal text-left">Factura(s) <span className="text-red-500">*</span></th>
+                <th className="py-3 px-4 font-normal text-left">
+                  Factura(s) <span className="text-red-500">*</span>
+                  <div className="text-[9px] text-gray-400 mt-0.5 font-normal normal-case tracking-normal">Ej: 10234, 10235</div>
+                </th>
                 <th className="py-3 px-4 font-normal w-20 text-center">Bultos <span className="text-red-500">*</span></th>
                 <th className="py-3 w-8"></th>
               </tr>
@@ -731,7 +755,8 @@ export default function GuiasPage() {
                   </td>
                   <td className="py-2 pr-2">
                     <select value={item.empresa} onChange={(e) => updateItem(idx, "empresa", e.target.value)}
-                      className="w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
+                      className={inputClass(`item-${idx}-empresa`, "w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent focus:border-black transition appearance-none")}>
+                      <option value="">Seleccionar...</option>
                       {empresas.map((e) => <option key={e} value={e}>{e}</option>)}
                     </select>
                   </td>
@@ -739,6 +764,9 @@ export default function GuiasPage() {
                     <input type="text" value={item.facturas}
                       onChange={(e) => updateItem(idx, "facturas", e.target.value)}
                       className={inputClass(`item-${idx}-facturas`, "w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition")} />
+                    {validationErrors.has(`item-${idx}-facturas-format`) && (
+                      <p className="text-[9px] text-red-500 mt-0.5">Mín. 4 dígitos, separar con coma</p>
+                    )}
                   </td>
                   <td className="py-2 pr-2">
                     <input type="number" min={0} value={item.bultos}
@@ -794,11 +822,16 @@ export default function GuiasPage() {
     const guiaItems = g.guia_items || [];
     const bultos = guiaItems.reduce((s, i) => s + (i.bultos || 0), 0);
     const canComplete = (role === "bodega" || role === "admin") && !g.placa;
+    const canEdit = role === "admin" || role === "secretaria" || role === "bodega";
+    const canDelete = role === "admin" || role === "secretaria";
 
     return (
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
         <div className="flex flex-wrap gap-4 mb-8 no-print">
           <button onClick={() => setView("list")} className="text-sm text-gray-400 hover:text-black transition">← Volver</button>
+          {canEdit && (
+            <button onClick={() => startEdit(g.id)} className="text-sm text-gray-500 hover:text-black transition">Editar</button>
+          )}
           <button onClick={() => window.print()} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
             Imprimir
           </button>
@@ -830,15 +863,28 @@ export default function GuiasPage() {
                   className="w-full border-b border-gray-300 py-2 text-sm outline-none focus:border-black transition bg-transparent" />
               </div>
             </div>
-            <div className="mb-4">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2 block">Firma del receptor *</label>
-              <div className="relative inline-block">
-                <canvas ref={canvasRef} width={300} height={150}
-                  className="border border-gray-300 rounded bg-white touch-none" />
-                <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-300 text-sm pointer-events-none">Firme aquí</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-4">
+              <div>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2 block">Firma del receptor *</label>
+                <div className="relative inline-block">
+                  <canvas ref={canvasRef} width={300} height={150}
+                    className="border border-gray-300 rounded bg-white touch-none" />
+                  <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-300 text-sm pointer-events-none">Firme aquí</span>
+                </div>
+                <div>
+                  <button onClick={() => clearCanvasEl(canvasRef.current)} className="text-xs text-gray-400 hover:text-black transition mt-1">Limpiar firma</button>
+                </div>
               </div>
               <div>
-                <button onClick={clearCanvas} className="text-xs text-gray-400 hover:text-black transition mt-1">Limpiar firma</button>
+                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2 block">Firma del entregador (quien entrega) *</label>
+                <div className="relative inline-block">
+                  <canvas ref={canvasEntregadorRef} width={300} height={150}
+                    className="border border-gray-300 rounded bg-white touch-none" />
+                  <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-gray-300 text-sm pointer-events-none">Firme aquí</span>
+                </div>
+                <div>
+                  <button onClick={() => clearCanvasEl(canvasEntregadorRef.current)} className="text-xs text-gray-400 hover:text-black transition mt-1">Limpiar firma</button>
+                </div>
               </div>
             </div>
             <button onClick={confirmarDespacho} disabled={bSaving}
@@ -922,8 +968,8 @@ export default function GuiasPage() {
           <div className="grid grid-cols-2 gap-12 mt-12 text-xs">
             <div>
               <div className="font-medium uppercase mb-6">Entregado por</div>
-              <div className="mb-4">NOMBRE: <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span></div>
-              <div>FIRMA: <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span></div>
+              <div className="mb-4">NOMBRE: <span className="ml-1 font-medium">{g.entregado_por || ""}</span>{!g.entregado_por && <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>}</div>
+              <div>FIRMA: {g.firma_entregador_base64 ? <img src={g.firma_entregador_base64} alt="Firma entregador" style={{ height: 40 }} className="inline-block ml-1" /> : <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>}</div>
               <div className="text-gray-400 mt-2 italic">Nombre y firma</div>
             </div>
             <div>
@@ -946,6 +992,13 @@ export default function GuiasPage() {
             La firma del transportista constituye aceptación expresa de la mercancía detallada en este documento, en la cantidad y condición indicadas. Cualquier faltante o daño no reportado al momento de la recepción será responsabilidad exclusiva del transportista.
           </div>
         </div>
+
+        {/* Delete button — detail view */}
+        {canDelete && (
+          <div className="no-print mt-6">
+            <button onClick={() => deleteGuia(g.id)} className="text-xs text-gray-400 hover:text-red-500 transition">Eliminar guía</button>
+          </div>
+        )}
 
         {/* Toast */}
         {toast && (
