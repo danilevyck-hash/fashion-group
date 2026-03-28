@@ -48,6 +48,10 @@ export default function ChequesPage() {
   const [rebotandoId, setRebotandoId] = useState<string | null>(null);
   const [motivoRebote, setMotivoRebote] = useState("");
 
+  // Directorio autocomplete
+  const [dirClientes, setDirClientes] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
   // Form fields
   const [fCliente, setFCliente] = useState("");
   const [fEmpresa, setFEmpresa] = useState("");
@@ -68,7 +72,12 @@ export default function ChequesPage() {
     catch { setError("Error al cargar cheques"); } setLoading(false);
   }, []);
 
-  useEffect(() => { if (authChecked) loadCheques(); }, [authChecked, loadCheques]);
+  useEffect(() => {
+    if (authChecked) {
+      loadCheques();
+      fetch("/api/directorio").then(r => r.ok ? r.json() : []).then(d => setDirClientes((d || []).map((c: { nombre: string }) => c.nombre))).catch(() => {});
+    }
+  }, [authChecked, loadCheques]);
 
   // Resumen por cliente
   const resumenClientes = useMemo(() => {
@@ -120,7 +129,18 @@ export default function ChequesPage() {
   }
 
   async function marcarRebotado(id: string) {
-    await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rebotado", motivo_rebote: motivoRebote || null }) });
+    const cheque = cheques.find(c => c.id === id);
+    const res = await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rebotado", motivo_rebote: motivoRebote || null }) });
+    if (res.ok && cheque) {
+      await fetch("/api/overrides", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre_normalized: cheque.cliente.toUpperCase().trim(),
+          resultado_contacto: `⚠ Cheque rebotado: N° ${cheque.numero_cheque} por $${fmt(cheque.monto)} — ${motivoRebote || "Sin motivo"}`,
+        }),
+      });
+    }
     setRebotandoId(null);
     setMotivoRebote("");
     loadCheques();
@@ -280,7 +300,19 @@ export default function ChequesPage() {
           <div className="grid grid-cols-2 gap-x-8 gap-y-4">
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Cliente <span className="text-red-500">*</span></label>
-              <input type="text" value={fCliente} onChange={(e) => setFCliente(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition" />
+              <div className="relative">
+                <input type="text" value={fCliente} onChange={(e) => { setFCliente(e.target.value); setShowSuggestions(true); }} onFocus={() => setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition" />
+                {showSuggestions && fCliente.length >= 2 && (() => {
+                  const matches = dirClientes.filter(n => n.toLowerCase().includes(fCliente.toLowerCase())).slice(0, 5);
+                  return matches.length > 0 ? (
+                    <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 mt-1">
+                      {matches.map(n => (
+                        <button key={n} onMouseDown={() => { setFCliente(n); setShowSuggestions(false); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition">{n}</button>
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
+              </div>
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa <span className="text-red-500">*</span></label>

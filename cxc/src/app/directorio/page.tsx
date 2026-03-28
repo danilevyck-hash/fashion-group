@@ -33,6 +33,7 @@ export default function DirectorioPage() {
   const [newData, setNewData] = useState({ nombre: "", empresa: "", whatsapp: "", correo: "", contacto: "", notas: "" });
   const [toast, setToast] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [cxcClients, setCxcClients] = useState<Set<string>>(new Set());
   const importRef = useRef<HTMLInputElement>(null);
 
   const loadClientes = useCallback(async () => {
@@ -43,7 +44,13 @@ export default function DirectorioPage() {
   }, []);
 
   useEffect(() => {
-    if (authChecked) loadClientes();
+    if (authChecked) {
+      loadClientes();
+      fetch("/api/clients").then(r => r.ok ? r.json() : []).then(d => {
+        const names = new Set<string>((d || []).map((r: {nombre_normalized: string}) => r.nombre_normalized));
+        setCxcClients(names);
+      }).catch(() => {});
+    }
   }, [authChecked, loadClientes]);
 
   if (!authChecked) return null;
@@ -73,7 +80,26 @@ export default function DirectorioPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(editData),
     });
-    if (res.ok) { setEditing(null); loadClientes(); }
+    if (res.ok) {
+      setEditing(null);
+      loadClientes();
+      // Sync to CXC overrides
+      const cliente = editData as Partial<Cliente>;
+      if (cliente.nombre) {
+        const normalized = cliente.nombre.toUpperCase().trim().replace(/\s+/g, " ");
+        await fetch("/api/overrides", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre_normalized: normalized,
+            correo: cliente.correo || "",
+            telefono: cliente.telefono || "",
+            celular: cliente.celular || "",
+            contacto: cliente.contacto || "",
+          }),
+        }).catch(() => {}); // Don't fail if CXC override doesn't exist
+      }
+    }
   }
 
   async function handleDelete(id: string) {
@@ -254,7 +280,9 @@ export default function DirectorioPage() {
                         className="grid grid-cols-6 py-3 cursor-pointer"
                         onClick={() => setExpanded(isExpanded ? null : c.id)}
                       >
-                        <div className="font-medium">{c.nombre}</div>
+                        <div className="font-medium">{c.nombre}{cxcClients.has(c.nombre.toUpperCase().trim().replace(/\s+/g, " ")) && (
+                          <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full ml-1">CXC</span>
+                        )}</div>
                         <div className="text-gray-500">{c.empresa}</div>
                         <div className="text-gray-500">{c.whatsapp ? (
                           <a href={`https://wa.me/${(c.whatsapp).replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-800">
