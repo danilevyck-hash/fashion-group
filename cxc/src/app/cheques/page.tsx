@@ -295,9 +295,9 @@ export default function ChequesPage() {
 
       {/* Form */}
       {showForm && (
-        <div className="bg-gray-50 rounded-2xl p-6 mb-8">
+        <div className="bg-gray-50 rounded-2xl p-6 mb-8 overflow-visible">
           <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">{editingId ? "Editar Cheque" : "Nuevo Cheque"}</div>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-4 overflow-visible">
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Cliente <span className="text-red-500">*</span></label>
               <div className="relative">
@@ -305,7 +305,7 @@ export default function ChequesPage() {
                 {showSuggestions && fCliente.length >= 2 && (() => {
                   const matches = dirClientes.filter(n => n.toLowerCase().includes(fCliente.toLowerCase())).slice(0, 5);
                   return matches.length > 0 ? (
-                    <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 mt-1">
+                    <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 mt-1">
                       {matches.map(n => (
                         <button key={n} onMouseDown={() => { setFCliente(n); setShowSuggestions(false); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition">{n}</button>
                       ))}
