@@ -106,6 +106,16 @@ export async function POST(req: NextRequest) {
     }
   } catch { /* */ }
 
+  // 3. Legacy fallback: env var passwords (for roles without fg_users entries)
+  if (!role) {
+    const envRoles: Record<string, string> = {};
+    if (process.env.ADMIN_PASSWORD) envRoles[process.env.ADMIN_PASSWORD] = "admin";
+    if (process.env.DIRECTOR_PASSWORD) envRoles[process.env.DIRECTOR_PASSWORD] = "director";
+    if (process.env.UPLOAD_PASSWORD) envRoles[process.env.UPLOAD_PASSWORD] = "upload";
+    if (process.env.CONTABILIDAD_PASSWORD) envRoles[process.env.CONTABILIDAD_PASSWORD] = "contabilidad";
+    role = envRoles[password] || null;
+  }
+
   if (!role) {
     return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
   }

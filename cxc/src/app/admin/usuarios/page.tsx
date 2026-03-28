@@ -78,8 +78,9 @@ export default function UsuariosPage() {
     setLoading(true);
     try {
       const res = await fetch("/api/admin/usuarios");
+      if (res.status === 401) { sessionStorage.clear(); window.location.href = "/"; return; }
       if (res.ok) setRoles(await res.json());
-    } catch { /* */ }
+    } catch { showToast("Error de conexión"); }
     setLoading(false);
   }, []);
 
@@ -92,15 +93,16 @@ export default function UsuariosPage() {
         (data || []).forEach((p: { role: string; password: string; updated_at: string }) => { map[p.role] = p; });
         setPasswords(map);
       }
-    } catch { /* */ }
+    } catch { showToast("Error al cargar contraseñas"); }
   }, []);
 
   const loadFgUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
       const res = await fetch("/api/admin/users");
+      if (res.status === 401) { sessionStorage.clear(); window.location.href = "/"; return; }
       if (res.ok) setFgUsers(await res.json());
-    } catch { /* */ }
+    } catch { showToast("Error al cargar usuarios"); }
     setLoadingUsers(false);
   }, []);
 
