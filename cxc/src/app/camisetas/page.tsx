@@ -6,7 +6,7 @@ import Link from "next/link";
 import { hasModuleAccess } from "@/lib/auth-check";
 
 interface Producto { id: string; nombre: string; genero: string; color: string; precio_panama: number; rrp: number; stock_comprado: number; }
-interface Cliente { id: string; nombre: string; }
+interface Cliente { id: string; nombre: string; estado?: string; }
 interface Pedido { id: string; cliente_id: string; producto_id: string; paquetes: number; }
 
 const PPQ = 13;
@@ -119,6 +119,16 @@ export default function CamisetasPage() {
     const res = await fetch(`/api/camisetas/clientes/${id}`, { method: "DELETE" });
     if (res.ok) { setSelectedClient(null); showToast("Cliente eliminado"); load(); }
     else showToast("Error al eliminar");
+  }
+
+  async function toggleEstado(id: string) {
+    const cl = clientes.find(c => c.id === id);
+    if (!cl) return;
+    const next = cl.estado === "Entregado" ? "Pendiente" : "Entregado";
+    setClientes(prev => prev.map(c => c.id === id ? { ...c, estado: next } : c));
+    const res = await fetch(`/api/camisetas/clientes/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: next }) });
+    if (res.ok) showToast(next === "Entregado" ? "Marcado como entregado" : "Marcado como pendiente");
+    else { showToast("Error"); load(); }
   }
 
   async function downloadClientPDF(cId: string) {
@@ -270,13 +280,23 @@ export default function CamisetasPage() {
                 <thead>
                   <tr>
                     <th className="sticky left-0 z-10 bg-white text-left py-3 pr-4 text-[10px] uppercase tracking-widest text-gray-400 font-normal min-w-[180px] border-b border-gray-200">Producto</th>
-                    {sortedClientes.map(c => (
-                      <th key={c.id} className="py-2 px-1 text-[10px] text-gray-400 font-normal text-center min-w-[44px] border-b border-gray-200" style={{ height: 60 }}>
-                        <button onClick={() => { setSelectedClient(c.id); setTab("cliente"); }}
-                          className="hover:text-black transition whitespace-nowrap origin-bottom-left inline-block"
-                          style={{ transform: "rotate(-45deg)", transformOrigin: "center", fontSize: "9px" }}>{c.nombre}</button>
-                      </th>
-                    ))}
+                    {sortedClientes.map(c => {
+                      const cVal = clientValor(c.id);
+                      const isEntregado = c.estado === "Entregado";
+                      return (
+                        <th key={c.id} className={`py-1 px-1 text-[10px] text-gray-400 font-normal text-center min-w-[44px] border-b border-gray-200 ${isEntregado ? "opacity-40" : ""}`} style={{ height: 70 }}>
+                          <button onClick={() => { setSelectedClient(c.id); setTab("cliente"); }}
+                            className="hover:text-black transition whitespace-nowrap inline-block"
+                            style={{ transform: "rotate(-45deg)", transformOrigin: "center", fontSize: "9px" }}>{c.nombre}</button>
+                          <div className="flex flex-col items-center gap-0.5 mt-0.5">
+                            <span className={`text-[8px] px-1 py-0 rounded-full ${isEntregado ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                              {isEntregado ? "✓" : "○"}
+                            </span>
+                            {!isVendedor && cVal > 0 && <span className="text-[8px] text-gray-400 tabular-nums">${(cVal/1000).toFixed(1)}k</span>}
+                          </div>
+                        </th>
+                      );
+                    })}
                     <th className="py-3 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right border-l border-gray-200 border-b border-gray-200 bg-gray-50">Paq</th>
                     <th className="py-3 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right border-b border-gray-200 bg-gray-50">Pzas</th>
                     {!isVendedor && <th className="py-3 px-3 text-[10px] uppercase tracking-widest text-gray-400 font-normal text-right border-b border-gray-200 bg-gray-50">Valor</th>}
@@ -357,12 +377,23 @@ export default function CamisetasPage() {
                 <div className="space-y-0">
                   {sortedClientes.filter(c => !clientSearch || c.nombre.toLowerCase().includes(clientSearch.toLowerCase())).map(c => {
                     const active = selectedClient === c.id;
+                    const isEntregado = c.estado === "Entregado";
                     return (
-                      <button key={c.id} onClick={() => setSelectedClient(c.id)}
-                        className={`w-full text-left py-2 text-xs border-b border-gray-50 transition flex items-center justify-between ${active ? "border-l-2 border-l-red-600 pl-2" : "pl-0 hover:bg-gray-50"}`}>
-                        <span className={active ? "text-black" : "text-gray-600"}>{c.nombre}</span>
-                        <span className="text-gray-400 tabular-nums">{clientTotal(c.id) || ""}</span>
-                      </button>
+                      <div key={c.id} className={`py-2 text-xs border-b border-gray-50 transition ${active ? "border-l-2 border-l-red-600 pl-2" : "pl-0 hover:bg-gray-50"}`}>
+                        <button onClick={() => setSelectedClient(c.id)} className="w-full text-left flex items-center justify-between">
+                          <span className={active ? "text-black" : "text-gray-600"}>{c.nombre}</span>
+                          <span className="text-gray-400 tabular-nums">{clientTotal(c.id) || ""}</span>
+                        </button>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className={`text-[9px] px-1.5 py-0 rounded-full ${isEntregado ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                            {isEntregado ? "Entregado" : "Pendiente"}
+                          </span>
+                          <button onClick={(e) => { e.stopPropagation(); toggleEstado(c.id); }}
+                            className={`text-[9px] px-1.5 py-0 rounded-full border transition ${isEntregado ? "border-gray-300 text-gray-500 hover:border-gray-400" : "border-green-300 text-green-700 hover:border-green-500"}`}>
+                            {isEntregado ? "↩ Pendiente" : "✓ Entregado"}
+                          </button>
+                        </div>
+                      </div>
                     );
                   })}
                 </div>

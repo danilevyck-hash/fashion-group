@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabaseServer
     .from("camisetas_clientes")
-    .insert({ nombre: nombre.trim() })
+    .insert({ nombre: nombre.trim(), estado: "Pendiente" })
     .select()
     .single();
 
