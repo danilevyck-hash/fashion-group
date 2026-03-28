@@ -129,6 +129,14 @@ function ReclamosPage() {
     }
   }
 
+  // Historial collapse state per empresa
+  const [expandedHistorial, setExpandedHistorial] = useState<Record<string, boolean>>({});
+
+  const loadDetail = useCallback(async (id: string) => {
+    try { const res = await fetch(`/api/reclamos/${id}`); if (res.ok) { const d = await res.json(); if (d?.id) { setCurrent(d); setView("detail", d.id); } } } catch { /* */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Handle browser back/forward
   useEffect(() => {
     function onPopState() {
@@ -137,17 +145,14 @@ function ReclamosPage() {
       const id = params.get("id") || "";
       _setView(v);
       if (v === "detail" && id) {
-        loadReclamo(id);
+        loadDetail(id);
       } else if (v === "list") {
         setCurrent(null);
       }
     }
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
-  }, []);
-
-  // Historial collapse state per empresa
-  const [expandedHistorial, setExpandedHistorial] = useState<Record<string, boolean>>({});
+  }, [loadDetail]);
 
   // Auth
   useEffect(() => {
@@ -170,6 +175,12 @@ function ReclamosPage() {
     try { const res = await fetch("/api/reclamos/contactos"); if (res.ok) setContactos(await res.json()); } catch { /* */ }
   }, []);
 
+  // Load from URL on mount
+  useEffect(() => {
+    if (authChecked && urlId && view === "detail") loadDetail(urlId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authChecked, urlId, loadDetail]);
+
   useEffect(() => { if (authChecked) { loadReclamos(); loadContactos(); setCustomMotivos(loadCustomMotivos()); } }, [authChecked, loadReclamos, loadContactos]);
 
   if (!authChecked) return null;
@@ -188,18 +199,6 @@ function ReclamosPage() {
   function updateItem(idx: number, field: string, val: string | number) {
     setFItems((prev) => prev.map((item, i) => { if (i !== idx) return item; const u = { ...item, [field]: val }; u.subtotal = (u.cantidad || 0) * (u.precio_unitario || 0); return u; }));
   }
-
-  async function loadDetail(id: string) {
-    try { const res = await fetch(`/api/reclamos/${id}`); if (res.ok) { const d = await res.json(); if (d?.id) { setCurrent(d); setView("detail", d.id); } } } catch { /* */ }
-  }
-
-  // Alias for popstate handler
-  const loadReclamo = loadDetail;
-
-  // Load from URL on mount
-  useEffect(() => {
-    if (urlId && view === "detail") loadDetail(urlId);
-  }, [urlId]);
 
   async function saveReclamo() {
     if (!fEmpresa || !fFecha || !fFactura) { setError("Completa empresa, factura y fecha."); return; }
