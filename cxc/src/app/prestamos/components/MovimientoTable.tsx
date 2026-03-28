@@ -2,7 +2,7 @@
 
 import { fmt, fmtDate } from "@/lib/format";
 import { Movimiento, CONCEPTO_COLORS } from "./types";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, StatusBadge } from "@/components/ui";
 
 interface Props {
   sortedMovs: Movimiento[];
@@ -41,11 +41,7 @@ export default function MovimientoTable({ sortedMovs, isAdmin, isAdminOrDirector
                   <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(m.monto)}</td>
                   <td className="py-3 px-4 text-gray-400 text-xs max-w-[200px] truncate" title={m.notas || ""}>{m.notas || "—"}</td>
                   <td className="py-3 px-4">
-                    {m.estado === "aprobado" ? (
-                      <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">Aprobado</span>
-                    ) : (
-                      <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">Pendiente aprobación</span>
-                    )}
+                    <StatusBadge estado={m.estado === "pendiente_aprobacion" ? "En revisión" : m.estado} />
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-1">

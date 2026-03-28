@@ -201,7 +201,7 @@ export default function DirectorioPage() {
           <div className="flex items-center gap-4 mt-6">
             <button onClick={handleCreate}
               className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
-              Guardar
+              Guardar Cliente
             </button>
             <button onClick={() => setShowNew(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
           </div>
@@ -300,7 +300,7 @@ export default function DirectorioPage() {
                           </div>
                           <div className="flex gap-3 mt-4">
                             <button onClick={() => handleUpdate(c.id)}
-                              className="text-sm bg-black text-white px-5 py-1.5 rounded-full hover:bg-gray-800 transition">Guardar</button>
+                              className="text-sm bg-black text-white px-5 py-1.5 rounded-full hover:bg-gray-800 transition">Guardar Cliente</button>
                             <button onClick={() => setEditing(null)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
                           </div>
                         </div>

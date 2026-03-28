@@ -2,7 +2,7 @@
 
 import { fmt, fmtDate } from "@/lib/format";
 import { CajaPeriodo } from "./types";
-import { SkeletonTable, EmptyState } from "@/components/ui";
+import { SkeletonTable, EmptyState, StatusBadge } from "@/components/ui";
 
 interface Props {
   periodos: CajaPeriodo[];
@@ -91,15 +91,7 @@ export default function PeriodoList({
                       {p.fecha_cierre ? fmtDate(p.fecha_cierre) : "—"}
                     </td>
                     <td className="py-3 px-4">
-                      {p.estado === "abierto" ? (
-                        <span className="text-[11px] bg-black text-white px-2.5 py-0.5 rounded-full">
-                          Abierto
-                        </span>
-                      ) : (
-                        <span className="text-[11px] bg-gray-200 text-gray-500 px-2.5 py-0.5 rounded-full">
-                          Cerrado
-                        </span>
-                      )}
+                      <StatusBadge estado={p.estado} />
                     </td>
                     <td className="py-3 px-4 text-right tabular-nums text-gray-400">
                       ${fmt(p.fondo_inicial)}

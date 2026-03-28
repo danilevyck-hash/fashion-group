@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { fmt, fmtDate } from "@/lib/format";
-import { Toast } from "@/components/ui";
+import { Toast, StatusBadge } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
 import { ESTADOS, EMPRESAS, EC, TALLAS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, buildSingleReclamoPdfHtml, openPdfWindow, loadCustomMotivos, saveCustomMotivo } from "./constants";
 
@@ -122,7 +122,7 @@ export default function ReclamoDetail({
           <p className="text-sm text-gray-400">Factura: {current.nro_factura}{current.nro_orden_compra ? ` | PO: ${current.nro_orden_compra}` : ""}</p>
           <p className="text-sm text-gray-400">{fmtDate(current.fecha_reclamo)} — {days} días</p>
         </div>
-        <span className={`text-xs px-3 py-1 rounded-full ${EC[current.estado] || "bg-gray-100 text-gray-500"}`}>{current.estado}</span>
+        <StatusBadge estado={current.estado} />
       </div>
 
       {/* Quick action buttons */}
@@ -144,7 +144,7 @@ export default function ReclamoDetail({
           PDF
         </button>
         {role === "admin" && (
-          <button onClick={() => setShowDeleteConfirm(true)} className="text-xs border border-red-100 px-3 py-1.5 rounded-full text-red-300 hover:text-red-600 hover:border-red-300 transition ml-auto">Eliminar</button>
+          <button onClick={() => setShowDeleteConfirm(true)} className="text-xs border border-red-100 px-3 py-1.5 rounded-full text-red-300 hover:text-red-600 hover:border-red-300 transition ml-auto">Eliminar Reclamo</button>
         )}
       </div>
 
@@ -272,7 +272,7 @@ export default function ReclamoDetail({
         <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} title="Descargar este reclamo en formato Excel" className="text-sm text-gray-400 hover:text-black transition">Excel</button>
         <button onClick={() => openPdfWindow(buildSingleReclamoPdfHtml(current))} title="Descargar este reclamo en formato PDF" className="text-sm text-gray-400 hover:text-black transition">PDF</button>
         {role === "admin" && (
-          <button onClick={() => setShowDeleteConfirm(true)} title="Eliminar permanentemente este reclamo" className="text-sm text-gray-300 hover:text-red-500 transition ml-auto">Eliminar</button>
+          <button onClick={() => setShowDeleteConfirm(true)} title="Eliminar permanentemente este reclamo" className="text-sm text-gray-300 hover:text-red-500 transition ml-auto">Eliminar Reclamo</button>
         )}
       </div>
 
@@ -373,7 +373,7 @@ export default function ReclamoDetail({
           <button onClick={() => setEditItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition mb-6">+ Agregar fila</button>
           <div className="flex items-center gap-6">
             <button onClick={onSaveEdit} disabled={editSaving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
-              {editSaving ? "Guardando..." : "Guardar cambios"}
+              {editSaving ? "Guardando..." : "Guardar Cambios"}
             </button>
             <button onClick={() => setEditMode(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
           </div>

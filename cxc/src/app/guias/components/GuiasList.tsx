@@ -3,7 +3,7 @@
 import { fmtDate } from "@/lib/format";
 import type { Guia, GuiaItem } from "./types";
 import { clientesSummary, getMonthOptions } from "./constants";
-import { SkeletonTable, EmptyState } from "@/components/ui";
+import { SkeletonTable, EmptyState, StatusBadge } from "@/components/ui";
 
 interface GuiasListProps {
   guias: Guia[];
@@ -156,15 +156,7 @@ export default function GuiasList({
                             </td>
                             <td className="py-3 px-4 text-right tabular-nums">{g.total_bultos}</td>
                             <td className="py-3 px-4">
-                              {!g.placa ? (
-                                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                                  📦 Pendiente
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
-                                  ✅ Despachada
-                                </span>
-                              )}
+                              <StatusBadge estado={!g.placa ? "pendiente" : "despachada"} />
                             </td>
                           </tr>
                         ))}

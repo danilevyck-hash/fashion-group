@@ -2,8 +2,8 @@
 
 import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
-import { ESTADOS, EC, daysSince, calcSub, buildReclamosPdfHtml, openPdfWindow } from "./constants";
-import { EmptyState } from "@/components/ui";
+import { ESTADOS, daysSince, calcSub, buildReclamosPdfHtml, openPdfWindow } from "./constants";
+import { EmptyState, StatusBadge } from "@/components/ui";
 
 interface Props {
   role: string;
@@ -183,7 +183,7 @@ export default function EmpresaList({
               return (
                 <tr key={r.id}
                   onClick={() => selectionMode ? (isOpen && toggleSelect(r.id)) : onLoadDetail(r.id)}
-                  className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
+                  className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
                   {selectionMode && (
                     <td className="py-3">
                       <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!isOpen} className="accent-black disabled:opacity-30" />
@@ -193,7 +193,7 @@ export default function EmpresaList({
                   <td className="py-3 text-gray-500">{r.nro_factura}</td>
                   <td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
                   <td className={`py-3 text-right tabular-nums ${days > 60 && isOpen ? "text-red-600 font-medium" : days > 30 && isOpen ? "text-amber-600" : "text-gray-400"}`}>{days}d</td>
-                  <td className="py-3"><span className={`text-[11px] px-2 py-0.5 rounded-full ${EC[r.estado] || "bg-gray-100 text-gray-500"}`}>{r.estado}</span></td>
+                  <td className="py-3"><StatusBadge estado={r.estado} /></td>
                   <td className="py-3 text-right tabular-nums">${fmt(total)}</td>
                   <td className="py-3 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                     {isOpen && !selectionMode && (

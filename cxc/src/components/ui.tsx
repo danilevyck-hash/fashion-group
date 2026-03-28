@@ -136,6 +136,27 @@ export function Badge({ children, color = "gray" }: { children: ReactNode; color
   return <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium inline-flex items-center ${cls}`}>{children}</span>;
 }
 
+// ── ESTÉTICA 9: Status Badge (unified estado → color mapping) ──
+const STATUS_COLORS: Record<string, string> = {
+  // Yellow: pending/draft
+  pendiente: "yellow", borrador: "yellow", "Borrador": "yellow", "pendiente_aprobacion": "yellow",
+  // Blue: active/open/sent
+  activo: "blue", abierto: "blue", "Enviado": "blue",
+  // Green: completed/resolved/deposited
+  depositado: "green", aprobado: "green", "Resuelto con NC": "green", cerrado: "green", "Aplicada": "green", "Entregado": "green",
+  // Red: rejected/expired/bounced
+  rechazado: "red", "Rechazado": "red", vencido: "red", rebotado: "red", archivado: "red",
+  // Purple: in review
+  "En revisión": "purple",
+  // Orange: in progress
+  "Preparando": "orange", "En camino": "orange", "Pendiente Bodega": "orange",
+};
+
+export function StatusBadge({ estado }: { estado: string }) {
+  const color = STATUS_COLORS[estado] || "gray";
+  return <Badge color={color}>{estado}</Badge>;
+}
+
 // ── ESTÉTICA 10: Money Formatter ──
 export function fmtMoney(n: number | null | undefined): string {
   const v = Number(n) || 0;

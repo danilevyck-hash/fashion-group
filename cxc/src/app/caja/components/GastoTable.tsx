@@ -216,7 +216,7 @@ export default function GastoTable({
                           onClick={onSaveEdit}
                           className="text-gray-500 hover:text-black mr-1"
                         >
-                          ✓
+                          Guardar Gasto
                         </button>
                         <button
                           onClick={() => setEditingGastoId(null)}

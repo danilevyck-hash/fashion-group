@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
-import { SkeletonTable, EmptyState, Toast } from "@/components/ui";
+import { SkeletonTable, EmptyState, Toast, StatusBadge } from "@/components/ui";
 import XLSX from "xlsx-js-style";
 import { fmt, fmtDate } from "@/lib/format";
 import { EMPRESAS } from "@/lib/companies";
@@ -318,7 +318,7 @@ export default function ChequesPage() {
           </div>
           {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
           <div className="flex items-center gap-4 mt-6">
-            <button onClick={saveCheque} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">{saving ? "Guardando..." : "Guardar"}</button>
+            <button onClick={saveCheque} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">{saving ? "Guardando..." : "Guardar Cheque"}</button>
             <button onClick={() => { resetForm(); setShowForm(false); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
           </div>
         </div>
@@ -453,12 +453,7 @@ export default function ChequesPage() {
                   <td className="py-3 px-4 text-gray-500">{c.numero_cheque}</td>
                   <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(c.monto)}</td>
                   <td className="py-3 px-4">
-                    {c.estado === "pendiente" && <span className="text-[11px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Pendiente</span>}
-                    {c.estado === "depositado" && <span className="text-[11px] bg-black text-white px-2 py-0.5 rounded-full">Depositado</span>}
-                    {c.estado === "vencido" && <span className="text-[11px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Vencido</span>}
-                    {c.estado === "rebotado" && (
-                      <span className="text-[11px] bg-red-600 text-white px-2 py-0.5 rounded-full" title={c.motivo_rebote || ""}>Rebotado</span>
-                    )}
+                    <StatusBadge estado={c.estado} />
                   </td>
                   <td className="py-3 px-4 text-right flex items-center justify-end gap-2">
                     {(c.estado === "pendiente" || c.estado === "vencido") && (<>
