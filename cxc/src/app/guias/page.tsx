@@ -504,9 +504,6 @@ export default function GuiasPage() {
   async function confirmarDespacho() {
     if (!printGuia) return;
     if (!bPlaca.trim()) { showToast("Ingresa la placa del vehículo"); return; }
-    if (!bNumGuia.trim()) { showToast("Ingresa el N° de guía del transportista"); return; }
-    const guiaLines = bNumGuia.trim().split("\n").map(l => l.trim()).filter(Boolean);
-    if (guiaLines.some(l => /[,;]/.test(l) || /\w\s+\w/.test(l))) { showToast("Ingrese un número de guía por línea"); return; }
     if (!bReceptor.trim()) { showToast("Ingresa el nombre del receptor"); return; }
     if (!bCedula.trim()) { showToast("Ingresa la cédula del receptor"); return; }
     if (isCanvasClear(canvasRef.current)) { showToast("Se requiere la firma del receptor"); return; }
@@ -520,7 +517,6 @@ export default function GuiasPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         placa: bPlaca.trim(),
-        numero_guia_transp: bNumGuia.trim(),
         receptor_nombre: bReceptor.trim(),
         cedula: bCedula.trim(),
         firma_base64,
@@ -885,11 +881,6 @@ export default function GuiasPage() {
                 <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Placa / Vehículo *</label>
                 <input type="text" value={bPlaca} onChange={(e) => setBPlaca(e.target.value)}
                   className="w-full border-b border-gray-300 py-2 text-sm outline-none focus:border-black transition bg-transparent" />
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">N° Guía Transportista * <span className="normal-case tracking-normal text-[9px]">(uno por línea)</span></label>
-                <textarea value={bNumGuia} onChange={(e) => setBNumGuia(e.target.value)} rows={2}
-                  className="w-full border-b border-gray-300 py-2 text-sm outline-none focus:border-black transition bg-transparent resize-none" placeholder="Ej:&#10;GT-001&#10;GT-002" />
               </div>
               <div>
                 <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Nombre del receptor *</label>
