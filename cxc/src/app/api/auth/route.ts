@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import bcrypt from "bcryptjs";
 
 const COOKIE_NAME = "cxc_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -15,56 +16,75 @@ function setSessionCookie(res: NextResponse, payload: Record<string, unknown>) {
   });
 }
 
+function isHash(s: string): boolean {
+  return s.startsWith("$2a$") || s.startsWith("$2b$");
+}
+
 export async function POST(req: NextRequest) {
   const { password } = await req.json();
 
-  // 1. Check fg_users table first (new system)
+  // 1. Check fg_users table (supports both hashed and plaintext during migration)
   try {
-    const { data: user } = await supabaseServer
+    const { data: users } = await supabaseServer
       .from("fg_users")
-      .select("id, name, role, active")
-      .eq("password", password)
-      .eq("active", true)
-      .single();
+      .select("id, name, role, password, active")
+      .eq("active", true);
 
-    if (user) {
-      // Get enabled modules
-      const { data: mods } = await supabaseServer
-        .from("fg_user_modules")
-        .select("module_key")
-        .eq("user_id", user.id)
-        .eq("enabled", true);
+    if (users) {
+      for (const user of users) {
+        const match = isHash(user.password)
+          ? await bcrypt.compare(password, user.password)
+          : password === user.password;
 
-      const modules = (mods || []).map((m: { module_key: string }) => m.module_key);
+        if (match) {
+          const { data: mods } = await supabaseServer
+            .from("fg_user_modules")
+            .select("module_key")
+            .eq("user_id", user.id)
+            .eq("enabled", true);
 
-      const payload = {
-        authenticated: true,
-        role: user.role,
-        userId: user.id,
-        userName: user.name,
-        modules,
-      };
+          const modules = (mods || []).map((m: { module_key: string }) => m.module_key);
 
-      const res = NextResponse.json(payload);
-      setSessionCookie(res, { role: user.role, userId: user.id, userName: user.name, modules });
-      return res;
+          const payload = {
+            authenticated: true,
+            role: user.role,
+            userId: user.id,
+            userName: user.name,
+            modules,
+          };
+
+          const res = NextResponse.json(payload);
+          setSessionCookie(res, { role: user.role, userId: user.id, userName: user.name, modules });
+          return res;
+        }
+      }
     }
   } catch {
     // fg_users table may not exist yet — continue to legacy
   }
 
-  // 2. Legacy: Check role_passwords table
+  // 2. Legacy: Check role_passwords table (supports both hashed and plaintext)
   let role: string | null = null;
   try {
-    const { data } = await supabaseServer
+    const { data: rows } = await supabaseServer
       .from("role_passwords")
-      .select("role")
-      .eq("password", password)
-      .single();
-    if (data) role = data.role;
+      .select("role, password");
+
+    if (rows) {
+      for (const row of rows) {
+        const match = isHash(row.password)
+          ? await bcrypt.compare(password, row.password)
+          : password === row.password;
+
+        if (match) {
+          role = row.role;
+          break;
+        }
+      }
+    }
   } catch { /* */ }
 
-  // 3. Legacy: Fall back to env vars
+  // 3. Legacy: Fall back to env vars (always plaintext)
   if (!role) {
     const envRoles: Record<string, string> = {};
     if (process.env.ADMIN_PASSWORD) envRoles[process.env.ADMIN_PASSWORD] = "admin";
