@@ -88,9 +88,32 @@ export default function PlantillasPage() {
     }
   }, []);
 
-  useEffect(() => { if (authChecked) loadOrder(); }, [authChecked, loadOrder]);
+  // Home stats for alerts
+  interface HomeStats { vencenHoy: number; vencenEstaSemana: number; prestamosPendientes: number; reclamosViejos: number; cxcStale: boolean; lastUpload: string | null; }
+  const [stats, setStats] = useState<HomeStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  const loadStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/home-stats");
+      if (res.ok) setStats(await res.json());
+    } catch { /* */ }
+    setStatsLoading(false);
+  }, []);
+
+  useEffect(() => { if (authChecked) { loadOrder(); loadStats(); } }, [authChecked, loadOrder, loadStats]);
 
   if (!authChecked) return null;
+
+  // Build alerts
+  const alerts: { label: string; count: number; href: string; color: "red" | "yellow" | "blue" }[] = [];
+  if (stats) {
+    if (stats.vencenHoy > 0) alerts.push({ label: "Cheques vencen hoy", count: stats.vencenHoy, href: "/cheques", color: "red" });
+    if (stats.vencenEstaSemana > 0) alerts.push({ label: "Cheques vencen esta semana", count: stats.vencenEstaSemana, href: "/cheques", color: "yellow" });
+    if (stats.prestamosPendientes > 0) alerts.push({ label: "Aprobaciones pendientes", count: stats.prestamosPendientes, href: "/prestamos", color: "blue" });
+    if (stats.reclamosViejos > 0) alerts.push({ label: "Reclamos +45 días sin resolver", count: stats.reclamosViejos, href: "/reclamos", color: "red" });
+    if (stats.cxcStale) alerts.push({ label: "Data CXC desactualizada", count: 0, href: "/upload", color: "yellow" });
+  }
 
   // Determine visible modules
   const isAdmin = role === "admin";
@@ -153,6 +176,51 @@ export default function PlantillasPage() {
         <h1 className="text-2xl font-light text-gray-800">{getGreeting()}, {displayName}</h1>
         <p className="text-sm text-gray-400 mt-1">{getDateLabel()}</p>
       </div>
+
+      {/* Alerts */}
+      {statsLoading ? (
+        <div className="mb-6 space-y-2">
+          {[1, 2].map(i => <div key={i} className="h-12 bg-gray-50 rounded-xl animate-pulse" />)}
+        </div>
+      ) : alerts.length > 0 ? (
+        <div className="mb-6 space-y-2">
+          <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-2">Acciones de hoy</div>
+          {alerts.map((a, i) => (
+            <button key={i} onClick={() => router.push(a.href)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition hover:shadow-sm ${
+                a.color === "red" ? "border-red-200 bg-red-50 hover:border-red-300" :
+                a.color === "yellow" ? "border-amber-200 bg-amber-50 hover:border-amber-300" :
+                "border-blue-200 bg-blue-50 hover:border-blue-300"
+              }`}>
+              <span className={`text-lg ${
+                a.color === "red" ? "text-red-500" :
+                a.color === "yellow" ? "text-amber-500" :
+                "text-blue-500"
+              }`}>
+                {a.color === "red" ? "⚠" : a.color === "yellow" ? "⏳" : "📋"}
+              </span>
+              <span className={`text-sm flex-1 ${
+                a.color === "red" ? "text-red-700" :
+                a.color === "yellow" ? "text-amber-700" :
+                "text-blue-700"
+              }`}>{a.label}</span>
+              {a.count > 0 && (
+                <span className={`text-lg font-semibold tabular-nums ${
+                  a.color === "red" ? "text-red-600" :
+                  a.color === "yellow" ? "text-amber-600" :
+                  "text-blue-600"
+                }`}>{a.count}</span>
+              )}
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-300 flex-shrink-0"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          ))}
+        </div>
+      ) : stats ? (
+        <div className="mb-6 flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <span className="text-emerald-500 text-lg">✓</span>
+          <span className="text-sm text-emerald-700">Todo al día — sin alertas pendientes</span>
+        </div>
+      ) : null}
 
       {/* Edit toggle */}
       <div className="flex justify-end mb-3">
