@@ -59,7 +59,7 @@ export default function GuiaDetail({
   const canComplete = (role === "bodega" || role === "admin") && !isDispatched;
   const canEdit =
     (role === "admin" || role === "secretaria" || role === "bodega") && !isDispatched;
-  const canDelete = (role === "admin" || role === "secretaria") && !isDispatched;
+  const canDelete = role === "admin" || (role === "secretaria" && !isDispatched);
 
   function handleConfirmar() {
     if (!bPlaca.trim()) {
