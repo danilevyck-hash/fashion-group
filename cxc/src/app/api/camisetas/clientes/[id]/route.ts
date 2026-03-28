@@ -18,9 +18,16 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
   const { id } = params;
 
   // Delete pedidos first, then client
-  await supabaseServer.from("camisetas_pedidos").delete().eq("cliente_id", id);
-  const { error } = await supabaseServer.from("camisetas_clientes").delete().eq("id", id);
+  const { error: pedErr } = await supabaseServer.from("camisetas_pedidos").delete().eq("cliente_id", id);
+  if (pedErr) {
+    console.error("Error deleting pedidos for client", id, pedErr.message);
+    return NextResponse.json({ error: `Error al eliminar pedidos: ${pedErr.message}` }, { status: 500 });
+  }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const { error } = await supabaseServer.from("camisetas_clientes").delete().eq("id", id);
+  if (error) {
+    console.error("Error deleting client", id, error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }

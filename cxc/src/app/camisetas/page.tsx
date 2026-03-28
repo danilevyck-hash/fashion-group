@@ -118,7 +118,7 @@ export default function CamisetasPage() {
     if (!confirm(`¿Eliminar ${nombre}? Se borrarán todos sus pedidos.`)) return;
     const res = await fetch(`/api/camisetas/clientes/${id}`, { method: "DELETE" });
     if (res.ok) { setSelectedClient(null); showToast("Cliente eliminado"); load(); }
-    else showToast("Error al eliminar");
+    else { const err = await res.json().catch(() => null); showToast(err?.error || "Error al eliminar"); }
   }
 
   async function toggleEstado(id: string) {
@@ -172,11 +172,11 @@ export default function CamisetasPage() {
       const body = clientPedidos.map(({ prod, paq }) => {
         const tallas = TALLAS[prod.genero] || {};
         const tallaStr = Object.entries(tallas).filter(([, v]) => v > 0).map(([k, v]) => `${k}:${v * paq}`).join(" ");
-        return [prod.nombre, prod.genero, String(paq), String(paq * PPQ), tallaStr, `$${fmt(prod.precio_panama)}`, `$${fmt(paq * PPQ * prod.precio_panama)}`];
+        return [prod.nombre, prod.genero, String(paq), String(paq * PPQ), tallaStr, `$${fmt(prod.precio_panama)}`, `$${fmt(prod.rrp)}`, `$${fmt(paq * PPQ * prod.precio_panama)}`];
       });
       autoTable(doc, {
-        startY: 36, head: [["Producto", "Género", "Paq", "Pzas", "Tallas", "Precio/u", "Subtotal"]], body,
-        foot: [["Total", "", String(tPaq), String(tPaq * PPQ), "", "", `$${fmt(tVal)}`]],
+        startY: 36, head: [["Producto", "Género", "Paq", "Pzas", "Tallas", "Precio/u", "RRP", "Subtotal"]], body,
+        foot: [["Total", "", String(tPaq), String(tPaq * PPQ), "", "", "", `$${fmt(tVal)}`]],
         styles: { fontSize: 8, cellPadding: 2 }, headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
         footStyles: { fillColor: [245, 245, 245], textColor: [26, 26, 26], fontStyle: "bold" },
       });
