@@ -6,7 +6,7 @@ import ClientRow from "./ClientRow";
 import ContactPanel from "./ContactPanel";
 
 type RiskFilter = "all" | "current" | "watch" | "overdue";
-type SortKey = "name" | "current" | "watch" | "overdue" | "total";
+type SortKey = "name" | "current" | "watch" | "overdue" | "total" | "follow_up";
 type SortDir = "asc" | "desc";
 
 interface Props {
@@ -30,6 +30,7 @@ interface Props {
   onOpenEmail: (client: ConsolidatedClient) => void;
   onMarkContacted: (clientName: string, method: string) => void;
   onSaveEdit: (nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) => void;
+  onRegisterContact: (clientName: string, data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) => Promise<void>;
 }
 
 export default function ClientTable({
@@ -52,6 +53,7 @@ export default function ClientTable({
   onOpenEmail,
   onMarkContacted,
   onSaveEdit,
+  onRegisterContact,
 }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -156,8 +158,18 @@ export default function ClientTable({
 
       {/* Result count + selection toggle */}
       <div className="flex items-center justify-between mb-2">
-        <div className="text-xs text-gray-400">
-          {(search || riskFilter !== "all" || companyFilter !== "all") ? `${filtered.length} de ${clients.length} clientes` : `${filtered.length} clientes`}
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-gray-400">
+            {(search || riskFilter !== "all" || companyFilter !== "all") ? `${filtered.length} de ${clients.length} clientes` : `${filtered.length} clientes`}
+          </div>
+          <button
+            onClick={() => toggleSort("follow_up")}
+            className={`text-xs flex items-center gap-1 px-2 py-1 rounded-md transition ${sortKey === "follow_up" ? "bg-purple-100 text-purple-700 font-medium" : "text-gray-400 hover:text-gray-700"}`}
+            title="Ordenar por fecha de próximo seguimiento"
+          >
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            Seguimiento{sortKey === "follow_up" ? sortArrow("follow_up") : ""}
+          </button>
         </div>
         {!selectionMode ? (
           <button onClick={() => setSelectionMode(true)} className="text-xs text-gray-400 hover:text-gray-700 transition flex items-center gap-1">
@@ -233,6 +245,7 @@ export default function ClientTable({
                   isSelected={isSelected}
                   onQuickWA={() => { onOpenWhatsApp(client); onMarkContacted(client.nombre_normalized, "whatsapp"); }}
                   onQuickEmail={() => { onOpenEmail(client); onMarkContacted(client.nombre_normalized, "email"); }}
+                  onRegisterContact={(data) => onRegisterContact(client.nombre_normalized, data)}
                 />
                 {isExpanded && !selectionMode && (
                   <ContactPanel
@@ -242,6 +255,7 @@ export default function ClientTable({
                     onOpenEmail={onOpenEmail}
                     onMarkContacted={onMarkContacted}
                     onSaveEdit={onSaveEdit}
+                    onRegisterContact={(data) => onRegisterContact(client.nombre_normalized, data)}
                     companyFilter={companyFilter}
                     roleCompanies={roleCompanies}
                   />

@@ -20,7 +20,7 @@ import useAdminData from "./hooks/useAdminData";
 // ── Helpers ──────────────────────────────────────────────
 
 type RiskFilter = "all" | "current" | "watch" | "overdue";
-type SortKey = "name" | "current" | "watch" | "overdue" | "total";
+type SortKey = "name" | "current" | "watch" | "overdue" | "total" | "follow_up";
 type SortDir = "asc" | "desc";
 
 function buildWhatsAppMsg(client: ConsolidatedClient) {
@@ -203,6 +203,20 @@ export default function AdminDashboard() {
         const cmp = a.nombre_normalized.localeCompare(b.nombre_normalized, "es", { sensitivity: "base" });
         return sortDir === "asc" ? cmp : -cmp;
       }
+      if (sortKey === "follow_up") {
+        // Clients with overdue follow-up (date < today) first, then by date asc, then no date last
+        const today = new Date().toISOString().slice(0, 10);
+        const da = a.proximo_seguimiento || "";
+        const db = b.proximo_seguimiento || "";
+        const aOverdue = da && da < today;
+        const bOverdue = db && db < today;
+        if (aOverdue && !bOverdue) return -1;
+        if (!aOverdue && bOverdue) return 1;
+        if (!da && db) return 1;
+        if (da && !db) return -1;
+        if (da !== db) return da < db ? -1 : 1;
+        return a.nombre_normalized.localeCompare(b.nombre_normalized, "es", { sensitivity: "base" });
+      }
       let va: number, vb: number;
       if (sortKey === "current") { va = a.current; vb = b.current; }
       else if (sortKey === "watch") { va = a.watch; vb = b.watch; }
@@ -374,6 +388,27 @@ export default function AdminDashboard() {
       { onConflict: "nombre_normalized" }
     );
     if (!error) loadData();
+  }
+
+  async function handleRegisterContact(clientName: string, data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) {
+    // Save resultado + proximo_seguimiento to cxc_client_overrides (merge with existing contact fields)
+    const existingClient = clients.find((c) => c.nombre_normalized === clientName);
+    await supabase.from("cxc_client_overrides").upsert(
+      {
+        nombre_normalized: clientName,
+        correo: existingClient?.correo || "",
+        telefono: existingClient?.telefono || "",
+        celular: existingClient?.celular || "",
+        contacto: existingClient?.contacto || "",
+        resultado_contacto: data.resultado_contacto,
+        proximo_seguimiento: data.proximo_seguimiento || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "nombre_normalized" }
+    );
+    // Also log the contact in cxc_contact_log
+    await markContacted(clientName, data.metodo.toLowerCase());
+    loadData();
   }
 
   function buildExportSubtitle() {
@@ -555,6 +590,7 @@ export default function AdminDashboard() {
         onOpenEmail={openEmail}
         onMarkContacted={markContacted}
         onSaveEdit={handleSaveEdit}
+        onRegisterContact={handleRegisterContact}
       />
 
     </div>

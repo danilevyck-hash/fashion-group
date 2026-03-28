@@ -1,7 +1,6 @@
 "use client";
 
 import { fmt } from "@/lib/format";
-import { CATEGORIAS_DEFAULT } from "./types";
 import { EMPRESAS } from "@/lib/companies";
 
 export const CAJA_EMPRESAS = [...EMPRESAS, "Multifashion", "Otro / General"];
@@ -179,23 +178,7 @@ export default function GastoForm({
                   <span>{c}</span>
                   <button
                     onClick={() => {
-                      const updated = categorias.filter((x) => x !== c);
-                      setCategorias(updated);
-                      localStorage.setItem(
-                        "fg_categorias",
-                        JSON.stringify(
-                          updated.filter((x) => !CATEGORIAS_DEFAULT.includes(x))
-                        )
-                      );
-                      if (CATEGORIAS_DEFAULT.includes(c)) {
-                        const del = JSON.parse(
-                          localStorage.getItem("fg_categorias_deleted") || "[]"
-                        );
-                        localStorage.setItem(
-                          "fg_categorias_deleted",
-                          JSON.stringify([...del, c])
-                        );
-                      }
+                      setCategorias(categorias.filter((x) => x !== c));
                     }}
                     className="text-gray-300 hover:text-red-500 text-xs ml-3"
                   >
@@ -212,17 +195,15 @@ export default function GastoForm({
                   className="flex-1 border-b border-gray-200 py-0.5 text-xs outline-none"
                 />
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     if (!newCatName.trim() || categorias.includes(newCatName.trim()))
                       return;
-                    const updated = [...categorias, newCatName.trim()];
-                    setCategorias(updated);
-                    localStorage.setItem(
-                      "fg_categorias",
-                      JSON.stringify(
-                        updated.filter((x) => !CATEGORIAS_DEFAULT.includes(x))
-                      )
-                    );
+                    await fetch("/api/caja/categorias", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ nombre: newCatName.trim() }),
+                    });
+                    setCategorias([...categorias, newCatName.trim()]);
                     setNewCatName("");
                   }}
                   className="text-xs text-gray-500 hover:text-black"

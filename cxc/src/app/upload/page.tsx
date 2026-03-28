@@ -182,7 +182,7 @@ export default function UploadPage() {
     const required = ["CODIGO", "NOMBRE", "TOTAL"];
     const missing = required.filter((r) => !headers.some((h) => h.toUpperCase().includes(r)));
     if (missing.length > 0) return { valid: false, error: `Faltan columnas: ${missing.join(", ")}. Verifica que sea el reporte CxC separado por '${sep}'.`, headers, rows: [] as string[][], totalRows: lines.length - 1, companyKey };
-    return { valid: true, error: "", headers, rows: lines.slice(1, 6).map((l) => l.split(sep).map((v) => v.trim())), totalRows: lines.length - 1, companyKey };
+    return { valid: true, error: "", headers, rows: lines.slice(1, 11).map((l) => l.split(sep).map((v) => v.trim())), totalRows: lines.length - 1, companyKey };
   }
 
   function uploadAge(dateStr: string): "fresh" | "warning" | "stale" {
@@ -285,26 +285,74 @@ export default function UploadPage() {
 
       {/* CSV Preview Overlay */}
       {csvPreview && (
-        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center'}}>
-          <div style={{background:'white',borderRadius:'12px',padding:'24px',maxWidth:'600px',width:'90%',maxHeight:'80vh',overflowY:'auto'}}>
-            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
+        <div style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',padding:'16px'}}>
+          <div style={{background:'white',borderRadius:'12px',padding:'24px',maxWidth:'900px',width:'100%',maxHeight:'85vh',overflowY:'auto'}}>
+            {/* Header */}
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'16px'}}>
               <div>
-                <p style={{fontWeight:600,fontSize:'14px'}}>{uploadCompanies.find((c) => c.key === csvPreview.companyKey)?.name}</p>
-                <p style={{color:'#888',fontSize:'12px'}}>{csvPreview.totalRows} registros detectados</p>
+                <p style={{fontWeight:600,fontSize:'15px',marginBottom:'4px'}}>{uploadCompanies.find((c) => c.key === csvPreview.companyKey)?.name}</p>
+                <p style={{color:'#6b7280',fontSize:'12px'}}>
+                  {csvPreview.totalRows} filas detectadas, {csvPreview.headers.length} columnas
+                  {csvPreview.valid && csvPreview.rows.length > 0 && (
+                    <span style={{marginLeft:'8px',color:'#9ca3af'}}>— mostrando primeras {csvPreview.rows.length} filas</span>
+                  )}
+                </p>
               </div>
               {csvPreview.valid
-                ? <span style={{background:'#f0fdf4',color:'#16a34a',padding:'4px 12px',borderRadius:'99px',fontSize:'12px'}}>✓ Formato válido</span>
-                : <span style={{background:'#fef2f2',color:'#dc2626',padding:'4px 12px',borderRadius:'99px',fontSize:'12px'}}>✗ Error</span>
+                ? <span style={{background:'#f0fdf4',color:'#16a34a',padding:'4px 12px',borderRadius:'99px',fontSize:'12px',whiteSpace:'nowrap',flexShrink:0}}>✓ Formato válido</span>
+                : <span style={{background:'#fef2f2',color:'#dc2626',padding:'4px 12px',borderRadius:'99px',fontSize:'12px',whiteSpace:'nowrap',flexShrink:0}}>✗ Error de formato</span>
               }
             </div>
-            {csvPreview.error && <p style={{color:'red',fontSize:'13px',marginBottom:'12px'}}>{csvPreview.error}</p>}
-            <div style={{display:'flex',gap:'12px',marginTop:'16px'}}>
+
+            {/* Error message */}
+            {csvPreview.error && (
+              <div style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'8px',padding:'10px 14px',color:'#dc2626',fontSize:'13px',marginBottom:'16px'}}>
+                {csvPreview.error}
+              </div>
+            )}
+
+            {/* Preview table */}
+            {csvPreview.valid && csvPreview.rows.length > 0 && (
+              <div style={{overflowX:'auto',marginBottom:'20px',border:'1px solid #e5e7eb',borderRadius:'8px'}}>
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'11px'}}>
+                  <thead>
+                    <tr style={{background:'#f9fafb',borderBottom:'1px solid #e5e7eb'}}>
+                      {csvPreview.headers.map((h, i) => (
+                        <th key={i} style={{textAlign:'left',padding:'8px 10px',color:'#6b7280',fontWeight:600,whiteSpace:'nowrap',textTransform:'uppercase',letterSpacing:'0.04em',fontSize:'10px'}}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {csvPreview.rows.map((row, ri) => (
+                      <tr key={ri} style={{borderBottom:'1px solid #f3f4f6'}}>
+                        {csvPreview.headers.map((_, ci) => (
+                          <td key={ci} style={{padding:'7px 10px',color:'#374151',whiteSpace:'nowrap',maxWidth:'180px',overflow:'hidden',textOverflow:'ellipsis'}}>
+                            {row[ci] ?? ''}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* Action buttons */}
+            <div style={{display:'flex',gap:'10px'}}>
               {csvPreview.valid && pendingFile && (
-                <button onClick={async () => { await handleUpload(csvPreview.companyKey, pendingFile); setCsvPreview(null); setPendingText(""); setPendingFile(null); }} style={{background:'black',color:'white',border:'none',padding:'10px 24px',borderRadius:'99px',cursor:'pointer',fontSize:'14px'}}>
-                  Confirmar y subir
+                <button
+                  onClick={async () => { await handleUpload(csvPreview.companyKey, pendingFile); setCsvPreview(null); setPendingText(""); setPendingFile(null); }}
+                  style={{background:'#111827',color:'white',border:'none',padding:'10px 24px',borderRadius:'99px',cursor:'pointer',fontSize:'14px',fontWeight:500}}
+                >
+                  Confirmar subida
                 </button>
               )}
-              <button onClick={() => { setCsvPreview(null); setPendingText(""); setPendingFile(null); }} style={{background:'white',border:'1px solid #ddd',padding:'10px 16px',borderRadius:'99px',cursor:'pointer',fontSize:'14px',color:'#666'}}>
+              <button
+                onClick={() => { setCsvPreview(null); setPendingText(""); setPendingFile(null); }}
+                style={{background:'white',border:'1px solid #d1d5db',padding:'10px 18px',borderRadius:'99px',cursor:'pointer',fontSize:'14px',color:'#6b7280'}}
+              >
                 Cancelar
               </button>
             </div>

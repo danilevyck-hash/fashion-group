@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { CajaPeriodo, CajaGasto, View, CATEGORIAS_DEFAULT, loadCategorias } from "../components/types";
+import { CajaPeriodo, CajaGasto, View, CATEGORIAS_DEFAULT } from "../components/types";
 import { GastoFormValues, GastoFormSetters } from "../components/GastoForm";
 
 export function useCajaState(urlId: string, initialView: View) {
@@ -78,7 +78,12 @@ export function useCajaState(urlId: string, initialView: View) {
   }, []);
 
   useEffect(() => {
-    setCategorias(loadCategorias());
+    fetch("/api/caja/categorias")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: string[] | null) => {
+        if (data && data.length > 0) setCategorias(data);
+      })
+      .catch(() => { /* keep CATEGORIAS_DEFAULT */ });
     loadPeriodos();
     fetch("/api/caja/responsables")
       .then((r) => (r.ok ? r.json() : []))

@@ -1,7 +1,10 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
+import ContactModal from "./ContactModal";
 
 interface Props {
   client: ConsolidatedClient;
@@ -10,6 +13,7 @@ interface Props {
   onOpenEmail: (client: ConsolidatedClient) => void;
   onMarkContacted: (clientName: string, method: string) => void;
   onSaveEdit: (nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) => void;
+  onRegisterContact?: (data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) => Promise<void>;
   companyFilter: string;
   roleCompanies: Company[];
 }
@@ -21,6 +25,7 @@ export default function ContactPanel({
   onOpenEmail,
   onMarkContacted,
   onSaveEdit,
+  onRegisterContact,
   companyFilter,
   roleCompanies,
 }: Props) {
@@ -28,6 +33,7 @@ export default function ContactPanel({
   const [editData, setEditData] = useState({ correo: "", telefono: "", celular: "", contacto: "" });
   const [copied, setCopied] = useState<string | null>(null);
   const [waSending, setWaSending] = useState(false);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
 
   function startEdit() {
     setEditing(true);
@@ -128,6 +134,31 @@ export default function ContactPanel({
               Hace {daysSince}d via {lastContact.method}
             </div>
           )}
+
+          {/* Contact tracking: resultado + próximo seguimiento */}
+          {(client.resultado_contacto || client.proximo_seguimiento) && (
+            <div className="mt-3 space-y-1.5">
+              {client.resultado_contacto && (
+                <div className="flex items-start gap-1.5 text-xs text-gray-600">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0 mt-0.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                  <span>{client.resultado_contacto}</span>
+                </div>
+              )}
+              {client.proximo_seguimiento && (() => {
+                const today = new Date().toISOString().slice(0, 10);
+                const isOverdue = client.proximo_seguimiento < today;
+                const isToday = client.proximo_seguimiento === today;
+                const colorClass = isOverdue ? "text-red-600" : isToday ? "text-amber-600" : "text-gray-600";
+                const label = isOverdue ? "Seguimiento vencido" : isToday ? "Seguimiento hoy" : "Prox. seguimiento";
+                return (
+                  <div className={`flex items-center gap-1.5 text-xs ${colorClass}`}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span>{label}: {new Date(client.proximo_seguimiento + "T00:00:00").toLocaleDateString("es-PA", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
         </div>
 
         {/* Right: Action buttons */}
@@ -154,9 +185,29 @@ export default function ContactPanel({
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
               Llamada
             </button>
+            {onRegisterContact && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setContactModalOpen(true); }}
+                className="flex items-center gap-2 text-xs border border-purple-200 text-purple-700 px-3 py-2 rounded-lg hover:bg-purple-50 transition font-medium"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                Registrar
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {onRegisterContact && (
+        <ContactModal
+          open={contactModalOpen}
+          onClose={() => setContactModalOpen(false)}
+          clientName={client.nombre_normalized}
+          initialResultado={client.resultado_contacto || ""}
+          initialProximoSeguimiento={client.proximo_seguimiento || ""}
+          onSave={onRegisterContact}
+        />
+      )}
 
       {/* Internal note */}
       <ClientNote clientName={client.nombre_normalized} />

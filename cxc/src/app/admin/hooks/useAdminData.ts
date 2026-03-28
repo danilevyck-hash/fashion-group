@@ -46,7 +46,7 @@ export default function useAdminData() {
 
       const { data: rows } = await supabase.from("cxc_rows").select("*");
       const { data: overrides } = await supabase.from("cxc_client_overrides").select("*");
-      const overrideMap: Record<string, { correo: string; telefono: string; celular: string; contacto: string }> = {};
+      const overrideMap: Record<string, { correo: string; telefono: string; celular: string; contacto: string; resultado_contacto?: string; proximo_seguimiento?: string }> = {};
       if (overrides) {
         for (const o of overrides) overrideMap[o.nombre_normalized] = o;
       }
@@ -67,6 +67,8 @@ export default function useAdminData() {
               telefono: ovr?.telefono || r.telefono || "",
               celular: ovr?.celular || r.celular || "",
               contacto: ovr?.contacto || r.contacto || "",
+              resultado_contacto: ovr?.resultado_contacto || "",
+              proximo_seguimiento: ovr?.proximo_seguimiento || "",
               total: 0, current: 0, watch: 0, overdue: 0,
               d0_30: 0, d31_60: 0, d61_90: 0, d91_120: 0, d121_plus: 0,
               hasOverride: !!ovr,

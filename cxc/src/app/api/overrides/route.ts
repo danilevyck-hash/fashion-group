@@ -9,21 +9,23 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { nombre_normalized, correo, telefono, celular, contacto } = body;
+  const { nombre_normalized, correo, telefono, celular, contacto, resultado_contacto, proximo_seguimiento } = body;
+
+  // Build update object — only include contact tracking fields if provided
+  const upsertData: Record<string, unknown> = {
+    nombre_normalized,
+    correo,
+    telefono,
+    celular,
+    contacto,
+    updated_at: new Date().toISOString(),
+  };
+  if (resultado_contacto !== undefined) upsertData.resultado_contacto = resultado_contacto;
+  if (proximo_seguimiento !== undefined) upsertData.proximo_seguimiento = proximo_seguimiento;
 
   const { data, error } = await supabaseServer
     .from("cxc_client_overrides")
-    .upsert(
-      {
-        nombre_normalized,
-        correo,
-        telefono,
-        celular,
-        contacto,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "nombre_normalized" }
-    )
+    .upsert(upsertData, { onConflict: "nombre_normalized" })
     .select()
     .single();
 

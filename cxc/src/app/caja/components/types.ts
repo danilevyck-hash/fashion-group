@@ -38,27 +38,3 @@ export const CATEGORIAS_DEFAULT = [
   "Servicios varios",
   "Otro",
 ];
-
-export function loadCategorias(): string[] {
-  if (typeof window === "undefined") return CATEGORIAS_DEFAULT;
-  try {
-    const stored = JSON.parse(
-      localStorage.getItem("fg_categorias") || "[]"
-    ) as string[];
-    const deleted = JSON.parse(
-      localStorage.getItem("fg_categorias_deleted") || "[]"
-    ) as string[];
-    const defaults = CATEGORIAS_DEFAULT.filter((c) => !deleted.includes(c));
-    const merged = [
-      ...defaults,
-      ...stored.filter((s) => s && !defaults.includes(s)),
-    ];
-    if (merged.length === 0) {
-      localStorage.removeItem("fg_categorias_deleted");
-      return CATEGORIAS_DEFAULT;
-    }
-    return merged;
-  } catch {
-    return CATEGORIAS_DEFAULT;
-  }
-}

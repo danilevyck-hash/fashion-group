@@ -68,6 +68,8 @@ export default function VentasPage() {
   const [csvMes, setCsvMes] = useState(Math.max(1, new Date().getMonth()));
   const [csvParsed, setCsvParsed] = useState<{ tipo: string; cliente: string; subtotal: number; costo: number }[] | null>(null);
   const [csvUploading, setCsvUploading] = useState(false);
+  const [csvRawPreview, setCsvRawPreview] = useState<{ headers: string[]; rows: string[][]; total: number } | null>(null);
+  const [showDupeWarning, setShowDupeWarning] = useState(false);
 
   // Metas state
   const [metaEmpresa, setMetaEmpresa] = useState(EMPRESAS[0]);
@@ -201,8 +203,21 @@ export default function VentasPage() {
     setSaving(false);
   }
 
+  function checkDuplicate() {
+    return safeVentas.some((v) => v.empresa === csvEmpresa && v.año === csvAño && v.mes === csvMes);
+  }
+
+  function handleConfirmUpload() {
+    if (checkDuplicate()) {
+      setShowDupeWarning(true);
+    } else {
+      uploadCSV();
+    }
+  }
+
   async function uploadCSV() {
     if (!csvParsed?.length) return;
+    setShowDupeWarning(false);
     setCsvUploading(true);
     try {
       const res = await fetch("/api/ventas/upload", {
@@ -214,6 +229,7 @@ export default function VentasPage() {
         const data = await res.json();
         showToast(`${data.summary?.facturas || 0} facturas procesadas`);
         setCsvParsed(null);
+        setCsvRawPreview(null);
         loadData(selectedYear);
       }
     } catch { showToast("Error de conexión"); }
@@ -511,20 +527,78 @@ export default function VentasPage() {
                     <input type="file" accept=".csv" onChange={async (e) => {
                       const f = e.target.files?.[0]; if (!f) return;
                       const text = await f.text();
+                      // Build raw preview (first 10 data rows)
+                      const allLines = text.split("\n").filter((l) => l.trim());
+                      if (allLines.length >= 2) {
+                        const sep = allLines[0].includes(";") ? ";" : ",";
+                        const previewHeaders = allLines[0].split(sep).map((h) => h.trim());
+                        const previewRows = allLines.slice(1, 11).map((l) => l.split(sep).map((v) => v.trim()));
+                        setCsvRawPreview({ headers: previewHeaders, rows: previewRows, total: allLines.length - 1 });
+                      }
                       setCsvParsed(parseCSV(text));
                     }} className="w-full text-xs py-1.5" />
                   </div>
                 </div>
+                {/* Raw CSV preview table */}
+                {csvRawPreview && (
+                  <div className="mb-4">
+                    <p className="text-xs text-gray-500 mb-2">
+                      <span className="font-medium text-gray-700">{csvRawPreview.total} filas detectadas, {csvRawPreview.headers.length} columnas</span>
+                      {csvRawPreview.rows.length > 0 && <span className="text-gray-400 ml-1">— primeras {csvRawPreview.rows.length} filas</span>}
+                    </p>
+                    <div className="overflow-x-auto border border-gray-200 rounded-xl">
+                      <table className="w-full text-[11px]">
+                        <thead>
+                          <tr className="bg-gray-50 border-b border-gray-200">
+                            {csvRawPreview.headers.map((h, i) => (
+                              <th key={i} className="text-left px-3 py-2 text-[10px] uppercase tracking-[0.05em] text-gray-400 font-normal whitespace-nowrap">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {csvRawPreview.rows.map((row, ri) => (
+                            <tr key={ri} className="border-b border-gray-100 last:border-0">
+                              {csvRawPreview.headers.map((_, ci) => (
+                                <td key={ci} className="px-3 py-1.5 text-gray-600 whitespace-nowrap max-w-[160px] overflow-hidden text-ellipsis">{row[ci] ?? ''}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Parsed summary */}
                 {csvSummary && (
                   <div className="bg-gray-50 rounded-xl p-4 mb-4">
                     <p className="text-xs text-gray-700 font-medium mb-1">{csvSummary.facturas} facturas | {csvSummary.ncs} notas de credito</p>
                     <p className="text-xs text-gray-500">Ventas Brutas: ${fmt(csvSummary.ventasBrutas)} | NC: ${fmt(csvSummary.nc)} | Netas: ${fmt(csvSummary.ventasBrutas - csvSummary.nc)}</p>
                   </div>
                 )}
-                <button onClick={uploadCSV} disabled={csvUploading || !csvParsed?.length} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40 flex items-center gap-2">
-                  {csvUploading && <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>}
-                  {csvUploading ? "Procesando..." : "Confirmar y subir"}
-                </button>
+
+                {/* Duplicate warning */}
+                {showDupeWarning && (
+                  <div className="mb-4 border border-amber-200 bg-amber-50 rounded-xl p-4">
+                    <p className="text-sm font-medium text-amber-800 mb-1">Ya existe data para {csvEmpresa} — {MESES_FULL[csvMes - 1]} {csvAño}</p>
+                    <p className="text-xs text-amber-600 mb-3">¿Deseas sobrescribir los datos existentes?</p>
+                    <div className="flex gap-2">
+                      <button onClick={uploadCSV} className="bg-amber-600 text-white px-4 py-2 rounded-full text-xs font-medium hover:bg-amber-700 transition">
+                        Sí, sobrescribir
+                      </button>
+                      <button onClick={() => setShowDupeWarning(false)} className="border border-gray-300 px-4 py-2 rounded-full text-xs text-gray-600 hover:bg-gray-50 transition">
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {!showDupeWarning && (
+                  <button onClick={handleConfirmUpload} disabled={csvUploading || !csvParsed?.length} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40 flex items-center gap-2">
+                    {csvUploading && <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>}
+                    {csvUploading ? "Procesando..." : "Confirmar y subir"}
+                  </button>
+                )}
               </div>
             )}
 
