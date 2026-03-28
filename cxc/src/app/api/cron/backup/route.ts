@@ -1,7 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const secret = req.headers.get("x-cron-secret") || req.nextUrl.searchParams.get("secret");
+  const expected = process.env.CRON_SECRET;
+  if (!expected || secret !== expected) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const today = new Date().toISOString().slice(0, 10);
 
   const { data: reclamos } = await supabaseServer.from("reclamos").select("*, reclamo_items(*)").order("created_at", { ascending: false });

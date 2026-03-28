@@ -8,7 +8,7 @@ import { ALL_COMPANIES, getCompaniesForRole } from "@/lib/companies";
 import { normalizeName } from "@/lib/normalize";
 import { resolveAlias } from "@/lib/aliases";
 import Papa from "papaparse";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { hasModuleAccess } from "@/lib/auth-check";
 
 interface UploadStatus {
