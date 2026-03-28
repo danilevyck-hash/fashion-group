@@ -1,287 +1,48 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import { fmt, fmtDate } from "@/lib/format";
-import { EMPRESAS } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
 
-interface CajaPeriodo {
-  id: string;
-  numero: number;
-  fecha_apertura: string;
-  fecha_cierre: string | null;
-  fondo_inicial: number;
-  estado: string;
-  total_gastado: number;
-  repuesto: boolean;
-  repuesto_at: string | null;
-  caja_gastos?: CajaGasto[];
-}
-
-interface CajaGasto {
-  id: string;
-  periodo_id: string;
-  fecha: string;
-  descripcion: string;
-  proveedor: string;
-  nro_factura: string;
-  responsable: string;
-  categoria: string;
-  empresa: string;
-  subtotal: number;
-  itbms: number;
-  total: number;
-  nombre?: string; // legacy
-}
-
-const CATEGORIAS_DEFAULT = ["Transporte", "Papelería", "Alimentación", "Limpieza", "Mensajería", "Servicios varios", "Otro"];
-
-const CAJA_EMPRESAS = [...EMPRESAS, "Multifashion", "Otro / General"];
-
-function loadCategorias(): string[] {
-  if (typeof window === "undefined") return CATEGORIAS_DEFAULT;
-  try {
-    const stored = JSON.parse(localStorage.getItem("fg_categorias") || "[]") as string[];
-    const deleted = JSON.parse(localStorage.getItem("fg_categorias_deleted") || "[]") as string[];
-    const defaults = CATEGORIAS_DEFAULT.filter((c) => !deleted.includes(c));
-    const merged = [...defaults, ...stored.filter((s) => s && !defaults.includes(s))];
-    // If everything was deleted, reset and return defaults
-    if (merged.length === 0) {
-      localStorage.removeItem("fg_categorias_deleted");
-      return CATEGORIAS_DEFAULT;
-    }
-    return merged;
-  } catch { return CATEGORIAS_DEFAULT; }
-}
-
-type View = "list" | "detail" | "print";
+import { View } from "./components/types";
+import { useCajaState } from "./hooks/useCajaState";
+import PeriodoList from "./components/PeriodoList";
+import PeriodoDetailHeader from "./components/PeriodoDetailHeader";
+import PeriodoDetailFooter from "./components/PeriodoDetailFooter";
+import ResumenGastos from "./components/ResumenGastos";
+import GastoForm from "./components/GastoForm";
+import GastoTable from "./components/GastoTable";
+import PrintView from "./components/PrintView";
 
 export default function CajaPageWrapper() {
-  return <Suspense><CajaPage /></Suspense>;
+  return (
+    <Suspense>
+      <CajaPage />
+    </Suspense>
+  );
 }
 
 function CajaPage() {
-  const { authChecked, role } = useAuth({ moduleKey: "caja", allowedRoles: ["admin","upload","secretaria","director"] });
+  const { authChecked, role } = useAuth({
+    moduleKey: "caja",
+    allowedRoles: ["admin", "upload", "secretaria", "director"],
+  });
   const searchParams = useSearchParams();
-  const [view, _setView] = useState<View>((searchParams.get("view") as View) || "list");
-  const [urlId] = useState(searchParams.get("id") || "");
+  const urlId = searchParams.get("id") || "";
+  const initialView = (searchParams.get("view") as View) || "list";
 
-  function setView(v: View, id?: string) {
-    _setView(v);
-    if (v === "list") {
-      window.history.pushState(null, "", "/caja");
-    } else if (id) {
-      window.history.pushState(null, "", `/caja?view=${v}&id=${id}`);
-    }
-  }
-
-  // Handle browser back/forward
-  useEffect(() => {
-    function onPopState() {
-      const params = new URLSearchParams(window.location.search);
-      const v = (params.get("view") as View) || "list";
-      const id = params.get("id") || "";
-      _setView(v);
-      if (id && v !== "list") {
-        loadDetail(id);
-      } else {
-        setCurrent(null);
-      }
-    }
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
-  const [periodos, setPeriodos] = useState<CajaPeriodo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [current, setCurrent] = useState<CajaPeriodo | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  // lowBalanceWarning is now computed inline in detail view
-  const [categorias, setCategorias] = useState(CATEGORIAS_DEFAULT);
-  const [showManageCat, setShowManageCat] = useState(false);
-  const [newCatName, setNewCatName] = useState("");
-
-  // Responsables
-  const [responsables, setResponsables] = useState<string[]>([]);
-  const [showAddResponsable, setShowAddResponsable] = useState(false);
-  const [newResponsable, setNewResponsable] = useState("");
-
-  // Add expense form state
-  const [gFecha, setGFecha] = useState(new Date().toISOString().slice(0, 10));
-  const [gDescripcion, setGDescripcion] = useState("");
-  const [gProveedor, setGProveedor] = useState("");
-  const [gNroFactura, setGNroFactura] = useState("");
-  const [gSubtotal, setGSubtotal] = useState("");
-  const [gItbmsPct, setGItbmsPct] = useState("0");
-  const [gCategoria, setGCategoria] = useState("Transporte");
-  const [gCategoriaOtro, setGCategoriaOtro] = useState("");
-  const [gResponsable, setGResponsable] = useState("");
-  const [gEmpresa, setGEmpresa] = useState("");
-  const [gEmpresaOtro, setGEmpresaOtro] = useState("");
-  const [addingGasto, setAddingGasto] = useState(false);
-  const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
-  const [editGasto, setEditGasto] = useState<Partial<CajaGasto>>({});
-  const [showResumen, setShowResumen] = useState(false);
-
-  const subtotalNum = parseFloat(gSubtotal) || 0;
-  const itbmsNum = subtotalNum * (parseFloat(gItbmsPct) / 100);
-  const totalNum = subtotalNum + itbmsNum;
-
-  useEffect(() => {
-    setCategorias(loadCategorias());
-    loadPeriodos();
-    fetch("/api/caja/responsables").then((r) => r.ok ? r.json() : []).then((data) => {
-      const names = (data || []).map((r: { nombre: string }) => r.nombre);
-      if (names.length > 0) {
-        setResponsables(names);
-        localStorage.setItem("fg_responsables", JSON.stringify(names));
-      } else {
-        try { const cached = JSON.parse(localStorage.getItem("fg_responsables") || "[]"); if (cached.length > 0) setResponsables(cached); } catch { /* */ }
-      }
-    }).catch(() => {
-      try { const cached = JSON.parse(localStorage.getItem("fg_responsables") || "[]"); if (cached.length > 0) setResponsables(cached); } catch { /* */ }
-    });
-  }, []);
-
-  const loadPeriodos = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/caja/periodos");
-      if (!res.ok) throw new Error();
-      setPeriodos(await res.json());
-    } catch {
-      setError("Error al cargar períodos");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  async function createPeriodo() {
-    const input = window.prompt("Fondo inicial del período ($):", "200");
-    if (!input) return;
-    const fondo = parseFloat(input);
-    if (isNaN(fondo) || fondo <= 0) return;
-    setError(null);
-    try {
-      const res = await fetch("/api/caja/periodos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fondo_inicial: fondo }),
-      });
-      if (!res.ok) throw new Error();
-      const p = await res.json();
-      loadPeriodos();
-      await loadDetail(p.id);
-    } catch {
-      setError("Error al crear período");
-    }
-  }
-
-  async function loadDetail(id: string) {
-    const res = await fetch(`/api/caja/periodos/${id}`);
-    if (res.ok) {
-      const data = await res.json();
-      const gastos = data.caja_gastos || [];
-      data.total_gastado = gastos.reduce((s: number, g: CajaGasto) => s + (g.total || 0), 0);
-      setCurrent(data);
-      setView("detail", id);
-    }
-  }
-
-  // Load from URL on mount
-  useEffect(() => {
-    if (urlId && (view === "detail" || view === "print")) {
-      loadDetail(urlId).then(() => { if (view === "print") _setView("print"); });
-    }
-  }, [urlId]);
-
-  async function closePeriodo(id: string) {
-    if (!confirm("¿Cerrar este período? No podrá agregar más gastos.")) return;
-    await fetch(`/api/caja/periodos/${id}`, { method: "PATCH" });
-    await loadDetail(id);
-    loadPeriodos();
-  }
-
-  async function deletePeriodo(id: string) {
-    if (!confirm("¿Eliminar este período y todos sus gastos?")) return;
-    const res = await fetch(`/api/caja/periodos/${id}`, { method: "DELETE" });
-    if (res.ok) {
-      loadPeriodos();
-      if (current?.id === id) { setCurrent(null); setView("list", undefined); }
-    } else {
-      setError("Error al eliminar período");
-    }
-  }
-
-  async function aprobarReposicion(id: string) {
-    const res = await fetch(`/api/caja/periodos/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "repuesto" }),
-    });
-    if (res.ok) { await loadDetail(id); loadPeriodos(); }
-    else setError("Error al aprobar reposición");
-  }
-
-  async function addGasto() {
-    if (!current) return;
-    setAddingGasto(true);
-    setError(null);
-    try {
-      const resolvedCategoria = gCategoria === "Otro" ? (gCategoriaOtro.trim() || "Otro") : gCategoria;
-      const resolvedEmpresa = gEmpresa === "Otro / General" ? (gEmpresaOtro.trim() || "Otro / General") : gEmpresa;
-      const res = await fetch("/api/caja/gastos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          periodo_id: current.id,
-          fecha: gFecha,
-          descripcion: gDescripcion,
-          proveedor: gProveedor,
-          nro_factura: gNroFactura,
-          responsable: gResponsable,
-          categoria: resolvedCategoria,
-          empresa: resolvedEmpresa,
-          subtotal: subtotalNum,
-          itbms: itbmsNum,
-          total: totalNum,
-        }),
-      });
-      if (!res.ok) throw new Error();
-      setGFecha(new Date().toISOString().split("T")[0]);
-      setGDescripcion(""); setGProveedor(""); setGNroFactura(""); setGSubtotal(""); setGItbmsPct("0");
-      setGCategoria("Transporte"); setGCategoriaOtro(""); setGResponsable(""); setGEmpresa(""); setGEmpresaOtro("");
-      await loadDetail(current.id);
-      loadPeriodos();
-    } catch {
-      setError("Error al agregar gasto");
-    } finally {
-      setAddingGasto(false);
-    }
-  }
-
-  async function deleteGasto(gastoId: string) {
-    if (!current) return;
-    if (!confirm("¿Eliminar?")) return;
-    await fetch(`/api/caja/gastos/${gastoId}`, { method: "DELETE" });
-    await loadDetail(current.id);
-    loadPeriodos();
-  }
-
-  async function saveEditGasto() {
-    if (!current || !editingGastoId) return;
-    const sub = parseFloat(String(editGasto.subtotal)) || 0;
-    const tax = parseFloat(String(editGasto.itbms)) || 0;
-    await fetch(`/api/caja/gastos/${editingGastoId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...editGasto, subtotal: sub, itbms: tax, total: sub + tax }),
-    });
-    setEditingGastoId(null); setEditGasto({});
-    await loadDetail(current.id); loadPeriodos();
-  }
+  const {
+    view, setView,
+    periodos, loading, current, setCurrent, error,
+    categorias, setCategorias, showManageCat, setShowManageCat, newCatName, setNewCatName,
+    responsables, setResponsables, showAddResponsable, setShowAddResponsable, newResponsable, setNewResponsable,
+    addingGasto, subtotalNum, totalNum,
+    editingGastoId, setEditingGastoId, editGasto, setEditGasto,
+    formValues, formSetters,
+    loadDetail, createPeriodo, closePeriodo, deletePeriodo, aprobarReposicion,
+    addGasto, deleteGasto, saveEditGasto, exportExcel,
+  } = useCajaState(urlId, initialView);
 
   if (!authChecked) return null;
 
@@ -292,83 +53,29 @@ function CajaPage() {
     return (
       <div>
         <AppHeader module="Caja Menuda" />
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex items-end justify-between mb-10">
-          <div>
-            <h1 className="text-xl font-light tracking-tight">Caja Menuda</h1>
-            <p className="text-sm text-gray-400 mt-1">Fondo rotativo para gastos menores</p>
-          </div>
-          {!hasOpenPeriod && (
-            <button onClick={createPeriodo}
-              className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
-              Nuevo Período
-            </button>
-          )}
-        </div>
-
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-
-        {loading ? (
-          <div>{[...Array(5)].map((_, i) => <div key={i} className="flex gap-4 py-3 px-4 border-b border-gray-50"><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/5" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /><div className="h-3 bg-gray-100 rounded animate-pulse w-1/6" /></div>)}</div>
-        ) : periodos.length === 0 ? (
-          <p className="text-gray-300 text-sm text-center py-20">No hay períodos registrados</p>
-        ) : (
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
-                <th className="text-left py-3 px-4 font-normal">N°</th>
-                <th className="text-left py-3 px-4 font-normal">Apertura</th>
-                <th className="text-left py-3 px-4 font-normal">Cierre</th>
-                <th className="text-left py-3 px-4 font-normal">Estado</th>
-                <th className="text-right py-3 px-4 font-normal">Fondo</th>
-                <th className="text-right py-3 px-4 font-normal">Gastado</th>
-                <th className="text-right py-3 px-4 font-normal">Saldo</th>
-                <th className="text-right py-3 px-4 font-normal"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {periodos.map((p) => {
-                const saldo = p.fondo_inicial - p.total_gastado;
-                return (
-                  <tr key={p.id} onClick={() => loadDetail(p.id)} className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer">
-                    <td className="py-3 px-4 font-medium">{p.numero}</td>
-                    <td className="py-3 px-4 text-gray-500">{fmtDate(p.fecha_apertura)}</td>
-                    <td className="py-3 px-4 text-gray-500">{p.fecha_cierre ? fmtDate(p.fecha_cierre) : "—"}</td>
-                    <td className="py-3 px-4">
-                      {p.estado === "abierto" ? (
-                        <span className="text-[11px] bg-black text-white px-2.5 py-0.5 rounded-full">Abierto</span>
-                      ) : (
-                        <span className="text-[11px] bg-gray-200 text-gray-500 px-2.5 py-0.5 rounded-full">Cerrado</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-right tabular-nums text-gray-400">${fmt(p.fondo_inicial)}</td>
-                    <td className="py-3 px-4 text-right tabular-nums">${fmt(p.total_gastado)}</td>
-                    <td className={`py-3 px-4 text-right tabular-nums font-medium ${saldo < 0 ? "text-red-600" : ""}`}>
-                      ${fmt(saldo)}
-                    </td>
-                    <td className="py-3 px-4 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                      <button onClick={() => { loadDetail(p.id).then(() => setView("print", p.id)); }}
-                        className="text-sm text-gray-500 hover:text-black transition">Imprimir</button>
-                      {p.estado === "abierto" && (<>
-                        <span className="text-gray-200">·</span>
-                        <button onClick={() => closePeriodo(p.id)} className="text-sm text-gray-500 hover:text-black transition">Cerrar</button>
-                      </>)}
-                      {p.estado === "cerrado" && role === "admin" && (<>
-                        <span className="text-gray-200">·</span>
-                        <button onClick={() => deletePeriodo(p.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>
-                      </>)}
-                      <button onClick={() => loadDetail(p.id)} className="text-gray-300 hover:text-black ml-2 transition">›</button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          </div>
-        )}
+        <PeriodoList
+          periodos={periodos}
+          loading={loading}
+          error={error}
+          hasOpenPeriod={hasOpenPeriod}
+          role={role}
+          onCreatePeriodo={createPeriodo}
+          onLoadDetail={(id) => loadDetail(id)}
+          onPrintPeriodo={(id) => loadDetail(id).then(() => setView("print", id))}
+          onClosePeriodo={closePeriodo}
+          onDeletePeriodo={deletePeriodo}
+        />
       </div>
-      </div>
+    );
+  }
+
+  // ── PRINT VIEW ──
+  if (view === "print" && current) {
+    return (
+      <PrintView
+        current={current}
+        onBack={() => setView("detail", current.id)}
+      />
     );
   }
 
@@ -376,482 +83,69 @@ function CajaPage() {
   if (view === "detail" && current) {
     const gastos = current.caja_gastos || [];
     const totalGastado = gastos.reduce((s, g) => s + (g.total || 0), 0);
-    const totalSubtotal = gastos.reduce((s, g) => s + (g.subtotal || 0), 0);
-    const totalItbms = gastos.reduce((s, g) => s + (g.itbms || 0), 0);
     const saldo = current.fondo_inicial - totalGastado;
     const isOpen = current.estado === "abierto";
+    const pctUsed = current.fondo_inicial > 0 ? (saldo / current.fondo_inicial) * 100 : 100;
 
     return (
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
-        <button onClick={() => { setView("list", undefined); setCurrent(null); }}
-          className="text-sm text-gray-400 hover:text-black transition mb-8 block">
-          ← Períodos
-        </button>
+        <PeriodoDetailHeader
+          current={current}
+          totalGastado={totalGastado}
+          saldo={saldo}
+          pctUsed={pctUsed}
+          onBack={() => { setView("list", undefined); setCurrent(null); }}
+        />
 
-        <div className="flex flex-wrap items-center gap-4 mb-8">
-          <h1 className="text-xl font-light tracking-tight">Período N° {current.numero}</h1>
-          <span className="text-sm text-gray-400">{fmtDate(current.fecha_apertura)}</span>
-          {isOpen ? (
-            <span className="text-[11px] bg-black text-white px-2.5 py-0.5 rounded-full">Abierto</span>
-          ) : (
-            <span className="text-[11px] bg-gray-200 text-gray-500 px-2.5 py-0.5 rounded-full">Cerrado — {fmtDate(current.fecha_cierre || "")}</span>
-          )}
-        </div>
-
-        {/* Summary */}
-        <div className="grid grid-cols-3 gap-8 mb-10">
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">Fondo</div>
-            <div className="text-2xl font-semibold tabular-nums">${fmt(current.fondo_inicial)}</div>
-          </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">Gastado</div>
-            <div className="text-2xl font-semibold tabular-nums">${fmt(totalGastado)}</div>
-          </div>
-          <div>
-            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">Saldo</div>
-            <div className={`text-2xl font-semibold tabular-nums ${saldo < 0 ? "text-red-600" : ""}`}>${fmt(saldo)}</div>
-          </div>
-        </div>
-
-        {/* Category chart — always visible */}
-        {gastos.length > 0 && (() => {
-          const catTotals: Record<string, number> = {};
-          for (const g of gastos) { const cat = g.categoria || "Varios"; catTotals[cat] = (catTotals[cat] || 0) + g.total; }
-          const catTotal = Object.values(catTotals).reduce((s, v) => s + v, 0);
-          const chartEntries = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
-          return (
-            <div className="mb-6">
-              <div className="space-y-1.5">
-                {chartEntries.map(([cat, total]) => (
-                  <div key={cat} className="flex items-center gap-2">
-                    <span className="text-xs text-gray-400 w-32 truncate">{cat}</span>
-                    <div className="flex-1 bg-gray-100 rounded-full h-1">
-                      <div className="bg-black h-1 rounded-full" style={{ width: `${catTotal > 0 ? ((total / catTotal) * 100).toFixed(0) : 0}%` }} />
-                    </div>
-                    <span className="text-xs text-gray-400 w-14 text-right tabular-nums">${total.toFixed(2)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Resumen de gastos por categoria y empresa — CAMBIO 31 */}
-        {gastos.length > 0 && (() => {
-          const catTotalsR: Record<string, number> = {};
-          const empTotalsR: Record<string, number> = {};
-          for (const g of gastos) {
-            const cat = g.categoria || "Varios";
-            catTotalsR[cat] = (catTotalsR[cat] || 0) + g.total;
-            const emp = g.empresa || "Sin asignar";
-            empTotalsR[emp] = (empTotalsR[emp] || 0) + g.total;
-          }
-          const grandTotal = gastos.reduce((s, g) => s + g.total, 0);
-          const catEntries = Object.entries(catTotalsR).sort((a, b) => b[1] - a[1]);
-          const empEntries = Object.entries(empTotalsR).sort((a, b) => b[1] - a[1]);
-          return (
-            <div className="mb-6">
-              <button onClick={() => setShowResumen(!showResumen)}
-                className="text-[11px] uppercase tracking-[0.05em] text-gray-400 hover:text-black transition flex items-center gap-1 mb-3">
-                <span className={`inline-block transition-transform ${showResumen ? "rotate-90" : ""}`}>›</span>
-                Resumen de gastos
-              </button>
-              {showResumen && (
-                <div className="grid grid-cols-2 gap-8">
-                  <div>
-                    <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2">Por categoría</div>
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
-                          <th className="text-left py-3 px-4 font-normal">Categoría</th>
-                          <th className="text-right py-3 px-4 font-normal">Monto</th>
-                          <th className="text-right py-3 px-4 font-normal">%</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {catEntries.map(([cat, total]) => (
-                          <tr key={cat} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                            <td className="py-3 px-4">{cat}</td>
-                            <td className="py-3 px-4 text-right tabular-nums">${fmt(total)}</td>
-                            <td className="py-3 px-4 text-right tabular-nums text-gray-400">{grandTotal > 0 ? ((total / grandTotal) * 100).toFixed(1) : "0.0"}%</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div>
-                    <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2">Por empresa</div>
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
-                          <th className="text-left py-3 px-4 font-normal">Empresa</th>
-                          <th className="text-right py-3 px-4 font-normal">Monto</th>
-                          <th className="text-right py-3 px-4 font-normal">%</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {empEntries.map(([emp, total]) => (
-                          <tr key={emp} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                            <td className="py-3 px-4">{emp}</td>
-                            <td className="py-3 px-4 text-right tabular-nums">${fmt(total)}</td>
-                            <td className="py-3 px-4 text-right tabular-nums text-gray-400">{grandTotal > 0 ? ((total / grandTotal) * 100).toFixed(1) : "0.0"}%</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
+        <ResumenGastos gastos={gastos} />
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
-        {/* Low balance alert — CAMBIO 32 */}
-        {(() => {
-          const pctUsed = current.fondo_inicial > 0 ? (saldo / current.fondo_inicial) * 100 : 100;
-          if (pctUsed < 10) return (
-            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-6 flex items-center gap-3">
-              <span className="text-red-500 text-base">&#9888;</span>
-              <p className="text-sm text-red-700">
-                Saldo bajo — quedan ${fmt(saldo)} de ${fmt(current.fondo_inicial)} ({pctUsed.toFixed(0)}%). Considera reabastecer el fondo.
-              </p>
-            </div>
-          );
-          if (pctUsed < 20) return (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 flex items-center gap-3">
-              <span className="text-amber-500 text-base">&#9888;</span>
-              <p className="text-sm text-amber-700">
-                Saldo bajo — quedan ${fmt(saldo)} de ${fmt(current.fondo_inicial)} ({pctUsed.toFixed(0)}%). Considera reabastecer el fondo.
-              </p>
-            </div>
-          );
-          return null;
-        })()}
-
-        {/* Add expense form */}
         {isOpen && (
-          <div className="mb-10">
-            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Agregar Gasto</div>
-            <div className="grid grid-cols-5 gap-3 items-end mb-3">
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Fecha</label>
-                <input type="date" value={gFecha} onChange={(e) => setGFecha(e.target.value)}
-                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Descripción <span className="text-red-500">*</span></label>
-                <input type="text" value={gDescripcion} onChange={(e) => setGDescripcion(e.target.value)} placeholder="Qué se compró"
-                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Proveedor</label>
-                <input type="text" value={gProveedor} onChange={(e) => setGProveedor(e.target.value)} placeholder="Dónde se compró"
-                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">N° Factura</label>
-                <input type="text" value={gNroFactura} onChange={(e) => setGNroFactura(e.target.value)} placeholder="Opcional"
-                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Categoría</label>
-                <select value={gCategoria} onChange={(e) => { setGCategoria(e.target.value); if (e.target.value !== "Otro") setGCategoriaOtro(""); }}
-                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
-                  {categorias.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-                {gCategoria === "Otro" && (
-                  <input type="text" value={gCategoriaOtro} onChange={(e) => setGCategoriaOtro(e.target.value)} placeholder="Especificar categoría"
-                    className="w-full border-b border-gray-200 py-1 text-xs outline-none focus:border-black transition mt-1" />
-                )}
-                <button onClick={() => setShowManageCat(!showManageCat)} className="text-[10px] text-gray-300 hover:text-gray-500 mt-1 block">
-                  Gestionar categorías
-                </button>
-                {showManageCat && (
-                  <div className="mt-2 p-2 bg-gray-50 rounded text-xs space-y-1">
-                    {categorias.map((c) => (
-                      <div key={c} className="flex items-center justify-between py-1">
-                        <span>{c}</span>
-                        <button onClick={() => {
-                          const updated = categorias.filter((x) => x !== c);
-                          setCategorias(updated);
-                          localStorage.setItem("fg_categorias", JSON.stringify(updated.filter((x) => !CATEGORIAS_DEFAULT.includes(x))));
-                          if (CATEGORIAS_DEFAULT.includes(c)) {
-                            const del = JSON.parse(localStorage.getItem("fg_categorias_deleted") || "[]");
-                            localStorage.setItem("fg_categorias_deleted", JSON.stringify([...del, c]));
-                          }
-                        }} className="text-gray-300 hover:text-red-500 text-xs ml-3">×</button>
-                      </div>
-                    ))}
-                    <div className="flex items-center gap-1 mt-1">
-                      <input type="text" value={newCatName} onChange={(e) => setNewCatName(e.target.value)} placeholder="Nueva categoría"
-                        className="flex-1 border-b border-gray-200 py-0.5 text-xs outline-none" />
-                      <button onClick={() => {
-                        if (!newCatName.trim() || categorias.includes(newCatName.trim())) return;
-                        const updated = [...categorias, newCatName.trim()];
-                        setCategorias(updated);
-                        localStorage.setItem("fg_categorias", JSON.stringify(updated.filter((x) => !CATEGORIAS_DEFAULT.includes(x))));
-                        setNewCatName("");
-                      }} className="text-xs text-gray-500 hover:text-black">＋</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="grid grid-cols-6 gap-3 items-end">
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
-                  Responsable
-                  {!showAddResponsable && (
-                    <button onClick={() => setShowAddResponsable(true)} className="text-gray-300 hover:text-gray-500 transition text-xs ml-1">＋</button>
-                  )}
-                </label>
-                {showAddResponsable ? (
-                  <div className="flex items-center gap-1">
-                    <input type="text" value={newResponsable} onChange={(e) => setNewResponsable(e.target.value)} placeholder="Nombre"
-                      className="flex-1 border-b border-gray-300 py-1 text-xs outline-none focus:border-black" autoFocus />
-                    <button onClick={async () => {
-                      if (!newResponsable.trim()) return;
-                      await fetch("/api/caja/responsables", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre: newResponsable.trim() }) });
-                      setResponsables([...responsables, newResponsable.trim()]);
-                      setGResponsable(newResponsable.trim());
-                      setNewResponsable(""); setShowAddResponsable(false);
-                    }} className="text-xs text-gray-500 hover:text-black">OK</button>
-                    <button onClick={() => { setNewResponsable(""); setShowAddResponsable(false); }} className="text-xs text-gray-300 hover:text-black">×</button>
-                  </div>
-                ) : (
-                  <select value={gResponsable} onChange={(e) => setGResponsable(e.target.value)}
-                    className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
-                    <option value="">—</option>
-                    {responsables.map((r) => <option key={r} value={r}>{r}</option>)}
-                  </select>
-                )}
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Empresa</label>
-                <select value={gEmpresa} onChange={(e) => { setGEmpresa(e.target.value); if (e.target.value !== "Otro / General") setGEmpresaOtro(""); }}
-                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
-                  <option value="">—</option>
-                  {CAJA_EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
-                </select>
-                {gEmpresa === "Otro / General" && (
-                  <input type="text" value={gEmpresaOtro} onChange={(e) => setGEmpresaOtro(e.target.value)} placeholder="Especificar empresa"
-                    className="w-full border-b border-gray-200 py-1 text-xs outline-none focus:border-black transition mt-1" />
-                )}
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Sub-total</label>
-                <input type="number" step="0.01" value={gSubtotal} onChange={(e) => setGSubtotal(e.target.value)}
-                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">ITBMS</label>
-                <select value={gItbmsPct} onChange={(e) => setGItbmsPct(e.target.value)}
-                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
-                  <option value="0">0%</option>
-                  <option value="7">7%</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Total</label>
-                <input type="text" readOnly value={`$${fmt(totalNum)}`}
-                  className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent tabular-nums" />
-              </div>
-              <div>
-                <button onClick={addGasto} disabled={addingGasto || !gDescripcion || subtotalNum <= 0}
-                  className="bg-black text-white px-6 py-1.5 rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40">
-                  Agregar
-                </button>
-              </div>
-            </div>
-          </div>
+          <GastoForm
+            values={formValues}
+            setters={formSetters}
+            addingGasto={addingGasto}
+            subtotalNum={subtotalNum}
+            totalNum={totalNum}
+            categorias={categorias}
+            responsables={responsables}
+            showManageCat={showManageCat}
+            showAddResponsable={showAddResponsable}
+            newCatName={newCatName}
+            newResponsable={newResponsable}
+            setCategorias={setCategorias}
+            setShowManageCat={setShowManageCat}
+            setShowAddResponsable={setShowAddResponsable}
+            setNewCatName={setNewCatName}
+            setNewResponsable={setNewResponsable}
+            setResponsables={setResponsables}
+            onAddGasto={addGasto}
+          />
         )}
 
-        {/* Expenses table */}
-        <div className="mb-10">
-          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Gastos</div>
-          <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
-                <th className="text-left py-3 px-4 font-normal">Fecha</th>
-                <th className="text-left py-3 px-4 font-normal">Descripción</th>
-                <th className="text-left py-3 px-4 font-normal">Proveedor</th>
-                <th className="text-left py-3 px-4 font-normal">Responsable</th>
-                <th className="text-left py-3 px-4 font-normal">Categoría</th>
-                <th className="text-left py-3 px-4 font-normal">Empresa</th>
-                <th className="text-left py-3 px-4 font-normal">N° Factura</th>
-                <th className="text-right py-3 px-4 font-normal">Sub-total</th>
-                <th className="text-right py-3 px-4 font-normal">ITBMS</th>
-                <th className="text-right py-3 px-4 font-normal">Total</th>
-                <th className="w-16"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {gastos.length === 0 ? (
-                <tr><td colSpan={11} className="py-12 text-center text-gray-300 text-sm">Sin gastos registrados</td></tr>
-              ) : (
-                <>
-                  {gastos.map((g) => editingGastoId === g.id ? (
-                    <tr key={g.id} className="border-b border-gray-100 bg-gray-50">
-                      <td className="py-2 pr-1"><input type="date" value={editGasto.fecha || ""} onChange={(e) => setEditGasto({ ...editGasto, fecha: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
-                      <td className="py-2 pr-1"><input type="text" value={editGasto.descripcion || ""} onChange={(e) => setEditGasto({ ...editGasto, descripcion: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
-                      <td className="py-2 pr-1"><input type="text" value={editGasto.proveedor || ""} onChange={(e) => setEditGasto({ ...editGasto, proveedor: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
-                      <td className="py-2 pr-1"><select value={editGasto.responsable || ""} onChange={(e) => setEditGasto({ ...editGasto, responsable: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"><option value="">—</option>{responsables.map((r) => <option key={r} value={r}>{r}</option>)}</select></td>
-                      <td className="py-2 pr-1"><select value={editGasto.categoria || "Varios"} onChange={(e) => setEditGasto({ ...editGasto, categoria: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent">{categorias.map((c) => <option key={c} value={c}>{c}</option>)}</select></td>
-                      <td className="py-2 pr-1"><select value={editGasto.empresa || ""} onChange={(e) => setEditGasto({ ...editGasto, empresa: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"><option value="">—</option>{CAJA_EMPRESAS.map((emp) => <option key={emp} value={emp}>{emp}</option>)}</select></td>
-                      <td className="py-2 pr-1"><input type="text" value={editGasto.nro_factura || ""} onChange={(e) => setEditGasto({ ...editGasto, nro_factura: e.target.value })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent" /></td>
-                      <td className="py-2 pr-1"><input type="number" step="0.01" value={editGasto.subtotal ?? ""} onChange={(e) => setEditGasto({ ...editGasto, subtotal: parseFloat(e.target.value) || 0 })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent text-right" /></td>
-                      <td className="py-2 pr-1"><input type="number" step="0.01" value={editGasto.itbms ?? ""} onChange={(e) => setEditGasto({ ...editGasto, itbms: parseFloat(e.target.value) || 0 })} className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent text-right" /></td>
-                      <td className="py-2 text-right tabular-nums text-xs font-medium">${fmt((parseFloat(String(editGasto.subtotal)) || 0) + (parseFloat(String(editGasto.itbms)) || 0))}</td>
-                      <td className="py-2 text-center text-xs"><button onClick={saveEditGasto} className="text-gray-500 hover:text-black mr-1">✓</button><button onClick={() => setEditingGastoId(null)} className="text-gray-300 hover:text-black">×</button></td>
-                    </tr>
-                  ) : (
-                    <tr key={g.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="py-3 px-4 text-gray-500">{fmtDate(g.fecha)}</td>
-                      <td className="py-3 px-4">{g.descripcion || g.nombre}</td>
-                      <td className="py-3 px-4 text-gray-500">{g.proveedor || "—"}</td>
-                      <td className="py-3 px-4 text-gray-500">{g.responsable || "—"}</td>
-                      <td className="py-3 px-4 text-gray-500">{g.categoria || "Varios"}</td>
-                      <td className="py-3 px-4 text-gray-500">{g.empresa || "—"}</td>
-                      <td className="py-3 px-4 text-gray-500">{g.nro_factura || "—"}</td>
-                      <td className="py-3 px-4 text-right tabular-nums">${fmt(g.subtotal)}</td>
-                      <td className="py-3 px-4 text-right tabular-nums text-gray-500">${fmt(g.itbms)}</td>
-                      <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(g.total)}</td>
-                      <td className="py-3 px-4 text-center text-xs">
-                        <button onClick={() => { setEditingGastoId(g.id); setEditGasto({ fecha: g.fecha, descripcion: g.descripcion || g.nombre, proveedor: g.proveedor || "", nro_factura: g.nro_factura || "", responsable: g.responsable || "", categoria: g.categoria || "Varios", empresa: g.empresa || "", subtotal: g.subtotal, itbms: g.itbms }); }} className="text-gray-400 hover:text-black transition mr-1">Editar</button>
-                        <button onClick={() => deleteGasto(g.id)} className="text-gray-300 hover:text-red-500 transition">×</button>
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="border-t border-gray-300">
-                    <td colSpan={7} className="py-3 px-4 text-right text-[11px] uppercase tracking-[0.05em] text-gray-400">Totales</td>
-                    <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(totalSubtotal)}</td>
-                    <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(totalItbms)}</td>
-                    <td className="py-3 px-4 text-right tabular-nums font-semibold">${fmt(totalGastado)}</td>
-                    <td></td>
-                  </tr>
-                </>
-              )}
-            </tbody>
-          </table>
-          </div>
-        </div>
+        <GastoTable
+          gastos={gastos}
+          isOpen={isOpen}
+          categorias={categorias}
+          responsables={responsables}
+          editingGastoId={editingGastoId}
+          editGasto={editGasto}
+          setEditingGastoId={setEditingGastoId}
+          setEditGasto={setEditGasto}
+          onSaveEdit={saveEditGasto}
+          onDeleteGasto={deleteGasto}
+        />
 
-        {/* Reposicion */}
-        {current.estado === "cerrado" && (
-          <div className="mt-8 border-t border-gray-100 pt-8 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Reposición de fondos</p>
-              <p className="text-sm text-gray-400 mt-0.5">Total a reponer: ${fmt(totalGastado)}</p>
-            </div>
-            {!current.repuesto ? (
-              <button
-                onClick={() => aprobarReposicion(current.id)}
-                className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
-                Aprobar reposición
-              </button>
-            ) : (
-              <span className="text-sm text-green-600 font-medium">
-                ✓ Repuesto el {current.repuesto_at ? new Date(current.repuesto_at).toLocaleDateString("es-PA") : ""}
-              </span>
-            )}
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center gap-6 mt-8">
-          <button onClick={() => current && setView("print", current.id)}
-            className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
-            Imprimir
-          </button>
-          <button onClick={async () => {
-            const res = await fetch("/api/caja/export-excel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ periodo_id: current.id }) });
-            if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `CajaMenuda-Periodo${current.numero}.xlsx`; a.click(); URL.revokeObjectURL(url); }
-          }} title="Exportar gastos a Excel" className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-full transition">↓ Excel</button>
-          {isOpen && (
-            <button onClick={() => closePeriodo(current.id)}
-              className="text-sm text-gray-400 hover:text-black transition">
-              Cerrar Período
-            </button>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // ── PRINT VIEW ──
-  if (view === "print" && current) {
-    const gastos = current.caja_gastos || [];
-    const totalGastado = gastos.reduce((s, g) => s + (g.total || 0), 0);
-    const totalSubtotal = gastos.reduce((s, g) => s + (g.subtotal || 0), 0);
-    const totalItbms = gastos.reduce((s, g) => s + (g.itbms || 0), 0);
-    const saldo = current.fondo_inicial - totalGastado;
-
-    return (
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
-        <div className="flex flex-wrap gap-4 mb-8 no-print">
-          <button onClick={() => current && setView("detail", current.id)} className="text-sm text-gray-400 hover:text-black transition">← Volver</button>
-          <button onClick={() => window.print()} className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition">
-            Imprimir
-          </button>
-        </div>
-
-        <div id="print-document" className="border border-gray-200 rounded-lg p-8" style={{ fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif" }}>
-          <h1 className="text-center text-lg font-bold mb-2 uppercase tracking-wide">Reporte de Caja Menuda</h1>
-          <p className="text-center text-sm text-gray-600 mb-1">
-            Período N° {current.numero} | Apertura: {fmtDate(current.fecha_apertura)}
-            {current.fecha_cierre ? ` — Cierre: ${fmtDate(current.fecha_cierre)}` : " — Abierto"}
-          </p>
-          <p className="text-center text-sm mb-6">Fondo Inicial: ${fmt(current.fondo_inicial)}</p>
-
-          <table className="w-full text-xs border-collapse mb-4">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Fecha</th>
-                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Descripción</th>
-                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Proveedor</th>
-                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Responsable</th>
-                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Categoría</th>
-                <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">Empresa</th>
-                <th className="border border-gray-300 px-2 py-1.5 font-medium text-right">Sub-total</th>
-                <th className="border border-gray-300 px-2 py-1.5 font-medium text-right">ITBMS</th>
-                <th className="border border-gray-300 px-2 py-1.5 font-medium text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {gastos.map((g) => (
-                <tr key={g.id}>
-                  <td className="border border-gray-300 px-2 py-1">{fmtDate(g.fecha)}</td>
-                  <td className="border border-gray-300 px-2 py-1">{g.descripcion || g.nombre}</td>
-                  <td className="border border-gray-300 px-2 py-1">{g.proveedor || "—"}</td>
-                  <td className="border border-gray-300 px-2 py-1">{g.responsable || "—"}</td>
-                  <td className="border border-gray-300 px-2 py-1">{g.categoria || "Varios"}</td>
-                  <td className="border border-gray-300 px-2 py-1">{g.empresa || "—"}</td>
-                  <td className="border border-gray-300 px-2 py-1 text-right">${fmt(g.subtotal)}</td>
-                  <td className="border border-gray-300 px-2 py-1 text-right">${fmt(g.itbms)}</td>
-                  <td className="border border-gray-300 px-2 py-1 text-right">${fmt(g.total)}</td>
-                </tr>
-              ))}
-              <tr className="font-bold">
-                <td colSpan={6} className="border border-gray-300 px-2 py-1.5 text-right uppercase">Totales</td>
-                <td className="border border-gray-300 px-2 py-1.5 text-right">${fmt(totalSubtotal)}</td>
-                <td className="border border-gray-300 px-2 py-1.5 text-right">${fmt(totalItbms)}</td>
-                <td className="border border-gray-300 px-2 py-1.5 text-right">${fmt(totalGastado)}</td>
-              </tr>
-            </tbody>
-          </table>
-
-          <div className="text-sm font-bold mb-8">
-            Saldo Final: <span className={saldo < 0 ? "text-red-600" : ""}>${fmt(saldo)}</span>
-          </div>
-
-          <div className="mt-16 text-sm flex justify-between">
-            <div>Preparado por: <span className="border-b border-gray-400 inline-block w-56 ml-1">&nbsp;</span></div>
-            <div>Aprobado por: <span className="border-b border-gray-400 inline-block w-56 ml-1">&nbsp;</span></div>
-          </div>
-        </div>
+        <PeriodoDetailFooter
+          current={current}
+          totalGastado={totalGastado}
+          isOpen={isOpen}
+          onPrint={() => setView("print", current.id)}
+          onClose={() => closePeriodo(current.id)}
+          onAprobarReposicion={aprobarReposicion}
+          onExportExcel={exportExcel}
+        />
       </div>
     );
   }
