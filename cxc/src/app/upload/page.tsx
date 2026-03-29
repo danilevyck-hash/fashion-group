@@ -202,10 +202,21 @@ export default function UploadPage() {
     <div>
       <AppHeader module="Carga de Archivos" />
       <div className="max-w-2xl mx-auto px-6 py-8">
+
+      {/* Navigation tabs */}
+      <div className="flex gap-3 mb-8">
+        <div className="flex-1 border-2 border-black rounded-xl p-4">
+          <div className="text-sm font-medium mb-1">Cargar CxC</div>
+          <div className="text-xs text-gray-400">Antigüedad de deuda — Switch Soft</div>
+        </div>
+        <a href="/ventas/carga" className="flex-1 border border-gray-200 rounded-xl p-4 text-left hover:border-gray-400 transition block">
+          <div className="text-sm font-medium mb-1 text-gray-600">Cargar Ventas</div>
+          <div className="text-xs text-gray-400">Listado de comprobantes — Switch Soft</div>
+        </a>
+      </div>
+
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-xl font-semibold tracking-tight">Carga de Archivos CXC</h1>
-        <div className="flex items-center gap-4">
-        </div>
       </div>
 
       {/* Upload guide */}
