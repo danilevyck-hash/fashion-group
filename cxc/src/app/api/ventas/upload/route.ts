@@ -22,7 +22,7 @@ interface RawRow {
   itbms: number;
   total: number;
   utilidad: number;
-  pct_utilidad: number;
+  pct_utilidad: number | null;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -102,7 +102,7 @@ function parseCSV(text: string, empresa: string): RawRow[] {
       itbms: toNum(get("ITBMS")),
       total: toNum(get("TOTAL")),
       utilidad,
-      pct_utilidad: toNum(get("% UTILIDAD") || get("%  UTILIDAD") || get("% UTILIDAD")),
+      pct_utilidad: (() => { const v = toNum(get("% UTILIDAD") || get("%  UTILIDAD") || get("% UTILIDAD")); return Math.abs(v) > 999.99 ? null : v; })(),
     });
   }
 
@@ -151,7 +151,8 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): RawRow[] {
 
     // Try both possible column name variants for % UTILIDAD
     const pctKey = headers.find((h) => h.includes("UTILIDAD") && h.includes("%")) ?? "";
-    const pct_utilidad = pctKey ? toNum(cols[headers.indexOf(pctKey)]) : 0;
+    const pctRaw = pctKey ? toNum(cols[headers.indexOf(pctKey)]) : 0;
+    const pct_utilidad = Math.abs(pctRaw) > 999.99 ? null : pctRaw;
 
     rows.push({
       empresa,
