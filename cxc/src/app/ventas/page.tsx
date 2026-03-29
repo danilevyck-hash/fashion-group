@@ -145,8 +145,8 @@ export default function VentasDashboard() {
     setLoading(true);
     try {
       const [v2Raw, metasRes] = await Promise.all([
-        fetch(`/api/ventas/v2?año=${año}&desde=${desdeStr}`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`/api/ventas/metas?año=${año}`).then(r => r.ok ? r.json() : []).catch(() => []),
+        fetch(`/api/ventas/v2?anio=${año}&desde=${desdeStr}`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`/api/ventas/metas?anio=${año}`).then(r => r.ok ? r.json() : []).catch(() => []),
       ]);
       const v2 = v2Raw as { byEmpresaMes?: VentaRow[]; prevYear?: { empresa: string; mes: number; subtotal: number; utilidad: number }[]; clientesDetalle?: ClienteDetalle[] } | null;
       console.log("[ventas] v2 response:", v2 ? `byEmpresaMes=${v2.byEmpresaMes?.length} prevYear=${v2.prevYear?.length} clientes=${v2.clientesDetalle?.length}` : "NULL", "v2Raw type:", typeof v2Raw);
@@ -265,7 +265,7 @@ export default function VentasDashboard() {
               className="text-xs border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-50 transition print:hidden">
               Cargar datos
             </button>
-            <button onClick={() => window.open(`/ventas/reporte?año=${año}&empresa=${empresaFilter.join(",") || "all"}&vista=${vista}`, "_blank")}
+            <button onClick={() => window.open(`/ventas/reporte?anio=${año}&empresa=${empresaFilter.join(",") || "all"}&vista=${vista}`, "_blank")}
               className="text-xs border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-50 transition print:hidden">
               Imprimir
             </button>

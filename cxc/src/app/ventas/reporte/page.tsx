@@ -18,7 +18,7 @@ interface ClienteDetalle {
 
 function ReportePage() {
   const params = useSearchParams();
-  const año = Number(params.get("año")) || new Date().getFullYear();
+  const año = Number(params.get("anio")) || new Date().getFullYear();
   const empresaFilter = params.get("empresa") || "all";
   const vista = (params.get("vista") as "mensual" | "quarter") || "mensual";
 
@@ -30,10 +30,10 @@ function ReportePage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`/api/ventas?año=${año}`).then(r => r.ok ? r.json() : []),
-      fetch(`/api/ventas?año=${año - 1}`).then(r => r.ok ? r.json() : []),
-      fetch(`/api/ventas/metas?año=${año}`).then(r => r.ok ? r.json() : []),
-      fetch(`/api/ventas/v2?año=${año}`).then(r => r.ok ? r.json() : null),
+      fetch(`/api/ventas?anio=${año}`).then(r => r.ok ? r.json() : []),
+      fetch(`/api/ventas?anio=${año - 1}`).then(r => r.ok ? r.json() : []),
+      fetch(`/api/ventas/metas?anio=${año}`).then(r => r.ok ? r.json() : []),
+      fetch(`/api/ventas/v2?anio=${año}`).then(r => r.ok ? r.json() : null),
     ]).then(([d, p, m, v2]: [VentaRow[], VentaRow[], { empresa: string; mes: number; meta: number }[], { clientesDetalle?: ClienteDetalle[] } | null]) => {
       setData(d || []);
       setPrevData(p || []);

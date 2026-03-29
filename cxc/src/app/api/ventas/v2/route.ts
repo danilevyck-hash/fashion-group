@@ -161,7 +161,7 @@ export async function GET(req: NextRequest) {
   if (authError) return authError;
 
   const params = req.nextUrl.searchParams;
-  const añoParam = params.get("año");
+  const añoParam = params.get("anio");
   const empresaParam = params.get("empresa"); // undefined / "" / "all" = all companies
   const desdeParam = params.get("desde"); // optional: ISO date cutoff for clientesDetalle
 

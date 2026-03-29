@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export async function GET(req: NextRequest) {
-  const año = req.nextUrl.searchParams.get("año");
+  const año = req.nextUrl.searchParams.get("anio");
   const empresa = req.nextUrl.searchParams.get("empresa");
   if (!año) return NextResponse.json({ error: "año required" }, { status: 400 });
 

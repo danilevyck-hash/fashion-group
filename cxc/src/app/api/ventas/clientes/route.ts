@@ -3,7 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 
 export async function GET(req: NextRequest) {
   const empresa = req.nextUrl.searchParams.get("empresa");
-  const año = req.nextUrl.searchParams.get("año");
+  const año = req.nextUrl.searchParams.get("anio");
   const mes = req.nextUrl.searchParams.get("mes");
   if (!empresa || !año || !mes) return NextResponse.json({ error: "empresa, año, mes required" }, { status: 400 });
 
