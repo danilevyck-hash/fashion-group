@@ -11,9 +11,8 @@ export async function GET() {
     .limit(500);
 
   if (error) {
-    // Table may not exist yet (42P01) — return empty
-    console.error("[ventas/v2/status]", error.code, error.message);
-    if (error.code === "42P01") return NextResponse.json({});
+    console.error("[ventas/v2/status] FULL ERROR:", JSON.stringify(error));
+    console.error("[ventas/v2/status] code:", error.code, "message:", error.message, "details:", error.details, "hint:", error.hint);
     return NextResponse.json({});
   }
 

@@ -226,8 +226,8 @@ export async function POST(req: NextRequest) {
       .from("ventas_raw")
       .upsert(batch, { onConflict: "n_sistema,empresa", ignoreDuplicates: true });
     if (upsErr) {
-      console.error("[ventas/upload] upsert error", upsErr);
-      return NextResponse.json({ error: "Error interno" }, { status: 500 });
+      console.error("[ventas/upload] upsert FULL ERROR:", JSON.stringify(upsErr));
+      return NextResponse.json({ error: `Error: ${upsErr.code} — ${upsErr.message}` }, { status: 500 });
     }
     inserted += batch.length;
   }

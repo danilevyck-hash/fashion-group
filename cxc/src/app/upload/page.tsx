@@ -226,9 +226,11 @@ function UploadPageInner() {
       if (res.ok) {
         const data = await res.json();
         setVentasUploads(data);
+      } else {
+        console.error("[upload] ventas status failed:", res.status, await res.text().catch(() => ""));
       }
-    } catch {
-      // silently fail
+    } catch (err) {
+      console.error("[upload] ventas status error:", err);
     }
   }
 
