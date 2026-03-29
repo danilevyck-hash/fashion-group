@@ -12,6 +12,7 @@ interface VentasRawRow {
   utilidad: number;
   cliente: string;
   tipo: string;
+  fecha: string;
 }
 
 interface EmpresaMesAgg {
@@ -26,6 +27,14 @@ interface ClienteAgg {
   cliente: string;
   subtotal: number;
   utilidad: number;
+}
+
+interface ClienteDetalle {
+  cliente: string;
+  subtotal: number;
+  utilidad: number;
+  lastFecha: string;
+  empresas: { empresa: string; subtotal: number; utilidad: number; lastFecha: string }[];
 }
 
 interface PrevYearAgg {
@@ -64,8 +73,6 @@ function aggregateTopClientes(rows: VentasRawRow[], topN = 10): ClienteAgg[] {
   const map = new Map<string, ClienteAgg>();
 
   for (const r of rows) {
-    // Only count Facturas for top clients
-    if ((r.tipo ?? "").trim() !== "Factura") continue;
     const key = (r.cliente ?? "").trim() || "(Sin nombre)";
     const existing = map.get(key);
     if (existing) {
@@ -79,6 +86,35 @@ function aggregateTopClientes(rows: VentasRawRow[], topN = 10): ClienteAgg[] {
   return [...map.values()]
     .sort((a, b) => b.subtotal - a.subtotal)
     .slice(0, topN);
+}
+
+function aggregateClientesDetalle(rows: VentasRawRow[]): ClienteDetalle[] {
+  const map = new Map<string, { subtotal: number; utilidad: number; lastFecha: string; empresas: Map<string, { subtotal: number; utilidad: number; lastFecha: string }> }>();
+
+  for (const r of rows) {
+    const key = (r.cliente ?? "").trim() || "(Sin nombre)";
+    if (!map.has(key)) map.set(key, { subtotal: 0, utilidad: 0, lastFecha: "", empresas: new Map() });
+    const c = map.get(key)!;
+    c.subtotal += r.subtotal ?? 0;
+    c.utilidad += r.utilidad ?? 0;
+    if ((r.fecha ?? "") > c.lastFecha) c.lastFecha = r.fecha ?? "";
+
+    if (!c.empresas.has(r.empresa)) c.empresas.set(r.empresa, { subtotal: 0, utilidad: 0, lastFecha: "" });
+    const e = c.empresas.get(r.empresa)!;
+    e.subtotal += r.subtotal ?? 0;
+    e.utilidad += r.utilidad ?? 0;
+    if ((r.fecha ?? "") > e.lastFecha) e.lastFecha = r.fecha ?? "";
+  }
+
+  return [...map.entries()]
+    .map(([cliente, d]) => ({
+      cliente,
+      subtotal: d.subtotal,
+      utilidad: d.utilidad,
+      lastFecha: d.lastFecha,
+      empresas: [...d.empresas.entries()].map(([empresa, ed]) => ({ empresa, ...ed })).sort((a, b) => b.subtotal - a.subtotal),
+    }))
+    .sort((a, b) => b.subtotal - a.subtotal);
 }
 
 function aggregatePrevYear(rows: VentasRawRow[]): PrevYearAgg[] {
@@ -117,7 +153,7 @@ export async function GET(req: NextRequest) {
   // ── Fetch current year rows ──────────────────────────────────────────────
   let qCurrent = supabaseServer
     .from("ventas_raw")
-    .select("empresa, mes, subtotal, costo, utilidad, cliente, tipo")
+    .select("empresa, mes, subtotal, costo, utilidad, cliente, tipo, fecha")
     .eq("anio", año);
 
   if (filterEmpresa) qCurrent = qCurrent.eq("empresa", filterEmpresa);
@@ -150,5 +186,6 @@ export async function GET(req: NextRequest) {
     byEmpresaMes: aggregateByEmpresaMes(rows),
     topClientes: aggregateTopClientes(rows),
     prevYear: aggregatePrevYear(prev),
+    clientesDetalle: aggregateClientesDetalle(rows),
   });
 }

@@ -12,7 +12,13 @@ const MES_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep"
 
 interface VentaRow { empresa: string; año: number; mes: number; ventas_brutas: number; notas_credito: number; notas_debito: number; costo_total: number; }
 interface MetaRow { empresa: string; año: number; mes: number; meta: number; }
-interface ClienteRow { empresa: string; año: number; mes: number; cliente: string; ventas: number; }
+interface ClienteDetalle {
+  cliente: string;
+  subtotal: number;
+  utilidad: number;
+  lastFecha: string;
+  empresas: { empresa: string; subtotal: number; utilidad: number; lastFecha: string }[];
+}
 
 function netas(r: VentaRow) { return r.ventas_brutas - r.notas_credito + r.notas_debito; }
 function utilidad(r: VentaRow) { return netas(r) - r.costo_total; }
@@ -21,7 +27,6 @@ function fmtK(n: number) { if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_0
 // ── Helpers ──
 function calcKPIs(rows: VentaRow[], prevRows: VentaRow[], metaRows: MetaRow[], vista: "mensual" | "quarter") {
   const ventasNetas = rows.reduce((s, r) => s + netas(r), 0);
-
   const monthsWithData = [...new Set(rows.map(r => r.mes))];
   const comparablePrev = prevRows.filter(r => monthsWithData.includes(r.mes));
   const prevTotal = comparablePrev.reduce((s, r) => s + netas(r), 0);
@@ -31,45 +36,56 @@ function calcKPIs(rows: VentaRow[], prevRows: VentaRow[], metaRows: MetaRow[], v
   const totalUtil = rows.reduce((s, r) => s + utilidad(r), 0);
   const margenBruto = ventasNetas ? (totalUtil / ventasNetas) * 100 : 0;
 
-  // Tendencia de margen vs same period prev year
+  // Utilidad vs anterior
   const prevUtil = comparablePrev.reduce((s, r) => s + utilidad(r), 0);
+  const utilVsAnt: string | null = prevUtil !== 0
+    ? `${((totalUtil - prevUtil) / Math.abs(prevUtil) * 100) >= 0 ? "+" : ""}${((totalUtil - prevUtil) / Math.abs(prevUtil) * 100).toFixed(0)}%`
+    : null;
+
+  // Margen display with trend
   const prevMargen = prevTotal > 0 ? (prevUtil / prevTotal) * 100 : null;
-  let tendenciaMargen: string;
-  let tendenciaFlag: boolean;
+  let margenDisplay: string;
+  let margenFlag: boolean;
   if (prevMargen !== null) {
     const diff = margenBruto - prevMargen;
     const arrow = diff >= 0 ? "↑" : "↓";
     const sign = diff >= 0 ? "+" : "";
-    tendenciaMargen = `${margenBruto.toFixed(1)}% ${arrow}${sign}${diff.toFixed(1)}pp`;
-    tendenciaFlag = diff < 0;
+    margenDisplay = `${margenBruto.toFixed(1)}% ${arrow}${sign}${diff.toFixed(1)}pp`;
+    margenFlag = diff < 0;
   } else {
-    tendenciaMargen = `${margenBruto.toFixed(1)}% —`;
-    tendenciaFlag = false;
+    margenDisplay = `${margenBruto.toFixed(1)}%`;
+    margenFlag = false;
   }
 
   const metaTotal = metaRows.reduce((s, m) => s + (m.meta || 0), 0);
   const vsMeta = metaTotal ? (ventasNetas / metaTotal) * 100 : 0;
 
-  return { ventasNetas, vsAnterior, margenBruto, tendenciaMargen, tendenciaFlag, metaTotal, vsMeta, prevTotal: comparablePrev.reduce((s, r) => s + netas(r), 0) };
+  return { ventasNetas, vsAnterior, totalUtil, utilVsAnt, margenDisplay, margenFlag, metaTotal, vsMeta };
 }
 
-function buildTable(rows: VentaRow[], vista: "mensual" | "quarter") {
+function buildTable(rows: VentaRow[], prevRows: VentaRow[], vista: "mensual" | "quarter") {
   const periods = vista === "quarter" ? ["Q1", "Q2", "Q3", "Q4"] : MES_NAMES;
   const tableRows = EMPRESAS.map(emp => {
     const empRows = rows.filter(r => r.empresa === emp);
+    const empPrev = prevRows.filter(r => r.empresa === emp);
     const values = periods.map((_, i) => {
       const filtered = vista === "quarter"
         ? empRows.filter(r => Math.ceil(r.mes / 3) === i + 1)
         : empRows.filter(r => r.mes === i + 1);
       return filtered.reduce((s, r) => s + netas(r), 0);
     });
+    const prevValues = periods.map((_, i) => {
+      const filtered = vista === "quarter"
+        ? empPrev.filter(r => Math.ceil(r.mes / 3) === i + 1)
+        : empPrev.filter(r => r.mes === i + 1);
+      return filtered.reduce((s, r) => s + netas(r), 0);
+    });
     const total = values.reduce((s, v) => s + v, 0);
     const totalUtil = empRows.reduce((s, r) => s + utilidad(r), 0);
     const margen = total ? (totalUtil / total) * 100 : 0;
-    return { empresa: emp, values, total, margen };
+    return { empresa: emp, values, prevValues, total, margen };
   });
 
-  // Total row
   const totalValues = periods.map((_, i) => tableRows.reduce((s, r) => s + r.values[i], 0));
   const grandTotal = totalValues.reduce((s, v) => s + v, 0);
   const grandUtil = rows.reduce((s, r) => s + utilidad(r), 0);
@@ -95,73 +111,86 @@ export default function VentasDashboard() {
   const [años, setAños] = useState<number[]>([]);
   const [metas, setMetas] = useState<MetaRow[]>([]);
   const [showMetas, setShowMetas] = useState(false);
-  const [showClientes, setShowClientes] = useState(false);
-  const [clientes, setClientes] = useState<ClienteRow[]>([]);
-  const [loadingClientes, setLoadingClientes] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [metaDraft, setMetaDraft] = useState<Record<string, number[]>>({});
   const [savingMetas, setSavingMetas] = useState(false);
   const [kpiTooltip, setKpiTooltip] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"resumen" | "clientes">("resumen");
+  const [clientesData, setClientesData] = useState<ClienteDetalle[]>([]);
+  const [clientSearch, setClientSearch] = useState("");
+  const [clientSort, setClientSort] = useState<"ventas" | "utilidad" | "margen" | "pct" | "fecha">("ventas");
+  const [clientSortDir, setClientSortDir] = useState<"desc" | "asc">("desc");
+  const [expandedClient, setExpandedClient] = useState<string | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
-  // Fetch available years
   useEffect(() => {
     fetch("/api/ventas/años").then(r => r.json()).then(setAños).catch(() => {});
   }, []);
 
-  // Fetch ventas + metas
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const qs = empresa !== "all" ? `&empresa=${encodeURIComponent(empresa)}` : "";
-      const [curr, prev, metasRes] = await Promise.all([
+      const [curr, prev, metasRes, v2Res] = await Promise.all([
         fetch(`/api/ventas?año=${año}${qs}`).then(r => r.json()),
         fetch(`/api/ventas?año=${año - 1}${qs}`).then(r => r.json()),
         fetch(`/api/ventas/metas?año=${año}`).then(r => r.json()),
+        fetch(`/api/ventas/v2?año=${año}`).then(r => r.json()).catch(() => ({})),
       ]);
       setVentas(Array.isArray(curr) ? curr : []);
       setVentasPrev(Array.isArray(prev) ? prev : []);
       setMetas(Array.isArray(metasRes) ? metasRes : []);
+      setClientesData(Array.isArray(v2Res?.clientesDetalle) ? v2Res.clientesDetalle : []);
     } catch { /* ignore */ }
     setLoading(false);
   }, [año, empresa]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Filtered data
   const filtered = useMemo(() => empresa === "all" ? ventas : ventas.filter(r => r.empresa === empresa), [ventas, empresa]);
   const filteredPrev = useMemo(() => empresa === "all" ? ventasPrev : ventasPrev.filter(r => r.empresa === empresa), [ventasPrev, empresa]);
   const filteredMetas = useMemo(() => empresa === "all" ? metas : metas.filter(m => m.empresa === empresa), [metas, empresa]);
 
   const kpi = useMemo(() => calcKPIs(filtered, filteredPrev, filteredMetas, vista), [filtered, filteredPrev, filteredMetas, vista]);
-  const table = useMemo(() => buildTable(filtered, vista), [filtered, vista]);
+  const table = useMemo(() => buildTable(filtered, filteredPrev, vista), [filtered, filteredPrev, vista]);
 
-  // Top clientes
-  const fetchClientes = useCallback(async () => {
-    if (clientes.length > 0) { setShowClientes(v => !v); return; }
-    setLoadingClientes(true);
-    setShowClientes(true);
-    try {
-      // Fetch for all months of the year for the filtered empresa
-      const promises = Array.from({ length: 12 }, (_, i) => {
-        const emp = empresa === "all" ? EMPRESAS[0] : empresa;
-        return fetch(`/api/ventas/clientes?empresa=${encodeURIComponent(emp)}&año=${año}&mes=${i + 1}`).then(r => r.json());
-      });
-      const all = (await Promise.all(promises)).flat().filter(Array.isArray) as unknown as ClienteRow[];
-      // Aggregate by client
-      const byClient: Record<string, { ventas: number }> = {};
-      (await Promise.all(promises)).flat().forEach((c: any) => {
-        if (!c?.cliente) return;
-        byClient[c.cliente] = byClient[c.cliente] || { ventas: 0 };
-        byClient[c.cliente].ventas += c.ventas || 0;
-      });
-      const sorted = Object.entries(byClient).sort((a, b) => b[1].ventas - a[1].ventas).slice(0, 10)
-        .map(([cliente, d]) => ({ empresa: empresa === "all" ? "" : empresa, año, mes: 0, cliente, ventas: d.ventas }));
-      setClientes(sorted);
-    } catch { /* ignore */ }
-    setLoadingClientes(false);
-  }, [empresa, año, clientes.length]);
+  // Clientes logic
+  const clientesFiltered = useMemo(() => {
+    let list = clientesData;
+    if (empresa !== "all") list = list.filter(c => c.empresas.some(e => e.empresa === empresa));
+    if (clientSearch) {
+      const q = clientSearch.toLowerCase();
+      list = list.filter(c => c.cliente.toLowerCase().includes(q));
+    }
+    const totalVentas = list.reduce((s, c) => s + c.subtotal, 0);
+    const dir = clientSortDir === "desc" ? -1 : 1;
+    list = [...list].sort((a, b) => {
+      switch (clientSort) {
+        case "ventas": return (b.subtotal - a.subtotal) * dir;
+        case "utilidad": return (b.utilidad - a.utilidad) * dir;
+        case "margen": return (((b.subtotal ? b.utilidad / b.subtotal : 0) - (a.subtotal ? a.utilidad / a.subtotal : 0))) * dir;
+        case "pct": return (b.subtotal - a.subtotal) * dir;
+        case "fecha": return ((b.lastFecha || "").localeCompare(a.lastFecha || "")) * dir;
+        default: return 0;
+      }
+    });
+    return list;
+  }, [clientesData, empresa, clientSearch, clientSort, clientSortDir]);
+
+  const totalVentas = clientesFiltered.reduce((s, c) => s + c.subtotal, 0);
+  const topClient = clientesFiltered[0] || null;
+  const top5Pct = totalVentas > 0 ? (clientesFiltered.slice(0, 5).reduce((s, c) => s + c.subtotal, 0) / totalVentas) * 100 : 0;
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
+  const inactiveClients = clientesFiltered.filter(c => c.lastFecha && c.lastFecha < sixtyDaysAgo);
+  const inactiveCount = inactiveClients.length;
+  const displayClients = showInactive ? inactiveClients : clientesFiltered;
+
+  function toggleClientSort(col: typeof clientSort) {
+    if (clientSort === col) setClientSortDir(d => d === "desc" ? "asc" : "desc");
+    else { setClientSort(col); setClientSortDir("desc"); }
+  }
 
   // Metas modal
   const openMetas = () => {
@@ -195,15 +224,12 @@ export default function VentasDashboard() {
   if (!authChecked) return null;
 
   const kpiCards = [
-    { key: "ventas", label: "Ventas netas", value: fmtK(kpi.ventasNetas), flag: false, tooltip: "Total de ventas sin ITBMS. Fórmula: Facturas − NC + ND, usando Subtotal." },
-    { key: "vsAnterior", label: "vs. Año Ant.", value: kpi.vsAnterior === null ? "—" : `${kpi.vsAnterior >= 0 ? "+" : ""}${kpi.vsAnterior.toFixed(1)}%`, flag: kpi.vsAnterior !== null && kpi.vsAnterior < -20, tooltip: "Compara los mismos meses con datos vs el año pasado." },
-    { key: "margen", label: "Margen bruto", value: `${kpi.margenBruto.toFixed(1)}%`, flag: kpi.margenBruto < 20, tooltip: "Utilidad bruta / ventas netas. Indica rentabilidad por dólar vendido." },
-    { key: "tendencia", label: "Tendencia margen", value: kpi.tendenciaMargen, flag: kpi.tendenciaFlag, tooltip: "Compara el margen bruto del período actual vs el mismo período del año anterior. Un margen creciente indica mejor control de costos." },
-    { key: "vsMeta", label: "vs. Meta", value: kpi.metaTotal ? `${kpi.vsMeta.toFixed(0)}%` : "N/A", flag: kpi.metaTotal > 0 && kpi.vsMeta < 80, tooltip: "Cumplimiento de meta definida. N/A si no hay metas." },
+    { key: "ventas", label: "Ventas netas", value: fmtK(kpi.ventasNetas), flag: false, tooltip: "Total de ventas sin ITBMS. Facturas − NC + ND, usando Subtotal.", valueExtra: undefined as string | null | undefined },
+    { key: "vsAnterior", label: "vs. Año Ant.", value: kpi.vsAnterior === null ? "—" : `${kpi.vsAnterior >= 0 ? "+" : ""}${kpi.vsAnterior.toFixed(1)}%`, flag: kpi.vsAnterior !== null && kpi.vsAnterior < -20, tooltip: "Compara los mismos meses con datos vs el año pasado.", valueExtra: undefined as string | null | undefined },
+    { key: "utilidad", label: "Utilidad total", value: fmtK(kpi.totalUtil), valueExtra: kpi.utilVsAnt, flag: false, tooltip: "Utilidad bruta total del período en B/. absolutos." },
+    { key: "margen", label: "Margen bruto", value: kpi.margenDisplay, flag: kpi.margenFlag, tooltip: "Utilidad / ventas netas. Fusionado con tendencia vs año anterior.", valueExtra: undefined as string | null | undefined },
+    { key: "vsMeta", label: "vs. Meta", value: kpi.metaTotal ? `${kpi.vsMeta.toFixed(0)}%` : "N/A", flag: kpi.metaTotal > 0 && kpi.vsMeta < 80, tooltip: "Cumplimiento de la meta definida. N/A si no hay metas.", valueExtra: undefined as string | null | undefined },
   ];
-
-  const clienteTotal = clientes.reduce((s, c) => s + c.ventas, 0);
-  const top3Pct = clienteTotal > 0 ? (clientes.slice(0, 3).reduce((s, c) => s + c.ventas, 0) / kpi.ventasNetas) * 100 : 0;
 
   return (
     <>
@@ -242,7 +268,7 @@ export default function VentasDashboard() {
               </button>
             ))}
           </div>
-          <select value={empresa} onChange={e => { setEmpresa(e.target.value); setClientes([]); setShowClientes(false); }}
+          <select value={empresa} onChange={e => setEmpresa(e.target.value)}
             className="text-xs border border-gray-200 rounded-full px-3 py-1.5 bg-white">
             <option value="all">Todas las empresas</option>
             {EMPRESAS.map(e => <option key={e} value={e}>{e}</option>)}
@@ -264,92 +290,141 @@ export default function VentasDashboard() {
                   <button onClick={() => setKpiTooltip(kpiTooltip === k.key ? null : k.key)} className="text-gray-300 hover:text-gray-500 text-[10px] ml-1">?</button>
                 </div>
                 <p className={`text-xl font-semibold ${k.flag ? "text-red-600" : ""}`}>{k.value}</p>
+                {k.valueExtra && <p className="text-xs text-gray-400">{k.valueExtra}</p>}
                 {kpiTooltip === k.key && <p className="text-[10px] text-gray-400 mt-1">{k.tooltip}</p>}
               </div>
             ))}
           </div>
         )}
 
-        {/* Data Table */}
-        {loading ? <SkeletonTable rows={9} cols={vista === "quarter" ? 7 : 15} /> : (
-          <div className="overflow-x-auto mb-6 border border-gray-100 rounded-xl">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50/50">
-                  <th className="text-left px-3 py-2 font-medium text-gray-500 sticky left-0 bg-gray-50/50">Empresa</th>
-                  {table.periods.map(p => <th key={p} className="text-right px-2 py-2 font-medium text-gray-500">{p}</th>)}
-                  <th className="text-right px-3 py-2 font-medium text-gray-500">Total</th>
-                  <th className="text-right px-3 py-2 font-medium text-gray-500">Margen%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {table.tableRows.map((row, ri) => {
-                  if (row.total === 0 && empresa === "all") return null;
-                  return (
-                    <tr key={row.empresa} className="border-b border-gray-50 hover:bg-gray-50/50">
-                      <td className="px-3 py-2 font-medium text-gray-700 sticky left-0 bg-white whitespace-nowrap">{row.empresa}</td>
-                      {row.values.map((v, i) => {
-                        const prev = i > 0 ? row.values[i - 1] : 0;
-                        const drop = v > 0 && prev > 0 && v < prev * 0.85;
-                        return <td key={i} className="text-right px-2 py-2 tabular-nums text-gray-600">{v ? fmtK(v) : "—"}{drop ? " \u2193" : ""}</td>;
-                      })}
-                      <td className="text-right px-3 py-2 font-medium tabular-nums">{fmtK(row.total)}</td>
-                      <td className={`text-right px-3 py-2 tabular-nums ${row.margen < 15 ? "bg-red-50 text-red-600" : "text-gray-600"}`}>
-                        {row.total ? `${row.margen.toFixed(1)}%` : "-"}
+        {/* Tab Bar */}
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 mb-6 max-w-xs print:hidden">
+          <button onClick={() => setActiveTab("resumen")} className={`flex-1 py-2 px-4 text-sm rounded-md transition ${activeTab === "resumen" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Resumen</button>
+          <button onClick={() => setActiveTab("clientes")} className={`flex-1 py-2 px-4 text-sm rounded-md transition ${activeTab === "clientes" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Clientes</button>
+        </div>
+
+        {/* Resumen Tab */}
+        {activeTab === "resumen" && (
+          <>
+            {loading ? <SkeletonTable rows={9} cols={vista === "quarter" ? 7 : 15} /> : (
+              <div className="overflow-x-auto mb-6 border border-gray-100 rounded-xl">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-100 bg-gray-50/50">
+                      <th className="text-left px-3 py-2 font-medium text-gray-500 sticky left-0 bg-gray-50/50">Empresa</th>
+                      {table.periods.map(p => <th key={p} className="text-right px-2 py-2 font-medium text-gray-500">{p}</th>)}
+                      <th className="text-right px-3 py-2 font-medium text-gray-500">Total</th>
+                      <th className="text-right px-3 py-2 font-medium text-gray-500">Margen%</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {table.tableRows.map(row => {
+                      if (row.total === 0 && empresa === "all") return null;
+                      return (
+                        <tr key={row.empresa} className="border-b border-gray-50 hover:bg-gray-50/50">
+                          <td className="px-3 py-2 font-medium text-gray-700 sticky left-0 bg-white whitespace-nowrap">{row.empresa}</td>
+                          {row.values.map((v, i) => {
+                            const prev = row.prevValues[i];
+                            const drop = v > 0 && prev > 0 && v < prev * 0.85;
+                            return <td key={i} className="text-right px-2 py-2 tabular-nums text-gray-600">{v ? fmtK(v) : "—"}{drop ? " ↓" : ""}</td>;
+                          })}
+                          <td className="text-right px-3 py-2 font-medium tabular-nums">{fmtK(row.total)}</td>
+                          <td className={`text-right px-3 py-2 tabular-nums ${row.margen < 15 ? "bg-red-50 text-red-600" : "text-gray-600"}`}>
+                            {row.total ? `${row.margen.toFixed(1)}%` : "-"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
+                      <td className="px-3 py-2 sticky left-0 bg-gray-50">TOTAL</td>
+                      {table.totalValues.map((v, i) => <td key={i} className="text-right px-2 py-2 tabular-nums">{v ? fmtK(v) : "-"}</td>)}
+                      <td className="text-right px-3 py-2 tabular-nums">{fmtK(table.grandTotal)}</td>
+                      <td className={`text-right px-3 py-2 tabular-nums ${table.grandMargen < 15 ? "text-red-600" : ""}`}>
+                        {table.grandTotal ? `${table.grandMargen.toFixed(1)}%` : "-"}
                       </td>
                     </tr>
-                  );
-                })}
-                {/* Total row */}
-                <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-                  <td className="px-3 py-2 sticky left-0 bg-gray-50">TOTAL</td>
-                  {table.totalValues.map((v, i) => <td key={i} className="text-right px-2 py-2 tabular-nums">{v ? fmtK(v) : "-"}</td>)}
-                  <td className="text-right px-3 py-2 tabular-nums">{fmtK(table.grandTotal)}</td>
-                  <td className={`text-right px-3 py-2 tabular-nums ${table.grandMargen < 15 ? "text-red-600" : ""}`}>
-                    {table.grandTotal ? `${table.grandMargen.toFixed(1)}%` : "-"}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Top Clientes */}
-        <div className="mb-6 print:hidden">
-          <button onClick={fetchClientes} className="text-xs text-gray-500 hover:text-gray-700 transition flex items-center gap-1">
-            Top Clientes {showClientes ? "\u25BC" : "\u25B6"}
-          </button>
-          {showClientes && (
-            <div className="mt-3 border border-gray-100 rounded-xl overflow-hidden">
-              {top3Pct > 60 && (
-                <div className="bg-amber-50 border-b border-amber-100 px-4 py-2 text-xs text-amber-700">
-                  Los 3 principales clientes representan {top3Pct.toFixed(0)}% del total - alta concentracion
-                </div>
-              )}
-              {loadingClientes ? <SkeletonTable rows={5} cols={4} /> : (
-                <table className="w-full text-xs">
-                  <thead><tr className="border-b border-gray-100 bg-gray-50/50">
-                    <th className="text-left px-3 py-2 font-medium text-gray-500">Cliente</th>
-                    <th className="text-right px-3 py-2 font-medium text-gray-500">Ventas B/.</th>
-                    <th className="text-right px-3 py-2 font-medium text-gray-500">% del Total</th>
-                  </tr></thead>
-                  <tbody>
-                    {clientes.map(c => (
-                      <tr key={c.cliente} className="border-b border-gray-50">
-                        <td className="px-3 py-2 text-gray-700">{c.cliente}</td>
-                        <td className="text-right px-3 py-2 tabular-nums">{fmtK(c.ventas)}</td>
-                        <td className="text-right px-3 py-2 tabular-nums text-gray-500">
-                          {kpi.ventasNetas ? `${((c.ventas / kpi.ventasNetas) * 100).toFixed(1)}%` : "-"}
-                        </td>
-                      </tr>
-                    ))}
-                    {clientes.length === 0 && <tr><td colSpan={3} className="px-3 py-6 text-center text-gray-400">Sin datos de clientes</td></tr>}
                   </tbody>
                 </table>
-              )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Clientes Tab */}
+        {activeTab === "clientes" && (
+          <>
+            {/* Client KPIs */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Top Cliente</p>
+                <p className="text-sm font-semibold">{topClient?.cliente || "—"}</p>
+                <p className="text-xs text-gray-400">{topClient ? fmtK(topClient.subtotal) : ""}</p>
+              </div>
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Concentración Top 5</p>
+                <p className={`text-xl font-semibold ${top5Pct > 60 ? "text-amber-600" : ""}`}>{top5Pct.toFixed(0)}%</p>
+                <p className="text-xs text-gray-400">del total de ventas</p>
+              </div>
+              <div className={`rounded-xl p-4 cursor-pointer transition ${showInactive ? "bg-red-50 border border-red-200" : "bg-gray-50"}`} onClick={() => setShowInactive(!showInactive)}>
+                <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Sin compra 60+ días</p>
+                <p className={`text-xl font-semibold ${inactiveCount > 0 ? "text-red-600" : ""}`}>{inactiveCount}</p>
+                <p className="text-xs text-gray-400">{showInactive ? "Mostrando inactivos" : "Click para filtrar"}</p>
+              </div>
             </div>
-          )}
-        </div>
+
+            {/* Search */}
+            <div className="mb-4">
+              <input type="text" value={clientSearch} onChange={e => setClientSearch(e.target.value)}
+                placeholder="Buscar cliente..." className="text-xs border border-gray-200 rounded-full px-4 py-2 w-full max-w-xs" />
+            </div>
+
+            {/* Client Table */}
+            <div className="overflow-x-auto border border-gray-100 rounded-xl mb-6">
+              <table className="w-full text-xs">
+                <thead><tr className="border-b border-gray-100 bg-gray-50/50">
+                  <th className="text-left px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("ventas")}>Cliente</th>
+                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("ventas")}>Ventas</th>
+                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("utilidad")}>Utilidad</th>
+                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("margen")}>Margen%</th>
+                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("pct")}>% Total</th>
+                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("fecha")}>Última Compra</th>
+                </tr></thead>
+                <tbody>
+                  {displayClients.map(c => {
+                    const margen = c.subtotal ? (c.utilidad / c.subtotal * 100) : 0;
+                    const pct = totalVentas ? (c.subtotal / totalVentas * 100) : 0;
+                    const lastCompra = c.lastFecha ? MES_NAMES[new Date(c.lastFecha).getMonth()] + " " + new Date(c.lastFecha).getFullYear() : "—";
+                    const expanded = expandedClient === c.cliente;
+                    return [
+                      <tr key={c.cliente} className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer" onClick={() => setExpandedClient(expanded ? null : c.cliente)}>
+                        <td className="px-3 py-2 text-gray-700 flex items-center gap-1">
+                          <span className={`text-gray-300 text-[10px] transition ${expanded ? "rotate-90" : ""}`}>▶</span>
+                          {c.cliente}
+                        </td>
+                        <td className="text-right px-3 py-2 tabular-nums">{fmtK(c.subtotal)}</td>
+                        <td className="text-right px-3 py-2 tabular-nums">{fmtK(c.utilidad)}</td>
+                        <td className={`text-right px-3 py-2 tabular-nums ${margen < 15 ? "text-red-600" : ""}`}>{margen.toFixed(1)}%</td>
+                        <td className="text-right px-3 py-2 tabular-nums text-gray-500">{pct.toFixed(1)}%</td>
+                        <td className="text-right px-3 py-2 text-gray-500">{lastCompra}</td>
+                      </tr>,
+                      expanded && c.empresas.map(e => (
+                        <tr key={`${c.cliente}-${e.empresa}`} className="bg-gray-50/30">
+                          <td className="px-3 py-1.5 pl-8 text-gray-400 text-[11px]">{e.empresa}</td>
+                          <td className="text-right px-3 py-1.5 tabular-nums text-gray-400 text-[11px]">{fmtK(e.subtotal)}</td>
+                          <td className="text-right px-3 py-1.5 tabular-nums text-gray-400 text-[11px]">{fmtK(e.utilidad)}</td>
+                          <td className="text-right px-3 py-1.5 tabular-nums text-gray-400 text-[11px]">{e.subtotal ? ((e.utilidad / e.subtotal) * 100).toFixed(1) : 0}%</td>
+                          <td></td>
+                          <td className="text-right px-3 py-1.5 text-gray-400 text-[11px]">{e.lastFecha ? MES_NAMES[new Date(e.lastFecha).getMonth()] + " " + new Date(e.lastFecha).getFullYear() : "—"}</td>
+                        </tr>
+                      )),
+                    ];
+                  })}
+                  {displayClients.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-gray-400">Sin datos de clientes</td></tr>}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Metas Modal */}

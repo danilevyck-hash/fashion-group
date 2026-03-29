@@ -9,6 +9,12 @@ const EMPRESAS = ["Vistana International", "Fashion Wear", "Fashion Shoes", "Act
 const MES_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 interface VentaRow { empresa: string; mes: number; ventas_brutas: number; costo: number; utilidad: number; }
+interface ClienteDetalle {
+  cliente: string;
+  subtotal: number;
+  utilidad: number;
+  ultima_compra?: string;
+}
 
 function ReportePage() {
   const params = useSearchParams();
@@ -19,7 +25,7 @@ function ReportePage() {
   const [data, setData] = useState<VentaRow[]>([]);
   const [prevData, setPrevData] = useState<VentaRow[]>([]);
   const [metas, setMetas] = useState<{ empresa: string; mes: number; meta: number }[]>([]);
-  const [clientes, setClientes] = useState<{ cliente: string; subtotal: number; utilidad: number }[]>([]);
+  const [clientesDetalle, setClientesDetalle] = useState<ClienteDetalle[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,9 +33,12 @@ function ReportePage() {
       fetch(`/api/ventas?año=${año}`).then(r => r.ok ? r.json() : []),
       fetch(`/api/ventas?año=${año - 1}`).then(r => r.ok ? r.json() : []),
       fetch(`/api/ventas/metas?año=${año}`).then(r => r.ok ? r.json() : []),
-      fetch(`/api/ventas/clientes?año=${año}`).then(r => r.ok ? r.json() : []),
-    ]).then(([d, p, m, c]) => {
-      setData(d || []); setPrevData(p || []); setMetas(m || []); setClientes(c || []);
+      fetch(`/api/ventas/v2?año=${año}`).then(r => r.ok ? r.json() : null),
+    ]).then(([d, p, m, v2]: [VentaRow[], VentaRow[], { empresa: string; mes: number; meta: number }[], { clientesDetalle?: ClienteDetalle[] } | null]) => {
+      setData(d || []);
+      setPrevData(p || []);
+      setMetas(m || []);
+      setClientesDetalle(v2?.clientesDetalle || []);
       setLoading(false);
       setTimeout(() => window.print(), 500);
     });
@@ -38,6 +47,7 @@ function ReportePage() {
   const filtered = useMemo(() => empresaFilter === "all" ? data : data.filter(r => r.empresa === empresaFilter), [data, empresaFilter]);
   const filteredPrev = useMemo(() => empresaFilter === "all" ? prevData : prevData.filter(r => r.empresa === empresaFilter), [prevData, empresaFilter]);
 
+  // KPI calculations
   const ventasNetas = filtered.reduce((s, r) => s + (r.ventas_brutas || 0), 0);
   const monthsWithData = [...new Set(filtered.map(r => r.mes))];
   const comparablePrev = filteredPrev.filter(r => monthsWithData.includes(r.mes));
@@ -47,15 +57,24 @@ function ReportePage() {
     : null;
   const totalUtilidad = filtered.reduce((s, r) => s + (r.utilidad || 0), 0);
   const margen = ventasNetas > 0 ? (totalUtilidad / ventasNetas) * 100 : 0;
-  const metaTotal = metas.filter(m => empresaFilter === "all" || m.empresa === empresaFilter).reduce((s, m) => s + (m.meta || 0), 0);
+
+  const prevUtilidad = comparablePrev.reduce((s, r) => s + (r.utilidad || 0), 0);
+  const prevMargen = prevTotal > 0 ? (prevUtilidad / prevTotal) * 100 : null;
+  const margenDelta: number | null = prevMargen !== null ? margen - prevMargen : null;
+
+  const metaTotal = metas
+    .filter(m => empresaFilter === "all" || m.empresa === empresaFilter)
+    .reduce((s, m) => s + (m.meta || 0), 0);
   const vsMeta = metaTotal > 0 ? (ventasNetas / metaTotal) * 100 : 0;
 
   const empresas = empresaFilter === "all" ? EMPRESAS : [empresaFilter];
 
-  const topClientes = useMemo(() => {
-    const c = empresaFilter === "all" ? clientes : clientes.filter(r => true); // clientes already filtered by year
-    return [...c].sort((a, b) => b.subtotal - a.subtotal).slice(0, 5);
-  }, [clientes, empresaFilter]);
+  // Top 10 clients from v2 clientesDetalle
+  const top10Clients = useMemo(() => {
+    return [...clientesDetalle]
+      .sort((a, b) => b.subtotal - a.subtotal)
+      .slice(0, 10);
+  }, [clientesDetalle]);
 
   if (loading) return <div className="p-12 text-center text-gray-400">Cargando reporte...</div>;
 
@@ -75,31 +94,59 @@ function ReportePage() {
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs — order: Ventas Netas | vs Año Ant. | Utilidad Total | Margen Bruto | vs Meta */}
       <div className="grid grid-cols-5 gap-3 mb-6 text-center">
+        {/* 1. Ventas Netas */}
         <div className="border border-gray-200 rounded-lg p-3">
           <div className="text-[9px] uppercase text-gray-400">Ventas Netas</div>
           <div className="text-base font-semibold">${fmt(ventasNetas)}</div>
         </div>
+
+        {/* 2. vs Año Ant. */}
         <div className="border border-gray-200 rounded-lg p-3">
           <div className="text-[9px] uppercase text-gray-400">vs Año Ant.</div>
-          <div className={`text-base font-semibold ${vsAnterior !== null && vsAnterior < -20 ? "text-red-600" : ""}`}>{vsAnterior === null ? "—" : `${vsAnterior > 0 ? "+" : ""}${vsAnterior.toFixed(1)}%`}</div>
+          <div className={`text-base font-semibold ${vsAnterior !== null && vsAnterior < -20 ? "text-red-600" : vsAnterior !== null && vsAnterior >= 0 ? "text-green-600" : ""}`}>
+            {vsAnterior === null ? "—" : `${vsAnterior > 0 ? "+" : ""}${vsAnterior.toFixed(1)}%`}
+          </div>
+          {vsAnterior !== null && (
+            <div className="text-[9px] text-gray-400 mt-0.5">{fmt(prevTotal)} ant.</div>
+          )}
         </div>
+
+        {/* 3. Utilidad Total */}
+        <div className="border border-gray-200 rounded-lg p-3">
+          <div className="text-[9px] uppercase text-gray-400">Utilidad Total</div>
+          <div className={`text-base font-semibold ${totalUtilidad < 0 ? "text-red-600" : ""}`}>
+            B/. {fmt(totalUtilidad)}
+          </div>
+        </div>
+
+        {/* 4. Margen Bruto */}
         <div className="border border-gray-200 rounded-lg p-3">
           <div className="text-[9px] uppercase text-gray-400">Margen Bruto</div>
-          <div className={`text-base font-semibold ${margen < 20 ? "text-red-600" : ""}`}>{margen.toFixed(1)}%</div>
+          <div className={`text-base font-semibold ${margen < 20 ? "text-red-600" : ""}`}>
+            {margen.toFixed(1)}%
+          </div>
+          {margenDelta !== null && (
+            <div className={`text-[9px] mt-0.5 ${margenDelta >= 0 ? "text-green-600" : "text-red-500"}`}>
+              {margenDelta > 0 ? "▲" : "▼"} {Math.abs(margenDelta).toFixed(1)} pp vs ant.
+            </div>
+          )}
         </div>
-        <div className="border border-gray-200 rounded-lg p-3">
-          <div className="text-[9px] uppercase text-gray-400">Utilidad Bruta</div>
-          <div className="text-base font-semibold">${fmt(totalUtilidad)}</div>
-        </div>
+
+        {/* 5. vs Meta */}
         <div className="border border-gray-200 rounded-lg p-3">
           <div className="text-[9px] uppercase text-gray-400">vs Meta</div>
-          <div className={`text-base font-semibold ${vsMeta < 80 && metaTotal > 0 ? "text-red-600" : ""}`}>{metaTotal > 0 ? `${vsMeta.toFixed(1)}%` : "—"}</div>
+          <div className={`text-base font-semibold ${vsMeta < 80 && metaTotal > 0 ? "text-red-600" : vsMeta >= 100 && metaTotal > 0 ? "text-green-600" : ""}`}>
+            {metaTotal > 0 ? `${vsMeta.toFixed(1)}%` : "—"}
+          </div>
+          {metaTotal > 0 && (
+            <div className="text-[9px] text-gray-400 mt-0.5">Meta: {fmt(metaTotal)}</div>
+          )}
         </div>
       </div>
 
-      {/* Table */}
+      {/* Empresa Table */}
       <table className="w-full text-[11px] border-collapse mb-6">
         <thead>
           <tr className="border-b-2 border-gray-300">
@@ -132,34 +179,57 @@ function ReportePage() {
             return (
               <tr key={emp} className="border-b border-gray-100">
                 <td className="py-1.5 font-medium">{emp}</td>
-                {periods.map((p, i) => <td key={i} className={`text-right py-1.5 tabular-nums ${p.v === 0 ? "text-gray-300" : ""}`}>{p.v > 0 ? fmt(p.v) : "—"}</td>)}
+                {periods.map((p, i) => (
+                  <td key={i} className={`text-right py-1.5 tabular-nums ${p.v === 0 ? "text-gray-300" : ""}`}>
+                    {p.v > 0 ? fmt(p.v) : "—"}
+                  </td>
+                ))}
                 <td className="text-right py-1.5 font-semibold tabular-nums">{fmt(total)}</td>
                 <td className="text-right py-1.5 tabular-nums">{fmt(utilTotal)}</td>
-                <td className={`text-right py-1.5 tabular-nums ${mg < 15 ? "text-red-600" : ""}`}>{mg > 0 ? mg.toFixed(1) + "%" : "—"}</td>
+                <td className={`text-right py-1.5 tabular-nums ${mg < 15 ? "text-red-600" : ""}`}>
+                  {mg > 0 ? mg.toFixed(1) + "%" : "—"}
+                </td>
               </tr>
             );
           })}
         </tbody>
       </table>
 
-      {/* Top Clientes */}
-      {topClientes.length > 0 && (
+      {/* Top 10 Clientes */}
+      {top10Clients.length > 0 && (
         <>
-          <h3 className="text-xs font-semibold uppercase text-gray-400 mb-2">Top 5 Clientes</h3>
+          <h3 className="text-xs font-semibold uppercase text-gray-400 mb-2">Top 10 Clientes del Período</h3>
           <table className="w-full text-[11px] border-collapse mb-8">
-            <thead><tr className="border-b border-gray-300">
-              <th className="text-left py-1.5 font-semibold">Cliente</th>
-              <th className="text-right py-1.5 font-semibold">Ventas B/.</th>
-              <th className="text-right py-1.5 font-semibold">% del Total</th>
-            </tr></thead>
+            <thead>
+              <tr className="border-b-2 border-gray-300">
+                <th className="text-left py-1.5 font-semibold">Cliente</th>
+                <th className="text-right py-1.5 font-semibold">Ventas B/.</th>
+                <th className="text-right py-1.5 font-semibold">Utilidad B/.</th>
+                <th className="text-right py-1.5 font-semibold">Margen %</th>
+                <th className="text-right py-1.5 font-semibold">% del Total</th>
+                <th className="text-right py-1.5 font-semibold">Última Compra</th>
+              </tr>
+            </thead>
             <tbody>
-              {topClientes.map(c => (
-                <tr key={c.cliente} className="border-b border-gray-100">
-                  <td className="py-1.5">{c.cliente}</td>
-                  <td className="text-right py-1.5 tabular-nums">{fmt(c.subtotal)}</td>
-                  <td className="text-right py-1.5 tabular-nums">{ventasNetas > 0 ? ((c.subtotal / ventasNetas) * 100).toFixed(1) + "%" : "—"}</td>
-                </tr>
-              ))}
+              {top10Clients.map(c => {
+                const mg = c.subtotal > 0 ? (c.utilidad / c.subtotal) * 100 : 0;
+                const pct = ventasNetas > 0 ? (c.subtotal / ventasNetas) * 100 : 0;
+                const ultima = c.ultima_compra
+                  ? new Date(c.ultima_compra).toLocaleDateString("es-PA")
+                  : "—";
+                return (
+                  <tr key={c.cliente} className="border-b border-gray-100">
+                    <td className="py-1.5">{c.cliente}</td>
+                    <td className="text-right py-1.5 tabular-nums">{fmt(c.subtotal)}</td>
+                    <td className="text-right py-1.5 tabular-nums">{fmt(c.utilidad)}</td>
+                    <td className={`text-right py-1.5 tabular-nums ${mg < 15 ? "text-red-600" : ""}`}>
+                      {mg > 0 ? mg.toFixed(1) + "%" : "—"}
+                    </td>
+                    <td className="text-right py-1.5 tabular-nums">{pct.toFixed(1)}%</td>
+                    <td className="text-right py-1.5 text-gray-500">{ultima}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </>
@@ -172,8 +242,30 @@ function ReportePage() {
 
       <style jsx>{`
         @media print {
+          /* Layout */
           .print-report { max-width: 100%; padding: 0; margin: 0 1.5cm; font-size: 11px; }
-          @page { margin: 1.5cm; }
+          @page { margin: 1.5cm; size: A4 landscape; }
+
+          /* Hide everything outside the report */
+          body > *:not(.print-report),
+          nav, header, aside, footer,
+          [role="navigation"], [role="banner"],
+          button, a[role="button"],
+          .no-print { display: none !important; }
+
+          /* When the report is nested inside a layout, hide sibling layout nodes */
+          body * { visibility: hidden; }
+          .print-report, .print-report * { visibility: visible; }
+          .print-report { position: absolute; top: 0; left: 0; right: 0; }
+
+          /* Ensure table borders survive print */
+          table { border-collapse: collapse; width: 100%; }
+          th, td { border-bottom: 1px solid #e5e7eb; padding: 4px 6px; }
+          thead tr { border-bottom: 2px solid #d1d5db; }
+
+          /* Color adjustments for print */
+          .text-red-600 { color: #dc2626 !important; }
+          .text-green-600 { color: #16a34a !important; }
         }
       `}</style>
     </div>
