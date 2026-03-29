@@ -160,8 +160,9 @@ export async function GET(req: NextRequest) {
 
   const { data: currentRows, error: currentErr } = await qCurrent;
   if (currentErr) {
-    console.error("[ventas/v2] current year query error", currentErr);
-    return NextResponse.json({ error: currentErr.message }, { status: 500 });
+    console.error("[ventas/v2] current year query error", currentErr.code, currentErr.message);
+    if (currentErr.code === "42P01") return NextResponse.json({ byEmpresaMes: [], topClientes: [], prevYear: [], clientesDetalle: [] });
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 
   // ── Fetch previous year rows (subtotal only, for comparison) ─────────────
@@ -174,8 +175,8 @@ export async function GET(req: NextRequest) {
 
   const { data: prevRows, error: prevErr } = await qPrev;
   if (prevErr) {
-    console.error("[ventas/v2] prev year query error", prevErr);
-    return NextResponse.json({ error: prevErr.message }, { status: 500 });
+    console.error("[ventas/v2] prev year query error", prevErr.code, prevErr.message);
+    // Non-fatal — proceed with empty prev data
   }
 
   // ── Aggregate ────────────────────────────────────────────────────────────
