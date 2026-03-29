@@ -89,12 +89,18 @@ function aggregateTopClientes(rows: VentasRawRow[], topN = 10): ClienteAgg[] {
     .slice(0, topN);
 }
 
-function aggregateClientesDetalle(filteredRows: VentasRawRow[], allRows: VentasRawRow[]): ClienteDetalle[] {
-  // Build lastFecha map from ALL rows (no period filter)
+const CLIENTES_INTERNOS = new Set(["CONFECCIONES BOSTON", "MULTI FASHION HOLDING", "MULTIFASHION", "BOSTON"]);
+
+function aggregateClientesDetalle(
+  filteredRows: VentasRawRow[],
+  historicalFechas: { cliente: string; fecha: string; empresa: string }[],
+): ClienteDetalle[] {
+  // Build lastFecha map from historical data (ALL time, no period/year filter)
   const lastFechaMap = new Map<string, string>();
   const lastFechaEmpMap = new Map<string, string>();
-  for (const r of allRows) {
+  for (const r of historicalFechas) {
     const key = (r.cliente ?? "").trim() || "(Sin nombre)";
+    if (CLIENTES_INTERNOS.has(key.toUpperCase())) continue;
     const prev = lastFechaMap.get(key) || "";
     if ((r.fecha ?? "") > prev) lastFechaMap.set(key, r.fecha ?? "");
     const empKey = `${key}|${r.empresa}`;
@@ -106,6 +112,7 @@ function aggregateClientesDetalle(filteredRows: VentasRawRow[], allRows: VentasR
   const map = new Map<string, { subtotal: number; utilidad: number; empresas: Map<string, { subtotal: number; utilidad: number }> }>();
   for (const r of filteredRows) {
     const key = (r.cliente ?? "").trim() || "(Sin nombre)";
+    if (CLIENTES_INTERNOS.has(key.toUpperCase())) continue;
     if (!map.has(key)) map.set(key, { subtotal: 0, utilidad: 0, empresas: new Map() });
     const c = map.get(key)!;
     c.subtotal += r.subtotal ?? 0;
@@ -211,6 +218,21 @@ export async function GET(req: NextRequest) {
     prevOffset += PAGE;
   }
 
+  // ── Fetch historical last-fecha per client (ALL time, no year filter) ────
+  let historicalFechas: { cliente: string; fecha: string; empresa: string }[] = [];
+  let histOffset = 0;
+  while (true) {
+    const { data, error } = await supabaseServer
+      .from("ventas_raw")
+      .select("cliente, fecha, empresa")
+      .order("fecha", { ascending: false })
+      .range(histOffset, histOffset + PAGE - 1);
+    if (error) { console.error("[ventas/v2] historical fecha error", error.code); break; }
+    historicalFechas = historicalFechas.concat(data ?? []);
+    if (!data || data.length < PAGE) break;
+    histOffset += PAGE;
+  }
+
   // ── Aggregate ────────────────────────────────────────────────────────────
   const rows = currentRows;
   const prev = allPrevRows;
@@ -224,6 +246,6 @@ export async function GET(req: NextRequest) {
     byEmpresaMes: aggregateByEmpresaMes(rows),
     topClientes: aggregateTopClientes(rows),
     prevYear: aggregatePrevYear(prev),
-    clientesDetalle: aggregateClientesDetalle(clienteRows, rows),
+    clientesDetalle: aggregateClientesDetalle(clienteRows, historicalFechas),
   });
 }
