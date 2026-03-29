@@ -31,18 +31,26 @@ function calcKPIs(rows: VentaRow[], prevRows: VentaRow[], metaRows: MetaRow[], v
   const totalUtil = rows.reduce((s, r) => s + utilidad(r), 0);
   const margenBruto = ventasNetas ? (totalUtil / ventasNetas) * 100 : 0;
 
-  // Best period
-  const byPeriod: Record<string, number> = {};
-  rows.forEach(r => {
-    const key = vista === "quarter" ? `Q${Math.ceil(r.mes / 3)}` : MES_NAMES[r.mes - 1];
-    byPeriod[key] = (byPeriod[key] || 0) + netas(r);
-  });
-  const mejorPeriodo = Object.entries(byPeriod).sort((a, b) => b[1] - a[1])[0]?.[0] || "-";
+  // Tendencia de margen vs same period prev year
+  const prevUtil = comparablePrev.reduce((s, r) => s + utilidad(r), 0);
+  const prevMargen = prevTotal > 0 ? (prevUtil / prevTotal) * 100 : null;
+  let tendenciaMargen: string;
+  let tendenciaFlag: boolean;
+  if (prevMargen !== null) {
+    const diff = margenBruto - prevMargen;
+    const arrow = diff >= 0 ? "↑" : "↓";
+    const sign = diff >= 0 ? "+" : "";
+    tendenciaMargen = `${margenBruto.toFixed(1)}% ${arrow}${sign}${diff.toFixed(1)}pp`;
+    tendenciaFlag = diff < 0;
+  } else {
+    tendenciaMargen = `${margenBruto.toFixed(1)}% —`;
+    tendenciaFlag = false;
+  }
 
   const metaTotal = metaRows.reduce((s, m) => s + (m.meta || 0), 0);
   const vsMeta = metaTotal ? (ventasNetas / metaTotal) * 100 : 0;
 
-  return { ventasNetas, vsAnterior, margenBruto, mejorPeriodo, metaTotal, vsMeta, prevTotal: comparablePrev.reduce((s, r) => s + netas(r), 0) };
+  return { ventasNetas, vsAnterior, margenBruto, tendenciaMargen, tendenciaFlag, metaTotal, vsMeta, prevTotal: comparablePrev.reduce((s, r) => s + netas(r), 0) };
 }
 
 function buildTable(rows: VentaRow[], vista: "mensual" | "quarter") {
@@ -190,7 +198,7 @@ export default function VentasDashboard() {
     { key: "ventas", label: "Ventas netas", value: fmtK(kpi.ventasNetas), flag: false, tooltip: "Total de ventas sin ITBMS. Fórmula: Facturas − NC + ND, usando Subtotal." },
     { key: "vsAnterior", label: "vs. Año Ant.", value: kpi.vsAnterior === null ? "—" : `${kpi.vsAnterior >= 0 ? "+" : ""}${kpi.vsAnterior.toFixed(1)}%`, flag: kpi.vsAnterior !== null && kpi.vsAnterior < -20, tooltip: "Compara los mismos meses con datos vs el año pasado." },
     { key: "margen", label: "Margen bruto", value: `${kpi.margenBruto.toFixed(1)}%`, flag: kpi.margenBruto < 20, tooltip: "Utilidad bruta / ventas netas. Indica rentabilidad por dólar vendido." },
-    { key: "mejorPeriodo", label: "Mejor periodo", value: kpi.mejorPeriodo, flag: false, tooltip: "Mes o quarter con mayor venta neta en el año seleccionado." },
+    { key: "tendencia", label: "Tendencia margen", value: kpi.tendenciaMargen, flag: kpi.tendenciaFlag, tooltip: "Compara el margen bruto del período actual vs el mismo período del año anterior. Un margen creciente indica mejor control de costos." },
     { key: "vsMeta", label: "vs. Meta", value: kpi.metaTotal ? `${kpi.vsMeta.toFixed(0)}%` : "N/A", flag: kpi.metaTotal > 0 && kpi.vsMeta < 80, tooltip: "Cumplimiento de meta definida. N/A si no hay metas." },
   ];
 
@@ -205,7 +213,7 @@ export default function VentasDashboard() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-semibold">Dashboard de Ventas</h1>
           <div className="flex items-center gap-2">
-            <button onClick={() => router.push("/ventas/carga")}
+            <button onClick={() => router.push("/upload?tab=ventas")}
               className="text-xs border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-50 transition print:hidden">
               Cargar datos
             </button>

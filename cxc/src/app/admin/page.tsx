@@ -140,10 +140,16 @@ export default function AdminDashboard() {
 
   const roleCompanies = useMemo(() => getCompaniesForRole(userRole), [userRole]);
 
+  const CXC_RESTRICTED = ["fashion_wear", "fashion_shoes", "vistana", "active_wear", "active_shoes"];
+  const cxcCompanies = useMemo(
+    () => userRole === "director" ? roleCompanies : roleCompanies.filter(c => CXC_RESTRICTED.includes(c.key)),
+    [userRole, roleCompanies]
+  );
+
   // ── Filtering + sorting ──────────────────────────────
 
   const filtered = useMemo(() => {
-    const roleKeys = new Set(roleCompanies.map((c) => c.key));
+    const roleKeys = new Set(cxcCompanies.map((c) => c.key));
     let result = clients
       .map((c) => {
         const filteredCompanies: typeof c.companies = {};
@@ -228,11 +234,11 @@ export default function AdminDashboard() {
     });
 
     return result;
-  }, [clients, roleCompanies, companyFilter, riskFilter, search, sortKey, sortDir]);
+  }, [clients, cxcCompanies, companyFilter, riskFilter, search, sortKey, sortDir]);
 
   // ── Role-filtered clients ──
   const roleClients = useMemo(() => {
-    const roleKeys = new Set(roleCompanies.map((c) => c.key));
+    const roleKeys = new Set(cxcCompanies.map((c) => c.key));
     return clients
       .map((c) => {
         const fc: typeof c.companies = {};
@@ -250,7 +256,7 @@ export default function AdminDashboard() {
         return { ...c, companies: fc, current, watch, overdue, total };
       })
       .filter((c): c is ConsolidatedClient => c !== null && c.total > 0);
-  }, [clients, roleCompanies]);
+  }, [clients, cxcCompanies]);
 
   useEffect(() => {
     if (!authChecked) return;
@@ -290,7 +296,7 @@ export default function AdminDashboard() {
   }
 
   function sendVendorWhatsApp(companyKey: string) {
-    const co = roleCompanies.find((c) => c.key === companyKey);
+    const co = cxcCompanies.find((c) => c.key === companyKey);
     if (!co?.vendedorPhone || !co?.vendedor) { alert("Esta empresa no tiene vendedor asignado."); return; }
 
     const vendorClients = VENDOR_MAP[companyKey] || {};
@@ -448,7 +454,14 @@ export default function AdminDashboard() {
       <AppHeader module="Panel CXC" />
       <div className="max-w-6xl mx-auto px-6 py-8">
       {/* Export */}
-      <div className="flex justify-end mb-6">
+      <div className="flex justify-end items-center gap-3 mb-6">
+          <button
+            onClick={() => (window.location.href = "/upload?tab=cxc")}
+            className="text-sm border border-gray-200 text-gray-700 px-5 py-2 rounded-lg font-medium hover:bg-gray-50 transition flex items-center gap-2"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Cargar archivo
+          </button>
           <div className="relative">
             <button
               onClick={() => setShowExport(!showExport)}
@@ -496,7 +509,7 @@ export default function AdminDashboard() {
                 <button
                   onClick={() => {
                     const sub = buildExportSubtitle();
-                    generatePDFDetallado(filtered, roleCompanies, sub);
+                    generatePDFDetallado(filtered, cxcCompanies, sub);
                     setShowExport(false);
                   }}
                   className="w-full text-left px-3 py-2.5 hover:bg-gray-50 transition flex items-start gap-3"
@@ -512,7 +525,7 @@ export default function AdminDashboard() {
           </div>
       </div>
 
-      <UploadFreshness roleCompanies={roleCompanies} uploads={uploads} />
+      <UploadFreshness roleCompanies={cxcCompanies} uploads={uploads} />
 
       {/* Activity logs */}
       {userRole === "admin" && (
@@ -544,7 +557,7 @@ export default function AdminDashboard() {
         {showUploadHistory && (
           <div className="mt-3 border border-gray-100 rounded-xl overflow-hidden">
             <table className="w-full text-xs"><thead><tr className="bg-gray-50 border-b border-gray-100"><th className="text-left px-4 py-2.5 font-medium text-gray-500">Empresa</th><th className="text-left px-4 py-2.5 font-medium text-gray-500">Último upload</th><th className="text-left px-4 py-2.5 font-medium text-gray-500">Hace</th><th className="text-right px-4 py-2.5 font-medium text-gray-500">Registros</th></tr></thead>
-            <tbody>{roleCompanies.map((co) => {
+            <tbody>{cxcCompanies.map((co) => {
               const u = uploads[co.key];
               if (!u) return <tr key={co.key}><td className="px-4 py-2.5">{co.name}</td><td colSpan={3} className="px-4 py-2.5 text-gray-300">Sin datos</td></tr>;
               const days = Math.floor((Date.now() - new Date(u.uploaded_at).getTime()) / 86400000);
@@ -560,7 +573,7 @@ export default function AdminDashboard() {
       <KpiCards roleClients={roleClients} onFilterOverdue={() => setRiskFilter("overdue")} />
 
       <CompanySummary
-        roleCompanies={roleCompanies}
+        roleCompanies={cxcCompanies}
         roleClients={roleClients}
         companyFilter={companyFilter}
         clients={clients}
@@ -571,7 +584,7 @@ export default function AdminDashboard() {
 
       <ClientTable
         filtered={filtered}
-        roleCompanies={roleCompanies}
+        roleCompanies={cxcCompanies}
         roleClients={roleClients}
         companyFilter={companyFilter}
         setCompanyFilter={setCompanyFilter}
