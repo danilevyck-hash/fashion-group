@@ -149,6 +149,7 @@ export default function VentasDashboard() {
         fetch(`/api/ventas/metas?año=${año}`).then(r => r.ok ? r.json() : []).catch(() => []),
       ]);
       const v2 = v2Raw as { byEmpresaMes?: VentaRow[]; prevYear?: { empresa: string; mes: number; subtotal: number; utilidad: number }[]; clientesDetalle?: ClienteDetalle[] } | null;
+      console.log("[ventas] v2 response:", v2 ? `byEmpresaMes=${v2.byEmpresaMes?.length} prevYear=${v2.prevYear?.length} clientes=${v2.clientesDetalle?.length}` : "NULL", "v2Raw type:", typeof v2Raw);
       setVentas(Array.isArray(v2?.byEmpresaMes) ? v2.byEmpresaMes : []);
       setVentasPrev(Array.isArray(v2?.prevYear) ? v2.prevYear.map(r => ({ ...r, costo: 0 })) : []);
       setMetas(Array.isArray(metasRes) ? metasRes : []);

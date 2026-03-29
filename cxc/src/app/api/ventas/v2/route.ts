@@ -192,6 +192,11 @@ export async function GET(req: NextRequest) {
     offset += PAGE;
   }
   const currentRows = allCurrentRows;
+  console.log(`[ventas/v2] año=${año} filterEmpresa=${filterEmpresa} desde=${desdeParam} currentRows=${currentRows.length} pages=${Math.ceil(offset/PAGE)+1}`);
+  if (currentRows.length > 0) {
+    const empresas = [...new Set(currentRows.map(r => r.empresa))];
+    console.log(`[ventas/v2] empresas found: ${empresas.join(", ")}`);
+  }
   if (currentErr) {
     console.error("[ventas/v2] current year query error", currentErr.code, currentErr.message);
     if (currentErr.code === "42P01") return NextResponse.json({ byEmpresaMes: [], topClientes: [], prevYear: [], clientesDetalle: [] });
@@ -218,6 +223,8 @@ export async function GET(req: NextRequest) {
     prevOffset += PAGE;
   }
 
+  console.log(`[ventas/v2] prevRows=${allPrevRows.length}`);
+
   // ── Aggregate ────────────────────────────────────────────────────────────
   const rows = currentRows;
   const prev = allPrevRows;
@@ -226,11 +233,14 @@ export async function GET(req: NextRequest) {
   const clienteRows = desdeParam
     ? rows.filter(r => (r.fecha ?? "") >= desdeParam)
     : rows;
+  console.log(`[ventas/v2] clienteRows=${clienteRows.length} (desde=${desdeParam})`);
 
-  return NextResponse.json({
+  const result = {
     byEmpresaMes: aggregateByEmpresaMes(rows),
     topClientes: aggregateTopClientes(rows),
     prevYear: aggregatePrevYear(prev),
     clientesDetalle: aggregateClientesDetalle(clienteRows, rows),
-  });
+  };
+  console.log(`[ventas/v2] response: byEmpresaMes=${result.byEmpresaMes.length} topClientes=${result.topClientes.length} prevYear=${result.prevYear.length} clientesDetalle=${result.clientesDetalle.length}`);
+  return NextResponse.json(result);
 }
