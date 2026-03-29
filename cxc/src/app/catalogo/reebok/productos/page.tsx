@@ -21,6 +21,7 @@ function Productos() {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [gender, setGender] = useState(searchParams.get("gender") || "");
   const [category, setCategory] = useState("");
@@ -64,6 +65,11 @@ function Productos() {
   }, []);
 
   useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  useEffect(() => {
     async function load() {
       setLoading(true);
       try {
@@ -103,7 +109,7 @@ function Productos() {
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..."
+        <input value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Buscar..."
           className="border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition w-48" />
         <select value={gender} onChange={e => setGender(e.target.value)}
           className="border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition bg-transparent">
@@ -123,8 +129,8 @@ function Productos() {
           className={`text-xs px-3 py-1.5 rounded-full transition font-medium ${onlyOferta ? "bg-orange-500 text-white" : "border border-gray-200 text-gray-500 hover:border-gray-400"}`}>
           Oferta
         </button>
-        {(search || gender || category || onlyOferta) && (
-          <button onClick={() => { setSearch(""); setGender(""); setCategory(""); setOnlyOferta(false); }} className="text-xs text-gray-400 hover:text-black transition">Limpiar</button>
+        {(searchInput || gender || category || onlyOferta) && (
+          <button onClick={() => { setSearchInput(""); setSearch(""); setGender(""); setCategory(""); setOnlyOferta(false); }} className="text-xs text-gray-400 hover:text-black transition">Limpiar</button>
         )}
         <span className="text-xs text-gray-400 ml-auto">{filtered.length} productos</span>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Product } from "@/components/reebok/supabase";
 import NewOrderModal from "./NewOrderModal";
 
@@ -12,7 +12,7 @@ function getCachedQty(productId: string): number {
   } catch { return 0; }
 }
 
-export default function ProductCard({ product, stock = 0 }: { product: Product; stock?: number }) {
+export default React.memo(function ProductCard({ product, stock = 0 }: { product: Product; stock?: number }) {
   const [qty, setQty] = useState(() => getCachedQty(product.id));
   const [busy, setBusy] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
@@ -48,10 +48,13 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
   async function updateOrder(newQty: number) {
     const activeOrderId = localStorage.getItem("reebok_active_order_id");
     if (!activeOrderId) return;
+    // Optimistic update — show new qty immediately
+    const prevQty = qty;
+    setQty(newQty <= 0 ? 0 : newQty);
     setBusy(true);
     try {
       const res = await fetch(`/api/catalogo/reebok/orders/${activeOrderId}`);
-      if (!res.ok) { setBusy(false); return; }
+      if (!res.ok) { setQty(prevQty); setBusy(false); return; }
       const order = await res.json();
       const items = (order.reebok_order_items || []) as { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number }[];
       const idx = items.findIndex(i => i.product_id === product.id);
@@ -70,11 +73,16 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
       });
       if (putRes.ok) {
         localStorage.setItem("reebok_order_items", JSON.stringify(newItems));
-        setQty(newQty <= 0 ? 0 : newQty);
         if (newQty > 0 && idx < 0) window.dispatchEvent(new CustomEvent("reebok-toast", { detail: "Agregado" }));
         window.dispatchEvent(new Event("reebok-order-changed"));
+      } else {
+        // Revert on API failure
+        setQty(prevQty);
       }
-    } catch { /* */ }
+    } catch {
+      // Revert on network error
+      setQty(prevQty);
+    }
     setBusy(false);
   }
 
@@ -97,7 +105,7 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
             {stock > 0 ? "Disponible" : "Agotado"}
           </span>
           {product.image_url ? (
-            <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-2" />
+            <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-2" loading="lazy" />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-gray-300">
               <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
@@ -149,4 +157,4 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
       )}
     </>
   );
-}
+});

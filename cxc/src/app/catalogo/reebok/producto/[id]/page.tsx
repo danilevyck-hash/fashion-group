@@ -49,7 +49,7 @@ export default function ProductoDetalle() {
       <div className="grid md:grid-cols-2 gap-8">
         <div className="aspect-square bg-reebok-grey rounded-lg overflow-hidden">
           {product.image_url ? (
-            <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" />
+            <img src={product.image_url} alt={product.name} className="w-full h-full object-contain" loading="lazy" />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-gray-400">
               <svg className="w-24 h-24" fill="none" stroke="currentColor" viewBox="0 0 24 24">

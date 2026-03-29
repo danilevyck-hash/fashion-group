@@ -105,7 +105,7 @@ export default function VentasDashboard() {
 
   const [año, setAño] = useState(new Date().getFullYear());
   const [vista, setVista] = useState<"mensual" | "quarter">("mensual");
-  const [empresa, setEmpresa] = useState("all");
+  const [empresaFilter, setEmpresaFilter] = useState<string[]>([]); // empty = all
   const [loading, setLoading] = useState(true);
   const [ventas, setVentas] = useState<VentaRow[]>([]);
   const [ventasPrev, setVentasPrev] = useState<VentaRow[]>([]);
@@ -123,6 +123,7 @@ export default function VentasDashboard() {
   const [clientSortDir, setClientSortDir] = useState<"desc" | "asc">("desc");
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
+  const [clientPeriod, setClientPeriod] = useState<"3m" | "6m" | "12m" | "ytd">("12m");
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
@@ -133,9 +134,8 @@ export default function VentasDashboard() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const empQs = empresa !== "all" ? `&empresa=${encodeURIComponent(empresa)}` : "";
       const [v2Raw, metasRes] = await Promise.all([
-        fetch(`/api/ventas/v2?año=${año}${empQs}`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`/api/ventas/v2?año=${año}`).then(r => r.ok ? r.json() : null).catch(() => null),
         fetch(`/api/ventas/metas?año=${año}`).then(r => r.ok ? r.json() : []).catch(() => []),
       ]);
       const v2 = v2Raw as { byEmpresaMes?: VentaRow[]; prevYear?: { empresa: string; mes: number; subtotal: number; utilidad: number }[]; clientesDetalle?: ClienteDetalle[] } | null;
@@ -145,28 +145,62 @@ export default function VentasDashboard() {
       setClientesData(Array.isArray(v2?.clientesDetalle) ? v2.clientesDetalle : []);
     } catch { /* ignore */ }
     setLoading(false);
-  }, [año, empresa]);
+  }, [año]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const filtered = useMemo(() => empresa === "all" ? ventas : ventas.filter(r => r.empresa === empresa), [ventas, empresa]);
-  const filteredPrev = useMemo(() => empresa === "all" ? ventasPrev : ventasPrev.filter(r => r.empresa === empresa), [ventasPrev, empresa]);
-  const filteredMetas = useMemo(() => empresa === "all" ? metas : metas.filter(m => m.empresa === empresa), [metas, empresa]);
+  const filtered = useMemo(() => empresaFilter.length === 0 ? ventas : ventas.filter(r => empresaFilter.includes(r.empresa)), [ventas, empresaFilter]);
+  const filteredPrev = useMemo(() => empresaFilter.length === 0 ? ventasPrev : ventasPrev.filter(r => empresaFilter.includes(r.empresa)), [ventasPrev, empresaFilter]);
+  const filteredMetas = useMemo(() => empresaFilter.length === 0 ? metas : metas.filter(m => empresaFilter.includes(m.empresa)), [metas, empresaFilter]);
 
   const kpi = useMemo(() => calcKPIs(filtered, filteredPrev, filteredMetas, vista), [filtered, filteredPrev, filteredMetas, vista]);
   const table = useMemo(() => buildTable(filtered, filteredPrev, vista), [filtered, filteredPrev, vista]);
 
+  // Clientes period filter
+  const clientesPeriodFiltered = useMemo(() => {
+    const now = new Date();
+    let cutoff: string;
+    if (clientPeriod === "ytd") {
+      cutoff = `${now.getFullYear()}-01-01`;
+    } else {
+      const months = clientPeriod === "3m" ? 3 : clientPeriod === "6m" ? 6 : 12;
+      const d = new Date(now);
+      d.setMonth(d.getMonth() - months);
+      cutoff = d.toISOString().slice(0, 10);
+    }
+    // Filter: only clients with lastFecha >= cutoff
+    return clientesData.filter(c => c.lastFecha >= cutoff);
+  }, [clientesData, clientPeriod]);
+
   // Clientes logic
   const clientesFiltered = useMemo(() => {
-    let list = clientesData;
-    if (empresa !== "all") list = list.filter(c => c.empresas.some(e => e.empresa === empresa));
+    let list = clientesPeriodFiltered;
+    if (empresaFilter.length > 0) list = list.filter(c => c.empresas.some(e => empresaFilter.includes(e.empresa)));
     if (clientSearch) {
       const q = clientSearch.toLowerCase();
       list = list.filter(c => c.cliente.toLowerCase().includes(q));
     }
-    const totalVentas = list.reduce((s, c) => s + c.subtotal, 0);
+    // Filter out clients with subtotal <= 0
+    list = list.filter(c => c.subtotal > 0);
+    return list;
+  }, [clientesPeriodFiltered, empresaFilter, clientSearch]);
+
+  // KPI calculation (before user sort) — sort by subtotal desc for top client
+  const clientesForKPI = useMemo(() => {
+    return [...clientesFiltered].sort((a, b) => b.subtotal - a.subtotal);
+  }, [clientesFiltered]);
+
+  const totalVentas = clientesForKPI.reduce((s, c) => s + c.subtotal, 0);
+  const topClient = clientesForKPI[0] || null;
+  const top5Pct = totalVentas > 0 ? (clientesForKPI.slice(0, 5).reduce((s, c) => s + c.subtotal, 0) / totalVentas) * 100 : 0;
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
+  const inactiveClients = clientesForKPI.filter(c => c.lastFecha && c.lastFecha < sixtyDaysAgo);
+  const inactiveCount = inactiveClients.length;
+
+  // Apply user sort for table display
+  const clientesSorted = useMemo(() => {
     const dir = clientSortDir === "desc" ? -1 : 1;
-    list = [...list].sort((a, b) => {
+    return [...clientesFiltered].sort((a, b) => {
       switch (clientSort) {
         case "ventas": return (b.subtotal - a.subtotal) * dir;
         case "utilidad": return (b.utilidad - a.utilidad) * dir;
@@ -176,16 +210,9 @@ export default function VentasDashboard() {
         default: return 0;
       }
     });
-    return list;
-  }, [clientesData, empresa, clientSearch, clientSort, clientSortDir]);
+  }, [clientesFiltered, clientSort, clientSortDir]);
 
-  const totalVentas = clientesFiltered.reduce((s, c) => s + c.subtotal, 0);
-  const topClient = clientesFiltered[0] || null;
-  const top5Pct = totalVentas > 0 ? (clientesFiltered.slice(0, 5).reduce((s, c) => s + c.subtotal, 0) / totalVentas) * 100 : 0;
-  const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
-  const inactiveClients = clientesFiltered.filter(c => c.lastFecha && c.lastFecha < sixtyDaysAgo);
-  const inactiveCount = inactiveClients.length;
-  const displayClients = showInactive ? inactiveClients : clientesFiltered;
+  const displayClients = showInactive ? inactiveClients : clientesSorted;
 
   function toggleClientSort(col: typeof clientSort) {
     if (clientSort === col) setClientSortDir(d => d === "desc" ? "asc" : "desc");
@@ -243,7 +270,7 @@ export default function VentasDashboard() {
               className="text-xs border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-50 transition print:hidden">
               Cargar datos
             </button>
-            <button onClick={() => window.open(`/ventas/reporte?año=${año}&empresa=${empresa}&vista=${vista}`, "_blank")}
+            <button onClick={() => window.open(`/ventas/reporte?año=${año}&empresa=${empresaFilter.join(",") || "all"}&vista=${vista}`, "_blank")}
               className="text-xs border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-50 transition print:hidden">
               Imprimir
             </button>
@@ -268,11 +295,21 @@ export default function VentasDashboard() {
               </button>
             ))}
           </div>
-          <select value={empresa} onChange={e => setEmpresa(e.target.value)}
-            className="text-xs border border-gray-200 rounded-full px-3 py-1.5 bg-white">
-            <option value="all">Todas las empresas</option>
-            {EMPRESAS.map(e => <option key={e} value={e}>{e}</option>)}
-          </select>
+          <div className="flex flex-wrap gap-1.5">
+            <button onClick={() => setEmpresaFilter([])}
+              className={`px-3 py-1 text-xs rounded-full transition ${empresaFilter.length === 0 ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+              Todas
+            </button>
+            {EMPRESAS.map(e => {
+              const active = empresaFilter.includes(e);
+              return (
+                <button key={e} onClick={() => setEmpresaFilter(prev => active ? prev.filter(x => x !== e) : [...prev, e])}
+                  className={`px-3 py-1 text-xs rounded-full transition ${active ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                  {e.replace("International", "Intl.").replace("Confecciones ", "")}
+                </button>
+              );
+            })}
+          </div>
           {role === "admin" && (
             <button onClick={openMetas} className="ml-auto text-xs bg-black text-white rounded-full px-4 py-1.5 hover:bg-gray-800 transition">
               Editar metas
@@ -335,7 +372,7 @@ export default function VentasDashboard() {
                   </thead>
                   <tbody>
                     {table.tableRows.map(row => {
-                      if (row.total === 0 && empresa === "all") return null;
+                      if (row.total === 0 && empresaFilter.length === 0) return null;
                       return (
                         <tr key={row.empresa} className="border-b border-gray-50 hover:bg-gray-50/50">
                           <td className="px-3 py-2 font-medium text-gray-700 sticky left-0 bg-white whitespace-nowrap">{row.empresa}</td>
@@ -369,6 +406,16 @@ export default function VentasDashboard() {
         {/* Clientes Tab */}
         {activeTab === "clientes" && (
           <>
+            {/* Client Period Filter */}
+            <div className="flex gap-1.5 mb-4">
+              {(["3m", "6m", "12m", "ytd"] as const).map(p => (
+                <button key={p} onClick={() => setClientPeriod(p)}
+                  className={`px-3 py-1 text-xs rounded-full transition ${clientPeriod === p ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500"}`}>
+                  {p === "3m" ? "Últ. 3 meses" : p === "6m" ? "Últ. 6 meses" : p === "12m" ? "Últ. 12 meses" : "Este año"}
+                </button>
+              ))}
+            </div>
+
             {/* Client KPIs */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
               <div className="bg-gray-50 rounded-xl p-4">
