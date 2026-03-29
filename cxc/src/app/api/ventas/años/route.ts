@@ -2,16 +2,19 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export async function GET() {
+  // Try ventas_raw first (new system)
   const { data, error } = await supabaseServer
-    .from("ventas_mensuales")
-    .select("año")
-    .order("año", { ascending: false });
+    .from("ventas_raw")
+    .select("anio");
 
-  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
+  if (error) {
+    console.error("[ventas/años]", error.code, error.message);
+    // Fallback to current year
+    return NextResponse.json([new Date().getFullYear()]);
+  }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const years = [...new Set((data || []).map((r: any) => r.año as number))];
+  const years = [...new Set((data || []).map((r: { anio: number }) => r.anio))];
   const currentYear = new Date().getFullYear();
-  if (!years.includes(currentYear)) years.unshift(currentYear);
+  if (!years.includes(currentYear)) years.push(currentYear);
   return NextResponse.json(years.sort((a, b) => b - a));
 }

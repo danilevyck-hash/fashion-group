@@ -10,7 +10,7 @@ import { SkeletonTable, SkeletonKPI, Toast, Modal } from "@/components/ui";
 const EMPRESAS = ["Vistana International", "Fashion Wear", "Fashion Shoes", "Active Shoes", "Active Wear", "Joystep", "Confecciones Boston", "Multifashion"];
 const MES_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-interface VentaRow { empresa: string; año: number; mes: number; ventas_brutas: number; notas_credito: number; notas_debito: number; costo_total: number; }
+interface VentaRow { empresa: string; mes: number; subtotal: number; costo: number; utilidad: number; }
 interface MetaRow { empresa: string; año: number; mes: number; meta: number; }
 interface ClienteDetalle {
   cliente: string;
@@ -20,8 +20,8 @@ interface ClienteDetalle {
   empresas: { empresa: string; subtotal: number; utilidad: number; lastFecha: string }[];
 }
 
-function netas(r: VentaRow) { return r.ventas_brutas - r.notas_credito + r.notas_debito; }
-function utilidad(r: VentaRow) { return netas(r) - r.costo_total; }
+function netas(r: VentaRow) { return r.subtotal; }
+function utilidad(r: VentaRow) { return r.utilidad; }
 function fmtK(n: number) { if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`; if (Math.abs(n) >= 1000) return `$${(n / 1000).toFixed(0)}k`; return `$${fmt(n)}`; }
 
 // ── Helpers ──
@@ -133,17 +133,16 @@ export default function VentasDashboard() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const qs = empresa !== "all" ? `&empresa=${encodeURIComponent(empresa)}` : "";
-      const [curr, prev, metasRes, v2Res] = await Promise.all([
-        fetch(`/api/ventas?año=${año}${qs}`).then(r => r.json()),
-        fetch(`/api/ventas?año=${año - 1}${qs}`).then(r => r.json()),
-        fetch(`/api/ventas/metas?año=${año}`).then(r => r.json()),
-        fetch(`/api/ventas/v2?año=${año}`).then(r => r.json()).catch(() => ({})),
+      const empQs = empresa !== "all" ? `&empresa=${encodeURIComponent(empresa)}` : "";
+      const [v2Raw, metasRes] = await Promise.all([
+        fetch(`/api/ventas/v2?año=${año}${empQs}`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`/api/ventas/metas?año=${año}`).then(r => r.ok ? r.json() : []).catch(() => []),
       ]);
-      setVentas(Array.isArray(curr) ? curr : []);
-      setVentasPrev(Array.isArray(prev) ? prev : []);
+      const v2 = v2Raw as { byEmpresaMes?: VentaRow[]; prevYear?: { empresa: string; mes: number; subtotal: number }[]; clientesDetalle?: ClienteDetalle[] } | null;
+      setVentas(Array.isArray(v2?.byEmpresaMes) ? v2.byEmpresaMes : []);
+      setVentasPrev(Array.isArray(v2?.prevYear) ? v2.prevYear.map(r => ({ ...r, costo: 0, utilidad: 0 })) : []);
       setMetas(Array.isArray(metasRes) ? metasRes : []);
-      setClientesData(Array.isArray(v2Res?.clientesDetalle) ? v2Res.clientesDetalle : []);
+      setClientesData(Array.isArray(v2?.clientesDetalle) ? v2.clientesDetalle : []);
     } catch { /* ignore */ }
     setLoading(false);
   }, [año, empresa]);
