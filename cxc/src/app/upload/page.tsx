@@ -245,7 +245,7 @@ function UploadPageInner() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Error al cargar");
       setMessage({ text: `${file.name}: ${json.count} registros cargados para ${empresaName}`, type: "ok" });
-      loadVentasStatus();
+      await loadVentasStatus();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
       setMessage({ text: msg, type: "err" });

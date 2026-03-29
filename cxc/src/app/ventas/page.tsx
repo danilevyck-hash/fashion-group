@@ -60,7 +60,8 @@ function calcKPIs(rows: VentaRow[], prevRows: VentaRow[], metaRows: MetaRow[], v
   const metaTotal = metaRows.reduce((s, m) => s + (m.meta || 0), 0);
   const vsMeta = metaTotal ? (ventasNetas / metaTotal) * 100 : 0;
 
-  return { ventasNetas, vsAnterior, totalUtil, utilVsAnt, margenDisplay, margenFlag, metaTotal, vsMeta };
+  const hasPrevData = comparablePrev.length > 0;
+  return { ventasNetas, vsAnterior, totalUtil, utilVsAnt, margenDisplay, margenFlag, metaTotal, vsMeta, monthsWithData, hasPrevData };
 }
 
 function buildTable(rows: VentaRow[], prevRows: VentaRow[], vista: "mensual" | "quarter") {
@@ -295,6 +296,22 @@ export default function VentasDashboard() {
               </div>
             ))}
           </div>
+        )}
+
+        {/* Period indicator */}
+        {!loading && kpi.monthsWithData.length > 0 && (
+          <p className="text-[11px] text-gray-400 mb-4">
+            Mostrando {(() => {
+              const sorted = [...kpi.monthsWithData].sort((a, b) => a - b);
+              const from = MES_NAMES[sorted[0] - 1];
+              const to = MES_NAMES[sorted[sorted.length - 1] - 1];
+              const range = sorted.length === 1 ? `${from} ${año}` : `${from} – ${to} ${año}`;
+              const prev = kpi.hasPrevData
+                ? ` · comparando vs ${sorted.length === 1 ? `${from} ${año - 1}` : `${from} – ${to} ${año - 1}`}`
+                : " · sin datos comparativos";
+              return range + prev;
+            })()}
+          </p>
         )}
 
         {/* Tab Bar */}

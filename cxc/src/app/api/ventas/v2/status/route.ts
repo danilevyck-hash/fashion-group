@@ -4,11 +4,12 @@ import { supabaseServer } from "@/lib/supabase-server";
 export async function GET() {
   // Get latest fecha per empresa from ventas_raw
   // Use a limited query to avoid full table scan
+  // Only need latest fecha per empresa — use distinct ordering
   const { data, error } = await supabaseServer
     .from("ventas_raw")
     .select("empresa, fecha, uploaded_at")
     .order("fecha", { ascending: false })
-    .limit(500);
+    .limit(1000);
 
   if (error) {
     console.error("[ventas/v2/status] FULL ERROR:", JSON.stringify(error));

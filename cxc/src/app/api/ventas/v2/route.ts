@@ -151,14 +151,25 @@ export async function GET(req: NextRequest) {
   const filterEmpresa = empresaParam && empresaParam !== "all" ? empresaParam : null;
 
   // ── Fetch current year rows ──────────────────────────────────────────────
-  let qCurrent = supabaseServer
-    .from("ventas_raw")
-    .select("empresa, mes, subtotal, costo, utilidad, cliente, tipo, fecha")
-    .eq("anio", año);
-
-  if (filterEmpresa) qCurrent = qCurrent.eq("empresa", filterEmpresa);
-
-  const { data: currentRows, error: currentErr } = await qCurrent;
+  // Fetch ALL rows for the year — Supabase default limit is 1000, so paginate
+  let allCurrentRows: VentasRawRow[] = [];
+  let currentErr: { code: string; message: string } | null = null;
+  const PAGE = 10000;
+  let offset = 0;
+  while (true) {
+    let q = supabaseServer
+      .from("ventas_raw")
+      .select("empresa, mes, subtotal, costo, utilidad, cliente, tipo, fecha")
+      .eq("anio", año)
+      .range(offset, offset + PAGE - 1);
+    if (filterEmpresa) q = q.eq("empresa", filterEmpresa);
+    const { data, error } = await q;
+    if (error) { currentErr = error; break; }
+    allCurrentRows = allCurrentRows.concat((data ?? []) as VentasRawRow[]);
+    if (!data || data.length < PAGE) break;
+    offset += PAGE;
+  }
+  const currentRows = allCurrentRows;
   if (currentErr) {
     console.error("[ventas/v2] current year query error", currentErr.code, currentErr.message);
     if (currentErr.code === "42P01") return NextResponse.json({ byEmpresaMes: [], topClientes: [], prevYear: [], clientesDetalle: [] });
@@ -166,22 +177,28 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Fetch previous year rows (subtotal only, for comparison) ─────────────
-  let qPrev = supabaseServer
-    .from("ventas_raw")
-    .select("empresa, mes, subtotal")
-    .eq("anio", año - 1);
-
-  if (filterEmpresa) qPrev = qPrev.eq("empresa", filterEmpresa);
-
-  const { data: prevRows, error: prevErr } = await qPrev;
-  if (prevErr) {
-    console.error("[ventas/v2] prev year query error", prevErr.code, prevErr.message);
-    // Non-fatal — proceed with empty prev data
+  let allPrevRows: VentasRawRow[] = [];
+  let prevOffset = 0;
+  while (true) {
+    let q = supabaseServer
+      .from("ventas_raw")
+      .select("empresa, mes, subtotal")
+      .eq("anio", año - 1)
+      .range(prevOffset, prevOffset + PAGE - 1);
+    if (filterEmpresa) q = q.eq("empresa", filterEmpresa);
+    const { data, error } = await q;
+    if (error) {
+      console.error("[ventas/v2] prev year query error", error.code, error.message);
+      break;
+    }
+    allPrevRows = allPrevRows.concat((data ?? []) as VentasRawRow[]);
+    if (!data || data.length < PAGE) break;
+    prevOffset += PAGE;
   }
 
   // ── Aggregate ────────────────────────────────────────────────────────────
-  const rows = (currentRows ?? []) as VentasRawRow[];
-  const prev = (prevRows ?? []) as VentasRawRow[];
+  const rows = currentRows;
+  const prev = allPrevRows;
 
   return NextResponse.json({
     byEmpresaMes: aggregateByEmpresaMes(rows),
