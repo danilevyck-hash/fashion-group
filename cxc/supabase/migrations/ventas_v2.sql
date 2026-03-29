@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS ventas_raw (
   quarter integer NOT NULL,
   tipo text NOT NULL,
   n_sistema text,
+  n_fiscal text,
   vendedor text,
   cliente text,
   costo numeric(12,2),
@@ -16,6 +17,7 @@ CREATE TABLE IF NOT EXISTS ventas_raw (
   total numeric(12,2),
   utilidad numeric(12,2),
   pct_utilidad numeric(8,4),
+  uploaded_by uuid,
   uploaded_at timestamptz DEFAULT now()
 );
 

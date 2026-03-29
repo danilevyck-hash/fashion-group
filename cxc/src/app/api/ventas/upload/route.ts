@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { requireAuth } from "@/lib/require-auth";
+import { requireAuth, getSession } from "@/lib/require-auth";
 import * as XLSX from "xlsx-js-style";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface RawRow {
   empresa: string;
-  fecha: string; // ISO date string
+  fecha: string;
   anio: number;
   mes: number;
-  trimestre: number;
+  quarter: number;
   tipo: string;
-  sucursal: string;
   n_sistema: string;
   n_fiscal: string;
   vendedor: string;
@@ -84,16 +83,15 @@ function parseCSV(text: string, empresa: string): RawRow[] {
     const dateObj = new Date(fechaISO);
     const mes = dateObj.getMonth() + 1;
     const año = dateObj.getFullYear();
-    const trimestre = Math.ceil(mes / 3);
+    const quarter = Math.ceil(mes / 3);
 
     rows.push({
       empresa,
       fecha: fechaISO,
       anio: año,
       mes,
-      trimestre,
+      quarter,
       tipo,
-      sucursal: get("SUCURSAL"),
       n_sistema: get("N.SISTEMA"),
       n_fiscal: get("N.FISCAL"),
       vendedor: get("VENDEDOR"),
@@ -149,7 +147,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): RawRow[] {
     const dateObj = new Date(fechaISO);
     const mes = dateObj.getMonth() + 1;
     const año = dateObj.getFullYear();
-    const trimestre = Math.ceil(mes / 3);
+    const quarter = Math.ceil(mes / 3);
 
     // Try both possible column name variants for % UTILIDAD
     const pctKey = headers.find((h) => h.includes("UTILIDAD") && h.includes("%")) ?? "";
@@ -160,9 +158,8 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): RawRow[] {
       fecha: fechaISO,
       anio: año,
       mes,
-      trimestre,
+      quarter,
       tipo,
-      sucursal: get("SUCURSAL"),
       n_sistema: get("N.SISTEMA"),
       n_fiscal: get("N.FISCAL"),
       vendedor: get("VENDEDOR"),
@@ -185,6 +182,9 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): RawRow[] {
 export async function POST(req: NextRequest) {
   const authError = requireAuth(req, ["admin", "upload", "secretaria"]);
   if (authError) return authError;
+
+  const session = getSession(req);
+  const uploadedBy = session?.userId || null;
 
   let empresa: string;
   let rows: RawRow[];
@@ -221,7 +221,7 @@ export async function POST(req: NextRequest) {
   const BATCH = 500;
   let inserted = 0;
   for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH);
+    const batch = rows.slice(i, i + BATCH).map(r => ({ ...r, uploaded_by: uploadedBy }));
     const { error: upsErr } = await supabaseServer
       .from("ventas_raw")
       .upsert(batch, { onConflict: "n_sistema,empresa", ignoreDuplicates: true });
