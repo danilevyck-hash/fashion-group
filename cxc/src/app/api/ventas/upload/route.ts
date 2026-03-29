@@ -72,6 +72,7 @@ function parseCSV(text: string, empresa: string): RawRow[] {
     const subtotal = toNum(get("SUBTOTAL"));
     const utilidad = toNum(get("UTILIDAD"));
     if (subtotal === 0 && utilidad === 0) continue;
+    if (Math.abs(subtotal) < 1.00) continue;
 
     const tipo = normTipo(get("TIPO"));
     if (!VALID_TIPOS.has(tipo)) continue;
@@ -102,7 +103,7 @@ function parseCSV(text: string, empresa: string): RawRow[] {
       itbms: toNum(get("ITBMS")),
       total: toNum(get("TOTAL")),
       utilidad,
-      pct_utilidad: (() => { const v = toNum(get("% UTILIDAD") || get("%  UTILIDAD") || get("% UTILIDAD")); return Math.abs(v) > 999.99 ? null : v; })(),
+      pct_utilidad: (() => { const v = Math.abs(toNum(get("% UTILIDAD") || get("%  UTILIDAD") || get("% UTILIDAD"))); return v > 999.99 ? null : v; })(),
     });
   }
 
@@ -136,6 +137,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): RawRow[] {
     const subtotal = getNum("SUBTOTAL");
     const utilidad = getNum("UTILIDAD");
     if (subtotal === 0 && utilidad === 0) continue;
+    if (Math.abs(subtotal) < 1.00) continue;
 
     const tipo = normTipo(get("TIPO"));
     if (!VALID_TIPOS.has(tipo)) continue;
@@ -152,7 +154,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): RawRow[] {
     // Try both possible column name variants for % UTILIDAD
     const pctKey = headers.find((h) => h.includes("UTILIDAD") && h.includes("%")) ?? "";
     const pctRaw = pctKey ? toNum(cols[headers.indexOf(pctKey)]) : 0;
-    const pct_utilidad = Math.abs(pctRaw) > 999.99 ? null : pctRaw;
+    const pct_utilidad = Math.abs(pctRaw) > 999.99 ? null : Math.abs(pctRaw);
 
     rows.push({
       empresa,
