@@ -89,22 +89,31 @@ function aggregateTopClientes(rows: VentasRawRow[], topN = 10): ClienteAgg[] {
     .slice(0, topN);
 }
 
-function aggregateClientesDetalle(rows: VentasRawRow[]): ClienteDetalle[] {
-  const map = new Map<string, { subtotal: number; utilidad: number; lastFecha: string; empresas: Map<string, { subtotal: number; utilidad: number; lastFecha: string }> }>();
-
-  for (const r of rows) {
+function aggregateClientesDetalle(filteredRows: VentasRawRow[], allRows: VentasRawRow[]): ClienteDetalle[] {
+  // Build lastFecha map from ALL rows (no period filter)
+  const lastFechaMap = new Map<string, string>();
+  const lastFechaEmpMap = new Map<string, string>();
+  for (const r of allRows) {
     const key = (r.cliente ?? "").trim() || "(Sin nombre)";
-    if (!map.has(key)) map.set(key, { subtotal: 0, utilidad: 0, lastFecha: "", empresas: new Map() });
+    const prev = lastFechaMap.get(key) || "";
+    if ((r.fecha ?? "") > prev) lastFechaMap.set(key, r.fecha ?? "");
+    const empKey = `${key}|${r.empresa}`;
+    const prevE = lastFechaEmpMap.get(empKey) || "";
+    if ((r.fecha ?? "") > prevE) lastFechaEmpMap.set(empKey, r.fecha ?? "");
+  }
+
+  // Aggregate subtotal/utilidad from filtered rows only
+  const map = new Map<string, { subtotal: number; utilidad: number; empresas: Map<string, { subtotal: number; utilidad: number }> }>();
+  for (const r of filteredRows) {
+    const key = (r.cliente ?? "").trim() || "(Sin nombre)";
+    if (!map.has(key)) map.set(key, { subtotal: 0, utilidad: 0, empresas: new Map() });
     const c = map.get(key)!;
     c.subtotal += r.subtotal ?? 0;
     c.utilidad += r.utilidad ?? 0;
-    if ((r.fecha ?? "") > c.lastFecha) c.lastFecha = r.fecha ?? "";
-
-    if (!c.empresas.has(r.empresa)) c.empresas.set(r.empresa, { subtotal: 0, utilidad: 0, lastFecha: "" });
+    if (!c.empresas.has(r.empresa)) c.empresas.set(r.empresa, { subtotal: 0, utilidad: 0 });
     const e = c.empresas.get(r.empresa)!;
     e.subtotal += r.subtotal ?? 0;
     e.utilidad += r.utilidad ?? 0;
-    if ((r.fecha ?? "") > e.lastFecha) e.lastFecha = r.fecha ?? "";
   }
 
   return [...map.entries()]
@@ -112,8 +121,11 @@ function aggregateClientesDetalle(rows: VentasRawRow[]): ClienteDetalle[] {
       cliente,
       subtotal: d.subtotal,
       utilidad: d.utilidad,
-      lastFecha: d.lastFecha,
-      empresas: [...d.empresas.entries()].map(([empresa, ed]) => ({ empresa, ...ed })).sort((a, b) => b.subtotal - a.subtotal),
+      lastFecha: lastFechaMap.get(cliente) || "",
+      empresas: [...d.empresas.entries()].map(([empresa, ed]) => ({
+        empresa, ...ed,
+        lastFecha: lastFechaEmpMap.get(`${cliente}|${empresa}`) || "",
+      })).sort((a, b) => b.subtotal - a.subtotal),
     }))
     .sort((a, b) => b.subtotal - a.subtotal);
 }
@@ -212,6 +224,6 @@ export async function GET(req: NextRequest) {
     byEmpresaMes: aggregateByEmpresaMes(rows),
     topClientes: aggregateTopClientes(rows),
     prevYear: aggregatePrevYear(prev),
-    clientesDetalle: aggregateClientesDetalle(clienteRows),
+    clientesDetalle: aggregateClientesDetalle(clienteRows, rows),
   });
 }
