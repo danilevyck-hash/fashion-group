@@ -93,12 +93,12 @@ const CLIENTES_INTERNOS = new Set(["CONFECCIONES BOSTON", "MULTI FASHION HOLDING
 
 function aggregateClientesDetalle(
   filteredRows: VentasRawRow[],
-  allYearRows: VentasRawRow[],
+  historicalDates: { cliente: string; empresa: string; fecha: string }[],
 ): ClienteDetalle[] {
-  // Build lastFecha map from ALL rows of the year (not period-filtered)
+  // Build lastFecha map from historical dates (all time, ordered desc, limited)
   const lastFechaMap = new Map<string, string>();
   const lastFechaEmpMap = new Map<string, string>();
-  for (const r of allYearRows) {
+  for (const r of historicalDates) {
     const key = (r.cliente ?? "").trim() || "(Sin nombre)";
     if (CLIENTES_INTERNOS.has(key.toUpperCase())) continue;
     const prev = lastFechaMap.get(key) || "";
@@ -225,6 +225,15 @@ export async function GET(req: NextRequest) {
 
   console.log(`[ventas/v2] prevRows=${allPrevRows.length}`);
 
+  // ── Fetch historical last-fecha per client (ordered desc, limited) ──────
+  const { data: lastDates } = await supabaseServer
+    .from("ventas_raw")
+    .select("cliente, empresa, fecha")
+    .gte("anio", 2022)
+    .order("fecha", { ascending: false })
+    .limit(10000);
+  console.log(`[ventas/v2] lastDates=${(lastDates ?? []).length}`);
+
   // ── Aggregate ────────────────────────────────────────────────────────────
   const rows = currentRows;
   const prev = allPrevRows;
@@ -239,7 +248,7 @@ export async function GET(req: NextRequest) {
     byEmpresaMes: aggregateByEmpresaMes(rows),
     topClientes: aggregateTopClientes(rows),
     prevYear: aggregatePrevYear(prev),
-    clientesDetalle: aggregateClientesDetalle(clienteRows, rows),
+    clientesDetalle: aggregateClientesDetalle(clienteRows, lastDates ?? []),
   };
   console.log(`[ventas/v2] response: byEmpresaMes=${result.byEmpresaMes.length} topClientes=${result.topClientes.length} prevYear=${result.prevYear.length} clientesDetalle=${result.clientesDetalle.length}`);
   return NextResponse.json(result);
