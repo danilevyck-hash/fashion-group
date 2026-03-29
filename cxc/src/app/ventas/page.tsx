@@ -138,9 +138,9 @@ export default function VentasDashboard() {
         fetch(`/api/ventas/v2?año=${año}${empQs}`).then(r => r.ok ? r.json() : null).catch(() => null),
         fetch(`/api/ventas/metas?año=${año}`).then(r => r.ok ? r.json() : []).catch(() => []),
       ]);
-      const v2 = v2Raw as { byEmpresaMes?: VentaRow[]; prevYear?: { empresa: string; mes: number; subtotal: number }[]; clientesDetalle?: ClienteDetalle[] } | null;
+      const v2 = v2Raw as { byEmpresaMes?: VentaRow[]; prevYear?: { empresa: string; mes: number; subtotal: number; utilidad: number }[]; clientesDetalle?: ClienteDetalle[] } | null;
       setVentas(Array.isArray(v2?.byEmpresaMes) ? v2.byEmpresaMes : []);
-      setVentasPrev(Array.isArray(v2?.prevYear) ? v2.prevYear.map(r => ({ ...r, costo: 0, utilidad: 0 })) : []);
+      setVentasPrev(Array.isArray(v2?.prevYear) ? v2.prevYear.map(r => ({ ...r, costo: 0 })) : []);
       setMetas(Array.isArray(metasRes) ? metasRes : []);
       setClientesData(Array.isArray(v2?.clientesDetalle) ? v2.clientesDetalle : []);
     } catch { /* ignore */ }
@@ -342,7 +342,7 @@ export default function VentasDashboard() {
                           {row.values.map((v, i) => {
                             const prev = row.prevValues[i];
                             const drop = v > 0 && prev > 0 && v < prev * 0.85;
-                            return <td key={i} className="text-right px-2 py-2 tabular-nums text-gray-600">{v ? fmtK(v) : "—"}{drop ? " ↓" : ""}</td>;
+                            return <td key={i} className="text-right px-2 py-2 tabular-nums text-gray-600">{v > 0 ? fmtK(v) : "—"}{drop ? " ↓" : ""}</td>;
                           })}
                           <td className="text-right px-3 py-2 font-medium tabular-nums">{fmtK(row.total)}</td>
                           <td className={`text-right px-3 py-2 tabular-nums ${row.margen < 15 ? "bg-red-50 text-red-600" : "text-gray-600"}`}>

@@ -2,19 +2,32 @@ import { NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export async function GET() {
-  // Try ventas_raw first (new system)
-  const { data, error } = await supabaseServer
-    .from("ventas_raw")
-    .select("anio");
+  // Fetch all distinct years from ventas_raw — paginate to get all rows
+  const years = new Set<number>();
+  let offset = 0;
+  const PAGE = 1000;
 
-  if (error) {
-    console.error("[ventas/años]", error.code, error.message);
-    // Fallback to current year
-    return NextResponse.json([new Date().getFullYear()]);
+  while (true) {
+    const { data, error } = await supabaseServer
+      .from("ventas_raw")
+      .select("anio")
+      .range(offset, offset + PAGE - 1);
+
+    if (error) {
+      console.error("[ventas/años]", error.code, error.message);
+      break;
+    }
+
+    for (const r of data ?? []) {
+      years.add(r.anio);
+    }
+
+    if (!data || data.length < PAGE) break;
+    offset += PAGE;
   }
 
-  const years = [...new Set((data || []).map((r: { anio: number }) => r.anio))];
   const currentYear = new Date().getFullYear();
-  if (!years.includes(currentYear)) years.push(currentYear);
-  return NextResponse.json(years.sort((a, b) => b - a));
+  years.add(currentYear);
+
+  return NextResponse.json([...years].sort((a, b) => b - a));
 }

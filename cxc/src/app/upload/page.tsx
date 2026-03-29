@@ -36,6 +36,7 @@ interface UploadStatus {
 interface VentasStatus {
   date: string;
   label: string;
+  count?: number;
 }
 
 // ── Inner component (needs useSearchParams inside Suspense) ───────────────────
@@ -273,9 +274,10 @@ function UploadPageInner() {
       if (!up) return <div className="flex items-center gap-1.5 text-xs text-gray-400"><span className="opacity-50">&#9898;</span> Sin datos</div>;
       const days = (Date.now() - new Date(up.date).getTime()) / 86400000;
       const thresholds = key === "multifashion" ? { warn: 7, alert: 14 } : { warn: 30, alert: 60 };
-      if (days > thresholds.alert) return <div className="flex items-center gap-1.5 text-xs text-red-600"><span>&#128308;</span> Atrasado &middot; {up.label}</div>;
-      if (days > thresholds.warn) return <div className="flex items-center gap-1.5 text-xs text-amber-600"><span>&#9888;&#65039;</span> Pendiente &middot; {up.label}</div>;
-      return <div className="flex items-center gap-1.5 text-xs text-green-600"><span>&#9989;</span> Al dia &middot; {up.label}</div>;
+      const detail = `${up.label}${up.count ? ` · ${up.count} reg.` : ""}`;
+      if (days > thresholds.alert) return <div className="flex items-center gap-1.5 text-xs text-red-600"><span>&#128308;</span> Atrasado &middot; {detail}</div>;
+      if (days > thresholds.warn) return <div className="flex items-center gap-1.5 text-xs text-amber-600"><span>&#9888;&#65039;</span> Pendiente &middot; {detail}</div>;
+      return <div className="flex items-center gap-1.5 text-xs text-green-600"><span>&#9989;</span> Al dia &middot; {detail}</div>;
     }
   }
 

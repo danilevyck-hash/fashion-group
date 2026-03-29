@@ -41,6 +41,7 @@ interface PrevYearAgg {
   empresa: string;
   mes: number;
   subtotal: number;
+  utilidad: number;
 }
 
 // ─── Aggregation helpers ──────────────────────────────────────────────────────
@@ -125,8 +126,9 @@ function aggregatePrevYear(rows: VentasRawRow[]): PrevYearAgg[] {
     const existing = map.get(key);
     if (existing) {
       existing.subtotal += r.subtotal ?? 0;
+      existing.utilidad += r.utilidad ?? 0;
     } else {
-      map.set(key, { empresa: r.empresa, mes: r.mes, subtotal: r.subtotal ?? 0 });
+      map.set(key, { empresa: r.empresa, mes: r.mes, subtotal: r.subtotal ?? 0, utilidad: r.utilidad ?? 0 });
     }
   }
 
@@ -151,10 +153,10 @@ export async function GET(req: NextRequest) {
   const filterEmpresa = empresaParam && empresaParam !== "all" ? empresaParam : null;
 
   // ── Fetch current year rows ──────────────────────────────────────────────
-  // Fetch ALL rows for the year — Supabase default limit is 1000, so paginate
+  // Supabase default limit is 1000 rows — paginate in chunks of 1000
   let allCurrentRows: VentasRawRow[] = [];
   let currentErr: { code: string; message: string } | null = null;
-  const PAGE = 10000;
+  const PAGE = 1000;
   let offset = 0;
   while (true) {
     let q = supabaseServer
@@ -176,13 +178,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 
-  // ── Fetch previous year rows (subtotal only, for comparison) ─────────────
+  // ── Fetch previous year rows (subtotal + utilidad for margin comparison) ──
   let allPrevRows: VentasRawRow[] = [];
   let prevOffset = 0;
   while (true) {
     let q = supabaseServer
       .from("ventas_raw")
-      .select("empresa, mes, subtotal")
+      .select("empresa, mes, subtotal, utilidad")
       .eq("anio", año - 1)
       .range(prevOffset, prevOffset + PAGE - 1);
     if (filterEmpresa) q = q.eq("empresa", filterEmpresa);

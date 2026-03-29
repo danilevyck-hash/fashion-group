@@ -3,32 +3,39 @@ import { supabaseServer } from "@/lib/supabase-server";
 
 export async function GET() {
   // Get latest fecha per empresa from ventas_raw
-  // Use a limited query to avoid full table scan
-  // Only need latest fecha per empresa — use distinct ordering
-  const { data, error } = await supabaseServer
-    .from("ventas_raw")
-    .select("empresa, fecha, uploaded_at")
-    .order("fecha", { ascending: false })
-    .limit(1000);
+  // Paginate to ensure all empresas are covered
+  const latest: Record<string, { date: string; label: string; count: number }> = {};
+  let offset = 0;
+  const PAGE = 1000;
 
-  if (error) {
-    console.error("[ventas/v2/status] FULL ERROR:", JSON.stringify(error));
-    console.error("[ventas/v2/status] code:", error.code, "message:", error.message, "details:", error.details, "hint:", error.hint);
-    return NextResponse.json({});
-  }
+  while (true) {
+    const { data, error } = await supabaseServer
+      .from("ventas_raw")
+      .select("empresa, fecha, uploaded_at")
+      .order("fecha", { ascending: false })
+      .range(offset, offset + PAGE - 1);
 
-  // Group by empresa, take latest fecha
-  const latest: Record<string, { date: string; label: string }> = {};
-  for (const row of data ?? []) {
-    if (!latest[row.empresa]) {
-      const d = new Date(row.fecha);
-      const mes = d.toLocaleDateString("es-PA", { month: "short" });
-      const año = d.getFullYear();
-      latest[row.empresa] = {
-        date: row.uploaded_at || row.fecha,
-        label: `${mes} ${año}`,
-      };
+    if (error) {
+      console.error("[ventas/v2/status]", error.code, error.message);
+      break;
     }
+
+    for (const row of data ?? []) {
+      if (!latest[row.empresa]) {
+        const d = new Date(row.fecha);
+        const mes = d.toLocaleDateString("es-PA", { month: "short" });
+        const año = d.getFullYear();
+        latest[row.empresa] = {
+          date: row.uploaded_at || row.fecha,
+          label: `${mes} ${año}`,
+          count: 0,
+        };
+      }
+      latest[row.empresa].count++;
+    }
+
+    if (!data || data.length < PAGE) break;
+    offset += PAGE;
   }
 
   return NextResponse.json(latest);
