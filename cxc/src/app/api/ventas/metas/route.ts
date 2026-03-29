@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabaseServer
     .from("ventas_metas")
     .select("*")
-    .eq("año", parseInt(anio, 10))
+    .eq("anio", parseInt(anio, 10))
     .order("empresa", { ascending: true })
     .order("mes", { ascending: true });
 
@@ -41,8 +41,8 @@ export async function POST(req: NextRequest) {
   const { error } = await supabaseServer
     .from("ventas_metas")
     .upsert(
-      records.map((r) => ({ empresa: r.empresa, año: r.año, mes: r.mes, meta: r.meta ?? 0 })),
-      { onConflict: "empresa,año,mes" }
+      records.map((r) => ({ empresa: r.empresa, anio: r.año, mes: r.mes, meta: r.meta ?? 0 })),
+      { onConflict: "empresa,anio,mes" }
     );
 
   if (error) {
@@ -69,7 +69,7 @@ export async function DELETE(req: NextRequest) {
     .from("ventas_metas")
     .delete()
     .eq("empresa", empresa)
-    .eq("año", parseInt(anio, 10))
+    .eq("anio", parseInt(anio, 10))
     .eq("mes", parseInt(mes, 10));
 
   if (error) {
