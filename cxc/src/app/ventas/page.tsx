@@ -131,11 +131,21 @@ export default function VentasDashboard() {
     fetch("/api/ventas/años").then(r => r.json()).then(setAños).catch(() => {});
   }, []);
 
+  // Compute desde cutoff for clientes
+  const desdeStr = useMemo(() => {
+    const now = new Date();
+    if (clientPeriod === "ytd") return `${now.getFullYear()}-01-01`;
+    const months = clientPeriod === "3m" ? 3 : clientPeriod === "6m" ? 6 : 12;
+    const d = new Date(now);
+    d.setMonth(d.getMonth() - months);
+    return d.toISOString().slice(0, 10);
+  }, [clientPeriod]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [v2Raw, metasRes] = await Promise.all([
-        fetch(`/api/ventas/v2?año=${año}`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`/api/ventas/v2?año=${año}&desde=${desdeStr}`).then(r => r.ok ? r.json() : null).catch(() => null),
         fetch(`/api/ventas/metas?año=${año}`).then(r => r.ok ? r.json() : []).catch(() => []),
       ]);
       const v2 = v2Raw as { byEmpresaMes?: VentaRow[]; prevYear?: { empresa: string; mes: number; subtotal: number; utilidad: number }[]; clientesDetalle?: ClienteDetalle[] } | null;
@@ -145,7 +155,7 @@ export default function VentasDashboard() {
       setClientesData(Array.isArray(v2?.clientesDetalle) ? v2.clientesDetalle : []);
     } catch { /* ignore */ }
     setLoading(false);
-  }, [año]);
+  }, [año, desdeStr]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -156,25 +166,9 @@ export default function VentasDashboard() {
   const kpi = useMemo(() => calcKPIs(filtered, filteredPrev, filteredMetas, vista), [filtered, filteredPrev, filteredMetas, vista]);
   const table = useMemo(() => buildTable(filtered, filteredPrev, vista), [filtered, filteredPrev, vista]);
 
-  // Clientes period filter
-  const clientesPeriodFiltered = useMemo(() => {
-    const now = new Date();
-    let cutoff: string;
-    if (clientPeriod === "ytd") {
-      cutoff = `${now.getFullYear()}-01-01`;
-    } else {
-      const months = clientPeriod === "3m" ? 3 : clientPeriod === "6m" ? 6 : 12;
-      const d = new Date(now);
-      d.setMonth(d.getMonth() - months);
-      cutoff = d.toISOString().slice(0, 10);
-    }
-    // Filter: only clients with lastFecha >= cutoff
-    return clientesData.filter(c => c.lastFecha >= cutoff);
-  }, [clientesData, clientPeriod]);
-
-  // Clientes logic
+  // Clientes logic — clientesData already filtered by period via API
   const clientesFiltered = useMemo(() => {
-    let list = clientesPeriodFiltered;
+    let list = clientesData;
     if (empresaFilter.length > 0) list = list.filter(c => c.empresas.some(e => empresaFilter.includes(e.empresa)));
     if (clientSearch) {
       const q = clientSearch.toLowerCase();
@@ -183,7 +177,7 @@ export default function VentasDashboard() {
     // Filter out clients with subtotal <= 0
     list = list.filter(c => c.subtotal > 0);
     return list;
-  }, [clientesPeriodFiltered, empresaFilter, clientSearch]);
+  }, [clientesData, empresaFilter, clientSearch]);
 
   // KPI calculation (before user sort) — sort by subtotal desc for top client
   const clientesForKPI = useMemo(() => {

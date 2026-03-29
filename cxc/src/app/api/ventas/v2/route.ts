@@ -144,6 +144,7 @@ export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   const añoParam = params.get("año");
   const empresaParam = params.get("empresa"); // undefined / "" / "all" = all companies
+  const desdeParam = params.get("desde"); // optional: ISO date cutoff for clientesDetalle
 
   if (!añoParam) return NextResponse.json({ error: "año requerido" }, { status: 400 });
 
@@ -202,10 +203,15 @@ export async function GET(req: NextRequest) {
   const rows = currentRows;
   const prev = allPrevRows;
 
+  // Filter rows for clientesDetalle by optional desde param
+  const clienteRows = desdeParam
+    ? rows.filter(r => (r.fecha ?? "") >= desdeParam)
+    : rows;
+
   return NextResponse.json({
     byEmpresaMes: aggregateByEmpresaMes(rows),
     topClientes: aggregateTopClientes(rows),
     prevYear: aggregatePrevYear(prev),
-    clientesDetalle: aggregateClientesDetalle(rows),
+    clientesDetalle: aggregateClientesDetalle(clienteRows),
   });
 }
