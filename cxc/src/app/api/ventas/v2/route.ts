@@ -99,20 +99,22 @@ function aggregateClientesDetalle(
   const lastFechaMap = new Map<string, string>();
   const lastFechaEmpMap = new Map<string, string>();
   for (const r of historicalDates) {
-    const key = (r.cliente ?? "").trim() || "(Sin nombre)";
+    const raw = (r.cliente ?? "").trim().replace(/\s+/g, " ");
+    const key = raw || "(Sin nombre)";
     if (CLIENTES_INTERNOS.has(key.toUpperCase())) continue;
-    const fecha = r.ultima_fecha ?? "";
+    const fecha = String(r.ultima_fecha ?? "");
     const prev = lastFechaMap.get(key) || "";
     if (fecha > prev) lastFechaMap.set(key, fecha);
-    const empKey = `${key}|${r.empresa}`;
+    const empKey = `${key}|${(r.empresa ?? "").trim()}`;
     const prevE = lastFechaEmpMap.get(empKey) || "";
     if (fecha > prevE) lastFechaEmpMap.set(empKey, fecha);
   }
+  console.log(`[ventas/v2] lastFechaMap size=${lastFechaMap.size}, sample=${[...lastFechaMap.entries()].slice(0, 3).map(([k, v]) => `${k}=${v}`).join(", ")}`);
 
   // Aggregate subtotal/utilidad from period-filtered rows only
   const map = new Map<string, { subtotal: number; utilidad: number; empresas: Map<string, { subtotal: number; utilidad: number }> }>();
   for (const r of filteredRows) {
-    const key = (r.cliente ?? "").trim() || "(Sin nombre)";
+    const key = (r.cliente ?? "").trim().replace(/\s+/g, " ") || "(Sin nombre)";
     if (CLIENTES_INTERNOS.has(key.toUpperCase())) continue;
     if (!map.has(key)) map.set(key, { subtotal: 0, utilidad: 0, empresas: new Map() });
     const c = map.get(key)!;
