@@ -59,24 +59,24 @@ export default function OrderDetailPage() {
   if (loading || !order) return (
     <div className="min-h-screen bg-white">
       <div className="max-w-3xl mx-auto px-4 py-6">
-        <div className="h-4 bg-gray-100 rounded animate-pulse w-24 mb-6" />
-        <div className="h-7 bg-gray-100 rounded animate-pulse w-48 mb-2" />
-        <div className="h-4 bg-gray-100 rounded animate-pulse w-32 mb-8" />
-        <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="flex items-center gap-4 py-3 border-b border-gray-50">
-              <div className="w-14 h-14 bg-gray-100 rounded-lg animate-pulse flex-shrink-0" />
+        <div className="h-4 shimmer w-24 mb-6" />
+        <div className="h-7 shimmer w-56 mb-2" />
+        <div className="h-4 shimmer w-36 mb-8" />
+        <div className="space-y-0">
+          {[0, 1, 2, 3, 4].map(i => (
+            <div key={i} className="flex items-center gap-4 py-4 border-b border-gray-50" style={{ animationDelay: `${i * 80}ms` }}>
+              <div className="w-14 h-14 shimmer rounded-xl flex-shrink-0" />
               <div className="flex-1 space-y-2">
-                <div className="h-3.5 bg-gray-100 rounded animate-pulse w-3/4" />
-                <div className="h-3 bg-gray-100 rounded animate-pulse w-1/3" />
+                <div className="h-3.5 shimmer" style={{ width: `${70 - i * 5}%` }} />
+                <div className="h-3 shimmer" style={{ width: `${40 - i * 3}%` }} />
               </div>
-              <div className="h-8 bg-gray-100 rounded animate-pulse w-16" />
+              <div className="h-9 shimmer w-16 rounded-lg" />
             </div>
           ))}
         </div>
-        <div className="mt-8 flex justify-between">
-          <div className="h-5 bg-gray-100 rounded animate-pulse w-20" />
-          <div className="h-7 bg-gray-100 rounded animate-pulse w-28" />
+        <div className="mt-8 pt-4 border-t border-gray-100 flex justify-between items-center">
+          <div className="h-4 shimmer w-16" />
+          <div className="h-8 shimmer w-32 rounded-lg" />
         </div>
       </div>
     </div>

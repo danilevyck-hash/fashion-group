@@ -139,13 +139,13 @@ function Productos() {
       {loading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {[...Array(12)].map((_, i) => (
-            <div key={i} className="bg-white overflow-hidden">
-              <div className="aspect-square bg-gray-50 animate-pulse" />
-              <div className="p-3 space-y-2">
-                <div className="h-3.5 bg-gray-100 rounded animate-pulse w-3/4" />
-                <div className="h-3 bg-gray-100 rounded animate-pulse w-1/2" />
-                <div className="h-5 bg-gray-100 rounded animate-pulse w-16 mt-1" />
-                <div className="h-10 bg-gray-100 rounded animate-pulse w-full mt-2" />
+            <div key={i} className="bg-white overflow-hidden" style={{ animationDelay: `${i * 50}ms`, animationFillMode: "backwards" }}>
+              <div className="aspect-square shimmer" />
+              <div className="p-3 space-y-2.5">
+                <div className="h-3.5 shimmer" style={{ width: "70%" }} />
+                <div className="h-3 shimmer" style={{ width: "45%" }} />
+                <div className="h-5 shimmer w-16 mt-1.5" />
+                <div className="h-10 shimmer w-full mt-2 rounded-md" />
               </div>
             </div>
           ))}
@@ -153,7 +153,7 @@ function Productos() {
       ) : filtered.length === 0 ? (
         <p className="text-center py-20 text-gray-400 text-sm">No se encontraron productos</p>
       ) : (
-        <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 ${orderCount > 0 ? "pb-24" : ""}`}>
+        <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 fade-in ${orderCount > 0 ? "pb-24" : ""}`}>
           {filtered.map(p => <ProductCard key={p.id} product={p} stock={inventoryMap[p.id] || 0} />)}
         </div>
       )}
