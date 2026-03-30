@@ -93,23 +93,15 @@ const CLIENTES_INTERNOS = new Set(["CONFECCIONES BOSTON", "MULTI FASHION HOLDING
 
 function aggregateClientesDetalle(
   filteredRows: VentasRawRow[],
-  historicalDates: { cliente: string; empresa: string; ultima_fecha: string }[],
+  lastDates: { cliente: string; ultima_fecha: string }[],
 ): ClienteDetalle[] {
-  // Build lastFecha map from RPC result (MAX(fecha) per cliente+empresa)
+  // Build lastFecha map — RPC already returns MAX(fecha) per normalized cliente
   const lastFechaMap = new Map<string, string>();
-  const lastFechaEmpMap = new Map<string, string>();
-  for (const r of historicalDates) {
-    const raw = (r.cliente ?? "").trim().replace(/\s+/g, " ");
-    const key = raw || "(Sin nombre)";
+  for (const r of lastDates) {
+    const key = (r.cliente ?? "").trim().replace(/\s+/g, " ") || "(Sin nombre)";
     if (CLIENTES_INTERNOS.has(key.toUpperCase())) continue;
-    const fecha = String(r.ultima_fecha ?? "");
-    const prev = lastFechaMap.get(key) || "";
-    if (fecha > prev) lastFechaMap.set(key, fecha);
-    const empKey = `${key}|${(r.empresa ?? "").trim()}`;
-    const prevE = lastFechaEmpMap.get(empKey) || "";
-    if (fecha > prevE) lastFechaEmpMap.set(empKey, fecha);
+    lastFechaMap.set(key, String(r.ultima_fecha ?? ""));
   }
-  console.log(`[ventas/v2] lastFechaMap size=${lastFechaMap.size}, sample=${[...lastFechaMap.entries()].slice(0, 3).map(([k, v]) => `${k}=${v}`).join(", ")}`);
 
   // Aggregate subtotal/utilidad from period-filtered rows only
   const map = new Map<string, { subtotal: number; utilidad: number; empresas: Map<string, { subtotal: number; utilidad: number }> }>();
@@ -133,8 +125,7 @@ function aggregateClientesDetalle(
       utilidad: d.utilidad,
       lastFecha: lastFechaMap.get(cliente) || "",
       empresas: [...d.empresas.entries()].map(([empresa, ed]) => ({
-        empresa, ...ed,
-        lastFecha: lastFechaEmpMap.get(`${cliente}|${empresa}`) || "",
+        empresa, ...ed, lastFecha: "",
       })).sort((a, b) => b.subtotal - a.subtotal),
     }))
     .sort((a, b) => b.subtotal - a.subtotal);
