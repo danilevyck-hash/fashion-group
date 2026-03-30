@@ -228,10 +228,12 @@ export async function GET(req: NextRequest) {
   const rows = currentRows;
   const prev = allPrevRows;
 
-  // Filter rows for clientesDetalle by optional desde param
-  const clienteRows = desdeParam
+  // Filter rows for clientesDetalle by optional desde param + exclude internal empresas
+  const EMPRESAS_EXCLUIDAS = new Set(["Confecciones Boston", "Multifashion"]);
+  const clienteRows = (desdeParam
     ? rows.filter(r => (r.fecha ?? "") >= desdeParam)
-    : rows;
+    : rows
+  ).filter(r => !EMPRESAS_EXCLUIDAS.has(r.empresa));
   console.log(`[ventas/v2] clienteRows=${clienteRows.length} (desde=${desdeParam})`);
 
   const result = {
