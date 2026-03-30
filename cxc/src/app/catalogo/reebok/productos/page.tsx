@@ -138,7 +138,17 @@ function Productos() {
       {/* Grid */}
       {loading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {[...Array(8)].map((_, i) => <div key={i} className="aspect-square bg-gray-100 rounded animate-pulse" />)}
+          {[...Array(12)].map((_, i) => (
+            <div key={i} className="bg-white overflow-hidden">
+              <div className="aspect-square bg-gray-50 animate-pulse" />
+              <div className="p-3 space-y-2">
+                <div className="h-3.5 bg-gray-100 rounded animate-pulse w-3/4" />
+                <div className="h-3 bg-gray-100 rounded animate-pulse w-1/2" />
+                <div className="h-5 bg-gray-100 rounded animate-pulse w-16 mt-1" />
+                <div className="h-10 bg-gray-100 rounded animate-pulse w-full mt-2" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : filtered.length === 0 ? (
         <p className="text-center py-20 text-gray-400 text-sm">No se encontraron productos</p>
