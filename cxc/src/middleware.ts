@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const COOKIE_NAME = "cxc_session";
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 // Routes that don't require authentication
 const PUBLIC_PATHS = [
@@ -56,7 +57,16 @@ export function middleware(req: NextRequest) {
     return res;
   }
 
-  return NextResponse.next();
+  // Auto-refresh: re-set cookie with fresh 7-day maxAge on every request
+  const res = NextResponse.next();
+  res.cookies.set(COOKIE_NAME, session, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: COOKIE_MAX_AGE,
+  });
+  return res;
 }
 
 export const config = {
