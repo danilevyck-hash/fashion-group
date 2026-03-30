@@ -50,40 +50,39 @@ export default React.memo(function ProductCard({ product, stock = 0 }: { product
     if (!activeOrderId) return;
     // Optimistic update — show new qty immediately
     const prevQty = qty;
-    setQty(newQty <= 0 ? 0 : newQty);
-    setBusy(true);
+    const effectiveQty = newQty <= 0 ? 0 : newQty;
+    setQty(effectiveQty);
+
+    // Update localStorage cache optimistically
     try {
-      const res = await fetch(`/api/catalogo/reebok/orders/${activeOrderId}`);
-      if (!res.ok) { setQty(prevQty); setBusy(false); return; }
-      const order = await res.json();
-      const items = (order.reebok_order_items || []) as { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number }[];
-      const idx = items.findIndex(i => i.product_id === product.id);
-
-      let newItems;
-      if (newQty <= 0) {
-        newItems = items.filter(i => i.product_id !== product.id);
-      } else if (idx >= 0) {
-        newItems = items.map((i, j) => j === idx ? { ...i, quantity: newQty } : i);
+      const cached = JSON.parse(localStorage.getItem("reebok_order_items") || "[]");
+      let updated;
+      if (effectiveQty <= 0) {
+        updated = cached.filter((i: { product_id: string }) => i.product_id !== product.id);
       } else {
-        newItems = [...items, { product_id: product.id, sku: product.sku || "", name: product.name, image_url: product.image_url || "", quantity: newQty, unit_price: product.price || 0 }];
+        const idx = cached.findIndex((i: { product_id: string }) => i.product_id === product.id);
+        if (idx >= 0) {
+          updated = cached.map((i: { product_id: string; quantity: number }, j: number) => j === idx ? { ...i, quantity: effectiveQty } : i);
+        } else {
+          updated = [...cached, { product_id: product.id, sku: product.sku || "", name: product.name, image_url: product.image_url || "", quantity: effectiveQty, unit_price: product.price || 0 }];
+        }
       }
+      localStorage.setItem("reebok_order_items", JSON.stringify(updated));
+      if (effectiveQty > 0 && prevQty === 0) window.dispatchEvent(new CustomEvent("reebok-toast", { detail: "Agregado" }));
+      window.dispatchEvent(new Event("reebok-order-changed"));
+    } catch { /* */ }
 
-      const putRes = await fetch(`/api/catalogo/reebok/orders/${activeOrderId}`, {
-        method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: newItems }),
+    // PATCH single item in background — no GET needed
+    try {
+      const res = await fetch(`/api/catalogo/reebok/orders/${activeOrderId}/item`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: product.id, sku: product.sku || "", name: product.name, image_url: product.image_url || "", quantity: effectiveQty, unit_price: product.price || 0 }),
       });
-      if (putRes.ok) {
-        localStorage.setItem("reebok_order_items", JSON.stringify(newItems));
-        if (newQty > 0 && idx < 0) window.dispatchEvent(new CustomEvent("reebok-toast", { detail: "Agregado" }));
-        window.dispatchEvent(new Event("reebok-order-changed"));
-      } else {
-        // Revert on API failure
-        setQty(prevQty);
-      }
+      if (!res.ok) setQty(prevQty);
     } catch {
-      // Revert on network error
       setQty(prevQty);
     }
-    setBusy(false);
   }
 
   function handleAdd() {
