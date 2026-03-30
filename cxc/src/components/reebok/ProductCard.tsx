@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Product } from "@/components/reebok/supabase";
 import NewOrderModal from "./NewOrderModal";
 
@@ -45,18 +45,25 @@ export default React.memo(function ProductCard({ product, stock = 0 }: { product
     return () => window.removeEventListener("reebok-order-changed", handler);
   }, [product.id]);
 
-  async function updateOrder(newQty: number) {
+  // Debounced PATCH — batch rapid clicks into one API call
+  const patchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingQty = useRef<number | null>(null);
+  const baseCache = useRef<string>("[]");
+
+  function updateOrder(newQty: number) {
     const activeOrderId = localStorage.getItem("reebok_active_order_id");
     if (!activeOrderId) return;
-    // Save previous state for revert
-    const prevQty = qty;
-    const prevCache = localStorage.getItem("reebok_order_items") || "[]";
     const effectiveQty = newQty <= 0 ? 0 : newQty;
+    const isFirstInBatch = pendingQty.current === null;
 
-    // Optimistic update — show new qty + update cache immediately
+    // Save base cache only on first click of a batch
+    if (isFirstInBatch) baseCache.current = localStorage.getItem("reebok_order_items") || "[]";
+    pendingQty.current = effectiveQty;
+
+    // Optimistic update — immediate UI + cache
     setQty(effectiveQty);
     try {
-      const cached = JSON.parse(prevCache);
+      const cached = JSON.parse(localStorage.getItem("reebok_order_items") || "[]");
       let updated;
       if (effectiveQty <= 0) {
         updated = cached.filter((i: { product_id: string }) => i.product_id !== product.id);
@@ -69,28 +76,33 @@ export default React.memo(function ProductCard({ product, stock = 0 }: { product
         }
       }
       localStorage.setItem("reebok_order_items", JSON.stringify(updated));
-      if (effectiveQty > 0 && prevQty === 0) window.dispatchEvent(new CustomEvent("reebok-toast", { detail: "Agregado" }));
+      if (effectiveQty > 0 && isFirstInBatch && qty === 0) window.dispatchEvent(new CustomEvent("reebok-toast", { detail: "Agregado" }));
       window.dispatchEvent(new Event("reebok-order-changed"));
     } catch { /* */ }
 
-    // PATCH single item in background
-    try {
-      const res = await fetch(`/api/catalogo/reebok/orders/${activeOrderId}/item`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: product.id, sku: product.sku || "", name: product.name, image_url: product.image_url || "", quantity: effectiveQty, unit_price: product.price || 0 }),
-      });
-      if (!res.ok) {
-        // Revert qty + localStorage on failure
-        setQty(prevQty);
-        localStorage.setItem("reebok_order_items", prevCache);
+    // Debounce: reset timer, send only final qty after 400ms idle
+    if (patchTimer.current) clearTimeout(patchTimer.current);
+    patchTimer.current = setTimeout(async () => {
+      const finalQty = pendingQty.current!;
+      const revertCache = baseCache.current;
+      pendingQty.current = null;
+      try {
+        const res = await fetch(`/api/catalogo/reebok/orders/${activeOrderId}/item`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ product_id: product.id, sku: product.sku || "", name: product.name, image_url: product.image_url || "", quantity: finalQty, unit_price: product.price || 0 }),
+        });
+        if (!res.ok) {
+          setQty(getCachedQty(product.id));
+          localStorage.setItem("reebok_order_items", revertCache);
+          window.dispatchEvent(new Event("reebok-order-changed"));
+        }
+      } catch {
+        setQty(getCachedQty(product.id));
+        localStorage.setItem("reebok_order_items", revertCache);
         window.dispatchEvent(new Event("reebok-order-changed"));
       }
-    } catch {
-      setQty(prevQty);
-      localStorage.setItem("reebok_order_items", prevCache);
-      window.dispatchEvent(new Event("reebok-order-changed"));
-    }
+    }, 400);
   }
 
   function handleAdd() {

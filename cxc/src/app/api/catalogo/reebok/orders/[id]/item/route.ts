@@ -1,48 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { reebokServer } from "@/lib/reebok-supabase-server";
 
-const PIEZAS = 12;
+export const runtime = "edge";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const { product_id, sku, name, image_url, quantity, unit_price } = await req.json();
-
   if (!product_id) return NextResponse.json({ error: "product_id requerido" }, { status: 400 });
 
   if (quantity <= 0) {
     const { error } = await reebokServer.from("reebok_order_items").delete()
       .eq("order_id", params.id).eq("product_id", product_id);
-    if (error) {
-      console.error("[reebok/item PATCH delete]", error.code, error.message);
-      return NextResponse.json({ error: "Error al eliminar item" }, { status: 500 });
-    }
+    if (error) return NextResponse.json({ error: "Error al eliminar" }, { status: 500 });
   } else {
-    const { data: existing } = await reebokServer.from("reebok_order_items")
-      .select("id").eq("order_id", params.id).eq("product_id", product_id).maybeSingle();
-
-    if (existing) {
-      const { error } = await reebokServer.from("reebok_order_items").update({ quantity })
-        .eq("order_id", params.id).eq("product_id", product_id);
-      if (error) {
-        console.error("[reebok/item PATCH update]", error.code, error.message);
-        return NextResponse.json({ error: "Error al actualizar item" }, { status: 500 });
-      }
-    } else {
-      const { error } = await reebokServer.from("reebok_order_items").insert({
+    const { error } = await reebokServer.from("reebok_order_items")
+      .upsert({
         order_id: params.id, product_id, sku: sku || null, name: name || null,
-        image_url: image_url || null, quantity: quantity || 1, unit_price: Number(unit_price) || 0,
-      });
-      if (error) {
-        console.error("[reebok/item PATCH insert]", error.code, error.message);
-        return NextResponse.json({ error: "Error al agregar item" }, { status: 500 });
-      }
-    }
+        image_url: image_url || null, quantity, unit_price: Number(unit_price) || 0,
+      }, { onConflict: "order_id,product_id" });
+    if (error) return NextResponse.json({ error: "Error al guardar" }, { status: 500 });
   }
-
-  // Recalc order total
-  const { data: items } = await reebokServer.from("reebok_order_items")
-    .select("quantity, unit_price").eq("order_id", params.id);
-  const total = (items || []).reduce((s, i) => s + (i.quantity || 1) * PIEZAS * Number(i.unit_price || 0), 0);
-  await reebokServer.from("reebok_orders").update({ total, updated_at: new Date().toISOString() }).eq("id", params.id);
 
   return NextResponse.json({ ok: true });
 }
