@@ -48,14 +48,15 @@ export default React.memo(function ProductCard({ product, stock = 0 }: { product
   async function updateOrder(newQty: number) {
     const activeOrderId = localStorage.getItem("reebok_active_order_id");
     if (!activeOrderId) return;
-    // Optimistic update — show new qty immediately
+    // Save previous state for revert
     const prevQty = qty;
+    const prevCache = localStorage.getItem("reebok_order_items") || "[]";
     const effectiveQty = newQty <= 0 ? 0 : newQty;
-    setQty(effectiveQty);
 
-    // Update localStorage cache optimistically
+    // Optimistic update — show new qty + update cache immediately
+    setQty(effectiveQty);
     try {
-      const cached = JSON.parse(localStorage.getItem("reebok_order_items") || "[]");
+      const cached = JSON.parse(prevCache);
       let updated;
       if (effectiveQty <= 0) {
         updated = cached.filter((i: { product_id: string }) => i.product_id !== product.id);
@@ -72,16 +73,23 @@ export default React.memo(function ProductCard({ product, stock = 0 }: { product
       window.dispatchEvent(new Event("reebok-order-changed"));
     } catch { /* */ }
 
-    // PATCH single item in background — no GET needed
+    // PATCH single item in background
     try {
       const res = await fetch(`/api/catalogo/reebok/orders/${activeOrderId}/item`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ product_id: product.id, sku: product.sku || "", name: product.name, image_url: product.image_url || "", quantity: effectiveQty, unit_price: product.price || 0 }),
       });
-      if (!res.ok) setQty(prevQty);
+      if (!res.ok) {
+        // Revert qty + localStorage on failure
+        setQty(prevQty);
+        localStorage.setItem("reebok_order_items", prevCache);
+        window.dispatchEvent(new Event("reebok-order-changed"));
+      }
     } catch {
       setQty(prevQty);
+      localStorage.setItem("reebok_order_items", prevCache);
+      window.dispatchEvent(new Event("reebok-order-changed"));
     }
   }
 
