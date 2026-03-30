@@ -93,19 +93,20 @@ const CLIENTES_INTERNOS = new Set(["CONFECCIONES BOSTON", "MULTI FASHION HOLDING
 
 function aggregateClientesDetalle(
   filteredRows: VentasRawRow[],
-  historicalDates: { cliente: string; empresa: string; fecha: string }[],
+  historicalDates: { cliente: string; empresa: string; ultima_fecha: string }[],
 ): ClienteDetalle[] {
-  // Build lastFecha map from historical dates (all time, ordered desc, limited)
+  // Build lastFecha map from RPC result (MAX(fecha) per cliente+empresa)
   const lastFechaMap = new Map<string, string>();
   const lastFechaEmpMap = new Map<string, string>();
   for (const r of historicalDates) {
     const key = (r.cliente ?? "").trim() || "(Sin nombre)";
     if (CLIENTES_INTERNOS.has(key.toUpperCase())) continue;
+    const fecha = r.ultima_fecha ?? "";
     const prev = lastFechaMap.get(key) || "";
-    if ((r.fecha ?? "") > prev) lastFechaMap.set(key, r.fecha ?? "");
+    if (fecha > prev) lastFechaMap.set(key, fecha);
     const empKey = `${key}|${r.empresa}`;
     const prevE = lastFechaEmpMap.get(empKey) || "";
-    if ((r.fecha ?? "") > prevE) lastFechaEmpMap.set(empKey, r.fecha ?? "");
+    if (fecha > prevE) lastFechaEmpMap.set(empKey, fecha);
   }
 
   // Aggregate subtotal/utilidad from period-filtered rows only
@@ -225,13 +226,9 @@ export async function GET(req: NextRequest) {
 
   console.log(`[ventas/v2] prevRows=${allPrevRows.length}`);
 
-  // ── Fetch historical last-fecha per client (ordered desc, limited) ──────
-  const { data: lastDates } = await supabaseServer
-    .from("ventas_raw")
-    .select("cliente, empresa, fecha")
-    .gte("anio", 2022)
-    .order("fecha", { ascending: false })
-    .limit(10000);
+  // ── Fetch historical last-fecha per client via RPC (aggregated, efficient) ──
+  const { data: lastDates, error: lastDatesErr } = await supabaseServer.rpc("get_ultima_compra");
+  if (lastDatesErr) console.error("[ventas/v2] get_ultima_compra error:", lastDatesErr.code, lastDatesErr.message);
   console.log(`[ventas/v2] lastDates=${(lastDates ?? []).length}`);
 
   // ── Aggregate ────────────────────────────────────────────────────────────

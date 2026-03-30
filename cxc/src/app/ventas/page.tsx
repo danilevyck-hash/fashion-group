@@ -168,6 +168,11 @@ export default function VentasDashboard() {
   const table = useMemo(() => buildTable(filtered, filteredPrev, vista), [filtered, filteredPrev, vista]);
 
   // Clientes logic — clientesData already filtered by period via API
+  const esInterno = (nombre: string) => {
+    const n = nombre.toUpperCase().trim();
+    return n.includes("BOSTON") || n.includes("MULTI FASHION") || n.includes("MULTIFASHION");
+  };
+
   const clientesFiltered = useMemo(() => {
     let list = clientesData;
     if (empresaFilter.length > 0) list = list.filter(c => c.empresas.some(e => empresaFilter.includes(e.empresa)));
@@ -175,9 +180,9 @@ export default function VentasDashboard() {
       const q = clientSearch.toLowerCase();
       list = list.filter(c => c.cliente.toLowerCase().includes(q));
     }
-    // Filter out clients with subtotal <= 0
-    list = list.filter(c => c.subtotal > 0);
-    return list;
+    // Filter out clients with subtotal <= 0 and internal clients
+    list = list.filter(c => c.subtotal > 0 && !esInterno(c.cliente));
+    return list.sort((a, b) => b.subtotal - a.subtotal);
   }, [clientesData, empresaFilter, clientSearch]);
 
   // KPI calculation (before user sort) — sort by subtotal desc for top client
