@@ -123,7 +123,6 @@ export default function VentasDashboard() {
   const [clientSortDir, setClientSortDir] = useState<"desc" | "asc">("desc");
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
-  const [clientPeriod, setClientPeriod] = useState<"3m" | "6m" | "12m" | "ytd">("12m");
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
@@ -131,15 +130,12 @@ export default function VentasDashboard() {
     fetch("/api/ventas/años").then(r => r.json()).then(setAños).catch(() => {});
   }, []);
 
-  // Compute desde cutoff for clientes
+  // Clientes always uses last 12 months
   const desdeStr = useMemo(() => {
-    const now = new Date();
-    if (clientPeriod === "ytd") return `${now.getFullYear()}-01-01`;
-    const months = clientPeriod === "3m" ? 3 : clientPeriod === "6m" ? 6 : 12;
-    const d = new Date(now);
-    d.setMonth(d.getMonth() - months);
+    const d = new Date();
+    d.setMonth(d.getMonth() - 12);
     return d.toISOString().slice(0, 10);
-  }, [clientPeriod]);
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -406,16 +402,6 @@ export default function VentasDashboard() {
         {/* Clientes Tab */}
         {activeTab === "clientes" && (
           <>
-            {/* Client Period Filter */}
-            <div className="flex gap-1.5 mb-4">
-              {(["3m", "6m", "12m", "ytd"] as const).map(p => (
-                <button key={p} onClick={() => setClientPeriod(p)}
-                  className={`px-3 py-1 text-xs rounded-full transition ${clientPeriod === p ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500"}`}>
-                  {p === "3m" ? "Últ. 3 meses" : p === "6m" ? "Últ. 6 meses" : p === "12m" ? "Últ. 12 meses" : "Este año"}
-                </button>
-              ))}
-            </div>
-
             {/* Client KPIs */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
               <div className="bg-gray-50 rounded-xl p-4">
