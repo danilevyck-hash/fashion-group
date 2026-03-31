@@ -19,14 +19,13 @@ export default function ProductosPage() {
 function Productos() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<(Product & { _stock: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [gender, setGender] = useState(searchParams.get("gender") || "");
   const [category, setCategory] = useState("");
   const [onlyOferta, setOnlyOferta] = useState(false);
-  const [inventoryMap, setInventoryMap] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<string | null>(null);
   const [orderCount, setOrderCount] = useState(0);
   const [orderId, setOrderId] = useState("");
@@ -78,32 +77,20 @@ function Productos() {
           fetch("/api/catalogo/reebok/inventory"),
         ]);
 
-        // Parse both responses before setting any state
-        const prods = pRes.ok ? await pRes.json() : [];
-        const inv = iRes.ok ? await iRes.json() : [];
+        const prods: Product[] = pRes.ok ? await pRes.json() : [];
+        const inv: { product_id: string; quantity: number }[] = iRes.ok ? await iRes.json() : [];
 
-        const map: Record<string, number> = {};
-        (inv || []).forEach((i: { product_id: string; quantity: number }) => {
-          map[i.product_id] = (map[i.product_id] || 0) + i.quantity;
-        });
+        // Build stock map
+        const stockMap: Record<string, number> = {};
+        inv.forEach(i => { stockMap[i.product_id] = (stockMap[i.product_id] || 0) + i.quantity });
 
-        // Set both states together — guaranteed single re-render
-        setProducts(prods);
-        setInventoryMap(map);
+        // Embed stock into each product — single state, no sync issues
+        setProducts(prods.map(p => ({ ...p, _stock: stockMap[p.id] || 0 })));
       } catch { /* */ }
       setLoading(false);
     }
     load();
   }, []);
-
-  // Debug: check if keys match at render time
-  if (products.length > 0 && Object.keys(inventoryMap).length > 0) {
-    const fp = products[0];
-    const mk = Object.keys(inventoryMap)[0];
-    console.log('[MATCH] p.id:', fp.id, 'type:', typeof fp.id, '| map key:', mk, 'type:', typeof mk, '| match:', fp.id === mk, '| lookup:', inventoryMap[fp.id], '| map size:', Object.keys(inventoryMap).length);
-  } else {
-    console.log('[MATCH] products:', products.length, 'mapKeys:', Object.keys(inventoryMap).length);
-  }
 
   const filtered = products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()))
@@ -167,7 +154,7 @@ function Productos() {
         <p className="text-center py-20 text-gray-400 text-sm">No se encontraron productos</p>
       ) : (
         <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 fade-in ${orderCount > 0 ? "pb-24" : ""}`}>
-          {filtered.map(p => <ProductCard key={p.id} product={p} stock={inventoryMap[p.id] || 0} />)}
+          {filtered.map(p => <ProductCard key={p.id} product={p} stock={p._stock} />)}
         </div>
       )}
 
