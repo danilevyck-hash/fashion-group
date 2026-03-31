@@ -11,8 +11,9 @@ function normalizeHeader(h: string): string {
 
 export async function POST(req: NextRequest) {
   try {
-    const { items } = await req.json() as {
+    const { items, empresa } = await req.json() as {
       items: { codigo: string; existencia: number; descripcion: string }[]
+      empresa?: 'shoes' | 'wear'
     }
 
     if (!items || !Array.isArray(items)) {
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
     // Get all products with current inventory
     const { data: products, error: prodErr } = await supabase
       .from('products')
-      .select('id, sku, name, active')
+      .select('id, sku, name, active, category')
     if (prodErr) return NextResponse.json({ error: prodErr.message }, { status: 500 })
 
     const { data: inventoryData, error: invErr } = await supabase
@@ -40,9 +41,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Build exact SKU map (case-sensitive)
-    const skuMap = new Map<string, { id: string; name: string; active: boolean }>()
+    const skuMap = new Map<string, { id: string; name: string; active: boolean; category: string }>()
     for (const p of products || []) {
-      if (p.sku) skuMap.set(p.sku, { id: p.id, name: p.name, active: p.active })
+      if (p.sku) skuMap.set(p.sku, { id: p.id, name: p.name, active: p.active, category: p.category })
     }
 
     // Track which SKUs from the DB were seen in the CSV
@@ -89,12 +90,15 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Find active products in DB that were NOT in this CSV
+    // Find active products in DB that were NOT in this CSV, filtered by empresa
     const notInCSV: { sku: string; name: string }[] = []
     for (const p of products || []) {
-      if (p.sku && p.active && !csvSkus.has(p.sku)) {
-        notInCSV.push({ sku: p.sku, name: p.name })
-      }
+      if (!p.sku || !p.active || csvSkus.has(p.sku)) continue
+
+      if (empresa === 'shoes' && p.category !== 'footwear') continue
+      if (empresa === 'wear' && p.category !== 'apparel' && p.category !== 'accessories') continue
+
+      notInCSV.push({ sku: p.sku, name: p.name })
     }
 
     return NextResponse.json({ updated, wentToZero, notFound, notInCSV })

@@ -94,12 +94,9 @@ function InventorySection() {
       </div>
 
       <div className="space-y-6">
-        <InventoryZone label="Active Shoes" result={shoesResult} onResult={setShoesResult} />
-        <InventoryZone label="Active Wear" result={wearResult} onResult={setWearResult} />
+        <InventoryZone label="Active Shoes" empresa="shoes" notInCSVLabel="en footwear del website pero no en este CSV" result={shoesResult} onResult={setShoesResult} />
+        <InventoryZone label="Active Wear" empresa="wear" notInCSVLabel="en apparel/accesorios del website pero no en este CSV" result={wearResult} onResult={setWearResult} />
       </div>
-
-      {/* Cross-zone: "In website but not in any CSV" */}
-      <NotInCSVCrossSection shoesResult={shoesResult} wearResult={wearResult} />
     </section>
   )
 }
@@ -108,10 +105,14 @@ function InventorySection() {
 
 function InventoryZone({
   label,
+  empresa,
+  notInCSVLabel,
   result,
   onResult,
 }: {
   label: string
+  empresa: 'shoes' | 'wear'
+  notInCSVLabel: string
   result: InventoryResult | null
   onResult: (r: InventoryResult | null) => void
 }) {
@@ -164,7 +165,7 @@ function InventoryZone({
       const res = await fetch('/api/catalogo/reebok/inventory/switchsoft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items }),
+        body: JSON.stringify({ items, empresa }),
       })
       const data: InventoryResult = await res.json()
       onResult(data)
@@ -172,7 +173,7 @@ function InventoryZone({
       alert('Error al procesar el archivo')
     }
     setProcessing(false)
-  }, [onResult])
+  }, [onResult, empresa])
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
@@ -216,7 +217,7 @@ function InventoryZone({
 
       {result && (
         <>
-          <InventoryResultBlock result={result} />
+          <InventoryResultBlock result={result} notInCSVLabel={notInCSVLabel} />
           <button
             onClick={() => onResult(null)}
             className="text-xs text-gray-400 hover:text-gray-600 underline mt-2"
@@ -231,7 +232,7 @@ function InventoryZone({
 
 // ── Inventory Result Block ─────────────────────────────────────────────────────
 
-function InventoryResultBlock({ result }: { result: InventoryResult }) {
+function InventoryResultBlock({ result, notInCSVLabel }: { result: InventoryResult; notInCSVLabel: string }) {
   const [showUpdated, setShowUpdated] = useState(false)
 
   return (
@@ -321,79 +322,28 @@ function InventoryResultBlock({ result }: { result: InventoryResult }) {
           </div>
         </div>
       )}
-    </div>
-  )
-}
 
-// ── Cross-zone: Not In CSV ────────────────────────────────────────────────────
-
-function NotInCSVCrossSection({
-  shoesResult,
-  wearResult,
-}: {
-  shoesResult: InventoryResult | null
-  wearResult: InventoryResult | null
-}) {
-  const hasShoes = shoesResult !== null
-  const hasWear = wearResult !== null
-
-  if (!hasShoes && !hasWear) return null
-
-  // Only one zone uploaded — show note
-  if (hasShoes && !hasWear) {
-    const items = shoesResult.notInCSV
-    if (items.length === 0) return null
-    return (
-      <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-3">
-        <span className="text-sm font-medium text-gray-700">
-          {items.length} en website pero no en Active Shoes
-        </span>
-        <p className="text-xs text-gray-500 italic mt-1">Sube tambien el archivo de Active Wear para ver el reporte completo</p>
-      </div>
-    )
-  }
-
-  if (!hasShoes && hasWear) {
-    const items = wearResult.notInCSV
-    if (items.length === 0) return null
-    return (
-      <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-3">
-        <span className="text-sm font-medium text-gray-700">
-          {items.length} en website pero no en Active Wear
-        </span>
-        <p className="text-xs text-gray-500 italic mt-1">Sube tambien el archivo de Active Shoes para ver el reporte completo</p>
-      </div>
-    )
-  }
-
-  // Both zones have results — intersect
-  const shoesSet = new Set(shoesResult!.notInCSV.map(i => i.sku))
-  const nameMap = new Map<string, string>()
-  for (const item of shoesResult!.notInCSV) nameMap.set(item.sku, item.name)
-  for (const item of wearResult!.notInCSV) nameMap.set(item.sku, item.name)
-
-  const items = wearResult!.notInCSV.filter(i => shoesSet.has(i.sku))
-
-  if (items.length === 0) return null
-
-  return (
-    <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-3">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-medium text-gray-700">
-          {items.length} en website pero no en ningun CSV
-        </span>
-        <button
-          onClick={() => copyToClipboard(items.map(i => `${i.sku}\t${i.name}`).join('\n'))}
-          className="text-xs text-gray-600 hover:text-gray-800 underline"
-        >
-          Copiar lista
-        </button>
-      </div>
-      <div className="max-h-32 overflow-y-auto text-xs text-gray-600 font-mono space-y-0.5">
-        {items.map((item, i) => (
-          <div key={i}>{item.sku} — {item.name}</div>
-        ))}
-      </div>
+      {/* 4. In website but not in CSV (filtered by empresa) */}
+      {result.notInCSV.length > 0 && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm font-medium text-gray-700">
+              {result.notInCSV.length} {notInCSVLabel}
+            </span>
+            <button
+              onClick={() => copyToClipboard(result.notInCSV.map(i => `${i.sku}\t${i.name}`).join('\n'))}
+              className="text-xs text-gray-600 hover:text-gray-800 underline"
+            >
+              Copiar lista
+            </button>
+          </div>
+          <div className="max-h-32 overflow-y-auto text-xs text-gray-600 font-mono space-y-0.5">
+            {result.notInCSV.map((item, i) => (
+              <div key={i}>{item.sku} — {item.name}</div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
