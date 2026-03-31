@@ -14,6 +14,8 @@ const PUBLIC_PATHS = [
 const PUBLIC_PREFIXES = [
   "/api/cron/",     // cron jobs use CRON_SECRET
   "/api/catalogo/reebok/auth", // reebok separate auth
+  "/api/catalogo/reebok/products", // public catalog reads
+  "/api/catalogo/reebok/inventory", // public catalog stock
   "/_next/",
   "/icon-",
   "/manifest",
