@@ -8,14 +8,14 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 const ALL_MODULES = [
   { key: "cxc", label: "CXC", subtitle: "Cuentas por cobrar", icon: "📊", href: "/admin", roles: ["admin", "director", "vendedor"] },
   { key: "upload", label: "Cargar CSV", subtitle: "Antigüedad de deuda", icon: "📤", href: "/upload", roles: ["admin", "upload"] },
-  { key: "guias", label: "Guías", subtitle: "Transporte y despacho", icon: "🚚", href: "/guias", roles: ["admin", "upload"] },
-  { key: "caja", label: "Caja Menuda", subtitle: "Control de gastos", icon: "💵", href: "/caja", roles: ["admin", "upload"] },
+  { key: "guias", label: "Guías", subtitle: "Transporte y despacho", icon: "🚚", href: "/guias", roles: ["admin", "upload", "secretaria", "bodega"] },
+  { key: "caja", label: "Caja Menuda", subtitle: "Control de gastos", icon: "💵", href: "/caja", roles: ["admin", "upload", "contabilidad"] },
   { key: "directorio", label: "Directorio", subtitle: "Clientes y contactos", icon: "📋", href: "/directorio", roles: ["admin", "upload", "vendedor"] },
-  { key: "cheques", label: "Cheques", subtitle: "Posfechados", icon: "🏦", href: "/cheques", roles: ["admin", "upload"] },
+  { key: "cheques", label: "Cheques", subtitle: "Posfechados", icon: "🏦", href: "/cheques", roles: ["admin", "upload", "director", "contabilidad"] },
   { key: "prestamos", label: "Préstamos", subtitle: "Colaboradores", icon: "🤝", href: "/prestamos", roles: ["admin", "contabilidad"] },
-  { key: "reclamos", label: "Reclamos", subtitle: "Seguimiento", icon: "📝", href: "/reclamos", roles: ["admin", "upload"] },
+  { key: "reclamos", label: "Reclamos", subtitle: "Seguimiento", icon: "📝", href: "/reclamos", roles: ["admin", "upload", "secretaria"] },
   { key: "ventas", label: "Ventas", subtitle: "Mensuales", icon: "📈", href: "/ventas", roles: ["admin", "director", "contabilidad"] },
-  { key: "reebok", label: "Catálogo Reebok", subtitle: "Productos y pedidos", icon: "👟", href: "/catalogo/reebok", roles: ["admin", "vendedor", "cliente"] },
+  { key: "reebok", label: "Catálogo Reebok", subtitle: "Productos y pedidos", icon: "👟", href: "/catalogo/reebok", roles: ["admin", "vendedor", "cliente", "secretaria"] },
   { key: "camisetas", label: "Camisetas Selección", subtitle: "Pedidos y stock", icon: "👕", href: "/camisetas", roles: ["admin"] },
   { key: "usuarios", label: "Usuarios", subtitle: "Permisos y accesos", icon: "👥", href: "/admin/usuarios", roles: ["admin"] },
 ];
@@ -53,7 +53,10 @@ export default function PlantillasPage() {
     setRole(r);
     setUserName(sessionStorage.getItem("fg_user_name") || "");
     setUserId(sessionStorage.getItem("fg_user_id") || "");
-    setDarkMode(localStorage.getItem("fg_dark_mode") === "1");
+    const isDark = localStorage.getItem("fg_dark_mode") === "1";
+    setDarkMode(isDark);
+    if (isDark) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
 
     // Load modules from new system
     try {
@@ -106,7 +109,7 @@ export default function PlantillasPage() {
   if (!authChecked) return null;
 
   // Build alerts — only show alerts relevant to the user's role
-  const alertRoles = ['admin', 'secretaria', 'director', 'contabilidad'];
+  const alertRoles = ['admin', 'secretaria', 'director', 'contabilidad', 'upload'];
   const showAlerts = alertRoles.includes(role);
   const alerts: { label: string; count: number; href: string; color: "red" | "yellow" | "blue" }[] = [];
   if (stats && showAlerts) {
@@ -158,9 +161,10 @@ export default function PlantillasPage() {
     }
   }
 
-  const displayName = userName || (role === "admin" ? "Daniel" : role === "director" ? "Director" : role);
+  const displayName = userName || "";
 
   return (
+    <div className={`min-h-screen ${darkMode ? "bg-gray-950 text-gray-100" : ""}`}>
     <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
       {/* Header */}
       <div className="flex items-end justify-between mb-8">
@@ -175,7 +179,7 @@ export default function PlantillasPage() {
 
       {/* Greeting */}
       <div className="mb-8">
-        <h1 className="text-2xl font-light text-gray-800">{getGreeting()}, {displayName}</h1>
+        <h1 className={`text-2xl font-light ${darkMode ? "text-gray-100" : "text-gray-800"}`}>{getGreeting()}{displayName ? `, ${displayName}` : ""}</h1>
         <p className="text-sm text-gray-400 mt-1">{getDateLabel()}</p>
       </div>
 
@@ -250,7 +254,7 @@ export default function PlantillasPage() {
                       {...(editMode ? prov.dragHandleProps : {})}
                       onClick={() => { if (!editMode) router.push(mod.href); }}
                       className={`relative border rounded-2xl p-4 transition cursor-pointer select-none ${
-                        snapshot.isDragging ? "shadow-lg border-gray-300 bg-white z-50" : "border-gray-100 hover:border-gray-300 hover:shadow-sm bg-white"
+                        snapshot.isDragging ? "shadow-lg border-gray-300 bg-white z-50" : `${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-100 hover:border-gray-300 hover:shadow-sm bg-white"}`
                       } ${editMode ? "cursor-grab active:cursor-grabbing" : ""}`}
                     >
                       {editMode && (
@@ -268,6 +272,7 @@ export default function PlantillasPage() {
           )}
         </Droppable>
       </DragDropContext>
+    </div>
     </div>
   );
 }

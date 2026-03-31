@@ -48,6 +48,9 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
   // Debounced PATCH — batch rapid clicks into one API call
   const patchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingQty = useRef<number | null>(null);
+
+  // Cleanup timer on unmount
+  useEffect(() => { return () => { if (patchTimer.current) clearTimeout(patchTimer.current) } }, []);
   const baseCache = useRef<string>("[]");
 
   function updateOrder(newQty: number) {

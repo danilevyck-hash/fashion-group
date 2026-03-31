@@ -34,6 +34,14 @@ export default function OrderDetailPage() {
       const res = await fetch(`/api/catalogo/reebok/orders/${id}`);
       if (res.ok) {
         const d = await res.json();
+        // Cliente can only view their own orders
+        const role = sessionStorage.getItem("cxc_role") || "";
+        if (role === "cliente") {
+          const userName = sessionStorage.getItem("fg_user_name") || "";
+          if (userName && d.client_name && d.client_name.toLowerCase() !== userName.toLowerCase()) {
+            router.push("/catalogo/reebok/productos"); return;
+          }
+        }
         setOrder(d); setItems(d.reebok_order_items || []); setClientName(d.client_name || "");
       } else router.push("/catalogo/reebok/pedidos");
     } catch { router.push("/catalogo/reebok/pedidos"); }

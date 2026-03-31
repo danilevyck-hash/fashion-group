@@ -13,7 +13,15 @@ export default function PedidosPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  useEffect(() => { if (!sessionStorage.getItem("cxc_role")) router.push("/"); }, [router]);
+  const [role, setRole] = useState("");
+  const [clientFilter, setClientFilter] = useState("");
+
+  useEffect(() => {
+    const r = sessionStorage.getItem("cxc_role") || "";
+    if (!r) { router.push("/"); return; }
+    setRole(r);
+    if (r === "cliente") setClientFilter(sessionStorage.getItem("fg_user_name") || "");
+  }, [router]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -25,13 +33,16 @@ export default function PedidosPage() {
 
   async function deleteOrder(id: string) {
     if (!confirm("¿Eliminar este pedido?")) return;
-    await fetch(`/api/catalogo/reebok/orders/${id}`, { method: "DELETE" });
-    const activeId = localStorage.getItem("reebok_active_order_id");
-    if (activeId === id) { localStorage.removeItem("reebok_active_order_id"); localStorage.removeItem("reebok_active_order_number"); localStorage.removeItem("reebok_active_order_client"); }
+    const res = await fetch(`/api/catalogo/reebok/orders/${id}`, { method: "DELETE" });
+    if (res.ok) {
+      const activeId = localStorage.getItem("reebok_active_order_id");
+      if (activeId === id) { localStorage.removeItem("reebok_active_order_id"); localStorage.removeItem("reebok_active_order_number"); localStorage.removeItem("reebok_active_order_client"); }
+    }
     load();
   }
 
-  const filtered = orders.filter(o => !search || o.client_name.toLowerCase().includes(search.toLowerCase()));
+  const visibleOrders = clientFilter ? orders.filter(o => o.client_name.toLowerCase() === clientFilter.toLowerCase()) : orders;
+  const filtered = visibleOrders.filter(o => !search || o.client_name.toLowerCase().includes(search.toLowerCase()));
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
