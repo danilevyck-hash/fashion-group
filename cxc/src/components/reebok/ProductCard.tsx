@@ -121,7 +121,7 @@ export default React.memo(function ProductCard({ product, stock = 0 }: { product
             <span className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">OFERTA</span>
           )}
           <span className={`absolute top-2 right-2 z-10 text-[9px] font-medium px-1.5 py-0.5 rounded-full ${stock > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
-            {stock > 0 ? "Disponible" : "Agotado"}
+            {stock > 0 ? `${stock} disponibles` : "Agotado"}
           </span>
           {product.image_url ? (
             <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-2" loading="lazy" />

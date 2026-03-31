@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/components/reebok/supabase'
+import { reebokServer } from '@/lib/reebok-supabase-server'
 
 function normalizeHeader(h: string): string {
   return h
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
 
       const previousQty = currentQtyMap.get(match.id) || 0
 
-      const { error } = await supabase
+      const { error } = await reebokServer
         .from('inventory')
         .upsert(
           { product_id: match.id, size: 'UNICA', quantity: item.existencia },
