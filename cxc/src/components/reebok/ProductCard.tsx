@@ -120,9 +120,11 @@ export default React.memo(function ProductCard({ product, stock = 0 }: { product
           {product.on_sale && (
             <span className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">OFERTA</span>
           )}
-          <span className={`absolute top-2 right-2 z-10 text-[9px] font-medium px-1.5 py-0.5 rounded-full ${stock > 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"}`}>
-            {stock > 0 ? `${stock} disponibles` : "Agotado"}
-          </span>
+          {stock > 0 && (
+            <span className="absolute top-2 right-2 z-10 text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+              {stock} disponibles
+            </span>
+          )}
           {product.image_url ? (
             <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-2" loading="lazy" />
           ) : (
@@ -139,6 +141,9 @@ export default React.memo(function ProductCard({ product, stock = 0 }: { product
           </div>
           <p className="text-base font-semibold text-black mt-1.5">
             {product.price ? `$${product.price.toFixed(0)}` : "Consultar"}
+          </p>
+          <p className={`text-[11px] mt-0.5 ${stock > 0 ? "text-green-600" : "text-gray-400"}`}>
+            {stock > 0 ? `${stock} disponibles` : "Agotado"}
           </p>
 
           {inOrder ? (
