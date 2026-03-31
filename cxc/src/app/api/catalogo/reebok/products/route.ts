@@ -37,22 +37,10 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
-  // Log which key reebokServer is using
-  const keyUsed = process.env.REEBOK_SERVICE_ROLE_KEY ? 'REEBOK_SERVICE_ROLE_KEY'
-    : process.env.SUPABASE_SERVICE_ROLE_KEY ? 'SUPABASE_SERVICE_ROLE_KEY'
-    : process.env.NEXT_PUBLIC_REEBOK_SUPABASE_ANON_KEY ? 'NEXT_PUBLIC_REEBOK_SUPABASE_ANON_KEY (FALLBACK!)'
-    : 'NEXT_PUBLIC_SUPABASE_ANON_KEY (FALLBACK!)'
-  console.log(`[DELETE product] id=${id}, key=${keyUsed}`)
+  await reebokServer.from('inventory').delete().eq('product_id', id)
 
-  // Delete inventory first (explicit, in case CASCADE fails)
-  const invResult = await reebokServer.from('inventory').delete().eq('product_id', id).select('id')
-  console.log(`[DELETE inventory] deleted=${invResult.data?.length || 0}, error=${invResult.error?.message || 'none'}`)
-
-  // Delete the product
   const { data, error } = await reebokServer.from('products').delete().eq('id', id).select('id').maybeSingle()
-  console.log(`[DELETE product] data=${JSON.stringify(data)}, error=${error?.message || 'none'}`)
-
-  if (error) { return NextResponse.json({ error: error.message }, { status: 500 }); }
-  if (!data) { return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 }); }
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (!data) return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 })
   return NextResponse.json({ success: true, deleted: data.id })
 }
