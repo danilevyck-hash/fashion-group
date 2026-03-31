@@ -68,11 +68,8 @@ export default function ReebokAdmin() {
       <InventorySection />
       <div className="my-10 border-t border-gray-200" />
       <ProductsSection />
-      <div className="mt-8 text-center">
-        <Link href="/catalogo/reebok/admin/productos" className="text-xs text-gray-400 hover:text-gray-600 underline">
-          Ver lista completa de productos &rarr;
-        </Link>
-      </div>
+      <div className="my-10 border-t border-gray-200" />
+      <ManageSection />
     </div>
   )
 }
@@ -350,6 +347,28 @@ function InventoryResultBlock({ result, notInCSVLabel }: { result: InventoryResu
 
 // ── Section 2: Agregar Productos ───────────────────────────────────────────────
 
+function ManageSection() {
+  return (
+    <section>
+      <h2 className="text-lg font-semibold mb-4">Gestionar Productos</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Link href="/catalogo/reebok/admin/productos" className="border border-gray-200 rounded-lg p-4 hover:border-gray-400 transition-colors">
+          <p className="text-sm font-medium">Ver y eliminar productos</p>
+          <p className="text-xs text-gray-400 mt-1">Elimina productos del catalogo</p>
+        </Link>
+        <Link href="/catalogo/reebok/admin/inventario" className="border border-gray-200 rounded-lg p-4 hover:border-gray-400 transition-colors">
+          <p className="text-sm font-medium">Ver inventario por talla</p>
+          <p className="text-xs text-gray-400 mt-1">Quita tallas o ajusta cantidades</p>
+        </Link>
+        <a href="#agregar" className="border border-gray-200 rounded-lg p-4 hover:border-gray-400 transition-colors">
+          <p className="text-sm font-medium">Agregar productos nuevos</p>
+          <p className="text-xs text-gray-400 mt-1">CSV de productos y fotos</p>
+        </a>
+      </div>
+    </section>
+  )
+}
+
 function ProductsSection() {
   const [importProcessing, setImportProcessing] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult>(null)
@@ -543,7 +562,7 @@ function ProductsSection() {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold mb-3">Agregar Productos</h2>
+      <h2 id="agregar" className="text-lg font-semibold mb-3 scroll-mt-8">Agregar Productos</h2>
 
       {/* Step 1: CSV */}
       <div className="mb-6">
