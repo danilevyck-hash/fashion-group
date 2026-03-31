@@ -351,14 +351,10 @@ function ManageSection() {
   return (
     <section>
       <h2 className="text-lg font-semibold mb-4">Gestionar Productos</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Link href="/catalogo/reebok/admin/productos" className="border border-gray-200 rounded-lg p-4 hover:border-gray-400 transition-colors">
-          <p className="text-sm font-medium">Ver y eliminar productos</p>
-          <p className="text-xs text-gray-400 mt-1">Elimina productos del catalogo</p>
-        </Link>
-        <Link href="/catalogo/reebok/admin/inventario" className="border border-gray-200 rounded-lg p-4 hover:border-gray-400 transition-colors">
-          <p className="text-sm font-medium">Ver inventario por talla</p>
-          <p className="text-xs text-gray-400 mt-1">Quita tallas o ajusta cantidades</p>
+          <p className="text-sm font-medium">Ver, editar y eliminar productos</p>
+          <p className="text-xs text-gray-400 mt-1">Inventario por talla, activo/inactivo, eliminar</p>
         </Link>
         <a href="#agregar" className="border border-gray-200 rounded-lg p-4 hover:border-gray-400 transition-colors">
           <p className="text-sm font-medium">Agregar productos nuevos</p>

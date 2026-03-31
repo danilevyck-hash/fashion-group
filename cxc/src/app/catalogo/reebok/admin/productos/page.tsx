@@ -4,12 +4,14 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import XLSX from 'xlsx-js-style'
-import { Product } from '@/components/reebok/supabase'
+import { Product, InventoryItem } from '@/components/reebok/supabase'
 import AdminNav from '@/components/reebok/AdminNav'
 
 export default function AdminProductos() {
   const router = useRouter()
   const [products, setProducts] = useState<Product[]>([])
+  const [inventory, setInventory] = useState<InventoryItem[]>([])
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [uploadResult, setUploadResult] = useState<{ created: number; updated: number; errors: number } | null>(null)
@@ -20,13 +22,28 @@ export default function AdminProductos() {
       router.push('/catalogo/reebok/admin')
       return
     }
-    loadProducts()
+    loadData()
   }, [router])
 
-  const loadProducts = () => {
-    fetch('/api/catalogo/reebok/products')
-      .then(r => r.json())
-      .then(data => { setProducts(Array.isArray(data) ? data : []); setLoading(false) })
+  const loadData = async () => {
+    const [prods, inv] = await Promise.all([
+      fetch('/api/catalogo/reebok/products').then(r => r.json()),
+      fetch('/api/catalogo/reebok/inventory').then(r => r.json()),
+    ])
+    setProducts(Array.isArray(prods) ? prods : [])
+    setInventory(Array.isArray(inv) ? inv : [])
+    setLoading(false)
+  }
+
+  const getInventory = (productId: string) => inventory.filter(i => i.product_id === productId)
+  const getTotalQty = (productId: string) => getInventory(productId).reduce((s, i) => s + i.quantity, 0)
+
+  const toggle = (id: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }
 
   const toggleField = async (product: Product, field: 'active' | 'on_sale') => {
@@ -35,7 +52,7 @@ export default function AdminProductos() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: product.id, [field]: !product[field] }),
     })
-    loadProducts()
+    loadData()
   }
 
   const deleteProduct = async (id: string) => {
@@ -47,25 +64,46 @@ export default function AdminProductos() {
         alert(`Error al eliminar: ${data.error || `HTTP ${res.status}`}`)
         return
       }
-      // Remove from local state immediately
       setProducts(prev => prev.filter(p => p.id !== id))
+      setInventory(prev => prev.filter(i => i.product_id !== id))
     } catch (err) {
       alert(`Error de conexion: ${err}`)
     }
   }
 
+  // ── Inventory actions ──
+
+  const addSize = async (productId: string, size: string, quantity: number) => {
+    await fetch('/api/catalogo/reebok/inventory', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_id: productId, size, quantity }),
+    })
+    const inv = await fetch('/api/catalogo/reebok/inventory').then(r => r.json())
+    setInventory(Array.isArray(inv) ? inv : [])
+  }
+
+  const updateQty = async (invId: string, quantity: number) => {
+    await fetch('/api/catalogo/reebok/inventory', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: invId, quantity }),
+    })
+    setInventory(prev => prev.map(i => i.id === invId ? { ...i, quantity } : i))
+  }
+
+  const deleteSize = async (invId: string) => {
+    await fetch(`/api/catalogo/reebok/inventory?id=${invId}`, { method: 'DELETE' })
+    setInventory(prev => prev.filter(i => i.id !== invId))
+  }
+
+  // ── Excel template ──
+
   const downloadTemplate = async () => {
     setUploading(true)
     try {
-      // Fetch inventory
-      const invRes = await fetch('/api/catalogo/reebok/inventory')
-      const invData = await invRes.json()
       const invMap: Record<string, number> = {}
-      if (Array.isArray(invData)) {
-        invData.forEach((i: { product_id: string; quantity: number }) => {
-          invMap[i.product_id] = (invMap[i.product_id] || 0) + i.quantity
-        })
-      }
+      inventory.forEach(i => { invMap[i.product_id] = (invMap[i.product_id] || 0) + i.quantity })
 
       const headerStyle = {
         font: { bold: true, color: { rgb: 'FFFFFF' } },
@@ -148,7 +186,7 @@ export default function AdminProductos() {
       })
       const result = await res.json()
       setUploadResult(result)
-      loadProducts()
+      loadData()
     } catch (err) { console.error(err); alert('Error al procesar archivo') }
     setUploading(false)
     if (csvRef.current) csvRef.current.value = ''
@@ -193,63 +231,115 @@ export default function AdminProductos() {
       {loading ? (
         <p className="text-center py-10 text-gray-500">Cargando...</p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-2">Foto</th>
-                <th className="text-left py-3 px-2">SKU</th>
-                <th className="text-left py-3 px-2">Nombre</th>
-                <th className="text-left py-3 px-2">Color</th>
-                <th className="text-left py-3 px-2">Precio</th>
-                <th className="text-left py-3 px-2">Categoria</th>
-                <th className="text-left py-3 px-2">Genero</th>
-                <th className="text-left py-3 px-2">Activo</th>
-                <th className="text-left py-3 px-2">Oferta</th>
-                <th className="text-left py-3 px-2">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.map(p => (
-                <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="py-2 px-2">
-                    <div className="w-12 h-12 bg-reebok-grey rounded overflow-hidden">
-                      {p.image_url ? (
-                        <img src={p.image_url} alt="" className="w-full h-full object-contain" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">-</div>
-                      )}
+        <div className="space-y-2">
+          {products.map(p => (
+            <div key={p.id} className="border border-gray-200 rounded-lg overflow-hidden">
+              {/* Product row */}
+              <div className="flex items-center hover:bg-gray-50">
+                <button onClick={() => toggle(p.id)} className="flex-1 flex items-center gap-3 px-4 py-3 text-left min-w-0">
+                  <div className="w-10 h-10 bg-reebok-grey rounded overflow-hidden flex-shrink-0">
+                    {p.image_url ? <img src={p.image_url} alt="" className="w-full h-full object-contain" /> : <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">-</div>}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-sm truncate">{p.name}</span>
+                      {p.sku && <span className="text-xs text-gray-400 font-mono flex-shrink-0">{p.sku}</span>}
                     </div>
-                  </td>
-                  <td className="py-2 px-2 font-mono text-xs">{p.sku || '-'}</td>
-                  <td className="py-2 px-2 font-medium">{p.name}</td>
-                  <td className="py-2 px-2 text-gray-600">{p.color || '-'}</td>
-                  <td className="py-2 px-2">{p.price ? `$${p.price}` : '-'}</td>
-                  <td className="py-2 px-2">{p.category}</td>
-                  <td className="py-2 px-2">{p.gender || '-'}</td>
-                  <td className="py-2 px-2">
-                    <button onClick={() => toggleField(p, 'active')} className={`px-2 py-1 rounded text-xs font-medium ${p.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {p.active ? 'Si' : 'No'}
-                    </button>
-                  </td>
-                  <td className="py-2 px-2">
-                    <button onClick={() => toggleField(p, 'on_sale')} className={`px-2 py-1 rounded text-xs font-medium ${p.on_sale ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
-                      {p.on_sale ? 'Si' : 'No'}
-                    </button>
-                  </td>
-                  <td className="py-2 px-2">
-                    <div className="flex gap-2">
-                      <Link href={`/catalogo/reebok/admin/productos/nuevo?id=${p.id}`} className="text-blue-600 hover:underline text-xs">Editar</Link>
-                      <button onClick={() => deleteProduct(p.id)} className="text-red-600 hover:underline text-xs">Eliminar</button>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-gray-400">{p.category}</span>
+                      <span className="text-xs text-gray-300">|</span>
+                      <span className="text-xs text-gray-400">{p.gender || '-'}</span>
+                      {p.price && <>
+                        <span className="text-xs text-gray-300">|</span>
+                        <span className="text-xs text-gray-400">${p.price}</span>
+                      </>}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0">
+                    <span className={`text-xs font-medium ${getTotalQty(p.id) > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      {getTotalQty(p.id)} uds
+                    </span>
+                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${expanded.has(p.id) ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+                <div className="flex items-center gap-1.5 px-3 flex-shrink-0 border-l border-gray-100">
+                  <button onClick={() => toggleField(p, 'active')} className={`px-2 py-1 rounded text-xs font-medium ${p.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {p.active ? 'Activo' : 'Inactivo'}
+                  </button>
+                  <button onClick={() => toggleField(p, 'on_sale')} className={`px-2 py-1 rounded text-xs font-medium ${p.on_sale ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-500'}`}>
+                    {p.on_sale ? 'Oferta' : '-'}
+                  </button>
+                  <Link href={`/catalogo/reebok/admin/productos/nuevo?id=${p.id}`} className="text-blue-600 hover:underline text-xs px-1">Editar</Link>
+                  <button onClick={() => deleteProduct(p.id)} className="text-red-600 hover:underline text-xs px-1">Eliminar</button>
+                </div>
+              </div>
+
+              {/* Inventory accordion */}
+              {expanded.has(p.id) && (
+                <div className="border-t px-4 py-3 bg-gray-50">
+                  {getInventory(p.id).length > 0 ? (
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-xs text-gray-500">
+                          <th className="text-left py-1">Talla</th>
+                          <th className="text-left py-1">Cantidad</th>
+                          <th className="text-left py-1"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getInventory(p.id).map(inv => (
+                          <tr key={inv.id} className="border-t border-gray-200">
+                            <td className="py-1 font-medium">{inv.size}</td>
+                            <td className="py-1">
+                              <input
+                                type="number"
+                                value={inv.quantity}
+                                onChange={e => updateQty(inv.id, parseInt(e.target.value) || 0)}
+                                className="w-20 border rounded px-2 py-1 text-sm"
+                                min={0}
+                              />
+                            </td>
+                            <td className="py-1">
+                              <button onClick={() => deleteSize(inv.id)} className="text-red-500 text-xs hover:underline">Quitar talla</button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="text-xs text-gray-500">Sin inventario registrado</p>
+                  )}
+                  <AddSizeForm onAdd={(size, qty) => addSize(p.id, size, qty)} />
+                </div>
+              )}
+            </div>
+          ))}
           {products.length === 0 && <p className="text-center py-10 text-gray-500">No hay productos. Agrega el primero!</p>}
         </div>
       )}
     </div>
+  )
+}
+
+function AddSizeForm({ onAdd }: { onAdd: (size: string, qty: number) => void }) {
+  const [size, setSize] = useState('')
+  const [qty, setQty] = useState('0')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!size) return
+    onAdd(size, parseInt(qty) || 0)
+    setSize('')
+    setQty('0')
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex gap-2 mt-3 pt-3 border-t border-gray-200">
+      <input value={size} onChange={e => setSize(e.target.value)} placeholder="Talla" className="border rounded px-2 py-1 text-sm w-20" />
+      <input type="number" value={qty} onChange={e => setQty(e.target.value)} placeholder="Cant" min={0} className="border rounded px-2 py-1 text-sm w-20" />
+      <button type="submit" className="text-xs bg-reebok-red text-white px-3 py-1 rounded hover:bg-red-700 transition-colors">Agregar</button>
+    </form>
   )
 }
