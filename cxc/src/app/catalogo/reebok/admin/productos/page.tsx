@@ -39,13 +39,19 @@ export default function AdminProductos() {
   }
 
   const deleteProduct = async (id: string) => {
-    if (!confirm('Eliminar este producto?')) return
-    const res = await fetch(`/api/catalogo/reebok/products?id=${id}`, { method: 'DELETE' })
-    if (!res.ok) {
+    if (!confirm('Eliminar este producto? Esta accion no se puede deshacer.')) return
+    try {
+      const res = await fetch(`/api/catalogo/reebok/products?id=${id}`, { method: 'DELETE' })
       const data = await res.json().catch(() => ({}))
-      alert(`Error al eliminar: ${data.error || 'Error desconocido'}`)
+      if (!res.ok) {
+        alert(`Error al eliminar: ${data.error || `HTTP ${res.status}`}`)
+        return
+      }
+      // Remove from local state immediately
+      setProducts(prev => prev.filter(p => p.id !== id))
+    } catch (err) {
+      alert(`Error de conexion: ${err}`)
     }
-    loadProducts()
   }
 
   const downloadTemplate = async () => {

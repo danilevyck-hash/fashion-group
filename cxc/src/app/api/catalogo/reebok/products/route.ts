@@ -36,7 +36,13 @@ export async function DELETE(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
-  const { error } = await reebokServer.from('products').delete().eq('id', id)
-  if (error) { console.error(error); return NextResponse.json({ error: error.message }, { status: 500 }); }
-  return NextResponse.json({ success: true })
+
+  // Delete inventory first (explicit, in case CASCADE fails)
+  await reebokServer.from('inventory').delete().eq('product_id', id)
+
+  // Delete the product
+  const { data, error } = await reebokServer.from('products').delete().eq('id', id).select('id').maybeSingle()
+  if (error) { console.error('DELETE products error:', error); return NextResponse.json({ error: error.message }, { status: 500 }); }
+  if (!data) { return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 }); }
+  return NextResponse.json({ success: true, deleted: data.id })
 }
