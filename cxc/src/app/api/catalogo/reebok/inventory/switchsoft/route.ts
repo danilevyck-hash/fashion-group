@@ -58,7 +58,10 @@ export async function POST(req: NextRequest) {
     for (const item of items) {
       const match = skuMap.get(item.codigo)
       if (!match) {
-        notFound.push({ codigo: item.codigo, descripcion: item.descripcion })
+        // Only report not-found if they have stock — zero-stock codes not in website are irrelevant
+        if (item.existencia > 0) {
+          notFound.push({ codigo: item.codigo, descripcion: item.descripcion })
+        }
         continue
       }
 

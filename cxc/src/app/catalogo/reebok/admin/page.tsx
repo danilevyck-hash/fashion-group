@@ -52,7 +52,7 @@ export default function ReebokAdmin() {
 
   useEffect(() => {
     const role = sessionStorage.getItem('cxc_role')
-    if (role !== 'admin') {
+    if (!role || !['admin', 'secretaria'].includes(role)) {
       router.replace('/')
       return
     }
@@ -188,6 +188,9 @@ function InventorySection() {
         <InventoryResultBlock key={idx} result={result} index={idx} total={results.length} />
       ))}
 
+      {/* Cross-file: "In website but not in CSV" */}
+      {results.length > 0 && <NotInCSVSection results={results} />}
+
       {results.length > 0 && (
         <button
           onClick={() => setResults([])}
@@ -297,28 +300,66 @@ function InventoryResultBlock({ result, index, total }: { result: InventoryResul
         </div>
       )}
 
-      {/* 4. In website but not in CSV */}
-      {result.notInCSV.length > 0 && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-sm font-medium text-gray-700">
-              {result.notInCSV.length} en website pero no en CSV
-            </span>
-            <button
-              onClick={() => copyToClipboard(result.notInCSV.map(i => `${i.sku}\t${i.name}`).join('\n'))}
-              className="text-xs text-gray-600 hover:text-gray-800 underline"
-            >
-              Copiar lista
-            </button>
-          </div>
-          <div className="max-h-32 overflow-y-auto text-xs text-gray-600 font-mono space-y-0.5">
-            {result.notInCSV.map((item, i) => (
-              <div key={i}>{item.sku} — {item.name}</div>
-            ))}
-          </div>
-          <p className="text-xs text-gray-500 mt-2 italic">Pueden estar en el otro archivo de inventario</p>
+    </div>
+  )
+}
+
+// ── Cross-file: Not In CSV ─────────────────────────────────────────────────────
+
+function NotInCSVSection({ results }: { results: InventoryResult[] }) {
+  if (results.length === 1) {
+    // Only 1 file uploaded — show per-file list with note
+    const items = results[0].notInCSV
+    if (items.length === 0) return null
+    return (
+      <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-sm font-medium text-gray-700">
+            {items.length} en website pero no en este CSV
+          </span>
+          <button
+            onClick={() => copyToClipboard(items.map(i => `${i.sku}\t${i.name}`).join('\n'))}
+            className="text-xs text-gray-600 hover:text-gray-800 underline"
+          >
+            Copiar lista
+          </button>
         </div>
-      )}
+        <p className="text-xs text-gray-500 italic">Sube el segundo archivo para ver el reporte completo</p>
+      </div>
+    )
+  }
+
+  // 2+ files — intersect: only products that appear in ALL notInCSV lists
+  const skuSets = results.map(r => new Set(r.notInCSV.map(i => i.sku)))
+  const nameMap = new Map<string, string>()
+  for (const r of results) {
+    for (const item of r.notInCSV) {
+      nameMap.set(item.sku, item.name)
+    }
+  }
+  const intersection = Array.from(skuSets[0]).filter(sku => skuSets.every(s => s.has(sku)))
+  const items = intersection.map(sku => ({ sku, name: nameMap.get(sku) || '' }))
+
+  if (items.length === 0) return null
+
+  return (
+    <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-sm font-medium text-gray-700">
+          {items.length} en website pero no en ningun CSV
+        </span>
+        <button
+          onClick={() => copyToClipboard(items.map(i => `${i.sku}\t${i.name}`).join('\n'))}
+          className="text-xs text-gray-600 hover:text-gray-800 underline"
+        >
+          Copiar lista
+        </button>
+      </div>
+      <div className="max-h-32 overflow-y-auto text-xs text-gray-600 font-mono space-y-0.5">
+        {items.map((item, i) => (
+          <div key={i}>{item.sku} — {item.name}</div>
+        ))}
+      </div>
     </div>
   )
 }
