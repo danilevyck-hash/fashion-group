@@ -433,7 +433,7 @@ function ImportExportSection({ products, inventory, onDataChange }: {
     <div>
       <div className="grid grid-cols-3 gap-2 mb-4">
         {(['import', 'photos', 'export'] as const).map(key => {
-          const labels = { import: 'Importar productos', photos: 'Subir fotos', export: 'Exportar catalogo' }
+          const labels = { import: 'Agregar productos', photos: 'Subir fotos', export: 'Exportar catálogo' }
           return (
             <button key={key} onClick={() => setActive(active === key ? null : key)}
               className={`py-3 rounded-lg text-sm font-medium transition-colors ${active === key ? 'bg-black text-white' : 'border border-gray-200 text-gray-700 hover:border-gray-400'}`}>
@@ -456,61 +456,88 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
   const [result, setResult] = useState<{ created: number; updated: number; errors: number } | null>(null)
   const ref = useRef<HTMLInputElement>(null)
 
+  function autoMapHeaders(headers: string[]) {
+    const fm: Record<number, string> = {}
+    headers.forEach((h, i) => {
+      const l = h.toLowerCase().replace(/[^a-z]/g, '')
+      if (l.includes('sku') || l.includes('codigo') || l.includes('item') || l.includes('style')) fm[i] = 'sku'
+      else if (l.includes('nombre') || l === 'name' || l.includes('modelo')) fm[i] = 'name'
+      else if (l.includes('precio') || l === 'price' || l.includes('rrp') || l.includes('retail') || l.includes('wsp')) fm[i] = 'price'
+      else if (l.includes('color') || l.includes('colour')) fm[i] = 'color'
+      else if (l.includes('categ') || l.includes('depart')) fm[i] = 'category'
+      else if (l.includes('gender') || l.includes('genero') || l.includes('sexo')) fm[i] = 'gender'
+      else if (l.includes('sub') || l.includes('segment') || l.includes('tipo')) fm[i] = 'sub_category'
+      else if (l.includes('desc')) fm[i] = 'description'
+      else if (l.includes('existencia') || l.includes('quantity') || l.includes('cantidad') || l.includes('qty')) fm[i] = 'quantity'
+      else if (l.includes('oferta') || l.includes('sale')) fm[i] = 'on_sale'
+      else if (l.includes('activo') || l.includes('active')) fm[i] = 'active'
+    })
+    return fm
+  }
+
+  function rowToProduct(cols: string[], fm: Record<number, string>) {
+    const p: Record<string, string | number | boolean | undefined> = {}
+    Object.entries(fm).forEach(([idx, field]) => {
+      const v = cols[parseInt(idx)] || ''; if (!v) return
+      if (field === 'price') { const n = parseFloat(v.replace(/[^0-9.,]/g, '').replace(',', '.')); p[field] = isNaN(n) ? undefined : n }
+      else if (field === 'gender') { const x = v.toLowerCase(); p[field] = x.includes('hombre') || x.includes('male') || x === 'm' ? 'male' : x.includes('mujer') || x.includes('female') || x === 'f' ? 'female' : x.includes('nino') || x.includes('kid') ? 'kids' : x.includes('unisex') ? 'unisex' : v }
+      else if (field === 'category') { const x = v.toLowerCase(); p[field] = x.includes('foot') || x.includes('calzado') ? 'footwear' : x.includes('apparel') || x.includes('ropa') ? 'apparel' : x.includes('acces') ? 'accessories' : v || 'footwear' }
+      else if (field === 'quantity') p[field] = parseInt(v) || 0
+      else if (field === 'on_sale') { const x = v.toLowerCase(); p[field] = x === 'si' || x === 'yes' || x === 'true' }
+      else if (field === 'active') { const x = v.toLowerCase(); p[field] = x !== 'no' && x !== 'false' }
+      else p[field] = v
+    })
+    if (!p.sku) return null
+    if (!p.category) p.category = 'footwear'; if (!p.name) p.name = p.sku as string; if (p.active === undefined) p.active = true
+    return p
+  }
+
+  async function parseCSV(file: File) {
+    const text = await file.text()
+    const lines = text.split(/\r?\n/).filter(l => l.trim())
+    if (lines.length < 2) return []
+    const delimiter = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ','
+    const parseLine = (line: string) => {
+      const r: string[] = []; let cur = '', inQ = false
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i]
+        if (ch === '"') { if (inQ && line[i + 1] === '"') { cur += '"'; i++ } else inQ = !inQ }
+        else if (ch === delimiter && !inQ) { r.push(cur.trim()); cur = '' } else cur += ch
+      }
+      r.push(cur.trim()); return r
+    }
+    const headers = parseLine(lines[0])
+    const fm = autoMapHeaders(headers)
+    const prods: Record<string, string | number | boolean | undefined>[] = []
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseLine(lines[i]); if (cols.every(c => !c)) continue
+      const p = rowToProduct(cols, fm); if (p) prods.push(p)
+    }
+    return prods
+  }
+
+  async function parseExcel(file: File) {
+    const XLSX = (await import('xlsx-js-style')).default
+    const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' })
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    const rows: string[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as string[][]
+    if (rows.length < 2) return []
+    const headers = rows[0].map(h => String(h))
+    const fm = autoMapHeaders(headers)
+    const prods: Record<string, string | number | boolean | undefined>[] = []
+    for (let i = 1; i < rows.length; i++) {
+      const cols = rows[i].map(c => String(c).trim()); if (cols.every(c => !c)) continue
+      const p = rowToProduct(cols, fm); if (p) prods.push(p)
+    }
+    return prods
+  }
+
   const handleFile = async (file: File) => {
     setProcessing(true); setResult(null)
     try {
-      const text = await file.text()
-      const lines = text.split(/\r?\n/).filter(l => l.trim())
-      if (lines.length < 2) { setProcessing(false); return }
-      const delimiter = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ','
-
-      const parseLine = (line: string) => {
-        const r: string[] = []; let cur = '', inQ = false
-        for (let i = 0; i < line.length; i++) {
-          const ch = line[i]
-          if (ch === '"') { if (inQ && line[i + 1] === '"') { cur += '"'; i++ } else inQ = !inQ }
-          else if (ch === delimiter && !inQ) { r.push(cur.trim()); cur = '' } else cur += ch
-        }
-        r.push(cur.trim()); return r
-      }
-
-      const headers = parseLine(lines[0])
-      const fm: Record<number, string> = {}
-      headers.forEach((h, i) => {
-        const l = h.toLowerCase().replace(/[^a-z]/g, '')
-        if (l.includes('sku') || l.includes('codigo') || l.includes('item') || l.includes('style')) fm[i] = 'sku'
-        else if (l.includes('nombre') || l === 'name' || l.includes('modelo')) fm[i] = 'name'
-        else if (l.includes('precio') || l === 'price' || l.includes('rrp') || l.includes('retail') || l.includes('wsp')) fm[i] = 'price'
-        else if (l.includes('color') || l.includes('colour')) fm[i] = 'color'
-        else if (l.includes('categ') || l.includes('depart')) fm[i] = 'category'
-        else if (l.includes('gender') || l.includes('genero') || l.includes('sexo')) fm[i] = 'gender'
-        else if (l.includes('sub') || l.includes('segment') || l.includes('tipo')) fm[i] = 'sub_category'
-        else if (l.includes('desc')) fm[i] = 'description'
-        else if (l.includes('existencia') || l.includes('quantity') || l.includes('cantidad') || l.includes('qty')) fm[i] = 'quantity'
-        else if (l.includes('oferta') || l.includes('sale')) fm[i] = 'on_sale'
-        else if (l.includes('activo') || l.includes('active')) fm[i] = 'active'
-      })
-
-      const prods: Record<string, string | number | boolean | undefined>[] = []
-      for (let i = 1; i < lines.length; i++) {
-        const cols = parseLine(lines[i]); if (cols.every(c => !c)) continue
-        const p: Record<string, string | number | boolean | undefined> = {}
-        Object.entries(fm).forEach(([idx, field]) => {
-          const v = cols[parseInt(idx)] || ''; if (!v) return
-          if (field === 'price') { const n = parseFloat(v.replace(/[^0-9.,]/g, '').replace(',', '.')); p[field] = isNaN(n) ? undefined : n }
-          else if (field === 'gender') { const x = v.toLowerCase(); p[field] = x.includes('hombre') || x.includes('male') || x === 'm' ? 'male' : x.includes('mujer') || x.includes('female') || x === 'f' ? 'female' : x.includes('nino') || x.includes('kid') ? 'kids' : x.includes('unisex') ? 'unisex' : v }
-          else if (field === 'category') { const x = v.toLowerCase(); p[field] = x.includes('foot') || x.includes('calzado') ? 'footwear' : x.includes('apparel') || x.includes('ropa') ? 'apparel' : x.includes('acces') ? 'accessories' : v || 'footwear' }
-          else if (field === 'quantity') p[field] = parseInt(v) || 0
-          else if (field === 'on_sale') { const x = v.toLowerCase(); p[field] = x === 'si' || x === 'yes' || x === 'true' }
-          else if (field === 'active') { const x = v.toLowerCase(); p[field] = x !== 'no' && x !== 'false' }
-          else p[field] = v
-        })
-        if (!p.sku) continue
-        if (!p.category) p.category = 'footwear'; if (!p.name) p.name = p.sku as string; if (p.active === undefined) p.active = true
-        prods.push(p)
-      }
-      if (prods.length === 0) { alert('Sin productos validos'); setProcessing(false); return }
-
+      const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
+      const prods = isExcel ? await parseExcel(file) : await parseCSV(file)
+      if (prods.length === 0) { alert('Sin productos válidos'); setProcessing(false); return }
       const res = await fetch('/api/catalogo/reebok/products/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ products: prods }) })
       setResult(await res.json()); onDone()
     } catch { alert('Error al procesar') }
@@ -529,8 +556,8 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
           </div>
         ) : (
           <label className="inline-flex items-center gap-2 bg-black text-white px-4 py-2 rounded text-sm font-medium hover:bg-gray-800 cursor-pointer">
-            Seleccionar CSV
-            <input ref={ref} type="file" accept=".csv,.tsv,.txt" onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]) }} className="hidden" />
+            Seleccionar CSV o Excel
+            <input ref={ref} type="file" accept=".csv,.tsv,.txt,.xlsx,.xls" onChange={e => { if (e.target.files?.[0]) handleFile(e.target.files[0]) }} className="hidden" />
           </label>
         )}
     </div>
