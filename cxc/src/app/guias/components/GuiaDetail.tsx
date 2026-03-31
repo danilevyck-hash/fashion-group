@@ -57,9 +57,8 @@ export default function GuiaDetail({
 
   const isDispatched = !!g.placa;
   const canComplete = (role === "bodega" || role === "admin") && !isDispatched;
-  const canEdit =
-    (role === "admin" || role === "secretaria" || role === "bodega") && !isDispatched;
-  const canDelete = role === "admin" || (role === "secretaria" && !isDispatched);
+  const canEdit = role === "admin" || role === "secretaria" || (role === "bodega" && !isDispatched);
+  const canDelete = role === "admin" || role === "secretaria";
 
   function handleConfirmar() {
     if (!bPlaca.trim()) {
