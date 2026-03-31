@@ -12,7 +12,7 @@ function getCachedQty(productId: string): number {
   } catch { return 0; }
 }
 
-export default React.memo(function ProductCard({ product, stock = 0 }: { product: Product; stock?: number }) {
+export default function ProductCard({ product, stock = 0 }: { product: Product; stock?: number }) {
   const [qty, setQty] = useState(() => getCachedQty(product.id));
   const [busy, setBusy] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
@@ -181,4 +181,4 @@ export default React.memo(function ProductCard({ product, stock = 0 }: { product
       )}
     </>
   );
-});
+}
