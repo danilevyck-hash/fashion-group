@@ -9,7 +9,7 @@ interface OrderItem { id?: string; product_id: string; sku: string; name: string
 interface Order { id: string; order_number: string; client_name: string; comment: string; total: number; reebok_order_items: OrderItem[]; created_at: string; }
 interface DirClient { nombre: string; empresa: string; }
 
-const P = 12;
+const P = 12; // piezas por bulto
 
 export default function OrderDetailPage() {
   const router = useRouter();

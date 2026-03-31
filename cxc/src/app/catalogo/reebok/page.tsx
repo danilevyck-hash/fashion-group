@@ -31,13 +31,13 @@ export default function ReebokLanding() {
             onClick={() => router.push("/catalogo/reebok/admin")}
             className="w-full bg-black text-white py-5 rounded-lg text-sm font-medium hover:bg-gray-800 transition"
           >
-            Administrar Catalogo
+            Administrar Catálogo
           </button>
           <button
             onClick={() => router.push("/catalogo/reebok/productos")}
             className="w-full bg-white text-black border border-black py-5 rounded-lg text-sm font-medium hover:bg-gray-50 transition"
           >
-            Ver Catalogo y Pedidos
+            Ver Catálogo y Pedidos
           </button>
         </div>
       </div>
@@ -60,7 +60,7 @@ export default function ReebokLanding() {
           onClick={() => router.push("/catalogo/reebok/productos")}
           className="w-full bg-white text-black border border-black py-4 rounded text-sm font-medium hover:bg-gray-50 transition"
         >
-          Ver catalogo
+          Ver catálogo
         </button>
         <button
           onClick={() => router.push("/catalogo/reebok/pedidos")}

@@ -6,7 +6,7 @@ interface DirClient { nombre: string; empresa: string; }
 
 interface Props {
   onClose: () => void;
-  onCreated: (orderId: string, orderNumber: string, clientName: string) => void;
+  onCreated: (orderId: string, orderNumber?: string, clientName?: string) => void;
   autoAddProduct?: { product_id: string; sku: string; name: string; image_url: string; unit_price: number };
 }
 

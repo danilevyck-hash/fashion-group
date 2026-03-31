@@ -60,19 +60,25 @@ function NuevoProducto() {
       price: form.price ? parseFloat(form.price) : null,
       ...(editId ? { id: editId } : {}),
     }
-    await fetch('/api/catalogo/reebok/products', {
+    const res = await fetch('/api/catalogo/reebok/products', {
       method: editId ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
-    router.push('/catalogo/reebok/admin/productos')
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      alert(`Error al guardar: ${d.error || 'Error desconocido'}`)
+      setSaving(false)
+      return
+    }
+    router.push('/catalogo/reebok/admin')
   }
 
   const set = (key: string, value: string | boolean) => setForm(f => ({ ...f, [key]: value }))
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
-      <Link href="/catalogo/reebok/admin/productos" className="text-sm text-reebok-red hover:underline mb-6 inline-block">&larr; Volver a productos</Link>
+      <Link href="/catalogo/reebok/admin" className="text-sm text-reebok-red hover:underline mb-6 inline-block">← Volver</Link>
       <h1 className="text-2xl font-bold mb-6">{editId ? 'Editar Producto' : 'Nuevo Producto'}</h1>
 
       <form onSubmit={handleSave} className="space-y-4">
@@ -88,7 +94,7 @@ function NuevoProducto() {
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Descripcion</label>
+          <label className="block text-sm font-medium mb-1">Descripción</label>
           <textarea value={form.description} onChange={e => set('description', e.target.value)} rows={3} className="w-full border rounded px-3 py-2 text-sm" />
         </div>
 
@@ -98,7 +104,7 @@ function NuevoProducto() {
             <input type="number" step="0.01" value={form.price} onChange={e => set('price', e.target.value)} className="w-full border rounded px-3 py-2 text-sm" placeholder="79.95" />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Categoria *</label>
+            <label className="block text-sm font-medium mb-1">Categoría *</label>
             <select value={form.category} onChange={e => set('category', e.target.value)} className="w-full border rounded px-3 py-2 text-sm">
               <option value="footwear">Calzado</option>
               <option value="apparel">Ropa</option>
@@ -106,18 +112,18 @@ function NuevoProducto() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Genero</label>
+            <label className="block text-sm font-medium mb-1">Género</label>
             <select value={form.gender} onChange={e => set('gender', e.target.value)} className="w-full border rounded px-3 py-2 text-sm">
               <option value="male">Hombre</option>
               <option value="female">Mujer</option>
-              <option value="kids">Ninos</option>
+              <option value="kids">Niños</option>
             </select>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Sub-categoria</label>
+            <label className="block text-sm font-medium mb-1">Subcategoría</label>
             <input value={form.sub_category} onChange={e => set('sub_category', e.target.value)} className="w-full border rounded px-3 py-2 text-sm" placeholder="classics, running, training" />
           </div>
           <div>
@@ -159,7 +165,7 @@ function NuevoProducto() {
 
         <label className="flex items-center gap-2">
           <input type="checkbox" checked={form.active} onChange={e => set('active', e.target.checked)} />
-          <span className="text-sm">Producto activo (visible en catalogo)</span>
+          <span className="text-sm">Producto activo (visible en catálogo)</span>
         </label>
 
         <button type="submit" disabled={saving || !form.name} className="w-full bg-reebok-red text-white py-3 rounded font-bold text-sm uppercase hover:bg-red-700 transition-colors disabled:opacity-50">

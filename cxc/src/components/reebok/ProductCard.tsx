@@ -14,10 +14,10 @@ function getCachedQty(productId: string): number {
 
 export default function ProductCard({ product, stock = 0 }: { product: Product; stock?: number }) {
   const [qty, setQty] = useState(() => getCachedQty(product.id));
-  const [busy, setBusy] = useState(false);
+  const [busy] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
 
-  const genderLabel = product.gender === "male" ? "Hombre" : product.gender === "female" ? "Mujer" : product.gender === "kids" ? "Ninos" : "";
+  const genderLabel = product.gender === "male" ? "Hombre" : product.gender === "female" ? "Mujer" : product.gender === "kids" ? "Niños" : "";
 
   // Check if product is in active order on mount
   const checkOrder = useCallback(async () => {

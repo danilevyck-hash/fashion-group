@@ -138,10 +138,11 @@ function ProductsListSection({
   )
 
   const toggleField = async (p: Product, field: 'active' | 'on_sale') => {
-    await fetch('/api/catalogo/reebok/products', {
+    const res = await fetch('/api/catalogo/reebok/products', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: p.id, [field]: !p[field] }),
     })
+    if (!res.ok) { alert('Error al actualizar'); return }
     setProducts(prev => prev.map(x => x.id === p.id ? { ...x, [field]: !x[field] } : x))
   }
 
@@ -184,7 +185,7 @@ function ProductsListSection({
       <div className="flex items-center gap-3 mb-4">
         <input
           value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar por nombre o SKU..."
+          placeholder="Buscar por nombre o SKU..." aria-label="Buscar productos"
           className="flex-1 border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition"
         />
         <Link href="/catalogo/reebok/admin/productos/nuevo"
@@ -227,7 +228,7 @@ function ProductsListSection({
               <div className="flex items-center gap-1 px-2 flex-shrink-0 border-l border-gray-100">
                 <button onClick={() => toggleField(p, 'active')}
                   className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${p.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
-                  {p.active ? 'Act' : 'Inact'}
+                  {p.active ? 'Activo' : 'Inactivo'}
                 </button>
                 <button onClick={() => toggleField(p, 'on_sale')}
                   className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${p.on_sale ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-400'}`}>
@@ -251,7 +252,7 @@ function ProductsListSection({
                         <tr key={inv.id} className="border-t border-gray-200">
                           <td className="py-1 font-medium">{inv.size}</td>
                           <td className="py-1">
-                            <input type="number" value={inv.quantity} min={0}
+                            <input type="number" value={inv.quantity} min={0} step={1}
                               onChange={e => updateQty(inv.id, parseInt(e.target.value) || 0)}
                               className="w-20 border rounded px-2 py-1 text-sm" />
                           </td>

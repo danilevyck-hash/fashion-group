@@ -44,7 +44,7 @@ export default function ProductoDetalle() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      <Link href="/" className="text-sm text-reebok-red hover:underline mb-6 inline-block">&larr; Volver al catalogo</Link>
+      <Link href="/catalogo/reebok/productos" className="text-sm text-reebok-red hover:underline mb-6 inline-block">← Volver al catálogo</Link>
 
       <div className="grid md:grid-cols-2 gap-8">
         <div className="aspect-square bg-reebok-grey rounded-lg overflow-hidden">
@@ -109,7 +109,7 @@ export default function ProductoDetalle() {
           ) : (
             <div className="bg-reebok-grey p-4 rounded text-center">
               <p className="text-gray-600">Tallas no disponibles en este momento</p>
-              <p className="text-sm text-gray-500 mt-1">Consulta disponibilidad por WhatsApp</p>
+              <p className="text-sm text-gray-500 mt-1">Consulta disponibilidad con tu vendedor</p>
             </div>
           )}
         </div>

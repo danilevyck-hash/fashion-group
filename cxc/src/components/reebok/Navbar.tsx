@@ -33,7 +33,7 @@ export default function Navbar() {
           {isManager && (
             <div className="flex items-center gap-3">
               <Link href="/catalogo/reebok/pedidos" className="text-xs text-gray-500 hover:text-black transition">Pedidos</Link>
-              <button onClick={() => setShowNewOrder(true)} className="text-xs bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800 transition">+ Nuevo</button>
+              <button onClick={() => setShowNewOrder(true)} className="text-xs bg-black text-white px-3 py-1.5 rounded hover:bg-gray-800 transition">Nuevo pedido</button>
             </div>
           )}
         </div>

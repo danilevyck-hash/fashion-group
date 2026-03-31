@@ -86,7 +86,7 @@ function Productos() {
 
         // Embed stock into each product — single state, no sync issues
         setProducts(prods.map(p => ({ ...p, _stock: stockMap[p.id] || 0 })));
-      } catch { /* */ }
+      } catch { setProducts([]); }
       setLoading(false);
     }
     load();
@@ -109,14 +109,14 @@ function Productos() {
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
-        <input value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Buscar..."
+        <input value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Buscar..." aria-label="Buscar productos"
           className="border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition w-48" />
         <select value={gender} onChange={e => setGender(e.target.value)}
           className="border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition bg-transparent">
           <option value="">Todos</option>
           <option value="male">Hombre</option>
           <option value="female">Mujer</option>
-          <option value="kids">Ninos</option>
+          <option value="kids">Niños</option>
         </select>
         <select value={category} onChange={e => setCategory(e.target.value)}
           className="border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition bg-transparent">
