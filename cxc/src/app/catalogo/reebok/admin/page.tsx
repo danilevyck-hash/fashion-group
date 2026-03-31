@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -67,6 +68,11 @@ export default function ReebokAdmin() {
       <InventorySection />
       <div className="my-10 border-t border-gray-200" />
       <ProductsSection />
+      <div className="mt-8 text-center">
+        <Link href="/catalogo/reebok/admin/productos" className="text-xs text-gray-400 hover:text-gray-600 underline">
+          Ver lista completa de productos &rarr;
+        </Link>
+      </div>
     </div>
   )
 }
@@ -74,8 +80,42 @@ export default function ReebokAdmin() {
 // ── Section 1: Actualizar Inventario ───────────────────────────────────────────
 
 function InventorySection() {
+  const [shoesResult, setShoesResult] = useState<InventoryResult | null>(null)
+  const [wearResult, setWearResult] = useState<InventoryResult | null>(null)
+
+  return (
+    <section>
+      <h2 className="text-lg font-semibold mb-3">Actualizar Inventario</h2>
+
+      <div className="text-xs text-gray-500 space-y-1 mb-5">
+        <p>Descarga el listado de articulos desde Switch Soft &rarr; Stock Articulos &rarr; Listado de Articulos &rarr; Descargar (primera opcion)</p>
+        <p>Descarga cada empresa por separado desde Switch Soft y sube cada archivo en su seccion correspondiente</p>
+        <p>El sistema actualiza solo los productos que encuentre por codigo</p>
+      </div>
+
+      <div className="space-y-6">
+        <InventoryZone label="Active Shoes" result={shoesResult} onResult={setShoesResult} />
+        <InventoryZone label="Active Wear" result={wearResult} onResult={setWearResult} />
+      </div>
+
+      {/* Cross-zone: "In website but not in any CSV" */}
+      <NotInCSVCrossSection shoesResult={shoesResult} wearResult={wearResult} />
+    </section>
+  )
+}
+
+// ── Inventory Zone (reusable for Shoes / Wear) ────────────────────────────────
+
+function InventoryZone({
+  label,
+  result,
+  onResult,
+}: {
+  label: string
+  result: InventoryResult | null
+  onResult: (r: InventoryResult | null) => void
+}) {
   const [processing, setProcessing] = useState(false)
-  const [results, setResults] = useState<InventoryResult[]>([])
   const [dragging, setDragging] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -93,7 +133,6 @@ function InventorySection() {
         return
       }
 
-      // Parse header — normalize to strip accents
       const header = lines[0].split(';').map(h => h.trim().replace(/"/g, ''))
       const codigoIdx = header.findIndex(h => normalizeHeader(h) === 'CODIGO')
       const existenciaIdx = header.findIndex(h => normalizeHeader(h) === 'EXISTENCIA')
@@ -105,7 +144,6 @@ function InventorySection() {
         return
       }
 
-      // Parse rows — keep last value per CODIGO (handles duplicates)
       const map = new Map<string, { existencia: number; descripcion: string }>()
       for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(';').map(c => c.trim().replace(/"/g, ''))
@@ -129,12 +167,12 @@ function InventorySection() {
         body: JSON.stringify({ items }),
       })
       const data: InventoryResult = await res.json()
-      setResults(prev => [...prev, data])
+      onResult(data)
     } catch {
       alert('Error al procesar el archivo')
     }
     setProcessing(false)
-  }, [])
+  }, [onResult])
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
@@ -144,18 +182,11 @@ function InventorySection() {
   }
 
   return (
-    <section>
-      <h2 className="text-lg font-semibold mb-3">Actualizar Inventario</h2>
+    <div>
+      <h3 className="text-sm font-semibold text-gray-700 mb-2">{label}</h3>
 
-      <div className="text-xs text-gray-500 space-y-1 mb-4">
-        <p>Descarga el listado de articulos desde Switch Soft &rarr; Stock Articulos &rarr; Listado de Articulos &rarr; Descargar (primera opcion)</p>
-        <p>Sube primero el archivo de zapatos, luego el de ropa/accesorios</p>
-        <p>El sistema actualiza solo los productos que encuentre por codigo</p>
-      </div>
-
-      {/* Drop zone — always visible unless processing */}
       {processing ? (
-        <div className="flex items-center justify-center py-10">
+        <div className="flex items-center justify-center py-8 border border-gray-200 rounded-lg">
           <Spinner />
         </div>
       ) : (
@@ -164,15 +195,15 @@ function InventorySection() {
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
           onClick={() => fileRef.current?.click()}
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
+          className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
             dragging ? 'border-reebok-red bg-red-50' : 'border-gray-300 hover:border-gray-400'
           }`}
         >
-          <svg className="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-6 h-6 mx-auto text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
-          <p className="font-medium text-sm">Subir CSV de Switch Soft</p>
-          <p className="text-xs text-gray-400 mt-1">.csv</p>
+          <p className="text-sm font-medium">Subir CSV — {label}</p>
+          <p className="text-xs text-gray-400 mt-0.5">.csv</p>
           <input
             ref={fileRef}
             type="file"
@@ -183,37 +214,28 @@ function InventorySection() {
         </div>
       )}
 
-      {/* Results — one block per uploaded file */}
-      {results.map((result, idx) => (
-        <InventoryResultBlock key={idx} result={result} index={idx} total={results.length} />
-      ))}
-
-      {/* Cross-file: "In website but not in CSV" */}
-      {results.length > 0 && <NotInCSVSection results={results} />}
-
-      {results.length > 0 && (
-        <button
-          onClick={() => setResults([])}
-          className="text-xs text-gray-400 hover:text-gray-600 underline mt-3"
-        >
-          Limpiar resultados
-        </button>
+      {result && (
+        <>
+          <InventoryResultBlock result={result} />
+          <button
+            onClick={() => onResult(null)}
+            className="text-xs text-gray-400 hover:text-gray-600 underline mt-2"
+          >
+            Limpiar resultados
+          </button>
+        </>
       )}
-    </section>
+    </div>
   )
 }
 
 // ── Inventory Result Block ─────────────────────────────────────────────────────
 
-function InventoryResultBlock({ result, index, total }: { result: InventoryResult; index: number; total: number }) {
+function InventoryResultBlock({ result }: { result: InventoryResult }) {
   const [showUpdated, setShowUpdated] = useState(false)
 
-  const label = total > 1 ? `Archivo ${index + 1}` : null
-
   return (
-    <div className="mt-4 space-y-2">
-      {label && <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</p>}
-
+    <div className="mt-3 space-y-2">
       {/* 1. Updated */}
       {result.updated.length > 0 && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-3">
@@ -299,51 +321,63 @@ function InventoryResultBlock({ result, index, total }: { result: InventoryResul
           </div>
         </div>
       )}
-
     </div>
   )
 }
 
-// ── Cross-file: Not In CSV ─────────────────────────────────────────────────────
+// ── Cross-zone: Not In CSV ────────────────────────────────────────────────────
 
-function NotInCSVSection({ results }: { results: InventoryResult[] }) {
-  if (results.length === 1) {
-    // Only 1 file uploaded — show per-file list with note
-    const items = results[0].notInCSV
+function NotInCSVCrossSection({
+  shoesResult,
+  wearResult,
+}: {
+  shoesResult: InventoryResult | null
+  wearResult: InventoryResult | null
+}) {
+  const hasShoes = shoesResult !== null
+  const hasWear = wearResult !== null
+
+  if (!hasShoes && !hasWear) return null
+
+  // Only one zone uploaded — show note
+  if (hasShoes && !hasWear) {
+    const items = shoesResult.notInCSV
     if (items.length === 0) return null
     return (
-      <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-sm font-medium text-gray-700">
-            {items.length} en website pero no en este CSV
-          </span>
-          <button
-            onClick={() => copyToClipboard(items.map(i => `${i.sku}\t${i.name}`).join('\n'))}
-            className="text-xs text-gray-600 hover:text-gray-800 underline"
-          >
-            Copiar lista
-          </button>
-        </div>
-        <p className="text-xs text-gray-500 italic">Sube el segundo archivo para ver el reporte completo</p>
+      <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <span className="text-sm font-medium text-gray-700">
+          {items.length} en website pero no en Active Shoes
+        </span>
+        <p className="text-xs text-gray-500 italic mt-1">Sube tambien el archivo de Active Wear para ver el reporte completo</p>
       </div>
     )
   }
 
-  // 2+ files — intersect: only products that appear in ALL notInCSV lists
-  const skuSets = results.map(r => new Set(r.notInCSV.map(i => i.sku)))
-  const nameMap = new Map<string, string>()
-  for (const r of results) {
-    for (const item of r.notInCSV) {
-      nameMap.set(item.sku, item.name)
-    }
+  if (!hasShoes && hasWear) {
+    const items = wearResult.notInCSV
+    if (items.length === 0) return null
+    return (
+      <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-3">
+        <span className="text-sm font-medium text-gray-700">
+          {items.length} en website pero no en Active Wear
+        </span>
+        <p className="text-xs text-gray-500 italic mt-1">Sube tambien el archivo de Active Shoes para ver el reporte completo</p>
+      </div>
+    )
   }
-  const intersection = Array.from(skuSets[0]).filter(sku => skuSets.every(s => s.has(sku)))
-  const items = intersection.map(sku => ({ sku, name: nameMap.get(sku) || '' }))
+
+  // Both zones have results — intersect
+  const shoesSet = new Set(shoesResult!.notInCSV.map(i => i.sku))
+  const nameMap = new Map<string, string>()
+  for (const item of shoesResult!.notInCSV) nameMap.set(item.sku, item.name)
+  for (const item of wearResult!.notInCSV) nameMap.set(item.sku, item.name)
+
+  const items = wearResult!.notInCSV.filter(i => shoesSet.has(i.sku))
 
   if (items.length === 0) return null
 
   return (
-    <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg p-3">
+    <div className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-3">
       <div className="flex items-center justify-between mb-1">
         <span className="text-sm font-medium text-gray-700">
           {items.length} en website pero no en ningun CSV
