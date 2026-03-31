@@ -96,6 +96,15 @@ function Productos() {
     load();
   }, []);
 
+  // Debug: check if keys match at render time
+  if (products.length > 0 && Object.keys(inventoryMap).length > 0) {
+    const fp = products[0];
+    const mk = Object.keys(inventoryMap)[0];
+    console.log('[MATCH] p.id:', fp.id, 'type:', typeof fp.id, '| map key:', mk, 'type:', typeof mk, '| match:', fp.id === mk, '| lookup:', inventoryMap[fp.id], '| map size:', Object.keys(inventoryMap).length);
+  } else {
+    console.log('[MATCH] products:', products.length, 'mapKeys:', Object.keys(inventoryMap).length);
+  }
+
   const filtered = products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => !gender || p.gender === gender)
