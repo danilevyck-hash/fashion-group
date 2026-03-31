@@ -478,7 +478,7 @@ export default function UsuariosPage() {
             <div className="text-sm font-medium">Catálogo Reebok</div>
             <div className="text-xs text-gray-400 mt-0.5">Administración de productos, inventario y fotos</div>
           </div>
-          <button onClick={() => router.push("/catalogo/reebok/admin/productos")} className="text-sm border border-gray-200 px-4 py-2 rounded-full hover:border-gray-400 transition">
+          <button onClick={() => router.push("/catalogo/reebok/admin")} className="text-sm border border-gray-200 px-4 py-2 rounded-full hover:border-gray-400 transition">
             Abrir Admin →
           </button>
         </div>

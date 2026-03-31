@@ -6,9 +6,11 @@ import { useRouter } from 'next/navigation'
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type InventoryResult = {
-  updated: { sku: string; name: string; existencia: number }[]
-  notFound: string[]
-} | null
+  updated: { sku: string; name: string; anterior: number; nueva: number }[]
+  wentToZero: { sku: string; name: string }[]
+  notFound: { codigo: string; descripcion: string }[]
+  notInCSV: { sku: string; name: string }[]
+}
 
 type ImportResult = {
   created: number
@@ -21,6 +23,25 @@ type PhotoResult = {
   sku: string
   status: 'success' | 'no_match' | 'error'
   message: string
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+
+function normalizeHeader(h: string): string {
+  return h.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim()
+}
+
+function copyToClipboard(text: string) {
+  navigator.clipboard.writeText(text)
+}
+
+function Spinner({ className = 'h-6 w-6' }: { className?: string }) {
+  return (
+    <svg className={`animate-spin text-reebok-red ${className}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+    </svg>
+  )
 }
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
@@ -53,19 +74,16 @@ export default function ReebokAdmin() {
 // ── Section 1: Actualizar Inventario ───────────────────────────────────────────
 
 function InventorySection() {
-  const [dragging, setDragging] = useState(false)
   const [processing, setProcessing] = useState(false)
-  const [result, setResult] = useState<InventoryResult>(null)
-  const [showUpdated, setShowUpdated] = useState(false)
+  const [results, setResults] = useState<InventoryResult[]>([])
+  const [dragging, setDragging] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const processCSV = useCallback(async (file: File) => {
     if (!file.name.endsWith('.csv')) return
     setProcessing(true)
-    setResult(null)
 
     try {
-      // Read file as latin-1
       const buffer = await file.arrayBuffer()
       const text = new TextDecoder('latin1').decode(buffer)
 
@@ -75,10 +93,11 @@ function InventorySection() {
         return
       }
 
-      // Parse header to find CODIGO and EXISTENCIA columns
+      // Parse header — normalize to strip accents
       const header = lines[0].split(';').map(h => h.trim().replace(/"/g, ''))
-      const codigoIdx = header.findIndex(h => h.toUpperCase() === 'CODIGO')
-      const existenciaIdx = header.findIndex(h => h.toUpperCase() === 'EXISTENCIA')
+      const codigoIdx = header.findIndex(h => normalizeHeader(h) === 'CODIGO')
+      const existenciaIdx = header.findIndex(h => normalizeHeader(h) === 'EXISTENCIA')
+      const descripcionIdx = header.findIndex(h => normalizeHeader(h) === 'DESCRIPCION')
 
       if (codigoIdx === -1 || existenciaIdx === -1) {
         alert('CSV no tiene columnas CODIGO y/o EXISTENCIA')
@@ -86,26 +105,31 @@ function InventorySection() {
         return
       }
 
-      // Parse rows — keep last value per CODIGO
-      const map = new Map<string, number>()
+      // Parse rows — keep last value per CODIGO (handles duplicates)
+      const map = new Map<string, { existencia: number; descripcion: string }>()
       for (let i = 1; i < lines.length; i++) {
         const cols = lines[i].split(';').map(c => c.trim().replace(/"/g, ''))
         const codigo = cols[codigoIdx]
         const existencia = parseInt(cols[existenciaIdx])
+        const descripcion = descripcionIdx !== -1 ? cols[descripcionIdx] || '' : ''
         if (codigo && !isNaN(existencia)) {
-          map.set(codigo, existencia)
+          map.set(codigo, { existencia, descripcion })
         }
       }
 
-      const items = Array.from(map.entries()).map(([codigo, existencia]) => ({ codigo, existencia }))
+      const items = Array.from(map.entries()).map(([codigo, data]) => ({
+        codigo,
+        existencia: data.existencia,
+        descripcion: data.descripcion,
+      }))
 
       const res = await fetch('/api/catalogo/reebok/inventory/switchsoft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items }),
       })
-      const data = await res.json()
-      setResult(data)
+      const data: InventoryResult = await res.json()
+      setResults(prev => [...prev, data])
     } catch {
       alert('Error al procesar el archivo')
     }
@@ -119,26 +143,32 @@ function InventorySection() {
     if (file) processCSV(file)
   }
 
-  const copyNotFound = () => {
-    if (!result?.notFound.length) return
-    navigator.clipboard.writeText(result.notFound.join('\n'))
-  }
-
   return (
     <section>
-      <h2 className="text-lg font-semibold mb-4">Actualizar Inventario</h2>
+      <h2 className="text-lg font-semibold mb-3">Actualizar Inventario</h2>
 
-      {!processing && !result && (
+      <div className="text-xs text-gray-500 space-y-1 mb-4">
+        <p>Descarga el listado de articulos desde Switch Soft &rarr; Stock Articulos &rarr; Listado de Articulos &rarr; Descargar (primera opcion)</p>
+        <p>Sube primero el archivo de zapatos, luego el de ropa/accesorios</p>
+        <p>El sistema actualiza solo los productos que encuentre por codigo</p>
+      </div>
+
+      {/* Drop zone — always visible unless processing */}
+      {processing ? (
+        <div className="flex items-center justify-center py-10">
+          <Spinner />
+        </div>
+      ) : (
         <div
           onDragOver={e => { e.preventDefault(); setDragging(true) }}
           onDragLeave={() => setDragging(false)}
           onDrop={handleDrop}
           onClick={() => fileRef.current?.click()}
-          className={`border-2 border-dashed rounded-lg p-10 text-center cursor-pointer transition-colors ${
+          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
             dragging ? 'border-reebok-red bg-red-50' : 'border-gray-300 hover:border-gray-400'
           }`}
         >
-          <svg className="w-10 h-10 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
           </svg>
           <p className="font-medium text-sm">Subir CSV de Switch Soft</p>
@@ -153,95 +183,153 @@ function InventorySection() {
         </div>
       )}
 
-      {processing && (
-        <div className="flex items-center justify-center py-10">
-          <svg className="animate-spin h-6 w-6 text-reebok-red" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-          </svg>
-        </div>
-      )}
+      {/* Results — one block per uploaded file */}
+      {results.map((result, idx) => (
+        <InventoryResultBlock key={idx} result={result} index={idx} total={results.length} />
+      ))}
 
-      {result && (
-        <div className="space-y-3">
-          {/* Updated */}
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <button
-              onClick={() => setShowUpdated(v => !v)}
-              className="w-full flex items-center justify-between text-left"
-            >
-              <span className="text-sm font-medium text-green-800">
-                {result.updated.length} productos actualizados
-              </span>
-              <svg className={`w-4 h-4 text-green-600 transition-transform ${showUpdated ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {showUpdated && result.updated.length > 0 && (
-              <div className="mt-3 max-h-64 overflow-y-auto">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-green-50">
-                    <tr className="text-left text-green-700">
-                      <th className="py-1 pr-2">SKU</th>
-                      <th className="py-1 pr-2">Nombre</th>
-                      <th className="py-1 text-right">Existencia</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.updated.map((item, i) => (
-                      <tr key={i} className="border-t border-green-100">
-                        <td className="py-1 pr-2 font-mono">{item.sku}</td>
-                        <td className="py-1 pr-2 truncate max-w-[200px]">{item.name}</td>
-                        <td className="py-1 text-right font-medium">{item.existencia}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-
-          {/* Not found */}
-          {result.notFound.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-amber-800">
-                  {result.notFound.length} codigos no encontrados
-                </span>
-                <button
-                  onClick={copyNotFound}
-                  className="text-xs text-amber-700 hover:text-amber-900 underline"
-                >
-                  Copiar lista
-                </button>
-              </div>
-              <div className="text-xs text-amber-700 max-h-32 overflow-y-auto font-mono">
-                {result.notFound.join(', ')}
-              </div>
-            </div>
-          )}
-
-          <button
-            onClick={() => setResult(null)}
-            className="text-xs text-gray-500 hover:text-gray-700 underline"
-          >
-            Subir otro archivo
-          </button>
-        </div>
+      {results.length > 0 && (
+        <button
+          onClick={() => setResults([])}
+          className="text-xs text-gray-400 hover:text-gray-600 underline mt-3"
+        >
+          Limpiar resultados
+        </button>
       )}
     </section>
+  )
+}
+
+// ── Inventory Result Block ─────────────────────────────────────────────────────
+
+function InventoryResultBlock({ result, index, total }: { result: InventoryResult; index: number; total: number }) {
+  const [showUpdated, setShowUpdated] = useState(false)
+
+  const label = total > 1 ? `Archivo ${index + 1}` : null
+
+  return (
+    <div className="mt-4 space-y-2">
+      {label && <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</p>}
+
+      {/* 1. Updated */}
+      {result.updated.length > 0 && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+          <button
+            onClick={() => setShowUpdated(v => !v)}
+            className="w-full flex items-center justify-between text-left"
+          >
+            <span className="text-sm font-medium text-green-800">
+              {result.updated.length} productos actualizados
+            </span>
+            <svg className={`w-4 h-4 text-green-600 transition-transform ${showUpdated ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {showUpdated && (
+            <div className="mt-2 max-h-64 overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-green-50">
+                  <tr className="text-left text-green-700">
+                    <th className="py-1 pr-2">SKU</th>
+                    <th className="py-1 pr-2">Nombre</th>
+                    <th className="py-1 text-right">Anterior</th>
+                    <th className="py-1 text-right pl-2">Nueva</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.updated.map((item, i) => (
+                    <tr key={i} className="border-t border-green-100">
+                      <td className="py-1 pr-2 font-mono">{item.sku}</td>
+                      <td className="py-1 pr-2 truncate max-w-[180px]">{item.name}</td>
+                      <td className="py-1 text-right text-gray-500">{item.anterior}</td>
+                      <td className="py-1 text-right pl-2 font-medium">{item.nueva}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 2. Went to zero */}
+      {result.wentToZero.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm font-medium text-amber-800">
+              {result.wentToZero.length} quedaron en 0
+            </span>
+            <button
+              onClick={() => copyToClipboard(result.wentToZero.map(i => `${i.sku}\t${i.name}`).join('\n'))}
+              className="text-xs text-amber-700 hover:text-amber-900 underline"
+            >
+              Copiar lista
+            </button>
+          </div>
+          <div className="max-h-32 overflow-y-auto text-xs text-amber-700 font-mono space-y-0.5">
+            {result.wentToZero.map((item, i) => (
+              <div key={i}>{item.sku} — {item.name}</div>
+            ))}
+          </div>
+          <p className="text-xs text-amber-600 mt-2 italic">Revisar si se deben inactivar</p>
+        </div>
+      )}
+
+      {/* 3. In CSV but not in website */}
+      {result.notFound.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm font-medium text-blue-800">
+              {result.notFound.length} en CSV pero no en website
+            </span>
+            <button
+              onClick={() => copyToClipboard(result.notFound.map(i => `${i.codigo}\t${i.descripcion}`).join('\n'))}
+              className="text-xs text-blue-700 hover:text-blue-900 underline"
+            >
+              Copiar lista
+            </button>
+          </div>
+          <div className="max-h-32 overflow-y-auto text-xs text-blue-700 font-mono space-y-0.5">
+            {result.notFound.map((item, i) => (
+              <div key={i}>{item.codigo} — {item.descripcion}</div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 4. In website but not in CSV */}
+      {result.notInCSV.length > 0 && (
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-sm font-medium text-gray-700">
+              {result.notInCSV.length} en website pero no en CSV
+            </span>
+            <button
+              onClick={() => copyToClipboard(result.notInCSV.map(i => `${i.sku}\t${i.name}`).join('\n'))}
+              className="text-xs text-gray-600 hover:text-gray-800 underline"
+            >
+              Copiar lista
+            </button>
+          </div>
+          <div className="max-h-32 overflow-y-auto text-xs text-gray-600 font-mono space-y-0.5">
+            {result.notInCSV.map((item, i) => (
+              <div key={i}>{item.sku} — {item.name}</div>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-2 italic">Pueden estar en el otro archivo de inventario</p>
+        </div>
+      )}
+    </div>
   )
 }
 
 // ── Section 2: Agregar Productos ───────────────────────────────────────────────
 
 function ProductsSection() {
-  // CSV Import state
   const [importProcessing, setImportProcessing] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult>(null)
   const csvRef = useRef<HTMLInputElement>(null)
 
-  // Photo Upload state
   const [photoDragging, setPhotoDragging] = useState(false)
   const [photoProcessing, setPhotoProcessing] = useState(false)
   const [photoProgress, setPhotoProgress] = useState({ current: 0, total: 0 })
@@ -262,7 +350,6 @@ function ProductsSection() {
         return
       }
 
-      // Detect delimiter
       const firstLine = lines[0]
       const delimiter = firstLine.includes('\t') ? '\t' : firstLine.includes(';') ? ';' : ','
 
@@ -288,7 +375,6 @@ function ProductsSection() {
 
       const headers = parseLine(lines[0])
 
-      // Auto-map columns
       const fieldMap: Record<number, string> = {}
       headers.forEach((h, i) => {
         const lower = h.toLowerCase().replace(/[^a-z]/g, '')
@@ -305,7 +391,6 @@ function ProductsSection() {
         else if (lower.includes('activo') || lower.includes('active')) fieldMap[i] = 'active'
       })
 
-      // Parse all rows into product objects
       const products: Record<string, string | number | boolean | undefined>[] = []
       for (let i = 1; i < lines.length; i++) {
         const cols = parseLine(lines[i])
@@ -433,18 +518,15 @@ function ProductsSection() {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold mb-4">Agregar Productos</h2>
+      <h2 className="text-lg font-semibold mb-3">Agregar Productos</h2>
 
       {/* Step 1: CSV */}
       <div className="mb-6">
-        <h3 className="text-sm font-medium text-gray-600 mb-2">Paso 1 — Productos (CSV)</h3>
+        <h3 className="text-sm font-medium text-gray-600 mb-1">Paso 1 — Sube el CSV con los nuevos productos</h3>
 
         {importProcessing ? (
           <div className="flex items-center justify-center py-6 border border-gray-200 rounded-lg">
-            <svg className="animate-spin h-5 w-5 text-reebok-red" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
+            <Spinner className="h-5 w-5" />
           </div>
         ) : importResult ? (
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm space-y-1">
@@ -471,7 +553,7 @@ function ProductsSection() {
 
       {/* Step 2: Photos */}
       <div>
-        <h3 className="text-sm font-medium text-gray-600 mb-2">Paso 2 — Fotos</h3>
+        <h3 className="text-sm font-medium text-gray-600 mb-1">Paso 2 — Sube las fotos (nombre del archivo = SKU, ej: 100202579.jpg)</h3>
 
         {photoProcessing ? (
           <div className="border border-gray-200 rounded-lg p-6">
@@ -514,7 +596,7 @@ function ProductsSection() {
             }`}
           >
             <p className="text-sm font-medium">Arrastra fotos o haz click</p>
-            <p className="text-xs text-gray-400 mt-1">Nombre del archivo = SKU del producto</p>
+            <p className="text-xs text-gray-400 mt-1">JPG, PNG, WEBP</p>
             <input
               ref={photoRef}
               type="file"
