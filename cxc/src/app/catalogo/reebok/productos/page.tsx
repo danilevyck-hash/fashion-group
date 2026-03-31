@@ -77,21 +77,20 @@ function Productos() {
           fetch("/api/catalogo/reebok/products?active=true"),
           fetch("/api/catalogo/reebok/inventory"),
         ]);
-        console.log('[catalog] products:', pRes.status, 'inventory:', iRes.status);
-        if (pRes.ok) setProducts(await pRes.json());
-        if (iRes.ok) {
-          const inv = await iRes.json();
-          console.log('[catalog] inventory rows:', inv?.length, 'sample:', inv?.[0]);
-          const map: Record<string, number> = {};
-          (inv || []).forEach((i: { product_id: string; quantity: number }) => {
-            map[i.product_id] = (map[i.product_id] || 0) + i.quantity;
-          });
-          console.log('[catalog] inventoryMap keys:', Object.keys(map).length, 'sample value:', Object.values(map)[0]);
-          setInventoryMap(map);
-        } else {
-          console.error('[catalog] inventory failed:', iRes.status, await iRes.text().catch(() => ''));
-        }
-      } catch (err) { console.error('[catalog] fetch error:', err) }
+
+        // Parse both responses before setting any state
+        const prods = pRes.ok ? await pRes.json() : [];
+        const inv = iRes.ok ? await iRes.json() : [];
+
+        const map: Record<string, number> = {};
+        (inv || []).forEach((i: { product_id: string; quantity: number }) => {
+          map[i.product_id] = (map[i.product_id] || 0) + i.quantity;
+        });
+
+        // Set both states together — guaranteed single re-render
+        setProducts(prods);
+        setInventoryMap(map);
+      } catch { /* */ }
       setLoading(false);
     }
     load();
