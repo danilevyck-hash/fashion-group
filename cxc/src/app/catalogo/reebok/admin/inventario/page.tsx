@@ -204,7 +204,7 @@ export default function Inventario() {
                               />
                             </td>
                             <td className="py-1">
-                              <button onClick={() => deleteSize(inv.id)} className="text-red-500 text-xs hover:underline">Eliminar</button>
+                              <button onClick={() => deleteSize(inv.id)} className="text-red-500 text-xs hover:underline">Quitar talla</button>
                             </td>
                           </tr>
                         ))}
