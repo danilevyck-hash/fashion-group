@@ -34,15 +34,17 @@ async function fetchSystemData(baseUrl: string, cookie: string | null): Promise<
   const headers: Record<string, string> = {};
   if (cookie) headers["Cookie"] = cookie;
 
-  const [statsRes, cxcRes] = await Promise.all([
+  const [statsRes, cxcRes, reebokRes] = await Promise.all([
     fetch(`${baseUrl}/api/home-stats`, { headers }).catch(() => null),
     fetch(`${baseUrl}/api/cxc-summary`, { headers }).catch(() => null),
+    fetch(`${baseUrl}/api/catalogo/reebok/stats`, { headers }).catch(() => null),
   ]);
 
   const stats = statsRes?.ok ? await statsRes.json() : null;
   const cxc = cxcRes?.ok ? await cxcRes.json() : null;
+  const reebok = reebokRes?.ok ? await reebokRes.json() : null;
 
-  if (!stats && !cxc) return "";
+  if (!stats && !cxc && !reebok) return "";
 
   const fecha = new Date().toLocaleDateString("es-PA", { year: "numeric", month: "long", day: "numeric" });
   let block = `\n\n## Datos actuales del sistema (${fecha})`;
@@ -70,6 +72,38 @@ async function fetchSystemData(baseUrl: string, cookie: string | null): Promise<
 - Vigilancia (91-120 días): ${cxc.vigilanciaPct ?? 0}%
 - Vencida (>120 días): ${cxc.vencidoPct ?? 0}% ($${fmt(cxc.vencidoMas121 || 0)})
 - Clientes críticos (con saldo vencido >120d): ${cxc.clientesCriticos ?? 0}`;
+  }
+
+  if (reebok) {
+    const p = reebok.products || {};
+    const inv = reebok.inventory || {};
+    const o = reebok.orders || {};
+
+    block += `\n### Catálogo Reebok
+- Productos activos: ${p.active ?? 0} de ${p.total ?? 0} total${p.onSale ? ` (${p.onSale} en oferta)` : ""}
+- Productos sin stock: ${p.noStock ?? 0}
+- Stock total (unidades): ${inv.totalStock ?? 0}`;
+
+    // Categories
+    if (p.categories && Object.keys(p.categories).length > 0) {
+      block += `\n- Categorías: ${Object.entries(p.categories as Record<string, number>).map(([k, v]) => `${k} (${v})`).join(", ")}`;
+    }
+
+    block += `\n- Pedidos totales: ${o.total ?? 0}`;
+    block += `\n- Pedidos este mes: ${o.thisMonth ?? 0} por $${fmt(o.thisMonthTotal || 0)}`;
+
+    // Status breakdown
+    if (o.byStatus && Object.keys(o.byStatus).length > 0) {
+      block += `\n- Por estado: ${Object.entries(o.byStatus as Record<string, number>).map(([st, n]) => `${st}: ${n}`).join(", ")}`;
+    }
+
+    // Top clients
+    if (o.topClients?.length > 0) {
+      block += `\n- Top clientes Reebok:`;
+      for (const c of o.topClients) {
+        block += `\n  - ${c.name}: ${c.orders} pedido${c.orders !== 1 ? "s" : ""}, $${fmt(c.total)}`;
+      }
+    }
   }
 
   return block;
