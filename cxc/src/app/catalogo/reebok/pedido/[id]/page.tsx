@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
+import { useToast } from "@/components/ToastSystem";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
 interface Order { id: string; order_number: string; client_name: string; comment: string; total: number; reebok_order_items: OrderItem[]; created_at: string; }
@@ -13,6 +14,7 @@ const P = 12; // piezas por bulto
 
 export default function OrderDetailPage() {
   const router = useRouter();
+  const { confirm: confirmAction } = useToast();
   const params = useParams();
   const id = params.id as string;
 
@@ -126,7 +128,7 @@ export default function OrderDetailPage() {
     doc.setFontSize(12); doc.setTextColor(255); doc.setFont("helvetica", "bold");
     doc.text("REEBOK", 14, 12);
     doc.setFontSize(8); doc.setFont("helvetica", "normal");
-    doc.text("Fashion Group · Panama", 196, 12, { align: "right" });
+    doc.text("Fashion Group · Panamá", 196, 12, { align: "right" });
 
     doc.setTextColor(100); doc.setFontSize(9);
     doc.text(`Cliente: ${clientName}`, 14, 26);
@@ -168,7 +170,7 @@ export default function OrderDetailPage() {
   }
 
   async function deleteOrder() {
-    if (!confirm("¿Eliminar este pedido?")) return;
+    if (!await confirmAction("¿Eliminar este pedido?")) return;
     await fetch(`/api/catalogo/reebok/orders/${id}`, { method: "DELETE" });
     router.push("/catalogo/reebok/pedidos");
   }

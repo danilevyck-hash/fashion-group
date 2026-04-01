@@ -4,11 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
+import { useToast } from "@/components/ToastSystem";
 
 interface Order { id: string; order_number: string; client_name: string; total: number; item_count: number; created_at: string; }
 
 export default function PedidosPage() {
   const router = useRouter();
+  const { confirm } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -32,7 +34,7 @@ export default function PedidosPage() {
   useEffect(() => { load(); }, [load]);
 
   async function deleteOrder(id: string) {
-    if (!confirm("¿Eliminar este pedido?")) return;
+    if (!await confirm("¿Eliminar este pedido?")) return;
     const res = await fetch(`/api/catalogo/reebok/orders/${id}`, { method: "DELETE" });
     if (res.ok) {
       const activeId = localStorage.getItem("reebok_active_order_id");

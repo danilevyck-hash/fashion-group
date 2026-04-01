@@ -14,7 +14,7 @@ function getCachedQty(productId: string): number {
 
 export default function ProductCard({ product, stock = 0 }: { product: Product; stock?: number }) {
   const [qty, setQty] = useState(() => getCachedQty(product.id));
-  const [busy] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
 
   const genderLabel = product.gender === "male" ? "Hombre" : product.gender === "female" ? "Mujer" : product.gender === "kids" ? "Niños" : "";
@@ -85,6 +85,7 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
 
     // Debounce: reset timer, send only final qty after 400ms idle
     if (patchTimer.current) clearTimeout(patchTimer.current);
+    setBusy(true);
     patchTimer.current = setTimeout(async () => {
       const finalQty = pendingQty.current!;
       const revertCache = baseCache.current;
@@ -105,6 +106,7 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
         localStorage.setItem("reebok_order_items", revertCache);
         window.dispatchEvent(new Event("reebok-order-changed"));
       }
+      setBusy(false);
     }, 400);
   }
 

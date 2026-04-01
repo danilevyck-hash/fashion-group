@@ -40,7 +40,7 @@ export default function ProductoDetalle() {
     setTimeout(() => setAdded(false), 2000)
   }
 
-  if (!product) return <div className="text-center py-20 text-gray-500">Cargando...</div>
+  if (!product) return <div className="flex items-center justify-center min-h-[60vh]"><div className="w-8 h-8 border-2 border-gray-200 border-t-gray-900 rounded-full animate-spin" /></div>
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">

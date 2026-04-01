@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Product, InventoryItem } from '@/components/reebok/supabase'
+import { useToast } from '@/components/ToastSystem'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -123,6 +124,7 @@ function ProductsListSection({
   setInventory: React.Dispatch<React.SetStateAction<InventoryItem[]>>
   reloadInventory: () => Promise<void>
 }) {
+  const { toast, confirm } = useToast()
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
@@ -142,18 +144,18 @@ function ProductsListSection({
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: p.id, [field]: !p[field] }),
     })
-    if (!res.ok) { alert('Error al actualizar'); return }
+    if (!res.ok) { toast('Error al actualizar', 'error'); return }
     setProducts(prev => prev.map(x => x.id === p.id ? { ...x, [field]: !x[field] } : x))
   }
 
   const deleteProduct = async (id: string) => {
-    if (!confirm('Eliminar este producto? No se puede deshacer.')) return
+    if (!await confirm('Eliminar este producto? No se puede deshacer.')) return
     try {
       const res = await fetch(`/api/catalogo/reebok/products?id=${id}`, { method: 'DELETE' })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); alert(`Error: ${d.error || res.status}`); return }
+      if (!res.ok) { const d = await res.json().catch(() => ({})); toast(`Error: ${d.error || res.status}`, 'error'); return }
       setProducts(prev => prev.filter(p => p.id !== id))
       setInventory(prev => prev.filter(i => i.product_id !== id))
-    } catch (err) { alert(`Error: ${err}`) }
+    } catch (err) { toast(`Error: ${err}`, 'error') }
   }
 
   const addSize = async (productId: string, size: string, quantity: number) => {
@@ -293,8 +295,10 @@ function AddSizeForm({ onAdd }: { onAdd: (size: string, qty: number) => void }) 
 // ══════════════════════════════════════════════════════════════════════════════
 
 function InventoryUpdateSection() {
+  const { toast } = useToast()
   const [shoesResult, setShoesResult] = useState<InventoryResult | null>(null)
   const [wearResult, setWearResult] = useState<InventoryResult | null>(null)
+  const onError = useCallback((msg: string) => toast(msg, 'error'), [toast])
 
   return (
     <div>
@@ -302,16 +306,16 @@ function InventoryUpdateSection() {
         Switch Soft &rarr; Stock Articulos &rarr; Listado de Articulos &rarr; Descargar (primera opcion). Sube cada empresa por separado.
       </p>
       <div className="space-y-5">
-        <InventoryZone label="Active Shoes" empresa="shoes" notInCSVLabel="en footwear del website pero no en este CSV" result={shoesResult} onResult={setShoesResult} />
-        <InventoryZone label="Active Wear" empresa="wear" notInCSVLabel="en apparel/accesorios del website pero no en este CSV" result={wearResult} onResult={setWearResult} />
+        <InventoryZone label="Active Shoes" empresa="shoes" notInCSVLabel="en footwear del website pero no en este CSV" result={shoesResult} onResult={setShoesResult} onError={onError} />
+        <InventoryZone label="Active Wear" empresa="wear" notInCSVLabel="en apparel/accesorios del website pero no en este CSV" result={wearResult} onResult={setWearResult} onError={onError} />
       </div>
     </div>
   )
 }
 
-function InventoryZone({ label, empresa, notInCSVLabel, result, onResult }: {
+function InventoryZone({ label, empresa, notInCSVLabel, result, onResult, onError }: {
   label: string; empresa: 'shoes' | 'wear'; notInCSVLabel: string
-  result: InventoryResult | null; onResult: (r: InventoryResult | null) => void
+  result: InventoryResult | null; onResult: (r: InventoryResult | null) => void; onError: (msg: string) => void
 }) {
   const [processing, setProcessing] = useState(false)
   const [dragging, setDragging] = useState(false)
@@ -329,7 +333,7 @@ function InventoryZone({ label, empresa, notInCSVLabel, result, onResult }: {
       const codigoIdx = header.findIndex(h => normalizeHeader(h) === 'CODIGO')
       const existenciaIdx = header.findIndex(h => normalizeHeader(h) === 'EXISTENCIA')
       const descripcionIdx = header.findIndex(h => normalizeHeader(h) === 'DESCRIPCION')
-      if (codigoIdx === -1 || existenciaIdx === -1) { alert('CSV sin columnas CODIGO/EXISTENCIA'); setProcessing(false); return }
+      if (codigoIdx === -1 || existenciaIdx === -1) { onError('CSV sin columnas CODIGO/EXISTENCIA'); setProcessing(false); return }
 
       const map = new Map<string, { existencia: number; descripcion: string }>()
       for (let i = 1; i < lines.length; i++) {
@@ -344,9 +348,9 @@ function InventoryZone({ label, empresa, notInCSVLabel, result, onResult }: {
         body: JSON.stringify({ items, empresa }),
       })
       onResult(await res.json())
-    } catch { alert('Error al procesar') }
+    } catch { onError('Error al procesar') }
     setProcessing(false)
-  }, [onResult, empresa])
+  }, [onResult, empresa, onError])
 
   const handleDrop = (e: React.DragEvent) => { e.preventDefault(); setDragging(false); if (e.dataTransfer.files[0]) processCSV(e.dataTransfer.files[0]) }
 
@@ -452,6 +456,7 @@ function ImportExportSection({ products, inventory, onDataChange }: {
 // ── Import Panel ──
 
 function ImportPanel({ onDone }: { onDone: () => void }) {
+  const { toast } = useToast()
   const [processing, setProcessing] = useState(false)
   const [result, setResult] = useState<{ created: number; updated: number; errors: number } | null>(null)
   const ref = useRef<HTMLInputElement>(null)
@@ -537,10 +542,10 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
     try {
       const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls')
       const prods = isExcel ? await parseExcel(file) : await parseCSV(file)
-      if (prods.length === 0) { alert('Sin productos válidos'); setProcessing(false); return }
+      if (prods.length === 0) { toast('Sin productos válidos', 'warning'); setProcessing(false); return }
       const res = await fetch('/api/catalogo/reebok/products/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ products: prods }) })
       setResult(await res.json()); onDone()
-    } catch { alert('Error al procesar') }
+    } catch { toast('Error al procesar', 'error') }
     setProcessing(false); if (ref.current) ref.current.value = ''
   }
 
@@ -626,6 +631,7 @@ function PhotosPanel() {
 // ── Export Panel ──
 
 function ExportPanel({ products, inventory }: { products: Product[]; inventory: InventoryItem[] }) {
+  const { toast } = useToast()
   const [exporting, setExporting] = useState('')
   const getSizes = (pid: string) => inventory.filter(i => i.product_id === pid && i.quantity > 0).map(i => i.size).join(', ')
 
@@ -634,7 +640,7 @@ function ExportPanel({ products, inventory }: { products: Product[]; inventory: 
     try {
       const XLSX = (await import('xlsx-js-style')).default
       const hs = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: 'CC0000' }, patternType: 'solid' as const } }
-      const cols = ['SKU', 'Nombre', 'Color', 'Precio', 'Categoria', 'Genero', 'Tallas']
+      const cols = ['SKU', 'Nombre', 'Color', 'Precio', 'Categoría', 'Género', 'Tallas']
       const hr = cols.map(h => ({ v: h, s: hs }))
       const rows = products.filter(p => p.active).map(p => [p.sku || '-', p.name, p.color || '-', p.price ? `$${p.price}` : '-', p.category, p.gender || '-', getSizes(p.id) || '-'])
       const ws = XLSX.utils.aoa_to_sheet([hr, ...rows])
@@ -642,7 +648,7 @@ function ExportPanel({ products, inventory }: { products: Product[]; inventory: 
       const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Catalogo')
       const blob = new Blob([XLSX.write(wb, { type: 'array', bookType: 'xlsx' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'catalogo-reebok.xlsx'; a.click()
-    } catch { alert('Error al exportar') }
+    } catch { toast('Error al exportar', 'error') }
     setExporting('')
   }
 
@@ -652,13 +658,13 @@ function ExportPanel({ products, inventory }: { products: Product[]; inventory: 
       const { jsPDF } = await import('jspdf')
       const { default: autoTable } = await import('jspdf-autotable')
       const doc = new jsPDF('landscape')
-      doc.setFontSize(18); doc.text('Catalogo Reebok Panama', 14, 20)
+      doc.setFontSize(18); doc.text('Catálogo Reebok Panamá', 14, 20)
       doc.setFontSize(10); doc.text(`Generado: ${new Date().toLocaleDateString('es-PA')}`, 14, 28)
       const active = products.filter(p => p.active)
       const rows = active.slice(0, 100).map(p => [p.sku || '-', p.name, p.color || '-', p.price ? `$${p.price}` : '-', p.category, getSizes(p.id) || '-'])
-      autoTable(doc, { startY: 35, head: [['SKU', 'Nombre', 'Color', 'Precio', 'Categoria', 'Tallas']], body: rows, styles: { cellPadding: 3, fontSize: 8 } })
+      autoTable(doc, { startY: 35, head: [['SKU', 'Nombre', 'Color', 'Precio', 'Categoría', 'Tallas']], body: rows, styles: { cellPadding: 3, fontSize: 8 } })
       doc.save('catalogo-reebok.pdf')
-    } catch { alert('Error al exportar') }
+    } catch { toast('Error al exportar', 'error') }
     setExporting('')
   }
 

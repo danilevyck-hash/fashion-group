@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { useToast } from '@/components/ToastSystem'
 
 export default function NuevoProductoPage() {
   return <Suspense><NuevoProducto /></Suspense>
@@ -13,6 +14,7 @@ function NuevoProducto() {
   const searchParams = useSearchParams()
   const editId = searchParams.get('id')
 
+  const { toast } = useToast()
   const [form, setForm] = useState({
     sku: '', name: '', description: '', price: '', category: 'footwear',
     gender: 'male', sub_category: '', color: '', active: true, image_url: '',
@@ -67,7 +69,7 @@ function NuevoProducto() {
     })
     if (!res.ok) {
       const d = await res.json().catch(() => ({}))
-      alert(`Error al guardar: ${d.error || 'Error desconocido'}`)
+      toast(`Error al guardar: ${d.error || 'Error desconocido'}`, 'error')
       setSaving(false)
       return
     }
