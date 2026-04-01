@@ -15,7 +15,17 @@ function getPanamaDate(offset = 0) {
 
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("authorization")?.replace("Bearer ", "") || req.nextUrl.searchParams.get("secret");
-  if (secret !== process.env.CRON_SECRET) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  let authorized = secret === process.env.CRON_SECRET;
+  if (!authorized) {
+    try {
+      const session = req.cookies.get("cxc_session")?.value;
+      if (session) {
+        const parsed = JSON.parse(Buffer.from(session, "base64url").toString("utf-8"));
+        if (parsed.role === "admin") authorized = true;
+      }
+    } catch { /* invalid cookie */ }
+  }
+  if (!authorized) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const today = getPanamaDate();
   const tomorrow = getPanamaDate(1);
