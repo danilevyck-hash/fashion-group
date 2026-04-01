@@ -63,6 +63,7 @@ export default function GuiasPage() {
             s.setView("form");
           }}
           onViewGuia={s.viewGuia}
+          onReload={s.loadGuias}
         />
       </div>
     );

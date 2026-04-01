@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { fmtDate } from "@/lib/format";
 import type { Guia, GuiaItem } from "./types";
 import { clientesSummary, getMonthOptions } from "./constants";
@@ -18,7 +19,10 @@ interface GuiasListProps {
   role: string | null;
   onNewGuia: () => void;
   onViewGuia: (id: string) => void;
+  onReload?: () => void;
 }
+
+const DISPATCH_ROLES = ["admin", "secretaria", "director"];
 
 export default function GuiasList({
   guias,
@@ -33,7 +37,27 @@ export default function GuiasList({
   role,
   onNewGuia,
   onViewGuia,
+  onReload,
 }: GuiasListProps) {
+  const [dispatchModal, setDispatchModal] = useState<Guia | null>(null);
+  const [dispatching, setDispatching] = useState(false);
+  const canDispatch = role && DISPATCH_ROLES.includes(role);
+
+  async function confirmDispatch() {
+    if (!dispatchModal) return;
+    setDispatching(true);
+    try {
+      const res = await fetch(`/api/guias/${dispatchModal.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ estado: "Completada" }),
+      });
+      if (res.ok) {
+        setDispatchModal(null);
+        onReload?.();
+      }
+    } catch { /* */ }
+    setDispatching(false);
+  }
   return (
     <div>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
@@ -157,7 +181,16 @@ export default function GuiasList({
                             </td>
                             <td className="py-3 px-4 text-right tabular-nums">{g.total_bultos}</td>
                             <td className="py-3 px-4">
-                              <StatusBadge estado={!g.placa ? "pendiente" : "despachada"} />
+                              <div className="flex items-center gap-2">
+                                <StatusBadge estado={!g.placa ? "pendiente" : "despachada"} />
+                                {canDispatch && g.estado === "Pendiente Bodega" && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); setDispatchModal(g); }}
+                                    className="text-[10px] bg-emerald-600 text-white px-2.5 py-1 rounded-full hover:bg-emerald-700 transition font-medium">
+                                    Despachar
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -187,6 +220,23 @@ export default function GuiasList({
           </>
         )}
       </div>
+
+      {/* Dispatch confirmation modal */}
+      {dispatchModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setDispatchModal(null)}>
+          <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <p className="text-sm font-medium mb-1">¿Confirmar despacho de Guía #{dispatchModal.numero}?</p>
+            <p className="text-sm text-gray-500 mb-4">Transportista: {dispatchModal.transportista} — {dispatchModal.total_bultos || 0} bultos</p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setDispatchModal(null)} className="px-4 py-2 text-sm text-gray-500 hover:text-black transition">Cancelar</button>
+              <button onClick={confirmDispatch} disabled={dispatching}
+                className="px-5 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition disabled:opacity-50">
+                {dispatching ? "Despachando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
