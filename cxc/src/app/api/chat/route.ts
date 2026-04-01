@@ -26,9 +26,18 @@ const BASE_SYSTEM_PROMPT = `Eres el asistente de inteligencia de negocios de Fas
 - Respondes en español.
 - Sé conciso y directo.
 - Si no tienes datos específicos, dilo claramente en vez de inventar.
-- Usa formato con bullets o tablas cuando ayude a la claridad.
+- Cuando la respuesta incluya datos comparativos de múltiples empresas, clientes o períodos, SIEMPRE formatear como tabla Markdown con columnas alineadas. Ejemplo: ventas por empresa, CxC por empresa, cheques pendientes por cliente.
+- Usa bullets para listas simples, tablas para comparaciones.
 - Cuando cites cifras, siempre indica que son datos del sistema actualizados a la fecha mostrada.
-- Si no puedes responder algo o la consulta requiere cambios técnicos, di: "Para esta consulta, contacta al técnico del sistema: Daniel Levy".`;
+- Si no puedes responder algo o la consulta requiere cambios técnicos, di: "Para esta consulta, contacta al técnico del sistema: Daniel Levy".
+
+## Alertas automáticas
+Analiza los datos del sistema y si detectas alguna de estas situaciones, menciónalo proactivamente al inicio de tu respuesta:
+- CxC vencida > 30% del total → "⚠️ Atención: la cartera vencida supera el 30%"
+- Cheques vencidos sin depositar → "⚠️ Hay cheques vencidos pendientes de depósito"
+- Reclamos sin resolver > 45 días → "⚠️ Hay reclamos sin resolver por más de 45 días"
+- Guías pendientes > 5 días → "⚠️ Hay guías pendientes hace más de 5 días"
+Solo menciona alertas relevantes a la pregunta del usuario.`;
 
 function fmt(n: number): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -409,7 +418,31 @@ export async function POST(req: NextRequest) {
     }
 
     const systemData = await buildSystemData();
-    const systemPrompt = BASE_SYSTEM_PROMPT + systemData;
+
+    // #4: Enrich with specific client data if user mentions a client name
+    let clientContext = "";
+    const msgLower = message.toLowerCase();
+    if (msgLower.includes("cliente") || msgLower.includes("cuenta de") || msgLower.includes("saldo de") || msgLower.includes("deuda de")) {
+      // Extract potential client name (words after key phrases)
+      const match = message.match(/(?:cliente|cuenta de|saldo de|deuda de)\s+[""""]?([A-ZÁ-Ú][A-ZÁ-Ú\s&.'-]{2,})/i);
+      if (match) {
+        const searchName = match[1].trim().toUpperCase();
+        const { data: clientRows } = await supabaseServer
+          .from("cxc_rows")
+          .select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365")
+          .ilike("nombre_normalized", `%${searchName}%`)
+          .limit(10);
+        if (clientRows && clientRows.length > 0) {
+          clientContext = `\n\n## Datos específicos del cliente "${searchName}"`;
+          for (const r of clientRows) {
+            const vencido = (Number(r.d121_180) || 0) + (Number(r.d181_270) || 0) + (Number(r.d271_365) || 0) + (Number(r.mas_365) || 0);
+            clientContext += `\n- ${r.nombre_normalized} (${r.company_key}): total $${fmt(Number(r.total) || 0)}, 0-30d $${fmt(Number(r.d0_30) || 0)}, 31-60d $${fmt(Number(r.d31_60) || 0)}, 61-90d $${fmt(Number(r.d61_90) || 0)}, 91-120d $${fmt(Number(r.d91_120) || 0)}, vencido $${fmt(vencido)}`;
+          }
+        }
+      }
+    }
+
+    const systemPrompt = BASE_SYSTEM_PROMPT + systemData + clientContext;
 
     const client = new Anthropic({ apiKey });
 
