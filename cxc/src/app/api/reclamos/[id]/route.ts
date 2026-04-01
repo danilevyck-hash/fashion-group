@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireAdmin } from "@/lib/api-auth";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -51,9 +52,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const denied = requireAdmin(req); if (denied) return denied;
   const { id } = params;
   if (!uuidRegex.test(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+
+  // Check reclamo exists
+  const { data: existing } = await supabaseServer.from("reclamos").select("id").eq("id", id).maybeSingle();
+  if (!existing) return NextResponse.json({ error: "Reclamo no encontrado" }, { status: 404 });
 
   const { data: fotos } = await supabaseServer
     .from("reclamo_fotos")
