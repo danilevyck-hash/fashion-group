@@ -125,7 +125,7 @@ export default function GuiasPage() {
           showPostDespacho={s.showPostDespacho}
           setShowPostDespacho={s.setShowPostDespacho}
           toast={s.toast}
-          onBack={() => s.setView("list")}
+          onBack={() => { s.loadGuias(); s.setView("list"); }}
           onEdit={s.startEdit}
           onDelete={s.requestDeleteGuia}
           onConfirmarDespacho={s.confirmarDespacho}
