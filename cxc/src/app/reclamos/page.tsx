@@ -146,14 +146,15 @@ function ReclamosPage() {
     await loadDetail(current.id); loadReclamos();
   }
   function requestDeleteReclamo(id: string) {
+    setShowDeleteConfirm(false);
     setConfirmDeleteId(id);
   }
 
   async function confirmDeleteReclamo() {
     if (!confirmDeleteId) return;
-    setShowDeleteConfirm(false);
-    await fetch(`/api/reclamos/${confirmDeleteId}`, { method: "DELETE" });
+    const id = confirmDeleteId;
     setConfirmDeleteId(null);
+    await fetch(`/api/reclamos/${id}`, { method: "DELETE" });
     setCurrent(null); setView("list"); loadReclamos();
   }
 
