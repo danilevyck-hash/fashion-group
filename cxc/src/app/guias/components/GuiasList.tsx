@@ -44,28 +44,44 @@ export default function GuiasList({
   const canDispatch = role && DISPATCH_ROLES.includes(role);
 
   const [dispatchError, setDispatchError] = useState<string | null>(null);
+  const [dispatchSuccess, setDispatchSuccess] = useState<string | null>(null);
 
   async function confirmDispatch() {
     if (!dispatchModal) return;
+    const guiaNum = dispatchModal.numero;
+    const guiaId = dispatchModal.id;
     setDispatching(true);
     setDispatchError(null);
+    setDispatchSuccess(null);
     try {
-      const res = await fetch(`/api/guias/${dispatchModal.id}`, {
-        method: "PATCH", headers: { "Content-Type": "application/json" },
+      const url = `/api/guias/${guiaId}`;
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ estado: "Completada" }),
       });
-      if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.ok) {
         setDispatchModal(null);
-        onReload?.();
+        setDispatchSuccess(`Guía #${guiaNum} despachada`);
+        setTimeout(() => setDispatchSuccess(null), 3000);
+        if (onReload) onReload();
       } else {
-        const d = await res.json().catch(() => ({}));
-        setDispatchError(d.error || `Error ${res.status}`);
+        setDispatchError(data?.error || `Error ${res.status}: ${JSON.stringify(data)}`);
       }
-    } catch { setDispatchError("Error de conexión"); }
+    } catch (err) {
+      setDispatchError(`Error de conexión: ${err}`);
+    }
     setDispatching(false);
   }
   return (
     <div>
+      {/* Success toast */}
+      {dispatchSuccess && (
+        <div className="fixed top-4 right-4 z-50 bg-emerald-600 text-white text-sm px-4 py-2.5 rounded-lg shadow-lg">
+          {dispatchSuccess}
+        </div>
+      )}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex items-end justify-between mb-10">
           <div>
