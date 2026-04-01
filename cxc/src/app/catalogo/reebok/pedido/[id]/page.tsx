@@ -113,9 +113,8 @@ export default function OrderDetailPage() {
     try { const r = await fetch(url); const b = await r.blob(); return new Promise(res => { const rd = new FileReader(); rd.onload = () => res(rd.result as string); rd.readAsDataURL(b); }); } catch { return null; }
   }
 
-  async function downloadPDF() {
-    if (!order) return;
-    showToast("Generando PDF...");
+  async function generatePDFBlob(): Promise<{ blob: Blob; filename: string } | null> {
+    if (!order) return null;
     const { jsPDF } = await import("jspdf");
     const { default: autoTable } = await import("jspdf-autotable");
     const doc = new jsPDF("portrait");
@@ -157,16 +156,37 @@ export default function OrderDetailPage() {
     doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
     doc.text("Fashion Group Panamá · Reebok Authorized Distributor", 14, fy + 10);
 
-    doc.save(`${order.order_number}-${clientName.replace(/\s+/g, "-")}.pdf`);
+    const filename = `${order.order_number}-${clientName.replace(/\s+/g, "-")}.pdf`;
+    return { blob: doc.output("blob"), filename };
+  }
+
+  async function downloadPDF() {
+    showToast("Generando PDF...");
+    const result = await generatePDFBlob();
+    if (!result) return;
+    const url = URL.createObjectURL(result.blob);
+    const a = document.createElement("a"); a.href = url; a.download = result.filename; a.click();
+    URL.revokeObjectURL(url);
     showToast("PDF descargado");
   }
 
-  async function confirmOrder() {
+  async function shareWhatsApp() {
+    showToast("Generando PDF...");
     await saveOrder();
-    setSaving(true);
-    const res = await fetch("/api/catalogo/reebok/send-order", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId: id }) });
-    showToast(res.ok ? "Pedido confirmado y enviado" : "Error al enviar email");
-    setSaving(false);
+    const result = await generatePDFBlob();
+    if (!result) return;
+    const file = new File([result.blob], result.filename, { type: "application/pdf" });
+    if (navigator.share && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: `Pedido ${order!.order_number}`, text: `Pedido Reebok — ${clientName}` });
+    } else {
+      // Fallback: download PDF + open WhatsApp with text
+      const url = URL.createObjectURL(result.blob);
+      const a = document.createElement("a"); a.href = url; a.download = result.filename; a.click();
+      URL.revokeObjectURL(url);
+      const text = `*Pedido ${order!.order_number}*\n${clientName}\n${totalBultos} bultos · $${fmt(totalMoney)}\n\n_PDF adjunto_`;
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+    }
+    showToast("Listo");
   }
 
   async function deleteOrder() {
@@ -252,23 +272,17 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <Link href="/catalogo/reebok/productos" className="w-full border border-gray-300 text-black py-3 rounded text-sm font-medium hover:border-gray-500 transition text-center block">
+          <Link href="/catalogo/reebok/productos" className="w-full border border-gray-300 text-black py-3 rounded-lg text-sm font-medium hover:border-gray-500 transition text-center block">
             ← Seguir agregando productos
           </Link>
-          <button onClick={saveOrder} disabled={saving} className="w-full bg-black text-white py-3 rounded text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
-            {saving ? "Guardando..." : "Guardar cambios"}
+          <button onClick={saveOrder} disabled={saving} className="w-full bg-black text-white py-3.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
+            {saving ? "Guardando..." : "Guardar pedido"}
           </button>
-          <div className="grid grid-cols-3 gap-2">
-            <button onClick={downloadPDF} className="border border-gray-200 text-black py-2.5 rounded-lg text-sm hover:border-gray-400 transition">PDF</button>
-            <button onClick={() => {
-              const text = `*Pedido ${order.order_number}*\n${clientName}\n\n` +
-                items.map(i => `${i.name} — ${i.quantity} bultos × $${i.unit_price}`).join('\n') +
-                `\n\n*Total: ${totalBultos} bultos · $${fmt(totalMoney)}*`;
-              window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-            }} className="border border-green-300 text-green-700 py-2.5 rounded-lg text-sm hover:bg-green-50 transition">WhatsApp</button>
-            <button onClick={confirmOrder} disabled={saving || !items.length} className="bg-black text-white py-2.5 rounded-lg text-sm hover:bg-gray-800 transition disabled:opacity-40">Confirmar</button>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={downloadPDF} className="border border-gray-200 text-black py-3 rounded-lg text-sm hover:border-gray-400 transition">Descargar PDF</button>
+            <button onClick={shareWhatsApp} disabled={saving} className="bg-green-600 text-white py-3 rounded-lg text-sm hover:bg-green-700 transition disabled:opacity-40">Enviar por WhatsApp</button>
           </div>
-          <button onClick={deleteOrder} className="text-xs text-gray-400 hover:text-red-500 transition mt-2 py-1">Eliminar pedido</button>
+          <button onClick={deleteOrder} className="text-xs text-gray-400 hover:text-red-500 transition mt-4 py-1">Eliminar pedido</button>
         </div>
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2 rounded-full text-sm z-50">{toast}</div>}
