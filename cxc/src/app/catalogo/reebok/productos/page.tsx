@@ -98,6 +98,11 @@ function Productos() {
     ? [...new Set(products.filter(p => p.on_sale && p.price).map(p => p.price!))].sort((a, b) => a - b)
     : [];
 
+  const catOrder: Record<string, number> = { footwear: 0, apparel: 1, accessories: 2 };
+  const genOrder: Record<string, number> = { male: 0, female: 1, kids: 2, unisex: 3 };
+  const catLabel: Record<string, string> = { footwear: 'Calzado', apparel: 'Ropa', accessories: 'Accesorios' };
+  const genLabel: Record<string, string> = { male: 'Hombre', female: 'Mujer', kids: 'Niños', unisex: 'Unisex' };
+
   const filtered = products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => !gender || p.gender === gender)
@@ -105,12 +110,25 @@ function Productos() {
     .filter(p => !onlyOferta || p.on_sale)
     .filter(p => !priceFilter || p.price === Number(priceFilter))
     .sort((a, b) => {
-      const genderOrder: Record<string, number> = { male: 0, female: 1, kids: 2, unisex: 3 };
-      const ga = genderOrder[a.gender || 'unisex'] ?? 3;
-      const gb = genderOrder[b.gender || 'unisex'] ?? 3;
+      const ca = catOrder[a.category] ?? 9, cb = catOrder[b.category] ?? 9;
+      if (ca !== cb) return ca - cb;
+      const ga = genOrder[a.gender || 'unisex'] ?? 9, gb = genOrder[b.gender || 'unisex'] ?? 9;
       if (ga !== gb) return ga - gb;
       return a.name.localeCompare(b.name);
     });
+
+  // Group products by category + gender for section headers
+  type Group = { cat: string; gen: string; label: string; items: typeof filtered };
+  const groups: Group[] = [];
+  let lastKey = '';
+  for (const p of filtered) {
+    const key = `${p.category}|${p.gender || 'unisex'}`;
+    if (key !== lastKey) {
+      groups.push({ cat: p.category, gen: p.gender || 'unisex', label: `${catLabel[p.category] || p.category} — ${genLabel[p.gender || 'unisex'] || p.gender}`, items: [] });
+      lastKey = key;
+    }
+    groups[groups.length - 1].items.push(p);
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
@@ -173,8 +191,19 @@ function Productos() {
       ) : filtered.length === 0 ? (
         <p className="text-center py-20 text-gray-400 text-sm">No se encontraron productos</p>
       ) : (
-        <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 fade-in ${orderCount > 0 ? "pb-24" : ""}`}>
-          {filtered.map(p => <ProductCard key={p.id} product={p} stock={p._stock} />)}
+        <div className={`space-y-8 fade-in ${orderCount > 0 ? "pb-24" : ""}`}>
+          {groups.map(g => (
+            <div key={g.label}>
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="text-sm font-medium text-gray-800">{g.label}</h2>
+                <div className="flex-1 border-t border-gray-100" />
+                <span className="text-xs text-gray-300">{g.items.length}</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {g.items.map(p => <ProductCard key={p.id} product={p} stock={p._stock} />)}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
