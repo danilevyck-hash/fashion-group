@@ -104,41 +104,98 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     try {
       const { Resend } = await import("resend");
       const resend = new Resend(process.env.RESEND_API_KEY);
-      const gi = (data.guia_items || []) as { cliente: string; empresa: string; bultos: number; facturas: string }[];
+      const gi = (data.guia_items || []) as { cliente: string; direccion?: string; empresa: string; bultos: number; facturas: string }[];
       const totalB = gi.reduce((s, i) => s + (i.bultos || 0), 0);
       const itemsList = gi.map(i => `• ${i.cliente} — ${i.empresa} — ${i.bultos} bultos — ${i.facturas}`).join("<br>");
 
-      // Generate PDF server-side
+      // Generate professional PDF matching the print document
       let pdfBuffer: Buffer | null = null;
       try {
         const { jsPDF } = await import("jspdf");
         const { default: autoTable } = await import("jspdf-autotable");
         const doc = new jsPDF("portrait");
-        doc.setFillColor(26, 26, 26); doc.rect(0, 0, 210, 18, "F");
-        doc.setFontSize(12); doc.setTextColor(255); doc.setFont("helvetica", "bold");
-        doc.text(`GUÍA #${data.numero}`, 14, 12);
-        doc.setFontSize(8); doc.setFont("helvetica", "normal");
-        doc.text("Fashion Group · Panamá", 196, 12, { align: "right" });
-        doc.setTextColor(60); doc.setFontSize(9);
-        doc.text(`Transportista: ${transportista || data.transportista}`, 14, 26);
-        doc.text(`Placa: ${placa}`, 90, 26);
-        doc.text(`Fecha: ${data.fecha || ""}`, 150, 26);
-        doc.text(`Entregado por: ${data.entregado_por || "—"}`, 14, 33);
-        doc.text(`Receptor: ${receptor_nombre || "—"}`, 90, 33);
+        const W = 210;
+
+        // Title
+        doc.setFontSize(13); doc.setTextColor(26); doc.setFont("helvetica", "bold");
+        doc.text("GUÍA DE TRANSPORTE INTERIOR", W / 2, 16, { align: "center" });
+
+        // Header fields — 2 columns
+        doc.setFontSize(9); doc.setFont("helvetica", "normal"); doc.setTextColor(60);
+        const hY = 26;
+        doc.setFont("helvetica", "bold"); doc.text("N° GUÍA:", 14, hY);
+        doc.setFont("helvetica", "normal"); doc.text(String(data.numero), 42, hY);
+        doc.setFont("helvetica", "bold"); doc.text("FECHA:", 110, hY);
+        doc.setFont("helvetica", "normal"); doc.text(data.fecha || "", 132, hY);
+
+        doc.setFont("helvetica", "bold"); doc.text("TRANSPORTISTA:", 14, hY + 7);
+        doc.setFont("helvetica", "normal"); doc.text(transportista || data.transportista || "", 56, hY + 7);
+        doc.setFont("helvetica", "bold"); doc.text("PLACA:", 110, hY + 7);
+        doc.setFont("helvetica", "normal"); doc.text(placa || "", 132, hY + 7);
+
+        doc.setFont("helvetica", "bold"); doc.text("ENTREGADO POR:", 14, hY + 14);
+        doc.setFont("helvetica", "normal"); doc.text(data.entregado_por || "", 56, hY + 14);
+
+        // Separator
+        doc.setDrawColor(200); doc.line(14, hY + 19, W - 14, hY + 19);
+
+        // Items table
+        const guiaItemsFull = gi as { cliente: string; direccion?: string; empresa: string; facturas: string; bultos: number }[];
         autoTable(doc, {
-          startY: 40,
-          head: [["#", "Cliente", "Empresa", "Facturas", "Bultos"]],
-          body: gi.map((i, idx) => [String(idx + 1), i.cliente, i.empresa, i.facturas, String(i.bultos)]),
-          styles: { fontSize: 8, cellPadding: 3 },
-          headStyles: { fillColor: [26, 26, 26] },
-          columnStyles: { 0: { cellWidth: 10 }, 4: { cellWidth: 18, halign: "center" } },
+          startY: hY + 23,
+          head: [["#", "CLIENTE", "DIRECCIÓN", "EMPRESA", "FACTURA(S)", "BULTOS", "N° GUÍA TRANSP."]],
+          body: [
+            ...guiaItemsFull.map((it, idx) => [String(idx + 1), it.cliente, it.direccion || "", it.empresa, it.facturas, String(it.bultos), data.numero_guia_transp || ""]),
+            [{ content: "TOTAL DE BULTOS DESPACHADOS", colSpan: 5, styles: { halign: "right" as const, fontStyle: "bold" as const } }, String(totalB), ""],
+          ],
+          styles: { fontSize: 8, cellPadding: 2, lineColor: [180, 180, 180], lineWidth: 0.2 },
+          headStyles: { fillColor: [240, 240, 240], textColor: [26, 26, 26], fontStyle: "bold" },
+          columnStyles: { 0: { cellWidth: 8 }, 5: { cellWidth: 14, halign: "center" }, 6: { cellWidth: 22 } },
         });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const fy = (doc as any).lastAutoTable.finalY + 6;
-        doc.setFontSize(10); doc.setTextColor(26); doc.setFont("helvetica", "bold");
-        doc.text(`Total: ${totalB} bultos`, 14, fy);
-        doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
-        doc.text("Fashion Group Panamá", 14, fy + 8);
+        let fy = (doc as any).lastAutoTable.finalY + 6;
+
+        // Observaciones
+        doc.setFontSize(8); doc.setTextColor(26); doc.setFont("helvetica", "bold");
+        doc.text("OBSERVACIONES GENERALES DEL ENVÍO", 14, fy);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+        doc.rect(14, fy + 2, W - 28, 12); // empty box
+        if (data.observaciones) doc.text(data.observaciones, 16, fy + 7, { maxWidth: W - 32 });
+        fy += 20;
+
+        // Signatures — 2 columns
+        doc.setFontSize(8); doc.setFont("helvetica", "bold");
+        doc.text("ENTREGADO POR", 14, fy);
+        doc.text("RECIBIDO CONFORME — TRANSPORTISTA", 110, fy);
+        fy += 6;
+        doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+        doc.text(`NOMBRE: ${data.entregado_por || "________________"}`, 14, fy);
+        doc.text(`PLACA: ${placa || "________________"}`, 110, fy);
+        fy += 5;
+        doc.text("FIRMA: ________________", 14, fy);
+        doc.text(`NOMBRE: ${receptor_nombre || "________________"}`, 110, fy);
+        fy += 5;
+        doc.text("", 14, fy);
+        doc.text(`CÉDULA: ${data.cedula || "________________"}`, 110, fy);
+        fy += 5;
+        doc.text("", 14, fy);
+        doc.text("FIRMA: ________________", 110, fy);
+
+        // Add signature images if available
+        if (data.firma_entregador_base64) {
+          try { doc.addImage(data.firma_entregador_base64, "PNG", 14, fy - 12, 40, 15); } catch { /* */ }
+        }
+        if (data.firma_base64) {
+          try { doc.addImage(data.firma_base64, "PNG", 145, fy - 7, 40, 15); } catch { /* */ }
+        }
+
+        fy += 12;
+
+        // Footer legal
+        doc.setFontSize(6); doc.setTextColor(160);
+        doc.text("La firma del transportista constituye aceptación expresa de la mercancía detallada en este documento, en la cantidad y condición indicadas.", 14, fy, { maxWidth: W - 28 });
+        doc.text("Cualquier faltante o daño no reportado al momento de la recepción será responsabilidad exclusiva del transportista.", 14, fy + 4, { maxWidth: W - 28 });
+
         pdfBuffer = Buffer.from(doc.output("arraybuffer"));
       } catch { /* PDF generation failed, send email without attachment */ }
 
