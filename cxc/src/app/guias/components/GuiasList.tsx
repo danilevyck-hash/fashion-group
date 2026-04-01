@@ -43,9 +43,12 @@ export default function GuiasList({
   const [dispatching, setDispatching] = useState(false);
   const canDispatch = role && DISPATCH_ROLES.includes(role);
 
+  const [dispatchError, setDispatchError] = useState<string | null>(null);
+
   async function confirmDispatch() {
     if (!dispatchModal) return;
     setDispatching(true);
+    setDispatchError(null);
     try {
       const res = await fetch(`/api/guias/${dispatchModal.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -54,8 +57,11 @@ export default function GuiasList({
       if (res.ok) {
         setDispatchModal(null);
         onReload?.();
+      } else {
+        const d = await res.json().catch(() => ({}));
+        setDispatchError(d.error || `Error ${res.status}`);
       }
-    } catch { /* */ }
+    } catch { setDispatchError("Error de conexión"); }
     setDispatching(false);
   }
   return (
@@ -183,7 +189,7 @@ export default function GuiasList({
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2">
                                 <StatusBadge estado={!g.placa ? "pendiente" : "despachada"} />
-                                {canDispatch && g.estado === "Pendiente Bodega" && (
+                                {canDispatch && g.estado !== "Completada" && g.estado !== "Listo para Imprimir" && (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); setDispatchModal(g); }}
                                     className="text-[10px] bg-emerald-600 text-white px-2.5 py-1 rounded-full hover:bg-emerald-700 transition font-medium">
@@ -226,7 +232,8 @@ export default function GuiasList({
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setDispatchModal(null)}>
           <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
             <p className="text-sm font-medium mb-1">¿Confirmar despacho de Guía #{dispatchModal.numero}?</p>
-            <p className="text-sm text-gray-500 mb-4">Transportista: {dispatchModal.transportista} — {dispatchModal.total_bultos || 0} bultos</p>
+            <p className="text-sm text-gray-500 mb-2">Transportista: {dispatchModal.transportista} — {dispatchModal.total_bultos || 0} bultos</p>
+            {dispatchError && <p className="text-xs text-red-500 mb-2 bg-red-50 px-3 py-1.5 rounded">{dispatchError}</p>}
             <div className="flex gap-2 justify-end">
               <button onClick={() => setDispatchModal(null)} className="px-4 py-2 text-sm text-gray-500 hover:text-black transition">Cancelar</button>
               <button onClick={confirmDispatch} disabled={dispatching}

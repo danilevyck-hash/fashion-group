@@ -230,6 +230,27 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const { error } = await supabaseServer.from("guia_transporte").update(update).eq("id", params.id);
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
+
+  // Send email if dispatched via PATCH
+  if (body.estado === "Completada" || body.estado === "Listo para Imprimir") {
+    try {
+      const { data: guia } = await supabaseServer.from("guia_transporte").select("numero, transportista, placa, guia_items(cliente, empresa, bultos, facturas)").eq("id", params.id).single();
+      if (guia) {
+        const { Resend } = await import("resend");
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const gi = (guia.guia_items || []) as { cliente: string; empresa: string; bultos: number; facturas: string }[];
+        const totalB = gi.reduce((s, i) => s + (i.bultos || 0), 0);
+        const itemsList = gi.map(i => `• ${i.cliente} — ${i.empresa} — ${i.bultos} bultos`).join("<br>");
+        await resend.emails.send({
+          from: "Fashion Group <notificaciones@fashiongr.com>",
+          to: ["daniel@fashiongr.com", "info@fashiongr.com"],
+          subject: `✅ Guía #${guia.numero} despachada — ${guia.transportista}`,
+          html: `<h2>Guía #${guia.numero} despachada</h2><p><strong>Transportista:</strong> ${guia.transportista}<br><strong>Placa:</strong> ${guia.placa || "Sin placa"}<br><strong>Total:</strong> ${totalB} bultos</p><p>${itemsList}</p><p style="color:#888;font-size:11px">Fashion Group Panamá — Despachado por ${session?.userName || session?.role || "sistema"}</p>`,
+        });
+      }
+    } catch { /* email failed silently */ }
+  }
+
   return NextResponse.json({ ok: true });
 }
 
