@@ -52,8 +52,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   if (guiaErr) return NextResponse.json({ error: guiaErr.message }, { status: 500 });
 
-  // Delete old items, insert new
-  await supabaseServer.from("guia_items").delete().eq("guia_id", id);
+  // Only replace items if explicitly sent in body
+  if (items !== undefined) {
+    await supabaseServer.from("guia_items").delete().eq("guia_id", id);
+  }
 
   if (items && items.length > 0) {
     const rows = items.map((item: Record<string, unknown>, i: number) => ({
