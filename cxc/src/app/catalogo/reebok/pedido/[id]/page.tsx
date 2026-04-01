@@ -155,7 +155,7 @@ export default function OrderDetailPage() {
     doc.text(`${totalBultos} bultos · ${totalPiezas} piezas`, 14, fy);
     doc.text(`$${fmt(totalMoney)}`, 196, fy, { align: "right" });
     doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
-    doc.text("Fashion Group Panama · Reebok Authorized Distributor", 14, fy + 10);
+    doc.text("Fashion Group Panamá · Reebok Authorized Distributor", 14, fy + 10);
 
     doc.save(`${order.order_number}-${clientName.replace(/\s+/g, "-")}.pdf`);
     showToast("PDF descargado");
@@ -258,9 +258,15 @@ export default function OrderDetailPage() {
           <button onClick={saveOrder} disabled={saving} className="w-full bg-black text-white py-3 rounded text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
             {saving ? "Guardando..." : "Guardar cambios"}
           </button>
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={downloadPDF} className="border border-gray-200 text-black py-2.5 rounded text-sm hover:border-gray-400 transition">PDF</button>
-            <button onClick={confirmOrder} disabled={saving || !items.length} className="bg-red-600 text-white py-2.5 rounded text-sm hover:bg-red-700 transition disabled:opacity-40">Confirmar y enviar</button>
+          <div className="grid grid-cols-3 gap-2">
+            <button onClick={downloadPDF} className="border border-gray-200 text-black py-2.5 rounded-lg text-sm hover:border-gray-400 transition">PDF</button>
+            <button onClick={() => {
+              const text = `*Pedido ${order.order_number}*\n${clientName}\n\n` +
+                items.map(i => `${i.name} — ${i.quantity} bultos × $${i.unit_price}`).join('\n') +
+                `\n\n*Total: ${totalBultos} bultos · $${fmt(totalMoney)}*`;
+              window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+            }} className="border border-green-300 text-green-700 py-2.5 rounded-lg text-sm hover:bg-green-50 transition">WhatsApp</button>
+            <button onClick={confirmOrder} disabled={saving || !items.length} className="bg-black text-white py-2.5 rounded-lg text-sm hover:bg-gray-800 transition disabled:opacity-40">Confirmar</button>
           </div>
           <button onClick={deleteOrder} className="text-xs text-gray-400 hover:text-red-500 transition mt-2 py-1">Eliminar pedido</button>
         </div>

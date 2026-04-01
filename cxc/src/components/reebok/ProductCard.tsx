@@ -16,10 +16,10 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
   const [qty, setQty] = useState(() => getCachedQty(product.id));
   const [busy, setBusy] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
+  const [showLightbox, setShowLightbox] = useState(false);
+  const [showQtyInput, setShowQtyInput] = useState(false);
+  const [qtyInputVal, setQtyInputVal] = useState("");
 
-  const genderLabel = product.gender === "male" ? "Hombre" : product.gender === "female" ? "Mujer" : product.gender === "kids" ? "Niños" : "";
-
-  // Check if product is in active order on mount
   const checkOrder = useCallback(async () => {
     const id = localStorage.getItem("reebok_active_order_id");
     if (!id) { setQty(0); return; }
@@ -36,20 +36,14 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
 
   useEffect(() => { checkOrder(); }, [checkOrder]);
 
-  // Listen for order changes — read from localStorage cache (no API call)
   useEffect(() => {
-    function handler() {
-      setQty(getCachedQty(product.id));
-    }
+    function handler() { setQty(getCachedQty(product.id)); }
     window.addEventListener("reebok-order-changed", handler);
     return () => window.removeEventListener("reebok-order-changed", handler);
   }, [product.id]);
 
-  // Debounced PATCH — batch rapid clicks into one API call
   const patchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingQty = useRef<number | null>(null);
-
-  // Cleanup timer on unmount
   useEffect(() => { return () => { if (patchTimer.current) clearTimeout(patchTimer.current) } }, []);
   const baseCache = useRef<string>("[]");
 
@@ -58,12 +52,8 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
     if (!activeOrderId) return;
     const effectiveQty = newQty <= 0 ? 0 : newQty;
     const isFirstInBatch = pendingQty.current === null;
-
-    // Save base cache only on first click of a batch
     if (isFirstInBatch) baseCache.current = localStorage.getItem("reebok_order_items") || "[]";
     pendingQty.current = effectiveQty;
-
-    // Optimistic update — immediate UI + cache
     setQty(effectiveQty);
     try {
       const cached = JSON.parse(localStorage.getItem("reebok_order_items") || "[]");
@@ -83,7 +73,6 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
       window.dispatchEvent(new Event("reebok-order-changed"));
     } catch { /* */ }
 
-    // Debounce: reset timer, send only final qty after 400ms idle
     if (patchTimer.current) clearTimeout(patchTimer.current);
     setBusy(true);
     patchTimer.current = setTimeout(async () => {
@@ -92,20 +81,11 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
       pendingQty.current = null;
       try {
         const res = await fetch(`/api/catalogo/reebok/orders/${activeOrderId}/item`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          method: "PATCH", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ product_id: product.id, sku: product.sku || "", name: product.name, image_url: product.image_url || "", quantity: finalQty, unit_price: product.price || 0 }),
         });
-        if (!res.ok) {
-          setQty(getCachedQty(product.id));
-          localStorage.setItem("reebok_order_items", revertCache);
-          window.dispatchEvent(new Event("reebok-order-changed"));
-        }
-      } catch {
-        setQty(getCachedQty(product.id));
-        localStorage.setItem("reebok_order_items", revertCache);
-        window.dispatchEvent(new Event("reebok-order-changed"));
-      }
+        if (!res.ok) { setQty(getCachedQty(product.id)); localStorage.setItem("reebok_order_items", revertCache); window.dispatchEvent(new Event("reebok-order-changed")); }
+      } catch { setQty(getCachedQty(product.id)); localStorage.setItem("reebok_order_items", revertCache); window.dispatchEvent(new Event("reebok-order-changed")); }
       setBusy(false);
     }, 400);
   }
@@ -116,12 +96,21 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
     updateOrder(qty + 1);
   }
 
+  // #2: Tap qty → direct input
+  function openQtyInput() { setQtyInputVal(String(qty)); setShowQtyInput(true); }
+  function submitQtyInput() {
+    const n = parseInt(qtyInputVal);
+    if (!isNaN(n) && n >= 0) updateOrder(n);
+    setShowQtyInput(false);
+  }
+
   const inOrder = qty > 0;
 
   return (
     <>
-      <div className="bg-white overflow-hidden">
-        <div className="aspect-square bg-gray-50 relative overflow-hidden">
+      <div className="bg-white overflow-hidden rounded-lg">
+        {/* Image — tap to zoom (#7) */}
+        <div className="aspect-square bg-gray-50 relative overflow-hidden cursor-pointer" onClick={() => { if (product.image_url) setShowLightbox(true); }}>
           {product.image_url ? (
             <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-2" loading="lazy" />
           ) : (
@@ -136,39 +125,67 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
             {product.sku && <span className="text-[10px] text-gray-400 font-mono">{product.sku}</span>}
             {product.sku && product.sub_category && <span className="text-[10px] text-gray-300">·</span>}
             {product.sub_category && <span className="text-[10px] text-gray-500 capitalize">{product.sub_category}</span>}
+            {/* #8: Color */}
+            {product.color && <><span className="text-[10px] text-gray-300">·</span><span className="text-[10px] text-gray-400">{product.color}</span></>}
           </div>
           <div className="flex items-center gap-2 mt-1.5">
             <p className="text-base font-semibold text-black">
               {product.price ? `$${product.price.toFixed(0)}` : "Consultar"}
             </p>
-            {product.on_sale && <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded">OFERTA</span>}
+            {/* #13: Bigger badge */}
+            {product.on_sale && <span className="text-[11px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">OFERTA</span>}
           </div>
 
           {inOrder ? (
             <div className="mt-2">
               <div className="flex items-center justify-between bg-green-50 rounded px-1">
                 <button onClick={() => updateOrder(qty - 1)} disabled={busy}
-                  className="w-11 h-11 flex items-center justify-center text-green-700 text-lg font-medium hover:bg-green-100 rounded transition disabled:opacity-40">
+                  className="w-12 h-12 flex items-center justify-center text-green-700 text-lg font-medium hover:bg-green-100 rounded transition disabled:opacity-40">
                   {qty === 1 ? (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                   ) : "−"}
                 </button>
-                <div className="text-center">
-                  <span className="text-sm font-semibold text-green-700 tabular-nums">{qty}</span>
-                  <span className="text-[9px] text-green-600 ml-1">bultos</span>
-                </div>
+                {/* #2: Tap qty to edit directly */}
+                <button onClick={openQtyInput} className="text-center min-w-[48px] py-1">
+                  <span className="text-base font-semibold text-green-700 tabular-nums">{qty}</span>
+                  <span className="text-[10px] text-green-600 ml-1">bultos</span>
+                </button>
                 <button onClick={() => updateOrder(qty + 1)} disabled={busy}
-                  className="w-11 h-11 flex items-center justify-center text-green-700 text-lg font-medium hover:bg-green-100 rounded transition disabled:opacity-40">+</button>
+                  className="w-12 h-12 flex items-center justify-center text-green-700 text-lg font-medium hover:bg-green-100 rounded transition disabled:opacity-40">+</button>
               </div>
             </div>
           ) : (
             <button onClick={handleAdd} disabled={busy}
-              className="w-full mt-2 py-2.5 rounded text-xs font-medium uppercase tracking-wider transition bg-black text-white hover:bg-gray-800 disabled:opacity-40 min-h-[44px]">
+              className="w-full mt-2 py-3 rounded text-xs font-medium uppercase tracking-wider transition bg-black text-white hover:bg-gray-800 disabled:opacity-40 min-h-[48px]">
               {busy ? "..." : "Agregar"}
             </button>
           )}
         </div>
       </div>
+
+      {/* #2: Qty input modal */}
+      {showQtyInput && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]" onClick={() => setShowQtyInput(false)}>
+          <div className="bg-white rounded-xl p-5 w-56 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <p className="text-sm text-gray-600 mb-3">Cantidad de bultos</p>
+            <input type="number" min={0} autoFocus value={qtyInputVal} onChange={e => setQtyInputVal(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") submitQtyInput(); }}
+              className="w-full border-b-2 border-black text-2xl text-center font-semibold py-2 outline-none tabular-nums" />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setShowQtyInput(false)} className="flex-1 py-2 text-sm text-gray-500 hover:text-black transition">Cancelar</button>
+              <button onClick={submitQtyInput} className="flex-1 py-2 text-sm bg-black text-white rounded-lg hover:bg-gray-800 transition">Listo</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* #7: Lightbox */}
+      {showLightbox && product.image_url && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-8" onClick={() => setShowLightbox(false)}>
+          <img src={product.image_url} alt={product.name} className="max-w-full max-h-full object-contain rounded-lg" />
+          <button onClick={() => setShowLightbox(false)} className="absolute top-4 right-4 text-white/70 hover:text-white text-2xl">&times;</button>
+        </div>
+      )}
 
       {showNewOrder && (
         <NewOrderModal
