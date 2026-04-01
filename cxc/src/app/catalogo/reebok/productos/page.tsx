@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Product } from "@/components/reebok/supabase";
 import ProductCard from "@/components/reebok/ProductCard";
+import NewOrderModal from "@/components/reebok/NewOrderModal";
 
 function getOrderCount(): number {
   try {
@@ -32,6 +33,7 @@ function Productos() {
   const [orderTotal, setOrderTotal] = useState(0);
   const [orderId, setOrderId] = useState("");
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showNewOrder, setShowNewOrder] = useState(false);
 
   useEffect(() => {
     function handler(e: Event) { setToast((e as CustomEvent).detail); setTimeout(() => setToast(null), 1500); }
@@ -163,39 +165,51 @@ function Productos() {
         <p className="text-sm text-gray-400">Panamá</p>
       </div>
 
-      {/* #5: Touch-friendly filters */}
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        <input value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Buscar..." aria-label="Buscar productos"
-          className="border-b border-gray-200 py-2.5 text-sm outline-none focus:border-black transition w-48" />
-        <select value={gender} onChange={e => setGender(e.target.value)}
-          className="border-b border-gray-200 py-2.5 text-sm outline-none focus:border-black transition bg-transparent">
-          <option value="">Todos</option>
-          <option value="male">Hombre</option>
-          <option value="female">Mujer</option>
-          <option value="kids">Niños</option>
-        </select>
-        <select value={category} onChange={e => setCategory(e.target.value)}
-          className="border-b border-gray-200 py-2.5 text-sm outline-none focus:border-black transition bg-transparent">
-          <option value="">Todas</option>
-          <option value="footwear">Calzado</option>
-          <option value="apparel">Ropa</option>
-          <option value="accessories">Accesorios</option>
-        </select>
+      {/* Filters with labels */}
+      <div className="flex flex-wrap items-end gap-3 mb-6">
+        <div>
+          <label className="text-[10px] text-gray-400 uppercase tracking-wider">Buscar</label>
+          <input value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Nombre o SKU" aria-label="Buscar productos"
+            className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition w-44" />
+        </div>
+        <div>
+          <label className="text-[10px] text-gray-400 uppercase tracking-wider">Género</label>
+          <select value={gender} onChange={e => setGender(e.target.value)}
+            className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
+            <option value="">Todos</option>
+            <option value="male">Hombre</option>
+            <option value="female">Mujer</option>
+            <option value="kids">Niños</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-[10px] text-gray-400 uppercase tracking-wider">Categoría</label>
+          <select value={category} onChange={e => setCategory(e.target.value)}
+            className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
+            <option value="">Todas</option>
+            <option value="footwear">Calzado</option>
+            <option value="apparel">Ropa</option>
+            <option value="accessories">Accesorios</option>
+          </select>
+        </div>
         <button onClick={() => { setOnlyOferta(!onlyOferta); setPriceFilter(""); }}
-          className={`text-sm px-4 py-2 rounded-full transition font-medium ${onlyOferta ? "bg-orange-500 text-white" : "border border-gray-200 text-gray-500 hover:border-gray-400"}`}>
+          className={`text-sm px-4 py-2 rounded-full transition font-medium mb-0.5 ${onlyOferta ? "bg-orange-500 text-white" : "border border-gray-200 text-gray-500 hover:border-gray-400"}`}>
           Oferta
         </button>
         {onlyOferta && ofertaPrices.length > 1 && (
-          <select value={priceFilter} onChange={e => setPriceFilter(e.target.value)}
-            className="border-b border-orange-300 py-2.5 text-sm outline-none focus:border-orange-500 transition bg-transparent text-orange-700">
-            <option value="">Todos los precios</option>
-            {ofertaPrices.map(p => <option key={p} value={p}>${p.toFixed(0)}</option>)}
-          </select>
+          <div>
+            <label className="text-[10px] text-orange-400 uppercase tracking-wider">Precio</label>
+            <select value={priceFilter} onChange={e => setPriceFilter(e.target.value)}
+              className="block border-b border-orange-300 py-2 text-sm outline-none focus:border-orange-500 transition bg-transparent text-orange-700">
+              <option value="">Todos</option>
+              {ofertaPrices.map(p => <option key={p} value={p}>${p.toFixed(0)}</option>)}
+            </select>
+          </div>
         )}
         {(searchInput || gender || category || onlyOferta) && (
-          <button onClick={() => { setSearchInput(""); setSearch(""); setGender(""); setCategory(""); setOnlyOferta(false); setPriceFilter(""); }} className="text-sm text-gray-400 hover:text-black transition py-2">Limpiar</button>
+          <button onClick={() => { setSearchInput(""); setSearch(""); setGender(""); setCategory(""); setOnlyOferta(false); setPriceFilter(""); }} className="text-sm text-gray-400 hover:text-black transition py-2 mb-0.5">Limpiar</button>
         )}
-        <span className="text-xs text-gray-400 ml-auto">{filtered.length}</span>
+        <span className="text-xs text-gray-400 ml-auto mb-1">{filtered.length}</span>
       </div>
 
       {/* Grid */}
@@ -254,19 +268,45 @@ function Productos() {
         </button>
       )}
 
-      {/* #3: Floating order bar with $ total */}
-      {orderCount > 0 && orderId && (
+      {/* #3/#6: Floating bar — cart mode or order mode */}
+      {orderCount > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-40 p-3 bg-white border-t border-gray-100 shadow-lg">
-          <button onClick={() => router.push(`/catalogo/reebok/pedido/${orderId}`)}
-            className="w-full bg-black text-white py-3.5 rounded-lg text-sm font-medium flex items-center justify-between px-4">
-            <span>Ver pedido</span>
-            <span className="flex items-center gap-2">
-              <span className="tabular-nums">{orderCount} bulto{orderCount !== 1 ? "s" : ""}</span>
-              {orderTotal > 0 && <><span className="text-white/40">·</span><span className="tabular-nums font-semibold">${orderTotal.toLocaleString()}</span></>}
-              <span>→</span>
-            </span>
-          </button>
+          {orderId ? (
+            <button onClick={() => router.push(`/catalogo/reebok/pedido/${orderId}`)}
+              className="w-full bg-black text-white py-3.5 rounded-lg text-sm font-medium flex items-center justify-between px-4">
+              <span>Ver pedido</span>
+              <span className="flex items-center gap-2">
+                <span className="tabular-nums">{orderCount} bulto{orderCount !== 1 ? "s" : ""}</span>
+                {orderTotal > 0 && <><span className="text-white/40">·</span><span className="tabular-nums font-semibold">${orderTotal.toLocaleString()}</span></>}
+                <span>→</span>
+              </span>
+            </button>
+          ) : (
+            <button onClick={() => setShowNewOrder(true)}
+              className="w-full bg-green-600 text-white py-3.5 rounded-lg text-sm font-medium flex items-center justify-between px-4 hover:bg-green-700 transition">
+              <span>Crear pedido</span>
+              <span className="flex items-center gap-2">
+                <span className="tabular-nums">{orderCount} bulto{orderCount !== 1 ? "s" : ""}</span>
+                {orderTotal > 0 && <><span className="text-white/40">·</span><span className="tabular-nums font-semibold">${orderTotal.toLocaleString()}</span></>}
+                <span>→</span>
+              </span>
+            </button>
+          )}
         </div>
+      )}
+
+      {/* #6: Create order from cart */}
+      {showNewOrder && (
+        <NewOrderModal
+          onClose={() => setShowNewOrder(false)}
+          onCreated={(id) => {
+            setShowNewOrder(false);
+            setOrderId(id);
+            localStorage.setItem("reebok_active_order_id", id);
+            window.dispatchEvent(new Event("reebok-order-changed"));
+            router.push(`/catalogo/reebok/pedido/${id}`);
+          }}
+        />
       )}
     </div>
   );

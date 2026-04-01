@@ -41,11 +41,15 @@ export default function NewOrderModal({ onClose, onCreated, autoAddProduct }: Pr
     if (!name.trim()) return;
     setCreating(true);
     try {
-      const items = autoAddProduct ? [{
-        product_id: autoAddProduct.product_id, sku: autoAddProduct.sku,
-        name: autoAddProduct.name, image_url: autoAddProduct.image_url,
-        quantity: 1, unit_price: autoAddProduct.unit_price,
-      }] : [];
+      // Include cart items from localStorage if any, or single auto-add product
+      let items: { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number }[] = [];
+      try {
+        const cached = JSON.parse(localStorage.getItem("reebok_order_items") || "[]");
+        if (cached.length > 0) items = cached;
+      } catch { /* */ }
+      if (items.length === 0 && autoAddProduct) {
+        items = [{ product_id: autoAddProduct.product_id, sku: autoAddProduct.sku, name: autoAddProduct.name, image_url: autoAddProduct.image_url, quantity: 1, unit_price: autoAddProduct.unit_price }];
+      }
       const res = await fetch("/api/catalogo/reebok/orders", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ client_name: name.trim(), vendor_name: typeof window !== 'undefined' ? sessionStorage.getItem('fg_user_name') || null : null, items }),

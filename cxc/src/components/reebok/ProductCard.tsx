@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Product } from "@/components/reebok/supabase";
-import NewOrderModal from "./NewOrderModal";
 
 function getCachedQty(productId: string): number {
   try {
@@ -15,7 +14,6 @@ function getCachedQty(productId: string): number {
 export default function ProductCard({ product, stock = 0 }: { product: Product; stock?: number }) {
   const [qty, setQty] = useState(() => getCachedQty(product.id));
   const [busy, setBusy] = useState(false);
-  const [showNewOrder, setShowNewOrder] = useState(false);
   const [showLightbox, setShowLightbox] = useState(false);
   const [showQtyInput, setShowQtyInput] = useState(false);
   const [qtyInputVal, setQtyInputVal] = useState("");
@@ -47,14 +45,7 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
   useEffect(() => { return () => { if (patchTimer.current) clearTimeout(patchTimer.current) } }, []);
   const baseCache = useRef<string>("[]");
 
-  function updateOrder(newQty: number) {
-    const activeOrderId = localStorage.getItem("reebok_active_order_id");
-    if (!activeOrderId) return;
-    const effectiveQty = newQty <= 0 ? 0 : newQty;
-    const isFirstInBatch = pendingQty.current === null;
-    if (isFirstInBatch) baseCache.current = localStorage.getItem("reebok_order_items") || "[]";
-    pendingQty.current = effectiveQty;
-    setQty(effectiveQty);
+  function updateLocalCart(effectiveQty: number) {
     try {
       const cached = JSON.parse(localStorage.getItem("reebok_order_items") || "[]");
       let updated;
@@ -69,9 +60,23 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
         }
       }
       localStorage.setItem("reebok_order_items", JSON.stringify(updated));
-      if (effectiveQty > 0 && isFirstInBatch && qty === 0) window.dispatchEvent(new CustomEvent("reebok-toast", { detail: "Agregado" }));
-      window.dispatchEvent(new Event("reebok-order-changed"));
     } catch { /* */ }
+  }
+
+  function updateOrder(newQty: number) {
+    const activeOrderId = localStorage.getItem("reebok_active_order_id");
+    const effectiveQty = newQty <= 0 ? 0 : newQty;
+    const isFirstInBatch = pendingQty.current === null;
+    if (isFirstInBatch) baseCache.current = localStorage.getItem("reebok_order_items") || "[]";
+    pendingQty.current = effectiveQty;
+    setQty(effectiveQty);
+
+    updateLocalCart(effectiveQty);
+    if (effectiveQty > 0 && isFirstInBatch && qty === 0) window.dispatchEvent(new CustomEvent("reebok-toast", { detail: "Agregado" }));
+    window.dispatchEvent(new Event("reebok-order-changed"));
+
+    // If no order yet (cart mode), just update localStorage — no API call
+    if (!activeOrderId) { setBusy(false); return; }
 
     if (patchTimer.current) clearTimeout(patchTimer.current);
     setBusy(true);
@@ -91,8 +96,7 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
   }
 
   function handleAdd() {
-    const activeOrderId = localStorage.getItem("reebok_active_order_id");
-    if (!activeOrderId) { setShowNewOrder(true); return; }
+    // #6: Always add — no need to create order first
     updateOrder(qty + 1);
   }
 
@@ -187,13 +191,6 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
         </div>
       )}
 
-      {showNewOrder && (
-        <NewOrderModal
-          onClose={() => setShowNewOrder(false)}
-          onCreated={() => { setShowNewOrder(false); setTimeout(() => updateOrder(1), 300); }}
-          autoAddProduct={{ product_id: product.id, sku: product.sku || "", name: product.name, image_url: product.image_url || "", unit_price: product.price || 0 }}
-        />
-      )}
     </>
   );
 }
