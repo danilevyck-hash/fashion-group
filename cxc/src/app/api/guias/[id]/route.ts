@@ -228,8 +228,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const session = getSession(req);
   await logActivity(session?.role || "unknown", "guia_patch", "guias", { guiaId: params.id, fields: Object.keys(update) }, session?.userName);
 
-  const { error } = await supabaseServer.from("guia_transporte").update(update).eq("id", params.id);
-  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
+  const { data: updated, error } = await supabaseServer.from("guia_transporte").update(update).eq("id", params.id).select("id").maybeSingle();
+  if (error) { console.error(error); return NextResponse.json({ error: error.message }, { status: 500 }); }
+  if (!updated) { return NextResponse.json({ error: "Guía no encontrada o sin cambios" }, { status: 404 }); }
 
   // Send email if dispatched via PATCH
   if (body.estado === "Completada" || body.estado === "Listo para Imprimir") {
