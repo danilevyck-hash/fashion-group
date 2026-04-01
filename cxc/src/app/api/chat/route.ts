@@ -70,7 +70,7 @@ async function buildSystemData(): Promise<string> {
   // All queries in parallel
   const [
     cxcRows, cxcUploads,
-    ventasThisYear, ventasMetas,
+    ventasThisYear, ventasMetas, ventasRaw,
     reclamos,
     cheques,
     guias,
@@ -86,6 +86,8 @@ async function buildSystemData(): Promise<string> {
     // Ventas
     safe(supabaseServer.from("ventas_mensuales").select("empresa, mes, ventas_brutas, notas_credito, costo_total").eq("año", year)),
     safe(supabaseServer.from("ventas_metas").select("empresa, mes, meta").eq("anio", year)),
+    // Facturas recientes
+    safe(supabaseServer.from("ventas_raw").select("fecha, tipo, n_sistema, n_fiscal, cliente, vendedor, subtotal, total, utilidad, empresa").order("fecha", { ascending: false }).limit(50)),
     // Reclamos
     safe(supabaseServer.from("reclamos").select("id, empresa, proveedor, marca, estado, fecha_reclamo, created_at, reclamo_items(cantidad, precio_unitario)").order("created_at", { ascending: false })),
     // Cheques
@@ -401,6 +403,14 @@ async function buildSystemData(): Promise<string> {
     }
   }
 
+  // ── Últimas facturas ──
+  if (ventasRaw.length > 0) {
+    block += `\n### Últimas ${ventasRaw.length} facturas`;
+    for (const v of ventasRaw.slice(0, 50)) {
+      block += `\n- ${v.fecha || "?"} | ${v.tipo || "?"} ${v.n_fiscal || v.n_sistema || ""} | ${v.cliente || "?"} | ${v.empresa || "?"} | vendedor: ${v.vendedor || "?"} | $${fmt(Number(v.total) || 0)}${Number(v.utilidad) ? ` (util: $${fmt(Number(v.utilidad))})` : ""}`;
+    }
+  }
+
   return block;
 }
 
@@ -419,25 +429,77 @@ export async function POST(req: NextRequest) {
 
     const systemData = await buildSystemData();
 
-    // #4: Enrich with specific client data if user mentions a client name
+    // #4: Enrich with specific client/entity data
     let clientContext = "";
     const msgLower = message.toLowerCase();
-    if (msgLower.includes("cliente") || msgLower.includes("cuenta de") || msgLower.includes("saldo de") || msgLower.includes("deuda de")) {
-      // Extract potential client name (words after key phrases)
-      const match = message.match(/(?:cliente|cuenta de|saldo de|deuda de)\s+[""""]?([A-ZÁ-Ú][A-ZÁ-Ú\s&.'-]{2,})/i);
-      if (match) {
-        const searchName = match[1].trim().toUpperCase();
-        const { data: clientRows } = await supabaseServer
-          .from("cxc_rows")
-          .select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365")
-          .ilike("nombre_normalized", `%${searchName}%`)
-          .limit(10);
-        if (clientRows && clientRows.length > 0) {
-          clientContext = `\n\n## Datos específicos del cliente "${searchName}"`;
-          for (const r of clientRows) {
-            const vencido = (Number(r.d121_180) || 0) + (Number(r.d181_270) || 0) + (Number(r.d271_365) || 0) + (Number(r.mas_365) || 0);
-            clientContext += `\n- ${r.nombre_normalized} (${r.company_key}): total $${fmt(Number(r.total) || 0)}, 0-30d $${fmt(Number(r.d0_30) || 0)}, 31-60d $${fmt(Number(r.d31_60) || 0)}, 61-90d $${fmt(Number(r.d61_90) || 0)}, 91-120d $${fmt(Number(r.d91_120) || 0)}, vencido $${fmt(vencido)}`;
-          }
+
+    // Detect client-related queries
+    const clientPatterns = [
+      /(?:cliente|cuenta de|saldo de|deuda de|factur\w+ (?:de|a|para))\s+[""""]?([A-ZÁ-Úa-zá-ú][A-ZÁ-Úa-zá-ú\s&.'-]{2,})/i,
+      /(?:city|mall|jerusalem|golden|plaza|kheriddine|bouti|outlet|sporting|frontera|multifashion|fashion|boston)[A-ZÁ-Úa-zá-ú\s&.'-]*/i,
+    ];
+
+    let searchTerm = "";
+    for (const pattern of clientPatterns) {
+      const m = message.match(pattern);
+      if (m) { searchTerm = (m[1] || m[0]).trim(); break; }
+    }
+
+    if (searchTerm && searchTerm.length >= 3) {
+      const term = searchTerm.toUpperCase();
+
+      // Search CxC
+      let { data: cxcMatches } = await supabaseServer
+        .from("cxc_rows")
+        .select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365")
+        .ilike("nombre_normalized", `%${term}%`)
+        .limit(5);
+
+      // Fallback: split into words and search by longest word
+      if (!cxcMatches || cxcMatches.length === 0) {
+        const words = term.split(/\s+/).filter(w => w.length >= 3).sort((a, b) => b.length - a.length);
+        for (const word of words) {
+          const { data } = await supabaseServer
+            .from("cxc_rows")
+            .select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365")
+            .ilike("nombre_normalized", `%${word}%`)
+            .limit(5);
+          if (data && data.length > 0) { cxcMatches = data; break; }
+        }
+      }
+
+      if (cxcMatches && cxcMatches.length > 0) {
+        clientContext += `\n\n## Búsqueda: "${searchTerm}" — ${cxcMatches.length} resultado(s) en CxC`;
+        for (const r of cxcMatches.slice(0, 3)) {
+          const vencido = (Number(r.d121_180) || 0) + (Number(r.d181_270) || 0) + (Number(r.d271_365) || 0) + (Number(r.mas_365) || 0);
+          clientContext += `\n- ${r.nombre_normalized} (${r.company_key}): total $${fmt(Number(r.total) || 0)}, 0-30d $${fmt(Number(r.d0_30) || 0)}, 31-60d $${fmt(Number(r.d31_60) || 0)}, 61-90d $${fmt(Number(r.d61_90) || 0)}, 91-120d $${fmt(Number(r.d91_120) || 0)}, vencido $${fmt(vencido)}`;
+        }
+      }
+
+      // Search reclamos
+      const { data: reclamoMatches } = await supabaseServer
+        .from("reclamos")
+        .select("id, empresa, nro_reclamo, estado, fecha_reclamo")
+        .or(`empresa.ilike.%${term}%`)
+        .limit(3);
+      if (reclamoMatches && reclamoMatches.length > 0) {
+        clientContext += `\n\n## Reclamos relacionados con "${searchTerm}"`;
+        for (const r of reclamoMatches) {
+          clientContext += `\n- ${r.nro_reclamo} (${r.empresa}): estado ${r.estado}, fecha ${r.fecha_reclamo}`;
+        }
+      }
+
+      // Search facturas
+      const { data: facturaMatches } = await supabaseServer
+        .from("ventas_raw")
+        .select("fecha, tipo, n_fiscal, cliente, empresa, vendedor, total")
+        .ilike("cliente", `%${term}%`)
+        .order("fecha", { ascending: false })
+        .limit(5);
+      if (facturaMatches && facturaMatches.length > 0) {
+        clientContext += `\n\n## Facturas recientes de "${searchTerm}"`;
+        for (const v of facturaMatches) {
+          clientContext += `\n- ${v.fecha} | ${v.tipo} ${v.n_fiscal || ""} | ${v.empresa} | vendedor: ${v.vendedor || "?"} | $${fmt(Number(v.total) || 0)}`;
         }
       }
     }
