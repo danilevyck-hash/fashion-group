@@ -99,19 +99,59 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     await logActivity(session?.role || "unknown", estado ? "guia_dispatch" : "guia_edit", "guias", { guiaId: id, changes }, session?.userName);
   }
 
-  // Dispatch email notification
+  // Dispatch email with PDF attachment
   if (placa && estado && data) {
     try {
       const { Resend } = await import("resend");
       const resend = new Resend(process.env.RESEND_API_KEY);
-      const guiaItems = (data.guia_items || []) as { cliente: string; empresa: string; bultos: number; facturas: string }[];
-      const itemsList = guiaItems.map(i => `• ${i.cliente} — ${i.empresa} — ${i.bultos} bultos — ${i.facturas}`).join("<br>");
-      await resend.emails.send({
+      const gi = (data.guia_items || []) as { cliente: string; empresa: string; bultos: number; facturas: string }[];
+      const totalB = gi.reduce((s, i) => s + (i.bultos || 0), 0);
+      const itemsList = gi.map(i => `• ${i.cliente} — ${i.empresa} — ${i.bultos} bultos — ${i.facturas}`).join("<br>");
+
+      // Generate PDF server-side
+      let pdfBuffer: Buffer | null = null;
+      try {
+        const { jsPDF } = await import("jspdf");
+        const { default: autoTable } = await import("jspdf-autotable");
+        const doc = new jsPDF("portrait");
+        doc.setFillColor(26, 26, 26); doc.rect(0, 0, 210, 18, "F");
+        doc.setFontSize(12); doc.setTextColor(255); doc.setFont("helvetica", "bold");
+        doc.text(`GUÍA #${data.numero}`, 14, 12);
+        doc.setFontSize(8); doc.setFont("helvetica", "normal");
+        doc.text("Fashion Group · Panamá", 196, 12, { align: "right" });
+        doc.setTextColor(60); doc.setFontSize(9);
+        doc.text(`Transportista: ${transportista || data.transportista}`, 14, 26);
+        doc.text(`Placa: ${placa}`, 90, 26);
+        doc.text(`Fecha: ${data.fecha || ""}`, 150, 26);
+        doc.text(`Entregado por: ${data.entregado_por || "—"}`, 14, 33);
+        doc.text(`Receptor: ${receptor_nombre || "—"}`, 90, 33);
+        autoTable(doc, {
+          startY: 40,
+          head: [["#", "Cliente", "Empresa", "Facturas", "Bultos"]],
+          body: gi.map((i, idx) => [String(idx + 1), i.cliente, i.empresa, i.facturas, String(i.bultos)]),
+          styles: { fontSize: 8, cellPadding: 3 },
+          headStyles: { fillColor: [26, 26, 26] },
+          columnStyles: { 0: { cellWidth: 10 }, 4: { cellWidth: 18, halign: "center" } },
+        });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const fy = (doc as any).lastAutoTable.finalY + 6;
+        doc.setFontSize(10); doc.setTextColor(26); doc.setFont("helvetica", "bold");
+        doc.text(`Total: ${totalB} bultos`, 14, fy);
+        doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
+        doc.text("Fashion Group Panamá", 14, fy + 8);
+        pdfBuffer = Buffer.from(doc.output("arraybuffer"));
+      } catch { /* PDF generation failed, send email without attachment */ }
+
+      const emailOptions: { from: string; to: string[]; subject: string; html: string; attachments?: { filename: string; content: Buffer }[] } = {
         from: "Fashion Group <notificaciones@fashiongr.com>",
         to: ["daniel@fashiongr.com", "info@fashiongr.com"],
         subject: `✅ Guía #${data.numero} despachada — ${transportista || data.transportista}`,
-        html: `<h2>Guía #${data.numero} despachada</h2><p><strong>Transportista:</strong> ${transportista || data.transportista}<br><strong>Placa:</strong> ${placa}<br><strong>Receptor:</strong> ${receptor_nombre || "—"}</p><p><strong>Items:</strong></p><p>${itemsList || "Sin items"}</p><p style="color:#888;font-size:11px">Fashion Group Panamá — Notificación automática</p>`,
-      });
+        html: `<h2>Guía #${data.numero} despachada</h2><p><strong>Transportista:</strong> ${transportista || data.transportista}<br><strong>Placa:</strong> ${placa}<br><strong>Receptor:</strong> ${receptor_nombre || "—"}<br><strong>Total:</strong> ${totalB} bultos</p><p><strong>Items:</strong></p><p>${itemsList || "Sin items"}</p><p style="color:#888;font-size:11px">Fashion Group Panamá — Notificación automática</p>`,
+      };
+      if (pdfBuffer) {
+        emailOptions.attachments = [{ filename: `Guia-${data.numero}.pdf`, content: pdfBuffer }];
+      }
+      await resend.emails.send(emailOptions);
     } catch { /* email send failed */ }
   }
 

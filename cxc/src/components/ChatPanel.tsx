@@ -16,10 +16,10 @@ export default function ChatPanel() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Show for any logged-in user
+  // Show for all roles except bodega and cliente
   useEffect(() => {
     const role = sessionStorage.getItem("cxc_role");
-    if (role) {
+    if (role && role !== "bodega" && role !== "cliente") {
       setVisible(true);
     }
   }, []);
