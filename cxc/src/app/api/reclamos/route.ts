@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
+import { getRole, requireAdmin } from "@/lib/api-auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const role = getRole(req);
+  if (!role || !['admin', 'secretaria', 'upload'].includes(role)) {
+    return NextResponse.json({ error: 'Sin permisos' }, { status: 403 });
+  }
   const { data, error } = await supabaseServer
     .from("reclamos")
     .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_seguimiento(*)")
@@ -13,6 +18,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const denied = requireAdmin(req); if (denied) return denied;
   const body = await req.json();
   const { empresa, proveedor, marca, nro_factura, nro_orden_compra, fecha_reclamo, notas, items } = body;
 
