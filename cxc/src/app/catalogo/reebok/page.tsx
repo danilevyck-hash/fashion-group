@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import NewOrderModal from "@/components/reebok/NewOrderModal";
 
 const ADMIN_ROLES = ["admin", "secretaria"];
+const DIRECT_TO_CATALOG = ["vendedor"];
 
 export default function ReebokLanding() {
   const router = useRouter();
@@ -19,6 +20,12 @@ export default function ReebokLanding() {
   }, []);
 
   if (!ready) return null;
+
+  // Vendedor goes straight to catalog
+  if (role && DIRECT_TO_CATALOG.includes(role)) {
+    router.replace("/catalogo/reebok/productos");
+    return null;
+  }
 
   // Admin/secretaria see control panel
   if (role && ADMIN_ROLES.includes(role)) {
