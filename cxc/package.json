@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.81.0",
     "@hello-pangea/dnd": "^18.0.1",
     "@supabase/supabase-js": "^2.43.4",
     "@types/bcryptjs": "^2.4.6",
