@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest } from "next/server";
 
-const SYSTEM_PROMPT = `Eres el asistente de inteligencia de negocios de Fashion Group Panamá, un grupo de distribución de moda.
+const BASE_SYSTEM_PROMPT = `Eres el asistente de inteligencia de negocios de Fashion Group Panamá, un grupo de distribución de moda.
 
 ## Empresas del Grupo
 1. Vistana — distribuye Calvin Klein
@@ -23,7 +23,57 @@ const SYSTEM_PROMPT = `Eres el asistente de inteligencia de negocios de Fashion 
 - Respondes en español.
 - Sé conciso y directo.
 - Si no tienes datos específicos, dilo claramente en vez de inventar.
-- Usa formato con bullets o tablas cuando ayude a la claridad.`;
+- Usa formato con bullets o tablas cuando ayude a la claridad.
+- Cuando cites cifras, siempre indica que son datos del sistema actualizados a la fecha mostrada.`;
+
+function fmt(n: number): string {
+  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function fetchSystemData(baseUrl: string, cookie: string | null): Promise<string> {
+  const headers: Record<string, string> = {};
+  if (cookie) headers["Cookie"] = cookie;
+
+  const [statsRes, cxcRes] = await Promise.all([
+    fetch(`${baseUrl}/api/home-stats`, { headers }).catch(() => null),
+    fetch(`${baseUrl}/api/cxc-summary`, { headers }).catch(() => null),
+  ]);
+
+  const stats = statsRes?.ok ? await statsRes.json() : null;
+  const cxc = cxcRes?.ok ? await cxcRes.json() : null;
+
+  if (!stats && !cxc) return "";
+
+  const fecha = new Date().toLocaleDateString("es-PA", { year: "numeric", month: "long", day: "numeric" });
+  let block = `\n\n## Datos actuales del sistema (${fecha})`;
+
+  if (stats) {
+    block += `\n### KPIs
+- Ventas mes actual: $${fmt(stats.ventasMes || 0)}${stats.ventasPrev ? ` (mes anterior: $${fmt(stats.ventasPrev)})` : ""}
+- Reclamos abiertos: ${stats.reclamosPendientes ?? 0}${stats.reclamosViejos ? ` (${stats.reclamosViejos} con más de 30 días)` : ""}
+- Reclamos resueltos este mes: ${stats.reclamosResueltosEsteMes ?? 0}
+- CxC total: $${fmt(stats.cxcTotal || 0)} / vencida (>120 días): $${fmt(stats.cxcVencida || 0)}
+- Cheques que vencen esta semana: ${stats.vencenEstaSemana ?? 0}${stats.vencenHoy ? ` (${stats.vencenHoy} vencen hoy)` : ""}
+- Total pendiente en cheques: $${fmt(stats.chequesTotalPendiente || 0)}
+- Guías de transporte este mes: ${stats.guiasEsteMes ?? 0}
+- Total clientes en directorio: ${stats.totalClientes ?? 0}
+- Préstamos pendientes: ${stats.prestamosPendientes ?? 0}`;
+    if (stats.cxcStale) {
+      block += `\n- ⚠ Datos de CxC podrían estar desactualizados (última carga: ${stats.lastUpload || "desconocida"})`;
+    }
+  }
+
+  if (cxc) {
+    block += `\n### CxC por composición
+- Total cartera: $${fmt(cxc.totalCxc || 0)} (${cxc.empresasCount ?? 0} empresas)
+- Corriente (0-90 días): ${cxc.corrientePct ?? 0}%
+- Vigilancia (91-120 días): ${cxc.vigilanciaPct ?? 0}%
+- Vencida (>120 días): ${cxc.vencidoPct ?? 0}% ($${fmt(cxc.vencidoMas121 || 0)})
+- Clientes críticos (con saldo vencido >120d): ${cxc.clientesCriticos ?? 0}`;
+  }
+
+  return block;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,6 +88,15 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "API key no configurada" }, { status: 500 });
     }
 
+    // Fetch live system data server-side
+    const proto = req.headers.get("x-forwarded-proto") || "http";
+    const host = req.headers.get("host") || "localhost:3000";
+    const baseUrl = `${proto}://${host}`;
+    const cookie = req.headers.get("cookie");
+
+    const systemData = await fetchSystemData(baseUrl, cookie);
+    const systemPrompt = BASE_SYSTEM_PROMPT + systemData;
+
     const client = new Anthropic({ apiKey });
 
     const messages: Anthropic.MessageParam[] = [
@@ -48,7 +107,7 @@ export async function POST(req: NextRequest) {
     const stream = await client.messages.stream({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1024,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages,
     });
 
@@ -68,7 +127,7 @@ export async function POST(req: NextRequest) {
           }
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
-        } catch (err) {
+        } catch {
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ error: "Error en streaming" })}\n\n`)
           );

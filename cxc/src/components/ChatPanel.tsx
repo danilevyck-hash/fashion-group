@@ -16,10 +16,10 @@ export default function ChatPanel() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Only show for admin/director
+  // Show for any logged-in user
   useEffect(() => {
     const role = sessionStorage.getItem("cxc_role");
-    if (role === "admin" || role === "director") {
+    if (role) {
       setVisible(true);
     }
   }, []);
