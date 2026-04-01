@@ -192,52 +192,71 @@ function ReclamosPage() {
   const pendientes = reclamos.filter((r) => r.estado !== "Resuelto con NC" && r.estado !== "Rechazado");
   const totalPendiente = pendientes.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * 1.177, 0);
   const alertas = pendientes.filter((r) => daysSince(r.fecha_reclamo) > 45).length;
+  // ── Confirm modal — always rendered (used by list + detail views) ──
+  const deleteModal = (
+    <ConfirmModal
+      open={!!confirmDeleteId}
+      onClose={() => setConfirmDeleteId(null)}
+      onConfirm={confirmDeleteReclamo}
+      title="Eliminar reclamo"
+      message="¿Seguro que deseas eliminar este reclamo? Esta acción no se puede deshacer."
+      confirmLabel="Eliminar"
+      destructive
+    />
+  );
+
   // ── LIST VIEW ──
   if (view === "list") {
     if (!activeEmpresa) {
       return (
-        <EmpresaSelector
-          role={role}
-          reclamos={reclamos}
-          loading={loading}
-          contactos={contactos}
-          globalSearch={globalSearch}
-          setGlobalSearch={setGlobalSearch}
-          expandedHistorial={expandedHistorial}
-          setExpandedHistorial={setExpandedHistorial}
-          totalPendiente={totalPendiente}
-          pendientes={pendientes}
-          alertas={alertas}
-          onNewReclamo={() => { resetForm(); setView("form"); }}
-          onSelectEmpresa={(empresa) => { setActiveEmpresa(empresa); setSearch(""); setFilterEstado("all"); }}
-          onLoadDetail={(id, empresa) => { setActiveEmpresa(empresa); loadDetail(id); }}
-        />
+        <>
+          <EmpresaSelector
+            role={role}
+            reclamos={reclamos}
+            loading={loading}
+            contactos={contactos}
+            globalSearch={globalSearch}
+            setGlobalSearch={setGlobalSearch}
+            expandedHistorial={expandedHistorial}
+            setExpandedHistorial={setExpandedHistorial}
+            totalPendiente={totalPendiente}
+            pendientes={pendientes}
+            alertas={alertas}
+            onNewReclamo={() => { resetForm(); setView("form"); }}
+            onSelectEmpresa={(empresa) => { setActiveEmpresa(empresa); setSearch(""); setFilterEstado("all"); }}
+            onLoadDetail={(id, empresa) => { setActiveEmpresa(empresa); loadDetail(id); }}
+          />
+          {deleteModal}
+        </>
       );
     }
 
     return (
-      <EmpresaList
-        role={role}
-        activeEmpresa={activeEmpresa}
-        reclamos={reclamos}
-        contactos={contactos}
-        search={search}
-        setSearch={setSearch}
-        filterEstado={filterEstado}
-        setFilterEstado={setFilterEstado}
-        selectionMode={selectionMode}
-        setSelectionMode={setSelectionMode}
-        selectedIds={selectedIds}
-        setSelectedIds={setSelectedIds}
-        sortCol={sortCol}
-        setSortCol={setSortCol}
-        sortDir={sortDir}
-        setSortDir={setSortDir}
-        onBack={() => setActiveEmpresa(null)}
-        onNewReclamo={() => { resetForm(); setFEmpresa(activeEmpresa); setView("form"); }}
-        onLoadDetail={(id) => loadDetail(id)}
-        onDeleteReclamo={(id) => requestDeleteReclamo(id)}
-      />
+      <>
+        <EmpresaList
+          role={role}
+          activeEmpresa={activeEmpresa}
+          reclamos={reclamos}
+          contactos={contactos}
+          search={search}
+          setSearch={setSearch}
+          filterEstado={filterEstado}
+          setFilterEstado={setFilterEstado}
+          selectionMode={selectionMode}
+          setSelectionMode={setSelectionMode}
+          selectedIds={selectedIds}
+          setSelectedIds={setSelectedIds}
+          sortCol={sortCol}
+          setSortCol={setSortCol}
+          sortDir={sortDir}
+          setSortDir={setSortDir}
+          onBack={() => setActiveEmpresa(null)}
+          onNewReclamo={() => { resetForm(); setFEmpresa(activeEmpresa); setView("form"); }}
+          onLoadDetail={(id) => loadDetail(id)}
+          onDeleteReclamo={(id) => requestDeleteReclamo(id)}
+        />
+        {deleteModal}
+      </>
     );
   }
 
@@ -305,15 +324,7 @@ function ReclamosPage() {
         onDeleteFoto={deleteFoto}
         onAplicadaConfirm={handleAplicadaConfirm}
       />
-      <ConfirmModal
-        open={!!confirmDeleteId}
-        onClose={() => setConfirmDeleteId(null)}
-        onConfirm={confirmDeleteReclamo}
-        title="Eliminar reclamo"
-        message="¿Seguro que deseas eliminar este reclamo? Esta acción no se puede deshacer."
-        confirmLabel="Eliminar"
-        destructive
-      />
+      {deleteModal}
     </>
   );
 }
