@@ -104,7 +104,13 @@ function Productos() {
     .filter(p => !category || p.category === category)
     .filter(p => !onlyOferta || p.on_sale)
     .filter(p => !priceFilter || p.price === Number(priceFilter))
-    .sort((a, b) => (a.category === "footwear" ? 0 : 1) - (b.category === "footwear" ? 0 : 1));
+    .sort((a, b) => {
+      const genderOrder: Record<string, number> = { male: 0, female: 1, kids: 2, unisex: 3 };
+      const ga = genderOrder[a.gender || 'unisex'] ?? 3;
+      const gb = genderOrder[b.gender || 'unisex'] ?? 3;
+      if (ga !== gb) return ga - gb;
+      return a.name.localeCompare(b.name);
+    });
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
