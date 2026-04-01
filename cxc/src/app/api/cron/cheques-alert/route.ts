@@ -27,16 +27,27 @@ export async function GET(req: NextRequest) {
   }
   if (!authorized) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Test mode: send a test email and return
+  // Test mode: send test email with fake cheque data
   if (req.nextUrl.searchParams.get("test") === "true") {
+    const tomorrow = getPanamaDate(1);
     try {
       const result = await resend.emails.send({
         from: "Fashion Group <notificaciones@fashiongr.com>",
         to: NOTIFY_EMAILS,
-        subject: "🧪 Test — Notificación de Cheques",
-        html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px"><h2 style="color:#1a1a1a">Prueba de notificaciones</h2><p>Este es un email de prueba del sistema de notificaciones de Fashion Group.</p><p>Si recibes este mensaje, el sistema funciona correctamente.</p><p style="margin-top:24px;color:#888;font-size:12px">Fashion Group Panamá — ${new Date().toLocaleString("es-PA", { timeZone: "America/Panama" })}</p></div>`,
+        subject: "🧪 Test — 1 cheque por vencer — $1,000",
+        html: `
+          <h2 style="color:#1a1a1a">🧪 Cheques por vencer (PRUEBA)</h2>
+          <p>1 cheque por un total de <strong>$1,000</strong></p>
+          <table style="border-collapse:collapse;width:100%;font-size:14px">
+            <tr style="background:#f5f5f5"><th style="padding:8px;text-align:left">Cliente</th><th style="padding:8px">Empresa</th><th style="padding:8px;text-align:right">Monto</th><th style="padding:8px">Vence</th></tr>
+            <tr style="border-bottom:1px solid #eee"><td style="padding:8px">PRUEBA TEST</td><td style="padding:8px">Vistana</td><td style="padding:8px;text-align:right">$1,000.00</td><td style="padding:8px">MAÑANA (${tomorrow})</td></tr>
+          </table>
+          <p style="margin-top:16px;padding:12px;background:#fff3cd;border-radius:8px;font-size:13px">⚠️ Este es un email de prueba. Si lo recibes, el sistema de notificaciones funciona correctamente.</p>
+          <p style="margin-top:16px;color:#888;font-size:12px">WhatsApp para seguimiento: ${WA_NUMBERS.join(", ")}</p>
+          <p style="color:#888;font-size:11px">Fashion Group Panamá — ${new Date().toLocaleString("es-PA", { timeZone: "America/Panama" })}</p>
+        `,
       });
-      return NextResponse.json({ message: "Email de prueba enviado", result });
+      return NextResponse.json({ message: "Email de prueba enviado", to: NOTIFY_EMAILS, result });
     } catch (err) {
       return NextResponse.json({ error: "Error al enviar email", details: String(err) }, { status: 500 });
     }
