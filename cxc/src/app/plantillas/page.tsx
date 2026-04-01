@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import ReportExport from "./components/ReportExport";
+import SearchBar from "@/components/SearchBar";
 
 const ALL_MODULES = [
   { key: "cxc", label: "CXC", subtitle: "Cuentas por cobrar", icon: "📊", href: "/admin", roles: ["admin", "director", "vendedor"] },
@@ -190,6 +191,11 @@ export default function PlantillasPage() {
         <h1 className={`text-2xl font-light ${darkMode ? "text-gray-100" : "text-gray-800"}`}>{getGreeting()}{displayName ? `, ${displayName}` : ""}</h1>
         <p className="text-sm text-gray-400 mt-1">{getDateLabel()}</p>
       </div>
+
+      {/* Global Search — admin, secretaria, director */}
+      {["admin", "secretaria", "director"].includes(role) && (
+        <SearchBar darkMode={darkMode} />
+      )}
 
       {/* KPI Cards — admin and director only */}
       {(role === "admin" || role === "director") && (
