@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "crypto";
 
 const COOKIE_NAME = "cxc_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -76,8 +77,19 @@ export async function POST(req: NextRequest) {
             modules,
           };
 
+          const sessionToken = randomUUID();
+          // Create revocable session record
+          try {
+            await supabaseServer.from("user_sessions").insert({
+              user_name: user.name,
+              user_role: user.role,
+              session_token: sessionToken,
+              ip_address: ip,
+            });
+          } catch { /* table may not exist yet */ }
+
           const res = NextResponse.json(payload);
-          setSessionCookie(res, { role: user.role, userId: user.id, userName: user.name, modules });
+          setSessionCookie(res, { role: user.role, userId: user.id, userName: user.name, modules, sessionToken });
           await logActivity(user.role, "login", "auth", { userName: user.name }, user.name);
           return res;
         }
@@ -134,14 +146,38 @@ export async function POST(req: NextRequest) {
     }
   } catch { /* */ }
 
+  const sessionToken = randomUUID();
+  try {
+    await supabaseServer.from("user_sessions").insert({
+      user_name: role,
+      user_role: role,
+      session_token: sessionToken,
+      ip_address: ip,
+    });
+  } catch { /* table may not exist yet */ }
+
   const res = NextResponse.json({ role });
-  setSessionCookie(res, { role });
+  setSessionCookie(res, { role, sessionToken });
   await logActivity(role, "login", "auth");
   return res;
 }
 
-// DELETE — logout (clear cookie)
-export async function DELETE() {
+// DELETE — logout (clear cookie + revoke session)
+export async function DELETE(req: NextRequest) {
+  // Revoke session in DB
+  const raw = req.cookies.get(COOKIE_NAME)?.value;
+  if (raw) {
+    try {
+      const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf-8"));
+      if (parsed.sessionToken) {
+        await supabaseServer
+          .from("user_sessions")
+          .update({ revoked: true })
+          .eq("session_token", parsed.sessionToken);
+      }
+    } catch { /* */ }
+  }
+
   const res = NextResponse.json({ ok: true });
   res.cookies.delete(COOKIE_NAME);
   return res;

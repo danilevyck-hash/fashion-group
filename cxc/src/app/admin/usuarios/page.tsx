@@ -50,6 +50,12 @@ export default function UsuariosPage() {
   // Danger zone
   const [showDeactivate, setShowDeactivate] = useState<string | null>(null);
 
+  // Sessions
+  interface Session { id: string; user_name: string; user_role: string; ip_address: string | null; last_seen: string; created_at: string; revoked: boolean; }
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(true);
+  const [revokingSession, setRevokingSession] = useState<string | null>(null);
+
   // New user system
   interface FgUser { id: string; name: string; password: string; role: string; active: boolean; associated_company: string; modules: string[]; }
   const [fgUsers, setFgUsers] = useState<FgUser[]>([]);
@@ -95,6 +101,15 @@ export default function UsuariosPage() {
     } catch { showToast("Error al cargar contraseñas"); }
   }, []);
 
+  const loadSessions = useCallback(async () => {
+    setLoadingSessions(true);
+    try {
+      const res = await fetch("/api/admin/sessions");
+      if (res.ok) setSessions(await res.json());
+    } catch { showToast("Error al cargar sesiones"); }
+    setLoadingSessions(false);
+  }, []);
+
   const loadFgUsers = useCallback(async () => {
     setLoadingUsers(true);
     try {
@@ -105,7 +120,7 @@ export default function UsuariosPage() {
     setLoadingUsers(false);
   }, []);
 
-  useEffect(() => { if (authChecked) { loadRoles(); loadPasswords(); loadFgUsers(); } }, [authChecked, loadRoles, loadPasswords, loadFgUsers]);
+  useEffect(() => { if (authChecked) { loadRoles(); loadPasswords(); loadFgUsers(); loadSessions(); } }, [authChecked, loadRoles, loadPasswords, loadFgUsers, loadSessions]);
 
   if (!authChecked) return null;
 
@@ -202,6 +217,26 @@ export default function UsuariosPage() {
   }
   function toggleUserModule(key: string) {
     setUModules(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  }
+
+  async function revokeSession(sessionId: string) {
+    setRevokingSession(sessionId);
+    try {
+      const res = await fetch("/api/admin/sessions", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId }) });
+      if (res.ok) { showToast("Sesión revocada"); loadSessions(); }
+      else showToast("Error al revocar");
+    } catch { showToast("Error de conexión"); }
+    setRevokingSession(null);
+  }
+
+  async function revokeAllSessions(userName: string) {
+    setRevokingSession(userName);
+    try {
+      const res = await fetch("/api/admin/sessions", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userName }) });
+      if (res.ok) { showToast(`Todas las sesiones de ${userName} revocadas`); loadSessions(); }
+      else showToast("Error al revocar");
+    } catch { showToast("Error de conexión"); }
+    setRevokingSession(null);
   }
 
   function selectAll(role: string) {
@@ -342,6 +377,73 @@ export default function UsuariosPage() {
             </div>
           </div>
         )}
+
+        {/* ══ SESSIONS section ══ */}
+        <div className="mb-10">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-medium uppercase tracking-wide text-gray-400">Sesiones Activas</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Sesiones con acceso al sistema — revoca para cerrar sesión remotamente</p>
+            </div>
+            <button onClick={loadSessions} className="text-xs text-gray-400 hover:text-black transition">Actualizar</button>
+          </div>
+          {loadingSessions ? (
+            <SkeletonTable rows={3} cols={5} />
+          ) : (() => {
+            const active = sessions.filter(s => !s.revoked);
+            if (active.length === 0) return <p className="text-sm text-gray-400 py-4">No hay sesiones activas</p>;
+
+            // Group by user for "revoke all" button
+            const userNames = [...new Set(active.map(s => s.user_name))];
+
+            return (
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                {userNames.length > 1 && (
+                  <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex gap-2 flex-wrap">
+                    {userNames.map(name => {
+                      const count = active.filter(s => s.user_name === name).length;
+                      return (
+                        <button key={name} onClick={() => revokeAllSessions(name)} disabled={revokingSession === name}
+                          className="text-[11px] bg-red-50 text-red-600 px-2.5 py-1 rounded-full hover:bg-red-100 transition disabled:opacity-50">
+                          Revocar todas de {name} ({count})
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Usuario</th>
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Rol</th>
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">IP</th>
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Último acceso</th>
+                      <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Creada</th>
+                      <th className="px-4 py-2.5"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {active.map(s => (
+                      <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 font-medium">{s.user_name}</td>
+                        <td className="px-4 py-3 text-gray-500">{s.user_role}</td>
+                        <td className="px-4 py-3 text-gray-400 font-mono text-xs">{s.ip_address || "—"}</td>
+                        <td className="px-4 py-3 text-gray-400 text-xs">{new Date(s.last_seen).toLocaleString("es-PA")}</td>
+                        <td className="px-4 py-3 text-gray-400 text-xs">{new Date(s.created_at).toLocaleString("es-PA")}</td>
+                        <td className="px-4 py-3 text-right">
+                          <button onClick={() => revokeSession(s.id)} disabled={revokingSession === s.id}
+                            className="text-xs text-red-600 hover:underline disabled:opacity-50">
+                            {revokingSession === s.id ? "Revocando..." : "Revocar"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
+        </div>
 
         <hr className="mb-8 border-gray-100" />
 
