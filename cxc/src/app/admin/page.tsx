@@ -352,41 +352,6 @@ export default function AdminDashboard() {
     window.open(`https://wa.me/${co.vendedorPhone}?text=${msg}`, "_blank");
   }
 
-  function massWhatsApp(companyKey?: string) {
-    const targets = clients.filter((c) => {
-      if (companyKey) {
-        const d = c.companies[companyKey];
-        if (!d) return false;
-        const overdue = d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365;
-        return overdue > 0;
-      }
-      return c.overdue > 0;
-    });
-
-    if (targets.length === 0) {
-      alert("No hay clientes vencidos" + (companyKey ? " en esta empresa" : ""));
-      return;
-    }
-
-    const withPhone = targets.filter((c) => c.celular || c.telefono);
-    if (withPhone.length === 0) {
-      alert(`Hay ${targets.length} clientes vencidos pero ninguno tiene numero de telefono registrado.`);
-      return;
-    }
-
-    if (!confirm(`Se abriran ${withPhone.length} ventanas de WhatsApp (de ${targets.length} clientes vencidos). ¿Continuar?`)) return;
-
-    withPhone.forEach((client, i) => {
-      setTimeout(() => {
-        let phone = (client.celular || client.telefono).replace(/[^0-9]/g, "");
-        if (!phone.startsWith("507") && phone.length <= 8) phone = "507" + phone;
-        const msg = encodeURIComponent(buildWhatsAppMsg(client));
-        window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
-        markContacted(client.nombre_normalized, "whatsapp");
-      }, i * 1500);
-    });
-  }
-
   function openEmail(client: ConsolidatedClient) {
     if (!client.correo) { alert("Este cliente no tiene correo registrado. Edite el contacto primero."); return; }
     const subject = encodeURIComponent(buildEmailSubject(client));
@@ -596,7 +561,6 @@ export default function AdminDashboard() {
         clients={clients}
         vendorMap={VENDOR_MAP}
         onSendVendorWhatsApp={sendVendorWhatsApp}
-        onMassWhatsApp={massWhatsApp}
       />
 
       <ClientTable

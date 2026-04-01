@@ -85,6 +85,22 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (estado) {
     const session = getSession(req);
     await logActivity(session?.role || "unknown", "guia_dispatch", "guias", { guiaId: id, estado }, session?.userName);
+
+    // Send dispatch notification email
+    if (placa && data) {
+      try {
+        const { Resend } = await import("resend");
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        const guiaItems = (data.guia_items || []) as { cliente: string; empresa: string; bultos: number; facturas: string }[];
+        const itemsList = guiaItems.map((i: { cliente: string; empresa: string; bultos: number; facturas: string }) => `• ${i.cliente} — ${i.empresa} — ${i.bultos} bultos — ${i.facturas}`).join("<br>");
+        await resend.emails.send({
+          from: "Fashion Group <notificaciones@fashiongr.com>",
+          to: ["daniel@fashiongr.com", "info@fashiongr.com"],
+          subject: `✅ Guía #${data.numero} despachada — ${transportista || data.transportista}`,
+          html: `<h2>Guía #${data.numero} despachada</h2><p><strong>Transportista:</strong> ${transportista || data.transportista}<br><strong>Placa:</strong> ${placa}<br><strong>Receptor:</strong> ${receptor_nombre || "—"}</p><p><strong>Items:</strong></p><p>${itemsList || "Sin items"}</p><p style="color:#888;font-size:11px">Fashion Group Panamá — Notificación automática</p>`,
+        });
+      } catch { /* email send failed */ }
+    }
   }
 
   return NextResponse.json(data);

@@ -63,7 +63,7 @@ export default function ClientTable({
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(0);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = useState(25);
 
   // Reset page when filters change
   useEffect(() => { setPage(0); }, [riskFilter, companyFilter, search]);
@@ -230,7 +230,7 @@ export default function ClientTable({
         )}
 
         {(() => {
-          const paged = filtered.slice(page * pageSize, (page + 1) * pageSize);
+          const paged = pageSize === 0 ? filtered : filtered.slice(page * pageSize, (page + 1) * pageSize);
           return paged.map((client) => {
             const isExpanded = expanded === client.nombre_normalized;
             const isSelected = selectedNames.has(client.nombre_normalized);
@@ -273,29 +273,34 @@ export default function ClientTable({
       </div>
 
       {/* Pagination controls */}
-      {filtered.length > pageSize && (
-        <div className="flex items-center justify-between mt-3 px-1">
+      <div className="flex items-center justify-between mt-3 px-1">
+        <div className="flex items-center gap-2">
           <span className="text-[11px] text-gray-400">
-            Mostrando {page * pageSize + 1}-{Math.min((page + 1) * pageSize, filtered.length)} de {filtered.length} clientes
+            {pageSize === 0
+              ? `${filtered.length} clientes`
+              : `Mostrando ${page * pageSize + 1}-${Math.min((page + 1) * pageSize, filtered.length)} de ${filtered.length}`}
           </span>
+          <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }}
+            className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 text-gray-500 bg-transparent">
+            <option value={25}>25</option>
+            <option value={50}>50</option>
+            <option value={100}>100</option>
+            <option value={0}>Todos</option>
+          </select>
+        </div>
+        {pageSize > 0 && filtered.length > pageSize && (
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-              className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-30 disabled:cursor-not-allowed"
-            >
+            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+              className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-30 disabled:cursor-not-allowed">
               Anterior
             </button>
-            <button
-              onClick={() => setPage((p) => p + 1)}
-              disabled={(page + 1) * pageSize >= filtered.length}
-              className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-30 disabled:cursor-not-allowed"
-            >
+            <button onClick={() => setPage(p => p + 1)} disabled={(page + 1) * pageSize >= filtered.length}
+              className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-30 disabled:cursor-not-allowed">
               Siguiente
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="mt-3 text-[11px] text-gray-400 text-center">
         {filtered.length} clientes &middot; Politica: 0-90d corriente &middot; 91-120d vigilancia &middot; 121d+ vencido
