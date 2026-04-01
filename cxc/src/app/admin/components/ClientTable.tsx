@@ -31,6 +31,8 @@ interface Props {
   onMarkContacted: (clientName: string, method: string) => void;
   onSaveEdit: (nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) => void;
   onRegisterContact: (clientName: string, data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) => Promise<void>;
+  favorites?: Set<string>;
+  onToggleFavorite?: (name: string) => void;
 }
 
 export default function ClientTable({
@@ -54,6 +56,8 @@ export default function ClientTable({
   onMarkContacted,
   onSaveEdit,
   onRegisterContact,
+  favorites,
+  onToggleFavorite,
 }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -246,6 +250,8 @@ export default function ClientTable({
                   onQuickWA={() => { onOpenWhatsApp(client); onMarkContacted(client.nombre_normalized, "whatsapp"); }}
                   onQuickEmail={() => { onOpenEmail(client); onMarkContacted(client.nombre_normalized, "email"); }}
                   onRegisterContact={(data) => onRegisterContact(client.nombre_normalized, data)}
+                  isFavorite={favorites?.has(client.nombre_normalized)}
+                  onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(client.nombre_normalized) : undefined}
                 />
                 {isExpanded && !selectionMode && (
                   <ContactPanel

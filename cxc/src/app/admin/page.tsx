@@ -137,6 +137,18 @@ export default function AdminDashboard() {
   const [showUploadHistory, setShowUploadHistory] = useState(true);
   const [activityLogs, setActivityLogs] = useState<{id:string;action:string;details:string;created_at:string}[]>([]);
   const [showActivity, setShowActivity] = useState(false);
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("cxc_favorites") || "[]")); } catch { return new Set(); }
+  });
+
+  function toggleFavorite(name: string) {
+    setFavorites(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      localStorage.setItem("cxc_favorites", JSON.stringify([...next]));
+      return next;
+    });
+  }
 
   const roleCompanies = useMemo(() => getCompaniesForRole(userRole), [userRole]);
 
@@ -205,6 +217,11 @@ export default function AdminDashboard() {
     }
 
     result.sort((a, b) => {
+      // Favorites always first
+      const aFav = favorites.has(a.nombre_normalized) ? 0 : 1;
+      const bFav = favorites.has(b.nombre_normalized) ? 0 : 1;
+      if (aFav !== bFav) return aFav - bFav;
+
       if (sortKey === "name") {
         const cmp = a.nombre_normalized.localeCompare(b.nombre_normalized, "es", { sensitivity: "base" });
         return sortDir === "asc" ? cmp : -cmp;
@@ -234,7 +251,7 @@ export default function AdminDashboard() {
     });
 
     return result;
-  }, [clients, cxcCompanies, companyFilter, riskFilter, search, sortKey, sortDir]);
+  }, [clients, cxcCompanies, companyFilter, riskFilter, search, sortKey, sortDir, favorites]);
 
   // ── Role-filtered clients ──
   const roleClients = useMemo(() => {
@@ -604,6 +621,8 @@ export default function AdminDashboard() {
         onMarkContacted={markContacted}
         onSaveEdit={handleSaveEdit}
         onRegisterContact={handleRegisterContact}
+        favorites={favorites}
+        onToggleFavorite={toggleFavorite}
       />
 
     </div>

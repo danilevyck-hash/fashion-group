@@ -22,9 +22,11 @@ interface Props {
   onQuickWA?: () => void;
   onQuickEmail?: () => void;
   onRegisterContact?: (data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) => Promise<void>;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
 }
 
-export default function ClientRow({ client, isExpanded, onToggle, userRole, contactLog, selectionMode, isSelected, onQuickWA, onQuickEmail, onRegisterContact }: Props) {
+export default function ClientRow({ client, isExpanded, onToggle, userRole, contactLog, selectionMode, isSelected, onQuickWA, onQuickEmail, onRegisterContact, isFavorite, onToggleFavorite }: Props) {
   const lastContact = contactLog?.[client.nombre_normalized];
   const daysSinceContact = lastContact ? Math.floor((Date.now() - new Date(lastContact.date).getTime()) / 86400000) : null;
   const risk = riskInfo(client.current, client.watch, client.overdue);
@@ -48,6 +50,11 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
               </div>
             )}
             <div className={`${selectionMode ? "col-span-4 sm:col-span-3" : "col-span-5 sm:col-span-4"} font-medium truncate flex items-center gap-1.5`}>
+              {!selectionMode && onToggleFavorite && (
+                <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }} className="flex-shrink-0 text-sm leading-none hover:scale-110 transition-transform">
+                  {isFavorite ? <span className="text-amber-400">★</span> : <span className="text-gray-300 group-hover:text-gray-400">☆</span>}
+                </button>
+              )}
               {!selectionMode && (
                 <svg width="10" height="10" viewBox="0 0 10 10" className={`flex-shrink-0 text-gray-400 transition-transform ${isExpanded ? "rotate-90" : ""}`} fill="currentColor">
                   <path d="M3 1l5 4-5 4V1z"/>
