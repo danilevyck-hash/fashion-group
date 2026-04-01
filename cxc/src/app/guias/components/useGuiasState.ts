@@ -34,6 +34,7 @@ export function useGuiasState() {
 
   // Form state
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingEstado, setEditingEstado] = useState<string | null>(null);
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [transportista, setTransportista] = useState("");
   const [transportistaOtro, setTransportistaOtro] = useState("");
@@ -141,6 +142,7 @@ export function useGuiasState() {
     if (!res.ok) return;
     const g = await res.json();
     setEditingId(g.id);
+    setEditingEstado(g.estado || null);
     setFormNumero(g.numero);
     setFecha(g.fecha);
     if (transportistas.includes(g.transportista)) {
@@ -165,6 +167,7 @@ export function useGuiasState() {
 
   function resetForm() {
     setEditingId(null);
+    setEditingEstado(null);
     setFecha(new Date().toISOString().slice(0, 10));
     setTransportista("");
     setTransportistaOtro("");
@@ -241,7 +244,7 @@ export function useGuiasState() {
         transportista: transp,
         entregado_por: entregadoPor,
         observaciones,
-        estado: "Pendiente Bodega",
+        estado: editingId && editingEstado ? editingEstado : "Pendiente Bodega",
         items: validItems,
       }),
     });

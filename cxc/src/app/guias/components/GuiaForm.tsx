@@ -58,6 +58,20 @@ export default function GuiaForm({
     if (changeCount.current > 1) setDirty(true);
   }, [fecha, transportista, transportistaOtro, entregadoPor, observaciones, items]);
 
+  // Auto-save with debounce (only when editing existing guía)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!editingId || !dirty || saving) return;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      if (items.some(i => i.cliente)) {
+        handleSave();
+      }
+    }, 1500);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, dirty, editingId, saving]);
+
   // Warn before leaving with unsaved changes
   useEffect(() => {
     function handler(e: BeforeUnloadEvent) {
