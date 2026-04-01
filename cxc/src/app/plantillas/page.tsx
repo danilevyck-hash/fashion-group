@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import ReportExport from "./components/ReportExport";
 
 const ALL_MODULES = [
   { key: "cxc", label: "CXC", subtitle: "Cuentas por cobrar", icon: "📊", href: "/admin", roles: ["admin", "director", "vendedor"] },
@@ -236,6 +237,9 @@ export default function PlantillasPage() {
           </div>
         ) : null
       )}
+
+      {/* Export Reports — admin and director */}
+      {(role === "admin" || role === "director") && stats && !statsLoading && <ReportExport stats={stats} darkMode={darkMode} />}
 
       {/* Alerts */}
       {statsLoading ? (
