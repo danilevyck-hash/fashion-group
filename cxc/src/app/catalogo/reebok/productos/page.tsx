@@ -26,6 +26,7 @@ function Productos() {
   const [gender, setGender] = useState(searchParams.get("gender") || "");
   const [category, setCategory] = useState("");
   const [onlyOferta, setOnlyOferta] = useState(false);
+  const [priceFilter, setPriceFilter] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [orderCount, setOrderCount] = useState(0);
   const [orderId, setOrderId] = useState("");
@@ -92,11 +93,17 @@ function Productos() {
     load();
   }, []);
 
+  // Unique prices for on-sale products
+  const ofertaPrices = onlyOferta
+    ? [...new Set(products.filter(p => p.on_sale && p.price).map(p => p.price!))].sort((a, b) => a - b)
+    : [];
+
   const filtered = products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => !gender || p.gender === gender)
     .filter(p => !category || p.category === category)
     .filter(p => !onlyOferta || p.on_sale)
+    .filter(p => !priceFilter || p.price === Number(priceFilter))
     .sort((a, b) => (a.category === "footwear" ? 0 : 1) - (b.category === "footwear" ? 0 : 1));
 
   return (
@@ -125,12 +132,19 @@ function Productos() {
           <option value="apparel">Ropa</option>
           <option value="accessories">Accesorios</option>
         </select>
-        <button onClick={() => setOnlyOferta(!onlyOferta)}
+        <button onClick={() => { setOnlyOferta(!onlyOferta); setPriceFilter(""); }}
           className={`text-xs px-3 py-1.5 rounded-full transition font-medium ${onlyOferta ? "bg-orange-500 text-white" : "border border-gray-200 text-gray-500 hover:border-gray-400"}`}>
           Oferta
         </button>
+        {onlyOferta && ofertaPrices.length > 1 && (
+          <select value={priceFilter} onChange={e => setPriceFilter(e.target.value)}
+            className="border-b border-orange-300 py-1.5 text-sm outline-none focus:border-orange-500 transition bg-transparent text-orange-700">
+            <option value="">Todos los precios</option>
+            {ofertaPrices.map(p => <option key={p} value={p}>${p.toFixed(0)}</option>)}
+          </select>
+        )}
         {(searchInput || gender || category || onlyOferta) && (
-          <button onClick={() => { setSearchInput(""); setSearch(""); setGender(""); setCategory(""); setOnlyOferta(false); }} className="text-xs text-gray-400 hover:text-black transition">Limpiar</button>
+          <button onClick={() => { setSearchInput(""); setSearch(""); setGender(""); setCategory(""); setOnlyOferta(false); setPriceFilter(""); }} className="text-xs text-gray-400 hover:text-black transition">Limpiar</button>
         )}
         <span className="text-xs text-gray-400 ml-auto">{filtered.length} productos</span>
       </div>
