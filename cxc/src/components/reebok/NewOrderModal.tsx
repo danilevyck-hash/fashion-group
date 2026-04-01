@@ -48,7 +48,7 @@ export default function NewOrderModal({ onClose, onCreated, autoAddProduct }: Pr
       }] : [];
       const res = await fetch("/api/catalogo/reebok/orders", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_name: name.trim(), items }),
+        body: JSON.stringify({ client_name: name.trim(), vendor_name: typeof window !== 'undefined' ? sessionStorage.getItem('fg_user_name') || null : null, items }),
       });
       if (res.ok) {
         const order = await res.json();

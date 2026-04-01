@@ -117,6 +117,17 @@ function Productos() {
       return a.name.localeCompare(b.name);
     });
 
+  // Frequent products — products currently in the active order (shown at top when no filters)
+  const noFiltersActive = !search && !gender && !category && !onlyOferta;
+  const inOrderIds = new Set<string>();
+  try {
+    const cached = JSON.parse(localStorage.getItem("reebok_order_items") || "[]");
+    cached.forEach((i: { product_id: string }) => inOrderIds.add(i.product_id));
+  } catch { /* */ }
+  const frequentProducts = noFiltersActive && inOrderIds.size > 0
+    ? filtered.filter(p => inOrderIds.has(p.id))
+    : [];
+
   // Group products by category + gender for section headers
   type Group = { cat: string; gen: string; label: string; items: typeof filtered };
   const groups: Group[] = [];
@@ -192,6 +203,18 @@ function Productos() {
         <p className="text-center py-20 text-gray-400 text-sm">No se encontraron productos</p>
       ) : (
         <div className={`space-y-8 fade-in ${orderCount > 0 ? "pb-24" : ""}`}>
+          {frequentProducts.length > 0 && (
+            <div>
+              <div className="flex items-center gap-3 mb-3">
+                <h2 className="text-sm font-medium text-green-700">En este pedido</h2>
+                <div className="flex-1 border-t border-green-100" />
+                <span className="text-xs text-green-400">{frequentProducts.length}</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                {frequentProducts.map(p => <ProductCard key={`fav-${p.id}`} product={p} stock={p._stock} />)}
+              </div>
+            </div>
+          )}
           {groups.map(g => (
             <div key={g.label}>
               <div className="flex items-center gap-3 mb-3">

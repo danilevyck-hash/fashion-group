@@ -122,9 +122,6 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
     <>
       <div className="bg-white overflow-hidden">
         <div className="aspect-square bg-gray-50 relative overflow-hidden">
-          {product.on_sale && (
-            <span className="absolute top-2 left-2 z-10 bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">OFERTA</span>
-          )}
           {stock > 0 && (
             <span className="absolute top-2 right-2 z-10 text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
               {stock} disponibles
@@ -140,13 +137,17 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
         </div>
         <div className="p-3">
           <h3 className="text-sm font-medium text-gray-900 line-clamp-2 leading-tight">{product.name}</h3>
-          <div className="flex items-center gap-2 mt-1">
-            {product.sku && <span className="text-[10px] text-gray-400 font-mono">{product.sku}</span>}
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            {product.sub_category && <span className="text-[10px] text-gray-500 capitalize">{product.sub_category}</span>}
+            {product.sub_category && genderLabel && <span className="text-[10px] text-gray-300">·</span>}
             {genderLabel && <span className="text-[10px] text-gray-400">{genderLabel}</span>}
           </div>
-          <p className="text-base font-semibold text-black mt-1.5">
-            {product.price ? `$${product.price.toFixed(0)}` : "Consultar"}
-          </p>
+          <div className="flex items-center gap-2 mt-1.5">
+            <p className="text-base font-semibold text-black">
+              {product.price ? `$${product.price.toFixed(0)}` : "Consultar"}
+            </p>
+            {product.on_sale && <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded">OFERTA</span>}
+          </div>
           {stock > 0 && <p className="text-[11px] mt-0.5 text-green-600">{stock} disponibles</p>}
 
           {inOrder ? (
