@@ -147,9 +147,7 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
           <p className="text-base font-semibold text-black mt-1.5">
             {product.price ? `$${product.price.toFixed(0)}` : "Consultar"}
           </p>
-          <p className={`text-[11px] mt-0.5 ${stock > 0 ? "text-green-600" : "text-gray-400"}`}>
-            {stock > 0 ? `${stock} disponibles` : "Agotado"}
-          </p>
+          {stock > 0 && <p className="text-[11px] mt-0.5 text-green-600">{stock} disponibles</p>}
 
           {inOrder ? (
             <div className="mt-2">

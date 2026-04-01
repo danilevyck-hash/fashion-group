@@ -108,8 +108,7 @@ export default function ProductoDetalle() {
             </>
           ) : (
             <div className="bg-reebok-grey p-4 rounded text-center">
-              <p className="text-gray-600">Tallas no disponibles en este momento</p>
-              <p className="text-sm text-gray-500 mt-1">Consulta disponibilidad con tu vendedor</p>
+              <p className="text-gray-600">Consulta disponibilidad con tu vendedor</p>
             </div>
           )}
         </div>
