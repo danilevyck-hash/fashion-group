@@ -91,8 +91,15 @@ export default function PlantillasPage() {
     }
   }, []);
 
-  // Home stats for alerts
-  interface HomeStats { vencenHoy: number; vencenEstaSemana: number; prestamosPendientes: number; reclamosViejos: number; cxcStale: boolean; lastUpload: string | null; }
+  // Home stats for alerts + KPIs
+  interface HomeStats {
+    vencenHoy: number; vencenEstaSemana: number; prestamosPendientes: number;
+    reclamosViejos: number; reclamosPendientes: number; reclamosResueltosEsteMes: number;
+    cxcStale: boolean; lastUpload: string | null;
+    ventasMes: number; ventasPrev: number;
+    cxcTotal: number; cxcVencida: number;
+    chequesTotalPendiente: number;
+  }
   const [stats, setStats] = useState<HomeStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
@@ -182,6 +189,53 @@ export default function PlantillasPage() {
         <h1 className={`text-2xl font-light ${darkMode ? "text-gray-100" : "text-gray-800"}`}>{getGreeting()}{displayName ? `, ${displayName}` : ""}</h1>
         <p className="text-sm text-gray-400 mt-1">{getDateLabel()}</p>
       </div>
+
+      {/* KPI Cards — admin and director only */}
+      {(role === "admin" || role === "director") && (
+        statsLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+            {[1,2,3,4].map(i => <div key={i} className="h-24 rounded-2xl bg-gray-50 animate-pulse" />)}
+          </div>
+        ) : stats ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+            {/* Ventas */}
+            <div className={`rounded-2xl p-4 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
+              <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Ventas del mes</p>
+              <p className="text-xl font-semibold tabular-nums">${stats.ventasMes > 0 ? (stats.ventasMes / 1000).toFixed(0) + "K" : "—"}</p>
+              {stats.ventasPrev > 0 && stats.ventasMes > 0 ? (() => {
+                const pct = ((stats.ventasMes - stats.ventasPrev) / stats.ventasPrev * 100);
+                return <p className={`text-xs mt-1 ${pct >= 0 ? "text-green-600" : "text-red-500"}`}>{pct >= 0 ? "+" : ""}{pct.toFixed(0)}% vs mes anterior</p>;
+              })() : <p className="text-xs text-gray-300 mt-1">—</p>}
+            </div>
+            {/* Reclamos */}
+            <div className={`rounded-2xl p-4 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
+              <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Reclamos</p>
+              <p className="text-xl font-semibold tabular-nums">{stats.reclamosPendientes}</p>
+              <div className="flex items-center gap-2 mt-1">
+                {stats.reclamosViejos > 0 && <span className="text-xs text-red-500">{stats.reclamosViejos} +45d</span>}
+                {stats.reclamosResueltosEsteMes > 0 && <span className="text-xs text-green-600">{stats.reclamosResueltosEsteMes} resueltos</span>}
+                {stats.reclamosViejos === 0 && stats.reclamosResueltosEsteMes === 0 && <span className="text-xs text-gray-300">—</span>}
+              </div>
+            </div>
+            {/* CxC */}
+            <div className={`rounded-2xl p-4 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
+              <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Cartera (CxC)</p>
+              <p className="text-xl font-semibold tabular-nums">${stats.cxcTotal > 0 ? (stats.cxcTotal / 1000).toFixed(0) + "K" : "—"}</p>
+              {stats.cxcVencida > 0
+                ? <p className="text-xs text-red-500 mt-1">${(stats.cxcVencida / 1000).toFixed(0)}K vencida</p>
+                : <p className="text-xs text-green-600 mt-1">Sin vencidos</p>}
+            </div>
+            {/* Cheques */}
+            <div className={`rounded-2xl p-4 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
+              <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Cheques</p>
+              <p className="text-xl font-semibold tabular-nums">{stats.vencenEstaSemana}</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {stats.chequesTotalPendiente > 0 ? `$${(stats.chequesTotalPendiente / 1000).toFixed(0)}K pendiente` : "—"}
+              </p>
+            </div>
+          </div>
+        ) : null
+      )}
 
       {/* Alerts */}
       {statsLoading ? (
