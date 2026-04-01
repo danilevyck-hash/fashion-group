@@ -100,7 +100,7 @@ export default function GuiasList({
 
         {role === "bodega" &&
           (() => {
-            const pendingCount = guias.filter((g) => !g.placa).length;
+            const pendingCount = guias.filter((g) => g.estado === "Pendiente Bodega").length;
             if (pendingCount === 0) return null;
             return (
               <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700 mb-6 flex items-center justify-between">
@@ -186,7 +186,7 @@ export default function GuiasList({
                           )
                         );
                       })
-                      .filter((g) => !showPending || !g.placa);
+                      .filter((g) => !showPending || g.estado === "Pendiente Bodega");
                     return (
                       <>
                         {filtered.map((g) => (
@@ -204,7 +204,7 @@ export default function GuiasList({
                             <td className="py-3 px-4 text-right tabular-nums">{g.total_bultos}</td>
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-2">
-                                <StatusBadge estado={!g.placa ? "pendiente" : "despachada"} />
+                                <StatusBadge estado={g.estado === "Pendiente Bodega" ? "pendiente" : "despachada"} />
                                 {canDispatch && g.estado !== "Completada" && g.estado !== "Listo para Imprimir" && (
                                   <button
                                     onClick={(e) => { e.stopPropagation(); setDispatchModal(g); }}
