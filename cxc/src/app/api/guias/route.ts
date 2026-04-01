@@ -7,6 +7,7 @@ export async function GET() {
   const { data, error } = await supabaseServer
     .from("guia_transporte")
     .select("*, guia_items(bultos, facturas, cliente)")
+    .eq("deleted", false)
     .order("numero", { ascending: false });
 
   /* monto_total and estado come from the DB columns directly */

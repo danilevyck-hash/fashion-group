@@ -60,7 +60,14 @@ export default function GuiaDetail({
   const canEdit = role === "admin" || role === "secretaria" || (role === "bodega" && !isDispatched);
   const canDelete = role === "admin" || role === "secretaria";
 
+  const guiaItems = g.guia_items || [];
+  const totalBultos = guiaItems.reduce((s: number, i: { bultos?: number }) => s + (i.bultos || 0), 0);
+
   function handleConfirmar() {
+    if (guiaItems.length === 0 || totalBultos === 0) {
+      showToast("No se puede despachar una guía sin items");
+      return;
+    }
     if (!bPlaca.trim()) {
       showToast("Ingresa la placa del vehículo");
       return;

@@ -313,7 +313,8 @@ export function useGuiasState() {
       loadGuias();
       setShowPostDespacho(true);
     } else {
-      showToast("Error al guardar");
+      const errData = await res.json().catch(() => ({}));
+      showToast(errData.error || "Error al guardar");
     }
     setBSaving(false);
   }

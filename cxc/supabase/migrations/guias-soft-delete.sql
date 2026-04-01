@@ -1,0 +1,3 @@
+-- Soft delete for guias
+ALTER TABLE guia_transporte ADD COLUMN IF NOT EXISTS deleted BOOLEAN DEFAULT FALSE;
+ALTER TABLE guia_items ADD COLUMN IF NOT EXISTS deleted BOOLEAN DEFAULT FALSE;
