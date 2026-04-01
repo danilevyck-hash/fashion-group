@@ -27,6 +27,21 @@ export async function GET(req: NextRequest) {
   }
   if (!authorized) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // Test mode: send a test email and return
+  if (req.nextUrl.searchParams.get("test") === "true") {
+    try {
+      const result = await resend.emails.send({
+        from: "Fashion Group <notificaciones@fashiongr.com>",
+        to: NOTIFY_EMAILS,
+        subject: "🧪 Test — Notificación de Cheques",
+        html: `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px"><h2 style="color:#1a1a1a">Prueba de notificaciones</h2><p>Este es un email de prueba del sistema de notificaciones de Fashion Group.</p><p>Si recibes este mensaje, el sistema funciona correctamente.</p><p style="margin-top:24px;color:#888;font-size:12px">Fashion Group Panamá — ${new Date().toLocaleString("es-PA", { timeZone: "America/Panama" })}</p></div>`,
+      });
+      return NextResponse.json({ message: "Email de prueba enviado", result });
+    } catch (err) {
+      return NextResponse.json({ error: "Error al enviar email", details: String(err) }, { status: 500 });
+    }
+  }
+
   const today = getPanamaDate();
   const tomorrow = getPanamaDate(1);
 
