@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/components/reebok/supabase'
+import { logActivity } from '@/lib/log-activity'
+import { getSession } from '@/lib/require-auth'
 
 // POST: bulk update inventory from CSV (SKU + quantity)
 export async function POST(req: NextRequest) {
@@ -43,6 +45,8 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const session = getSession(req)
+    await logActivity(session?.role || 'unknown', 'inventory_upload', 'reebok', { updated: results.updated, skipped: results.skipped }, session?.userName)
     return NextResponse.json(results)
   } catch (err) {
     return NextResponse.json({ error: 'Error processing bulk upload' }, { status: 500 })

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/components/reebok/supabase'
 import { reebokServer } from '@/lib/reebok-supabase-server'
 import { requireAdmin } from '@/lib/api-auth'
+import { logActivity } from '@/lib/log-activity'
+import { getSession } from '@/lib/require-auth'
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
@@ -24,6 +26,8 @@ export async function POST(req: NextRequest) {
   if (!body.name) return NextResponse.json({ error: 'Nombre es requerido' }, { status: 400 })
   const { data, error } = await reebokServer.from('products').insert(body).select().single()
   if (error) { console.error(error); return NextResponse.json({ error: error.message }, { status: 500 }); }
+  const s = getSession(req)
+  await logActivity(s?.role || 'admin', 'product_create', 'reebok', { productId: data.id, name: body.name }, s?.userName)
   return NextResponse.json(data)
 }
 
@@ -47,5 +51,7 @@ export async function DELETE(req: NextRequest) {
   const { data, error } = await reebokServer.from('products').delete().eq('id', id).select('id').maybeSingle()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 })
+  const s = getSession(req)
+  await logActivity(s?.role || 'admin', 'product_delete', 'reebok', { productId: id }, s?.userName)
   return NextResponse.json({ success: true, deleted: data.id })
 }

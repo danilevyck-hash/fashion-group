@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { logActivity } from "@/lib/log-activity";
+import { getSession } from "@/lib/require-auth";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -78,6 +80,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   if (data?.guia_items) {
     data.guia_items.sort((a: { orden: number }, b: { orden: number }) => a.orden - b.orden);
+  }
+
+  if (estado) {
+    const session = getSession(req);
+    await logActivity(session?.role || "unknown", "guia_dispatch", "guias", { guiaId: id, estado }, session?.userName);
   }
 
   return NextResponse.json(data);

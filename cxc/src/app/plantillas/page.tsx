@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import ReportExport from "./components/ReportExport";
+import ActivityLog from "./components/ActivityLog";
 import SearchBar from "@/components/SearchBar";
 
 const ALL_MODULES = [
@@ -46,6 +47,7 @@ export default function PlantillasPage() {
   const [moduleOrder, setModuleOrder] = useState<string[]>([]);
   const [editMode, setEditMode] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -246,6 +248,28 @@ export default function PlantillasPage() {
 
       {/* Export Reports — admin and director */}
       {(role === "admin" || role === "director") && stats && !statsLoading && <ReportExport stats={stats} darkMode={darkMode} />}
+
+      {/* Activity Log toggle — admin only */}
+      {isAdmin && (
+        <div className="mb-6">
+          <button
+            onClick={() => setShowActivity(!showActivity)}
+            className={`flex items-center gap-2 text-xs px-4 py-2 rounded-full border transition ${
+              showActivity
+                ? darkMode ? "bg-gray-800 border-gray-600 text-white" : "bg-gray-900 text-white border-gray-900"
+                : darkMode ? "border-gray-700 text-gray-400 hover:text-gray-200" : "border-gray-200 text-gray-500 hover:text-gray-800"
+            }`}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
+            Actividad
+          </button>
+          {showActivity && (
+            <div className="mt-4">
+              <ActivityLog darkMode={darkMode} />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Alerts */}
       {statsLoading ? (

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { logActivity } from "@/lib/log-activity";
+import { getSession } from "@/lib/require-auth";
 
 export async function GET() {
   const { data, error } = await supabaseServer
@@ -61,5 +63,7 @@ export async function POST(req: NextRequest) {
     if (itemsErr) return NextResponse.json({ error: itemsErr.message }, { status: 500 });
   }
 
+  const session = getSession(req);
+  await logActivity(session?.role || "unknown", "guia_create", "guias", { guiaId: guia.id, numero }, session?.userName);
   return NextResponse.json(guia);
 }

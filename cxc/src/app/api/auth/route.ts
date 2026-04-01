@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { logActivity } from "@/lib/log-activity";
 import bcrypt from "bcryptjs";
 
 const COOKIE_NAME = "cxc_session";
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest) {
 
           const res = NextResponse.json(payload);
           setSessionCookie(res, { role: user.role, userId: user.id, userName: user.name, modules });
+          await logActivity(user.role, "login", "auth", { userName: user.name }, user.name);
           return res;
         }
       }
@@ -134,6 +136,7 @@ export async function POST(req: NextRequest) {
 
   const res = NextResponse.json({ role });
   setSessionCookie(res, { role });
+  await logActivity(role, "login", "auth");
   return res;
 }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getRole, requireAdmin } from "@/lib/api-auth";
+import { getSession } from "@/lib/require-auth";
 
 export async function GET(req: NextRequest) {
   const role = getRole(req);
@@ -115,6 +116,7 @@ export async function POST(req: NextRequest) {
     .eq("id", reclamo.id)
     .single();
 
-  await logActivity("system", "reclamo_creado", "reclamo", reclamo.id, `${empresa} — Factura ${nro_factura}`);
+  const session = getSession(req);
+  await logActivity(session?.role || "system", "reclamo_create", "reclamos", { reclamoId: reclamo.id, empresa, nro_factura }, session?.userName);
   return NextResponse.json({ ...(full || reclamo), items_warning: itemsWarning || undefined });
 }
