@@ -7,7 +7,7 @@ import { fmt } from "@/lib/format";
 import { useToast } from "@/components/ToastSystem";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
-interface Order { id: string; order_number: string; client_name: string; comment: string; total: number; reebok_order_items: OrderItem[]; created_at: string; }
+interface Order { id: string; order_number: string; client_name: string; comment: string; status: string; total: number; reebok_order_items: OrderItem[]; created_at: string; }
 interface DirClient { nombre: string; empresa: string; }
 
 const P = 12; // piezas por bulto
@@ -18,9 +18,12 @@ export default function OrderDetailPage() {
   const params = useParams();
   const id = params.id as string;
 
+  const [role, setRole] = useState("");
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [clientName, setClientName] = useState("");
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [waNumber, setWaNumber] = useState("+507");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -50,7 +53,7 @@ export default function OrderDetailPage() {
     setLoading(false);
   }, [id, router]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setRole(sessionStorage.getItem("cxc_role") || ""); load(); }, [load]);
 
   // Client autocomplete
   useEffect(() => {
@@ -189,11 +192,46 @@ export default function OrderDetailPage() {
     showToast("Listo");
   }
 
+  async function confirmOrder() {
+    showToast("Confirmando pedido...");
+    await saveOrder();
+    const res = await fetch(`/api/catalogo/reebok/orders/${id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "confirmado" }),
+    });
+    if (!res.ok) { showToast("Error al confirmar"); return; }
+
+    // Generate PDF and share
+    const result = await generatePDFBlob();
+    if (result && role !== "cliente") {
+      const file = new File([result.blob], result.filename, { type: "application/pdf" });
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: `Pedido ${order!.order_number}`, text: `Pedido Reebok — ${clientName}` });
+      } else {
+        const url = URL.createObjectURL(result.blob);
+        const a = document.createElement("a"); a.href = url; a.download = result.filename; a.click();
+        URL.revokeObjectURL(url);
+        if (waNumber.length > 4) {
+          const phone = waNumber.replace(/[^0-9]/g, "");
+          const text = `Hola, aquí está tu pedido ${order!.order_number} de Reebok Panamá. Gracias por tu compra.`;
+          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
+        }
+      }
+    }
+    setShowConfirmModal(false);
+    showToast("Pedido confirmado");
+    load();
+  }
+
   async function deleteOrder() {
     if (!await confirmAction("¿Eliminar este pedido?")) return;
     await fetch(`/api/catalogo/reebok/orders/${id}`, { method: "DELETE" });
     router.push("/catalogo/reebok/pedidos");
   }
+
+  const canEdit = ["admin", "secretaria", "vendedor"].includes(role);
+  const canDelete = ["admin", "secretaria"].includes(role);
+  const isConfirmed = order?.status === "confirmado";
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -203,9 +241,10 @@ export default function OrderDetailPage() {
           <div className="flex items-center gap-3 mt-1" ref={nameRef}>
             <span className="text-sm font-mono text-gray-400">{order.order_number}</span>
             <div className="relative flex-1">
-              <input value={clientName} onChange={e => setClientName(e.target.value)}
-                onFocus={() => { if (suggestions.length) setShowSugg(true); }}
-                className="text-xl font-semibold border-b border-transparent hover:border-gray-200 focus:border-black outline-none transition w-full bg-transparent" />
+              <input value={clientName} onChange={e => { if (canEdit) setClientName(e.target.value); }}
+                onFocus={() => { if (canEdit && suggestions.length) setShowSugg(true); }}
+                readOnly={!canEdit}
+                className={`text-xl font-semibold border-b border-transparent outline-none transition w-full bg-transparent ${canEdit ? "hover:border-gray-200 focus:border-black" : ""}`} />
               {showSugg && suggestions.length > 0 && (
                 <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg overflow-hidden">
                   {suggestions.slice(0, 5).map((c, i) => (
@@ -272,18 +311,60 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <Link href="/catalogo/reebok/productos" className="w-full border border-gray-300 text-black py-3 rounded-lg text-sm font-medium hover:border-gray-500 transition text-center block">
-            ← Seguir agregando productos
-          </Link>
-          <button onClick={saveOrder} disabled={saving} className="w-full bg-black text-white py-3.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
-            {saving ? "Guardando..." : "Guardar pedido"}
-          </button>
+          {!isConfirmed && (
+            <Link href="/catalogo/reebok/productos" className="w-full border border-gray-300 text-black py-3 rounded-lg text-sm font-medium hover:border-gray-500 transition text-center block">
+              ← Seguir agregando productos
+            </Link>
+          )}
+          {canEdit && !isConfirmed && (
+            <button onClick={saveOrder} disabled={saving} className="w-full bg-black text-white py-3.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
+              {saving ? "Guardando..." : "Guardar pedido"}
+            </button>
+          )}
+          {!isConfirmed && (
+            <button onClick={() => setShowConfirmModal(true)} disabled={saving || !items.length}
+              className="w-full bg-emerald-600 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-40">
+              Confirmar y enviar
+            </button>
+          )}
+          {isConfirmed && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-sm text-emerald-700 text-center mb-2">
+              Pedido confirmado
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <button onClick={downloadPDF} className="border border-gray-200 text-black py-3 rounded-lg text-sm hover:border-gray-400 transition">Descargar PDF</button>
-            <button onClick={shareWhatsApp} disabled={saving} className="bg-green-600 text-white py-3 rounded-lg text-sm hover:bg-green-700 transition disabled:opacity-40">Enviar por WhatsApp</button>
+            <button onClick={shareWhatsApp} disabled={saving} className="bg-green-600 text-white py-3 rounded-lg text-sm hover:bg-green-700 transition disabled:opacity-40">WhatsApp</button>
           </div>
-          <button onClick={deleteOrder} className="text-xs text-gray-400 hover:text-red-500 transition mt-4 py-1">Eliminar pedido</button>
+          {canDelete && <button onClick={deleteOrder} className="text-xs text-gray-400 hover:text-red-500 transition mt-4 py-1">Eliminar pedido</button>}
         </div>
+
+        {/* Confirm modal */}
+        {showConfirmModal && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowConfirmModal(false)}>
+            <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <h3 className="text-sm font-medium mb-3">Confirmar pedido {order?.order_number}</h3>
+              <div className="text-xs text-gray-500 space-y-1 mb-4">
+                <p>Cliente: {clientName}</p>
+                <p>{totalBultos} bultos · {totalPiezas} piezas · ${fmt(totalMoney)}</p>
+              </div>
+              {role !== "cliente" && (
+                <div className="mb-4">
+                  <label className="text-[10px] text-gray-400 uppercase tracking-wider block mb-1">WhatsApp del cliente</label>
+                  <input type="tel" value={waNumber} onChange={e => setWaNumber(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-black" placeholder="+50760001234" />
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button onClick={() => setShowConfirmModal(false)} className="flex-1 py-2.5 text-sm text-gray-500 hover:text-black transition">Cancelar</button>
+                <button onClick={confirmOrder} disabled={saving}
+                  className="flex-1 py-2.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition disabled:opacity-50">
+                  {saving ? "Enviando..." : "Confirmar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2 rounded-full text-sm z-50">{toast}</div>}
     </div>

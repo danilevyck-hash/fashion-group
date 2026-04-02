@@ -29,8 +29,8 @@ export default function PedidosPage() {
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role") || "";
     if (!r) { router.push("/"); return; }
+    if (r === "cliente") { router.push("/catalogo/reebok"); return; }
     setRole(r);
-    if (r === "cliente") setClientFilter(sessionStorage.getItem("fg_user_name") || "");
   }, [router]);
 
   const load = useCallback(async () => {
@@ -77,7 +77,8 @@ export default function PedidosPage() {
   const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const visibleOrders = clientFilter ? orders.filter(o => o.client_name.toLowerCase() === clientFilter.toLowerCase()) : orders;
+  const canDelete = role === "admin" || role === "secretaria";
+  const visibleOrders = orders;
   const filtered = visibleOrders
     .filter(o => !search || o.client_name.toLowerCase().includes(search.toLowerCase()) || o.order_number.toLowerCase().includes(search.toLowerCase()))
     .filter(o => {
@@ -134,9 +135,11 @@ export default function PedidosPage() {
                 <button onClick={() => duplicateOrder(o)} className="text-xs text-gray-300 hover:text-blue-500 transition px-1" title="Duplicar">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                 </button>
-                <button onClick={() => deleteOrder(o.id)} className="text-xs text-gray-300 hover:text-red-500 transition px-1" title="Eliminar">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-                </button>
+                {canDelete && (
+                  <button onClick={() => deleteOrder(o.id)} className="text-xs text-gray-300 hover:text-red-500 transition px-1" title="Eliminar">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                  </button>
+                )}
               </div>
             </div>
           ))}
