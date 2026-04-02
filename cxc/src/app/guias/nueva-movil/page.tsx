@@ -13,7 +13,7 @@ const CLIENTES = ["City Mall", "La Frontera Duty Free", "Jerusalem de Panama", "
 const DIRECCIONES = ["Paso Canoas", "David", "Santiago", "Guabito", "Changinola"];
 
 export default function NuevaGuiaMovil() {
-  const { authChecked } = useAuth({ moduleKey: "guias", allowedRoles: ["admin","upload","secretaria","director"] });
+  const { authChecked } = useAuth({ moduleKey: "guias", allowedRoles: ["admin","secretaria","bodega"] });
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [drawing, setDrawing] = useState(false);
 

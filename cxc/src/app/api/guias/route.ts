@@ -3,7 +3,11 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 
-export async function GET() {
+const GUIAS_ROLES = ["admin", "secretaria", "bodega"];
+
+export async function GET(req: NextRequest) {
+  const session = getSession(req);
+  if (!session || !GUIAS_ROLES.includes(session.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const { data, error } = await supabaseServer
     .from("guia_transporte")
     .select("*, guia_items(bultos, facturas, cliente)")
@@ -24,6 +28,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const s = getSession(req);
+  if (!s || !GUIAS_ROLES.includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const body = await req.json();
   const { fecha, transportista, placa, observaciones, items, monto_total, estado, firma_transportista, entregado_por } = body;
 

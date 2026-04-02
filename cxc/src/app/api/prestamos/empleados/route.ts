@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { getSession } from "@/lib/require-auth";
+
+const PRESTAMOS_ROLES = ["admin", "contabilidad"];
 
 export async function GET(req: NextRequest) {
+  const session = getSession(req);
+  if (!session || !PRESTAMOS_ROLES.includes(session.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const showArchived = req.nextUrl.searchParams.get("archivados") === "1";
 
   let query = supabaseServer

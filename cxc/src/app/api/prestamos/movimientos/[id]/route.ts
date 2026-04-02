@@ -4,7 +4,14 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = getSession(req);
   const body = await req.json();
+
+  // Only admin can approve
+  if (body.estado === "aprobado" && session?.role !== "admin") {
+    return NextResponse.json({ error: "Solo admin puede aprobar préstamos" }, { status: 403 });
+  }
+
   const allowed = ["tipo", "monto", "fecha", "descripcion", "estado", "aprobado_por"];
   const update: Record<string, unknown> = {};
   for (const k of allowed) { if (body[k] !== undefined) update[k] = body[k]; }
@@ -12,7 +19,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const { data, error } = await supabaseServer.from("prestamos_movimientos").update(update).eq("id", params.id).select().single();
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
 
-  const session = getSession(req);
   await logActivity(session?.role || "unknown", body.estado === "aprobado" ? "prestamo_approve" : "prestamo_mov_update", "prestamos", { movimientoId: params.id, fields: Object.keys(update) }, session?.userName);
 
   return NextResponse.json(data);

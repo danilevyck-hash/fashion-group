@@ -11,7 +11,7 @@ interface Guia { id: string; numero: number; fecha: string; transportista: strin
 
 export default function BodegaPage() {
   const router = useRouter();
-  const { authChecked } = useAuth({ moduleKey: "guias", allowedRoles: ["admin","upload","secretaria","director"] });
+  const { authChecked } = useAuth({ moduleKey: "guias", allowedRoles: ["admin","secretaria","bodega"] });
   const params = useParams();
   const id = params.id as string;
   const canvasRef = useRef<HTMLCanvasElement>(null);

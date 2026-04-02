@@ -42,7 +42,7 @@ interface VentasStatus {
 // ── Inner component (needs useSearchParams inside Suspense) ───────────────────
 
 function UploadPageInner() {
-  const { authChecked, role } = useAuth({ moduleKey: "upload", allowedRoles: ["admin", "upload", "secretaria", "director"] });
+  const { authChecked, role } = useAuth({ moduleKey: "upload", allowedRoles: ["admin", "secretaria"] });
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get("tab") === "ventas" ? "ventas" : "cxc") as "cxc" | "ventas";
 

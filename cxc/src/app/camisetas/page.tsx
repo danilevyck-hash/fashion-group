@@ -27,7 +27,7 @@ function Dot({ color, size = "sm" }: { color: string; size?: "sm" | "md" }) {
 }
 
 export default function CamisetasPage() {
-  const { authChecked, role } = useAuth({ moduleKey: "camisetas", allowedRoles: ["admin","director"] });
+  const { authChecked, role } = useAuth({ moduleKey: "camisetas", allowedRoles: ["admin","vendedor"] });
   const [tab, setTab] = useState<"resumen" | "cliente" | "stock">("cliente");
   const [productos, setProductos] = useState<Producto[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);

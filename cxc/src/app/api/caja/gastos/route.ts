@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { getSession } from "@/lib/require-auth";
 
 export async function POST(req: NextRequest) {
+  const session = getSession(req);
+  if (!session || !["admin", "secretaria"].includes(session.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const body = await req.json();
   const { periodo_id, fecha, descripcion, proveedor, nro_factura, responsable, categoria, empresa, subtotal, itbms, total } = body;
 

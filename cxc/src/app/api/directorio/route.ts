@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { getSession } from "@/lib/require-auth";
+
+const DIRECTORIO_ROLES = ["admin", "secretaria", "director", "contabilidad", "vendedor"];
 
 export async function GET(req: NextRequest) {
+  const session = getSession(req);
+  if (!session || !DIRECTORIO_ROLES.includes(session.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const format = req.nextUrl.searchParams.get("format");
 
   const { data, error } = await supabaseServer

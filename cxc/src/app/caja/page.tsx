@@ -27,7 +27,7 @@ export default function CajaPageWrapper() {
 function CajaPage() {
   const { authChecked, role } = useAuth({
     moduleKey: "caja",
-    allowedRoles: ["admin", "upload", "secretaria", "director"],
+    allowedRoles: ["admin", "secretaria"],
   });
   const searchParams = useSearchParams();
   const urlId = searchParams.get("id") || "";

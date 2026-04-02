@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { getSession } from "@/lib/require-auth";
 
-export async function GET() {
+const CHEQUES_ROLES = ["admin", "secretaria", "director"];
+
+export async function GET(req: NextRequest) {
+  const session = getSession(req);
+  if (!session || !CHEQUES_ROLES.includes(session.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const { data, error } = await supabaseServer
     .from("cheques")
     .select("*")
@@ -13,6 +18,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const s = getSession(req);
+  if (!s || !CHEQUES_ROLES.includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const body = await req.json();
   const { cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas, whatsapp } = body;
 

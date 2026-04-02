@@ -31,7 +31,7 @@ function todayStr() { return new Date().toISOString().slice(0, 10); }
 type Filter = "all" | "pendiente" | "depositado" | "vencido" | "rebotado" | "vencen_hoy" | "vencen_semana";
 
 export default function ChequesPage() {
-  const { authChecked, role } = useAuth({ moduleKey: "cheques", allowedRoles: ["admin","upload","secretaria","director","contabilidad"] });
+  const { authChecked, role } = useAuth({ moduleKey: "cheques", allowedRoles: ["admin","secretaria","director"] });
   const [cheques, setCheques] = useState<Cheque[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
