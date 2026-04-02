@@ -17,6 +17,19 @@ function parseMarkdownTable(text: string): string[][] | null {
   return rows.length >= 2 ? rows : null;
 }
 
+const SUGGESTIONS: Record<string, string[]> = {
+  admin: ["¿Cuánto vendimos este mes?", "Clientes con deuda vencida", "Resumen del día", "Guías pendientes"],
+  secretaria: ["¿Cheques que vencen esta semana?", "Guías pendientes de despacho", "¿Cómo creo un reclamo?"],
+  contabilidad: ["Deducciones de esta quincena", "¿Saldo del préstamo de...?", "Gastos de caja este mes"],
+  vendedor: ["¿Cuánto debe City Mall?", "Último pedido de...", "Productos en oferta"],
+  director: ["Ventas por empresa este mes", "CxC vencida total", "Reclamos abiertos"],
+};
+
+function extractAction(content: string): string | null {
+  const match = content.match(/\[ACTION:([^\]]+)\]/);
+  return match ? match[1] : null;
+}
+
 export default function ChatPanel() {
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -27,14 +40,16 @@ export default function ChatPanel() {
   const [welcomeLoaded, setWelcomeLoaded] = useState(false);
   const [history, setHistory] = useState<{ messages: Message[]; date: string }[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [role, setRole] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Show for all roles except bodega and cliente
   useEffect(() => {
-    const role = sessionStorage.getItem("cxc_role");
-    if (role && role !== "bodega" && role !== "cliente") {
+    const r = sessionStorage.getItem("cxc_role");
+    if (r && r !== "bodega" && r !== "cliente") {
       setVisible(true);
+      setRole(r);
     }
     // Load history from localStorage
     try {
@@ -153,6 +168,32 @@ export default function ChatPanel() {
     } finally { setStreaming(false); }
   }
 
+  // Execute confirmed action
+  async function executeAction(actionStr: string) {
+    setMessages(prev => [...prev, { role: "user", content: "Sí, confirmar" }]);
+    setStreaming(true);
+    setMessages(prev => [...prev, { role: "assistant", content: "" }]);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: actionStr }),
+      });
+      const data = await res.json();
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1].content = data.actionResult || "Acción completada";
+        return [...updated];
+      });
+    } catch {
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1].content = "❌ Error al ejecutar la acción";
+        return [...updated];
+      });
+    }
+    setStreaming(false);
+  }
+
   // #5: Export table to Excel
   async function exportTable(content: string) {
     const table = parseMarkdownTable(content);
@@ -249,12 +290,19 @@ export default function ChatPanel() {
                       ? "bg-black text-white dark:bg-white dark:text-black"
                       : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
                   }`}>
-                    {msg.content}
+                    {msg.role === "assistant" ? msg.content.replace(/\[ACTION:[^\]]+\]/g, "").trim() : msg.content}
                     {msg.role === "assistant" && !msg.content && streaming && (
                       <span className="inline-block w-1.5 h-4 bg-gray-400 animate-pulse ml-0.5" />
                     )}
                   </div>
-                  {/* #5: Export button for tables */}
+                  {/* Action buttons */}
+                  {msg.role === "assistant" && !streaming && extractAction(msg.content) && i === messages.length - 1 && (
+                    <div className="flex gap-2 mt-1.5 ml-1">
+                      <button onClick={() => executeAction(extractAction(msg.content)!)} className="text-[11px] bg-emerald-600 text-white px-3 py-1 rounded-full hover:bg-emerald-700 transition">Confirmar ✓</button>
+                      <button onClick={() => { setMessages(prev => [...prev, { role: "user", content: "No, cancelar" }]); }} className="text-[11px] text-gray-400 hover:text-gray-600 transition">Cancelar</button>
+                    </div>
+                  )}
+                  {/* Export button for tables */}
                   {msg.role === "assistant" && msg.content && parseMarkdownTable(msg.content) && (
                     <button onClick={() => exportTable(msg.content)} className="text-[10px] text-gray-400 hover:text-black dark:hover:text-white mt-1 ml-1 transition">
                       Exportar a Excel ↓
@@ -264,6 +312,15 @@ export default function ChatPanel() {
               </div>
             ))}
           </div>
+
+          {/* Suggestions — only before first user message */}
+          {messages.length <= 1 && !streaming && SUGGESTIONS[role] && (
+            <div className="px-4 py-2 flex flex-wrap gap-1.5 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
+              {SUGGESTIONS[role].map((s, i) => (
+                <button key={i} onClick={() => { setInput(s); }} className="text-[11px] border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 px-2.5 py-1 rounded-full hover:border-gray-400 transition truncate max-w-[180px]">{s}</button>
+              ))}
+            </div>
+          )}
 
           {/* Input */}
           <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">

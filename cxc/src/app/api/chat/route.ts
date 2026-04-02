@@ -26,18 +26,41 @@ const BASE_SYSTEM_PROMPT = `Eres el asistente de inteligencia de negocios de Fas
 - Respondes en español.
 - Sé conciso y directo.
 - Si no tienes datos específicos, dilo claramente en vez de inventar.
-- Cuando la respuesta incluya datos comparativos de múltiples empresas, clientes o períodos, SIEMPRE formatear como tabla Markdown con columnas alineadas. Ejemplo: ventas por empresa, CxC por empresa, cheques pendientes por cliente.
+- Cuando la respuesta incluya datos comparativos, SIEMPRE formatear como tabla Markdown.
 - Usa bullets para listas simples, tablas para comparaciones.
-- Cuando cites cifras, siempre indica que son datos del sistema actualizados a la fecha mostrada.
-- Si no puedes responder algo o la consulta requiere cambios técnicos, di: "Para esta consulta, contacta al técnico del sistema: Daniel Levy".
+- Cuando cites cifras, indica que son datos actualizados a la fecha mostrada.
+- Si no puedes responder algo técnico: "Para esta consulta, contacta al técnico del sistema: Daniel Levy".
+
+## Acciones que puedes ejecutar
+Puedes ejecutar acciones en el sistema. Cuando el usuario pida algo que implique cambiar datos:
+1. Muestra un RESUMEN claro de lo que vas a hacer
+2. Termina con: "¿Confirmo? (responde sí o no)"
+3. Solo ejecuta si el usuario responde "sí", "confirmar", "dale", "hazlo"
+4. NUNCA ejecutes sin confirmación
+
+Para indicar una acción pendiente, usa EXACTAMENTE este formato al final de tu respuesta:
+[ACTION:tipo|id|datos]
+
+Acciones disponibles:
+- [ACTION:despachar_guia|{id}|{numero}] — Marcar guía como despachada
+- [ACTION:depositar_cheque|{id}|{cliente},{monto}] — Marcar cheque como depositado
+- [ACTION:cambiar_estado_reclamo|{id}|{estado}] — Cambiar estado de reclamo
 
 ## Alertas automáticas
-Analiza los datos del sistema y si detectas alguna de estas situaciones, menciónalo proactivamente al inicio de tu respuesta:
-- CxC vencida > 30% del total → "⚠️ Atención: la cartera vencida supera el 30%"
-- Cheques vencidos sin depositar → "⚠️ Hay cheques vencidos pendientes de depósito"
-- Reclamos sin resolver > 45 días → "⚠️ Hay reclamos sin resolver por más de 45 días"
-- Guías pendientes > 5 días → "⚠️ Hay guías pendientes hace más de 5 días"
-Solo menciona alertas relevantes a la pregunta del usuario.`;
+Si detectas estas situaciones, menciónalo proactivamente:
+- CxC vencida > 30% del total → "⚠️ Cartera vencida supera el 30%"
+- Cheques vencidos sin depositar → "⚠️ Cheques vencidos pendientes"
+- Reclamos sin resolver > 45 días → "⚠️ Reclamos viejos sin resolver"
+- Guías pendientes > 5 días → "⚠️ Guías pendientes"
+
+## Guía de uso del sistema
+Si el usuario pregunta cómo hacer algo, explica paso a paso:
+- Crear guía: Dashboard → Guías → Nueva Guía → Llenar fecha, transportista, entregado por → Agregar items → Guardar
+- Subir inventario Reebok: Dashboard → Catálogo Reebok → Administrar → Actualizar Inventario → Subir CSV de Active Shoes o Active Wear
+- Registrar cheque: Dashboard → Cheques → Nuevo Cheque → Llenar datos → Guardar
+- Crear reclamo: Dashboard → Reclamos → Seleccionar empresa → Nuevo Reclamo → Agregar items → Guardar
+- Registrar gasto caja: Dashboard → Caja Menuda → Agregar Gasto → Llenar datos → Guardar
+- Subir CxC: Dashboard → Cargar CSV → Seleccionar empresa → Subir archivo`;
 
 function fmt(n: number): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -416,7 +439,27 @@ async function buildSystemData(): Promise<string> {
 
 export async function POST(req: NextRequest) {
   try {
-    const { message, history } = await req.json();
+    const { message, history, action } = await req.json();
+
+    // Execute confirmed action
+    if (action) {
+      try {
+        const [tipo, id, datos] = action.split("|");
+        if (tipo === "despachar_guia") {
+          const res = await supabaseServer.from("guia_transporte").update({ estado: "Completada" }).eq("id", id).select("id, numero").maybeSingle();
+          return Response.json({ actionResult: res.data ? `✅ Guía #${res.data.numero} despachada` : `❌ Guía no encontrada` });
+        }
+        if (tipo === "depositar_cheque") {
+          const res = await supabaseServer.from("cheques").update({ estado: "depositado", fecha_depositado: new Date().toISOString().slice(0, 10) }).eq("id", id).select("id, cliente").maybeSingle();
+          return Response.json({ actionResult: res.data ? `✅ Cheque de ${res.data.cliente} marcado como depositado` : `❌ Cheque no encontrado` });
+        }
+        if (tipo === "cambiar_estado_reclamo") {
+          const res = await supabaseServer.from("reclamos").update({ estado: datos, updated_at: new Date().toISOString() }).eq("id", id).select("id, nro_reclamo").maybeSingle();
+          return Response.json({ actionResult: res.data ? `✅ Reclamo ${res.data.nro_reclamo} → ${datos}` : `❌ Reclamo no encontrado` });
+        }
+        return Response.json({ actionResult: "❌ Acción no reconocida" });
+      } catch { return Response.json({ actionResult: "❌ Error al ejecutar acción" }); }
+    }
 
     if (!message || typeof message !== "string") {
       return Response.json({ error: "Mensaje requerido" }, { status: 400 });
@@ -427,84 +470,142 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "API key no configurada" }, { status: 500 });
     }
 
+    // Detect user role
+    let userRole = "desconocido";
+    let userName = "";
+    try {
+      const session = req.cookies.get("cxc_session")?.value;
+      if (session) {
+        const parsed = JSON.parse(Buffer.from(session, "base64url").toString("utf-8"));
+        userRole = parsed.role || "desconocido";
+        userName = parsed.userName || "";
+      }
+    } catch { /* */ }
+
+    const roleContext = `\n\n## Usuario actual
+- Rol: ${userRole}${userName ? ` (${userName})` : ""}
+- Adapta tu tono:
+  ${userRole === "admin" ? "Respuestas ejecutivas con números clave. Ofrece ejecutar acciones." : ""}
+  ${userRole === "secretaria" ? "Respuestas operativas paso a paso. Ayuda con tareas del día a día." : ""}
+  ${userRole === "contabilidad" ? "Respuestas con detalle financiero y trazabilidad." : ""}
+  ${userRole === "vendedor" ? "Respuestas sobre clientes, productos y pedidos. Enfoque comercial." : ""}
+  ${userRole === "director" ? "Respuestas de alto nivel con tendencias y comparaciones." : ""}`;
+
     const systemData = await buildSystemData();
 
-    // #4: Enrich with specific client/entity data
-    let clientContext = "";
+    // Smart search based on message content
+    let searchContext = "";
     const msgLower = message.toLowerCase();
 
-    // Detect client-related queries
-    const clientPatterns = [
+    // Extract search terms from various patterns
+    const termPatterns = [
       /(?:cliente|cuenta de|saldo de|deuda de|factur\w+ (?:de|a|para))\s+[""""]?([A-ZÁ-Úa-zá-ú][A-ZÁ-Úa-zá-ú\s&.'-]{2,})/i,
-      /(?:city|mall|jerusalem|golden|plaza|kheriddine|bouti|outlet|sporting|frontera|multifashion|fashion|boston)[A-ZÁ-Úa-zá-ú\s&.'-]*/i,
+      /(?:city|mall|jerusalem|golden|plaza|kheriddine|bouti|outlet|sporting|frontera)[A-ZÁ-Úa-zá-ú\s&.'-]*/i,
     ];
-
     let searchTerm = "";
-    for (const pattern of clientPatterns) {
-      const m = message.match(pattern);
-      if (m) { searchTerm = (m[1] || m[0]).trim(); break; }
-    }
+    for (const p of termPatterns) { const m = message.match(p); if (m) { searchTerm = (m[1] || m[0]).trim(); break; } }
 
+    // Search CxC if mentions client/saldo/deuda
     if (searchTerm && searchTerm.length >= 3) {
       const term = searchTerm.toUpperCase();
-
-      // Search CxC
-      let { data: cxcMatches } = await supabaseServer
-        .from("cxc_rows")
-        .select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365")
-        .ilike("nombre_normalized", `%${term}%`)
-        .limit(5);
-
-      // Fallback: split into words and search by longest word
-      if (!cxcMatches || cxcMatches.length === 0) {
-        const words = term.split(/\s+/).filter(w => w.length >= 3).sort((a, b) => b.length - a.length);
-        for (const word of words) {
-          const { data } = await supabaseServer
-            .from("cxc_rows")
-            .select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365")
-            .ilike("nombre_normalized", `%${word}%`)
-            .limit(5);
-          if (data && data.length > 0) { cxcMatches = data; break; }
+      let { data: cxcMatches } = await supabaseServer.from("cxc_rows").select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365").ilike("nombre_normalized", `%${term}%`).limit(5);
+      if (!cxcMatches?.length) {
+        for (const word of term.split(/\s+/).filter(w => w.length >= 3).sort((a, b) => b.length - a.length)) {
+          const { data } = await supabaseServer.from("cxc_rows").select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365").ilike("nombre_normalized", `%${word}%`).limit(5);
+          if (data?.length) { cxcMatches = data; break; }
         }
       }
-
-      if (cxcMatches && cxcMatches.length > 0) {
-        clientContext += `\n\n## Búsqueda: "${searchTerm}" — ${cxcMatches.length} resultado(s) en CxC`;
+      if (cxcMatches?.length) {
+        searchContext += `\n\n## CxC de "${searchTerm}"`;
         for (const r of cxcMatches.slice(0, 3)) {
           const vencido = (Number(r.d121_180) || 0) + (Number(r.d181_270) || 0) + (Number(r.d271_365) || 0) + (Number(r.mas_365) || 0);
-          clientContext += `\n- ${r.nombre_normalized} (${r.company_key}): total $${fmt(Number(r.total) || 0)}, 0-30d $${fmt(Number(r.d0_30) || 0)}, 31-60d $${fmt(Number(r.d31_60) || 0)}, 61-90d $${fmt(Number(r.d61_90) || 0)}, 91-120d $${fmt(Number(r.d91_120) || 0)}, vencido $${fmt(vencido)}`;
+          searchContext += `\n- ${r.nombre_normalized} (${r.company_key}): total $${fmt(Number(r.total) || 0)}, vencido $${fmt(vencido)}`;
         }
       }
-
-      // Search reclamos
-      const { data: reclamoMatches } = await supabaseServer
-        .from("reclamos")
-        .select("id, empresa, nro_reclamo, estado, fecha_reclamo")
-        .or(`empresa.ilike.%${term}%`)
-        .limit(3);
-      if (reclamoMatches && reclamoMatches.length > 0) {
-        clientContext += `\n\n## Reclamos relacionados con "${searchTerm}"`;
-        for (const r of reclamoMatches) {
-          clientContext += `\n- ${r.nro_reclamo} (${r.empresa}): estado ${r.estado}, fecha ${r.fecha_reclamo}`;
-        }
+      // Facturas
+      const { data: facturas } = await supabaseServer.from("ventas_raw").select("fecha, tipo, n_fiscal, cliente, empresa, vendedor, total").ilike("cliente", `%${term}%`).order("fecha", { ascending: false }).limit(5);
+      if (facturas?.length) {
+        searchContext += `\n\n## Facturas de "${searchTerm}"`;
+        for (const v of facturas) searchContext += `\n- ${v.fecha} | ${v.tipo} ${v.n_fiscal || ""} | ${v.empresa} | $${fmt(Number(v.total) || 0)}`;
       }
+    }
 
-      // Search facturas
-      const { data: facturaMatches } = await supabaseServer
-        .from("ventas_raw")
-        .select("fecha, tipo, n_fiscal, cliente, empresa, vendedor, total")
-        .ilike("cliente", `%${term}%`)
-        .order("fecha", { ascending: false })
-        .limit(5);
-      if (facturaMatches && facturaMatches.length > 0) {
-        clientContext += `\n\n## Facturas recientes de "${searchTerm}"`;
-        for (const v of facturaMatches) {
-          clientContext += `\n- ${v.fecha} | ${v.tipo} ${v.n_fiscal || ""} | ${v.empresa} | vendedor: ${v.vendedor || "?"} | $${fmt(Number(v.total) || 0)}`;
+    // Search guías if mentions guía/guia/despacho
+    if (msgLower.includes("guía") || msgLower.includes("guia") || msgLower.includes("despacho")) {
+      const numMatch = message.match(/(?:gu[ií]a|#)\s*(\d+)/i);
+      if (numMatch) {
+        const { data } = await supabaseServer.from("guia_transporte").select("id, numero, fecha, transportista, estado, placa, guia_items(cliente, bultos)").eq("numero", parseInt(numMatch[1])).eq("deleted", false).single();
+        if (data) {
+          const items = (data.guia_items || []) as { cliente: string; bultos: number }[];
+          const totalB = items.reduce((s, i) => s + (i.bultos || 0), 0);
+          searchContext += `\n\n## Guía #${data.numero}\n- ID: ${data.id}\n- Fecha: ${data.fecha} | Transportista: ${data.transportista} | Estado: ${data.estado} | Placa: ${data.placa || "sin placa"}\n- ${items.length} items, ${totalB} bultos`;
+        }
+      } else {
+        const { data } = await supabaseServer.from("guia_transporte").select("numero, estado, transportista, fecha").eq("deleted", false).eq("estado", "Pendiente Bodega").order("numero", { ascending: false }).limit(5);
+        if (data?.length) {
+          searchContext += `\n\n## Guías pendientes de despacho`;
+          for (const g of data) searchContext += `\n- #${g.numero}: ${g.transportista} — ${g.fecha}`;
         }
       }
     }
 
-    const systemPrompt = BASE_SYSTEM_PROMPT + systemData + clientContext;
+    // Search cheques if mentions cheque
+    if (msgLower.includes("cheque")) {
+      const { data } = await supabaseServer.from("cheques").select("id, cliente, empresa, monto, fecha_deposito, estado").eq("estado", "pendiente").eq("deleted", false).order("fecha_deposito").limit(10);
+      if (data?.length) {
+        searchContext += `\n\n## Cheques pendientes`;
+        for (const c of data) searchContext += `\n- ID: ${c.id} | ${c.cliente} (${c.empresa}) — $${fmt(Number(c.monto))} — vence ${c.fecha_deposito}`;
+      }
+    }
+
+    // Search préstamos if mentions préstamo/empleado
+    if (msgLower.includes("préstamo") || msgLower.includes("prestamo") || msgLower.includes("empleado")) {
+      const nameMatch = message.match(/(?:préstamo|prestamo|empleado|saldo de)\s+(?:de\s+)?([A-ZÁ-Úa-zá-ú]{3,})/i);
+      if (nameMatch) {
+        const { data } = await supabaseServer.from("prestamos_empleados").select("nombre, empresa, deduccion_quincenal, prestamos_movimientos(tipo, monto, estado)").ilike("nombre", `%${nameMatch[1]}%`).eq("activo", true).limit(3);
+        if (data?.length) {
+          searchContext += `\n\n## Préstamos`;
+          for (const e of data) {
+            const movs = (e.prestamos_movimientos || []) as { tipo: string; monto: number; estado: string }[];
+            const prestado = movs.filter(m => m.tipo === "prestamo" && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
+            const pagado = movs.filter(m => m.tipo !== "prestamo" && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
+            searchContext += `\n- ${e.nombre} (${e.empresa}): prestado $${fmt(prestado)}, pagado $${fmt(pagado)}, saldo $${fmt(prestado - pagado)}, deducción $${fmt(Number(e.deduccion_quincenal))}/quinc`;
+          }
+        }
+      }
+    }
+
+    // Search caja if mentions caja/gasto
+    if (msgLower.includes("caja") || msgLower.includes("gasto")) {
+      const { data } = await supabaseServer.from("caja_gastos").select("fecha, descripcion, total, categoria, empresa").eq("deleted", false).order("created_at", { ascending: false }).limit(10);
+      if (data?.length) {
+        searchContext += `\n\n## Últimos gastos de caja`;
+        for (const g of data) searchContext += `\n- ${g.fecha} | ${g.descripcion} | $${fmt(Number(g.total))} | ${g.categoria} | ${g.empresa || ""}`;
+      }
+    }
+
+    // Search directorio if mentions contacto/teléfono/directorio
+    if (msgLower.includes("contacto") || msgLower.includes("teléfono") || msgLower.includes("telefono") || msgLower.includes("directorio")) {
+      const nameM = message.match(/(?:contacto|teléfono|telefono|directorio)\s+(?:de\s+)?([A-ZÁ-Úa-zá-ú\s]{3,})/i);
+      if (nameM) {
+        const { data } = await supabaseServer.from("directorio_clientes").select("nombre, empresa, telefono, celular, correo, contacto").ilike("nombre", `%${nameM[1].trim()}%`).eq("deleted", false).limit(5);
+        if (data?.length) {
+          searchContext += `\n\n## Directorio`;
+          for (const c of data) searchContext += `\n- ${c.nombre} (${c.empresa}): tel ${c.telefono || "—"}, cel ${c.celular || "—"}, correo ${c.correo || "—"}, contacto ${c.contacto || "—"}`;
+        }
+      }
+    }
+
+    // Search reclamos if mentions reclamo
+    if (msgLower.includes("reclamo")) {
+      const numMatch = message.match(/REC-\d{4}-\d{4}/i);
+      if (numMatch) {
+        const { data } = await supabaseServer.from("reclamos").select("id, nro_reclamo, empresa, proveedor, estado, fecha_reclamo").eq("nro_reclamo", numMatch[0].toUpperCase()).single();
+        if (data) searchContext += `\n\n## Reclamo ${data.nro_reclamo}\n- ID: ${data.id}\n- Empresa: ${data.empresa} | Proveedor: ${data.proveedor} | Estado: ${data.estado} | Fecha: ${data.fecha_reclamo}`;
+      }
+    }
+
+    const systemPrompt = BASE_SYSTEM_PROMPT + roleContext + systemData + searchContext;
 
     const client = new Anthropic({ apiKey });
 
