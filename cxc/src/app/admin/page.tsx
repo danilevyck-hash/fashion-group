@@ -134,9 +134,6 @@ export default function AdminDashboard() {
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [showExport, setShowExport] = useState(false);
-  const [showUploadHistory, setShowUploadHistory] = useState(true);
-  const [activityLogs, setActivityLogs] = useState<{id:string;action:string;details:string;created_at:string}[]>([]);
-  const [showActivity, setShowActivity] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("cxc_favorites") || "[]")); } catch { return new Set(); }
   });
@@ -508,49 +505,6 @@ export default function AdminDashboard() {
       </div>
 
       <UploadFreshness roleCompanies={cxcCompanies} uploads={uploads} />
-
-      {/* Activity logs */}
-      {userRole === "admin" && (
-        <div className="mb-4">
-          <button onClick={async () => { if (showActivity) { setShowActivity(false); return; } const res = await fetch("/api/activity-logs"); if (res.ok) setActivityLogs(await res.json()); setShowActivity(true); }} className="text-xs text-gray-400 hover:text-gray-700 transition flex items-center gap-1.5">
-            <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${showActivity ? "rotate-90" : ""}`} fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg>
-            Actividad reciente
-          </button>
-          {showActivity && (
-            <div className="mt-3">{activityLogs.length === 0 ? <p className="text-sm text-gray-300 py-4 text-center">Sin actividad registrada</p> : (
-              <div className="space-y-1">{activityLogs.map((log) => {
-                const diff = Date.now() - new Date(log.created_at).getTime();
-                const m = Math.floor(diff / 60000); const h = Math.floor(diff / 3600000); const d = Math.floor(diff / 86400000);
-                const ago = d > 0 ? `${d}d` : h > 0 ? `${h}h` : `${m}m`;
-                const labels: Record<string, string> = { reclamo_creado: "Nuevo reclamo", reclamo_editado: "Editado", reclamo_eliminado: "Eliminado", csv_subido: "CSV subido" };
-                return <div key={log.id} className="flex items-center gap-3 py-2 border-b border-gray-50 text-xs"><span className="text-gray-300 w-12 flex-shrink-0">{ago}</span><span className="font-medium text-gray-700 w-28 flex-shrink-0">{labels[log.action] || log.action}</span><span className="text-gray-400 truncate">{log.details}</span></div>;
-              })}</div>
-            )}</div>
-          )}
-        </div>
-      )}
-
-      {/* Upload history toggle */}
-      <div className="mb-4">
-        <button onClick={() => setShowUploadHistory(!showUploadHistory)} className="text-xs text-gray-400 hover:text-gray-700 transition flex items-center gap-1.5">
-            <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${showUploadHistory ? "rotate-90" : ""}`} fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg>
-            Historial de cargas
-          </button>
-        {showUploadHistory && (
-          <div className="mt-3 border border-gray-100 rounded-xl overflow-hidden">
-            <table className="w-full text-xs"><thead><tr className="bg-gray-50 border-b border-gray-100"><th className="text-left px-4 py-2.5 font-medium text-gray-500">Empresa</th><th className="text-left px-4 py-2.5 font-medium text-gray-500">Último upload</th><th className="text-left px-4 py-2.5 font-medium text-gray-500">Hace</th><th className="text-right px-4 py-2.5 font-medium text-gray-500">Registros</th></tr></thead>
-            <tbody>{cxcCompanies.map((co) => {
-              const u = uploads[co.key];
-              if (!u) return <tr key={co.key}><td className="px-4 py-2.5">{co.name}</td><td colSpan={3} className="px-4 py-2.5 text-gray-300">Sin datos</td></tr>;
-              const days = Math.floor((Date.now() - new Date(u.uploaded_at).getTime()) / 86400000);
-              const hours = Math.floor((Date.now() - new Date(u.uploaded_at).getTime()) / 3600000);
-              const hace = days >= 1 ? `${days}d` : `${hours}h`;
-              const color = days > 14 ? "text-red-500" : days > 7 ? "text-amber-500" : "text-green-600";
-              return <tr key={co.key} className="border-b border-gray-50"><td className="px-4 py-2.5 font-medium">{co.name}</td><td className="px-4 py-2.5 text-gray-500">{new Date(u.uploaded_at).toLocaleDateString("es-PA")}</td><td className={`px-4 py-2.5 font-medium ${color}`}>hace {hace}</td><td className="px-4 py-2.5 text-right tabular-nums text-gray-500">{(u.row_count || 0).toLocaleString()}</td></tr>;
-            })}</tbody></table>
-          </div>
-        )}
-      </div>
 
       <KpiCards roleClients={roleClients} onFilterOverdue={() => setRiskFilter("overdue")} />
 
