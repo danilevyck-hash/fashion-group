@@ -54,7 +54,7 @@ export default function Navbar() {
       <nav className="sticky top-0 z-50 bg-white border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4">
           {showSystem && (
-            <Link href="/plantillas" className="text-xs text-gray-400 hover:text-gray-600 transition flex-shrink-0 py-2">← Sistema</Link>
+            <Link href="/plantillas" className="text-xs text-gray-400 hover:text-gray-600 transition flex-shrink-0 py-2">← Dashboard</Link>
           )}
           <Link href="/catalogo/reebok" className="flex-shrink-0">
             <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-7" />

@@ -36,9 +36,13 @@ export function useGuiasState() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingEstado, setEditingEstado] = useState<string | null>(null);
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
-  const [transportista, setTransportista] = useState("");
+  const [transportista, setTransportista] = useState(() => {
+    try { return localStorage.getItem("fg_last_transportista") || ""; } catch { return ""; }
+  });
   const [transportistaOtro, setTransportistaOtro] = useState("");
-  const [entregadoPor, setEntregadoPor] = useState("");
+  const [entregadoPor, setEntregadoPor] = useState(() => {
+    try { return localStorage.getItem("fg_last_entregado_por") || ""; } catch { return ""; }
+  });
   const [observaciones, setObservaciones] = useState("");
   const [items, setItems] = useState<GuiaItem[]>([emptyItem(1)]);
   const [nextNumero, setNextNumero] = useState(1);
@@ -230,6 +234,7 @@ export function useGuiasState() {
   async function saveGuia() {
     if (!validate()) return;
     const transp = transportista === "__other__" ? transportistaOtro : transportista;
+    try { localStorage.setItem("fg_last_transportista", transportista); localStorage.setItem("fg_last_entregado_por", entregadoPor); } catch { /* */ }
     const validItems = items.filter(
       (i) => i.cliente || i.direccion || i.facturas || i.bultos > 0,
     );

@@ -124,10 +124,10 @@ export default function PlantillasPage() {
   const showAlerts = alertRoles.includes(role);
   const alerts: { label: string; count: number; href: string; color: "red" | "yellow" | "blue" }[] = [];
   if (stats && showAlerts) {
-    if (stats.vencenHoy > 0) alerts.push({ label: "Cheques vencen hoy", count: stats.vencenHoy, href: "/cheques", color: "red" });
-    if (stats.vencenEstaSemana > 0) alerts.push({ label: "Cheques vencen esta semana", count: stats.vencenEstaSemana, href: "/cheques", color: "yellow" });
-    if (stats.prestamosPendientes > 0) alerts.push({ label: "Aprobaciones pendientes", count: stats.prestamosPendientes, href: "/prestamos", color: "blue" });
-    if (stats.reclamosViejos > 0 && (role === 'admin' || role === 'secretaria')) alerts.push({ label: "Reclamos +45 días sin resolver", count: stats.reclamosViejos, href: "/reclamos", color: "red" });
+    if (stats.vencenHoy > 0) alerts.push({ label: "Cheques vencen hoy", count: stats.vencenHoy, href: "/cheques?filtro=vencen_hoy", color: "red" });
+    if (stats.vencenEstaSemana > 0) alerts.push({ label: "Cheques vencen esta semana", count: stats.vencenEstaSemana, href: "/cheques?filtro=vencen_semana", color: "yellow" });
+    if (stats.prestamosPendientes > 0) alerts.push({ label: "Aprobaciones pendientes", count: stats.prestamosPendientes, href: "/prestamos?pendientes=1", color: "blue" });
+    if (stats.reclamosViejos > 0 && (role === 'admin' || role === 'secretaria')) alerts.push({ label: "Reclamos +45 días sin resolver", count: stats.reclamosViejos, href: "/reclamos?viejos=1", color: "red" });
     if (stats.cxcStale) alerts.push({ label: "Data CXC desactualizada", count: 0, href: "/upload", color: "yellow" });
   }
 

@@ -70,10 +70,10 @@ export default function ReebokLanding() {
           Ver catálogo
         </button>
         <button
-          onClick={() => router.push("/catalogo/reebok/pedidos")}
+          onClick={() => window.open("https://wa.me/50766745522?text=Hola%2C%20tengo%20una%20consulta%20sobre%20productos%20Reebok", "_blank")}
           className="w-full bg-white text-black border border-black py-4 rounded text-sm font-medium hover:bg-gray-50 transition"
         >
-          Mis pedidos
+          Contactar vendedor
         </button>
       </div>
 

@@ -133,7 +133,7 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
             {product.color && <><span className="text-[10px] text-gray-300">·</span><span className="text-[10px] text-gray-400">{product.color}</span></>}
           </div>
           <div className="flex items-center gap-2 mt-1.5">
-            <p className="text-base font-semibold text-black">
+            <p className="text-base font-semibold text-black" title={product.price ? `$${product.price.toFixed(2)} × 12 pzas = $${(product.price * 12).toFixed(0)}/bulto` : ""}>
               {product.price ? `$${product.price.toFixed(0)}` : "Consultar"}
             </p>
             {/* #13: Bigger badge */}

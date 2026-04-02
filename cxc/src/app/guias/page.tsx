@@ -18,7 +18,10 @@ export default function GuiasPage() {
   const s = useGuiasState();
 
   useEffect(() => {
-    if (authChecked) s.loadGuias();
+    if (authChecked) {
+      s.loadGuias();
+      if (role === "bodega") s.setShowPending(true);
+    }
   }, [authChecked]);
 
   // Handle browser back/forward
