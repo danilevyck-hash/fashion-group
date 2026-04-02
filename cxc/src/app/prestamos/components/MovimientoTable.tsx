@@ -46,7 +46,7 @@ export default function MovimientoTable({ sortedMovs, isAdmin, isAdminOrDirector
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-1">
-                      {m.estado === "pendiente_aprobacion" && isAdminOrDirector && (
+                      {m.estado === "pendiente_aprobacion" && isAdmin && (
                         <button onClick={() => onApprove(m.id)} className="text-xs bg-green-600 text-white px-3 py-1 rounded-full hover:bg-green-700 transition">Aprobar</button>
                       )}
                       {canEdit && (

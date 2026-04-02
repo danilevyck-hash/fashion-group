@@ -6,7 +6,7 @@ import { getSession } from "@/lib/require-auth";
 
 export async function GET(req: NextRequest) {
   const role = getRole(req);
-  if (!role || !['admin', 'secretaria', 'upload'].includes(role)) {
+  if (!role || !['admin', 'secretaria', 'upload', 'director'].includes(role)) {
     return NextResponse.json({ error: 'Sin permisos' }, { status: 403 });
   }
   const { data, error } = await supabaseServer

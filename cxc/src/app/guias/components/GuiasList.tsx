@@ -89,12 +89,14 @@ export default function GuiasList({
             <p className="text-sm text-gray-400 mt-1">Registro de envíos con transportistas</p>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <button
-              onClick={onNewGuia}
-              className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition"
-            >
-              Nueva Guía
-            </button>
+            {role !== "director" && (
+              <button
+                onClick={onNewGuia}
+                className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition"
+              >
+                Nueva Guía
+              </button>
+            )}
           </div>
         </div>
 
@@ -160,7 +162,7 @@ export default function GuiasList({
             <div className="overflow-x-auto -mx-4 sm:mx-0">
               <div className="min-w-[700px] px-4 sm:px-0">
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 bg-white z-10">
                   <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
                     <th className="text-left py-3 px-4 font-normal">N°</th>
                     <th className="text-left py-3 px-4 font-normal">Fecha</th>
