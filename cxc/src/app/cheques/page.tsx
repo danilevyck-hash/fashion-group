@@ -43,6 +43,8 @@ export default function ChequesPage() {
   const [resumenSort, setResumenSort] = useState<"monto" | "count">("monto");
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchProcessing, setBatchProcessing] = useState(false);
 
   // Rebotado modal
   const [rebotandoId, setRebotandoId] = useState<string | null>(null);
@@ -126,6 +128,21 @@ export default function ChequesPage() {
   async function depositar(id: string) {
     await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "depositado", fecha_depositado: todayStr() }) });
     loadCheques();
+  }
+
+  async function batchDepositar() {
+    if (selectedIds.size === 0) return;
+    setBatchProcessing(true);
+    for (const cid of selectedIds) {
+      await fetch(`/api/cheques/${cid}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "depositado", fecha_depositado: todayStr() }) });
+    }
+    setSelectedIds(new Set());
+    setBatchProcessing(false);
+    loadCheques();
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   }
 
   async function marcarRebotado(id: string) {
@@ -457,6 +474,16 @@ export default function ChequesPage() {
           onAction={() => setShowForm(true)}
         />
       ) : (
+        <>
+        {selectedIds.size > 0 && (
+          <div className="flex items-center gap-3 mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <span className="text-sm text-emerald-700">{selectedIds.size} cheque{selectedIds.size > 1 ? "s" : ""} seleccionado{selectedIds.size > 1 ? "s" : ""}</span>
+            <button onClick={batchDepositar} disabled={batchProcessing} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-full hover:bg-emerald-700 transition disabled:opacity-50">
+              {batchProcessing ? "Procesando..." : "Marcar depositados"}
+            </button>
+            <button onClick={() => setSelectedIds(new Set())} className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
+          </div>
+        )}
         <div className="overflow-x-auto -mx-4 sm:mx-0">
           <div className="min-w-[700px] px-4 sm:px-0">
         <table className="w-full text-sm">
@@ -480,7 +507,12 @@ export default function ChequesPage() {
               const isRebotado = c.estado === "rebotado";
               return (
                 <tr key={c.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${isToday ? "bg-yellow-50 border-l-4 border-l-yellow-400" : isVencido ? "bg-red-50/30" : isRebotado ? "bg-red-50/20" : ""} ${isDep || isVencido ? "text-gray-400" : ""}`}>
-                  <td className="py-3 px-4">{fmtDate(c.fecha_deposito)}</td>
+                  {c.estado === "pendiente" && (
+                    <td className="py-3 pl-2 pr-0 w-8">
+                      <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} className="accent-emerald-600 w-3.5 h-3.5" />
+                    </td>
+                  )}
+                  <td className={`py-3 px-4 ${c.estado !== "pendiente" ? "" : ""}`}>{fmtDate(c.fecha_deposito)}</td>
                   <td className="py-3 px-4 font-medium">{c.cliente}</td>
                   <td className="py-3 px-4 text-gray-500">{c.empresa}</td>
                   <td className="py-3 px-4 text-gray-500">{c.banco}</td>
@@ -513,6 +545,7 @@ export default function ChequesPage() {
         </table>
           </div>
         </div>
+        </>
       )}
       <Toast message={error} type="error" />
       <Toast message={toast} />

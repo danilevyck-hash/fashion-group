@@ -39,6 +39,19 @@ export default function BodegaPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Resize canvas to match CSS size
+  useEffect(() => {
+    function resize() {
+      const c = canvasRef.current; if (!c) return;
+      const r = c.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      c.width = r.width * dpr; c.height = r.height * dpr;
+      const ctx = c.getContext("2d"); if (ctx) ctx.scale(dpr, dpr);
+    }
+    resize(); window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, [loading]);
+
   // Canvas drawing
   const getPos = useCallback((e: React.TouchEvent | React.MouseEvent) => {
     const c = canvasRef.current;
@@ -59,7 +72,7 @@ export default function BodegaPage() {
     if (!drawing) return; e.preventDefault();
     const ctx = canvasRef.current?.getContext("2d");
     if (!ctx) return;
-    const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.strokeStyle = "#000"; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.stroke();
+    const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.strokeStyle = "#000"; ctx.lineWidth = 3; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.stroke();
   }, [drawing, getPos]);
 
   const stopDraw = useCallback(() => setDrawing(false), []);
@@ -182,11 +195,11 @@ export default function BodegaPage() {
       {/* Signature */}
       <div className="mb-6">
         <label className="text-[11px] text-gray-400 uppercase block mb-2">Firma del Transportista</label>
-        <canvas ref={canvasRef} width={600} height={200}
-          className="w-full h-[200px] border border-gray-300 rounded-lg bg-white touch-none"
+        <canvas ref={canvasRef}
+          className="w-full h-[180px] sm:h-[200px] border-2 border-gray-300 rounded-xl bg-white touch-none"
           onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={stopDraw}
           onMouseDown={startDraw} onMouseMove={draw} onMouseUp={stopDraw} onMouseLeave={stopDraw} />
-        <button onClick={clearSig} className="text-xs text-gray-400 hover:text-black mt-1">Limpiar firma</button>
+        <button onClick={clearSig} className="text-sm text-gray-400 hover:text-black mt-2 py-1">Limpiar firma</button>
       </div>
 
       {/* Save */}

@@ -103,6 +103,7 @@ export default function PlantillasPage() {
     ventasMes: number; ventasPrev: number;
     cxcTotal: number; cxcVencida: number;
     chequesTotalPendiente: number;
+    guiasPendientes: number;
   }
   const [stats, setStats] = useState<HomeStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -348,7 +349,15 @@ export default function PlantillasPage() {
                       {editMode && (
                         <span className="absolute top-2 right-2 text-gray-300 text-xs">⠿</span>
                       )}
-                      <div className="text-2xl mb-2">{mod.icon}</div>
+                      <div className="text-2xl mb-2 relative inline-block">
+                        {mod.icon}
+                        {mod.key === "guias" && stats && stats.guiasPendientes > 0 && (
+                          <span className="absolute -top-1 -right-3 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{stats.guiasPendientes}</span>
+                        )}
+                        {mod.key === "prestamos" && stats && stats.prestamosPendientes > 0 && (
+                          <span className="absolute -top-1 -right-3 bg-blue-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{stats.prestamosPendientes}</span>
+                        )}
+                      </div>
                       <div className="text-sm font-medium">{mod.label}</div>
                       <div className="text-xs text-gray-400 mt-0.5">{mod.subtitle}</div>
                     </div>

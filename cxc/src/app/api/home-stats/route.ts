@@ -16,7 +16,7 @@ export async function GET() {
 
   const [
     reclamosRes, reclamosViejosRes, reclamosResueltosRes,
-    chequesRes, periodoRes, guiasRes, clientesRes, uploadsRes, prestamosRes,
+    chequesRes, periodoRes, guiasRes, guiasPendientesRes, clientesRes, uploadsRes, prestamosRes,
     ventasMesRes, ventasPrevRes, cxcRes,
   ] = await Promise.all([
     supabaseServer.from("reclamos").select("*", { count: "exact", head: true })
@@ -30,6 +30,7 @@ export async function GET() {
     supabaseServer.from("cheques").select("fecha_deposito, monto").eq("estado", "pendiente"),
     supabaseServer.from("caja_periodos").select("fondo_inicial, id").eq("estado", "abierto").order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabaseServer.from("guia_transporte").select("*", { count: "exact", head: true }).gte("created_at", monthStart),
+    supabaseServer.from("guia_transporte").select("*", { count: "exact", head: true }).eq("estado", "Pendiente Bodega").eq("deleted", false),
     supabaseServer.from("directorio_clientes").select("*", { count: "exact", head: true }),
     supabaseServer.from("cxc_uploads").select("uploaded_at").order("uploaded_at", { ascending: false }).limit(1),
     supabaseServer.from("prestamos_movimientos").select("*", { count: "exact", head: true }).eq("estado", "pendiente_aprobacion"),
@@ -76,6 +77,7 @@ export async function GET() {
     cajaDisponible,
     cajaFondo: periodoAbierto?.fondo_inicial || null,
     guiasEsteMes: guiasRes.count || 0,
+    guiasPendientes: guiasPendientesRes.count || 0,
     totalClientes: clientesRes.count || 0,
     prestamosPendientes: prestamosRes.count || 0,
     cxcStale,
