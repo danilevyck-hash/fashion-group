@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabaseServer
     .from("reclamos")
     .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_seguimiento(*)")
+    .eq("deleted", false)
     .order("created_at", { ascending: false });
 
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }

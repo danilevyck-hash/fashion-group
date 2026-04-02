@@ -7,6 +7,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await supabaseServer
     .from("directorio_clientes")
     .select("*")
+    .eq("deleted", false)
     .order("nombre");
 
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }

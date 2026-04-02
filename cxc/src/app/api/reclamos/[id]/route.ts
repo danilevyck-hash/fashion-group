@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAdmin } from "@/lib/api-auth";
+import { logActivity } from "@/lib/log-activity";
+import { getSession } from "@/lib/require-auth";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -12,6 +14,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     .from("reclamos")
     .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_seguimiento(*)")
     .eq("id", id)
+    .eq("deleted", false)
     .single();
 
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
@@ -33,9 +36,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   if (seguimiento_nota) {
     await supabaseServer.from("reclamo_seguimiento").insert({
-      reclamo_id: id,
-      nota: seguimiento_nota,
-      autor: autor || "",
+      reclamo_id: id, nota: seguimiento_nota, autor: autor || "",
     });
   }
 
@@ -49,6 +50,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   }
 
+  const session = getSession(req);
+  await logActivity(session?.role || "unknown", "reclamo_edit", "reclamos", { reclamoId: id, fields: Object.keys(updates) }, session?.userName);
+
   return NextResponse.json({ ok: true });
 }
 
@@ -57,22 +61,15 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const { id } = params;
   if (!uuidRegex.test(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
-  // Check reclamo exists
-  const { data: existing } = await supabaseServer.from("reclamos").select("id").eq("id", id).maybeSingle();
+  const { data: existing } = await supabaseServer.from("reclamos").select("id, nro_reclamo, empresa").eq("id", id).maybeSingle();
   if (!existing) return NextResponse.json({ error: "Reclamo no encontrado" }, { status: 404 });
 
-  const { data: fotos } = await supabaseServer
-    .from("reclamo_fotos")
-    .select("storage_path")
-    .eq("reclamo_id", id);
-
-  if (fotos) {
-    for (const f of fotos) {
-      await supabaseServer.storage.from("reclamo-fotos").remove([f.storage_path]);
-    }
-  }
-
-  const { error } = await supabaseServer.from("reclamos").delete().eq("id", id);
+  // Soft delete
+  const { error } = await supabaseServer.from("reclamos").update({ deleted: true }).eq("id", id);
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
+
+  const session = getSession(req);
+  await logActivity(session?.role || "unknown", "reclamo_delete", "reclamos", { reclamoId: id, nro_reclamo: existing.nro_reclamo, empresa: existing.empresa }, session?.userName);
+
   return NextResponse.json({ ok: true });
 }

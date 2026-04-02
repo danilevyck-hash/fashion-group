@@ -5,6 +5,7 @@ export async function GET() {
   const { data, error } = await supabaseServer
     .from("caja_periodos")
     .select("*, caja_gastos(total)")
+    .eq("deleted", false)
     .order("numero", { ascending: false });
 
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }

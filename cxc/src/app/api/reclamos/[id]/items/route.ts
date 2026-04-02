@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { logActivity } from "@/lib/log-activity";
+import { getSession } from "@/lib/require-auth";
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const { items } = await req.json();
+
+  // Backup current items before replacing
+  const { data: backup } = await supabaseServer.from("reclamo_items").select("*").eq("reclamo_id", params.id);
+
   const { error: delErr } = await supabaseServer.from("reclamo_items").delete().eq("reclamo_id", params.id);
   if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
 
@@ -18,7 +24,18 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       motivo: String(item.motivo || "Faltante de Mercancía"),
     }));
     const { error: insErr } = await supabaseServer.from("reclamo_items").insert(rows);
-    if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+    if (insErr) {
+      // Restore backup if insert fails
+      if (backup && backup.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        await supabaseServer.from("reclamo_items").insert(backup.map(({ id, ...rest }) => rest));
+      }
+      return NextResponse.json({ error: insErr.message }, { status: 500 });
+    }
   }
+
+  const session = getSession(req);
+  await logActivity(session?.role || "unknown", "reclamo_items_update", "reclamos", { reclamoId: params.id, itemCount: items?.length || 0 }, session?.userName);
+
   return NextResponse.json({ ok: true });
 }
