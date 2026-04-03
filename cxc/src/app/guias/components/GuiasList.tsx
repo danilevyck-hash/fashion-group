@@ -69,12 +69,9 @@ export default function GuiasList({
 
   return (
     <div>
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex items-end justify-between mb-10">
-          <div>
-            <h1 className="text-xl font-light tracking-tight">Guias de Transporte</h1>
-            <p className="text-sm text-gray-400 mt-1">Registro de envios con transportistas</p>
-          </div>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-xl font-light tracking-tight">Guias de Transporte</h1>
           {canCreate && (
             <button
               onClick={onNewGuia}
@@ -117,7 +114,7 @@ export default function GuiasList({
           />
         ) : (
           <>
-            <div className="flex items-end gap-6 mb-6">
+            <div className="flex items-end gap-4 mb-4">
               <input
                 type="text"
                 value={search}

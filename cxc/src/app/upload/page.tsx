@@ -549,7 +549,7 @@ function UploadPageInner() {
   return (
     <div>
       <AppHeader module="Carga de Archivos" />
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-6">
 
         {/* Tab bar */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 mb-6 max-w-xs">

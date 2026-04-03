@@ -218,27 +218,27 @@ export default function PrestamosPage() {
     <div className="min-h-screen bg-white">
       <AppHeader module="Préstamos a Colaboradores" />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
-          <div className="bg-gray-50 rounded-xl p-4">
-            <div className="text-xs text-gray-400 uppercase tracking-wide">Total Prestado</div>
-            <div className="text-2xl font-semibold mt-1 tabular-nums">${fmt(totalPrestado)}</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
+          <div className="bg-gray-50 rounded-lg px-3 py-2.5">
+            <div className="text-[10px] text-gray-400 uppercase tracking-wide">Total Prestado</div>
+            <div className="text-lg font-semibold mt-0.5 tabular-nums">${fmt(totalPrestado)}</div>
           </div>
-          <div className="bg-gray-50 rounded-xl p-4">
-            <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo Pendiente Total</div>
-            <div className="text-2xl font-semibold mt-1 tabular-nums text-red-600">${fmt(totalSaldo)}</div>
+          <div className="bg-gray-50 rounded-lg px-3 py-2.5">
+            <div className="text-[10px] text-gray-400 uppercase tracking-wide">Saldo Pendiente</div>
+            <div className="text-lg font-semibold mt-0.5 tabular-nums text-red-600">${fmt(totalSaldo)}</div>
           </div>
-          <div className="bg-gray-50 rounded-xl p-4">
-            <div className="text-xs text-gray-400 uppercase tracking-wide">Empleados Activos</div>
-            <div className="text-2xl font-semibold mt-1 tabular-nums">{empleadosActivos}</div>
+          <div className="bg-gray-50 rounded-lg px-3 py-2.5">
+            <div className="text-[10px] text-gray-400 uppercase tracking-wide">Empleados Activos</div>
+            <div className="text-lg font-semibold mt-0.5 tabular-nums">{empleadosActivos}</div>
           </div>
-          <div className={`rounded-xl p-4 ${deduccionesCompletas ? "bg-green-50" : "bg-amber-50"}`}>
-            <div className="text-xs text-gray-400 uppercase tracking-wide">Deducciones Quincena</div>
-            <div className={`text-2xl font-semibold mt-1 tabular-nums ${deduccionesCompletas ? "text-green-600" : "text-amber-600"}`}>
+          <div className={`rounded-lg px-3 py-2.5 ${deduccionesCompletas ? "bg-green-50" : "bg-amber-50"}`}>
+            <div className="text-[10px] text-gray-400 uppercase tracking-wide">Deducciones Quincena</div>
+            <div className={`text-lg font-semibold mt-0.5 tabular-nums ${deduccionesCompletas ? "text-green-600" : "text-amber-600"}`}>
               {deduccionesAplicadas} / {deduccionesTotal}
             </div>
-            <div className="text-[11px] text-gray-400 mt-1">Quincena del {quincena.label}</div>
+            <div className="text-[10px] text-gray-400">{quincena.label}</div>
           </div>
         </div>
 

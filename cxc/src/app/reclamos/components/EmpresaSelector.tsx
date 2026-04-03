@@ -56,17 +56,14 @@ export default function EmpresaSelector({
   return (
     <div>
       <AppHeader module="Reclamos a Proveedores" />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex items-end justify-between mb-8">
-          <div>
-            <h1 className="text-xl font-light tracking-tight">Reclamos</h1>
-            <p className="text-sm text-gray-400 mt-1">Selecciona una empresa</p>
-          </div>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+        <div className="flex items-center justify-between mb-5">
+          <h1 className="text-xl font-light tracking-tight">Reclamos</h1>
           <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">Nuevo Reclamo</button>
         </div>
 
         {role === "admin" && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-5">
             <div className="border border-gray-100 rounded-xl p-4"><div className="text-xs text-gray-400 uppercase tracking-widest">Total Pendiente</div><div className="text-xl font-semibold mt-1 tabular-nums">${fmt(totalPendiente)}</div></div>
             <div className="border border-gray-100 rounded-xl p-4"><div className="text-xs text-gray-400 uppercase tracking-widest">Reclamos Abiertos</div><div className="text-xl font-semibold mt-1">{pendientes.length}</div></div>
             <div className={`border rounded-xl p-4 ${alertas > 0 ? "border-red-200 bg-red-50" : "border-gray-100"}`}><div className="text-xs text-gray-400 uppercase tracking-widest">Alertas +45 días</div><div className={`text-xl font-semibold mt-1 ${alertas > 0 ? "text-red-600" : ""}`}>{alertas}</div></div>
@@ -74,7 +71,7 @@ export default function EmpresaSelector({
         )}
 
         {/* Global search */}
-        <div className="mb-6">
+        <div className="mb-4">
           <input type="text" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)} placeholder="Buscar por N° factura, N° reclamo o empresa..." className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition max-w-md" />
         </div>
 

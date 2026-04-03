@@ -179,22 +179,17 @@ export default function PlantillasPage() {
 
   return (
     <div className={`min-h-screen ${darkMode ? "bg-gray-950 text-gray-100" : ""}`}>
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
       {/* Header */}
-      <div className="flex items-end justify-between mb-8">
-        <div>
-          <FGLogo variant="horizontal" theme="light" size={36} />
-        </div>
+      <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-4">
+          <FGLogo variant="horizontal" theme="light" size={30} />
+          <span className={`text-lg font-light ${darkMode ? "text-gray-100" : "text-gray-800"}`}>{getGreeting()}{displayName ? `, ${displayName}` : ""}</span>
+        </div>
+        <div className="flex items-center gap-3">
           <button onClick={() => { const next = !darkMode; setDarkMode(next); if (next) { document.documentElement.classList.add("dark"); localStorage.setItem("fg_dark_mode", "1"); } else { document.documentElement.classList.remove("dark"); localStorage.setItem("fg_dark_mode", "0"); } }} className="text-sm text-gray-400 hover:text-black transition px-1">{darkMode ? "☀" : "◑"}</button>
           <button onClick={() => { sessionStorage.clear(); router.push("/"); }} className="text-sm text-gray-400 hover:text-black transition">Salir</button>
         </div>
-      </div>
-
-      {/* Greeting */}
-      <div className="mb-8">
-        <h1 className={`text-2xl font-light ${darkMode ? "text-gray-100" : "text-gray-800"}`}>{getGreeting()}{displayName ? `, ${displayName}` : ""}</h1>
-        <p className="text-sm text-gray-400 mt-1">{getDateLabel()}</p>
       </div>
 
       {/* Global Search — admin, secretaria, director */}
@@ -205,24 +200,24 @@ export default function PlantillasPage() {
       {/* KPI Cards — admin and director only */}
       {(role === "admin" || role === "director") && (
         statsLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-            {[1,2,3,4].map(i => <div key={i} className="h-24 rounded-2xl bg-gray-50 animate-pulse" />)}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
+            {[1,2,3,4].map(i => <div key={i} className="h-20 rounded-xl bg-gray-50 animate-pulse" />)}
           </div>
         ) : stats ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
             {/* Ventas */}
-            <div className={`rounded-2xl p-4 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Ventas del mes</p>
-              <p className="text-xl font-semibold tabular-nums">${stats.ventasMes > 0 ? (stats.ventasMes / 1000).toFixed(0) + "K" : "—"}</p>
+            <div className={`rounded-xl px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
+              <p className="text-[10px] uppercase tracking-wider text-gray-400">Ventas del mes</p>
+              <p className="text-lg font-semibold tabular-nums mt-0.5">${stats.ventasMes > 0 ? (stats.ventasMes / 1000).toFixed(0) + "K" : "—"}</p>
               {stats.ventasPrev > 0 && stats.ventasMes > 0 ? (() => {
                 const pct = ((stats.ventasMes - stats.ventasPrev) / stats.ventasPrev * 100);
                 return <p className={`text-xs mt-1 ${pct >= 0 ? "text-green-600" : "text-red-500"}`}>{pct >= 0 ? "+" : ""}{pct.toFixed(0)}% vs mes anterior</p>;
               })() : <p className="text-xs text-gray-300 mt-1">—</p>}
             </div>
             {/* Reclamos */}
-            <div className={`rounded-2xl p-4 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Reclamos</p>
-              <p className="text-xl font-semibold tabular-nums">{stats.reclamosPendientes}</p>
+            <div className={`rounded-xl px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
+              <p className="text-[10px] uppercase tracking-wider text-gray-400">Reclamos</p>
+              <p className="text-lg font-semibold tabular-nums mt-0.5">{stats.reclamosPendientes}</p>
               <div className="flex items-center gap-2 mt-1">
                 {stats.reclamosViejos > 0 && <span className="text-xs text-red-500">{stats.reclamosViejos} +45d</span>}
                 {stats.reclamosResueltosEsteMes > 0 && <span className="text-xs text-green-600">{stats.reclamosResueltosEsteMes} resueltos</span>}
@@ -230,17 +225,17 @@ export default function PlantillasPage() {
               </div>
             </div>
             {/* CxC */}
-            <div className={`rounded-2xl p-4 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Cartera (CxC)</p>
-              <p className="text-xl font-semibold tabular-nums">${stats.cxcTotal > 0 ? (stats.cxcTotal / 1000).toFixed(0) + "K" : "—"}</p>
+            <div className={`rounded-xl px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
+              <p className="text-[10px] uppercase tracking-wider text-gray-400">CxC</p>
+              <p className="text-lg font-semibold tabular-nums mt-0.5">${stats.cxcTotal > 0 ? (stats.cxcTotal / 1000).toFixed(0) + "K" : "—"}</p>
               {stats.cxcVencida > 0
                 ? <p className="text-xs text-red-500 mt-1">${(stats.cxcVencida / 1000).toFixed(0)}K vencida</p>
                 : <p className="text-xs text-green-600 mt-1">Sin vencidos</p>}
             </div>
             {/* Cheques */}
-            <div className={`rounded-2xl p-4 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
-              <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-1">Cheques</p>
-              <p className="text-xl font-semibold tabular-nums">{stats.vencenEstaSemana}</p>
+            <div className={`rounded-xl px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
+              <p className="text-[10px] uppercase tracking-wider text-gray-400">Cheques</p>
+              <p className="text-lg font-semibold tabular-nums mt-0.5">{stats.vencenEstaSemana}</p>
               <p className="text-xs text-gray-400 mt-1">
                 {stats.chequesTotalPendiente > 0 ? `$${(stats.chequesTotalPendiente / 1000).toFixed(0)}K pendiente` : "—"}
               </p>
@@ -276,58 +271,33 @@ export default function PlantillasPage() {
 
       {/* Alerts */}
       {statsLoading ? (
-        <div className="mb-6 space-y-2">
-          {[1, 2].map(i => <div key={i} className="h-12 bg-gray-50 rounded-xl animate-pulse" />)}
-        </div>
+        <div className="mb-4 h-10 bg-gray-50 rounded-lg animate-pulse" />
       ) : alerts.length > 0 ? (
-        <div className="mb-6 space-y-2">
-          <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-2">Acciones de hoy</div>
+        <div className="mb-4 flex flex-wrap gap-2">
           {alerts.map((a, i) => (
             <button key={i} onClick={() => router.push(a.href)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition hover:shadow-sm ${
-                a.color === "red" ? "border-red-200 bg-red-50 hover:border-red-300" :
-                a.color === "yellow" ? "border-amber-200 bg-amber-50 hover:border-amber-300" :
-                "border-blue-200 bg-blue-50 hover:border-blue-300"
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium transition hover:shadow-sm ${
+                a.color === "red" ? "border-red-200 bg-red-50 text-red-700 hover:border-red-300" :
+                a.color === "yellow" ? "border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300" :
+                "border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300"
               }`}>
-              <span className={`text-lg ${
-                a.color === "red" ? "text-red-500" :
-                a.color === "yellow" ? "text-amber-500" :
-                "text-blue-500"
-              }`}>
-                {a.color === "red" ? "⚠" : a.color === "yellow" ? "⏳" : "📋"}
-              </span>
-              <span className={`text-sm flex-1 ${
-                a.color === "red" ? "text-red-700" :
-                a.color === "yellow" ? "text-amber-700" :
-                "text-blue-700"
-              }`}>{a.label}</span>
-              {a.count > 0 && (
-                <span className={`text-lg font-semibold tabular-nums ${
-                  a.color === "red" ? "text-red-600" :
-                  a.color === "yellow" ? "text-amber-600" :
-                  "text-blue-600"
-                }`}>{a.count}</span>
-              )}
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-300 flex-shrink-0"><polyline points="9 18 15 12 9 6"/></svg>
+              {a.count > 0 && <span className="font-bold tabular-nums">{a.count}</span>}
+              <span>{a.label}</span>
             </button>
           ))}
         </div>
       ) : stats ? (
-        <div className="mb-6 flex items-center gap-2 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
-          <span className="text-emerald-500 text-lg">✓</span>
-          <span className="text-sm text-emerald-700">Todo al día — sin alertas pendientes</span>
+        <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-700">
+          <span>✓</span> Todo al dia
         </div>
       ) : null}
 
       {/* Edit toggle */}
-      <div className="flex justify-end mb-3">
+      <div className="flex justify-end mb-2">
         {editMode ? (
-          <button onClick={saveOrder} className="text-xs bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 transition">Guardar orden</button>
+          <button onClick={saveOrder} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 transition">Guardar</button>
         ) : (
-          <button onClick={() => setEditMode(true)} className="text-xs text-gray-400 hover:text-black transition flex items-center gap-1">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-            Editar orden
-          </button>
+          <button onClick={() => setEditMode(true)} className="text-[11px] text-gray-400 hover:text-black transition">Editar orden</button>
         )}
       </div>
 
@@ -335,7 +305,7 @@ export default function PlantillasPage() {
       <DragDropContext onDragEnd={onDragEnd}>
         <Droppable droppableId="modules" direction="vertical">
           {(provided) => (
-            <div ref={provided.innerRef} {...provided.droppableProps} className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <div ref={provided.innerRef} {...provided.droppableProps} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
               {visibleModules.map((mod, index) => (
                 <Draggable key={mod.key} draggableId={mod.key} index={index} isDragDisabled={!editMode}>
                   {(prov, snapshot) => (
@@ -344,14 +314,14 @@ export default function PlantillasPage() {
                       {...prov.draggableProps}
                       {...(editMode ? prov.dragHandleProps : {})}
                       onClick={() => { if (!editMode) router.push(mod.href); }}
-                      className={`relative border rounded-2xl p-4 transition cursor-pointer select-none ${
+                      className={`relative border rounded-xl px-3 py-3 transition cursor-pointer select-none ${
                         snapshot.isDragging ? "shadow-lg border-gray-300 bg-white z-50" : `${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-100 hover:border-gray-300 hover:shadow-sm bg-white"}`
                       } ${editMode ? "cursor-grab active:cursor-grabbing" : ""}`}
                     >
                       {editMode && (
                         <span className="absolute top-2 right-2 text-gray-300 text-xs">⠿</span>
                       )}
-                      <div className="text-2xl mb-2 relative inline-block">
+                      <div className="text-xl mb-1.5 relative inline-block">
                         {mod.icon}
                         {(() => {
                           const badgeMap: Record<string, number> = {
@@ -371,8 +341,8 @@ export default function PlantillasPage() {
                           );
                         })()}
                       </div>
-                      <div className="text-sm font-medium">{mod.label}</div>
-                      <div className="text-xs text-gray-400 mt-0.5">{mod.subtitle}</div>
+                      <div className="text-[13px] font-medium leading-tight">{mod.label}</div>
+                      <div className="text-[11px] text-gray-400">{mod.subtitle}</div>
                     </div>
                   )}
                 </Draggable>

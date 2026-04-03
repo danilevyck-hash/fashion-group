@@ -254,12 +254,9 @@ export default function ChequesPage() {
   return (
     <div>
       <AppHeader module="Cheques Posfechados" />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-      <div className="flex items-end justify-between mb-8">
-        <div>
-          <h1 className="text-xl font-light tracking-tight">Cheques Posfechados</h1>
-          <p className="text-sm text-gray-400 mt-1">Gestión de cheques recibidos</p>
-        </div>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-xl font-light tracking-tight">Cheques Posfechados</h1>
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={exportPendientes} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-full transition">
             ↓ Exportar pendientes

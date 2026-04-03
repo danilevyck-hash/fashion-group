@@ -180,12 +180,9 @@ export default function DirectorioPage() {
   return (
     <div>
       <AppHeader module="Directorio de Clientes" />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <h1 className="text-xl font-light tracking-tight">Directorio</h1>
-          <p className="text-sm text-gray-400 mt-1">Contactos del grupo</p>
-        </div>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-xl font-light tracking-tight">Directorio</h1>
         <div className="flex flex-wrap items-center gap-3">
           <input
             ref={importRef}
