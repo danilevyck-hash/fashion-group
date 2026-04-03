@@ -7,6 +7,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import ReportExport from "./components/ReportExport";
 import ActivityLog from "./components/ActivityLog";
 import SearchBar from "@/components/SearchBar";
+import { useBadges } from "@/lib/hooks/useBadges";
 
 const ALL_MODULES = [
   { key: "cxc", label: "CXC", subtitle: "Cuentas por cobrar", icon: "📊", href: "/admin", roles: ["admin", "director", "vendedor"] },
@@ -48,6 +49,7 @@ export default function PlantillasPage() {
   const [editMode, setEditMode] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
+  const badges = useBadges();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -351,12 +353,23 @@ export default function PlantillasPage() {
                       )}
                       <div className="text-2xl mb-2 relative inline-block">
                         {mod.icon}
-                        {mod.key === "guias" && stats && stats.guiasPendientes > 0 && (
-                          <span className="absolute -top-1 -right-3 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{stats.guiasPendientes}</span>
-                        )}
-                        {mod.key === "prestamos" && stats && stats.prestamosPendientes > 0 && (
-                          <span className="absolute -top-1 -right-3 bg-blue-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">{stats.prestamosPendientes}</span>
-                        )}
+                        {(() => {
+                          const badgeMap: Record<string, number> = {
+                            cheques: badges.cheques,
+                            reclamos: badges.reclamos,
+                            prestamos: badges.prestamos,
+                            guias: badges.guias,
+                            cxc: badges.cxc,
+                            upload: badges.cxc, // upload page badge = stale CXC data
+                          };
+                          const count = badgeMap[mod.key] || 0;
+                          if (count === 0) return null;
+                          return (
+                            <span className="absolute -top-1.5 -right-3.5 bg-red-500 text-white text-[9px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center leading-none">
+                              {count > 99 ? "99+" : count}
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div className="text-sm font-medium">{mod.label}</div>
                       <div className="text-xs text-gray-400 mt-0.5">{mod.subtitle}</div>
