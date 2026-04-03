@@ -251,7 +251,7 @@ export default function PrestamosPage() {
             <span className="text-sm text-amber-700">
               Tienes <strong>{totalPendientes}</strong> préstamo{totalPendientes > 1 ? "s" : ""} pendiente{totalPendientes > 1 ? "s" : ""} de aprobación
             </span>
-            <span className="text-xs text-amber-500">{filterPendientes ? "Mostrar todos" : "Filtrar"} →</span>
+            <span className="text-xs font-medium text-amber-600">{filterPendientes ? "Ver todos los empleados" : "Ver pendientes de aprobar"} →</span>
           </button>
         )}
 

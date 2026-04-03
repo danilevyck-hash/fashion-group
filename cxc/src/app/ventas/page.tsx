@@ -97,10 +97,10 @@ function buildTable(rows: VentaRow[], prevRows: VentaRow[], vista: "mensual" | "
 
 export default function VentasDashboard() {
   const router = useRouter();
-  const { authChecked, role } = useAuth({ moduleKey: "ventas", allowedRoles: ["admin", "director"] });
+  const { authChecked, role } = useAuth({ moduleKey: "ventas", allowedRoles: ["admin", "director", "contabilidad"] });
 
   useEffect(() => {
-    if (authChecked && (role === "secretaria" || role === "secretaria")) router.push("/ventas/carga");
+    if (authChecked && role === "secretaria") router.push("/upload?tab=ventas");
   }, [authChecked, role, router]);
 
   const [año, setAño] = useState(new Date().getFullYear());

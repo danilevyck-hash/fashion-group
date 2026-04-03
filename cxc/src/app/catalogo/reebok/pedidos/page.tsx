@@ -32,7 +32,7 @@ export default function PedidosPage() {
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role") || "";
     if (!r) { router.push("/"); return; }
-    if (r === "cliente") { router.push("/catalogo/reebok"); return; }
+    // Clientes can see their own orders (filtered server-side by client name)
     setRole(r);
   }, [router]);
 

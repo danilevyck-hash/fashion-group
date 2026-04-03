@@ -133,8 +133,8 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
             {product.color && <><span className="text-[10px] text-gray-300">·</span><span className="text-[10px] text-gray-400">{product.color}</span></>}
           </div>
           <div className="flex items-center gap-2 mt-1.5">
-            <p className="text-base font-semibold text-black" title={product.price ? `$${product.price.toFixed(2)} × 12 pzas = $${(product.price * 12).toFixed(0)}/bulto` : ""}>
-              {product.price ? `$${product.price.toFixed(0)}` : "Consultar"}
+            <p className="text-base font-semibold text-black">
+              {product.price ? <>{`$${product.price.toFixed(0)}`}<span className="text-[11px] text-gray-400 font-normal ml-1">/unidad ({`$${(product.price * 12).toFixed(0)}`}/bulto)</span></> : "Consultar"}
             </p>
             {/* #13: Bigger badge */}
             {product.on_sale && <span className="text-[11px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">OFERTA</span>}

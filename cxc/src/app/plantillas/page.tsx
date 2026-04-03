@@ -10,7 +10,7 @@ import SearchBar from "@/components/SearchBar";
 import { useBadges } from "@/lib/hooks/useBadges";
 
 const ALL_MODULES = [
-  { key: "cxc", label: "CXC", subtitle: "Cuentas por cobrar", icon: "📊", href: "/admin", roles: ["admin", "director", "vendedor"] },
+  { key: "cxc", label: "Cuentas por Cobrar", subtitle: "Cartera de clientes", icon: "📊", href: "/admin", roles: ["admin", "secretaria", "director", "vendedor"] },
   { key: "upload", label: "Cargar CSV", subtitle: "Antigüedad de deuda", icon: "📤", href: "/upload", roles: ["admin", "secretaria"] },
   { key: "guias", label: "Guías", subtitle: "Transporte y despacho", icon: "🚚", href: "/guias", roles: ["admin", "secretaria", "bodega", "director"] },
   { key: "caja", label: "Caja Menuda", subtitle: "Control de gastos", icon: "💵", href: "/caja", roles: ["admin", "secretaria"] },
@@ -18,7 +18,7 @@ const ALL_MODULES = [
   { key: "cheques", label: "Cheques", subtitle: "Posfechados", icon: "🏦", href: "/cheques", roles: ["admin", "secretaria", "director"] },
   { key: "prestamos", label: "Préstamos", subtitle: "Colaboradores", icon: "🤝", href: "/prestamos", roles: ["admin", "contabilidad"] },
   { key: "reclamos", label: "Reclamos", subtitle: "Seguimiento", icon: "📝", href: "/reclamos", roles: ["admin", "secretaria", "director"] },
-  { key: "ventas", label: "Ventas", subtitle: "Mensuales", icon: "📈", href: "/ventas", roles: ["admin", "director"] },
+  { key: "ventas", label: "Ventas", subtitle: "Mensuales", icon: "📈", href: "/ventas", roles: ["admin", "director", "contabilidad"] },
   { key: "reebok", label: "Catálogo Reebok", subtitle: "Productos y pedidos", icon: "👟", href: "/catalogo/reebok", roles: ["admin", "vendedor", "cliente", "secretaria"] },
   { key: "camisetas", label: "Camisetas Selección", subtitle: "Pedidos y stock", icon: "👕", href: "/camisetas", roles: ["admin", "vendedor"] },
   { key: "usuarios", label: "Usuarios", subtitle: "Permisos y accesos", icon: "👥", href: "/admin/usuarios", roles: ["admin"] },

@@ -126,7 +126,7 @@ function buildVendorMsg(vendorName: string, companyName: string, brand: string, 
 // ── Main Component ───────────────────────────────────────
 
 export default function AdminDashboard() {
-  const { authChecked, role: userRole } = useAuth({ moduleKey: "admin", allowedRoles: ["admin"] });
+  const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "director"] });
   const { clients, uploads, contactLog, loading, loadError, loadData, setContactLog } = useAdminData();
   const [search, setSearch] = useState("");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
