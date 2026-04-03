@@ -19,6 +19,8 @@ interface GuiaEmail {
   numero_guia_transp?: string;
   firma_base64?: string;
   firma_entregador_base64?: string;
+  tipo_despacho?: string;
+  nombre_chofer?: string;
   guia_items: { cliente: string; direccion?: string; empresa: string; bultos: number; facturas: string }[];
 }
 
@@ -79,28 +81,34 @@ async function sendDispatchEmail(guia: GuiaEmail, dispatchedBy: string) {
       if (guia.observaciones) doc.text(guia.observaciones, 16, fy + 7, { maxWidth: W - 32 });
       fy += 20;
 
+      const isDirect = guia.tipo_despacho === "directo";
       doc.setFont("helvetica", "bold");
-      doc.text("ENTREGADO POR", 14, fy);
-      doc.text("RECIBIDO CONFORME — TRANSPORTISTA", 110, fy);
+      doc.text(isDirect ? "CHOFER" : "ENTREGADO POR", 14, fy);
+      doc.text(isDirect ? "RECIBIDO POR — CLIENTE" : "RECIBIDO CONFORME — TRANSPORTISTA", 110, fy);
       fy += 6;
       doc.setFont("helvetica", "normal");
-      doc.text(`NOMBRE: ${guia.entregado_por || "________________"}`, 14, fy);
-      doc.text(`PLACA: ${guia.placa || "________________"}`, 110, fy);
+      doc.text(`NOMBRE: ${isDirect ? (guia.nombre_chofer || "________________") : (guia.entregado_por || "________________")}`, 14, fy);
+      if (!isDirect) doc.text(`PLACA: ${guia.placa || "________________"}`, 110, fy);
+      else doc.text(`NOMBRE: ${guia.receptor_nombre || "________________"}`, 110, fy);
       fy += 5;
       doc.text("FIRMA: ________________", 14, fy);
-      doc.text(`NOMBRE: ${guia.receptor_nombre || "________________"}`, 110, fy);
+      if (!isDirect) doc.text(`NOMBRE: ${guia.receptor_nombre || "________________"}`, 110, fy);
+      else doc.text(`CEDULA: ${guia.cedula || "________________"}`, 110, fy);
       fy += 5;
       doc.text("", 14, fy);
-      doc.text(`CÉDULA: ${guia.cedula || "________________"}`, 110, fy);
+      if (!isDirect) doc.text(`CEDULA: ${guia.cedula || "________________"}`, 110, fy);
+      else doc.text("FIRMA: ________________", 110, fy);
       fy += 5;
-      doc.text("", 14, fy);
-      doc.text("FIRMA: ________________", 110, fy);
+      if (!isDirect) {
+        doc.text("", 14, fy);
+        doc.text("FIRMA: ________________", 110, fy);
+      }
 
       if (guia.firma_entregador_base64) {
         try { doc.addImage(guia.firma_entregador_base64, "PNG", 14, fy - 12, 40, 15); } catch { /* */ }
       }
       if (guia.firma_base64) {
-        try { doc.addImage(guia.firma_base64, "PNG", 145, fy - 7, 40, 15); } catch { /* */ }
+        try { doc.addImage(guia.firma_base64, "PNG", 145, fy - (isDirect ? 12 : 7), 40, 15); } catch { /* */ }
       }
       fy += 12;
 
@@ -111,14 +119,16 @@ async function sendDispatchEmail(guia: GuiaEmail, dispatchedBy: string) {
       pdfBuffer = Buffer.from(doc.output("arraybuffer"));
     } catch { /* PDF failed */ }
 
+    const tipoLabel = guia.tipo_despacho === "directo" ? "Entrega directa" : "Transportista externo";
     const emailOptions: { from: string; to: string[]; subject: string; html: string; attachments?: { filename: string; content: Buffer }[] } = {
       from: "Fashion Group <notificaciones@fashiongr.com>",
       to: ["daniel@fashiongr.com", "info@fashiongr.com"],
-      subject: `✅ Guía #${guia.numero} despachada — ${guia.transportista}`,
-      html: `<h2 style="color:#1a1a1a">Guía #${guia.numero} despachada</h2>
-        <p><strong>Transportista:</strong> ${guia.transportista} | <strong>Placa:</strong> ${guia.placa || "Sin placa"} | <strong>Receptor:</strong> ${guia.receptor_nombre || "—"} | <strong>Total:</strong> ${totalB} bultos</p>
+      subject: `Guia #${guia.numero} despachada — ${guia.transportista}`,
+      html: `<h2 style="color:#1a1a1a">Guia #${guia.numero} despachada</h2>
+        <p><strong>Tipo:</strong> ${tipoLabel} | <strong>Transportista:</strong> ${guia.transportista} | <strong>Placa:</strong> ${guia.placa || "N/A"} | <strong>Receptor:</strong> ${guia.receptor_nombre || "—"} | <strong>Total:</strong> ${totalB} bultos</p>
+        ${guia.nombre_chofer ? `<p><strong>Chofer:</strong> ${guia.nombre_chofer}</p>` : ""}
         <p><strong>Items:</strong></p><p>${itemsHtml || "Sin items"}</p>
-        <p style="color:#888;font-size:12px;margin-top:16px">Fashion Group Panamá — Despachado por ${dispatchedBy}</p>`,
+        <p style="color:#888;font-size:12px;margin-top:16px">Fashion Group Panama — Despachado por ${dispatchedBy}</p>`,
     };
     if (pdfBuffer) {
       emailOptions.attachments = [{ filename: `Guia-${guia.numero}.pdf`, content: pdfBuffer }];
@@ -149,7 +159,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const { id } = params;
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const body = await req.json();
-  const { fecha, transportista, placa, observaciones, items, monto_total, estado, receptor_nombre, cedula, firma_base64, firma_entregador_base64, entregado_por, numero_guia_transp } = body;
+  const { fecha, transportista, placa, observaciones, items, monto_total, estado, receptor_nombre, cedula, firma_base64, firma_entregador_base64, entregado_por, numero_guia_transp, tipo_despacho, nombre_chofer } = body;
 
   if (estado && (estado === "Completada" || estado === "Despachada")) {
     const { data: currentItems } = await supabaseServer.from("guia_items").select("bultos").eq("guia_id", id).eq("deleted", false);
@@ -176,6 +186,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (entregado_por !== undefined) updateData.entregado_por = entregado_por;
   if (numero_guia_transp !== undefined) updateData.numero_guia_transp = numero_guia_transp;
   if (firma_entregador_base64 !== undefined) updateData.firma_entregador_base64 = firma_entregador_base64;
+  if (tipo_despacho !== undefined) updateData.tipo_despacho = tipo_despacho;
+  if (nombre_chofer !== undefined) updateData.nombre_chofer = nombre_chofer;
 
   const { error: guiaErr } = await supabaseServer.from("guia_transporte").update(updateData).eq("id", id);
   if (guiaErr) return NextResponse.json({ error: guiaErr.message }, { status: 500 });
@@ -220,7 +232,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   if (!UUID_RE.test(params.id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const body = await req.json();
-  const allowed = ["placa", "observaciones", "estado", "receptor_nombre", "cedula", "firma_base64", "firma_entregador_base64", "entregado_por", "numero_guia_transp", "nombre_entregador", "cedula_entregador", "firma_transportista"];
+  const allowed = ["placa", "observaciones", "estado", "receptor_nombre", "cedula", "firma_base64", "firma_entregador_base64", "entregado_por", "numero_guia_transp", "nombre_entregador", "cedula_entregador", "firma_transportista", "tipo_despacho", "nombre_chofer"];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
     if (body[key] !== undefined) update[key] = body[key];

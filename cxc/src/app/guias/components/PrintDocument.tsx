@@ -8,6 +8,7 @@ interface PrintDocumentProps {
 export default function PrintDocument({ guia: g }: PrintDocumentProps) {
   const guiaItems = g.guia_items || [];
   const bultos = guiaItems.reduce((s, i) => s + (i.bultos || 0), 0);
+  const isDirect = g.tipo_despacho === "directo";
 
   return (
     <>
@@ -40,12 +41,12 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
         style={{ fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif" }}
       >
         <h1 className="text-center text-lg font-bold mb-6 uppercase tracking-wide">
-          Guía de Transporte Interior
+          Guia de Transporte Interior
         </h1>
 
         <div className="print-header grid grid-cols-2 gap-4 mb-4 text-sm">
           <div className="flex gap-2">
-            <span className="font-medium">N° GUÍA:</span>
+            <span className="font-medium">N GUIA:</span>
             <span className="border-b border-gray-300 flex-1 text-center">{g.numero}</span>
           </div>
           <div className="flex gap-2">
@@ -57,7 +58,7 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
             <span className="border-b border-gray-300 flex-1 text-center">{g.transportista}</span>
           </div>
           <div className="flex gap-2">
-            <span className="font-medium">PLACA / VEHÍCULO:</span>
+            <span className="font-medium">PLACA / VEHICULO:</span>
             <span className="border-b border-gray-300 flex-1 text-center">
               {g.placa || "\u00A0"}
             </span>
@@ -68,11 +69,25 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
               {g.entregado_por || "\u00A0"}
             </span>
           </div>
+          <div className="flex gap-2">
+            <span className="font-medium">TIPO:</span>
+            <span className="border-b border-gray-300 flex-1 text-center">
+              {isDirect ? "Entrega directa" : "Transportista externo"}
+            </span>
+          </div>
           {g.numero_guia_transp && (
             <div className="flex gap-2">
-              <span className="font-medium">N° GUÍA TRANSP.:</span>
+              <span className="font-medium">N GUIA TRANSP.:</span>
               <span className="border-b border-gray-300 flex-1 text-center">
                 {g.numero_guia_transp}
+              </span>
+            </div>
+          )}
+          {isDirect && g.nombre_chofer && (
+            <div className="flex gap-2">
+              <span className="font-medium">CHOFER:</span>
+              <span className="border-b border-gray-300 flex-1 text-center">
+                {g.nombre_chofer}
               </span>
             </div>
           )}
@@ -85,11 +100,11 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
             <tr className="bg-gray-100">
               <th className="border border-gray-300 px-2 py-1.5 font-medium w-8">#</th>
               <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">CLIENTE</th>
-              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">DIRECCIÓN</th>
+              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">DIRECCION</th>
               <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">EMPRESA</th>
               <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">FACTURA(S)</th>
               <th className="border border-gray-300 px-2 py-1.5 font-medium w-16 text-center">BULTOS</th>
-              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">N° GUÍA TRANSP.</th>
+              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">N GUIA TRANSP.</th>
             </tr>
           </thead>
           <tbody>
@@ -115,60 +130,75 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
         </table>
 
         <div className="print-obs mb-8 text-xs">
-          <div className="font-medium uppercase mb-1">Observaciones Generales del Envío</div>
+          <div className="font-medium uppercase mb-1">Observaciones Generales del Envio</div>
           <div className="border border-gray-300 rounded p-2 min-h-[40px] whitespace-pre-wrap">
             {g.observaciones || ""}
           </div>
         </div>
 
         <div className="print-signatures grid grid-cols-2 gap-12 mt-12 text-xs">
+          {/* Left column */}
           <div>
-            <div className="font-medium uppercase mb-6">Entregado por</div>
+            <div className="font-medium uppercase mb-6">
+              {isDirect ? "Chofer" : "Entregado por"}
+            </div>
             <div className="mb-4">
-              NOMBRE: <span className="ml-1 font-medium">{g.entregado_por || ""}</span>
-              {!g.entregado_por && <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>}
+              NOMBRE:{" "}
+              <span className="ml-1 font-medium">
+                {isDirect ? (g.nombre_chofer || "") : (g.entregado_por || "")}
+              </span>
+              {!(isDirect ? g.nombre_chofer : g.entregado_por) && (
+                <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>
+              )}
             </div>
             <div>
               FIRMA:{" "}
-              {g.firma_entregador_base64 ? (
-                <img src={g.firma_entregador_base64} alt="Firma entregador" style={{ height: 40 }} className="inline-block ml-1" />
+              {g.firma_base64 ? (
+                <img src={g.firma_base64} alt="Firma" style={{ height: 40 }} className="inline-block ml-1" />
               ) : (
                 <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>
               )}
             </div>
             <div className="text-gray-400 mt-2 italic">Nombre y firma</div>
           </div>
+          {/* Right column */}
           <div>
-            <div className="font-medium uppercase mb-6">Recibido Conforme — Transportista</div>
-            {g.placa ? (
-              <>
-                <div className="mb-4">PLACA: <span className="ml-1 font-medium">{g.placa}</span></div>
-                <div className="mb-4">NOMBRE: <span className="ml-1 font-medium">{g.receptor_nombre || ""}</span></div>
-                <div className="mb-4">CÉDULA: <span className="ml-1 font-medium">{g.cedula || ""}</span></div>
-                <div>
-                  FIRMA:{" "}
-                  {g.firma_base64 ? (
-                    <img src={g.firma_base64} alt="Firma" style={{ height: 40 }} className="inline-block ml-1" />
-                  ) : (
-                    <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="mb-4">NOMBRE: <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span></div>
-                <div className="mb-4">CÉDULA: <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span></div>
-                <div>FIRMA: <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span></div>
-              </>
+            <div className="font-medium uppercase mb-6">
+              {isDirect ? "Recibido por — Cliente" : "Recibido Conforme — Transportista"}
+            </div>
+            {!isDirect && (
+              <div className="mb-4">
+                PLACA:{" "}
+                <span className="ml-1 font-medium">{g.placa || ""}</span>
+                {!g.placa && <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>}
+              </div>
             )}
-            <div className="text-gray-400 mt-2 italic">Nombre, cédula y firma</div>
+            <div className="mb-4">
+              NOMBRE:{" "}
+              <span className="ml-1 font-medium">{g.receptor_nombre || ""}</span>
+              {!g.receptor_nombre && <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>}
+            </div>
+            <div className="mb-4">
+              CEDULA:{" "}
+              <span className="ml-1 font-medium">{g.cedula || ""}</span>
+              {!g.cedula && <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>}
+            </div>
+            <div>
+              FIRMA:{" "}
+              {g.firma_entregador_base64 ? (
+                <img src={g.firma_entregador_base64} alt="Firma" style={{ height: 40 }} className="inline-block ml-1" />
+              ) : (
+                <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>
+              )}
+            </div>
+            <div className="text-gray-400 mt-2 italic">Nombre, cedula y firma</div>
           </div>
         </div>
 
         <div className="print-footer mt-8 pt-4 border-t border-gray-200 text-[9px] text-gray-400 text-center leading-relaxed">
-          La firma del transportista constituye aceptación expresa de la mercancía detallada en este
-          documento, en la cantidad y condición indicadas. Cualquier faltante o daño no reportado al
-          momento de la recepción será responsabilidad exclusiva del transportista.
+          La firma del transportista constituye aceptacion expresa de la mercancia detallada en este
+          documento, en la cantidad y condicion indicadas. Cualquier faltante o dano no reportado al
+          momento de la recepcion sera responsabilidad exclusiva del transportista.
         </div>
       </div>
     </>

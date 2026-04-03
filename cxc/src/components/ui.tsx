@@ -192,7 +192,7 @@ const STATUS_COLORS: Record<string, string> = {
   // Blue: active/open/sent
   activo: "blue", abierto: "blue", "Enviado": "blue",
   // Green: completed/resolved/deposited
-  depositado: "green", aprobado: "green", "Resuelto con NC": "green", cerrado: "green", "Aplicada": "green", "Entregado": "green",
+  depositado: "green", aprobado: "green", "Resuelto con NC": "green", cerrado: "green", "Aplicada": "green", "Entregado": "green", despachada: "green",
   // Red: rejected/expired/bounced
   rechazado: "red", "Rechazado": "red", vencido: "red", rebotado: "red", archivado: "red",
   // Purple: in review

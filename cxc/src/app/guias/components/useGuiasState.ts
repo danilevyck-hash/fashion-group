@@ -26,6 +26,11 @@ export function useGuiasState() {
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
 
+  // Accordion expanded row
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedGuia, setExpandedGuia] = useState<Guia | null>(null);
+  const [expandedLoading, setExpandedLoading] = useState(false);
+
   // Dynamic lists
   const [transportistas, setTransportistas] = useState<string[]>(DEFAULT_TRANSPORTISTAS);
   const [clientes, setClientes] = useState<string[]>(DEFAULT_CLIENTES);
@@ -56,14 +61,17 @@ export function useGuiasState() {
   // Confirm delete state
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Detail / print state
-  const [printGuia, setPrintGuia] = useState<Guia | null>(null);
+  // Despacho state
   const [bPlaca, setBPlaca] = useState("");
   const [bReceptor, setBReceptor] = useState("");
   const [bCedula, setBCedula] = useState("");
+  const [bChofer, setBChofer] = useState("");
   const [bSaving, setBSaving] = useState(false);
   const [showPending, setShowPending] = useState(false);
-  const [showPostDespacho, setShowPostDespacho] = useState(false);
+  const [tipoDespacho, setTipoDespacho] = useState<"externo" | "directo">("externo");
+
+  // Print state
+  const [printGuia, setPrintGuia] = useState<Guia | null>(null);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -109,11 +117,48 @@ export function useGuiasState() {
       setGuias(data);
       setNextNumero(data.length > 0 ? data[0].numero + 1 : 1);
     } catch {
-      setError("Error al cargar guías");
+      setError("Error al cargar guias");
     } finally {
       setLoading(false);
     }
   }, []);
+
+  // ── Accordion expand/collapse ──
+
+  async function toggleExpand(id: string) {
+    if (expandedId === id) {
+      setExpandedId(null);
+      setExpandedGuia(null);
+      resetDespachoFields();
+      return;
+    }
+    setExpandedId(id);
+    setExpandedLoading(true);
+    try {
+      const res = await fetch(`/api/guias/${id}`);
+      if (res.ok) {
+        const g = await res.json();
+        setExpandedGuia(g);
+        // Pre-fill despacho fields if already dispatched
+        setBPlaca(g.placa || "");
+        setBReceptor(g.receptor_nombre || "");
+        setBCedula(g.cedula || "");
+        setBChofer(g.nombre_chofer || "");
+        setTipoDespacho(g.tipo_despacho || "externo");
+      }
+    } catch { /* */ }
+    setExpandedLoading(false);
+  }
+
+  function resetDespachoFields() {
+    setBPlaca("");
+    setBReceptor("");
+    setBCedula("");
+    setBChofer("");
+    setTipoDespacho("externo");
+  }
+
+  // ── Delete ──
 
   function requestDeleteGuia(id: string) {
     setConfirmDeleteId(id);
@@ -123,23 +168,24 @@ export function useGuiasState() {
     if (!confirmDeleteId) return;
     await fetch(`/api/guias/${confirmDeleteId}`, { method: "DELETE" });
     setConfirmDeleteId(null);
+    setExpandedId(null);
+    setExpandedGuia(null);
     loadGuias();
-    setView("list");
   }
 
-  async function viewGuia(id: string) {
+  // ── Print ──
+
+  async function openPrint(id: string) {
     const res = await fetch(`/api/guias/${id}`);
     if (res.ok) {
       const g = await res.json();
       setPrintGuia(g);
-      setBPlaca(g.placa || "");
-      setBReceptor(g.receptor_nombre || "");
-      setBCedula(g.cedula || "");
-      setShowPostDespacho(false);
       _setView("print");
       window.history.pushState({ guiaId: id }, "", `/guias?id=${id}`);
     }
   }
+
+  // ── Edit ──
 
   async function startEdit(id: string) {
     const res = await fetch(`/api/guias/${id}`);
@@ -265,8 +311,8 @@ export function useGuiasState() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            subject: `📦 Nueva Guía #${guia.numero} — Pendiente Bodega`,
-            body: `<h2>Guía #${guia.numero}</h2><p><strong>Transportista:</strong> ${transp}</p><p><strong>Total bultos:</strong> ${totalB}</p><p>Pendiente de completar en bodega.</p>`,
+            subject: `Nueva Guia #${guia.numero} — Pendiente Bodega`,
+            body: `<h2>Guia #${guia.numero}</h2><p><strong>Transportista:</strong> ${transp}</p><p><strong>Total bultos:</strong> ${totalB}</p><p>Pendiente de completar en bodega.</p>`,
           }),
         }).catch(() => {});
       }
@@ -279,47 +325,53 @@ export function useGuiasState() {
     setSaving(false);
   }
 
-  async function confirmarDespacho(
-    placa: string,
-    receptor: string,
-    cedula: string,
-    firma_base64: string,
-    firma_entregador_base64: string,
-  ) {
-    if (!printGuia) return;
+  // ── Despacho (always with signatures) ──
+
+  async function confirmarDespacho(firma1: string, firma2: string) {
+    if (!expandedGuia) return;
     setBSaving(true);
-    const res = await fetch(`/api/guias/${printGuia.id}`, {
+
+    const payload: Record<string, unknown> = {
+      estado: "Completada",
+      tipo_despacho: tipoDespacho,
+      receptor_nombre: bReceptor,
+      cedula: bCedula,
+      firma_base64: firma1,
+      firma_entregador_base64: firma2,
+    };
+
+    if (tipoDespacho === "externo") {
+      payload.placa = bPlaca;
+    } else {
+      payload.nombre_chofer = bChofer;
+    }
+
+    const res = await fetch(`/api/guias/${expandedGuia.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        placa,
-        receptor_nombre: receptor,
-        cedula,
-        firma_base64,
-        firma_entregador_base64,
-        estado: "Completada",
-      }),
+      body: JSON.stringify(payload),
     });
+
     if (res.ok) {
-      const bultos = (printGuia.guia_items || []).reduce((s, i) => s + (i.bultos || 0), 0);
+      const bultos = (expandedGuia.guia_items || []).reduce((s, i) => s + (i.bultos || 0), 0);
       fetch("/api/guias/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          subject: `✅ Guía #${printGuia.numero} completada — Lista para imprimir`,
-          body: `<h2>Guía #${printGuia.numero}</h2><p><strong>Transportista:</strong> ${printGuia.transportista}</p><p><strong>Placa:</strong> ${placa}</p><p><strong>Receptor:</strong> ${receptor}</p><p><strong>Total bultos:</strong> ${bultos}</p>`,
+          subject: `Guia #${expandedGuia.numero} completada — ${tipoDespacho === "externo" ? "Transportista" : "Entrega directa"}`,
+          body: `<h2>Guia #${expandedGuia.numero}</h2><p><strong>Transportista:</strong> ${expandedGuia.transportista}</p><p><strong>Tipo:</strong> ${tipoDespacho === "externo" ? "Transportista externo" : "Entrega directa"}</p><p><strong>Total bultos:</strong> ${bultos}</p>`,
         }),
       }).catch(() => {});
-      const fullRes = await fetch(`/api/guias/${printGuia.id}`);
+
+      showToast(`Guia #${expandedGuia.numero} despachada`);
+
+      // Refresh expanded guia
+      const fullRes = await fetch(`/api/guias/${expandedGuia.id}`);
       if (fullRes.ok) {
         const updated = await fullRes.json();
-        setPrintGuia(updated);
-        setBPlaca(updated.placa || "");
-        setBReceptor(updated.receptor_nombre || "");
-        setBCedula(updated.cedula || "");
+        setExpandedGuia(updated);
       }
       loadGuias();
-      setShowPostDespacho(true);
     } else {
       const errData = await res.json().catch(() => ({}));
       showToast(errData.error || "Error al guardar");
@@ -335,6 +387,8 @@ export function useGuiasState() {
     search, setSearch,
     monthFilter, setMonthFilter,
     showPending, setShowPending,
+    // accordion
+    expandedId, expandedGuia, expandedLoading, toggleExpand,
     // dynamic lists
     transportistas, clientes, direcciones, empresas,
     addTransportista, addCliente, addDireccion, addEmpresa,
@@ -351,18 +405,19 @@ export function useGuiasState() {
     validationErrors,
     updateItem, addRow, removeRow, resetForm,
     saveGuia,
-    // detail
-    printGuia, setPrintGuia,
+    // despacho
+    tipoDespacho, setTipoDespacho,
     bPlaca, setBPlaca,
     bReceptor, setBReceptor,
     bCedula, setBCedula,
+    bChofer, setBChofer,
     bSaving,
-    showPostDespacho, setShowPostDespacho,
-    toast,
-    showToast,
+    // print
+    printGuia, setPrintGuia, openPrint,
+    // toast
+    toast, showToast,
     // actions
     loadGuias,
-    viewGuia,
     startEdit,
     confirmDeleteId, setConfirmDeleteId,
     requestDeleteGuia, confirmDeleteGuia,

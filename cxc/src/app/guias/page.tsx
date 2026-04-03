@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { ConfirmModal } from "@/components/ui";
+import { ConfirmModal, Toast } from "@/components/ui";
 import { useGuiasState } from "./components/useGuiasState";
 import GuiasList from "./components/GuiasList";
 import GuiaForm from "./components/GuiaForm";
@@ -30,7 +30,7 @@ export default function GuiasPage() {
       const params = new URLSearchParams(window.location.search);
       const id = params.get("id");
       if (id) {
-        s.viewGuia(id);
+        s.openPrint(id);
       } else {
         s._setView("list");
         s.setPrintGuia(null);
@@ -39,7 +39,7 @@ export default function GuiasPage() {
     window.addEventListener("popstate", onPopState);
     const params = new URLSearchParams(window.location.search);
     const urlId = params.get("id");
-    if (urlId && authChecked) s.viewGuia(urlId);
+    if (urlId && authChecked) s.openPrint(urlId);
     return () => window.removeEventListener("popstate", onPopState);
   }, [authChecked]);
 
@@ -49,7 +49,7 @@ export default function GuiasPage() {
   if (s.view === "list") {
     return (
       <div>
-        <AppHeader module="Guías de Transporte" />
+        <AppHeader module="Guias de Transporte" />
         <GuiasList
           guias={s.guias}
           loading={s.loading}
@@ -61,13 +61,38 @@ export default function GuiasPage() {
           showPending={s.showPending}
           setShowPending={s.setShowPending}
           role={role}
-          onNewGuia={() => {
-            s.resetForm();
-            s.setView("form");
-          }}
-          onViewGuia={s.viewGuia}
-          onReload={s.loadGuias}
+          onNewGuia={() => { s.resetForm(); s.setView("form"); }}
+          expandedId={s.expandedId}
+          expandedGuia={s.expandedGuia}
+          expandedLoading={s.expandedLoading}
+          onToggleExpand={s.toggleExpand}
+          tipoDespacho={s.tipoDespacho}
+          setTipoDespacho={s.setTipoDespacho}
+          bPlaca={s.bPlaca}
+          setBPlaca={s.setBPlaca}
+          bReceptor={s.bReceptor}
+          setBReceptor={s.setBReceptor}
+          bCedula={s.bCedula}
+          setBCedula={s.setBCedula}
+          bChofer={s.bChofer}
+          setBChofer={s.setBChofer}
+          bSaving={s.bSaving}
+          onConfirmarDespacho={s.confirmarDespacho}
+          showToast={s.showToast}
+          onEdit={s.startEdit}
+          onPrint={s.openPrint}
+          onDelete={s.requestDeleteGuia}
         />
+        <ConfirmModal
+          open={!!s.confirmDeleteId}
+          onClose={() => s.setConfirmDeleteId(null)}
+          onConfirm={s.confirmDeleteGuia}
+          title="Eliminar guia"
+          message="Esta accion no se puede deshacer."
+          confirmLabel="Eliminar"
+          destructive
+        />
+        <Toast message={s.toast} />
       </div>
     );
   }
@@ -104,47 +129,18 @@ export default function GuiasPage() {
         onAddRow={s.addRow}
         onRemoveRow={s.removeRow}
         onSave={s.saveGuia}
-        onCancel={() => {
-          s.setView("list");
-          s.resetForm();
-        }}
+        onCancel={() => { s.setView("list"); s.resetForm(); }}
       />
     );
   }
 
-  // ── PRINT / DETAIL VIEW ──
+  // ── PRINT VIEW ──
   if (s.view === "print" && s.printGuia) {
     return (
-      <>
-        <GuiaDetail
-          guia={s.printGuia}
-          role={role}
-          bPlaca={s.bPlaca}
-          setBPlaca={s.setBPlaca}
-          bReceptor={s.bReceptor}
-          setBReceptor={s.setBReceptor}
-          bCedula={s.bCedula}
-          setBCedula={s.setBCedula}
-          bSaving={s.bSaving}
-          showPostDespacho={s.showPostDespacho}
-          setShowPostDespacho={s.setShowPostDespacho}
-          toast={s.toast}
-          onBack={() => { s.loadGuias(); s.setView("list"); }}
-          onEdit={s.startEdit}
-          onDelete={s.requestDeleteGuia}
-          onConfirmarDespacho={s.confirmarDespacho}
-          showToast={s.showToast}
-        />
-        <ConfirmModal
-          open={!!s.confirmDeleteId}
-          onClose={() => s.setConfirmDeleteId(null)}
-          onConfirm={s.confirmDeleteGuia}
-          title="Eliminar guía"
-          message="¿Eliminar esta guía? Esta acción no se puede deshacer."
-          confirmLabel="Eliminar"
-          destructive
-        />
-      </>
+      <GuiaDetail
+        guia={s.printGuia}
+        onBack={() => { s.loadGuias(); s.setView("list"); }}
+      />
     );
   }
 

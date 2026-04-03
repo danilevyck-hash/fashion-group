@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { fmtDate } from "@/lib/format";
 import type { Guia, GuiaItem } from "./types";
 import { clientesSummary, getMonthOptions } from "./constants";
 import { SkeletonTable, EmptyState, StatusBadge } from "@/components/ui";
+import DespachoForm from "./DespachoForm";
 
 interface GuiasListProps {
   guias: Guia[];
@@ -18,107 +18,86 @@ interface GuiasListProps {
   setShowPending: (v: boolean) => void;
   role: string | null;
   onNewGuia: () => void;
-  onViewGuia: (id: string) => void;
-  onReload?: () => void;
+  // Accordion
+  expandedId: string | null;
+  expandedGuia: Guia | null;
+  expandedLoading: boolean;
+  onToggleExpand: (id: string) => void;
+  // Despacho
+  tipoDespacho: "externo" | "directo";
+  setTipoDespacho: (v: "externo" | "directo") => void;
+  bPlaca: string;
+  setBPlaca: (v: string) => void;
+  bReceptor: string;
+  setBReceptor: (v: string) => void;
+  bCedula: string;
+  setBCedula: (v: string) => void;
+  bChofer: string;
+  setBChofer: (v: string) => void;
+  bSaving: boolean;
+  onConfirmarDespacho: (firma1: string, firma2: string) => void;
+  showToast: (msg: string) => void;
+  // Actions
+  onEdit: (id: string) => void;
+  onPrint: (id: string) => void;
+  onDelete: (id: string) => void;
 }
 
-const DISPATCH_ROLES = ["admin", "secretaria", "director"];
+const DESPACHO_ROLES = ["admin", "secretaria", "bodega", "director"];
+const CREATE_ROLES = ["admin", "secretaria", "bodega"];
+const DELETE_ROLES = ["admin", "secretaria"];
 
 export default function GuiasList({
-  guias,
-  loading,
-  error,
-  search,
-  setSearch,
-  monthFilter,
-  setMonthFilter,
-  showPending,
-  setShowPending,
-  role,
+  guias, loading, error, search, setSearch, monthFilter, setMonthFilter,
+  showPending, setShowPending, role,
   onNewGuia,
-  onViewGuia,
-  onReload,
+  expandedId, expandedGuia, expandedLoading, onToggleExpand,
+  tipoDespacho, setTipoDespacho,
+  bPlaca, setBPlaca, bReceptor, setBReceptor, bCedula, setBCedula,
+  bChofer, setBChofer, bSaving, onConfirmarDespacho, showToast,
+  onEdit, onPrint, onDelete,
 }: GuiasListProps) {
-  const [dispatchModal, setDispatchModal] = useState<Guia | null>(null);
-  const [dispatching, setDispatching] = useState(false);
-  const canDispatch = role && DISPATCH_ROLES.includes(role);
+  const canCreate = role && CREATE_ROLES.includes(role);
+  const canDespacho = role && DESPACHO_ROLES.includes(role);
+  const canDelete = role && DELETE_ROLES.includes(role);
+  const canEdit = role && ["admin", "secretaria", "bodega"].includes(role);
 
-  const [dispatchError, setDispatchError] = useState<string | null>(null);
-  const [dispatchSuccess, setDispatchSuccess] = useState<string | null>(null);
-
-  async function confirmDispatch() {
-    if (!dispatchModal) return;
-    const guiaNum = dispatchModal.numero;
-    const guiaId = dispatchModal.id;
-    setDispatching(true);
-    setDispatchError(null);
-    setDispatchSuccess(null);
-    try {
-      const url = `/api/guias/${guiaId}`;
-      const res = await fetch(url, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ estado: "Completada" }),
-      });
-      const data = await res.json().catch(() => null);
-      if (res.ok && data?.ok) {
-        setDispatchModal(null);
-        setDispatchSuccess(`Guía #${guiaNum} despachada`);
-        setTimeout(() => setDispatchSuccess(null), 3000);
-        if (onReload) onReload();
-      } else {
-        setDispatchError(data?.error || `Error ${res.status}: ${JSON.stringify(data)}`);
-      }
-    } catch (err) {
-      setDispatchError(`Error de conexión: ${err}`);
-    }
-    setDispatching(false);
-  }
   return (
     <div>
-      {/* Success toast */}
-      {dispatchSuccess && (
-        <div className="fixed top-4 right-4 z-50 bg-emerald-600 text-white text-sm px-4 py-2.5 rounded-lg shadow-lg">
-          {dispatchSuccess}
-        </div>
-      )}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex items-end justify-between mb-10">
           <div>
-            <h1 className="text-xl font-light tracking-tight">Guías de Transporte</h1>
-            <p className="text-sm text-gray-400 mt-1">Registro de envíos con transportistas</p>
+            <h1 className="text-xl font-light tracking-tight">Guias de Transporte</h1>
+            <p className="text-sm text-gray-400 mt-1">Registro de envios con transportistas</p>
           </div>
-          <div className="flex flex-wrap items-center gap-4">
-            {role !== "director" && (
-              <button
-                onClick={onNewGuia}
-                className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition"
-              >
-                Nueva Guía
-              </button>
-            )}
-          </div>
+          {canCreate && (
+            <button
+              onClick={onNewGuia}
+              className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition"
+            >
+              Nueva Guia
+            </button>
+          )}
         </div>
 
-        {role === "bodega" &&
-          (() => {
-            const pendingCount = guias.filter((g) => g.estado === "Pendiente Bodega").length;
-            if (pendingCount === 0) return null;
-            return (
-              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700 mb-6 flex items-center justify-between">
-                <span>
-                  📦 Tenés {pendingCount} guía{pendingCount !== 1 ? "s" : ""} pendiente
-                  {pendingCount !== 1 ? "s" : ""} de despachar
-                </span>
-                <button
-                  onClick={() => setShowPending(!showPending)}
-                  className="text-xs font-medium text-amber-600 hover:text-amber-800 underline"
-                >
-                  {showPending ? "Ver todas" : "Ver pendientes"}
-                </button>
-              </div>
-            );
-          })()}
+        {/* Bodega pending banner */}
+        {role === "bodega" && (() => {
+          const pendingCount = guias.filter((g) => g.estado === "Pendiente Bodega").length;
+          if (pendingCount === 0) return null;
+          return (
+            <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-600 mb-6 flex items-center justify-between">
+              <span>
+                {pendingCount} guia{pendingCount !== 1 ? "s" : ""} pendiente{pendingCount !== 1 ? "s" : ""} de despachar
+              </span>
+              <button
+                onClick={() => setShowPending(!showPending)}
+                className="text-xs font-medium text-gray-500 hover:text-black underline transition"
+              >
+                {showPending ? "Ver todas" : "Ver pendientes"}
+              </button>
+            </div>
+          );
+        })()}
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
@@ -126,10 +105,10 @@ export default function GuiasList({
           <SkeletonTable rows={5} cols={5} />
         ) : guias.length === 0 ? (
           <EmptyState
-            title="No hay guías registradas"
-            subtitle="Crea tu primera guía para registrar un despacho"
-            actionLabel="+ Nueva Guía"
-            onAction={onNewGuia}
+            title="No hay guias registradas"
+            subtitle="Crea tu primera guia para registrar un despacho"
+            actionLabel={canCreate ? "+ Nueva Guia" : undefined}
+            onAction={canCreate ? onNewGuia : undefined}
           />
         ) : (
           <>
@@ -139,129 +118,234 @@ export default function GuiasList({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por transportista, cliente o factura..."
-                className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black w-full max-w-sm"
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-black w-full max-w-sm transition"
               />
               <div className="flex items-center gap-2 shrink-0">
                 <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Mes</label>
                 <select
                   value={monthFilter}
                   onChange={(e) => setMonthFilter(e.target.value)}
-                  className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none"
+                  className="border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none"
                 >
                   {getMonthOptions().map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
+                    <option key={o.value} value={o.value}>{o.label}</option>
                   ))}
                 </select>
               </div>
             </div>
-            <p className="text-[10px] text-gray-400 mb-3">
-              📦 Pendiente = en espera de bodega · ✅ Despachada = lista para imprimir
-            </p>
-            <div className="overflow-x-auto -mx-4 sm:mx-0">
-              <div className="min-w-[700px] px-4 sm:px-0">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-white z-10">
-                  <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
-                    <th className="text-left py-3 px-4 font-normal">N°</th>
-                    <th className="text-left py-3 px-4 font-normal">Fecha</th>
-                    <th className="text-left py-3 px-4 font-normal">Transportista</th>
-                    <th className="text-left py-3 px-4 font-normal">Clientes</th>
-                    <th className="text-right py-3 px-4 font-normal">Bultos</th>
-                    <th className="text-left py-3 px-4 font-normal">Estado</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(() => {
-                    const filtered = guias
-                      .filter((g) => g.fecha && g.fecha.slice(0, 7) === monthFilter)
-                      .filter((g) => {
-                        if (!search) return true;
-                        const q = search.toLowerCase();
-                        return (
-                          g.transportista.toLowerCase().includes(q) ||
-                          (g.guia_items || []).some(
-                            (item: GuiaItem) =>
-                              (item.facturas || "").toLowerCase().includes(q) ||
-                              (item.cliente || "").toLowerCase().includes(q),
-                          )
-                        );
-                      })
-                      .filter((g) => !showPending || g.estado === "Pendiente Bodega");
+
+            <div className="space-y-1">
+              {(() => {
+                const filtered = guias
+                  .filter((g) => g.fecha && g.fecha.slice(0, 7) === monthFilter)
+                  .filter((g) => {
+                    if (!search) return true;
+                    const q = search.toLowerCase();
                     return (
-                      <>
-                        {filtered.map((g) => (
-                          <tr
-                            key={g.id}
-                            onClick={() => onViewGuia(g.id)}
-                            className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
-                          >
-                            <td className="py-3 px-4 font-medium">{g.numero}</td>
-                            <td className="py-3 px-4 text-gray-500">{fmtDate(g.fecha)}</td>
-                            <td className="py-3 px-4">{g.transportista}</td>
-                            <td className="py-3 px-4 text-gray-500 text-sm">
-                              {clientesSummary(g.guia_items || [])}
-                            </td>
-                            <td className="py-3 px-4 text-right tabular-nums">{g.total_bultos}</td>
-                            <td className="py-3 px-4">
-                              <div className="flex items-center gap-2">
-                                <StatusBadge estado={g.estado === "Pendiente Bodega" ? "pendiente" : "despachada"} />
-                                {canDispatch && g.estado !== "Completada" && g.estado !== "Listo para Imprimir" && (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); setDispatchModal(g); }}
-                                    className="text-[10px] bg-emerald-600 text-white px-2.5 py-1 rounded-full hover:bg-emerald-700 transition font-medium">
-                                    Despachar
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                        {filtered.length > 0 && (
-                          <tr className="border-t border-gray-300 bg-gray-50/60 font-medium">
-                            <td className="py-3 px-4" colSpan={4}>
-                              <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">
-                                Totales del mes
-                              </span>
-                              <span className="ml-3 text-sm">
-                                {filtered.length} guía{filtered.length !== 1 ? "s" : ""}
-                              </span>
-                            </td>
-                            <td className="py-3 px-4 text-right tabular-nums">
-                              {filtered.reduce((s, g) => s + (g.total_bultos || 0), 0)}
-                            </td>
-                            <td></td>
-                          </tr>
-                        )}
-                      </>
+                      g.transportista.toLowerCase().includes(q) ||
+                      (g.guia_items || []).some(
+                        (item: GuiaItem) =>
+                          (item.facturas || "").toLowerCase().includes(q) ||
+                          (item.cliente || "").toLowerCase().includes(q),
+                      )
                     );
-                  })()}
-                </tbody>
-              </table>
-              </div>
+                  })
+                  .filter((g) => !showPending || g.estado === "Pendiente Bodega");
+
+                if (filtered.length === 0) {
+                  return <p className="text-sm text-gray-400 py-8 text-center">No hay guias en este periodo</p>;
+                }
+
+                const totalBultos = filtered.reduce((s, g) => s + (g.total_bultos || 0), 0);
+
+                return (
+                  <>
+                    {filtered.map((g) => {
+                      const isExpanded = expandedId === g.id;
+                      const isDispatched = g.estado === "Completada" || g.estado === "Listo para Imprimir";
+
+                      return (
+                        <div key={g.id} className={`border rounded-xl transition-all ${isExpanded ? "border-gray-300 shadow-sm" : "border-gray-100 hover:border-gray-200"}`}>
+                          {/* Row header */}
+                          <button
+                            onClick={() => onToggleExpand(g.id)}
+                            className="w-full flex items-center gap-4 px-4 py-3 text-left text-sm"
+                          >
+                            <span className="font-medium w-10 shrink-0">{g.numero}</span>
+                            <span className="text-gray-500 w-24 shrink-0">{fmtDate(g.fecha)}</span>
+                            <span className="flex-1 truncate">{g.transportista}</span>
+                            <span className="text-gray-400 text-xs hidden sm:block w-40 truncate">
+                              {clientesSummary(g.guia_items || [])}
+                            </span>
+                            <span className="tabular-nums w-14 text-right shrink-0">{g.total_bultos}</span>
+                            <span className="w-24 shrink-0">
+                              <StatusBadge estado={isDispatched ? "despachada" : "pendiente"} />
+                            </span>
+                            <svg
+                              className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`}
+                              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+
+                          {/* Expanded content */}
+                          {isExpanded && (
+                            <div className="px-4 pb-5 border-t border-gray-100">
+                              {expandedLoading ? (
+                                <div className="py-6 text-center text-sm text-gray-400">Cargando...</div>
+                              ) : expandedGuia ? (
+                                <>
+                                  {/* Items table */}
+                                  <div className="overflow-x-auto mt-4">
+                                    <table className="w-full text-xs">
+                                      <thead>
+                                        <tr className="text-[10px] uppercase tracking-wider text-gray-400 border-b border-gray-100">
+                                          <th className="text-left py-2 px-2 font-normal">#</th>
+                                          <th className="text-left py-2 px-2 font-normal">Cliente</th>
+                                          <th className="text-left py-2 px-2 font-normal">Direccion</th>
+                                          <th className="text-left py-2 px-2 font-normal">Empresa</th>
+                                          <th className="text-left py-2 px-2 font-normal">Facturas</th>
+                                          <th className="text-center py-2 px-2 font-normal">Bultos</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {(expandedGuia.guia_items || []).map((item, idx) => (
+                                          <tr key={idx} className="border-b border-gray-50">
+                                            <td className="py-1.5 px-2 text-gray-300">{idx + 1}</td>
+                                            <td className="py-1.5 px-2">{item.cliente}</td>
+                                            <td className="py-1.5 px-2 text-gray-500">{item.direccion}</td>
+                                            <td className="py-1.5 px-2 text-gray-500">{item.empresa}</td>
+                                            <td className="py-1.5 px-2 text-gray-500">{item.facturas}</td>
+                                            <td className="py-1.5 px-2 text-center tabular-nums">{item.bultos}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+
+                                  {/* Observaciones */}
+                                  {expandedGuia.observaciones && (
+                                    <p className="text-xs text-gray-500 mt-3 italic">{expandedGuia.observaciones}</p>
+                                  )}
+
+                                  {/* Dispatched: read-only despacho data */}
+                                  {isDispatched && (
+                                    <div className="mt-4 pt-4 border-t border-gray-100">
+                                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                                        <div>
+                                          <span className="text-gray-400 block">Tipo</span>
+                                          <span className="font-medium">{expandedGuia.tipo_despacho === "directo" ? "Entrega directa" : "Transportista externo"}</span>
+                                        </div>
+                                        {expandedGuia.placa && (
+                                          <div>
+                                            <span className="text-gray-400 block">Placa</span>
+                                            <span className="font-medium">{expandedGuia.placa}</span>
+                                          </div>
+                                        )}
+                                        {expandedGuia.nombre_chofer && (
+                                          <div>
+                                            <span className="text-gray-400 block">Chofer</span>
+                                            <span className="font-medium">{expandedGuia.nombre_chofer}</span>
+                                          </div>
+                                        )}
+                                        <div>
+                                          <span className="text-gray-400 block">Receptor</span>
+                                          <span className="font-medium">{expandedGuia.receptor_nombre || "—"}</span>
+                                        </div>
+                                        <div>
+                                          <span className="text-gray-400 block">Cedula</span>
+                                          <span className="font-medium">{expandedGuia.cedula || "—"}</span>
+                                        </div>
+                                      </div>
+                                      {/* Signatures */}
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                                        {expandedGuia.firma_base64 && (
+                                          <div>
+                                            <span className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1">
+                                              {expandedGuia.tipo_despacho === "directo" ? "Firma del chofer" : "Firma del transportista"}
+                                            </span>
+                                            <img src={expandedGuia.firma_base64} alt="Firma" className="h-12 border border-gray-100 rounded p-1 bg-white" />
+                                          </div>
+                                        )}
+                                        {expandedGuia.firma_entregador_base64 && (
+                                          <div>
+                                            <span className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1">
+                                              {expandedGuia.tipo_despacho === "directo" ? "Firma del cliente" : "Firma del entregador"}
+                                            </span>
+                                            <img src={expandedGuia.firma_entregador_base64} alt="Firma" className="h-12 border border-gray-100 rounded p-1 bg-white" />
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Pending: despacho form */}
+                                  {!isDispatched && canDespacho && (
+                                    <DespachoForm
+                                      tipoDespacho={tipoDespacho}
+                                      setTipoDespacho={setTipoDespacho}
+                                      bPlaca={bPlaca}
+                                      setBPlaca={setBPlaca}
+                                      bReceptor={bReceptor}
+                                      setBReceptor={setBReceptor}
+                                      bCedula={bCedula}
+                                      setBCedula={setBCedula}
+                                      bChofer={bChofer}
+                                      setBChofer={setBChofer}
+                                      bSaving={bSaving}
+                                      onConfirmar={onConfirmarDespacho}
+                                      showToast={showToast}
+                                    />
+                                  )}
+
+                                  {/* Action buttons */}
+                                  <div className="flex items-center gap-4 mt-6 pt-4 border-t border-gray-100">
+                                    {canEdit && (
+                                      <button
+                                        onClick={() => onEdit(expandedGuia.id)}
+                                        className="text-xs text-gray-500 hover:text-black transition"
+                                      >
+                                        Editar
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => onPrint(expandedGuia.id)}
+                                      className="text-xs text-gray-500 hover:text-black transition"
+                                    >
+                                      Imprimir
+                                    </button>
+                                    {canDelete && (
+                                      <button
+                                        onClick={() => onDelete(expandedGuia.id)}
+                                        className="text-xs text-gray-400 hover:text-red-500 transition ml-auto"
+                                      >
+                                        Eliminar
+                                      </button>
+                                    )}
+                                  </div>
+                                </>
+                              ) : null}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* Totals */}
+                    <div className="flex items-center justify-between px-4 py-3 text-sm border-t border-gray-200 mt-2">
+                      <span className="text-gray-400 text-xs uppercase tracking-wider">
+                        {filtered.length} guia{filtered.length !== 1 ? "s" : ""}
+                      </span>
+                      <span className="tabular-nums font-medium">{totalBultos} bultos</span>
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </>
         )}
       </div>
-
-      {/* Dispatch confirmation modal */}
-      {dispatchModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setDispatchModal(null)}>
-          <div className="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
-            <p className="text-sm font-medium mb-1">¿Confirmar despacho de Guía #{dispatchModal.numero}?</p>
-            <p className="text-sm text-gray-500 mb-2">Transportista: {dispatchModal.transportista} — {dispatchModal.total_bultos || 0} bultos</p>
-            {dispatchError && <p className="text-xs text-red-500 mb-2 bg-red-50 px-3 py-1.5 rounded">{dispatchError}</p>}
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setDispatchModal(null)} className="px-4 py-2 text-sm text-gray-500 hover:text-black transition">Cancelar</button>
-              <button onClick={confirmDispatch} disabled={dispatching}
-                className="px-5 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition disabled:opacity-50">
-                {dispatching ? "Despachando..." : "Confirmar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
