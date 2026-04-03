@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
   const { data: reclamos, error } = await supabaseServer
     .from("reclamos")
-    .select("*, reclamo_items(*)")
+    .select("*, reclamo_items(*), reclamo_fotos(*)")
     .in("id", ids)
     .order("created_at", { ascending: false });
 
@@ -22,7 +22,8 @@ export async function POST(req: NextRequest) {
 
   for (const rec of reclamos || []) {
     const items = (rec.reclamo_items || []) as Record<string, unknown>[];
-    const ws = buildReclamoSheet(rec, items);
+    const fotos = (rec.reclamo_fotos || []) as { url?: string; storage_path: string }[];
+    const ws = buildReclamoSheet(rec, items, fotos);
     const name = (rec.nro_reclamo || "Reclamo").slice(0, 31);
     XLSX.utils.book_append_sheet(wb, ws, name);
   }

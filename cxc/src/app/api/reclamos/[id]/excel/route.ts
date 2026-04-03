@@ -15,14 +15,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const { data, error } = await supabaseServer
     .from("reclamos")
-    .select("*, reclamo_items(*)")
+    .select("*, reclamo_items(*), reclamo_fotos(*)")
     .eq("id", id)
     .single();
 
   if (error || !data) return NextResponse.json({ error: error?.message || "Not found" }, { status: 500 });
 
   const items = (data.reclamo_items || []) as Record<string, unknown>[];
-  const ws = buildReclamoSheet(data, items);
+  const fotos = (data.reclamo_fotos || []) as { url?: string; storage_path: string }[];
+  const ws = buildReclamoSheet(data, items, fotos);
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Reclamo");

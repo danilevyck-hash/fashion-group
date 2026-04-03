@@ -3,6 +3,11 @@ import XLSX from "xlsx-js-style";
 function fmtDate(d: string) { if (!d) return ""; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }
 function addr(r: number, c: number) { return XLSX.utils.encode_cell({ r, c }); }
 
+interface ReclamoFoto {
+  url?: string;
+  storage_path: string;
+}
+
 // Blue corporate palette
 const PRI = "1B3A5C"; const MID = "2E5E8E"; const SEP = "D4E6F1"; const LBL_BG = "EBF5FB"; const VAL_BG = "FDFEFE"; const DATA_BG = "F8F9F9"; const BRD = "D5DBDB";
 const B = { top: { style: "thin", color: { rgb: BRD } }, bottom: { style: "thin", color: { rgb: BRD } }, left: { style: "thin", color: { rgb: BRD } }, right: { style: "thin", color: { rgb: BRD } } };
@@ -10,7 +15,7 @@ const ESTADO_FG: Record<string, string> = { "Enviado": "1D4ED8", "En Revisión":
 
 function fill(c: number, r: number, ws: XLSX.WorkSheet, bg: string) { for (let i = 0; i <= c; i++) if (!ws[addr(r, i)]) ws[addr(r, i)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: bg } } } }; }
 
-export function buildReclamoSheet(rec: Record<string, unknown>, items: Record<string, unknown>[]): XLSX.WorkSheet {
+export function buildReclamoSheet(rec: Record<string, unknown>, items: Record<string, unknown>[], fotos: ReclamoFoto[] = []): XLSX.WorkSheet {
   const ws: XLSX.WorkSheet = {};
   const h: number[] = [];
   const merges: XLSX.Range[] = [];
@@ -104,6 +109,28 @@ export function buildReclamoSheet(rec: Record<string, unknown>, items: Record<st
   ws[addr(r, 6)] = { v: total, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 13, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: PRI } }, alignment: { horizontal: "right", vertical: "center" } } };
   merges.push({ s: { r: totalRow, c: 0 }, e: { r: totalRow, c: 4 } });
   h[r] = 28; r++;
+
+  // Evidence photos section
+  if (fotos.length > 0) {
+    const supabaseUrl = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+
+    // Spacer
+    fill(6, r, ws, "FFFFFF"); merges.push({ s: { r, c: 0 }, e: { r, c: 6 } }); h[r] = 10; r++;
+
+    // Section header
+    ws[addr(r, 0)] = { v: "EVIDENCIA FOTOGRÁFICA", t: "s", s: { font: { bold: true, sz: 11, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: MID } }, alignment: { horizontal: "center", vertical: "center" } } };
+    fill(6, r, ws, MID); merges.push({ s: { r, c: 0 }, e: { r, c: 6 } }); h[r] = 22; r++;
+
+    for (let i = 0; i < fotos.length; i++) {
+      const foto = fotos[i];
+      const publicUrl = foto.url || `${supabaseUrl}/storage/v1/object/public/reclamo-fotos/${foto.storage_path}`;
+      ws[addr(r, 0)] = { v: `Foto ${i + 1}`, t: "s", s: { font: { bold: true, sz: 9, color: { rgb: PRI }, name: "Calibri" }, fill: { fgColor: { rgb: LBL_BG } }, alignment: { horizontal: "left" }, border: B } };
+      ws[addr(r, 1)] = { v: publicUrl, t: "s", s: { font: { sz: 9, color: { rgb: "0563C1" }, underline: true, name: "Calibri" }, fill: { fgColor: { rgb: VAL_BG } }, alignment: { horizontal: "left" }, border: B }, l: { Target: publicUrl, Tooltip: `Ver foto ${i + 1}` } };
+      for (let c = 2; c <= 6; c++) ws[addr(r, c)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: VAL_BG } }, border: B } };
+      merges.push({ s: { r, c: 1 }, e: { r, c: 6 } });
+      h[r] = 18; r++;
+    }
+  }
 
   ws["!ref"] = `A1:G${r}`;
   ws["!merges"] = merges;

@@ -13,14 +13,25 @@ function fmtDate(d: string) {
 async function fetchReclamos(ids: string[]) {
   const { data, error } = await supabaseServer
     .from("reclamos")
-    .select("*, reclamo_items(*)")
+    .select("*, reclamo_items(*), reclamo_fotos(*)")
     .in("id", ids)
     .order("created_at", { ascending: false });
   if (error) { console.error(error); throw new Error("Error al cargar reclamos"); }
   return data || [];
 }
 
-function buildPdf(reclamos: Record<string, unknown>[]) {
+async function downloadFoto(storagePath: string): Promise<{ base64: string; ext: string } | null> {
+  try {
+    const { data, error } = await supabaseServer.storage.from("reclamo-fotos").download(storagePath);
+    if (error || !data) return null;
+    const ab = await data.arrayBuffer();
+    const base64 = Buffer.from(ab).toString("base64");
+    const ext = storagePath.split(".").pop()?.toLowerCase() || "jpeg";
+    return { base64, ext: ext === "jpg" ? "JPEG" : ext.toUpperCase() };
+  } catch { return null; }
+}
+
+async function buildPdf(reclamos: Record<string, unknown>[]) {
   const empresa = (reclamos[0]?.empresa as string) || "Export";
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
 
@@ -91,6 +102,50 @@ function buildPdf(reclamos: Record<string, unknown>[]) {
     },
   });
 
+  // Evidence photos section
+  const MAX_IMG = 150; // mm
+  const PAGE_W = 216; // letter width mm
+  const PAGE_H = 279; // letter height mm
+  const MARGIN = 15;
+
+  for (const rec of reclamos) {
+    const fotos = (rec.reclamo_fotos as { storage_path: string }[]) || [];
+    if (fotos.length === 0) continue;
+
+    // Download all photos for this reclamo in parallel
+    const downloaded = await Promise.all(fotos.map(f => downloadFoto(f.storage_path)));
+    const validPhotos = downloaded.filter((d): d is { base64: string; ext: string } => d !== null);
+    if (validPhotos.length === 0) continue;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let cursorY = (doc as any).lastAutoTable?.finalY ?? 100;
+
+    // Section header — new page if not enough room
+    if (cursorY + 30 > PAGE_H - MARGIN) { doc.addPage(); cursorY = MARGIN; }
+    cursorY += 8;
+    doc.setFillColor(46, 94, 142);
+    doc.rect(MARGIN, cursorY, PAGE_W - 2 * MARGIN, 8, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Evidencia Fotográfica — ${rec.nro_reclamo || ""}`, PAGE_W / 2, cursorY + 5.5, { align: "center" });
+    cursorY += 14;
+
+    for (const photo of validPhotos) {
+      // Always start photo on new page if not enough space for minimum render
+      if (cursorY + 40 > PAGE_H - MARGIN) { doc.addPage(); cursorY = MARGIN; }
+
+      const imgW = MAX_IMG;
+      const imgH = MAX_IMG;
+      const x = (PAGE_W - imgW) / 2; // centered
+
+      try {
+        doc.addImage(`data:image/${photo.ext.toLowerCase()};base64,${photo.base64}`, photo.ext, x, cursorY, imgW, imgH);
+      } catch { /* skip unreadable image */ }
+      cursorY += imgH + 8;
+    }
+  }
+
   // Footer with page numbers
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
@@ -118,7 +173,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No reclamos found" }, { status: 404 });
     }
 
-    const { doc, empresa } = buildPdf(reclamos);
+    const { doc, empresa } = await buildPdf(reclamos);
     const buf = doc.output("arraybuffer");
     const filename = `Reclamos-${empresa}-${new Date().toISOString().slice(0, 10)}.pdf`;
 
@@ -145,7 +200,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabaseServer
       .from("reclamos")
-      .select("*, reclamo_items(*)")
+      .select("*, reclamo_items(*), reclamo_fotos(*)")
       .eq("empresa", empresa)
       .order("created_at", { ascending: false });
 
@@ -156,7 +211,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "No reclamos found" }, { status: 404 });
     }
 
-    const { doc } = buildPdf(data);
+    const { doc } = await buildPdf(data);
     const buf = doc.output("arraybuffer");
     const filename = `Reclamos-${empresa}-${new Date().toISOString().slice(0, 10)}.pdf`;
 
