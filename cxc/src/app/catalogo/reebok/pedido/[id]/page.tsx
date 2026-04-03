@@ -161,6 +161,77 @@ export default function OrderDetailPage() {
     setItems(prev => prev.filter((_, i) => i !== idx));
   }
 
+  // ── SHARE: PDF + email to client ──
+  const [clientEmail, setClientEmail] = useState("");
+  const [sendingToClient, setSendingToClient] = useState(false);
+  const [showEmailInput, setShowEmailInput] = useState(false);
+
+  async function downloadPDF() {
+    if (!order) return;
+    showToast("Generando PDF...");
+    const { jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+    const doc = new jsPDF("portrait");
+
+    doc.setFillColor(26, 26, 26);
+    doc.rect(0, 0, 210, 18, "F");
+    doc.setFontSize(12); doc.setTextColor(255); doc.setFont("helvetica", "bold");
+    doc.text("REEBOK", 14, 12);
+    doc.setFontSize(8); doc.setFont("helvetica", "normal");
+    doc.text("Fashion Group · Panama", 196, 12, { align: "right" });
+
+    doc.setTextColor(100); doc.setFontSize(9);
+    doc.text(`Cliente: ${clientName}`, 14, 26);
+    doc.text(`Pedido: ${order.order_number}`, 90, 26);
+    doc.text(`Fecha: ${new Date(order.created_at).toLocaleDateString("es-PA")}`, 150, 26);
+
+    autoTable(doc, {
+      startY: 32,
+      head: [["Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
+      body: items.map(i => [i.name, i.sku || "", String(i.quantity), String(i.quantity * P), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * P * Number(i.unit_price))}`]),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
+      alternateRowStyles: { fillColor: [249, 249, 249] },
+      columnStyles: { 2: { halign: "center" }, 3: { halign: "center" }, 4: { halign: "right" }, 5: { halign: "right" } },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fy = (doc as any).lastAutoTable.finalY + 8;
+    doc.setFontSize(10); doc.setTextColor(26); doc.setFont("helvetica", "bold");
+    doc.text(`${totalBultos} bultos · ${totalPiezas} piezas`, 14, fy);
+    doc.text(`$${fmt(totalMoney)}`, 196, fy, { align: "right" });
+    doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
+    doc.text("Fashion Group Panama · Reebok Authorized Distributor", 14, fy + 10);
+
+    const filename = `${order.order_number}-${clientName.replace(/\s+/g, "-")}.pdf`;
+    const url = URL.createObjectURL(doc.output("blob"));
+    const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+    showToast("PDF descargado");
+  }
+
+  async function sendToClient() {
+    if (!clientEmail.trim() || !clientEmail.includes("@")) {
+      showToast("Ingresa un email valido"); return;
+    }
+    setSendingToClient(true);
+    try {
+      const res = await fetch("/api/catalogo/reebok/send-order", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: id, clientEmail: clientEmail.trim() }),
+      });
+      if (res.ok) {
+        showToast(`Pedido enviado a ${clientEmail.trim()}`);
+        setShowEmailInput(false);
+        setClientEmail("");
+      } else {
+        showToast("No se pudo enviar. Intenta de nuevo.");
+      }
+    } catch {
+      showToast("Error de conexion. Intenta de nuevo.");
+    }
+    setSendingToClient(false);
+  }
+
   const canEdit = ["admin", "secretaria", "vendedor"].includes(role);
   const canDelete = ["admin", "secretaria"].includes(role);
   const isConfirmed = order?.status === "confirmado";
@@ -306,6 +377,37 @@ export default function OrderDetailPage() {
             <span className="text-emerald-700 font-medium text-sm">&#10003; Pedido confirmado</span>
             <span className="text-emerald-600 text-xs block mt-0.5">Enviado por email a Fashion Group</span>
           </div>
+
+          {/* Share section — subtle, optional */}
+          <div className="pt-3 border-t border-gray-100">
+            <p className="text-[11px] uppercase tracking-wider text-gray-400 mb-2">Compartir pedido</p>
+            <div className="flex flex-col gap-2">
+              <button onClick={downloadPDF} className="text-xs text-gray-500 hover:text-black transition text-left flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Descargar PDF
+              </button>
+              {!showEmailInput ? (
+                <button onClick={() => setShowEmailInput(true)} className="text-xs text-gray-500 hover:text-black transition text-left flex items-center gap-2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  Enviar por email al cliente
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input type="email" value={clientEmail} onChange={e => setClientEmail(e.target.value)}
+                    placeholder="cliente@email.com" autoFocus
+                    onKeyDown={e => e.key === "Enter" && sendToClient()}
+                    className="flex-1 border border-gray-200 rounded-md px-2.5 py-1.5 text-xs outline-none focus:border-black transition" />
+                  <button onClick={sendToClient} disabled={sendingToClient}
+                    className="text-xs bg-black text-white px-3 py-1.5 rounded-md hover:bg-gray-800 transition disabled:opacity-40">
+                    {sendingToClient ? "Enviando..." : "Enviar"}
+                  </button>
+                  <button onClick={() => { setShowEmailInput(false); setClientEmail(""); }}
+                    className="text-xs text-gray-400 hover:text-black transition">x</button>
+                </div>
+              )}
+            </div>
+          </div>
+
           {canEdit && (
             <button onClick={editOrder} disabled={saving}
               className="w-full border border-gray-300 text-black py-2.5 rounded-lg text-sm hover:border-gray-500 transition disabled:opacity-40">
