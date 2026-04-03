@@ -24,10 +24,12 @@ function tdN(v: number, alt: boolean, bold = false, sz = 10, fg = "333333") {
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
+  try {
   const { periodo_id } = await req.json();
   if (!periodo_id) return NextResponse.json({ error: "No periodo_id" }, { status: 400 });
 
-  const { data: periodo } = await supabaseServer.from("caja_periodos").select("*").eq("id", periodo_id).single();
+  const { data: periodo, error: pErr } = await supabaseServer.from("caja_periodos").select("*").eq("id", periodo_id).single();
+  if (pErr || !periodo) return NextResponse.json({ error: "Período no encontrado" }, { status: 404 });
   const { data: gastos } = await supabaseServer.from("caja_gastos").select("*").eq("periodo_id", periodo_id).order("fecha", { ascending: true });
 
   const fondo = periodo?.fondo_inicial || 200;
@@ -147,4 +149,8 @@ export async function POST(req: NextRequest) {
       "Content-Disposition": `attachment; filename="CajaMenuda-Periodo${periodo?.numero || ""}.xlsx"`,
     },
   });
+  } catch (err) {
+    console.error("[caja/export-excel] Error:", err);
+    return NextResponse.json({ error: "Error al generar el Excel. Intenta de nuevo." }, { status: 500 });
+  }
 }

@@ -49,6 +49,7 @@ export default function ChequesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedVencidos, setSelectedVencidos] = useState<Set<string>>(new Set());
   const [batchProcessing, setBatchProcessing] = useState(false);
+  const [depositingId, setDepositingId] = useState<string | null>(null);
 
   // Rebotado modal
   const [rebotandoId, setRebotandoId] = useState<string | null>(null);
@@ -130,8 +131,13 @@ export default function ChequesPage() {
   }
 
   async function depositar(id: string) {
-    await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "depositado", fecha_depositado: todayStr() }) });
-    loadCheques();
+    setDepositingId(id);
+    try {
+      await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "depositado", fecha_depositado: todayStr() }) });
+      showToast("Cheque marcado como depositado");
+      loadCheques();
+    } catch { showToast("No se pudo depositar. Intenta de nuevo."); }
+    setDepositingId(null);
   }
 
   async function batchDepositar(ids: Set<string>, clearFn: (v: Set<string>) => void) {

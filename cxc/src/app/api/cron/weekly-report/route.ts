@@ -67,13 +67,20 @@ export async function GET(req: NextRequest) {
   `;
 
   try {
-    await resend.emails.send({
+    const { error: sendErr } = await resend.emails.send({
       from: "Fashion Group <notificaciones@fashiongr.com>",
       to: ["daniel@fashiongr.com"],
       subject: `📊 Resumen semanal — Fashion Group — ${today}`,
       html,
     });
-  } catch { /* */ }
+    if (sendErr) {
+      console.error("[weekly-report] Resend error:", sendErr.message);
+      return NextResponse.json({ error: sendErr.message }, { status: 500 });
+    }
+  } catch (err) {
+    console.error("[weekly-report] Send failed:", err);
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
 
   return NextResponse.json({ message: "Reporte semanal enviado", ventasTotal: totalVentas, cxcVencida, reclamos: reclamosCount, cheques: chequesCount });
 }

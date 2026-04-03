@@ -36,6 +36,7 @@ export default function DirectorioPage() {
   const [showNew, setShowNew] = useState(false);
   const [newData, setNewData] = useState({ nombre: "", empresa: "", whatsapp: "", correo: "", contacto: "", notas: "" });
   const [toast, setToast] = useState<string | null>(null);
+  const [savingNew, setSavingNew] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Cliente | null>(null);
   const [cxcClients, setCxcClients] = useState<Set<string>>(new Set());
   const importRef = useRef<HTMLInputElement>(null);
@@ -82,16 +83,21 @@ export default function DirectorioPage() {
 
   async function handleCreate() {
     if (!newData.nombre.trim()) return;
-    const res = await fetch("/api/directorio", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(newData),
-    });
-    if (res.ok) {
-      setNewData({ nombre: "", empresa: "", whatsapp: "", correo: "", contacto: "", notas: "" });
-      setShowNew(false);
-      loadClientes(debouncedSearch, page);
-    }
+    setSavingNew(true);
+    try {
+      const res = await fetch("/api/directorio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newData),
+      });
+      if (res.ok) {
+        setNewData({ nombre: "", empresa: "", whatsapp: "", correo: "", contacto: "", notas: "" });
+        setShowNew(false);
+        loadClientes(debouncedSearch, page);
+        setToast("Contacto creado");
+      } else { setToast("No se pudo crear el contacto. Intenta de nuevo."); }
+    } catch { setToast("Error de conexión. Intenta de nuevo."); }
+    setSavingNew(false);
   }
 
   async function handleUpdate(id: string) {
@@ -259,9 +265,9 @@ export default function DirectorioPage() {
             </div>
           </div>
           <div className="flex items-center gap-4 mt-6">
-            <button onClick={handleCreate}
-              className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition">
-              Guardar Cliente
+            <button onClick={handleCreate} disabled={savingNew}
+              className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition disabled:opacity-40">
+              {savingNew ? "Guardando..." : "Guardar Cliente"}
             </button>
             <button onClick={() => setShowNew(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
           </div>
