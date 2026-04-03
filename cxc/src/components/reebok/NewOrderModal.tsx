@@ -1,22 +1,22 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 
 interface DirClient { nombre: string; empresa: string; }
-interface CartItem { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
 
 interface Props {
-  items?: CartItem[];
   onClose: () => void;
-  onCreated: (orderId: string) => void;
 }
 
-export default function NewOrderModal({ items = [], onClose, onCreated }: Props) {
+// This modal ONLY asks for client name, saves to sessionStorage, and navigates to catalog.
+// The order is created later when the user adds products and clicks "Crear pedido".
+export default function NewOrderModal({ onClose }: Props) {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [suggestions, setSuggestions] = useState<DirClient[]>([]);
   const [showSugg, setShowSugg] = useState(false);
-  const [creating, setCreating] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -38,32 +38,22 @@ export default function NewOrderModal({ items = [], onClose, onCreated }: Props)
     return () => { document.removeEventListener("mousedown", h); document.removeEventListener("keydown", esc); };
   }, [onClose]);
 
-  async function create() {
+  function proceed() {
     if (!name.trim()) return;
-    setCreating(true);
-    try {
-      const res = await fetch("/api/catalogo/reebok/orders", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          client_name: name.trim(),
-          vendor_name: typeof window !== 'undefined' ? sessionStorage.getItem('fg_user_name') || null : null,
-          items,
-        }),
-      });
-      if (res.ok) {
-        const order = await res.json();
-        onCreated(order.id);
-      }
-    } catch { /* */ }
-    setCreating(false);
+    // Clear any existing draft and set new client name
+    sessionStorage.removeItem("reebok_draft_id");
+    sessionStorage.setItem("reebok_draft_client", name.trim());
+    onClose();
+    router.push("/catalogo/reebok/productos");
   }
 
-  const canCreate = confirmed || name.trim().length > 2;
+  const canProceed = confirmed || name.trim().length > 2;
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
-        <h2 className="text-base font-medium mb-4">Nuevo Pedido</h2>
+        <h2 className="text-base font-medium mb-1">Nuevo Pedido</h2>
+        <p className="text-xs text-gray-400 mb-4">Nombre del cliente para este pedido</p>
         <div className="relative" ref={ref}>
           {confirmed ? (
             <div className="flex items-center justify-between py-2 border-b border-gray-200">
@@ -74,8 +64,8 @@ export default function NewOrderModal({ items = [], onClose, onCreated }: Props)
             <>
               <input value={name} onChange={e => setName(e.target.value)}
                 onFocus={() => { if (suggestions.length) setShowSugg(true); }}
-                onKeyDown={e => { if (e.key === "Enter" && canCreate) create(); }}
-                placeholder="Nombre del cliente" autoFocus
+                onKeyDown={e => { if (e.key === "Enter" && canProceed) proceed(); }}
+                placeholder="Ej: City Mall Paso Canó" autoFocus
                 className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
               {showSugg && suggestions.length > 0 && (
                 <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
@@ -90,10 +80,9 @@ export default function NewOrderModal({ items = [], onClose, onCreated }: Props)
             </>
           )}
         </div>
-        <p className="text-xs text-gray-400 mt-2">{items.length} producto{items.length !== 1 ? "s" : ""} en el carrito</p>
-        <button onClick={create} disabled={creating || !canCreate}
+        <button onClick={proceed} disabled={!canProceed}
           className="w-full mt-4 bg-black text-white py-2.5 rounded text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
-          {creating ? "Creando..." : "Crear pedido"}
+          Ir al catálogo →
         </button>
         <button onClick={onClose} className="w-full mt-2 text-xs text-gray-400 hover:text-gray-600 py-1">Cancelar</button>
       </div>

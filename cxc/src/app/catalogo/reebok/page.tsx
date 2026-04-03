@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import NewOrderModal from "@/components/reebok/NewOrderModal";
 
 const ADMIN_ROLES = ["admin", "secretaria"];
 const DIRECT_TO_CATALOG = ["vendedor"];
@@ -10,6 +11,7 @@ export default function ReebokLanding() {
   const router = useRouter();
   const [role, setRole] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [showNewOrder, setShowNewOrder] = useState(false);
 
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role") || "";
@@ -56,7 +58,7 @@ export default function ReebokLanding() {
 
       <div className="w-full max-w-xs flex flex-col gap-3">
         <button
-          onClick={() => { sessionStorage.removeItem("reebok_active_draft_id"); router.push("/catalogo/reebok/productos"); }}
+          onClick={() => { sessionStorage.removeItem("reebok_draft_id"); sessionStorage.removeItem("reebok_draft_client"); setShowNewOrder(true); }}
           className="w-full bg-black text-white py-4 rounded text-sm font-medium hover:bg-gray-800 transition"
         >
           Nuevo pedido
@@ -75,6 +77,7 @@ export default function ReebokLanding() {
         </button>
       </div>
 
+      {showNewOrder && <NewOrderModal onClose={() => setShowNewOrder(false)} />}
     </div>
   );
 }

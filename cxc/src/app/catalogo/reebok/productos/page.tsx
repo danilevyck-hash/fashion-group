@@ -2,9 +2,9 @@
 
 import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Product } from "@/components/reebok/supabase";
 import ProductCard from "@/components/reebok/ProductCard";
-import NewOrderModal from "@/components/reebok/NewOrderModal";
 import { Toast } from "@/components/ui";
 
 interface CartItem { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
@@ -26,42 +26,48 @@ function Productos() {
   const [priceFilter, setPriceFilter] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [showNewOrder, setShowNewOrder] = useState(false);
   const [page, setPage] = useState(1);
+  const [saving, setSaving] = useState(false);
   const PAGE_SIZE = 24;
 
-  // Cart lives ONLY in React state — ephemeral, not persisted
+  // ── State: cart + draft context ──
   const [cart, setCart] = useState<CartItem[]>([]);
-  // Active draft: if user came from an existing draft order, we add to it instead of creating new
-  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
-  const [activeDraftNumber, setActiveDraftNumber] = useState("");
-  const [activeDraftClient, setActiveDraftClient] = useState("");
-  // Track which items were already in the draft (to only PATCH changes)
-  const [draftItemIds, setDraftItemIds] = useState<Set<string>>(new Set());
+  // Mode A: new order (client name in sessionStorage, no DB order yet)
+  const [draftClient, setDraftClient] = useState("");
+  // Mode B: existing order (draft ID in sessionStorage, order in DB)
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftNumber, setDraftNumber] = useState("");
+  const [draftOriginalIds, setDraftOriginalIds] = useState<Set<string>>(new Set());
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
   const cartTotal = cart.reduce((s, i) => s + i.quantity * 12 * Number(i.unit_price || 0), 0);
 
-  // Check for active draft on mount — load its items into cart
+  // ── On mount: determine mode from sessionStorage ──
   useEffect(() => {
-    const draftId = sessionStorage.getItem("reebok_active_draft_id");
-    if (draftId) {
-      fetch(`/api/catalogo/reebok/orders/${draftId}`).then(r => r.ok ? r.json() : null).then(order => {
+    const existingDraftId = sessionStorage.getItem("reebok_draft_id");
+    const newClient = sessionStorage.getItem("reebok_draft_client");
+
+    if (existingDraftId) {
+      // Mode B: returning from an existing draft order — load its items
+      fetch(`/api/catalogo/reebok/orders/${existingDraftId}`).then(r => r.ok ? r.json() : null).then(order => {
         if (order && order.status === "borrador") {
-          setActiveDraftId(order.id);
-          setActiveDraftNumber(order.order_number);
-          setActiveDraftClient(order.client_name || "");
-          // Pre-load draft items into cart so ProductCards show current quantities
-          const existingItems: CartItem[] = (order.reebok_order_items || []).map((i: { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number }) => ({
+          setDraftId(order.id);
+          setDraftNumber(order.order_number);
+          setDraftClient(order.client_name || "");
+          const items: CartItem[] = (order.reebok_order_items || []).map((i: CartItem) => ({
             product_id: i.product_id, sku: i.sku || "", name: i.name || "",
             image_url: i.image_url || "", quantity: i.quantity, unit_price: i.unit_price,
           }));
-          setCart(existingItems);
-          setDraftItemIds(new Set(existingItems.map(i => i.product_id)));
+          setCart(items);
+          setDraftOriginalIds(new Set(items.map(i => i.product_id)));
         } else {
-          sessionStorage.removeItem("reebok_active_draft_id");
+          // Draft no longer valid
+          sessionStorage.removeItem("reebok_draft_id");
         }
-      }).catch(() => { sessionStorage.removeItem("reebok_active_draft_id"); });
+      }).catch(() => { sessionStorage.removeItem("reebok_draft_id"); });
+    } else if (newClient) {
+      // Mode A: new order — client name set, catalog is empty
+      setDraftClient(newClient);
     }
   }, []);
 
@@ -74,23 +80,73 @@ function Productos() {
     });
   }, []);
 
-  // Scroll to top button
+  // ── Floating bar action: create or update ──
+  async function handleFloatingBarClick() {
+    if (cart.length === 0) return;
+    setSaving(true);
+
+    if (draftId) {
+      // Mode B: update existing order
+      setToast("Actualizando pedido...");
+      try {
+        for (const item of cart) {
+          await fetch(`/api/catalogo/reebok/orders/${draftId}/item`, {
+            method: "PATCH", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(item),
+          });
+        }
+        // Delete removed items
+        for (const pid of draftOriginalIds) {
+          if (!cart.find(i => i.product_id === pid)) {
+            await fetch(`/api/catalogo/reebok/orders/${draftId}/item`, {
+              method: "PATCH", headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ product_id: pid, quantity: 0 }),
+            });
+          }
+        }
+        router.push(`/catalogo/reebok/pedido/${draftId}`);
+      } catch { setToast("Error al actualizar pedido"); setSaving(false); }
+    } else {
+      // Mode A: create new order
+      setToast("Creando pedido...");
+      try {
+        const res = await fetch("/api/catalogo/reebok/orders", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            client_name: draftClient,
+            vendor_name: sessionStorage.getItem("fg_user_name") || null,
+            items: cart,
+          }),
+        });
+        if (res.ok) {
+          const order = await res.json();
+          // Switch sessionStorage from "new" mode to "existing" mode
+          sessionStorage.removeItem("reebok_draft_client");
+          sessionStorage.setItem("reebok_draft_id", order.id);
+          router.push(`/catalogo/reebok/pedido/${order.id}`);
+        } else {
+          const err = await res.json().catch(() => ({}));
+          setToast(err.error || "Error al crear pedido");
+          setSaving(false);
+        }
+      } catch { setToast("Error de conexion"); setSaving(false); }
+    }
+  }
+
+  // ── Scroll, search, filters ──
   useEffect(() => {
     function onScroll() { setShowScrollTop(window.scrollY > 400); }
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Debounced search
   useEffect(() => {
     const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // Reset page on filter change
   useEffect(() => { setPage(1); }, [gender, category, onlyOferta, priceFilter]);
 
-  // Load products
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -110,7 +166,7 @@ function Productos() {
     load();
   }, []);
 
-  // Unique prices for on-sale filter
+  // ── Derived state ──
   const ofertaPrices = onlyOferta
     ? [...new Set(products.filter(p => p.on_sale && p.price).map(p => p.price!))].sort((a, b) => a - b)
     : [];
@@ -134,27 +190,24 @@ function Productos() {
       return a.name.localeCompare(b.name);
     });
 
-  // Pagination
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  // Cart lookup
   const cartMap = new Map(cart.map(i => [i.product_id, i.quantity]));
 
-  // Group by category + gender
-  type Group = { cat: string; gen: string; label: string; items: typeof filtered };
+  type Group = { label: string; items: typeof filtered };
   const groups: Group[] = [];
   let lastKey = '';
   for (const p of paginated) {
     const key = `${p.category}|${p.gender || 'unisex'}`;
     if (key !== lastKey) {
-      groups.push({ cat: p.category, gen: p.gender || 'unisex', label: `${catLabel[p.category] || p.category} — ${genLabel[p.gender || 'unisex'] || p.gender}`, items: [] });
+      groups.push({ label: `${catLabel[p.category] || p.category} — ${genLabel[p.gender || 'unisex'] || p.gender}`, items: [] });
       lastKey = key;
     }
     groups[groups.length - 1].items.push(p);
   }
 
   const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  const hasContext = draftClient || draftId; // user is in an order flow
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
@@ -163,22 +216,33 @@ function Productos() {
         <p className="text-sm text-gray-400">Panamá</p>
       </div>
 
-      {/* Active draft banner */}
-      {activeDraftId && (
+      {/* ── Banner: order context ── */}
+      {hasContext && (
         <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 mb-4">
           <div className="flex items-center gap-2 text-sm">
-            <span className="w-2 h-2 rounded-full bg-black" />
-            <span className="text-gray-600">Editando pedido</span>
-            <span className="font-medium">{activeDraftNumber}</span>
-            {activeDraftClient && <span className="text-gray-400">— {activeDraftClient}</span>}
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            {draftId ? (
+              <>
+                <span className="text-gray-600">Editando</span>
+                <span className="font-medium">{draftNumber}</span>
+                <span className="text-gray-400">— {draftClient}</span>
+              </>
+            ) : (
+              <>
+                <span className="text-gray-600">Pedido para</span>
+                <span className="font-medium">{draftClient}</span>
+              </>
+            )}
           </div>
-          <button onClick={() => router.push(`/catalogo/reebok/pedido/${activeDraftId}`)} className="text-xs text-black hover:underline transition">
-            Ver pedido →
-          </button>
+          {draftId && (
+            <Link href={`/catalogo/reebok/pedido/${draftId}`} className="text-xs text-black hover:underline transition">
+              Ver pedido →
+            </Link>
+          )}
         </div>
       )}
 
-      {/* Filters */}
+      {/* ── Filters ── */}
       <div className="flex flex-wrap items-end gap-3 mb-6">
         <div>
           <label className="text-[10px] text-gray-400 uppercase tracking-wider">Buscar</label>
@@ -219,7 +283,7 @@ function Productos() {
         <span className="text-xs text-gray-400 ml-auto mb-1">{filtered.length}</span>
       </div>
 
-      {/* Grid */}
+      {/* ── Grid ── */}
       {loading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {[...Array(12)].map((_, i) => (
@@ -273,67 +337,21 @@ function Productos() {
           className="fixed bottom-20 right-4 z-30 w-10 h-10 bg-white border border-gray-200 rounded-full shadow-md flex items-center justify-center text-gray-400 hover:text-black transition">↑</button>
       )}
 
-      {/* Floating bar — only when cart has items */}
-      {cartCount > 0 && (
+      {/* ── Floating bar ── */}
+      {cartCount > 0 && hasContext && (
         <div className="fixed bottom-0 left-0 right-0 z-40 p-3 bg-white border-t border-gray-100 shadow-lg">
-          {activeDraftId ? (
-            // Save changes to existing draft
-            <button onClick={async () => {
-              setToast("Guardando pedido...");
-              try {
-                // PATCH all items (upsert handles new + updated, qty=0 deletes)
-                for (const item of cart) {
-                  await fetch(`/api/catalogo/reebok/orders/${activeDraftId}/item`, {
-                    method: "PATCH", headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(item),
-                  });
-                }
-                // Delete items that were in the draft but removed from cart
-                for (const pid of draftItemIds) {
-                  if (!cart.find(i => i.product_id === pid)) {
-                    await fetch(`/api/catalogo/reebok/orders/${activeDraftId}/item`, {
-                      method: "PATCH", headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ product_id: pid, quantity: 0 }),
-                    });
-                  }
-                }
-                router.push(`/catalogo/reebok/pedido/${activeDraftId}`);
-              } catch { setToast("Error al guardar pedido"); }
-            }}
-              className="w-full bg-black text-white py-3.5 rounded-lg text-sm font-medium flex items-center justify-between px-4 hover:bg-gray-800 transition">
-              <span>Guardar pedido {activeDraftNumber}</span>
-              <span className="flex items-center gap-2">
-                <span className="tabular-nums">{cartCount} bulto{cartCount !== 1 ? "s" : ""}</span>
-                {cartTotal > 0 && <><span className="text-white/40">·</span><span className="tabular-nums font-semibold">${fmt(cartTotal)}</span></>}
-                <span>→</span>
-              </span>
-            </button>
-          ) : (
-            // Create new order
-            <button onClick={() => setShowNewOrder(true)}
-              className="w-full bg-emerald-600 text-white py-3.5 rounded-lg text-sm font-medium flex items-center justify-between px-4 hover:bg-emerald-700 transition">
-              <span>Crear pedido</span>
-              <span className="flex items-center gap-2">
-                <span className="tabular-nums">{cartCount} bulto{cartCount !== 1 ? "s" : ""}</span>
-                {cartTotal > 0 && <><span className="text-white/40">·</span><span className="tabular-nums font-semibold">${fmt(cartTotal)}</span></>}
-                <span>→</span>
-              </span>
-            </button>
-          )}
+          <button onClick={handleFloatingBarClick} disabled={saving}
+            className={`w-full py-3.5 rounded-lg text-sm font-medium flex items-center justify-between px-4 transition disabled:opacity-50 ${
+              draftId ? "bg-black text-white hover:bg-gray-800" : "bg-emerald-600 text-white hover:bg-emerald-700"
+            }`}>
+            <span>{saving ? "Guardando..." : draftId ? `Actualizar pedido ${draftNumber}` : "Crear pedido"}</span>
+            <span className="flex items-center gap-2">
+              <span className="tabular-nums">{cartCount} bulto{cartCount !== 1 ? "s" : ""}</span>
+              {cartTotal > 0 && <><span className="text-white/40">·</span><span className="tabular-nums font-semibold">${fmt(cartTotal)}</span></>}
+              <span>→</span>
+            </span>
+          </button>
         </div>
-      )}
-
-      {showNewOrder && (
-        <NewOrderModal
-          items={cart}
-          onClose={() => setShowNewOrder(false)}
-          onCreated={(id) => {
-            setShowNewOrder(false);
-            setCart([]);
-            sessionStorage.setItem("reebok_active_draft_id", id);
-            router.push(`/catalogo/reebok/pedido/${id}`);
-          }}
-        />
       )}
     </div>
   );

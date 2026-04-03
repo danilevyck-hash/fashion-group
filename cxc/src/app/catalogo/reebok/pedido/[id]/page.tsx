@@ -51,7 +51,7 @@ export default function OrderDetailPage() {
         }
         setOrder(d); setItems(d.reebok_order_items || []); setClientName(d.client_name || "");
         // Track active draft so catalog can add to it
-        if (d.status === "borrador") sessionStorage.setItem("reebok_active_draft_id", id);
+        if (d.status === "borrador") sessionStorage.setItem("reebok_draft_id", id);
       } else router.push("/catalogo/reebok/pedidos");
     } catch { router.push("/catalogo/reebok/pedidos"); }
     setLoading(false);
@@ -118,7 +118,7 @@ export default function OrderDetailPage() {
     });
 
     // Clear active draft so catalog starts fresh
-    sessionStorage.removeItem("reebok_active_draft_id");
+    sessionStorage.removeItem("reebok_draft_id");
 
     // Send email with order summary via existing API
     try {
