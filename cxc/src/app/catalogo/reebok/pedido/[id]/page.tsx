@@ -184,12 +184,16 @@ export default function OrderDetailPage() {
     if (navigator.share && navigator.canShare?.({ files: [file] })) {
       await navigator.share({ files: [file], title: `Pedido ${order!.order_number}`, text: `Pedido Reebok — ${clientName}` });
     } else {
-      // Fallback: download PDF + open WhatsApp with text
+      // Fallback: download PDF + open WhatsApp with pre-filled message
       const url = URL.createObjectURL(result.blob);
       const a = document.createElement("a"); a.href = url; a.download = result.filename; a.click();
       URL.revokeObjectURL(url);
-      const text = `*Pedido ${order!.order_number}*\n${clientName}\n${totalBultos} bultos · $${fmt(totalMoney)}\n\n_PDF adjunto_`;
-      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+      // Build itemized message
+      const itemLines = items.map(i => `• ${i.name} — ${i.quantity} bultos × $${fmt(i.unit_price)} = $${fmt(i.quantity * P * Number(i.unit_price))}`);
+      const text = `*Pedido ${order!.order_number}*\nCliente: ${clientName}\n\n${itemLines.join("\n")}\n\n*Total: ${totalBultos} bultos · ${totalPiezas} piezas · $${fmt(totalMoney)}*\n\n_PDF descargado por separado_`;
+      // Use waNumber if set, otherwise open contact picker
+      const phone = waNumber.length > 4 ? waNumber.replace(/[^0-9]/g, "") : "";
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
     }
     showToast("Listo");
   }
@@ -315,31 +319,42 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="flex flex-col gap-2">
-          {!isConfirmed && (
-            <Link href="/catalogo/reebok/productos" className="w-full border border-gray-300 text-black py-3 rounded-lg text-sm font-medium hover:border-gray-500 transition text-center block">
-              ← Seguir agregando productos
-            </Link>
+          {isConfirmed ? (
+            <>
+              <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-4 text-center mb-1">
+                <span className="text-emerald-700 font-medium">&#10003; Pedido confirmado y enviado</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <button onClick={downloadPDF} className="border border-gray-200 text-black py-3 rounded-lg text-sm hover:border-gray-400 transition">Descargar PDF</button>
+                <button onClick={shareWhatsApp} disabled={saving} className="bg-green-600 text-white py-3 rounded-lg text-sm hover:bg-green-700 transition disabled:opacity-40">Enviar por WhatsApp</button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Primary: confirm and send */}
+              <button onClick={() => setShowConfirmModal(true)} disabled={saving || !items.length}
+                className="w-full bg-emerald-600 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-40">
+                Confirmar y enviar pedido
+              </button>
+              <p className="text-[11px] text-gray-400 text-center -mt-1">Envia el pedido por email a Fashion Group</p>
+
+              {/* Secondary: save draft */}
+              {canEdit && (
+                <button onClick={saveOrder} disabled={saving} className="w-full border border-gray-300 text-black py-3 rounded-lg text-sm font-medium hover:border-gray-500 transition disabled:opacity-40">
+                  {saving ? "Guardando..." : "Guardar borrador"}
+                </button>
+              )}
+
+              <Link href="/catalogo/reebok/productos" className="w-full text-center text-sm text-gray-500 hover:text-black transition py-2 block">
+                ← Seguir agregando productos
+              </Link>
+
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <button onClick={downloadPDF} className="border border-gray-200 text-black py-2.5 rounded-lg text-xs hover:border-gray-400 transition">Descargar PDF</button>
+                <button onClick={shareWhatsApp} disabled={saving} className="bg-green-600 text-white py-2.5 rounded-lg text-xs hover:bg-green-700 transition disabled:opacity-40">Enviar por WhatsApp</button>
+              </div>
+            </>
           )}
-          {canEdit && !isConfirmed && (
-            <button onClick={saveOrder} disabled={saving} className="w-full bg-black text-white py-3.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
-              {saving ? "Guardando..." : "Guardar pedido"}
-            </button>
-          )}
-          {!isConfirmed && (
-            <button onClick={() => setShowConfirmModal(true)} disabled={saving || !items.length}
-              className="w-full bg-emerald-600 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-40">
-              Confirmar y enviar
-            </button>
-          )}
-          {isConfirmed && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-sm text-emerald-700 text-center mb-2">
-              Pedido confirmado
-            </div>
-          )}
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={downloadPDF} className="border border-gray-200 text-black py-3 rounded-lg text-sm hover:border-gray-400 transition">Descargar PDF</button>
-            <button onClick={shareWhatsApp} disabled={saving} className="bg-green-600 text-white py-3 rounded-lg text-sm hover:bg-green-700 transition disabled:opacity-40">WhatsApp</button>
-          </div>
           {canDelete && <button onClick={() => setShowDeleteModal(true)} className="text-xs text-gray-400 hover:text-red-500 transition mt-4 py-1">Eliminar pedido</button>}
         </div>
 
