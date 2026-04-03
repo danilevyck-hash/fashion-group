@@ -519,24 +519,39 @@ export async function POST(req: NextRequest) {
       "active shoes": "active_shoes", "active wear": "active_wear", "reebok": "active_wear", "joystep": "joystep", "boston": "confecciones_boston",
     };
     let empresaFilter = "";
+    let empresaMatchedName = "";
     for (const [name, key] of Object.entries(empresaMap)) {
-      if (msgLower.includes(name)) { empresaFilter = key; break; }
+      if (msgLower.includes(name)) { empresaFilter = key; empresaMatchedName = name; break; }
+    }
+
+    // Strip empresa name and connector words ("en", "de") from searchTerm
+    if (searchTerm && empresaMatchedName) {
+      searchTerm = searchTerm.replace(new RegExp(`\\s+(?:en|de)\\s+${empresaMatchedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}.*$`, "i"), "").trim();
+      // Also strip if searchTerm ends with the empresa name directly
+      searchTerm = searchTerm.replace(new RegExp(`\\s*${empresaMatchedName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*$`, "i"), "").trim();
     }
 
     // Search CxC — aggressive: search if any term found OR if mentions debt/client keywords
     const shouldSearchCxC = searchTerm.length >= 3 || msgLower.includes("debe") || msgLower.includes("deuda") || msgLower.includes("saldo") || msgLower.includes("cobrar") || msgLower.includes("cartera");
     if (shouldSearchCxC && searchTerm.length >= 3) {
       const term = searchTerm.toUpperCase();
+      console.log("[CHAT SEARCH] searchTerm:", searchTerm, "empresaFilter:", empresaFilter, "empresaMatchedName:", empresaMatchedName, "term:", term);
       let { data: cxcMatches } = await supabaseServer.from("cxc_rows").select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365").ilike("nombre_normalized", `%${term}%`).limit(10);
+      console.log("[CHAT SEARCH] exact query '%"+term+"%' results:", cxcMatches?.length, "first:", cxcMatches?.[0]?.nombre_normalized);
       if (!cxcMatches?.length) {
-        for (const word of term.split(/\s+/).filter(w => w.length >= 3).sort((a, b) => b.length - a.length)) {
+        // Exclude empresa-related words from fallback
+        const empresaWords = new Set(Object.keys(empresaMap).flatMap(k => k.split(/\s+/)).map(w => w.toUpperCase()));
+        const stopWords = new Set(["EN", "DE", "LA", "LAS", "LOS", "EL", "DEL", "PARA", "POR", "CON", "QUE", "COMO", ...empresaWords]);
+        for (const word of term.split(/\s+/).filter(w => w.length >= 3 && !stopWords.has(w)).sort((a, b) => b.length - a.length)) {
+          console.log("[CHAT SEARCH] fallback word:", word);
           const { data } = await supabaseServer.from("cxc_rows").select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365").ilike("nombre_normalized", `%${word}%`).limit(10);
-          if (data?.length) { cxcMatches = data; break; }
+          if (data?.length) { cxcMatches = data; console.log("[CHAT SEARCH] fallback hit:", word, "results:", data.length, "first:", data[0]?.nombre_normalized); break; }
         }
       }
       // Filter by empresa if mentioned
       if (cxcMatches?.length && empresaFilter) {
         const filtered = cxcMatches.filter(r => r.company_key === empresaFilter);
+        console.log("[CHAT SEARCH] empresa filter:", empresaFilter, "before:", cxcMatches.length, "after:", filtered.length);
         if (filtered.length > 0) cxcMatches = filtered;
       }
       if (cxcMatches?.length) {

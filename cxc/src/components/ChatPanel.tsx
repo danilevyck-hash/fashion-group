@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
 
 interface Message {
   role: "user" | "assistant";
@@ -294,15 +295,35 @@ export default function ChatPanel() {
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className="max-w-[85%]">
-                  <div className={`px-3 py-2 rounded-2xl text-sm whitespace-pre-wrap ${
+                  <div className={`px-3 py-2 rounded-2xl text-sm ${
                     msg.role === "user"
-                      ? "bg-black text-white dark:bg-white dark:text-black"
-                      : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
+                      ? "bg-black text-white dark:bg-white dark:text-black whitespace-pre-wrap"
+                      : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 chat-markdown"
                   }`}>
-                    {msg.role === "assistant" ? msg.content.replace(/\[ACTION:[^\]]+\]/g, "").trim() : msg.content}
-                    {msg.role === "assistant" && !msg.content && streaming && (
-                      <span className="inline-block w-1.5 h-4 bg-gray-400 animate-pulse ml-0.5" />
-                    )}
+                    {msg.role === "assistant" ? (
+                      <>
+                        <ReactMarkdown
+                          components={{
+                            table: ({ children, ...props }) => <table className="w-full text-xs border-collapse my-2" {...props}>{children}</table>,
+                            thead: ({ children, ...props }) => <thead className="bg-gray-200 dark:bg-gray-700" {...props}>{children}</thead>,
+                            th: ({ children, ...props }) => <th className="text-left px-2 py-1 border border-gray-300 dark:border-gray-600 font-medium" {...props}>{children}</th>,
+                            td: ({ children, ...props }) => <td className="px-2 py-1 border border-gray-300 dark:border-gray-600" {...props}>{children}</td>,
+                            p: ({ children, ...props }) => <p className="mb-1 last:mb-0" {...props}>{children}</p>,
+                            ul: ({ children, ...props }) => <ul className="list-disc pl-4 mb-1" {...props}>{children}</ul>,
+                            ol: ({ children, ...props }) => <ol className="list-decimal pl-4 mb-1" {...props}>{children}</ol>,
+                            li: ({ children, ...props }) => <li className="mb-0.5" {...props}>{children}</li>,
+                            strong: ({ children, ...props }) => <strong className="font-semibold" {...props}>{children}</strong>,
+                            h2: ({ children, ...props }) => <h2 className="font-semibold text-sm mt-2 mb-1" {...props}>{children}</h2>,
+                            h3: ({ children, ...props }) => <h3 className="font-semibold text-sm mt-1.5 mb-0.5" {...props}>{children}</h3>,
+                          }}
+                        >
+                          {msg.content.replace(/\[ACTION:[^\]]+\]/g, "").trim()}
+                        </ReactMarkdown>
+                        {!msg.content && streaming && (
+                          <span className="inline-block w-1.5 h-4 bg-gray-400 animate-pulse ml-0.5" />
+                        )}
+                      </>
+                    ) : msg.content}
                   </div>
                   {/* Action buttons */}
                   {msg.role === "assistant" && !streaming && extractAction(msg.content) && i === messages.length - 1 && (
