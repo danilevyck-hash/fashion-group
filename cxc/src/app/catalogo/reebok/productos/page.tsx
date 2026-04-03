@@ -32,9 +32,27 @@ function Productos() {
 
   // Cart lives ONLY in React state — ephemeral, not persisted
   const [cart, setCart] = useState<CartItem[]>([]);
+  // Active draft: if user came from an existing draft order, we add to it instead of creating new
+  const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
+  const [activeDraftNumber, setActiveDraftNumber] = useState("");
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
   const cartTotal = cart.reduce((s, i) => s + i.quantity * 12 * Number(i.unit_price || 0), 0);
+
+  // Check for active draft on mount
+  useEffect(() => {
+    const draftId = sessionStorage.getItem("reebok_active_draft_id");
+    if (draftId) {
+      fetch(`/api/catalogo/reebok/orders/${draftId}`).then(r => r.ok ? r.json() : null).then(order => {
+        if (order && order.status === "borrador") {
+          setActiveDraftId(order.id);
+          setActiveDraftNumber(order.order_number);
+        } else {
+          sessionStorage.removeItem("reebok_active_draft_id");
+        }
+      }).catch(() => { sessionStorage.removeItem("reebok_active_draft_id"); });
+    }
+  }, []);
 
   const handleQtyChange = useCallback((productId: string, qty: number, product: Product) => {
     setCart(prev => {
@@ -232,15 +250,41 @@ function Productos() {
       {/* Floating bar — only when cart has items */}
       {cartCount > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-40 p-3 bg-white border-t border-gray-100 shadow-lg">
-          <button onClick={() => setShowNewOrder(true)}
-            className="w-full bg-emerald-600 text-white py-3.5 rounded-lg text-sm font-medium flex items-center justify-between px-4 hover:bg-emerald-700 transition">
-            <span>Crear pedido</span>
-            <span className="flex items-center gap-2">
-              <span className="tabular-nums">{cartCount} bulto{cartCount !== 1 ? "s" : ""}</span>
-              {cartTotal > 0 && <><span className="text-white/40">·</span><span className="tabular-nums font-semibold">${fmt(cartTotal)}</span></>}
-              <span>→</span>
-            </span>
-          </button>
+          {activeDraftId ? (
+            // Add to existing draft
+            <button onClick={async () => {
+              setToast("Agregando al pedido...");
+              try {
+                for (const item of cart) {
+                  await fetch(`/api/catalogo/reebok/orders/${activeDraftId}/item`, {
+                    method: "PATCH", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(item),
+                  });
+                }
+                setCart([]);
+                router.push(`/catalogo/reebok/pedido/${activeDraftId}`);
+              } catch { setToast("Error al agregar productos"); }
+            }}
+              className="w-full bg-black text-white py-3.5 rounded-lg text-sm font-medium flex items-center justify-between px-4 hover:bg-gray-800 transition">
+              <span>Agregar al pedido {activeDraftNumber}</span>
+              <span className="flex items-center gap-2">
+                <span className="tabular-nums">{cartCount} bulto{cartCount !== 1 ? "s" : ""}</span>
+                {cartTotal > 0 && <><span className="text-white/40">·</span><span className="tabular-nums font-semibold">${fmt(cartTotal)}</span></>}
+                <span>→</span>
+              </span>
+            </button>
+          ) : (
+            // Create new order
+            <button onClick={() => setShowNewOrder(true)}
+              className="w-full bg-emerald-600 text-white py-3.5 rounded-lg text-sm font-medium flex items-center justify-between px-4 hover:bg-emerald-700 transition">
+              <span>Crear pedido</span>
+              <span className="flex items-center gap-2">
+                <span className="tabular-nums">{cartCount} bulto{cartCount !== 1 ? "s" : ""}</span>
+                {cartTotal > 0 && <><span className="text-white/40">·</span><span className="tabular-nums font-semibold">${fmt(cartTotal)}</span></>}
+                <span>→</span>
+              </span>
+            </button>
+          )}
         </div>
       )}
 
@@ -251,6 +295,7 @@ function Productos() {
           onCreated={(id) => {
             setShowNewOrder(false);
             setCart([]);
+            sessionStorage.setItem("reebok_active_draft_id", id);
             router.push(`/catalogo/reebok/pedido/${id}`);
           }}
         />

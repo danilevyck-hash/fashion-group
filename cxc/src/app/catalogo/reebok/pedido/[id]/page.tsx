@@ -50,6 +50,8 @@ export default function OrderDetailPage() {
           }
         }
         setOrder(d); setItems(d.reebok_order_items || []); setClientName(d.client_name || "");
+        // Track active draft so catalog can add to it
+        if (d.status === "borrador") sessionStorage.setItem("reebok_active_draft_id", id);
       } else router.push("/catalogo/reebok/pedidos");
     } catch { router.push("/catalogo/reebok/pedidos"); }
     setLoading(false);
@@ -115,14 +117,8 @@ export default function OrderDetailPage() {
       body: JSON.stringify({ client_name: clientName, items, status: "confirmado" }),
     });
 
-    // Clear active order from localStorage so the catalog bar resets
-    if (localStorage.getItem("reebok_active_order_id") === id) {
-      localStorage.removeItem("reebok_active_order_id");
-      localStorage.removeItem("reebok_active_order_number");
-      localStorage.removeItem("reebok_active_order_client");
-      localStorage.setItem("reebok_order_items", "[]");
-      window.dispatchEvent(new Event("reebok-order-changed"));
-    }
+    // Clear active draft so catalog starts fresh
+    sessionStorage.removeItem("reebok_active_draft_id");
 
     // Send email with order summary via existing API
     try {
@@ -299,10 +295,10 @@ export default function OrderDetailPage() {
           {/* Auto-save indicator */}
           {autoSaveStatus === "saving" && <span className="text-[11px] text-gray-400">Guardando...</span>}
           {autoSaveStatus === "saved" && <span className="text-[11px] text-green-600">Guardado</span>}
-          {/* Catalog link */}
-          {!isConfirmed && (
-            <Link href="/catalogo/reebok/productos" className="text-xs text-gray-500 hover:text-black transition">
-              Ver catalogo
+          {/* Add more products */}
+          {!isConfirmed && canEdit && (
+            <Link href="/catalogo/reebok/productos" className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full hover:bg-gray-200 transition">
+              + Agregar productos
             </Link>
           )}
         </div>

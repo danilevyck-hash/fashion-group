@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
 
   const { client_name, vendor_name, items } = await req.json();
   if (!client_name) return NextResponse.json({ error: "client_name required" }, { status: 400 });
+  if (!items || !Array.isArray(items) || items.length === 0) return NextResponse.json({ error: "El pedido debe tener al menos un producto" }, { status: 400 });
 
   const { data: maxRow } = await reebokServer
     .from("reebok_orders").select("order_number").like("order_number", "PED-%").order("created_at", { ascending: false }).limit(1);
