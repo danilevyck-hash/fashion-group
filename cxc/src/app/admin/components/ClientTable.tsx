@@ -27,6 +27,7 @@ interface Props {
   clients: ConsolidatedClient[];
   contactLog: Record<string, { date: string; method: string }>;
   onOpenWhatsApp: (client: ConsolidatedClient) => void;
+  onCopyCollectionMsg: (client: ConsolidatedClient) => void;
   onOpenEmail: (client: ConsolidatedClient) => void;
   onMarkContacted: (clientName: string, method: string) => void;
   onSaveEdit: (nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) => void;
@@ -52,6 +53,7 @@ export default function ClientTable({
   clients,
   contactLog,
   onOpenWhatsApp,
+  onCopyCollectionMsg,
   onOpenEmail,
   onMarkContacted,
   onSaveEdit,
@@ -258,6 +260,7 @@ export default function ClientTable({
                     client={client}
                     contactLog={contactLog}
                     onOpenWhatsApp={onOpenWhatsApp}
+                    onCopyCollectionMsg={onCopyCollectionMsg}
                     onOpenEmail={onOpenEmail}
                     onMarkContacted={onMarkContacted}
                     onSaveEdit={onSaveEdit}
