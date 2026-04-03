@@ -171,12 +171,25 @@ export default function OrderDetailPage() {
   const [sendingToClient, setSendingToClient] = useState(false);
   const [showEmailInput, setShowEmailInput] = useState(false);
 
+  async function fetchImageB64(url: string): Promise<string | null> {
+    try { const r = await fetch(url); const b = await r.blob(); return new Promise(res => { const rd = new FileReader(); rd.onload = () => res(rd.result as string); rd.readAsDataURL(b); }); } catch { return null; }
+  }
+
   async function downloadPDF() {
     if (!order) return;
     showToast("Generando PDF...");
     const { jsPDF } = await import("jspdf");
     const { default: autoTable } = await import("jspdf-autotable");
     const doc = new jsPDF("portrait");
+
+    // Pre-fetch product images
+    const imgs: Record<number, string> = {};
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].image_url) {
+        const b = await fetchImageB64(items[i].image_url);
+        if (b) imgs[i] = b;
+      }
+    }
 
     doc.setFillColor(26, 26, 26);
     doc.rect(0, 0, 210, 18, "F");
@@ -192,12 +205,17 @@ export default function OrderDetailPage() {
 
     autoTable(doc, {
       startY: 32,
-      head: [["Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
-      body: items.map(i => [i.name, i.sku || "", String(i.quantity), String(i.quantity * P), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * P * Number(i.unit_price))}`]),
-      styles: { fontSize: 8, cellPadding: 3 },
+      head: [["", "Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
+      body: items.map(i => ["", i.name, i.sku || "", String(i.quantity), String(i.quantity * P), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * P * Number(i.unit_price))}`]),
+      styles: { fontSize: 8, cellPadding: 2, minCellHeight: 14 },
       headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: [249, 249, 249] },
-      columnStyles: { 2: { halign: "center" }, 3: { halign: "center" }, 4: { halign: "right" }, 5: { halign: "right" } },
+      columnStyles: { 0: { cellWidth: 16 }, 3: { halign: "center" }, 4: { halign: "center" }, 5: { halign: "right" }, 6: { halign: "right" } },
+      didDrawCell: (data: { row: { index: number; section: string }; column: { index: number }; cell: { x: number; y: number } }) => {
+        if (data.column.index === 0 && data.row.section === "body" && imgs[data.row.index]) {
+          try { doc.addImage(imgs[data.row.index], "JPEG", data.cell.x + 1, data.cell.y + 1, 12, 12); } catch { /* skip */ }
+        }
+      },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fy = (doc as any).lastAutoTable.finalY + 8;
