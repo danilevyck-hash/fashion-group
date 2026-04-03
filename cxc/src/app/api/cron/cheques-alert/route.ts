@@ -84,14 +84,37 @@ export async function GET(req: NextRequest) {
     <p style="color:#888;font-size:11px">Fashion Group Panamá — Alerta automática</p>
   `;
 
+  let emailError: string | null = null;
   try {
-    await resend.emails.send({
+    const { error: sendErr } = await resend.emails.send({
       from: "Fashion Group <notificaciones@fashiongr.com>",
       to: NOTIFY_EMAILS,
       subject: `⚠️ ${cheques.length} cheque${cheques.length > 1 ? "s" : ""} por vencer — $${totalMonto.toLocaleString()}`,
       html,
     });
-  } catch { /* email send failed silently */ }
+    if (sendErr) {
+      emailError = sendErr.message;
+      console.error(`[cheques-alert] Resend error: ${sendErr.message}`, { chequeCount: cheques.length, to: NOTIFY_EMAILS });
+    }
+  } catch (err) {
+    emailError = String(err);
+    console.error(`[cheques-alert] Email send failed:`, err, { chequeCount: cheques.length, to: NOTIFY_EMAILS });
+  }
 
-  return NextResponse.json({ message: "Alerta enviada", count: cheques.length, total: totalMonto });
+  // Log email errors to cron_email_errors table
+  if (emailError) {
+    try {
+      await supabaseServer.from("cron_email_errors").insert(
+        cheques.map((c: { cliente: string }) => ({
+          tipo: "cheque_reminder",
+          cheque_context: c.cliente,
+          error_message: emailError,
+        }))
+      );
+    } catch {
+      // Table may not exist yet — errors already logged to console above
+    }
+  }
+
+  return NextResponse.json({ message: emailError ? "Alerta enviada con errores" : "Alerta enviada", count: cheques.length, total: totalMonto, emailError });
 }

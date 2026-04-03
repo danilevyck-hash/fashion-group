@@ -17,6 +17,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const fields = pick(body, ALLOWED_FIELDS);
+  if (fields.itbms !== undefined) fields.itbms = Math.round((Number(fields.itbms) || 0) * 100) / 100;
+  if (fields.total !== undefined) fields.total = Math.round((Number(fields.total) || 0) * 100) / 100;
   const { data, error } = await supabaseServer.from("caja_gastos").update(fields).eq("id", params.id).select().single();
   if (error) return NextResponse.json({ error: "Error al actualizar gasto" }, { status: 500 });
 

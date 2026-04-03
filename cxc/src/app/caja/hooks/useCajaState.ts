@@ -49,8 +49,8 @@ export function useCajaState(urlId: string, initialView: View) {
   const [editGasto, setEditGasto] = useState<Partial<CajaGasto>>({});
 
   const subtotalNum = parseFloat(gSubtotal) || 0;
-  const itbmsNum = subtotalNum * (parseFloat(gItbmsPct) / 100);
-  const totalNum = subtotalNum + itbmsNum;
+  const itbmsNum = Math.round(subtotalNum * (parseFloat(gItbmsPct) / 100) * 100) / 100;
+  const totalNum = Math.round((subtotalNum + itbmsNum) * 100) / 100;
 
   const formValues: GastoFormValues = {
     gFecha, gDescripcion, gProveedor, gNroFactura,
@@ -245,11 +245,12 @@ export function useCajaState(urlId: string, initialView: View) {
   async function saveEditGasto() {
     if (!current || !editingGastoId) return;
     const sub = parseFloat(String(editGasto.subtotal)) || 0;
-    const tax = parseFloat(String(editGasto.itbms)) || 0;
+    const tax = Math.round((parseFloat(String(editGasto.itbms)) || 0) * 100) / 100;
+    const total = Math.round((sub + tax) * 100) / 100;
     await fetch(`/api/caja/gastos/${editingGastoId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...editGasto, subtotal: sub, itbms: tax, total: sub + tax }),
+      body: JSON.stringify({ ...editGasto, subtotal: sub, itbms: tax, total }),
     });
     setEditingGastoId(null); setEditGasto({});
     await loadDetail(current.id); loadPeriodos();

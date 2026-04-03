@@ -8,6 +8,9 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { periodo_id, fecha, descripcion, proveedor, nro_factura, responsable, categoria, empresa, subtotal, itbms, total } = body;
 
+  const roundedItbms = Math.round((Number(itbms) || 0) * 100) / 100;
+  const roundedTotal = Math.round((Number(total) || 0) * 100) / 100;
+
   const { data, error } = await supabaseServer
     .from("caja_gastos")
     .insert({
@@ -18,7 +21,7 @@ export async function POST(req: NextRequest) {
       responsable: responsable || "",
       categoria: categoria || "Varios",
       empresa: empresa || "",
-      subtotal, itbms, total,
+      subtotal, itbms: roundedItbms, total: roundedTotal,
       // Keep old fields populated for backwards compat
       nombre: descripcion || "",
     })
