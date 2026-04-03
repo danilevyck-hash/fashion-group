@@ -117,14 +117,14 @@ async function buildSystemData(): Promise<string> {
     safe(supabaseServer.from("ventas_metas").select("empresa, mes, meta").eq("anio", year)),
     // Facturas recientes
     safe(supabaseServer.from("ventas_raw").select("fecha, tipo, n_sistema, n_fiscal, cliente, vendedor, subtotal, total, utilidad, empresa").order("fecha", { ascending: false }).limit(50)),
-    // Reclamos
-    safe(supabaseServer.from("reclamos").select("id, empresa, proveedor, marca, estado, fecha_reclamo, created_at, reclamo_items(cantidad, precio_unitario)").order("created_at", { ascending: false })),
-    // Cheques
-    safe(supabaseServer.from("cheques").select("id, cliente, empresa, monto, fecha_deposito, estado")),
-    // Guías
-    safe(supabaseServer.from("guia_transporte").select("id, numero, fecha, transportista, estado, monto_total, guia_items(bultos, cliente)").order("numero", { ascending: false })),
-    // Directorio
-    safe(supabaseServer.from("directorio_clientes").select("id, nombre, empresa")),
+    // Reclamos (limit to recent — no need to load years of closed reclamos for chat)
+    safe(supabaseServer.from("reclamos").select("id, empresa, proveedor, marca, estado, fecha_reclamo, created_at, reclamo_items(cantidad, precio_unitario)").eq("deleted", false).order("created_at", { ascending: false }).limit(200)),
+    // Cheques (only pending + recent — no need for all historical)
+    safe(supabaseServer.from("cheques").select("id, cliente, empresa, monto, fecha_deposito, estado").eq("deleted", false).in("estado", ["pendiente", "vencido"]).order("fecha_deposito")),
+    // Guías (limit to recent 200)
+    safe(supabaseServer.from("guia_transporte").select("id, numero, fecha, transportista, estado, monto_total, guia_items(bultos, cliente)").eq("deleted", false).order("numero", { ascending: false }).limit(200)),
+    // Directorio (limit columns, exclude deleted)
+    safe(supabaseServer.from("directorio_clientes").select("id, nombre, empresa").eq("deleted", false)),
     // Préstamos
     safe(supabaseServer.from("prestamos_empleados").select("id, nombre, empresa, deduccion_quincenal, activo, prestamos_movimientos(tipo, monto)").eq("activo", true)),
     // Caja menuda

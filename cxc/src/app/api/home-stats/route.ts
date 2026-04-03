@@ -22,18 +22,21 @@ export async function GET(req: NextRequest) {
     ventasMesRes, ventasPrevRes, cxcRes,
   ] = await Promise.all([
     supabaseServer.from("reclamos").select("*", { count: "exact", head: true })
+      .eq("deleted", false)
       .not("estado", "in", '("Resuelto con NC","Rechazado","Aplicada")'),
     supabaseServer.from("reclamos").select("*", { count: "exact", head: true })
+      .eq("deleted", false)
       .not("estado", "in", '("Resuelto con NC","Rechazado","Aplicada")')
       .lt("fecha_reclamo", dias45),
     supabaseServer.from("reclamos").select("*", { count: "exact", head: true })
+      .eq("deleted", false)
       .in("estado", ["Resuelto con NC", "Aplicada"])
       .gte("updated_at", monthStart),
-    supabaseServer.from("cheques").select("fecha_deposito, monto").eq("estado", "pendiente"),
+    supabaseServer.from("cheques").select("fecha_deposito, monto").eq("estado", "pendiente").eq("deleted", false),
     supabaseServer.from("caja_periodos").select("fondo_inicial, id").eq("estado", "abierto").order("created_at", { ascending: false }).limit(1).maybeSingle(),
     supabaseServer.from("guia_transporte").select("*", { count: "exact", head: true }).gte("created_at", monthStart),
     supabaseServer.from("guia_transporte").select("*", { count: "exact", head: true }).eq("estado", "Pendiente Bodega").eq("deleted", false),
-    supabaseServer.from("directorio_clientes").select("*", { count: "exact", head: true }),
+    supabaseServer.from("directorio_clientes").select("*", { count: "exact", head: true }).eq("deleted", false),
     supabaseServer.from("cxc_uploads").select("uploaded_at").order("uploaded_at", { ascending: false }).limit(1),
     supabaseServer.from("prestamos_movimientos").select("*", { count: "exact", head: true }).eq("estado", "pendiente_aprobacion"),
     // Ventas mes actual
