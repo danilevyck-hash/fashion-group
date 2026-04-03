@@ -81,6 +81,20 @@ export default function ReclamoDetail({
   const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
   const [deleteFotoTarget, setDeleteFotoTarget] = useState<{ id: string; path: string } | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
+
+  async function sendEmail() {
+    setSendingEmail(true);
+    try {
+      const res = await fetch(`/api/reclamos/${current.id}/send-email`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      alert("Email enviado al proveedor");
+    } catch {
+      alert("Error al enviar el email");
+    } finally {
+      setSendingEmail(false);
+    }
+  }
 
   const items = current.reclamo_items ?? [];
   const seg = current.reclamo_seguimiento ?? [];
@@ -135,26 +149,30 @@ export default function ReclamoDetail({
         <StatusBadge estado={current.estado} />
       </div>
 
-      {/* Quick action buttons */}
+      {/* Action bar */}
       <div className="flex items-center gap-2 mb-6 flex-wrap">
         <button onClick={startEdit} className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
           Editar
         </button>
+        <button onClick={sendEmail} disabled={sendingEmail} className="text-xs bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 transition flex items-center gap-1 disabled:opacity-40">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
+          {sendingEmail ? "Enviando..." : "Enviar por Email"}
+        </button>
         <button onClick={sendWA} className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
           WhatsApp
+        </button>
+        <button onClick={() => openPdfWindow(buildSingleReclamoPdfHtml(current, fotos))} className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /><rect x="6" y="2" width="12" height="4" rx="1" /><path d="M4 18h16" /></svg>
+          Imprimir
         </button>
         <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
           Excel
         </button>
-        <button onClick={() => openPdfWindow(buildSingleReclamoPdfHtml(current, fotos))} className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
-          PDF
-        </button>
         {(role === "admin" || role === "secretaria") && (
-          <button onClick={() => setShowDeleteConfirm(true)} className="text-xs border border-red-100 px-3 py-1.5 rounded-full text-red-300 hover:text-red-600 hover:border-red-300 transition ml-auto">Eliminar Reclamo</button>
+          <button onClick={() => setShowDeleteConfirm(true)} className="text-xs text-red-300 hover:text-red-600 transition ml-auto">Eliminar Reclamo</button>
         )}
       </div>
 
@@ -289,17 +307,6 @@ export default function ReclamoDetail({
             <p className="text-[10px] text-gray-400 mt-0.5">{new Date(s.created_at).toLocaleString("es-PA")} — {s.autor}</p>
           </div>
         ))}
-      </div>
-
-      {/* Bottom action links */}
-      <div className="flex gap-3 flex-wrap mb-4">
-        <button onClick={startEdit} title="Editar todos los campos de este reclamo" className="text-sm text-gray-400 hover:text-black transition">Editar</button>
-        <button onClick={sendWA} title="Enviar recordatorio por WhatsApp" className="text-sm text-gray-400 hover:text-black transition">WhatsApp</button>
-        <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} title="Descargar este reclamo en formato Excel" className="text-sm text-gray-400 hover:text-black transition">Excel</button>
-        <button onClick={() => openPdfWindow(buildSingleReclamoPdfHtml(current, fotos))} title="Descargar este reclamo en formato PDF" className="text-sm text-gray-400 hover:text-black transition">PDF</button>
-        {(role === "admin" || role === "secretaria") && (
-          <button onClick={() => setShowDeleteConfirm(true)} title="Eliminar permanentemente este reclamo" className="text-sm text-gray-300 hover:text-red-500 transition ml-auto">Eliminar Reclamo</button>
-        )}
       </div>
 
       <ConfirmDeleteModal

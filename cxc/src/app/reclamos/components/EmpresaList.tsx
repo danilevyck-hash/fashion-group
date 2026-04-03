@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
 import { ESTADOS, daysSince, calcSub, buildReclamosPdfHtml, openPdfWindow } from "./constants";
@@ -103,6 +104,23 @@ export default function EmpresaList({
     window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
   }
 
+  const [emailProgress, setEmailProgress] = useState<string | null>(null);
+
+  async function sendBulkEmail(ids: string[]) {
+    if (!ids.length) return;
+    setEmailProgress(`Enviando 1 de ${ids.length}...`);
+    let sent = 0;
+    for (let i = 0; i < ids.length; i++) {
+      setEmailProgress(`Enviando ${i + 1} de ${ids.length}...`);
+      try {
+        const res = await fetch(`/api/reclamos/${ids[i]}/send-email`, { method: "POST" });
+        if (res.ok) sent++;
+      } catch {}
+    }
+    setEmailProgress(null);
+    alert(`${sent} email${sent !== 1 ? "s" : ""} enviado${sent !== 1 ? "s" : ""}`);
+  }
+
   function sendSingleWA(r: Reclamo) {
     if (!c?.whatsapp) { alert("No hay contacto con WhatsApp para esta empresa."); return; }
     const nombre = c.nombre_contacto || c.nombre || "equipo";
@@ -128,9 +146,13 @@ export default function EmpresaList({
                 {allSelected ? "Deseleccionar todo" : "Seleccionar todo"}
               </button>
               {selectedIds.length > 0 && <>
+                <button onClick={() => sendBulkEmail(selectedIds)} disabled={!!emailProgress} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition disabled:opacity-40 flex items-center gap-1">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
+                  {emailProgress || "Enviar por Email"}
+                </button>
                 <button onClick={downloadSelectedPdf} className="text-sm text-gray-400 hover:text-black transition border border-gray-200 px-4 py-2 rounded-full">↓ PDF</button>
                 <button onClick={downloadSelectedExcel} className="text-sm text-gray-400 hover:text-black transition border border-gray-200 px-4 py-2 rounded-full">↓ Excel</button>
-                <button onClick={() => sendBulkWA(selectedIds)} className="text-sm bg-black text-white px-5 py-2 rounded-full hover:bg-gray-800 transition">WhatsApp</button>
+                <button onClick={() => sendBulkWA(selectedIds)} className="text-sm text-gray-400 hover:text-black transition border border-gray-200 px-4 py-2 rounded-full">WhatsApp</button>
               </>}
               <button onClick={() => { setSelectionMode(false); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
             </>
