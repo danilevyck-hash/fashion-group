@@ -70,24 +70,32 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const excelBuffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
 
     // Build attachments
-    const attachments: { filename: string; content: Buffer }[] = [
+    const attachments: { filename: string; content: Buffer; cid?: string }[] = [
       { filename: `${rec.nro_reclamo}-${rec.empresa}.xlsx`, content: Buffer.from(excelBuffer) },
     ];
 
     // Download and attach fotos in parallel
     const fotos = (rec.reclamo_fotos || []) as { storage_path: string }[];
+    const fotoAttachments: { filename: string; content: Buffer; cid: string }[] = [];
     const downloads = await Promise.all(fotos.map(async (foto, i) => {
       try {
         const { data: fileData, error: dlErr } = await supabaseServer.storage.from("reclamo-fotos").download(foto.storage_path);
         if (!dlErr && fileData) {
           const ab = await fileData.arrayBuffer();
           const ext = foto.storage_path.split(".").pop() || "jpg";
-          return { filename: `evidencia-${i + 1}.${ext}`, content: Buffer.from(ab) };
+          const filename = `evidencia-${i + 1}.${ext}`;
+          const cid = `evidencia${i + 1}`;
+          return { filename, content: Buffer.from(ab), cid };
         }
       } catch { /* skip */ }
       return null;
     }));
-    for (const dl of downloads) { if (dl) attachments.push(dl); }
+    for (const dl of downloads) {
+      if (dl) {
+        attachments.push(dl);
+        fotoAttachments.push(dl);
+      }
+    }
 
     // Build HTML
     const total = subtotal * 1.177;
@@ -134,7 +142,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
             <tr style="border-top:2px solid #000"><td colspan="5" style="padding:8px;text-align:right;font-weight:600">TOTAL</td><td style="padding:8px;text-align:right;font-weight:600">$${fmt(total)}</td><td colspan="2"></td></tr>
           </tfoot>
         </table>
-        ${fotos.length > 0 ? `<p style="color:#666;font-size:12px;margin-top:16px">Se adjuntan ${fotos.length} foto(s) de evidencia.</p>` : ""}
+        ${fotoAttachments.length > 0 ? `
+          <h3 style="font-size:13px;text-transform:uppercase;letter-spacing:0.05em;color:#666;margin:24px 0 8px">Fotos de Evidencia</h3>
+          <div style="margin-bottom:16px">${fotoAttachments.map(f => `<img src="cid:${f.cid}" alt="${esc(f.filename)}" style="max-width:280px;height:auto;border-radius:8px;margin:0 8px 8px 0;border:1px solid #eee" />`).join("")}</div>
+        ` : ""}
         ${rec.notas ? `<p style="color:#666;font-size:12px">Notas: ${esc(rec.notas)}</p>` : ""}
         <p style="margin-top:24px">Quedamos en espera de la nota de crédito correspondiente.</p>
         <p>Saludos,<br><strong>Fashion Group</strong></p>
