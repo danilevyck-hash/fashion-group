@@ -381,7 +381,7 @@ function UploadPageInner() {
       }
 
       if (parsedRows.length === 0) {
-        setVentasPreview({ empresaKey, empresaName, rows: [], validCount: 0, errorCount: 0, duplicateCount: 0, formatError: "No se encontraron filas validas (Factura, NC, ND con subtotal > 1).", file });
+        setVentasPreview({ empresaKey, empresaName, rows: [], validCount: 0, errorCount: 0, duplicateCount: 0, formatError: "No se encontraron filas validas (Factura, Nota de Crédito o Nota de Débito con subtotal mayor a $1).", file });
         return;
       }
 

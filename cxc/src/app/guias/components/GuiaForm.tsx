@@ -228,7 +228,7 @@ export default function GuiaForm({
                     className={inputClass(`item-${idx}-bultos`, "w-full border-b border-gray-200 py-1 text-sm outline-none text-center focus:border-black transition")} />
                 </td>
                 <td className="py-2 text-center">
-                  {items.length > 1 && <button onClick={() => onRemoveRow(idx)} className="text-gray-300 hover:text-black transition text-sm">×</button>}
+                  {items.length > 1 && <button onClick={() => onRemoveRow(idx)} className="text-gray-400 hover:text-black transition text-sm">×</button>}
                 </td>
               </tr>
             ))}

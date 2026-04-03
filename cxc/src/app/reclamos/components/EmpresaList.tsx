@@ -226,7 +226,7 @@ export default function EmpresaList({
                       </button>
                     )}
                     {(role === "admin" || role === "secretaria") && !selectionMode && (
-                      <button onClick={() => onDeleteReclamo(r.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>
+                      <button onClick={() => onDeleteReclamo(r.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar Reclamo</button>
                     )}
                   </td>
                 </tr>

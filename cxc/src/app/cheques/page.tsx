@@ -75,7 +75,7 @@ export default function ChequesPage() {
   const loadCheques = useCallback(async () => {
     setLoading(true);
     try { const res = await fetch("/api/cheques"); if (res.ok) { const d = await res.json(); setCheques(Array.isArray(d) ? d : []); } }
-    catch { setError("Error al cargar cheques"); } setLoading(false);
+    catch { setError("No se pudieron cargar los cheques. Recarga la página."); } setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -682,7 +682,7 @@ export default function ChequesPage() {
                       <span className="text-gray-200">·</span>
                     </>)}
                     <button onClick={() => startEdit(c)} className="text-sm text-gray-500 hover:text-black transition">Editar</button>
-                    {role === "admin" && <><span className="text-gray-200">·</span><button onClick={() => setConfirmDeleteId(c.id)} className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button></>}
+                    {role === "admin" && <><span className="text-gray-200">·</span><button onClick={() => setConfirmDeleteId(c.id)} className="text-sm text-gray-400 hover:text-red-500 transition">Eliminar Cheque</button></>}
                   </td>
                 </tr>
               );

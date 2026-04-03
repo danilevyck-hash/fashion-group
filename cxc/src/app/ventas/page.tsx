@@ -239,15 +239,15 @@ export default function VentasDashboard() {
     try {
       const res = await fetch("/api/ventas/metas", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
       if (res.ok) { showToast("Metas guardadas"); setShowMetas(false); fetchData(); }
-      else showToast("Error al guardar metas");
-    } catch { showToast("Error de conexion"); }
+      else showToast("No se pudieron guardar las metas. Intenta de nuevo.");
+    } catch { showToast("Error de conexión. Verifica tu internet e intenta de nuevo."); }
     setSavingMetas(false);
   };
 
   if (!authChecked) return null;
 
   const kpiCards = [
-    { key: "ventas", label: "Ventas netas", value: fmtK(kpi.ventasNetas), flag: false, tooltip: "Total de ventas sin ITBMS. Facturas − NC + ND, usando Subtotal.", valueExtra: undefined as string | null | undefined },
+    { key: "ventas", label: "Ventas netas", value: fmtK(kpi.ventasNetas), flag: false, tooltip: "Total de ventas sin ITBMS. Facturas menos Notas de Crédito más Notas de Débito.", valueExtra: undefined as string | null | undefined },
     { key: "vsAnterior", label: "vs. Año Ant.", value: kpi.vsAnterior === null ? "—" : `${kpi.vsAnterior >= 0 ? "+" : ""}${kpi.vsAnterior.toFixed(1)}%`, flag: kpi.vsAnterior !== null && kpi.vsAnterior < -20, tooltip: "Compara los mismos meses con datos vs el año pasado.", valueExtra: undefined as string | null | undefined },
     { key: "utilidad", label: "Utilidad total", value: fmtK(kpi.totalUtil), valueExtra: kpi.utilVsAnt, flag: false, tooltip: "Utilidad bruta total del período en B/. absolutos." },
     { key: "margen", label: "Margen bruto", value: kpi.margenDisplay, flag: kpi.margenFlag, tooltip: "Utilidad / ventas netas. Fusionado con tendencia vs año anterior.", valueExtra: undefined as string | null | undefined },

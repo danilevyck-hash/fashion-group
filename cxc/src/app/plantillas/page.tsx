@@ -131,7 +131,7 @@ export default function PlantillasPage() {
     if (stats.vencenEstaSemana > 0) alerts.push({ label: "Cheques vencen esta semana", count: stats.vencenEstaSemana, href: "/cheques?filtro=vencen_semana", color: "yellow" });
     if (stats.prestamosPendientes > 0) alerts.push({ label: "Aprobaciones pendientes", count: stats.prestamosPendientes, href: "/prestamos?pendientes=1", color: "blue" });
     if (stats.reclamosViejos > 0 && (role === 'admin' || role === 'secretaria')) alerts.push({ label: "Reclamos +45 días sin resolver", count: stats.reclamosViejos, href: "/reclamos?viejos=1", color: "red" });
-    if (stats.cxcStale) alerts.push({ label: "Data CXC desactualizada", count: 0, href: "/upload", color: "yellow" });
+    if (stats.cxcStale) alerts.push({ label: "Datos de cartera desactualizados", count: 0, href: "/upload", color: "yellow" });
   }
 
   // Determine visible modules
@@ -226,7 +226,7 @@ export default function PlantillasPage() {
             </div>
             {/* CxC */}
             <div className={`rounded-lg px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
-              <p className="text-[10px] uppercase tracking-wider text-gray-400">CxC</p>
+              <p className="text-[10px] uppercase tracking-wider text-gray-400">Cuentas por Cobrar</p>
               <p className="text-lg font-semibold tabular-nums mt-0.5">${stats.cxcTotal > 0 ? (stats.cxcTotal / 1000).toFixed(0) + "K" : "—"}</p>
               {stats.cxcVencida > 0
                 ? <p className="text-xs text-red-500 mt-1">${(stats.cxcVencida / 1000).toFixed(0)}K vencida</p>

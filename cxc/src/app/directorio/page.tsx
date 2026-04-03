@@ -318,7 +318,7 @@ export default function DirectorioPage() {
                         onClick={() => setExpanded(isExpanded ? null : c.id)}
                       >
                         <div className="font-medium">{c.nombre}{cxcClients.has(c.nombre.toUpperCase().trim().replace(/\s+/g, " ")) && (
-                          <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full ml-1">CXC</span>
+                          <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full ml-1">CxC</span>
                         )}</div>
                         <div className="text-gray-500">{c.empresa}</div>
                         <div className="text-gray-500">{c.whatsapp ? (
@@ -342,10 +342,10 @@ export default function DirectorioPage() {
                             <button onClick={(e) => { e.stopPropagation(); setEditing(c.id); setEditData(c); }}
                               className="text-sm text-gray-400 hover:text-black transition">Editar</button>
                             <button onClick={(e) => { e.stopPropagation(); router.push(`/admin?search=${encodeURIComponent(c.nombre)}`); }}
-                              title="Ver posición CXC de este cliente" className="text-xs text-gray-400 hover:text-black transition">Ver en CXC →</button>
+                              title="Ver deuda de este cliente en Cuentas por Cobrar" className="text-xs text-gray-400 hover:text-black transition">Ver en CXC →</button>
                             {role === "admin" && (
                               <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
-                                className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>
+                                className="text-sm text-gray-400 hover:text-red-500 transition">Eliminar Contacto</button>
                             )}
                           </div>
                         </div>

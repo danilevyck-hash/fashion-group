@@ -246,7 +246,7 @@ function ProductsListSection({
                   {p.on_sale ? 'Oferta' : '—'}
                 </button>
                 <Link href={`/catalogo/reebok/admin/productos/nuevo?id=${p.id}`} className="text-blue-600 text-[11px] px-1 hover:underline">Editar</Link>
-                <button onClick={() => setDeleteProductTarget(p)} className="text-red-500 text-[11px] px-1 hover:underline">Eliminar</button>
+                <button onClick={() => setDeleteProductTarget(p)} className="text-red-500 text-[11px] px-1 hover:underline">Eliminar Producto</button>
               </div>
             </div>
 

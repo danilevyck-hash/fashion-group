@@ -61,7 +61,7 @@ export default function CamisetasPage() {
     try {
       const res = await fetch("/api/camisetas");
       if (res.ok) { const d = await res.json(); setProductos(d.productos || []); setClientes(d.clientes || []); setPedidos(d.pedidos || []); }
-    } catch { setToast("Error de conexión"); setTimeout(() => setToast(null), 3000); }
+    } catch { setToast("Error de conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
     setLoading(false);
   }, []);
 
@@ -119,7 +119,7 @@ export default function CamisetasPage() {
     if (res.ok) {
       if (diff <= 0 || prodTotalPaq(pId) + diff <= Math.floor((productos.find(x => x.id === pId)?.stock_comprado || 0) / PPQ)) showToast("Guardado");
     } else {
-      showToast("Error al guardar");
+      showToast("No se pudo guardar. Intenta de nuevo.");
       load();
     }
   }
@@ -136,7 +136,7 @@ export default function CamisetasPage() {
   async function deleteClient(id: string) {
     const res = await fetch(`/api/camisetas/clientes/${id}`, { method: "DELETE" });
     if (res.ok) { setSelectedClient(null); showToast("Cliente eliminado"); load(); }
-    else { const err = await res.json().catch(() => null); showToast(err?.error || "Error al eliminar"); }
+    else { const err = await res.json().catch(() => null); showToast(err?.error || "No se pudo eliminar. Intenta de nuevo."); }
   }
 
   async function toggleEstado(id: string) {
@@ -146,7 +146,7 @@ export default function CamisetasPage() {
     setClientes(prev => prev.map(c => c.id === id ? { ...c, estado: next } : c));
     const res = await fetch(`/api/camisetas/clientes/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: next }) });
     if (res.ok) showToast(next === "Entregado" ? "Marcado como entregado" : "Marcado como pendiente");
-    else { showToast("Error"); load(); }
+    else { showToast("Ocurrió un error. Intenta de nuevo."); load(); }
   }
 
   async function downloadClientPDF(cId: string) {
@@ -250,7 +250,7 @@ export default function CamisetasPage() {
           showToast(`Pedido de ${nuevoNombre.trim()} guardado`);
         }
       }
-    } catch { showToast("Error al guardar"); }
+    } catch { showToast("No se pudo guardar. Intenta de nuevo."); }
     setNuevoSaving(false);
   }
 
@@ -346,7 +346,7 @@ export default function CamisetasPage() {
                         <div><div className="text-lg font-semibold">{comp}</div><div className="text-[10px] text-gray-400">comprados</div></div>
                         <div><div className={`text-lg font-semibold ${disp < 0 ? "text-red-600" : ""}`}>{disp}</div><div className="text-[10px] text-gray-400">disponible</div></div>
                       </div>
-                      {!isVendedor && <div className="text-xs text-gray-400 mt-2 text-center">${fmt(tPaq * PPQ * prod.precio_panama)}</div>}
+                      {!isVendedor && <div className="text-xs text-gray-600 mt-2 text-center">${fmt(tPaq * PPQ * prod.precio_panama)}</div>}
                     </div>
                   );
                 })}
@@ -578,7 +578,7 @@ export default function CamisetasPage() {
                       <div>
                         <span className="text-sm">{prod.nombre}</span>
                         <span className="text-[10px] text-gray-400 ml-1">{prod.genero}</span>
-                        {!isVendedor && <div className="text-[10px] text-gray-400">${fmt(prod.precio_panama)} · RRP ${fmt(prod.rrp)}</div>}
+                        {!isVendedor && <div className="text-[10px] text-gray-600">${fmt(prod.precio_panama)} · RRP ${fmt(prod.rrp)}</div>}
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-1">
@@ -653,7 +653,7 @@ export default function CamisetasPage() {
                           <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${GENERO_BADGE[prod.genero] || "bg-gray-100 text-gray-600"}`}>{prod.genero}</span>
                         </div>
                       </div>
-                      {!isVendedor && <div className="text-[10px] text-gray-400 mb-2">${fmt(prod.precio_panama)}/u</div>}
+                      {!isVendedor && <div className="text-[10px] text-gray-600 mb-2">${fmt(prod.precio_panama)}/u</div>}
                       <input type="number" min={0} step={1} value={q}
                         onChange={e => setNuevoQtys(prev => ({ ...prev, [prod.id]: parseInt(e.target.value) || 0 }))}
                         className="w-full text-center border border-gray-200 rounded-lg py-2 text-sm outline-none focus:border-black transition tabular-nums" />
