@@ -1,6 +1,6 @@
 {
-  "name": "Fashion Group Sistema",
-  "short_name": "FG Sistema",
+  "name": "Fashion Group",
+  "short_name": "FG",
   "description": "Sistema interno Fashion Group",
   "start_url": "/plantillas",
   "display": "standalone",

@@ -96,6 +96,13 @@ input, button, select, textarea {
   input, select, textarea {
     font-size: 16px !important;
   }
+  /* Bottom bar spacing */
+  body { padding-bottom: 60px; }
+}
+
+/* Safe area for bottom bar (iPhone notch) */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* Smooth horizontal scroll for tables */

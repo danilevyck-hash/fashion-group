@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import ChatPanel from "@/components/ChatPanel";
+import MobileBottomBar from "@/components/MobileBottomBar";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="min-h-screen">
         {children}
+        <MobileBottomBar />
         <ChatPanel />
         <script
           dangerouslySetInnerHTML={{
