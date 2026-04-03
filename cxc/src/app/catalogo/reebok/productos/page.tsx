@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Product } from "@/components/reebok/supabase";
 import ProductCard from "@/components/reebok/ProductCard";
 import NewOrderModal from "@/components/reebok/NewOrderModal";
+import { Toast } from "@/components/ui";
 
 function getOrderCount(): number {
   try {
@@ -36,7 +37,7 @@ function Productos() {
   const [showNewOrder, setShowNewOrder] = useState(false);
 
   useEffect(() => {
-    function handler(e: Event) { setToast((e as CustomEvent).detail); setTimeout(() => setToast(null), 1500); }
+    function handler(e: Event) { setToast((e as CustomEvent).detail); setTimeout(() => setToast(null), 3000); }
     window.addEventListener("reebok-toast", handler);
     return () => window.removeEventListener("reebok-toast", handler);
   }, []);
@@ -258,7 +259,7 @@ function Productos() {
         </div>
       )}
 
-      {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2 rounded-full text-sm z-50">{toast}</div>}
+      <Toast message={toast} />
 
       {/* #12: Scroll to top */}
       {showScrollTop && (

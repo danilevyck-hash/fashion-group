@@ -160,7 +160,7 @@ export default function ReclamoDetail({
 
       {/* Enviar button for Borrador */}
       {current.estado === "Borrador" && (
-        <button onClick={() => onChangeEstado("Enviado")} className="mb-6 bg-blue-600 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2">
+        <button onClick={() => onChangeEstado("Enviado")} className="mb-6 bg-black text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition flex items-center gap-2">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
           Enviar Reclamo
         </button>

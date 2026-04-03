@@ -344,8 +344,8 @@ function UploadPageInner() {
 
         {/* Tab bar */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 mb-6 max-w-xs">
-          <button onClick={() => setActiveTab("cxc")} className={`flex-1 py-2 px-4 text-sm rounded-md transition ${activeTab === "cxc" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>CxC</button>
-          <button onClick={() => setActiveTab("ventas")} className={`flex-1 py-2 px-4 text-sm rounded-md transition ${activeTab === "ventas" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Ventas</button>
+          <button onClick={() => setActiveTab("cxc")} className={`flex-1 py-2 px-4 text-sm rounded-full transition ${activeTab === "cxc" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>CxC</button>
+          <button onClick={() => setActiveTab("ventas")} className={`flex-1 py-2 px-4 text-sm rounded-full transition ${activeTab === "ventas" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Ventas</button>
         </div>
 
         {/* Message banner */}

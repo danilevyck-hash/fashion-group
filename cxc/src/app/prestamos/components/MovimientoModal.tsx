@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { MOV_TYPES } from "./types";
 
 interface Props {
@@ -24,11 +25,18 @@ export default function MovimientoModal({
   show, step, mLabel, mConcepto, mFecha, mMonto, mNotas, saving,
   onClose, onSelectType, onBack, onChangeFecha, onChangeMonto, onChangeNotas, onSave,
 }: Props) {
+  useEffect(() => {
+    if (!show) return;
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [show, onClose]);
+
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
         {step === "type" ? (
           <>
             <h2 className="font-medium mb-4">Nuevo Movimiento</h2>

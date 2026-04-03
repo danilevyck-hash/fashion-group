@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { useToast } from "@/components/ToastSystem";
-import { ConfirmDeleteModal } from "@/components/ui";
+import { ConfirmDeleteModal, EmptyState } from "@/components/ui";
 
 interface Order { id: string; order_number: string; client_name: string; vendor_name: string | null; status: string; total: number; item_count: number; created_at: string; }
 
@@ -115,7 +115,7 @@ export default function PedidosPage() {
       {loading ? (
         <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="h-14 bg-gray-100 rounded-lg animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
-        <p className="text-gray-400 text-sm py-16 text-center">{search || dateFilter ? "Sin resultados" : "No hay pedidos."}</p>
+        <EmptyState title={search || dateFilter ? "Sin resultados" : "No hay pedidos"} subtitle={search || dateFilter ? "Intenta con otros filtros" : "Los pedidos aparecerán aquí"} />
       ) : (
         <div className="space-y-2">
           {filtered.map(o => (

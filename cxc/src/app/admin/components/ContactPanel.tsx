@@ -102,7 +102,7 @@ export default function ContactPanel({
               <input className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300" placeholder="Nombre contacto"
                 value={editData.contacto} onChange={(e) => setEditData({ ...editData, contacto: e.target.value })} />
               <div className="col-span-2 flex gap-2 mt-1">
-                <button onClick={saveEdit} className="text-xs bg-gray-900 text-white px-4 py-1.5 rounded-lg hover:bg-gray-800 transition font-medium">Guardar</button>
+                <button onClick={saveEdit} className="text-xs bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 transition font-medium">Guardar</button>
                 <button onClick={() => setEditing(false)} className="text-xs text-gray-500 hover:text-black transition">Cancelar</button>
               </div>
             </div>

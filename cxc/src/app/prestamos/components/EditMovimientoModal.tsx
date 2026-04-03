@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect } from "react";
+
 interface Props {
   show: boolean;
   emFecha: string;
@@ -19,11 +21,18 @@ export default function EditMovimientoModal({
   show, emFecha, emConcepto, emMonto, emNotas, saving,
   onClose, onChangeFecha, onChangeConcepto, onChangeMonto, onChangeNotas, onSave,
 }: Props) {
+  useEffect(() => {
+    if (!show) return;
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [show, onClose]);
+
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4" onClick={e => e.stopPropagation()}>
         <h2 className="font-medium mb-4">Editar Movimiento</h2>
         <div className="space-y-4">
           <div>

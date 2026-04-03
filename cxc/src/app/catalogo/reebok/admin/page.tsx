@@ -311,7 +311,7 @@ function AddSizeForm({ onAdd }: { onAdd: (size: string, qty: number) => void }) 
     <form onSubmit={submit} className="flex gap-2 mt-3 pt-3 border-t border-gray-200">
       <input value={size} onChange={e => setSize(e.target.value)} placeholder="Talla" className="border rounded px-2 py-1 text-sm w-20" />
       <input type="number" value={qty} onChange={e => setQty(e.target.value)} min={0} className="border rounded px-2 py-1 text-sm w-20" />
-      <button type="submit" className="text-xs bg-black text-white px-3 py-1 rounded hover:bg-gray-800 transition-colors">Agregar</button>
+      <button type="submit" className="text-xs bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 transition-colors">Agregar</button>
     </form>
   )
 }

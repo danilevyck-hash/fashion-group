@@ -5,7 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { useToast } from "@/components/ToastSystem";
-import { ConfirmDeleteModal } from "@/components/ui";
+import { ConfirmDeleteModal, Toast } from "@/components/ui";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
 interface Order { id: string; order_number: string; client_name: string; comment: string; status: string; total: number; reebok_order_items: OrderItem[]; created_at: string; }
@@ -379,7 +379,7 @@ export default function OrderDetailPage() {
         loading={deletingOrder}
       />
 
-      {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2 rounded-full text-sm z-50">{toast}</div>}
+      <Toast message={toast} />
     </div>
   );
 }

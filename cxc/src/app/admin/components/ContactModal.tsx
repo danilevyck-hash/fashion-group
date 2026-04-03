@@ -101,7 +101,7 @@ export default function ContactModal({
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 bg-gray-900 text-white text-sm font-medium px-4 py-2.5 rounded-full hover:bg-gray-800 transition disabled:opacity-50"
+            className="flex-1 bg-black text-white text-sm font-medium px-4 py-2.5 rounded-full hover:bg-gray-800 transition disabled:opacity-50"
           >
             {saving ? "Guardando..." : "Guardar"}
           </button>

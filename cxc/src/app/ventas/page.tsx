@@ -293,14 +293,14 @@ export default function VentasDashboard() {
           </div>
           <div className="flex flex-wrap gap-1.5">
             <button onClick={() => setEmpresaFilter([])}
-              className={`px-3 py-1 text-xs rounded-full transition ${empresaFilter.length === 0 ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+              className={`px-3 py-1 text-xs rounded-full transition ${empresaFilter.length === 0 ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
               Todas
             </button>
             {EMPRESAS.map(e => {
               const active = empresaFilter.includes(e);
               return (
                 <button key={e} onClick={() => setEmpresaFilter(prev => active ? prev.filter(x => x !== e) : [...prev, e])}
-                  className={`px-3 py-1 text-xs rounded-full transition ${active ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                  className={`px-3 py-1 text-xs rounded-full transition ${active ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
                   {e.replace("International", "Intl.").replace("Confecciones ", "")}
                 </button>
               );
@@ -348,8 +348,8 @@ export default function VentasDashboard() {
 
         {/* Tab Bar */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 mb-6 max-w-xs print:hidden">
-          <button onClick={() => setActiveTab("resumen")} className={`flex-1 py-2 px-4 text-sm rounded-md transition ${activeTab === "resumen" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Resumen</button>
-          <button onClick={() => setActiveTab("clientes")} className={`flex-1 py-2 px-4 text-sm rounded-md transition ${activeTab === "clientes" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Clientes</button>
+          <button onClick={() => setActiveTab("resumen")} className={`flex-1 py-2 px-4 text-sm rounded-full transition ${activeTab === "resumen" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Resumen</button>
+          <button onClick={() => setActiveTab("clientes")} className={`flex-1 py-2 px-4 text-sm rounded-full transition ${activeTab === "clientes" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Clientes</button>
         </div>
 
         {/* Resumen Tab */}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { Toast, EmptyState } from "@/components/ui";
 
 interface Cliente { id: string; nombre: string; empresa: string; correo: string; whatsapp: string; }
 
@@ -91,7 +92,7 @@ export default function ClientesPage() {
       {loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-gray-400 text-sm">{search ? "Sin resultados" : "No hay clientes registrados"}</div>
+        <EmptyState title={search ? "Sin resultados" : "No hay clientes registrados"} subtitle={search ? `No se encontraron clientes para "${search}"` : "Los clientes aparecerán aquí al crear pedidos"} />
       ) : (
         <div className="border border-gray-200 rounded-xl overflow-hidden">
           <table className="w-full text-sm">
@@ -159,12 +160,7 @@ export default function ClientesPage() {
         </div>
       )}
 
-      {/* Toast */}
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2.5 rounded-full text-sm z-50 shadow-lg">
-          {toast}
-        </div>
-      )}
+      <Toast message={toast} />
     </div>
   );
 }

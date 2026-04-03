@@ -52,7 +52,7 @@ export default function CamisetasPage() {
   const [nuevoQtys, setNuevoQtys] = useState<Record<string, number>>({});
   const [nuevoSaving, setNuevoSaving] = useState(false);
 
-  const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 2500); };
+  const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 3000); };
 
   const isVendedor = role === "vendedor";
 

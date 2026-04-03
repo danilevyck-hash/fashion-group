@@ -1,6 +1,16 @@
 "use client";
 
+import { useEffect } from "react";
 import { fmt } from "@/lib/format";
+
+function useEscClose(show: boolean, onClose: () => void) {
+  useEffect(() => {
+    if (!show) return;
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", h);
+    return () => document.removeEventListener("keydown", h);
+  }, [show, onClose]);
+}
 
 // ── Pago Quincenal Confirm ──────────────────────────────────────────────────
 interface PagoConfirmProps {
@@ -12,10 +22,11 @@ interface PagoConfirmProps {
 }
 
 export function PagoQuincenalConfirm({ show, nombreEmpleado, deduccionQuincenal, onClose, onConfirm }: PagoConfirmProps) {
+  useEscClose(show, onClose);
   if (!show) return null;
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
         <h2 className="font-medium mb-3">Confirmar Pago Quincenal</h2>
         <p className="text-sm text-gray-500">
           ¿Registrar pago quincenal de <strong className="text-black">${fmt(deduccionQuincenal)}</strong> para <strong className="text-black">{nombreEmpleado}</strong>?
@@ -40,10 +51,11 @@ interface DeleteConfirmProps {
 }
 
 export function DeleteEmpleadoConfirm({ show, nombreEmpleado, deleteInput, onChangeInput, onClose, onConfirm }: DeleteConfirmProps) {
+  useEscClose(show, onClose);
   if (!show) return null;
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
         <h2 className="font-medium mb-2 text-red-700">Eliminar Empleado</h2>
         <p className="text-sm text-gray-500 mb-4">Esta acción es irreversible. Escribe el nombre del empleado para confirmar:</p>
         <p className="text-sm font-medium mb-2">{nombreEmpleado}</p>
@@ -70,10 +82,11 @@ interface ClearHistoryProps {
 }
 
 export function ClearHistoryConfirm({ show, movCount, clearInput, onChangeInput, onClose, onConfirm }: ClearHistoryProps) {
+  useEscClose(show, onClose);
   if (!show) return null;
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
         <h2 className="font-medium mb-2 text-red-700">Borrar Todo el Historial</h2>
         <p className="text-sm text-gray-500 mb-4">
           Esta acción eliminará {movCount} movimiento{movCount > 1 ? "s" : ""} de forma irreversible. Escribe CONFIRMAR para continuar:
@@ -99,10 +112,11 @@ interface ForceArchiveProps {
 }
 
 export function ForceArchiveConfirm({ show, saldo, onClose, onConfirm }: ForceArchiveProps) {
+  useEscClose(show, onClose);
   if (!show) return null;
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
         <h2 className="font-medium mb-2 text-red-700">Forzar Archivado</h2>
         <p className="text-sm text-gray-500 mb-4">
           Este empleado tiene saldo pendiente de <strong className="text-red-600">${fmt(saldo)}</strong>. ¿Confirmas que deseas archivarlo?

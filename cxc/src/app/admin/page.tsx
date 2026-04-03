@@ -415,7 +415,7 @@ export default function AdminDashboard() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4">
         <p className="text-red-500 text-sm">{loadError}</p>
-        <button onClick={loadData} className="text-sm bg-black text-white px-4 py-2 rounded hover:bg-gray-800">Reintentar</button>
+        <button onClick={loadData} className="text-sm bg-black text-white px-4 py-2 rounded-full hover:bg-gray-800">Reintentar</button>
       </div>
     );
   }
@@ -436,7 +436,7 @@ export default function AdminDashboard() {
       <div className="flex justify-end items-center gap-3 mb-6">
           <button
             onClick={() => (window.location.href = "/upload?tab=cxc")}
-            className="text-sm border border-gray-200 text-gray-700 px-5 py-2 rounded-lg font-medium hover:bg-gray-50 transition flex items-center gap-2"
+            className="text-sm border border-gray-200 text-gray-700 px-5 py-2 rounded-full font-medium hover:bg-gray-50 transition flex items-center gap-2"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Cargar archivo
@@ -444,7 +444,7 @@ export default function AdminDashboard() {
           <div className="relative">
             <button
               onClick={() => setShowExport(!showExport)}
-              className="text-sm bg-gray-900 text-white px-5 py-2 rounded-lg font-medium hover:bg-gray-800 transition flex items-center gap-2"
+              className="text-sm bg-black text-white px-5 py-2 rounded-full font-medium hover:bg-gray-800 transition flex items-center gap-2"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Exportar
