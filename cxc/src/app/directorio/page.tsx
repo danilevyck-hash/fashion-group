@@ -108,6 +108,7 @@ export default function DirectorioPage() {
     });
     if (res.ok) {
       setEditing(null);
+      showToast("Contacto actualizado");
       loadClientes(debouncedSearch, page);
       // Sync to CXC overrides
       const cliente = editData as Partial<Cliente>;
@@ -129,8 +130,11 @@ export default function DirectorioPage() {
   }
 
   async function handleDelete(id: string) {
-    const res = await fetch(`/api/directorio/${id}`, { method: "DELETE" });
-    if (res.ok) { setExpanded(null); loadClientes(debouncedSearch, page); }
+    try {
+      const res = await fetch(`/api/directorio/${id}`, { method: "DELETE" });
+      if (res.ok) { setExpanded(null); showToast("Contacto eliminado"); loadClientes(debouncedSearch, page); }
+      else showToast("Error al eliminar");
+    } catch { showToast("Error de conexión"); }
   }
 
   async function handleImport(file: File) {

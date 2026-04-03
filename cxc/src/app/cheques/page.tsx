@@ -178,9 +178,11 @@ export default function ChequesPage() {
   }
 
   async function deleteCheque(id: string) {
-    await fetch(`/api/cheques/${id}`, { method: "DELETE" });
-    loadCheques();
-    showToast("Cheque eliminado");
+    try {
+      const res = await fetch(`/api/cheques/${id}`, { method: "DELETE" });
+      if (res.ok) { loadCheques(); showToast("Cheque eliminado"); }
+      else showToast("Error al eliminar cheque");
+    } catch { showToast("Error de conexión"); }
   }
 
   function exportPendientes() {

@@ -160,6 +160,7 @@ function ProductsListSection({
       if (!res.ok) { const d = await res.json().catch(() => ({})); toast(`Error: ${d.error || res.status}`, 'error'); setDeletingProduct(false); return }
       setProducts(prev => prev.filter(p => p.id !== deleteProductTarget.id))
       setInventory(prev => prev.filter(i => i.product_id !== deleteProductTarget.id))
+      toast('Producto eliminado')
     } catch (err) { toast(`Error: ${err}`, 'error') }
     setDeletingProduct(false)
     setDeleteProductTarget(null)

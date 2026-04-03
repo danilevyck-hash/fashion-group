@@ -211,7 +211,11 @@ export default function UsuariosPage() {
     setSavingUser(false);
   }
   async function toggleUserActive(id: string, active: boolean) {
-    await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, active }) });
+    try {
+      const res = await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, active }) });
+      if (res.ok) showToast(active ? "Usuario activado" : "Usuario desactivado");
+      else showToast("Error al actualizar");
+    } catch { showToast("Error de conexión"); }
     loadFgUsers();
   }
   // Helper: get modules for a role from loaded roles data
