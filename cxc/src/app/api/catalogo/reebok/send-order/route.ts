@@ -53,8 +53,24 @@ export async function POST(req: NextRequest) {
     total = body.total || 0;
   }
 
+  // ── Fetch product images as base64 for PDF ──
+  const imgs: Record<number, string> = {};
+  await Promise.all(items.map(async (item, idx) => {
+    if (!item.image_url) return;
+    try {
+      const res = await fetch(item.image_url);
+      if (!res.ok) return;
+      const buf = await res.arrayBuffer();
+      const b64 = Buffer.from(buf).toString("base64");
+      const contentType = res.headers.get("content-type") || "image/jpeg";
+      imgs[idx] = `data:${contentType};base64,${b64}`;
+    } catch { /* skip failed images */ }
+  }));
+
   // ── Generate PDF attachment ──
   const doc = new jsPDF("portrait");
+  const fechaLabel = new Date(createdAt + (createdAt.includes("T") ? "" : "T12:00:00"))
+    .toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" });
 
   doc.setFillColor(26, 26, 26);
   doc.rect(0, 0, 210, 18, "F");
@@ -66,16 +82,21 @@ export async function POST(req: NextRequest) {
   doc.setTextColor(100); doc.setFontSize(9);
   doc.text(`Cliente: ${clientName}`, 14, 26);
   doc.text(`Pedido: ${orderNumber}`, 90, 26);
-  doc.text(`Fecha: ${new Date(createdAt).toLocaleDateString("es-PA")}`, 150, 26);
+  doc.text(`Fecha: ${fechaLabel}`, 150, 26);
 
   autoTable(doc, {
     startY: 32,
-    head: [["Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
-    body: items.map(i => [i.name, i.sku, String(i.quantity), String(i.quantity * P), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * P * Number(i.unit_price))}`]),
-    styles: { fontSize: 8, cellPadding: 3 },
+    head: [["", "Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
+    body: items.map(i => ["", i.name, i.sku, String(i.quantity), String(i.quantity * P), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * P * Number(i.unit_price))}`]),
+    styles: { fontSize: 8, cellPadding: 2, minCellHeight: 14 },
     headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: [249, 249, 249] },
-    columnStyles: { 2: { halign: "center" }, 3: { halign: "center" }, 4: { halign: "right" }, 5: { halign: "right" } },
+    columnStyles: { 0: { cellWidth: 16 }, 3: { halign: "center" }, 4: { halign: "center" }, 5: { halign: "right" }, 6: { halign: "right" } },
+    didDrawCell: (data: { row: { index: number; section: string }; column: { index: number }; cell: { x: number; y: number } }) => {
+      if (data.column.index === 0 && data.row.section === "body" && imgs[data.row.index]) {
+        try { doc.addImage(imgs[data.row.index], "JPEG", data.cell.x + 1, data.cell.y + 1, 12, 12); } catch { /* skip */ }
+      }
+    },
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fy = (doc as any).lastAutoTable.finalY + 8;
@@ -103,7 +124,7 @@ export async function POST(req: NextRequest) {
     <div style="font-family:Arial,sans-serif;max-width:650px;margin:0 auto">
       <div style="background:#1a1a1a;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
         <h2 style="margin:0;font-size:18px">Pedido ${orderNumber} — ${clientName}</h2>
-        <p style="margin:4px 0 0;font-size:12px;opacity:0.7">${new Date(createdAt).toLocaleDateString("es-PA")}</p>
+        <p style="margin:4px 0 0;font-size:12px;opacity:0.7">${fechaLabel}</p>
       </div>
       <div style="padding:20px;border:1px solid #eee;border-top:none;border-radius:0 0 8px 8px">
         <p style="color:#333;font-size:14px;line-height:1.5;margin:0 0 16px">
