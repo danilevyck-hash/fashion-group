@@ -1,0 +1,1 @@
+npx next build. Si hay errores, arréglalos. Si compila limpio, dime "Build limpio" con el conteo de páginas estáticas y dinámicas.

@@ -1,0 +1,1 @@
+git add -A && git push origin main. Luego verifica que Vercel deployó sin errores revisando el output del push.

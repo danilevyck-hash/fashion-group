@@ -1,0 +1,1 @@
+Para cada API route en src/app/api/ que tenga requireRole(), verifica que el rol "secretaria" tiene acceso donde lo necesita. Lista cualquier endpoint sin auth que debería tenerlo. Excluye endpoints intencionalmente públicos: /api/catalogo/reebok/products GET, /api/catalogo/reebok/inventory GET, /api/auth POST, /api/cron/* (usan CRON_SECRET).
