@@ -179,22 +179,15 @@ export default function OrderDetailPage() {
     showToast("Generando PDF...");
     await saveOrder();
     const result = await generatePDFBlob();
-    if (!result) return;
-    const file = new File([result.blob], result.filename, { type: "application/pdf" });
-    if (navigator.share && navigator.canShare?.({ files: [file] })) {
-      await navigator.share({ files: [file], title: `Pedido ${order!.order_number}`, text: `Pedido Reebok — ${clientName}` });
-    } else {
-      // Fallback: download PDF + open WhatsApp with pre-filled message
+    if (result) {
       const url = URL.createObjectURL(result.blob);
       const a = document.createElement("a"); a.href = url; a.download = result.filename; a.click();
       URL.revokeObjectURL(url);
-      // Build itemized message
-      const itemLines = items.map(i => `• ${i.name} — ${i.quantity} bultos × $${fmt(i.unit_price)} = $${fmt(i.quantity * P * Number(i.unit_price))}`);
-      const text = `*Pedido ${order!.order_number}*\nCliente: ${clientName}\n\n${itemLines.join("\n")}\n\n*Total: ${totalBultos} bultos · ${totalPiezas} piezas · $${fmt(totalMoney)}*\n\n_PDF descargado por separado_`;
-      // Use waNumber if set, otherwise open contact picker
-      const phone = waNumber.length > 4 ? waNumber.replace(/[^0-9]/g, "") : "";
-      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
     }
+    const itemLines = items.map(i => `• ${i.name} — ${i.quantity} bultos × $${fmt(i.unit_price)} = $${fmt(i.quantity * P * Number(i.unit_price))}`);
+    const text = `*Pedido ${order!.order_number}*\nCliente: ${clientName}\n\n${itemLines.join("\n")}\n\n*Total: ${totalBultos} bultos · ${totalPiezas} piezas · $${fmt(totalMoney)}*\n\n_PDF descargado por separado_`;
+    const phone = waNumber.replace(/[^0-9]/g, "");
+    window.open(`https://wa.me/${phone.length >= 8 ? phone : ""}?text=${encodeURIComponent(text)}`, "_blank");
     showToast("Listo");
   }
 
@@ -207,25 +200,17 @@ export default function OrderDetailPage() {
     });
     if (!res.ok) { showToast("Error al confirmar"); return; }
 
-    // Generate PDF and share
-    const result = await generatePDFBlob();
-    if (result && role !== "cliente") {
-      const file = new File([result.blob], result.filename, { type: "application/pdf" });
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: `Pedido ${order!.order_number}`, text: `Pedido Reebok — ${clientName}` });
-      } else {
-        const url = URL.createObjectURL(result.blob);
-        const a = document.createElement("a"); a.href = url; a.download = result.filename; a.click();
-        URL.revokeObjectURL(url);
-        if (waNumber.length > 4) {
-          const phone = waNumber.replace(/[^0-9]/g, "");
-          const text = `Hola, aquí está tu pedido ${order!.order_number} de Reebok Panamá. Gracias por tu compra.`;
-          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
-        }
-      }
-    }
     setShowConfirmModal(false);
-    showToast("Pedido confirmado");
+
+    // Send WhatsApp to the client if number provided
+    const phone = waNumber.replace(/[^0-9]/g, "");
+    if (phone.length >= 8) {
+      const msg = `Hola ${clientName}, tu pedido ${order!.order_number} ha sido recibido.\n\n${totalBultos} bultos · ${totalPiezas} piezas · $${fmt(totalMoney)}\n\nTe estaremos confirmando disponibilidad pronto.\nFashion Group Panamá`;
+      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank");
+      showToast("Pedido confirmado");
+    } else {
+      showToast("Pedido confirmado. No se envió WhatsApp porque no hay número.");
+    }
     load();
   }
 
@@ -369,9 +354,10 @@ export default function OrderDetailPage() {
               </div>
               {role !== "cliente" && (
                 <div className="mb-4">
-                  <label className="text-[10px] text-gray-400 uppercase tracking-wider block mb-1">WhatsApp del cliente</label>
+                  <label className="text-[10px] text-gray-400 uppercase tracking-wider block mb-1">WhatsApp del cliente (opcional)</label>
                   <input type="tel" value={waNumber} onChange={e => setWaNumber(e.target.value)}
                     className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-black" placeholder="+50760001234" />
+                  <p className="text-[10px] text-gray-400 mt-1">Se abrirá WhatsApp con un mensaje de confirmación para el cliente</p>
                 </div>
               )}
               <div className="flex gap-2">
