@@ -226,7 +226,7 @@ function Productos() {
           </select>
         </div>
         <button onClick={() => { setOnlyOferta(!onlyOferta); setPriceFilter(""); }}
-          className={`text-sm px-4 py-2 rounded-full transition font-medium mb-0.5 ${onlyOferta ? "bg-orange-500 text-white" : "border border-gray-200 text-gray-500 hover:border-gray-400"}`}>
+          className={`text-sm px-4 py-2 rounded-md transition font-medium mb-0.5 ${onlyOferta ? "bg-orange-500 text-white" : "border border-gray-200 text-gray-500 hover:border-gray-400"}`}>
           Oferta
         </button>
         {onlyOferta && ofertaPrices.length > 1 && (
@@ -280,7 +280,7 @@ function Productos() {
             <div key={g.label}>
               <div className="flex items-center gap-3 mb-3">
                 <h2 className="text-sm font-medium text-gray-800">{g.label}</h2>
-                <div className="flex-1 border-t border-gray-100" />
+                <div className="flex-1 border-t border-gray-200" />
                 <span className="text-xs text-gray-300">{g.items.length}</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -295,10 +295,10 @@ function Productos() {
       {!loading && totalPages > 1 && (
         <div className="flex items-center justify-center gap-4 mt-8 mb-4">
           <button onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} disabled={page === 1}
-            className="text-sm border border-gray-200 px-4 py-2 rounded-full hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">← Anterior</button>
+            className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">← Anterior</button>
           <span className="text-xs text-gray-400">Página {page} de {totalPages}</span>
           <button onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} disabled={page === totalPages}
-            className="text-sm border border-gray-200 px-4 py-2 rounded-full hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">Siguiente →</button>
+            className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">Siguiente →</button>
         </div>
       )}
 
@@ -314,7 +314,7 @@ function Productos() {
 
       {/* #3/#6: Floating bar — cart mode or order mode */}
       {orderCount > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 p-3 bg-white border-t border-gray-100 shadow-lg">
+        <div className="fixed bottom-0 left-0 right-0 z-40 p-3 bg-white border-t border-gray-200 shadow-lg">
           {orderId ? (
             <button onClick={() => router.push(`/catalogo/reebok/pedido/${orderId}`)}
               className="w-full bg-black text-white py-3.5 rounded-lg text-sm font-medium flex items-center justify-between px-4">

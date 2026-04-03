@@ -236,7 +236,7 @@ function ProductsListSection({
                 </div>
               </button>
               {/* Actions */}
-              <div className="flex items-center gap-1 px-2 flex-shrink-0 border-l border-gray-100">
+              <div className="flex items-center gap-1 px-2 flex-shrink-0 border-l border-gray-200">
                 <button onClick={() => toggleField(p, 'active')}
                   className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${p.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
                   {p.active ? 'Activo' : 'Inactivo'}
@@ -255,7 +255,7 @@ function ProductsListSection({
               <div className="border-t px-4 py-3 bg-gray-50">
                 {getInv(p.id).length > 0 ? (
                   <table className="w-full text-sm">
-                    <thead><tr className="text-xs text-gray-500">
+                    <thead className="sticky top-0 bg-white z-10"><tr className="text-xs text-gray-500">
                       <th className="text-left py-1">Talla</th><th className="text-left py-1">Cantidad</th><th />
                     </tr></thead>
                     <tbody>

@@ -215,7 +215,7 @@ export default function DirectorioPage() {
             const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Directorio-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url);
           }} title="Exportar a Excel" className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-full transition">↓ Excel</button>
           <button onClick={() => setShowNew(true)}
-            className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
+            className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition">
             Nuevo Contacto
           </button>
         </div>
@@ -223,7 +223,7 @@ export default function DirectorioPage() {
 
       {/* New contact form */}
       {showNew && (
-        <div className="border border-gray-100 rounded-2xl p-6 mb-8">
+        <div className="border border-gray-200 rounded-lg p-6 mb-8">
           <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Nuevo Contacto</div>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -260,7 +260,7 @@ export default function DirectorioPage() {
           </div>
           <div className="flex items-center gap-4 mt-6">
             <button onClick={handleCreate}
-              className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
+              className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition">
               Guardar Cliente
             </button>
             <button onClick={() => setShowNew(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
@@ -295,7 +295,7 @@ export default function DirectorioPage() {
           <div className="overflow-x-auto -mx-4 sm:mx-0">
           <div className="min-w-[600px] px-4 sm:px-0">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Nombre</th>
                 <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Empresa</th>
@@ -310,7 +310,7 @@ export default function DirectorioPage() {
                 const isExpanded = expanded === c.id;
                 const isEditing = editing === c.id;
                 return (
-                  <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors align-top">
+                  <tr key={c.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors align-top">
                     <td colSpan={6} className="p-0">
                       {/* Main row */}
                       <div
@@ -386,10 +386,10 @@ export default function DirectorioPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-4 mt-6">
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                className="text-sm border border-gray-200 px-4 py-2 rounded-full hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">← Anterior</button>
+                className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">← Anterior</button>
               <span className="text-xs text-gray-400">Página {page} de {totalPages}</span>
               <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="text-sm border border-gray-200 px-4 py-2 rounded-full hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">Siguiente →</button>
+                className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">Siguiente →</button>
             </div>
           )}
         </>

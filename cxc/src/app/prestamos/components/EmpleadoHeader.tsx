@@ -23,14 +23,14 @@ export default function EmpleadoHeader({ empleado, saldo, onEdit, onToggleArchiv
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
-        <button onClick={onEdit} className="border border-gray-200 px-4 py-2 rounded-full text-sm hover:border-gray-400 transition">Editar</button>
+        <button onClick={onEdit} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Editar</button>
         {empleado.activo && saldo === 0 && (
-          <button onClick={onToggleArchive} className="border border-gray-200 px-4 py-2 rounded-full text-sm hover:border-gray-400 transition">Archivar</button>
+          <button onClick={onToggleArchive} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Archivar</button>
         )}
         {!empleado.activo && (
-          <button onClick={onToggleArchive} className="border border-gray-200 px-4 py-2 rounded-full text-sm hover:border-gray-400 transition">Reactivar</button>
+          <button onClick={onToggleArchive} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Reactivar</button>
         )}
-        <button onClick={onBack} className="border border-gray-200 px-4 py-2 rounded-full text-sm hover:border-gray-400 transition">Volver</button>
+        <button onClick={onBack} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Volver</button>
       </div>
     </div>
   );

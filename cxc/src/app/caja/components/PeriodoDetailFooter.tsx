@@ -26,7 +26,7 @@ export default function PeriodoDetailFooter({
     <>
       {/* Reposición */}
       {current.estado === "cerrado" && (
-        <div className="mt-8 border-t border-gray-100 pt-8 flex items-center justify-between">
+        <div className="mt-8 border-t border-gray-200 pt-8 flex items-center justify-between">
           <div>
             <p className="text-sm font-medium">Reposición de fondos</p>
             <p className="text-sm text-gray-400 mt-0.5">
@@ -36,7 +36,7 @@ export default function PeriodoDetailFooter({
           {!current.repuesto ? (
             <button
               onClick={() => onAprobarReposicion(current.id)}
-              className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition"
+              className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition"
             >
               Aprobar reposición
             </button>
@@ -55,14 +55,14 @@ export default function PeriodoDetailFooter({
       <div className="flex flex-wrap items-center gap-6 mt-8">
         <button
           onClick={onPrint}
-          className="text-sm bg-black text-white px-6 py-2 rounded-full hover:bg-gray-800 transition"
+          className="text-sm bg-black text-white px-6 py-2 rounded-md hover:bg-gray-800 transition"
         >
           Imprimir
         </button>
         <button
           onClick={onExportExcel}
           title="Exportar gastos a Excel"
-          className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-full transition"
+          className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md transition"
         >
           ↓ Excel
         </button>

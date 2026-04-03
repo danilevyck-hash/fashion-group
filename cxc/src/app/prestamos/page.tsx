@@ -246,7 +246,7 @@ export default function PrestamosPage() {
         {totalPendientes > 0 && (role === "admin" || role === "director") && (
           <button
             onClick={() => setFilterPendientes(!filterPendientes)}
-            className="w-full mb-6 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-left flex items-center justify-between hover:border-amber-400 transition"
+            className="w-full mb-6 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-left flex items-center justify-between hover:border-amber-400 transition"
           >
             <span className="text-sm text-amber-700">
               Tienes <strong>{totalPendientes}</strong> préstamo{totalPendientes > 1 ? "s" : ""} pendiente{totalPendientes > 1 ? "s" : ""} de aprobación
@@ -257,9 +257,9 @@ export default function PrestamosPage() {
 
         {/* Actions + Filters */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
-          <button onClick={openNewEmp} className="bg-black text-white px-5 py-2 rounded-full text-sm hover:bg-gray-800 transition">+ Nuevo Empleado</button>
-          <button onClick={openNewMov} className="bg-black text-white px-5 py-2 rounded-full text-sm hover:bg-gray-800 transition">+ Nuevo Préstamo</button>
-          <button onClick={() => router.push("/prestamos/reporte")} className="border border-gray-200 px-5 py-2 rounded-full text-sm hover:border-gray-400 transition">Reporte Deducciones</button>
+          <button onClick={openNewEmp} className="bg-black text-white px-5 py-2 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo Empleado</button>
+          <button onClick={openNewMov} className="bg-black text-white px-5 py-2 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo Préstamo</button>
+          <button onClick={() => router.push("/prestamos/reporte")} className="border border-gray-200 px-5 py-2 rounded-md text-sm hover:border-gray-400 transition">Reporte Deducciones</button>
 
           <div className="flex-1" />
 
@@ -292,8 +292,8 @@ export default function PrestamosPage() {
           <div className="overflow-x-auto -mx-4 sm:mx-0">
             <div className="min-w-[600px] px-4 sm:px-0">
             <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100">
+              <thead className="sticky top-0 bg-white z-10">
+                <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Empleado</th>
                   <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Empresa</th>
                   <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Ded. Quincenal</th>
@@ -359,7 +359,7 @@ export default function PrestamosPage() {
       {/* ── Modal: New/Edit Employee ── */}
       {showEmpModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h2 className="font-medium mb-4">{editingEmp ? "Editar Empleado" : "Nuevo Empleado"}</h2>
             <div className="space-y-4">
               <div>
@@ -395,7 +395,7 @@ export default function PrestamosPage() {
       {/* ── Modal: New Movement ── */}
       {showMovModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             {movStep === "employee" && !mEmpleadoId ? (<>
               <h2 className="font-medium mb-4">Seleccionar Empleado</h2>
               <div className="space-y-1 max-h-80 overflow-y-auto">
@@ -414,7 +414,7 @@ export default function PrestamosPage() {
                 })}
               </div>
               <div className="mt-4">
-                <button onClick={() => setShowMovModal(false)} className="w-full py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
+                <button onClick={() => setShowMovModal(false)} className="w-full py-2 border rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
               </div>
             </>) : (<>
             <h2 className="font-medium mb-4">Nuevo Movimiento</h2>

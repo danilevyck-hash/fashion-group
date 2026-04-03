@@ -261,7 +261,7 @@ export default function ChequesPage() {
           <button onClick={exportPendientes} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-full transition">
             ↓ Exportar pendientes
           </button>
-          <button onClick={() => { resetForm(); setShowForm(!showForm); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">
+          <button onClick={() => { resetForm(); setShowForm(!showForm); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition">
             {showForm ? "Cerrar" : "Nuevo Cheque"}
           </button>
         </div>
@@ -271,7 +271,7 @@ export default function ChequesPage() {
       {vencenHoy.length > 0 && (
         <button
           onClick={() => setFilter("vencen_hoy")}
-          className="w-full mb-3 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-medium hover:bg-red-100 transition text-left"
+          className="w-full mb-3 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm font-medium hover:bg-red-100 transition text-left"
         >
           <span className="flex-shrink-0 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
           {vencenHoy.length} cheque{vencenHoy.length > 1 ? "s" : ""} vence{vencenHoy.length > 1 ? "n" : ""} hoy — ${fmt(totalVencenHoy)} total
@@ -280,7 +280,7 @@ export default function ChequesPage() {
       {vencenSemana.length > 0 && filter !== "vencen_hoy" && (
         <button
           onClick={() => setFilter("vencen_semana")}
-          className="w-full mb-3 flex items-center gap-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-xl px-4 py-3 text-sm font-medium hover:bg-amber-100 transition text-left"
+          className="w-full mb-3 flex items-center gap-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-4 py-3 text-sm font-medium hover:bg-amber-100 transition text-left"
         >
           <span className="flex-shrink-0 w-2 h-2 rounded-full bg-amber-500" />
           {vencenSemana.length} cheque{vencenSemana.length > 1 ? "s" : ""} vence{vencenSemana.length > 1 ? "n" : ""} esta semana
@@ -292,21 +292,21 @@ export default function ChequesPage() {
         const vencenSemanaKPI = pendientes.filter((c) => c.fecha_deposito >= today && c.fecha_deposito <= weekFromNow);
         return (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-            <div className="bg-gray-50 rounded-xl p-4">
+            <div className="bg-gray-50 rounded-lg p-4">
               <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Total a cobrar</div>
               <div className="text-xl font-semibold tabular-nums">${fmt(totalPendiente)}</div>
               <div className="text-xs text-gray-400 mt-0.5">{pendientes.length} cheques</div>
             </div>
-            <div className={`rounded-xl p-4 ${vencenSemanaKPI.length > 0 ? "bg-amber-50" : "bg-gray-50"}`}>
+            <div className={`rounded-lg p-4 ${vencenSemanaKPI.length > 0 ? "bg-amber-50" : "bg-gray-50"}`}>
               <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Vencen esta semana</div>
               <div className={`text-xl font-semibold tabular-nums ${vencenSemanaKPI.length > 0 ? "text-amber-600" : ""}`}>{vencenSemanaKPI.length}</div>
               <div className="text-xs text-gray-400 mt-0.5">${fmt(vencenSemanaKPI.reduce((s, c) => s + (Number(c.monto) || 0), 0))}</div>
             </div>
-            <div className="bg-gray-50 rounded-xl p-4">
+            <div className="bg-gray-50 rounded-lg p-4">
               <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Próximo depósito</div>
               <div className="text-xl font-semibold">{proximo ? fmtDate(proximo) : "—"}</div>
             </div>
-            <div className="bg-gray-50 rounded-xl p-4">
+            <div className="bg-gray-50 rounded-lg p-4">
               <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Depositados</div>
               <div className="text-xl font-semibold tabular-nums text-green-600">{depositados.length}</div>
               <div className="text-xs text-gray-400 mt-0.5">${fmt(depositados.reduce((s, c) => s + (Number(c.monto) || 0), 0))}</div>
@@ -317,7 +317,7 @@ export default function ChequesPage() {
 
       {/* Form */}
       {showForm && (
-        <div className="bg-gray-50 rounded-2xl p-6 mb-8 overflow-visible">
+        <div className="bg-gray-50 rounded-lg p-6 mb-8 overflow-visible">
           <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">{editingId ? "Editar Cheque" : "Nuevo Cheque"}</div>
           <div className="grid grid-cols-2 gap-x-8 gap-y-4 overflow-visible">
             <div className="flex flex-col gap-1">
@@ -373,7 +373,7 @@ export default function ChequesPage() {
           </div>
           {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
           <div className="flex items-center gap-4 mt-6">
-            <button onClick={saveCheque} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">{saving ? "Guardando..." : "Guardar Cheque"}</button>
+            <button onClick={saveCheque} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">{saving ? "Guardando..." : "Guardar Cheque"}</button>
             <button onClick={() => { resetForm(); setShowForm(false); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
           </div>
         </div>
@@ -423,13 +423,13 @@ export default function ChequesPage() {
             Resumen por cliente
           </button>
           {showResumen && (
-            <div className="bg-gray-50 rounded-xl p-4">
+            <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex gap-3 mb-3">
                 <button onClick={() => setResumenSort("monto")} className={`text-xs transition ${resumenSort === "monto" ? "font-medium text-black" : "text-gray-400"}`}>Por monto</button>
                 <button onClick={() => setResumenSort("count")} className={`text-xs transition ${resumenSort === "count" ? "font-medium text-black" : "text-gray-400"}`}>Por cantidad</button>
               </div>
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 bg-white z-10">
                   <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
                     <th className="text-left py-3 px-4 font-normal">Cliente</th>
                     <th className="text-right py-3 px-4 font-normal">Cant. cheques</th>
@@ -439,7 +439,7 @@ export default function ChequesPage() {
                 </thead>
                 <tbody>
                   {resumenClientes.map((r) => (
-                    <tr key={r.cliente} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                    <tr key={r.cliente} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
                       <td className="py-3 px-4 font-medium">{r.cliente}</td>
                       <td className="py-3 px-4 text-right tabular-nums">{r.count}</td>
                       <td className="py-3 px-4 text-right tabular-nums">${fmt(r.total)}</td>
@@ -456,7 +456,7 @@ export default function ChequesPage() {
       {/* Rebotado modal */}
       {rebotandoId && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => { setRebotandoId(null); setMotivoRebote(""); }}>
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Marcar como Rebotado</div>
             <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Motivo (opcional)</label>
             <textarea
@@ -467,7 +467,7 @@ export default function ChequesPage() {
               className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm outline-none focus:border-black transition resize-none mt-1"
             />
             <div className="flex items-center gap-3 mt-4">
-              <button onClick={() => marcarRebotado(rebotandoId)} className="bg-red-600 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-red-700 transition">Confirmar rebotado</button>
+              <button onClick={() => marcarRebotado(rebotandoId)} className="bg-red-600 text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition">Confirmar rebotado</button>
               <button onClick={() => { setRebotandoId(null); setMotivoRebote(""); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
             </div>
           </div>
@@ -530,12 +530,12 @@ export default function ChequesPage() {
               </div>
               <div className="grid grid-cols-7 border-t border-l border-gray-200">
                 {cells.map((day, i) => {
-                  if (day === null) return <div key={`e${i}`} className="border-r border-b border-gray-100 bg-gray-50/50 min-h-[80px]" />;
+                  if (day === null) return <div key={`e${i}`} className="border-r border-b border-gray-200 bg-gray-50/50 min-h-[80px]" />;
                   const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                   const isToday = dateStr === todayDate;
                   const dayCheques = byDay[day] || [];
                   return (
-                    <div key={day} className={`border-r border-b border-gray-100 min-h-[80px] p-1 ${isToday ? "bg-blue-50/60" : ""}`}>
+                    <div key={day} className={`border-r border-b border-gray-200 min-h-[80px] p-1 ${isToday ? "bg-blue-50/60" : ""}`}>
                       <div className={`text-[11px] mb-0.5 ${isToday ? "font-bold text-blue-600" : "text-gray-400"}`}>{day}</div>
                       <div className="space-y-0.5">
                         {dayCheques.slice(0, 3).map(c => (
@@ -545,13 +545,13 @@ export default function ChequesPage() {
                               {c.cliente.length > 12 ? c.cliente.slice(0, 12) + "…" : c.cliente} ${fmt(c.monto)}
                             </button>
                             {calPopover === c.id && (
-                              <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-56" onClick={e => e.stopPropagation()}>
+                              <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-56" onClick={e => e.stopPropagation()}>
                                 <div className="text-xs font-medium mb-1">{c.cliente}</div>
                                 <div className="text-[11px] text-gray-500 mb-0.5">{c.banco} · {c.numero_cheque}</div>
                                 <div className="text-sm font-semibold mb-2">${fmt(c.monto)}</div>
                                 <StatusBadge estado={c.estado} />
                                 {(c.estado === "pendiente" || c.estado === "vencido") && (
-                                  <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
+                                  <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
                                     <button onClick={() => { depositar(c.id); setCalPopover(null); }} className="text-[11px] text-emerald-600 hover:underline">Depositar</button>
                                     <button onClick={() => { setRebotandoId(c.id); setCalPopover(null); }} className="text-[11px] text-red-500 hover:underline">Rebotado</button>
                                   </div>
@@ -574,7 +574,7 @@ export default function ChequesPage() {
                 const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
                 const isToday = dateStr === todayDate;
                 return (
-                  <div key={day} className={`rounded-xl border p-3 ${isToday ? "border-blue-200 bg-blue-50/50" : "border-gray-100"}`}>
+                  <div key={day} className={`rounded-lg border p-3 ${isToday ? "border-blue-200 bg-blue-50/50" : "border-gray-200"}`}>
                     <div className={`text-xs mb-2 ${isToday ? "font-bold text-blue-600" : "text-gray-400"}`}>{fmtDate(dateStr)}{isToday ? " — Hoy" : ""}</div>
                     <div className="space-y-1.5">
                       {byDay[day].map(c => (
@@ -608,7 +608,7 @@ export default function ChequesPage() {
       ) : (
         <>
         {selectedIds.size > 0 && (
-          <div className="flex items-center gap-3 mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <div className="flex items-center gap-3 mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
             <span className="text-sm text-emerald-700">{selectedIds.size} pendiente{selectedIds.size > 1 ? "s" : ""} seleccionado{selectedIds.size > 1 ? "s" : ""}</span>
             <button onClick={() => batchDepositar(selectedIds, setSelectedIds)} disabled={batchProcessing} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-full hover:bg-emerald-700 transition disabled:opacity-50">
               {batchProcessing ? "Procesando..." : "Marcar depositados"}
@@ -617,7 +617,7 @@ export default function ChequesPage() {
           </div>
         )}
         {selectedVencidos.size > 0 && (
-          <div className="flex items-center gap-3 mb-3 px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl">
+          <div className="flex items-center gap-3 mb-3 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg">
             <span className="text-sm text-amber-700">{selectedVencidos.size} vencido{selectedVencidos.size > 1 ? "s" : ""} seleccionado{selectedVencidos.size > 1 ? "s" : ""}</span>
             <button onClick={() => batchDepositar(selectedVencidos, setSelectedVencidos)} disabled={batchProcessing} className="text-xs bg-amber-600 text-white px-4 py-1.5 rounded-full hover:bg-amber-700 transition disabled:opacity-50">
               {batchProcessing ? "Procesando..." : "Depositar seleccionados"}
@@ -628,7 +628,7 @@ export default function ChequesPage() {
         <div className="overflow-x-auto -mx-4 sm:mx-0">
           <div className="min-w-[700px] px-4 sm:px-0">
         <table className="w-full text-sm">
-          <thead>
+          <thead className="sticky top-0 bg-white z-10">
             <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
               <th className="text-left py-3 px-4 font-normal">Fecha Depósito</th>
               <th className="text-left py-3 px-4 font-normal">Cliente</th>
@@ -647,7 +647,7 @@ export default function ChequesPage() {
               const isDep = c.estado === "depositado";
               const isRebotado = c.estado === "rebotado";
               return (
-                <tr key={c.id} className={`border-b border-gray-100 hover:bg-gray-50 transition-colors ${isToday ? "bg-yellow-50 border-l-4 border-l-yellow-400" : isVencido ? "bg-red-50/30" : isRebotado ? "bg-red-50/20" : ""} ${isDep || isVencido ? "text-gray-400" : ""}`}>
+                <tr key={c.id} className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${isToday ? "bg-yellow-50 border-l-4 border-l-yellow-400" : isVencido ? "bg-red-50/30" : isRebotado ? "bg-red-50/20" : ""} ${isDep || isVencido ? "text-gray-400" : ""}`}>
                   {c.estado === "pendiente" && (
                     <td className="py-3 pl-2 pr-0 w-8">
                       <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} className="accent-emerald-600 w-3.5 h-3.5" />

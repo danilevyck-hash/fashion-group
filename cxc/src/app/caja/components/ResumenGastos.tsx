@@ -92,7 +92,7 @@ export default function ResumenGastos({ gastos }: Props) {
                   {catEntries.map(([cat, total]) => (
                     <tr
                       key={cat}
-                      className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                      className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
                     >
                       <td className="py-3 px-4">{cat}</td>
                       <td className="py-3 px-4 text-right tabular-nums">
@@ -125,7 +125,7 @@ export default function ResumenGastos({ gastos }: Props) {
                   {empEntries.map(([emp, total]) => (
                     <tr
                       key={emp}
-                      className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                      className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
                     >
                       <td className="py-3 px-4">{emp}</td>
                       <td className="py-3 px-4 text-right tabular-nums">

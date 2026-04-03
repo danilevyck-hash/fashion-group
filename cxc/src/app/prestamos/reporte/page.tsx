@@ -125,7 +125,7 @@ export default function ReportePage() {
         <h1 className="text-xl font-semibold mb-6">Reporte de Deducciones Quincenales</h1>
 
         {/* Period selector */}
-        <div className="flex flex-wrap items-end gap-4 mb-8 bg-gray-50 rounded-xl p-4">
+        <div className="flex flex-wrap items-end gap-4 mb-8 bg-gray-50 rounded-lg p-4">
           <div>
             <label className="text-xs text-gray-400 uppercase block mb-1">Quincena</label>
             <select value={quincena} onChange={e => setQuincena(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition">
@@ -146,10 +146,10 @@ export default function ReportePage() {
             </select>
           </div>
           <div className="flex-1" />
-          <button onClick={exportExcel} disabled={exporting || filtered.length === 0} className="bg-black text-white px-5 py-2 rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50">
+          <button onClick={exportExcel} disabled={exporting || filtered.length === 0} className="bg-black text-white px-5 py-2 rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
             {exporting ? "Exportando..." : "Exportar Excel"}
           </button>
-          <button onClick={exportPDF} disabled={exporting || filtered.length === 0} className="border border-gray-200 px-5 py-2 rounded-full text-sm hover:border-gray-400 transition disabled:opacity-50">
+          <button onClick={exportPDF} disabled={exporting || filtered.length === 0} className="border border-gray-200 px-5 py-2 rounded-md text-sm hover:border-gray-400 transition disabled:opacity-50">
             Exportar PDF
           </button>
         </div>
@@ -166,7 +166,7 @@ export default function ReportePage() {
             <div className="min-w-[600px] px-4 sm:px-0">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100">
+                <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-3 text-xs uppercase text-gray-400">Empleado</th>
                   <th className="text-left py-3 px-3 text-xs uppercase text-gray-400">Empresa</th>
                   <th className="text-right py-3 px-3 text-xs uppercase text-gray-400">Deducción Quincenal</th>
@@ -193,7 +193,7 @@ export default function ReportePage() {
         )}
 
         <div className="mt-8">
-          <button onClick={() => router.push("/prestamos")} className="border border-gray-200 px-5 py-2 rounded-full text-sm hover:border-gray-400 transition">← Volver a Préstamos</button>
+          <button onClick={() => router.push("/prestamos")} className="border border-gray-200 px-5 py-2 rounded-md text-sm hover:border-gray-400 transition">← Volver a Préstamos</button>
         </div>
       </div>
     </div>

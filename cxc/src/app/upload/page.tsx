@@ -484,9 +484,9 @@ function UploadPageInner() {
   }) {
     return (
       <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl w-full max-w-[950px] max-h-[85vh] flex flex-col">
+        <div className="bg-white rounded-lg w-full max-w-[950px] max-h-[85vh] flex flex-col">
           {/* Header */}
-          <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
+          <div className="px-6 pt-5 pb-4 border-b border-gray-200 flex-shrink-0">
             <div className="flex justify-between items-start">
               <div>
                 <p className="font-semibold text-[15px]">{title}</p>
@@ -529,13 +529,13 @@ function UploadPageInner() {
           )}
 
           {/* Actions */}
-          <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+          <div className="px-6 py-4 border-t border-gray-200 flex gap-3 flex-shrink-0">
             <button onClick={onConfirm} disabled={confirmDisabled}
-              className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-30 disabled:cursor-not-allowed">
+              className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-30 disabled:cursor-not-allowed">
               {confirmLabel}
             </button>
             <button onClick={onCancel}
-              className="border border-gray-300 px-5 py-2.5 rounded-full text-sm text-gray-600 hover:bg-gray-50 transition">
+              className="border border-gray-300 px-5 py-2.5 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition">
               Cancelar
             </button>
           </div>
@@ -566,7 +566,7 @@ function UploadPageInner() {
         {/* ── CXC Tab ──────────────────────────────────────────────────────── */}
         {activeTab === "cxc" && (
           <>
-            <details className="mb-6 bg-blue-50 border border-blue-200 rounded-xl overflow-hidden">
+            <details className="mb-6 bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
               <summary className="px-4 py-3 text-xs text-blue-700 cursor-pointer hover:bg-blue-100 transition flex items-center gap-2">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                 <span className="font-medium">Como sacar el reporte en Switch</span>
@@ -583,7 +583,7 @@ function UploadPageInner() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {cxcCompanies.map((co) => (
                 <div key={co.key}
-                  className={`border rounded-xl p-4 transition cursor-pointer relative ${dragOver === co.key ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"} ${uploading === co.key ? "opacity-60 pointer-events-none" : ""}`}
+                  className={`border rounded-lg p-4 transition cursor-pointer relative ${dragOver === co.key ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"} ${uploading === co.key ? "opacity-60 pointer-events-none" : ""}`}
                   onDragOver={(e) => { e.preventDefault(); setDragOver(co.key); }}
                   onDragLeave={() => setDragOver(null)}
                   onDrop={async (e) => { e.preventDefault(); setDragOver(null); const f = e.dataTransfer.files[0]; if (f) openCxcPreview(co.key, f); }}
@@ -628,7 +628,7 @@ function UploadPageInner() {
         {/* ── Ventas Tab ───────────────────────────────────────────────────── */}
         {activeTab === "ventas" && (
           <>
-            <details className="mb-6 bg-blue-50 border border-blue-200 rounded-xl overflow-hidden">
+            <details className="mb-6 bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
               <summary className="px-4 py-3 text-xs text-blue-700 cursor-pointer hover:bg-blue-100 transition flex items-center gap-2">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                 <span className="font-medium">Como sacar el reporte en Switch</span>
@@ -646,7 +646,7 @@ function UploadPageInner() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {UPLOAD_EMPRESAS.map((co) => (
                 <div key={co.key}
-                  className={`border rounded-xl p-4 transition cursor-pointer relative ${dragOver === co.key ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"} ${co.key === "multifashion" ? "bg-amber-50/30" : ""} ${ventasUploading === co.name ? "opacity-60 pointer-events-none" : ""}`}
+                  className={`border rounded-lg p-4 transition cursor-pointer relative ${dragOver === co.key ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"} ${co.key === "multifashion" ? "bg-amber-50/30" : ""} ${ventasUploading === co.name ? "opacity-60 pointer-events-none" : ""}`}
                   onDragOver={(e) => { e.preventDefault(); setDragOver(co.key); }}
                   onDragLeave={() => setDragOver(null)}
                   onDrop={(e) => { e.preventDefault(); setDragOver(null); const f = e.dataTransfer.files[0]; if (f) openVentasPreview(co.key, co.name, f); }}

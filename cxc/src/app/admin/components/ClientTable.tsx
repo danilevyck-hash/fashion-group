@@ -200,7 +200,7 @@ export default function ClientTable({
       </div>
 
       {/* Client table */}
-      <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
         {/* Sticky sortable header */}
         <div className="grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[10px] sm:text-[11px] font-medium text-gray-500 uppercase tracking-wider select-none sticky top-11 z-[5]">
           {selectionMode && <div className="col-span-1" />}

@@ -170,7 +170,7 @@ export default function ProductCard({ product, stock = 0 }: { product: Product; 
       {/* #2: Qty input modal */}
       {showQtyInput && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]" onClick={() => setShowQtyInput(false)}>
-          <div className="bg-white rounded-xl p-5 w-56 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-lg p-5 w-56 shadow-2xl" onClick={e => e.stopPropagation()}>
             <p className="text-sm text-gray-600 mb-3">Cantidad de bultos</p>
             <input type="number" min={0} autoFocus value={qtyInputVal} onChange={e => setQtyInputVal(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") submitQtyInput(); }}

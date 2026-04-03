@@ -106,10 +106,10 @@ export default function PrestamoDetallePage() {
         <DeduccionesHistorial movs={movs} deduccionQuincenal={empleado.deduccion_quincenal} />
 
         <div className="flex flex-wrap gap-3 mb-6">
-          <button onClick={actions.pagoQuincenal} className="bg-emerald-600 text-white px-5 py-2 rounded-full text-sm hover:bg-emerald-700 transition font-medium">
+          <button onClick={actions.pagoQuincenal} className="bg-emerald-600 text-white px-5 py-2 rounded-md text-sm hover:bg-emerald-700 transition font-medium">
             Pago Quincenal · ${fmt(empleado.deduccion_quincenal)}
           </button>
-          <button onClick={movForm.openMovModal} className="bg-black text-white px-5 py-2 rounded-full text-sm hover:bg-gray-800 transition">
+          <button onClick={movForm.openMovModal} className="bg-black text-white px-5 py-2 rounded-md text-sm hover:bg-gray-800 transition">
             + Nuevo Movimiento
           </button>
         </div>

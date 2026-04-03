@@ -79,7 +79,7 @@ export default function PeriodoDetailHeader({
 
       {/* Low balance alerts */}
       {pctUsed < 10 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-6 flex items-center gap-3">
+        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-6 flex items-center gap-3">
           <span className="text-red-500 text-base">&#9888;</span>
           <p className="text-sm text-red-700">
             Saldo bajo — quedan ${fmt(saldo)} de ${fmt(current.fondo_inicial)}{" "}
@@ -88,7 +88,7 @@ export default function PeriodoDetailHeader({
         </div>
       )}
       {pctUsed >= 10 && pctUsed < 20 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6 flex items-center gap-3">
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-6 flex items-center gap-3">
           <span className="text-amber-500 text-base">&#9888;</span>
           <p className="text-sm text-amber-700">
             Saldo bajo — quedan ${fmt(saldo)} de ${fmt(current.fondo_inicial)}{" "}

@@ -21,7 +21,7 @@ export default function KpiCards({ roleClients, onFilterOverdue }: Props) {
     <>
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6">
         {/* Total CXC */}
-        <div className="border border-gray-200 rounded-xl px-4 py-4 flex items-start gap-3">
+        <div className="border border-gray-200 rounded-lg px-4 py-4 flex items-start gap-3">
           <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
@@ -35,7 +35,7 @@ export default function KpiCards({ roleClients, onFilterOverdue }: Props) {
         </div>
 
         {/* Corriente */}
-        <div className="border border-emerald-200 rounded-xl px-4 py-4 flex items-start gap-3 bg-emerald-50/50">
+        <div className="border border-emerald-200 rounded-lg px-4 py-4 flex items-start gap-3 bg-emerald-50/50">
           <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
@@ -49,7 +49,7 @@ export default function KpiCards({ roleClients, onFilterOverdue }: Props) {
         </div>
 
         {/* Vigilancia */}
-        <div className="border border-amber-200 rounded-xl px-4 py-4 flex items-start gap-3 bg-amber-50/50">
+        <div className="border border-amber-200 rounded-lg px-4 py-4 flex items-start gap-3 bg-amber-50/50">
           <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
@@ -64,7 +64,7 @@ export default function KpiCards({ roleClients, onFilterOverdue }: Props) {
 
         {/* Vencido */}
         <div
-          className="border border-red-200 rounded-xl px-4 py-4 flex items-start gap-3 bg-red-50/50 cursor-pointer hover:bg-red-50 transition group"
+          className="border border-red-200 rounded-lg px-4 py-4 flex items-start gap-3 bg-red-50/50 cursor-pointer hover:bg-red-50 transition group"
           onClick={onFilterOverdue}
         >
           <div className="w-9 h-9 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">

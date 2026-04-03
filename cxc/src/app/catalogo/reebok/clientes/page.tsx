@@ -94,9 +94,9 @@ export default function ClientesPage() {
       ) : filtered.length === 0 ? (
         <EmptyState title={search ? "Sin resultados" : "No hay clientes registrados"} subtitle={search ? `No se encontraron clientes para "${search}"` : "Los clientes aparecerán aquí al crear pedidos"} />
       ) : (
-        <div className="border border-gray-200 rounded-xl overflow-hidden">
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 bg-white z-10">
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-4 py-3 text-[11px] uppercase text-gray-400 font-normal">Nombre</th>
                 <th className="text-left px-4 py-3 text-[11px] uppercase text-gray-400 font-normal">Empresa</th>
@@ -130,7 +130,7 @@ export default function ClientesPage() {
       {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h2 className="font-medium mb-4">{editingId ? "Editar Cliente" : "Nuevo Cliente"}</h2>
             <div className="space-y-3">
               <div>

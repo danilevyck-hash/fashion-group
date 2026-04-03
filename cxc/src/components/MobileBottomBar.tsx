@@ -38,10 +38,10 @@ export default function MobileBottomBar() {
       {/* More menu popover */}
       {showMore && (
         <div className="fixed inset-0 z-40 md:hidden" onClick={() => setShowMore(false)}>
-          <div className="absolute bottom-16 right-2 left-2 bg-white border border-gray-200 rounded-2xl shadow-xl p-2 max-h-[60vh] overflow-y-auto">
+          <div className="absolute bottom-16 right-2 left-2 bg-white border border-gray-200 rounded-lg shadow-xl p-2 max-h-[60vh] overflow-y-auto">
             {MORE_ITEMS.map(m => (
               <button key={m.href} onClick={() => { router.push(m.href); setShowMore(false); }}
-                className={`w-full text-left px-4 py-3 text-sm rounded-xl transition ${pathname.startsWith(m.href) ? "bg-gray-50 font-medium text-black" : "text-gray-600 hover:bg-gray-50"}`}>
+                className={`w-full text-left px-4 py-3 text-sm rounded-lg transition ${pathname.startsWith(m.href) ? "bg-gray-50 font-medium text-black" : "text-gray-600 hover:bg-gray-50"}`}>
                 {m.label}
               </button>
             ))}
@@ -50,7 +50,7 @@ export default function MobileBottomBar() {
       )}
 
       {/* Bottom bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-100 md:hidden safe-bottom">
+      <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200 md:hidden safe-bottom">
         <div className="flex items-stretch">
           {TABS.map(t => {
             const active = t.key === "inicio" ? pathname === "/plantillas" : pathname.startsWith(t.href);

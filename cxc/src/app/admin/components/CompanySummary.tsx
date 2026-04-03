@@ -37,7 +37,7 @@ export default function CompanySummary({
   if (roleCompanies.length <= 1) return null;
 
   return (
-    <div className="mb-6 border border-gray-200 rounded-xl px-5 py-4">
+    <div className="mb-6 border border-gray-200 rounded-lg px-5 py-4">
       <div className="mb-3">
         <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">CXC por Empresa</div>
       </div>

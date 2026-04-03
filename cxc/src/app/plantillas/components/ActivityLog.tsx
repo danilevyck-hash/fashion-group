@@ -91,14 +91,14 @@ export default function ActivityLog({ darkMode }: { darkMode: boolean }) {
       {/* Table */}
       {loading ? (
         <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map(i => <div key={i} className={`h-12 rounded-xl animate-pulse ${darkMode ? "bg-gray-800" : "bg-gray-50"}`} />)}
+          {[1, 2, 3, 4, 5].map(i => <div key={i} className={`h-12 rounded-lg animate-pulse ${darkMode ? "bg-gray-800" : "bg-gray-50"}`} />)}
         </div>
       ) : logs.length === 0 ? (
         <p className="text-sm text-gray-400 text-center py-8">Sin actividad registrada</p>
       ) : (
         <div className="space-y-2">
           {logs.map(log => (
-            <div key={log.id} className={`flex items-center gap-3 px-4 py-3 rounded-xl border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
+            <div key={log.id} className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className={`text-[10px] uppercase font-medium px-2 py-0.5 rounded-full ${MODULE_COLORS[log.module] || "bg-gray-100 text-gray-600"}`}>

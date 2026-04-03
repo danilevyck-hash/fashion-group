@@ -42,7 +42,7 @@ export default function GastoTable({
       <div className="overflow-x-auto -mx-4 sm:mx-0">
         <div className="min-w-[700px] px-4 sm:px-0">
         <table className="w-full text-sm">
-          <thead>
+          <thead className="sticky top-0 bg-white z-10">
             <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
               <th className="text-left py-3 px-4 font-normal">Fecha</th>
               <th className="text-left py-3 px-4 font-normal">Descripción</th>
@@ -71,7 +71,7 @@ export default function GastoTable({
               <>
                 {gastos.map((g) =>
                   editingGastoId === g.id ? (
-                    <tr key={g.id} className="border-b border-gray-100 bg-gray-50">
+                    <tr key={g.id} className="border-b border-gray-200 bg-gray-50">
                       <td className="py-2 pr-1">
                         <input
                           type="date"
@@ -230,7 +230,7 @@ export default function GastoTable({
                   ) : (
                     <tr
                       key={g.id}
-                      className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
+                      className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
                     >
                       <td className="py-3 px-4 text-gray-500">
                         {fmtDate(g.fecha)}

@@ -41,7 +41,7 @@ export default function PeriodoList({
         {!hasOpenPeriod && (
           <button
             onClick={onCreatePeriodo}
-            className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition"
+            className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition"
           >
             Nuevo Período
           </button>
@@ -63,7 +63,7 @@ export default function PeriodoList({
         <div className="overflow-x-auto -mx-4 sm:mx-0">
           <div className="min-w-[600px] px-4 sm:px-0">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
                 <th className="text-left py-3 px-4 font-normal">N°</th>
                 <th className="text-left py-3 px-4 font-normal">Apertura</th>
@@ -82,7 +82,7 @@ export default function PeriodoList({
                   <tr
                     key={p.id}
                     onClick={() => onLoadDetail(p.id)}
-                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+                    className="border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     <td className="py-3 px-4 font-medium">{p.numero}</td>
                     <td className="py-3 px-4 text-gray-500">

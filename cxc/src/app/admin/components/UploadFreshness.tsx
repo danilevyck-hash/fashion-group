@@ -23,7 +23,7 @@ export default function UploadFreshness({ roleCompanies, uploads }: Props) {
         const up = uploads[co.key];
         const age = up ? uploadAge(up.uploaded_at) : "stale";
         return (
-          <div key={co.key} className={`rounded px-3 py-2 text-xs border border-gray-100 ${up ? ageBg[age] : "bg-gray-50"}`}>
+          <div key={co.key} className={`rounded px-3 py-2 text-xs border border-gray-200 ${up ? ageBg[age] : "bg-gray-50"}`}>
             <div className="font-medium truncate">{co.name}</div>
             {up ? (
               <div className="flex items-center gap-1 mt-1">

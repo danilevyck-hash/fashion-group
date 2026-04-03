@@ -80,7 +80,7 @@ export default function OrderDetailPage() {
         <div className="space-y-0">
           {[0, 1, 2, 3, 4].map(i => (
             <div key={i} className="flex items-center gap-4 py-4 border-b border-gray-50" style={{ animationDelay: `${i * 80}ms` }}>
-              <div className="w-14 h-14 shimmer rounded-xl flex-shrink-0" />
+              <div className="w-14 h-14 shimmer rounded-lg flex-shrink-0" />
               <div className="flex-1 space-y-2">
                 <div className="h-3.5 shimmer" style={{ width: `${70 - i * 5}%` }} />
                 <div className="h-3 shimmer" style={{ width: `${40 - i * 3}%` }} />
@@ -89,7 +89,7 @@ export default function OrderDetailPage() {
             </div>
           ))}
         </div>
-        <div className="mt-8 pt-4 border-t border-gray-100 flex justify-between items-center">
+        <div className="mt-8 pt-4 border-t border-gray-200 flex justify-between items-center">
           <div className="h-4 shimmer w-16" />
           <div className="h-8 shimmer w-32 rounded-lg" />
         </div>
@@ -267,7 +267,7 @@ export default function OrderDetailPage() {
       {items.length > 0 && (
         <div className="mb-4">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b border-gray-200">
                 <th className="py-2 text-left text-[10px] uppercase text-gray-400 font-normal w-12"></th>
                 <th className="py-2 text-left text-[10px] uppercase text-gray-400 font-normal">Producto</th>
@@ -346,7 +346,7 @@ export default function OrderDetailPage() {
         {/* Confirm modal */}
         {showConfirmModal && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowConfirmModal(false)}>
-            <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
               <h3 className="text-sm font-medium mb-3">Confirmar pedido {order?.order_number}</h3>
               <div className="text-xs text-gray-500 space-y-1 mb-4">
                 <p>Cliente: {clientName}</p>

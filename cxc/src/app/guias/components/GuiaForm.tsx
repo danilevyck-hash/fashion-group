@@ -99,8 +99,8 @@ export default function GuiaForm({
 
   function SaveButton({ size = "normal" }: { size?: "normal" | "small" }) {
     const cls = size === "small"
-      ? "bg-black text-white px-4 py-2 rounded-full text-xs font-medium hover:bg-gray-800 transition disabled:opacity-40"
-      : "bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40";
+      ? "bg-black text-white px-4 py-2 rounded-md text-xs font-medium hover:bg-gray-800 transition disabled:opacity-40"
+      : "bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40";
     return (
       <button onClick={handleSave} disabled={saving || !items.some(i => i.cliente)} className={cls}>
         {saving ? "Guardando..." : editingId ? "Guardar Cambios" : "Guardar Guía"}
@@ -118,7 +118,7 @@ export default function GuiaForm({
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
       {/* Sticky top bar */}
-      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mb-6 border-b border-gray-100 flex items-center justify-between">
+      <div className="sticky top-0 z-20 bg-white/95 backdrop-blur -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mb-6 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition">← Guías</button>
           <span className="text-sm text-gray-300">N° {formNumero}</span>
@@ -200,32 +200,32 @@ export default function GuiaForm({
           </thead>
           <tbody>
             {items.map((item, idx) => (
-              <tr key={idx} className="border-b border-gray-100">
+              <tr key={idx} className="border-b border-gray-200">
                 <td className="py-2 text-gray-300">{idx + 1}</td>
                 <td className="py-2 pr-2">
                   <input list="clientes-list" type="text" value={item.cliente} onChange={e => onUpdateItem(idx, "cliente", e.target.value)}
-                    className={inputClass(`item-${idx}-cliente`, "w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition")} />
+                    className={inputClass(`item-${idx}-cliente`, "w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition")} />
                 </td>
                 <td className="py-2 pr-2">
                   <input list="direcciones-list" type="text" value={item.direccion} onChange={e => onUpdateItem(idx, "direccion", e.target.value)}
-                    className={inputClass(`item-${idx}-direccion`, "w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition")} />
+                    className={inputClass(`item-${idx}-direccion`, "w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition")} />
                 </td>
                 <td className="py-2 pr-2">
                   <select value={item.empresa} onChange={e => onUpdateItem(idx, "empresa", e.target.value)}
-                    className={inputClass(`item-${idx}-empresa`, "w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent focus:border-black transition appearance-none")}>
+                    className={inputClass(`item-${idx}-empresa`, "w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent focus:border-black transition appearance-none")}>
                     <option value="">Seleccionar...</option>
                     {empresas.map(e => <option key={e} value={e}>{e}</option>)}
                   </select>
                 </td>
                 <td className="py-2 pr-2">
                   <input type="text" value={item.facturas} onChange={e => onUpdateItem(idx, "facturas", e.target.value)}
-                    className={inputClass(`item-${idx}-facturas`, "w-full border-b border-gray-100 py-1 text-sm outline-none focus:border-black transition")} />
+                    className={inputClass(`item-${idx}-facturas`, "w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition")} />
                   {validationErrors.has(`item-${idx}-facturas-separator`) && <p className="text-[9px] text-red-500 mt-0.5">Separar con coma y espacio (ej: FA-001, FA-002)</p>}
                   {validationErrors.has(`item-${idx}-facturas-format`) && !validationErrors.has(`item-${idx}-facturas-separator`) && <p className="text-[9px] text-red-500 mt-0.5">Mín. 4 dígitos por factura</p>}
                 </td>
                 <td className="py-2 pr-2">
                   <input type="number" min={0} value={item.bultos} onChange={e => onUpdateItem(idx, "bultos", parseInt(e.target.value) || 0)}
-                    className={inputClass(`item-${idx}-bultos`, "w-full border-b border-gray-100 py-1 text-sm outline-none text-center focus:border-black transition")} />
+                    className={inputClass(`item-${idx}-bultos`, "w-full border-b border-gray-200 py-1 text-sm outline-none text-center focus:border-black transition")} />
                 </td>
                 <td className="py-2 text-center">
                   {items.length > 1 && <button onClick={() => onRemoveRow(idx)} className="text-gray-300 hover:text-black transition text-sm">×</button>}

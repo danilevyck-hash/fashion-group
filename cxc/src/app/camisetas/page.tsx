@@ -272,10 +272,10 @@ export default function CamisetasPage() {
             <p className="text-sm text-gray-400 mt-1">Pre-órdenes Selección Panamá</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => { setShowInfo(true); setInfoTab("precios"); }} className="border border-gray-200 text-gray-500 px-4 py-2.5 rounded-full text-sm hover:border-gray-400 hover:text-black transition flex-shrink-0 min-h-[44px]">
+            <button onClick={() => { setShowInfo(true); setInfoTab("precios"); }} className="border border-gray-200 text-gray-500 px-4 py-2.5 rounded-md text-sm hover:border-gray-400 hover:text-black transition flex-shrink-0 min-h-[44px]">
               Info Producto
             </button>
-            <button onClick={openNuevo} className="bg-black text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition flex-shrink-0 min-h-[44px]">
+            <button onClick={openNuevo} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition flex-shrink-0 min-h-[44px]">
               + Nuevo Pedido
             </button>
           </div>
@@ -284,24 +284,24 @@ export default function CamisetasPage() {
         {/* Stats cards */}
         {!loading && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            <div className="border border-amber-200 bg-amber-50 rounded-xl p-3">
+            <div className="border border-amber-200 bg-amber-50 rounded-lg p-3">
               <div className="text-[10px] text-amber-600 uppercase tracking-widest">Pendientes</div>
               <div className="text-xl font-semibold text-amber-700 mt-1">{pendientesCount}</div>
               <div className="text-[10px] text-amber-500">de entrega</div>
             </div>
-            <div className="border border-gray-100 rounded-xl p-3">
+            <div className="border border-gray-200 rounded-lg p-3">
               <div className="text-[10px] text-gray-400 uppercase tracking-widest">Paquetes</div>
               <div className="text-xl font-semibold mt-1">{gPaq.toLocaleString()}</div>
               <div className="text-[10px] text-gray-400">{(gPaq * PPQ).toLocaleString()} piezas</div>
             </div>
             {!isVendedor && (
-              <div className="border border-gray-100 rounded-xl p-3">
+              <div className="border border-gray-200 rounded-lg p-3">
                 <div className="text-[10px] text-gray-400 uppercase tracking-widest">Monto Total</div>
                 <div className="text-xl font-semibold mt-1">{fmtK(gVal)}</div>
               </div>
             )}
             {sobrev > 0 && (
-              <div className="border border-red-200 bg-red-50 rounded-xl p-3">
+              <div className="border border-red-200 bg-red-50 rounded-lg p-3">
                 <div className="text-[10px] text-red-600 uppercase tracking-widest">Sobrevendidos</div>
                 <div className="text-xl font-semibold text-red-600 mt-1">{sobrev}</div>
                 <div className="text-[10px] text-red-500">productos</div>
@@ -334,7 +334,7 @@ export default function CamisetasPage() {
                   const comp = Math.floor(prod.stock_comprado / PPQ);
                   const disp = comp - tPaq;
                   return (
-                    <div key={prod.id} className="border border-gray-100 rounded-xl p-4">
+                    <div key={prod.id} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-2">
                         <Dot color={prod.color} size="md" />
                         <span className="text-sm font-medium">{prod.nombre}</span>
@@ -362,7 +362,7 @@ export default function CamisetasPage() {
                   <div className="overflow-x-auto -mx-6 px-6">
                     <p className="text-[10px] text-gray-400 mb-3">Haz click en cualquier celda para editar</p>
                     <table className="text-xs w-max min-w-full border-collapse">
-                      <thead>
+                      <thead className="sticky top-0 bg-white z-10">
                         <tr>
                           <th className="sticky left-0 z-10 bg-white text-left py-3 pr-4 text-[10px] uppercase tracking-widest text-gray-400 font-normal min-w-[180px] border-b border-gray-200">Producto</th>
                           {sortedClientes.map(c => {
@@ -397,7 +397,7 @@ export default function CamisetasPage() {
                               const isOdd = pi % 2 === 1;
                               return (
                                 <tr key={prod.id} className={`${isOdd ? "bg-gray-50/60" : ""} hover:bg-blue-50/40 transition-colors`}>
-                                  <td className={`sticky left-0 z-10 ${isOdd ? "bg-gray-50" : "bg-white"} py-2 pr-4 border-b border-gray-100`}>
+                                  <td className={`sticky left-0 z-10 ${isOdd ? "bg-gray-50" : "bg-white"} py-2 pr-4 border-b border-gray-200`}>
                                     <span className="flex items-center gap-2">
                                       <Dot color={prod.color} />
                                       <span className="font-medium">{prod.nombre}</span>
@@ -408,7 +408,7 @@ export default function CamisetasPage() {
                                     const paq = getPaq(c.id, prod.id);
                                     const editing = editCell?.cId === c.id && editCell?.pId === prod.id;
                                     return (
-                                      <td key={c.id} className="py-1 px-0.5 text-center border-b border-gray-100">
+                                      <td key={c.id} className="py-1 px-0.5 text-center border-b border-gray-200">
                                         {editing ? (
                                           <input type="number" min={0} value={editVal} onChange={e => setEditVal(parseInt(e.target.value) || 0)}
                                             onBlur={() => savePedido(c.id, prod.id, editVal)}
@@ -424,9 +424,9 @@ export default function CamisetasPage() {
                                       </td>
                                     );
                                   })}
-                                  <td className="py-2 px-3 text-right tabular-nums font-semibold border-l border-gray-200 border-b border-gray-100 bg-gray-50/60">{tPaq}</td>
-                                  <td className="py-2 px-3 text-right tabular-nums text-gray-500 border-b border-gray-100 bg-gray-50/60">{tPaq * PPQ}</td>
-                                  {!isVendedor && <td className="py-2 px-3 text-right tabular-nums border-b border-gray-100 bg-gray-50/60">${fmt(tPaq * PPQ * prod.precio_panama)}</td>}
+                                  <td className="py-2 px-3 text-right tabular-nums font-semibold border-l border-gray-200 border-b border-gray-200 bg-gray-50/60">{tPaq}</td>
+                                  <td className="py-2 px-3 text-right tabular-nums text-gray-500 border-b border-gray-200 bg-gray-50/60">{tPaq * PPQ}</td>
+                                  {!isVendedor && <td className="py-2 px-3 text-right tabular-nums border-b border-gray-200 bg-gray-50/60">${fmt(tPaq * PPQ * prod.precio_panama)}</td>}
                                 </tr>
                               );
                             }),
@@ -472,7 +472,7 @@ export default function CamisetasPage() {
                       const isEntregado = c.estado === "Entregado";
                       return (
                         <div key={c.id} onClick={() => setSelectedClient(c.id)}
-                          className={`border rounded-xl p-4 cursor-pointer hover:border-gray-300 transition ${isEntregado ? "opacity-60 border-gray-100" : "border-gray-200"}`}>
+                          className={`border rounded-lg p-4 cursor-pointer hover:border-gray-300 transition ${isEntregado ? "opacity-60 border-gray-200" : "border-gray-200"}`}>
                           <div className="flex items-start justify-between mb-2">
                             <h3 className="text-sm font-medium">{c.nombre}</h3>
                             <StatusBadge estado={isEntregado ? "Entregado" : "Pendiente"} />
@@ -511,15 +511,15 @@ export default function CamisetasPage() {
                     {/* Action buttons */}
                     <div className="flex flex-wrap gap-2 mt-4">
                       {tPaq > 0 && (
-                        <button onClick={() => downloadClientPDF(selectedClient)} className="border border-gray-200 px-4 py-2 rounded-full text-sm hover:border-gray-400 transition">
+                        <button onClick={() => downloadClientPDF(selectedClient)} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">
                           Imprimir Pedido
                         </button>
                       )}
                       <button onClick={() => toggleEstado(cl.id)}
-                        className={`px-4 py-2 rounded-full text-sm transition ${isEntregado ? "border border-gray-200 text-gray-600 hover:border-gray-400" : "bg-green-600 text-white hover:bg-green-700"}`}>
+                        className={`px-4 py-2 rounded-md text-sm transition ${isEntregado ? "border border-gray-200 text-gray-600 hover:border-gray-400" : "bg-green-600 text-white hover:bg-green-700"}`}>
                         {isEntregado ? "Marcar como Pendiente" : "Marcar como Entregado"}
                       </button>
-                      <button onClick={() => setDeleteTarget(cl)} className="border border-red-200 text-red-600 px-4 py-2 rounded-full text-sm hover:border-red-400 transition">
+                      <button onClick={() => setDeleteTarget(cl)} className="border border-red-200 text-red-600 px-4 py-2 rounded-md text-sm hover:border-red-400 transition">
                         Cancelar Pedido
                       </button>
                     </div>
@@ -536,7 +536,7 @@ export default function CamisetasPage() {
                               const tallas = TALLAS[prod.genero] || {};
                               const tallaStr = paq > 0 ? Object.entries(tallas).filter(([, v]) => v > 0).map(([k, v]) => `${k}:${v * paq}`).join(" ") : "";
                               return (
-                                <div key={prod.id} className={`flex items-center py-2 border-b border-gray-100 gap-3 ${paq === 0 ? "opacity-40" : ""}`}>
+                                <div key={prod.id} className={`flex items-center py-2 border-b border-gray-200 gap-3 ${paq === 0 ? "opacity-40" : ""}`}>
                                   <Dot color={prod.color} />
                                   <span className="text-sm flex-1">{prod.nombre}</span>
                                   <input type="number" min={0} step={1} defaultValue={paq} key={`${selectedClient}-${prod.id}-${paq}`}
@@ -572,7 +572,7 @@ export default function CamisetasPage() {
                 const barColor = disp < 0 ? "bg-red-500" : disp < comp * 0.2 ? "bg-amber-400" : "bg-gray-900";
 
                 return (
-                  <div key={prod.id} className="flex items-center py-3 border-b border-gray-100 gap-4">
+                  <div key={prod.id} className="flex items-center py-3 border-b border-gray-200 gap-4">
                     <div className="flex items-center gap-2 w-48 flex-shrink-0">
                       <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ background: COLOR_MAP[prod.color] || "#ccc" }} />
                       <div>
@@ -603,7 +603,7 @@ export default function CamisetasPage() {
       {/* ═══ NUEVO PEDIDO MODAL ═══ */}
       {showNuevo && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowNuevo(false)}>
-          <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             {nuevoStep === "cliente" ? (<>
               <h2 className="text-lg font-medium mb-4">Nuevo Pedido</h2>
               <div>
@@ -645,7 +645,7 @@ export default function CamisetasPage() {
                 {sortedProductos.map(prod => {
                   const q = nuevoQtys[prod.id] || 0;
                   return (
-                    <div key={prod.id} className={`border rounded-xl p-3 transition ${q > 0 ? "border-black bg-gray-50" : "border-gray-200"}`}>
+                    <div key={prod.id} className={`border rounded-lg p-3 transition ${q > 0 ? "border-black bg-gray-50" : "border-gray-200"}`}>
                       <div className="flex items-center gap-2 mb-2">
                         <Dot color={prod.color} size="md" />
                         <div className="min-w-0">
@@ -662,7 +662,7 @@ export default function CamisetasPage() {
                 })}
               </div>
               {/* Running total */}
-              <div className="mt-4 bg-gray-50 rounded-xl px-4 py-3 text-sm">
+              <div className="mt-4 bg-gray-50 rounded-lg px-4 py-3 text-sm">
                 <span className="font-medium">{nuevoTotalPaq}</span> paq · <span>{nuevoTotalPzas}</span> pzas
                 {!isVendedor && <> · <span className="font-medium">${fmt(nuevoTotalVal)}</span></>}
               </div>
@@ -687,7 +687,7 @@ export default function CamisetasPage() {
         {infoTab === "precios" ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-400">
+              <thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 text-[10px] uppercase tracking-widest text-gray-400">
                 <th className="text-left pb-2 font-medium">Item</th>
                 <th className="text-left pb-2 font-medium">Género</th>
                 <th className="text-right pb-2 font-medium">Precio Panamá</th>
@@ -696,7 +696,7 @@ export default function CamisetasPage() {
               <tbody>
                 {GENERO_ORDER.flatMap(gen =>
                   sortedProductos.filter(p => p.genero === gen).map(p => (
-                    <tr key={p.id} className="border-b border-gray-100">
+                    <tr key={p.id} className="border-b border-gray-200">
                       <td className="py-2 flex items-center gap-2"><Dot color={p.color} />{p.nombre}</td>
                       <td className="py-2"><span className={`text-[10px] px-1.5 py-0.5 rounded-full ${GENERO_BADGE[p.genero]}`}>{p.genero}</span></td>
                       <td className="py-2 text-right tabular-nums">${fmt(p.precio_panama)}</td>
@@ -717,7 +717,7 @@ export default function CamisetasPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {Object.entries(TALLAS[gen]).map(([talla, qty]) => (
-                    <div key={talla} className={`border rounded-lg px-3 py-2 text-center min-w-[48px] ${qty > 0 ? "border-gray-200" : "border-gray-100 opacity-40"}`}>
+                    <div key={talla} className={`border rounded-lg px-3 py-2 text-center min-w-[48px] ${qty > 0 ? "border-gray-200" : "border-gray-200 opacity-40"}`}>
                       <div className="text-xs font-medium">{talla}</div>
                       <div className="text-lg font-semibold tabular-nums">{qty}</div>
                     </div>
@@ -727,7 +727,7 @@ export default function CamisetasPage() {
             ))}
           </div>
         )}
-        <button onClick={() => setShowInfo(false)} className="mt-4 w-full py-2.5 border border-gray-200 rounded-full text-sm hover:bg-gray-50 transition">Cerrar</button>
+        <button onClick={() => setShowInfo(false)} className="mt-4 w-full py-2.5 border rounded-md text-sm hover:bg-gray-50 transition">Cerrar</button>
       </Modal>
 
       <Toast message={toast} />

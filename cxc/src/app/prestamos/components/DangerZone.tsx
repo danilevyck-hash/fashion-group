@@ -59,7 +59,7 @@ export default function DangerZone({
           </button>
 
           {dangerOpen && (
-            <div className="border border-red-200 bg-red-50/50 rounded-2xl p-6 mt-2">
+            <div className="border border-red-200 bg-red-50/50 rounded-lg p-6 mt-2">
               <div className="space-y-3">
                 {/* Delete Employee */}
                 <div className="flex items-center justify-between">
@@ -118,7 +118,7 @@ export default function DangerZone({
 
       {/* Force Archive for director (outside danger zone) */}
       {role === "director" && !isAdmin && activo && saldo > 0 && (
-        <div className="border border-red-200 bg-red-50/50 rounded-2xl p-6">
+        <div className="border border-red-200 bg-red-50/50 rounded-lg p-6">
           <div className="flex items-center justify-between">
             <div>
               <div className="text-sm font-medium text-red-700">Forzar Archivado</div>

@@ -177,7 +177,7 @@ function ReportePage() {
             const utilTotal = periods.reduce((s, p) => s + p.u, 0);
             const mg = total > 0 ? (utilTotal / total) * 100 : 0;
             return (
-              <tr key={emp} className="border-b border-gray-100">
+              <tr key={emp} className="border-b border-gray-200">
                 <td className="py-1.5 font-medium">{emp}</td>
                 {periods.map((p, i) => (
                   <td key={i} className={`text-right py-1.5 tabular-nums ${p.v === 0 ? "text-gray-300" : ""}`}>
@@ -218,7 +218,7 @@ function ReportePage() {
                   ? new Date(c.ultima_compra).toLocaleDateString("es-PA")
                   : "—";
                 return (
-                  <tr key={c.cliente} className="border-b border-gray-100">
+                  <tr key={c.cliente} className="border-b border-gray-200">
                     <td className="py-1.5">{c.cliente}</td>
                     <td className="text-right py-1.5 tabular-nums">{fmt(c.subtotal)}</td>
                     <td className="text-right py-1.5 tabular-nums">{fmt(c.utilidad)}</td>

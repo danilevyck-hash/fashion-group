@@ -21,7 +21,7 @@ export function SkeletonKPI({ count = 3 }: { count?: number }) {
   return (
     <div className={`grid grid-cols-2 sm:grid-cols-${count} gap-4 mb-6`}>
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="bg-gray-50 rounded-xl p-4 space-y-2">
+        <div key={i} className="bg-gray-50 rounded-lg p-4 space-y-2">
           <div className="h-2.5 bg-gray-100 rounded animate-pulse w-20" />
           <div className="h-6 bg-gray-100 rounded animate-pulse w-24" />
         </div>
@@ -55,7 +55,7 @@ export function EmptyState({
       <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
       {subtitle && <p className="text-xs text-gray-400 mb-4 max-w-xs">{subtitle}</p>}
       {actionLabel && onAction && (
-        <button onClick={onAction} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition min-h-[44px]">
+        <button onClick={onAction} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition min-h-[44px]">
           {actionLabel}
         </button>
       )}
@@ -67,7 +67,7 @@ export function EmptyState({
 export function Toast({ message, type = "success" }: { message: string | null; type?: "success" | "error" }) {
   if (!message) return null;
   return (
-    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-full text-sm shadow-lg z-50 flex items-center gap-2 ${
+    <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-md text-sm shadow-lg z-50 flex items-center gap-2 ${
       type === "error" ? "bg-red-900 text-white" : "bg-black text-white"
     }`}>
       {type === "error" ? (
@@ -112,7 +112,7 @@ export function Modal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
-      <div ref={ref} className={`bg-white sm:rounded-2xl rounded-t-2xl p-6 ${maxWidth} w-full mx-0 sm:mx-4 shadow-2xl max-h-[90vh] overflow-y-auto`}>
+      <div ref={ref} className={`bg-white sm:rounded-lg rounded-t-2xl p-6 ${maxWidth} w-full mx-0 sm:mx-4 shadow-2xl max-h-[90vh] overflow-y-auto`}>
         {title && <h2 className="text-base font-medium mb-4">{title}</h2>}
         {children}
       </div>
@@ -145,14 +145,14 @@ export function ConfirmModal({
   if (!open) return null;
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white sm:rounded-2xl rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-base font-medium mb-1">{title}</h3>
         {message && <p className="text-sm text-gray-500 mb-6">{message}</p>}
         <div className="flex gap-3 mt-4">
           <button
             onClick={onConfirm}
             disabled={loading}
-            className={`flex-1 px-4 py-2.5 rounded-full text-sm font-medium transition disabled:opacity-50 min-h-[44px] ${
+            className={`flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition disabled:opacity-50 min-h-[44px] ${
               destructive
                 ? "bg-red-600 text-white hover:bg-red-700"
                 : "bg-black text-white hover:bg-gray-800"
@@ -160,7 +160,7 @@ export function ConfirmModal({
           >
             {loading ? "Procesando..." : confirmLabel}
           </button>
-          <button onClick={onClose} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-full text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
+          <button onClick={onClose} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
             {cancelLabel}
           </button>
         </div>
@@ -207,18 +207,18 @@ export function ConfirmDeleteModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onCancel}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className="relative bg-white sm:rounded-2xl rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-base font-semibold mb-1">{title}</h3>
         <p className="text-sm text-gray-500 mb-6">{description}</p>
         <div className="flex gap-3">
           <button
             onClick={onConfirm}
             disabled={!enabled || loading}
-            className="flex-1 px-4 py-2.5 rounded-full text-sm font-medium transition bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 min-h-[44px]"
+            className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 min-h-[44px]"
           >
             {loading ? "Eliminando..." : !enabled ? "Eliminar..." : "Eliminar"}
           </button>
-          <button onClick={onCancel} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-full text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
+          <button onClick={onCancel} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
             Cancelar
           </button>
         </div>
@@ -241,7 +241,7 @@ export function FotoLightbox({ src, onClose }: { src: string | null; onClose: ()
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
-      <img src={src} alt="" className="relative max-w-3xl max-h-[90vh] w-auto h-auto object-contain rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()} />
+      <img src={src} alt="" className="relative max-w-3xl max-h-[90vh] w-auto h-auto object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
     </div>
   );
 }

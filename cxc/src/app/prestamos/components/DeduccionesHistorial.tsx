@@ -19,7 +19,7 @@ export default function DeduccionesHistorial({ movs, deduccionQuincenal }: Props
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-gray-100">
+            <tr className="border-b border-gray-200">
               <th className="text-left py-2 px-3 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Quincena</th>
               <th className="text-right py-2 px-3 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Esperada</th>
               <th className="text-right py-2 px-3 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Aplicada</th>

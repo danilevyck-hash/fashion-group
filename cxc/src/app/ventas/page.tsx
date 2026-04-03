@@ -317,7 +317,7 @@ export default function VentasDashboard() {
         {loading ? <SkeletonKPI count={5} /> : (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
             {kpiCards.map(k => (
-              <div key={k.key} className="bg-gray-50 rounded-xl p-4">
+              <div key={k.key} className="bg-gray-50 rounded-lg p-4">
                 <div className="flex items-center mb-1">
                   <p className="text-[10px] uppercase tracking-wide text-gray-400">{k.label}</p>
                   <button onClick={() => setKpiTooltip(kpiTooltip === k.key ? null : k.key)} className="text-gray-300 hover:text-gray-500 text-[10px] ml-1">?</button>
@@ -356,10 +356,10 @@ export default function VentasDashboard() {
         {activeTab === "resumen" && (
           <>
             {loading ? <SkeletonTable rows={9} cols={vista === "quarter" ? 7 : 15} /> : (
-              <div className="overflow-x-auto mb-6 border border-gray-100 rounded-xl">
+              <div className="overflow-x-auto mb-6 border border-gray-200 rounded-lg">
                 <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50/50">
+                  <thead className="sticky top-0 bg-white z-10">
+                    <tr className="border-b border-gray-200 bg-gray-50/50">
                       <th className="text-left px-3 py-2 font-medium text-gray-500 sticky left-0 bg-gray-50/50">Empresa</th>
                       {table.periods.map(p => <th key={p} className="text-right px-2 py-2 font-medium text-gray-500">{p}</th>)}
                       <th className="text-right px-3 py-2 font-medium text-gray-500">Total</th>
@@ -404,17 +404,17 @@ export default function VentasDashboard() {
           <>
             {/* Client KPIs */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-              <div className="bg-gray-50 rounded-xl p-4">
+              <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Top Cliente</p>
                 <p className="text-sm font-semibold">{topClient?.cliente || "—"}</p>
                 <p className="text-xs text-gray-400">{topClient ? fmtK(topClient.subtotal) : ""}</p>
               </div>
-              <div className="bg-gray-50 rounded-xl p-4">
+              <div className="bg-gray-50 rounded-lg p-4">
                 <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Concentración Top 5</p>
                 <p className={`text-xl font-semibold ${top5Pct > 60 ? "text-amber-600" : ""}`}>{top5Pct.toFixed(0)}%</p>
                 <p className="text-xs text-gray-400">del total de ventas</p>
               </div>
-              <div className={`rounded-xl p-4 cursor-pointer transition ${showInactive ? "bg-red-50 border border-red-200" : "bg-gray-50"}`} onClick={() => setShowInactive(!showInactive)}>
+              <div className={`rounded-lg p-4 cursor-pointer transition ${showInactive ? "bg-red-50 border border-red-200" : "bg-gray-50"}`} onClick={() => setShowInactive(!showInactive)}>
                 <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Sin compra 60+ días</p>
                 <p className={`text-xl font-semibold ${inactiveCount > 0 ? "text-red-600" : ""}`}>{inactiveCount}</p>
                 <p className="text-xs text-gray-400">{showInactive ? "Mostrando inactivos" : "Click para filtrar"}</p>
@@ -428,9 +428,9 @@ export default function VentasDashboard() {
             </div>
 
             {/* Client Table */}
-            <div className="overflow-x-auto border border-gray-100 rounded-xl mb-6">
+            <div className="overflow-x-auto border border-gray-200 rounded-lg mb-6">
               <table className="w-full text-xs">
-                <thead><tr className="border-b border-gray-100 bg-gray-50/50">
+                <thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 bg-gray-50/50">
                   <th className="text-left px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("ventas")}>Cliente</th>
                   <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("ventas")}>Ventas</th>
                   <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("utilidad")}>Utilidad</th>
@@ -480,7 +480,7 @@ export default function VentasDashboard() {
       <Modal open={showMetas} onClose={() => setShowMetas(false)} title={`Metas ${año}`} maxWidth="max-w-4xl">
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
-            <thead><tr className="border-b border-gray-100">
+            <thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200">
               <th className="text-left px-2 py-1 font-medium text-gray-500">Empresa</th>
               {MES_NAMES.map(m => <th key={m} className="text-center px-1 py-1 font-medium text-gray-500 w-16">{m}</th>)}
             </tr></thead>

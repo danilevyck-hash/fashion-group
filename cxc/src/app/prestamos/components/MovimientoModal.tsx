@@ -36,13 +36,13 @@ export default function MovimientoModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
-      <div className="bg-white rounded-2xl p-6 max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4" onClick={e => e.stopPropagation()}>
         {step === "type" ? (
           <>
             <h2 className="font-medium mb-4">Nuevo Movimiento</h2>
             <div className="grid grid-cols-2 gap-2">
               {MOV_TYPES.map((t) => (
-                <button key={t.key} onClick={() => onSelectType(t.key)} className={`border rounded-xl px-3 py-3 text-left transition ${t.color}`}>
+                <button key={t.key} onClick={() => onSelectType(t.key)} className={`border rounded-lg px-3 py-3 text-left transition ${t.color}`}>
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-lg">{t.icon}</span>
                     <span className="text-xs font-medium">{t.label}</span>
@@ -52,7 +52,7 @@ export default function MovimientoModal({
               ))}
             </div>
             <div className="mt-4">
-              <button onClick={onClose} className="w-full py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
+              <button onClick={onClose} className="w-full py-2 border rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
             </div>
           </>
         ) : (

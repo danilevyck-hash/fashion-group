@@ -159,16 +159,16 @@ export default function ReportExport({ stats, darkMode }: { stats: Stats; darkMo
         )}
       </button>
       {open && (
-        <div className={`absolute right-0 top-full mt-1 rounded-xl shadow-lg border z-20 overflow-hidden w-56 ${darkMode ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
+        <div className={`absolute right-0 top-full mt-1 rounded-lg shadow-lg border z-20 overflow-hidden w-56 ${darkMode ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
           <button onClick={generateVentasExcel} className={`w-full text-left px-4 py-3 text-sm transition ${darkMode ? "hover:bg-gray-800" : "hover:bg-gray-50"}`}>
             <span className="font-medium">Ventas consolidado</span>
             <span className="block text-[10px] text-gray-400 mt-0.5">Excel por empresa</span>
           </button>
-          <button onClick={generateCxCExcel} className={`w-full text-left px-4 py-3 text-sm border-t transition ${darkMode ? "border-gray-800 hover:bg-gray-800" : "border-gray-100 hover:bg-gray-50"}`}>
+          <button onClick={generateCxCExcel} className={`w-full text-left px-4 py-3 text-sm border-t transition ${darkMode ? "border-gray-800 hover:bg-gray-800" : "border-gray-200 hover:bg-gray-50"}`}>
             <span className="font-medium">CxC consolidado</span>
             <span className="block text-[10px] text-gray-400 mt-0.5">Excel con aging por cliente</span>
           </button>
-          <button onClick={generateExecutivePDF} className={`w-full text-left px-4 py-3 text-sm border-t transition ${darkMode ? "border-gray-800 hover:bg-gray-800" : "border-gray-100 hover:bg-gray-50"}`}>
+          <button onClick={generateExecutivePDF} className={`w-full text-left px-4 py-3 text-sm border-t transition ${darkMode ? "border-gray-800 hover:bg-gray-800" : "border-gray-200 hover:bg-gray-50"}`}>
             <span className="font-medium">Reporte ejecutivo</span>
             <span className="block text-[10px] text-gray-400 mt-0.5">PDF con KPIs consolidados</span>
           </button>

@@ -71,8 +71,8 @@ export default function SignatureCanvas({ label, canvasRef, initialImage, onChan
       </label>
       <canvas
         ref={canvasRef}
-        className="w-full border border-gray-200 rounded-xl bg-white touch-none"
-        style={{ height: 150 }}
+        className="w-full border border-gray-200 rounded-lg bg-white touch-none"
+        style={{ height: 100 }}
       />
       <div className="flex gap-4 mt-1.5">
         <button

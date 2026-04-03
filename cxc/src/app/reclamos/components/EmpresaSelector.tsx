@@ -59,14 +59,14 @@ export default function EmpresaSelector({
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex items-center justify-between mb-5">
           <h1 className="text-xl font-light tracking-tight">Reclamos</h1>
-          <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition">Nuevo Reclamo</button>
+          <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition">Nuevo Reclamo</button>
         </div>
 
         {role === "admin" && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-5">
-            <div className="border border-gray-100 rounded-xl p-4"><div className="text-xs text-gray-400 uppercase tracking-widest">Total Pendiente</div><div className="text-xl font-semibold mt-1 tabular-nums">${fmt(totalPendiente)}</div></div>
-            <div className="border border-gray-100 rounded-xl p-4"><div className="text-xs text-gray-400 uppercase tracking-widest">Reclamos Abiertos</div><div className="text-xl font-semibold mt-1">{pendientes.length}</div></div>
-            <div className={`border rounded-xl p-4 ${alertas > 0 ? "border-red-200 bg-red-50" : "border-gray-100"}`}><div className="text-xs text-gray-400 uppercase tracking-widest">Alertas +45 días</div><div className={`text-xl font-semibold mt-1 ${alertas > 0 ? "text-red-600" : ""}`}>{alertas}</div></div>
+            <div className="border border-gray-200 rounded-lg p-4"><div className="text-xs text-gray-400 uppercase tracking-widest">Total Pendiente</div><div className="text-xl font-semibold mt-1 tabular-nums">${fmt(totalPendiente)}</div></div>
+            <div className="border border-gray-200 rounded-lg p-4"><div className="text-xs text-gray-400 uppercase tracking-widest">Reclamos Abiertos</div><div className="text-xl font-semibold mt-1">{pendientes.length}</div></div>
+            <div className={`border rounded-lg p-4 ${alertas > 0 ? "border-red-200 bg-red-50" : "border-gray-200"}`}><div className="text-xs text-gray-400 uppercase tracking-widest">Alertas +45 días</div><div className={`text-xl font-semibold mt-1 ${alertas > 0 ? "text-red-600" : ""}`}>{alertas}</div></div>
           </div>
         )}
 
@@ -101,7 +101,7 @@ export default function EmpresaSelector({
                   </tr></thead>
                   <tbody>
                     {results.map((r) => (
-                      <tr key={r.id} onClick={() => onLoadDetail(r.id, r.empresa)} className="border-b border-gray-100 hover:bg-gray-50/80 transition cursor-pointer">
+                      <tr key={r.id} onClick={() => onLoadDetail(r.id, r.empresa)} className="border-b border-gray-200 hover:bg-gray-50/80 transition cursor-pointer">
                         <td className="py-3 font-medium text-xs">{r.nro_reclamo}</td>
                         <td className="py-3 text-gray-500">{r.empresa}</td>
                         <td className="py-3 text-gray-500">{r.nro_factura}</td>
@@ -128,7 +128,7 @@ export default function EmpresaSelector({
               return (
                 <div key={empresa}
                   onClick={() => onSelectEmpresa(empresa)}
-                  className={`border border-gray-100 rounded-2xl p-6 cursor-pointer hover:border-gray-300 transition ${open.length === 0 ? "opacity-50" : ""}`}>
+                  className={`border border-gray-200 rounded-lg p-6 cursor-pointer hover:border-gray-300 transition ${open.length === 0 ? "opacity-50" : ""}`}>
                   <div className="flex items-start justify-between mb-1">
                     <p className="text-sm font-semibold">{empresa}</p>
                     <div className="flex gap-1.5">
@@ -148,7 +148,7 @@ export default function EmpresaSelector({
                   </div>
                   {/* Historial */}
                   {ers.length > 0 && (
-                    <div className="mt-4 border-t border-gray-100 pt-3" onClick={(ev) => ev.stopPropagation()}>
+                    <div className="mt-4 border-t border-gray-200 pt-3" onClick={(ev) => ev.stopPropagation()}>
                       <button
                         onClick={() => setExpandedHistorial((p) => ({ ...p, [empresa]: !p[empresa] }))}
                         className="text-[11px] text-gray-400 hover:text-black transition flex items-center gap-1 w-full">

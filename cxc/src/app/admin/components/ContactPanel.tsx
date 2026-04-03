@@ -248,7 +248,7 @@ export default function ContactPanel({
               {visibleCompanies.map((co) => {
                 const d = client.companies[co.key];
                 return (
-                  <tr key={co.key} className="border-t border-gray-100 hover:bg-white transition">
+                  <tr key={co.key} className="border-t border-gray-200 hover:bg-white transition">
                     {roleCompanies.length > 1 && <td className="py-1.5 font-medium">{co.name}</td>}
                     <td className="py-1.5 text-gray-400">{d.codigo}</td>
                     <td className="text-right py-1.5 tabular-nums">{fmt(d.d0_30)}</td>

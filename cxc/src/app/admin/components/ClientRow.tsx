@@ -40,7 +40,7 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
     <>
       <div className={`border-l-4 ${risk.border} group`} data-tooltip={risk.tooltip}>
         <div
-          className={`grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm cursor-pointer transition-colors border-b border-gray-100 ${isExpanded ? "bg-gray-50" : "hover:bg-gray-50/70"}`}
+          className={`grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm cursor-pointer transition-colors border-b border-gray-200 ${isExpanded ? "bg-gray-50" : "hover:bg-gray-50/70"}`}
           onClick={onToggle}
         >
           <>

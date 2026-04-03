@@ -75,7 +75,7 @@ export default function GuiasList({
           {canCreate && (
             <button
               onClick={onNewGuia}
-              className="text-sm bg-black text-white px-6 py-2.5 rounded-full font-medium hover:bg-gray-800 transition"
+              className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition"
             >
               Nueva Guia
             </button>
@@ -87,7 +87,7 @@ export default function GuiasList({
           const pendingCount = guias.filter((g) => g.estado === "Pendiente Bodega").length;
           if (pendingCount === 0) return null;
           return (
-            <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-600 mb-6 flex items-center justify-between">
+            <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-600 mb-6 flex items-center justify-between">
               <span>
                 {pendingCount} guia{pendingCount !== 1 ? "s" : ""} pendiente{pendingCount !== 1 ? "s" : ""} de despachar
               </span>
@@ -167,7 +167,7 @@ export default function GuiasList({
                       const isDispatched = g.estado === "Completada" || g.estado === "Listo para Imprimir";
 
                       return (
-                        <div key={g.id} className={`border rounded-xl transition-all ${isExpanded ? "border-gray-300 shadow-sm" : "border-gray-100 hover:border-gray-200"}`}>
+                        <div key={g.id} className={`border rounded-lg transition-all ${isExpanded ? "border-gray-300 shadow-sm" : "border-gray-200 hover:border-gray-200"}`}>
                           {/* Row header */}
                           <button
                             onClick={() => onToggleExpand(g.id)}
@@ -193,7 +193,7 @@ export default function GuiasList({
 
                           {/* Expanded content */}
                           {isExpanded && (
-                            <div className="px-4 pb-5 border-t border-gray-100">
+                            <div className="px-4 pb-5 border-t border-gray-200">
                               {expandedLoading ? (
                                 <div className="py-6 flex justify-center"><svg className="animate-spin h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
                               ) : expandedGuia ? (
@@ -201,8 +201,8 @@ export default function GuiasList({
                                   {/* Items table */}
                                   <div className="overflow-x-auto mt-4">
                                     <table className="w-full text-xs">
-                                      <thead>
-                                        <tr className="text-[10px] uppercase tracking-wider text-gray-400 border-b border-gray-100">
+                                      <thead className="sticky top-0 bg-white z-10">
+                                        <tr className="text-[10px] uppercase tracking-wider text-gray-400 border-b border-gray-200">
                                           <th className="text-left py-2 px-2 font-normal">#</th>
                                           <th className="text-left py-2 px-2 font-normal">Cliente</th>
                                           <th className="text-left py-2 px-2 font-normal">Direccion</th>
@@ -233,7 +233,7 @@ export default function GuiasList({
 
                                   {/* Dispatched: read-only despacho data */}
                                   {isDispatched && (
-                                    <div className="mt-4 pt-4 border-t border-gray-100">
+                                    <div className="mt-4 pt-4 border-t border-gray-200">
                                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                                         <div>
                                           <span className="text-gray-400 block">Tipo</span>
@@ -267,7 +267,7 @@ export default function GuiasList({
                                             <span className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1">
                                               {expandedGuia.tipo_despacho === "directo" ? "Firma del chofer" : "Firma del transportista"}
                                             </span>
-                                            <img src={expandedGuia.firma_base64} alt="Firma" className="h-12 border border-gray-100 rounded p-1 bg-white" />
+                                            <img src={expandedGuia.firma_base64} alt="Firma" className="h-12 border border-gray-200 rounded p-1 bg-white" />
                                           </div>
                                         )}
                                         {expandedGuia.firma_entregador_base64 && (
@@ -275,7 +275,7 @@ export default function GuiasList({
                                             <span className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1">
                                               {expandedGuia.tipo_despacho === "directo" ? "Firma del cliente" : "Firma del entregador"}
                                             </span>
-                                            <img src={expandedGuia.firma_entregador_base64} alt="Firma" className="h-12 border border-gray-100 rounded p-1 bg-white" />
+                                            <img src={expandedGuia.firma_entregador_base64} alt="Firma" className="h-12 border border-gray-200 rounded p-1 bg-white" />
                                           </div>
                                         )}
                                       </div>
@@ -306,7 +306,7 @@ export default function GuiasList({
                                   )}
 
                                   {/* Action buttons */}
-                                  <div className="flex items-center gap-4 mt-6 pt-4 border-t border-gray-100">
+                                  <div className="flex items-center gap-4 mt-6 pt-4 border-t border-gray-200">
                                     {canEdit && (
                                       <button
                                         onClick={() => onEdit(expandedGuia.id)}

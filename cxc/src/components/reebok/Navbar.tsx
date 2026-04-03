@@ -51,7 +51,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 bg-white border-b border-gray-100">
+      <nav className="sticky top-0 z-50 bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4">
           {showSystem && (
             <Link href="/plantillas" className="text-xs text-gray-400 hover:text-gray-600 transition flex-shrink-0 py-2">← Dashboard</Link>

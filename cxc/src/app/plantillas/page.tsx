@@ -201,12 +201,12 @@ export default function PlantillasPage() {
       {(role === "admin" || role === "director") && (
         statsLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
-            {[1,2,3,4].map(i => <div key={i} className="h-20 rounded-xl bg-gray-50 animate-pulse" />)}
+            {[1,2,3,4].map(i => <div key={i} className="h-20 rounded-lg bg-gray-50 animate-pulse" />)}
           </div>
         ) : stats ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
             {/* Ventas */}
-            <div className={`rounded-xl px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
+            <div className={`rounded-lg px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
               <p className="text-[10px] uppercase tracking-wider text-gray-400">Ventas del mes</p>
               <p className="text-lg font-semibold tabular-nums mt-0.5">${stats.ventasMes > 0 ? (stats.ventasMes / 1000).toFixed(0) + "K" : "—"}</p>
               {stats.ventasPrev > 0 && stats.ventasMes > 0 ? (() => {
@@ -215,7 +215,7 @@ export default function PlantillasPage() {
               })() : <p className="text-xs text-gray-300 mt-1">—</p>}
             </div>
             {/* Reclamos */}
-            <div className={`rounded-xl px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
+            <div className={`rounded-lg px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
               <p className="text-[10px] uppercase tracking-wider text-gray-400">Reclamos</p>
               <p className="text-lg font-semibold tabular-nums mt-0.5">{stats.reclamosPendientes}</p>
               <div className="flex items-center gap-2 mt-1">
@@ -225,7 +225,7 @@ export default function PlantillasPage() {
               </div>
             </div>
             {/* CxC */}
-            <div className={`rounded-xl px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
+            <div className={`rounded-lg px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
               <p className="text-[10px] uppercase tracking-wider text-gray-400">CxC</p>
               <p className="text-lg font-semibold tabular-nums mt-0.5">${stats.cxcTotal > 0 ? (stats.cxcTotal / 1000).toFixed(0) + "K" : "—"}</p>
               {stats.cxcVencida > 0
@@ -233,7 +233,7 @@ export default function PlantillasPage() {
                 : <p className="text-xs text-green-600 mt-1">Sin vencidos</p>}
             </div>
             {/* Cheques */}
-            <div className={`rounded-xl px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-100 bg-white"}`}>
+            <div className={`rounded-lg px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
               <p className="text-[10px] uppercase tracking-wider text-gray-400">Cheques</p>
               <p className="text-lg font-semibold tabular-nums mt-0.5">{stats.vencenEstaSemana}</p>
               <p className="text-xs text-gray-400 mt-1">
@@ -252,7 +252,7 @@ export default function PlantillasPage() {
         <div className="mb-6">
           <button
             onClick={() => setShowActivity(!showActivity)}
-            className={`flex items-center gap-2 text-xs px-4 py-2 rounded-full border transition ${
+            className={`flex items-center gap-2 text-xs px-4 py-2 rounded-md border transition ${
               showActivity
                 ? darkMode ? "bg-gray-800 border-gray-600 text-white" : "bg-gray-900 text-white border-gray-900"
                 : darkMode ? "border-gray-700 text-gray-400 hover:text-gray-200" : "border-gray-200 text-gray-500 hover:text-gray-800"
@@ -314,8 +314,8 @@ export default function PlantillasPage() {
                       {...prov.draggableProps}
                       {...(editMode ? prov.dragHandleProps : {})}
                       onClick={() => { if (!editMode) router.push(mod.href); }}
-                      className={`relative border rounded-xl px-3 py-3 transition cursor-pointer select-none ${
-                        snapshot.isDragging ? "shadow-lg border-gray-300 bg-white z-50" : `${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-100 hover:border-gray-300 hover:shadow-sm bg-white"}`
+                      className={`relative border rounded-lg px-3 py-3 transition cursor-pointer select-none ${
+                        snapshot.isDragging ? "shadow-lg border-gray-300 bg-white z-50" : `${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 hover:border-gray-300 bg-white"}`
                       } ${editMode ? "cursor-grab active:cursor-grabbing" : ""}`}
                     >
                       {editMode && (
@@ -342,7 +342,6 @@ export default function PlantillasPage() {
                         })()}
                       </div>
                       <div className="text-[13px] font-medium leading-tight">{mod.label}</div>
-                      <div className="text-[11px] text-gray-400">{mod.subtitle}</div>
                     </div>
                   )}
                 </Draggable>

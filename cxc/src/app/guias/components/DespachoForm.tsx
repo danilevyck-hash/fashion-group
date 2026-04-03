@@ -61,7 +61,7 @@ export default function DespachoForm({
   }
 
   return (
-    <div className="mt-6 pt-6 border-t border-gray-100">
+    <div className="mt-6 pt-6 border-t border-gray-200">
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-sm font-medium text-gray-900">Despachar</h3>
       </div>
@@ -135,7 +135,7 @@ export default function DespachoForm({
 
       {/* Confirm */}
       <button onClick={handleConfirmar} disabled={bSaving}
-        className="bg-black text-white px-8 py-3 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40 w-full sm:w-auto">
+        className="bg-black text-white px-8 py-3 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40 w-full sm:w-auto">
         {bSaving ? "Guardando..." : "Confirmar despacho"}
       </button>
     </div>

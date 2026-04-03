@@ -116,24 +116,24 @@ export default function ReclamoForm({
             </thead>
             <tbody>
               {fItems.map((item, idx) => (
-                <tr key={idx} className="border-b border-gray-100">
-                  <td className="py-2 pr-1"><input type="text" value={item.referencia} onChange={(e) => updateItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
-                  <td className="py-2 pr-1"><input type="text" value={item.descripcion} onChange={(e) => updateItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
+                <tr key={idx} className="border-b border-gray-200">
+                  <td className="py-2 pr-1"><input type="text" value={item.referencia} onChange={(e) => updateItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" /></td>
+                  <td className="py-2 pr-1"><input type="text" value={item.descripcion} onChange={(e) => updateItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" /></td>
                   <td className="py-2 pr-1">
                     {(!TALLAS.includes(item.talla) && item.talla !== "") ? (
                       <div className="flex items-center gap-1">
-                        <input type="text" value={item.talla} onChange={(e) => updateItem(idx, "talla", e.target.value)} placeholder="Talla" className="w-full border-b border-gray-100 py-1 text-sm outline-none" style={{ minWidth: 50 }} />
+                        <input type="text" value={item.talla} onChange={(e) => updateItem(idx, "talla", e.target.value)} placeholder="Talla" className="w-full border-b border-gray-200 py-1 text-sm outline-none" style={{ minWidth: 50 }} />
                         <button onClick={() => updateItem(idx, "talla", "")} className="text-gray-300 hover:text-black text-xs">×</button>
                       </div>
                     ) : (
-                      <select value={item.talla} onChange={(e) => { if (e.target.value === "Otros") updateItem(idx, "talla", " "); else updateItem(idx, "talla", e.target.value); }} className="border-b border-gray-100 py-1 text-sm outline-none bg-transparent" style={{ minWidth: 60 }}>
+                      <select value={item.talla} onChange={(e) => { if (e.target.value === "Otros") updateItem(idx, "talla", " "); else updateItem(idx, "talla", e.target.value); }} className="border-b border-gray-200 py-1 text-sm outline-none bg-transparent" style={{ minWidth: 60 }}>
                         <option value="">—</option>
                         {TALLAS.map((t) => <option key={t} value={t}>{t}</option>)}
                       </select>
                     )}
                   </td>
-                  <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-center" /></td>
-                  <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-right" /></td>
+                  <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-center" /></td>
+                  <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
                   <td className="py-2 pr-1">
                     {addingMotivo === idx ? (
                       <div className="flex items-center gap-1">
@@ -143,7 +143,7 @@ export default function ReclamoForm({
                         <button onClick={() => { setNewMotivoText(""); setAddingMotivo(null); }} className="text-xs text-gray-300 hover:text-black">x</button>
                       </div>
                     ) : (
-                      <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingMotivo(idx); setNewMotivoText(""); } else updateItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent">
+                      <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingMotivo(idx); setNewMotivoText(""); } else updateItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent">
                         <option value="">--</option>
                         {MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}
                         <option value="__add__">+ Agregar motivo</option>
@@ -167,8 +167,8 @@ export default function ReclamoForm({
       </div>
 
       {savedReclamoId ? (
-        <div className="mt-8 border-t border-gray-100 pt-6">
-          <div className="flex items-center gap-3 mb-6 p-4 bg-gray-50 rounded-xl">
+        <div className="mt-8 border-t border-gray-200 pt-6">
+          <div className="flex items-center gap-3 mb-6 p-4 bg-gray-50 rounded-lg">
             <div className="w-5 h-5 rounded-full bg-black flex items-center justify-center flex-shrink-0">
               <svg width="10" height="8" viewBox="0 0 10 8" fill="none"><path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" /></svg>
             </div>
@@ -183,7 +183,7 @@ export default function ReclamoForm({
               <div className="flex gap-3 flex-wrap mb-3">
                 {formFotos.map((f) => (
                   <div key={f.id} className="relative cursor-pointer" onClick={() => setLightboxSrc(f.url)}>
-                    <img src={f.url} alt="" className="w-20 h-20 object-cover rounded-xl border border-gray-100" />
+                    <img src={f.url} alt="" className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
                     <button onClick={(e) => { e.stopPropagation(); setDeleteFotoTarget(f); }} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
                   </div>
                 ))}
@@ -207,14 +207,14 @@ export default function ReclamoForm({
               </>
             )}
           </div>
-          <button onClick={onViewSaved} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition">Ver reclamo →</button>
+          <button onClick={onViewSaved} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition">Ver reclamo →</button>
           <button onClick={onResetAndCreateAnother} className="text-sm text-gray-400 hover:text-black transition ml-4">Crear otro reclamo</button>
         </div>
       ) : (
         <div className="mt-8">
           {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
           <div className="flex items-center gap-6">
-            <button onClick={onSave} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
+            <button onClick={onSave} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
               {saving ? "Guardando..." : "Guardar Reclamo"}
             </button>
             <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>

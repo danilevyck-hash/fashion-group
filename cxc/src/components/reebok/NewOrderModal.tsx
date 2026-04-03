@@ -76,7 +76,7 @@ export default function NewOrderModal({ onClose, onCreated, autoAddProduct }: Pr
         <h2 className="text-base font-medium mb-4">Nuevo Pedido</h2>
         <div className="relative" ref={ref}>
           {confirmed ? (
-            <div className="flex items-center justify-between py-2 border-b border-gray-100">
+            <div className="flex items-center justify-between py-2 border-b border-gray-200">
               <span className="text-sm font-medium">{name}</span>
               <button onClick={() => { setConfirmed(false); setName(""); }} className="text-xs text-gray-400 hover:text-gray-600">Cambiar</button>
             </div>

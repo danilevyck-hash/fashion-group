@@ -222,8 +222,8 @@ export default function ChatPanel() {
 
   // #7: Panel sizing
   const panelClass = expanded
-    ? "fixed inset-4 z-50 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col"
-    : "fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-40 w-full sm:w-[400px] h-[100dvh] sm:h-[600px] sm:max-h-[80vh] bg-white dark:bg-gray-900 sm:rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col fade-in";
+    ? "fixed inset-4 z-50 bg-white dark:bg-gray-900 rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col"
+    : "fixed bottom-0 right-0 sm:bottom-6 sm:right-6 z-40 w-full sm:w-[400px] h-[100dvh] sm:h-[600px] sm:max-h-[80vh] bg-white dark:bg-gray-900 sm:rounded-lg shadow-2xl border border-gray-200 dark:border-gray-700 flex flex-col fade-in";
 
   return (
     <>
@@ -295,7 +295,7 @@ export default function ChatPanel() {
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div className="max-w-[85%]">
-                  <div className={`px-3 py-2 rounded-2xl text-sm ${
+                  <div className={`px-3 py-2 rounded-lg text-sm ${
                     msg.role === "user"
                       ? "bg-black text-white dark:bg-white dark:text-black whitespace-pre-wrap"
                       : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 chat-markdown"
@@ -345,7 +345,7 @@ export default function ChatPanel() {
 
           {/* Suggestions — only before first user message */}
           {messages.length <= 1 && !streaming && SUGGESTIONS[role] && (
-            <div className="px-4 py-2 flex flex-wrap gap-1.5 border-t border-gray-100 dark:border-gray-800 flex-shrink-0">
+            <div className="px-4 py-2 flex flex-wrap gap-1.5 border-t border-gray-200 dark:border-gray-800 flex-shrink-0">
               {SUGGESTIONS[role].map((s, i) => (
                 <button key={i} onClick={() => { setInput(s); }} className="text-[11px] border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 px-2.5 py-1 rounded-full hover:border-gray-400 transition truncate max-w-[180px]">{s}</button>
               ))}

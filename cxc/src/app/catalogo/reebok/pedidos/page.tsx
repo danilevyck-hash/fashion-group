@@ -120,7 +120,7 @@ export default function PedidosPage() {
         <div className="space-y-2">
           {filtered.map(o => (
             <div key={o.id} onClick={() => router.push(`/catalogo/reebok/pedido/${o.id}`)}
-              className="flex items-center gap-3 px-4 py-3 border border-gray-100 rounded-lg hover:border-gray-300 transition cursor-pointer">
+              className="flex items-center gap-3 px-4 py-3 border border-gray-200 rounded-lg hover:border-gray-300 transition cursor-pointer">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium truncate">{o.client_name}</span>

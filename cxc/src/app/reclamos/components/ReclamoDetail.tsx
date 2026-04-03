@@ -178,7 +178,7 @@ export default function ReclamoDetail({
 
       {/* Enviar button for Borrador */}
       {current.estado === "Borrador" && (
-        <button onClick={() => onChangeEstado("Enviado")} className="mb-6 bg-black text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-gray-800 transition flex items-center gap-2">
+        <button onClick={() => onChangeEstado("Enviado")} className="mb-6 bg-black text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-gray-800 transition flex items-center gap-2">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
           Enviar Reclamo
         </button>
@@ -195,7 +195,7 @@ export default function ReclamoDetail({
               <button
                 onClick={() => { if (!isCurrent && canTransition) setConfirmingEstado(confirmingEstado === e ? null : e); }}
                 disabled={!isCurrent && !canTransition}
-                className={`h-8 text-xs text-center transition px-4 py-2 rounded-full ${isCurrent ? `${EC[e] || "bg-gray-100 text-gray-500"} ring-1 ring-current font-medium` : canTransition ? "bg-gray-100 text-gray-400 hover:bg-gray-200" : "bg-gray-50 text-gray-300 cursor-not-allowed"}`}>
+                className={`h-8 text-xs text-center transition px-4 py-2 rounded-md ${isCurrent ? `${EC[e] || "bg-gray-100 text-gray-500"} ring-1 ring-current font-medium` : canTransition ? "bg-gray-100 text-gray-400 hover:bg-gray-200" : "bg-gray-50 text-gray-300 cursor-not-allowed"}`}>
                 {e}
               </button>
               {confirmingEstado === e && !isCurrent && canTransition && (
@@ -221,10 +221,10 @@ export default function ReclamoDetail({
 
       {/* Totals */}
       <div className="grid grid-cols-4 gap-4 mb-8 mt-6">
-        <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Subtotal</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub)}</div></div>
-        <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Import. 10%</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * 0.10)}</div></div>
-        <div className="border border-gray-100 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * 0.077)}</div></div>
-        <div className="bg-gray-900 rounded-xl p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Total</div><div className="text-xl font-semibold tabular-nums mt-1 text-white">${fmt(sub * 1.177)}</div></div>
+        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Subtotal</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub)}</div></div>
+        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Import. 10%</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * 0.10)}</div></div>
+        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * 0.077)}</div></div>
+        <div className="bg-gray-900 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Total</div><div className="text-xl font-semibold tabular-nums mt-1 text-white">${fmt(sub * 1.177)}</div></div>
       </div>
 
       {/* Items table */}
@@ -234,7 +234,7 @@ export default function ReclamoDetail({
           <div className="overflow-x-auto -mx-4 sm:mx-0">
             <div className="min-w-[700px] px-4 sm:px-0">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
                   <th className="text-left pb-2 font-medium">Código</th>
                   <th className="text-left pb-2 font-medium">Descripción</th>
@@ -249,7 +249,7 @@ export default function ReclamoDetail({
               </thead>
               <tbody>
                 {items.map((item, i) => (
-                  <tr key={i} className="border-b border-gray-100">
+                  <tr key={i} className="border-b border-gray-200">
                     <td className="py-2">{item.referencia}</td>
                     <td className="py-2 text-gray-500">{item.descripcion}</td>
                     <td className="py-2 text-gray-500">{item.talla}</td>
@@ -277,7 +277,7 @@ export default function ReclamoDetail({
               const src = f.url || `${SUPA_URL}/storage/v1/object/public/reclamo-fotos/${f.storage_path}`;
               return (
                 <div key={f.id} className="relative cursor-pointer" onClick={() => setLightboxSrc(src)}>
-                  <img src={src} alt="" className="w-24 h-24 object-cover rounded-xl border border-gray-100" />
+                  <img src={src} alt="" className="w-24 h-24 object-cover rounded-lg border border-gray-200" />
                   <button onClick={(e) => { e.stopPropagation(); setDeleteFotoTarget({ id: f.id, path: f.storage_path }); }} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
                 </div>
               );
@@ -329,7 +329,7 @@ export default function ReclamoDetail({
 
       {/* Edit mode panel */}
       {editMode && (
-        <div className="border-t border-gray-100 pt-6">
+        <div className="border-t border-gray-200 pt-6">
           <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Editando Reclamo</div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-12 gap-y-5 mb-6">
             <div className="flex flex-col gap-1">
@@ -365,7 +365,7 @@ export default function ReclamoDetail({
           <div className="overflow-x-auto -mx-4 sm:mx-0 mb-4">
             <div className="min-w-[700px] px-4 sm:px-0">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
                   <th className="pb-2 font-medium text-left">Código</th>
                   <th className="pb-2 font-medium text-left">Descripción</th>
@@ -379,12 +379,12 @@ export default function ReclamoDetail({
               </thead>
               <tbody>
                 {editItems.map((item, idx) => (
-                  <tr key={idx} className="border-b border-gray-100">
-                    <td className="py-2 pr-1"><input type="text" value={item.referencia} onChange={(e) => updateEditItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
-                    <td className="py-2 pr-1"><input type="text" value={item.descripcion} onChange={(e) => updateEditItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none" /></td>
-                    <td className="py-2 pr-1"><input type="text" value={item.talla} onChange={(e) => updateEditItem(idx, "talla", e.target.value)} className="w-full border-b border-gray-100 py-1 text-sm outline-none" style={{ minWidth: 50 }} /></td>
-                    <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateEditItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-center" /></td>
-                    <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateEditItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-100 py-1 text-sm outline-none text-right" /></td>
+                  <tr key={idx} className="border-b border-gray-200">
+                    <td className="py-2 pr-1"><input type="text" value={item.referencia} onChange={(e) => updateEditItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" /></td>
+                    <td className="py-2 pr-1"><input type="text" value={item.descripcion} onChange={(e) => updateEditItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" /></td>
+                    <td className="py-2 pr-1"><input type="text" value={item.talla} onChange={(e) => updateEditItem(idx, "talla", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" style={{ minWidth: 50 }} /></td>
+                    <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateEditItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-center" /></td>
+                    <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateEditItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
                     <td className="py-2 pr-1">
                       {addingEditMotivo === idx ? (
                         <div className="flex items-center gap-1">
@@ -394,7 +394,7 @@ export default function ReclamoDetail({
                           <button onClick={() => { setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-300 hover:text-black">x</button>
                         </div>
                       ) : (
-                        <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingEditMotivo(idx); setNewMotivoText(""); } else updateEditItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-100 py-1 text-sm outline-none bg-transparent">
+                        <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingEditMotivo(idx); setNewMotivoText(""); } else updateEditItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent">
                           <option value="">--</option>
                           {MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}
                           <option value="__add__">+ Agregar motivo</option>
@@ -411,7 +411,7 @@ export default function ReclamoDetail({
           </div>
           <button onClick={() => setEditItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition mb-6">+ Agregar fila</button>
           <div className="flex items-center gap-6">
-            <button onClick={onSaveEdit} disabled={editSaving} className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
+            <button onClick={onSaveEdit} disabled={editSaving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
               {editSaving ? "Guardando..." : "Guardar Cambios"}
             </button>
             <button onClick={() => setEditMode(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
@@ -424,7 +424,7 @@ export default function ReclamoDetail({
       {/* Aplicada modal */}
       {showAplicadaModal && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setShowAplicadaModal(false)}>
-          <div className="bg-white rounded-2xl p-8 max-w-sm w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold mb-1">Resuelto con Nota de Crédito</h3>
             <p className="text-sm text-gray-400 mb-6">Registra los datos de la nota de crédito recibida.</p>
             <div className="space-y-4 mb-6">
@@ -438,8 +438,8 @@ export default function ReclamoDetail({
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={onAplicadaConfirm} disabled={!aplicadaNc.trim() || !aplicadaMonto} className="flex-1 bg-black text-white px-4 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">Confirmar</button>
-              <button onClick={() => { setShowAplicadaModal(false); setConfirmingEstado(null); }} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-full text-sm hover:bg-gray-50 transition">Cancelar</button>
+              <button onClick={onAplicadaConfirm} disabled={!aplicadaNc.trim() || !aplicadaMonto} className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">Confirmar</button>
+              <button onClick={() => { setShowAplicadaModal(false); setConfirmingEstado(null); }} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition">Cancelar</button>
             </div>
           </div>
         </div>

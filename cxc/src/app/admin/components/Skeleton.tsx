@@ -1,6 +1,6 @@
 export function SkeletonRow() {
   return (
-    <div className="animate-pulse flex gap-4 py-3 border-b border-gray-100">
+    <div className="animate-pulse flex gap-4 py-3 border-b border-gray-200">
       <div className="h-3 bg-gray-100 rounded w-1/3" />
       <div className="h-3 bg-gray-100 rounded w-1/5 ml-auto" />
       <div className="h-3 bg-gray-100 rounded w-1/5" />

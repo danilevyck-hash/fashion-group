@@ -273,7 +273,7 @@ export default function UsuariosPage() {
             <h1 className="text-xl font-semibold">Usuarios y Permisos</h1>
             <p className="text-sm text-gray-400 mt-1">Control de acceso por rol — cada rol usa una contraseña compartida</p>
           </div>
-          <button onClick={() => router.push("/plantillas")} className="border border-gray-200 px-4 py-2 rounded-full text-sm hover:border-gray-400 transition">Volver</button>
+          <button onClick={() => router.push("/plantillas")} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Volver</button>
         </div>
 
         {/* ══ NEW: fg_users section ══ */}
@@ -282,16 +282,16 @@ export default function UsuariosPage() {
             <div>
               <h2 className="text-sm font-medium uppercase tracking-wide text-gray-400">Usuarios del Sistema</h2>
             </div>
-            <button onClick={openNewUser} className="text-sm bg-black text-white px-4 py-2 rounded-full hover:bg-gray-800 transition">+ Nuevo Usuario</button>
+            <button onClick={openNewUser} className="text-sm bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition">+ Nuevo Usuario</button>
           </div>
           {loadingUsers ? (
             <SkeletonTable rows={3} cols={4} />
           ) : fgUsers.length === 0 ? (
             <EmptyState title="No hay usuarios" subtitle="Crea el primer usuario del sistema" actionLabel="+ Nuevo Usuario" onAction={openNewUser} />
           ) : (
-            <div className="border border-gray-200 rounded-xl overflow-hidden">
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
               <table className="w-full text-sm">
-                <thead>
+                <thead className="sticky top-0 bg-white z-10">
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Nombre</th>
                     <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Rol</th>
@@ -329,7 +329,7 @@ export default function UsuariosPage() {
         {/* ══ User modal ══ */}
         {showUserModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
               <h2 className="font-medium mb-4">{editUserId ? "Editar Usuario" : "Nuevo Usuario"}</h2>
               <div className="space-y-3">
                 <div>
@@ -402,7 +402,7 @@ export default function UsuariosPage() {
             const userNames = [...new Set(active.map(s => s.user_name))];
 
             return (
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
                 {userNames.length > 1 && (
                   <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex gap-2 flex-wrap">
                     {userNames.map(name => {
@@ -417,7 +417,7 @@ export default function UsuariosPage() {
                   </div>
                 )}
                 <table className="w-full text-sm">
-                  <thead>
+                  <thead className="sticky top-0 bg-white z-10">
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Usuario</th>
                       <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Rol</th>
@@ -450,7 +450,7 @@ export default function UsuariosPage() {
           })()}
         </div>
 
-        <hr className="mb-8 border-gray-100" />
+        <hr className="mb-8 border-gray-200" />
 
         <h2 className="text-sm font-medium uppercase tracking-wide text-gray-400 mb-4">Roles y Permisos</h2>
         <p className="text-xs text-gray-400 mb-6">Los módulos configurados aquí determinan el acceso de todos los usuarios con ese rol.</p>
@@ -463,7 +463,7 @@ export default function UsuariosPage() {
               const isExpanded = expandedRole === r.role;
               const isAdmin = r.role === "admin";
               return (
-                <div key={r.role} className={`border rounded-2xl overflow-hidden transition ${!r.activo ? "opacity-50 border-gray-200" : "border-gray-200"}`}>
+                <div key={r.role} className={`border rounded-lg overflow-hidden transition ${!r.activo ? "opacity-50 border-gray-200" : "border-gray-200"}`}>
                   {/* Role header */}
                   <button
                     onClick={() => setExpandedRole(isExpanded ? null : r.role)}
@@ -494,7 +494,7 @@ export default function UsuariosPage() {
 
                   {/* Expanded content */}
                   {isExpanded && (
-                    <div className="px-5 pb-5 border-t border-gray-100">
+                    <div className="px-5 pb-5 border-t border-gray-200">
                       {/* Module checkboxes */}
                       <div className="mt-4 mb-2 flex items-center justify-between">
                         <span className="text-xs text-gray-400 uppercase tracking-wide">Módulos con acceso</span>
@@ -552,7 +552,7 @@ export default function UsuariosPage() {
 
                       {/* Danger zone — deactivate (not for admin) */}
                       {!isAdmin && (
-                        <div className="mt-4 border border-red-200 bg-red-50/50 rounded-xl px-4 py-3">
+                        <div className="mt-4 border border-red-200 bg-red-50/50 rounded-lg px-4 py-3">
                           <div className="flex items-center justify-between">
                             <div>
                               <div className="text-xs font-medium text-red-700">{r.activo ? "Desactivar Rol" : "Reactivar Rol"}</div>
@@ -580,7 +580,7 @@ export default function UsuariosPage() {
       {/* Password modal */}
       {showPwModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
             <h2 className="font-medium mb-4">Contraseña — {ROLE_LABELS[showPwModal] || showPwModal}</h2>
             <div>
               <label className="text-[11px] text-gray-400 uppercase block mb-1">Nueva contraseña</label>
@@ -600,7 +600,7 @@ export default function UsuariosPage() {
       {/* Deactivate confirmation modal */}
       {showDeactivate && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4">
+          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
             <h2 className="font-medium mb-2 text-red-700">Desactivar Rol</h2>
             <p className="text-sm text-gray-500 mb-4">
               ¿Desactivar el rol <strong>{ROLE_LABELS[showDeactivate] || showDeactivate}</strong>? Los usuarios con esta contraseña no podrán acceder al sistema.

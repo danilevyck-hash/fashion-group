@@ -199,7 +199,7 @@ export default function SearchBar({ darkMode, compact }: { darkMode?: boolean; c
 
   return (
     <div ref={wrapperRef} className={`relative ${compact ? "w-56" : "w-full max-w-xl mx-auto mb-6"}`}>
-      <div className={`relative flex items-center rounded-xl border ${darkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"} transition focus-within:border-gray-400 focus-within:shadow-sm`}>
+      <div className={`relative flex items-center rounded-lg border ${darkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"} transition focus-within:border-gray-400 focus-within:shadow-sm`}>
         {/* Search icon */}
         <svg className="absolute left-3 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
@@ -212,7 +212,7 @@ export default function SearchBar({ darkMode, compact }: { darkMode?: boolean; c
           onFocus={() => { if (searched) setOpen(true); }}
           onKeyDown={onKeyDown}
           placeholder="Buscar... (⌘K)"
-          className={`w-full pl-10 pr-10 py-2 text-sm rounded-xl outline-none ${inputBg} bg-transparent`}
+          className={`w-full pl-10 pr-10 py-2 text-sm rounded-lg outline-none ${inputBg} bg-transparent`}
           autoFocus={compact}
         />
         {/* Loading spinner or clear */}
@@ -229,7 +229,7 @@ export default function SearchBar({ darkMode, compact }: { darkMode?: boolean; c
 
       {/* Dropdown */}
       {open && searched && (
-        <div className={`absolute z-50 mt-1 w-full rounded-xl border shadow-lg overflow-hidden ${bg}`} style={{ minWidth: 320 }}>
+        <div className={`absolute z-50 mt-1 w-full rounded-lg border shadow-lg overflow-hidden ${bg}`} style={{ minWidth: 320 }}>
           {hasResults ? (
             <div className="max-h-80 overflow-y-auto">
               {(() => {
