@@ -46,6 +46,7 @@ function Productos() {
   const [orderId, setOrderId] = useState("");
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
+  const [confirmedOrder, setConfirmedOrder] = useState<{ id: string; number: string } | null>(null);
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 24;
 
@@ -63,6 +64,18 @@ function Productos() {
       setOrderCount(getOrderCount());
       fetch(`/api/catalogo/reebok/orders/${id}`).then(r => r.ok ? r.json() : null).then(order => {
         if (order) {
+          // If the active order is no longer a draft, clear it from the cart bar
+          if (order.status !== "borrador") {
+            localStorage.removeItem("reebok_active_order_id");
+            localStorage.removeItem("reebok_active_order_number");
+            localStorage.removeItem("reebok_active_order_client");
+            localStorage.setItem("reebok_order_items", "[]");
+            setOrderId("");
+            setOrderCount(0);
+            setConfirmedOrder({ id: order.id, number: order.order_number });
+            window.dispatchEvent(new Event("reebok-order-changed"));
+            return;
+          }
           const items = order.reebok_order_items || [];
           localStorage.setItem("reebok_order_items", JSON.stringify(items));
           setOrderCount(items.reduce((s: number, i: { quantity: number }) => s + (i.quantity || 0), 0));
@@ -197,6 +210,17 @@ function Productos() {
         <h1 className="text-2xl font-light">Catálogo Reebok</h1>
         <p className="text-sm text-gray-400">Panamá</p>
       </div>
+
+      {/* Confirmed order banner */}
+      {confirmedOrder && (
+        <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-2.5 mb-4">
+          <span className="text-sm text-emerald-700">Tu pedido <strong>{confirmedOrder.number}</strong> fue confirmado</span>
+          <div className="flex items-center gap-3">
+            <button onClick={() => router.push(`/catalogo/reebok/pedido/${confirmedOrder.id}`)} className="text-xs text-emerald-700 font-medium hover:underline">Ver pedido</button>
+            <button onClick={() => setConfirmedOrder(null)} className="text-xs text-emerald-600 hover:text-emerald-800">Nuevo pedido</button>
+          </div>
+        </div>
+      )}
 
       {/* Filters with labels */}
       <div className="flex flex-wrap items-end gap-3 mb-6">

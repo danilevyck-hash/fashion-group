@@ -115,6 +115,15 @@ export default function OrderDetailPage() {
       body: JSON.stringify({ client_name: clientName, items, status: "confirmado" }),
     });
 
+    // Clear active order from localStorage so the catalog bar resets
+    if (localStorage.getItem("reebok_active_order_id") === id) {
+      localStorage.removeItem("reebok_active_order_id");
+      localStorage.removeItem("reebok_active_order_number");
+      localStorage.removeItem("reebok_active_order_client");
+      localStorage.setItem("reebok_order_items", "[]");
+      window.dispatchEvent(new Event("reebok-order-changed"));
+    }
+
     // Send email with order summary via existing API
     try {
       const res = await fetch("/api/catalogo/reebok/send-order", {
