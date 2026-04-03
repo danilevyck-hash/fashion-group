@@ -44,6 +44,7 @@ export default function ChequesPage() {
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedVencidos, setSelectedVencidos] = useState<Set<string>>(new Set());
   const [batchProcessing, setBatchProcessing] = useState(false);
 
   // Rebotado modal
@@ -130,19 +131,23 @@ export default function ChequesPage() {
     loadCheques();
   }
 
-  async function batchDepositar() {
-    if (selectedIds.size === 0) return;
+  async function batchDepositar(ids: Set<string>, clearFn: (v: Set<string>) => void) {
+    if (ids.size === 0) return;
     setBatchProcessing(true);
-    for (const cid of selectedIds) {
+    for (const cid of ids) {
       await fetch(`/api/cheques/${cid}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "depositado", fecha_depositado: todayStr() }) });
     }
-    setSelectedIds(new Set());
+    clearFn(new Set());
     setBatchProcessing(false);
     loadCheques();
   }
 
   function toggleSelect(id: string) {
     setSelectedIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+  }
+
+  function toggleSelectVencido(id: string) {
+    setSelectedVencidos(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
   }
 
   async function marcarRebotado(id: string) {
@@ -477,11 +482,20 @@ export default function ChequesPage() {
         <>
         {selectedIds.size > 0 && (
           <div className="flex items-center gap-3 mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl">
-            <span className="text-sm text-emerald-700">{selectedIds.size} cheque{selectedIds.size > 1 ? "s" : ""} seleccionado{selectedIds.size > 1 ? "s" : ""}</span>
-            <button onClick={batchDepositar} disabled={batchProcessing} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-full hover:bg-emerald-700 transition disabled:opacity-50">
+            <span className="text-sm text-emerald-700">{selectedIds.size} pendiente{selectedIds.size > 1 ? "s" : ""} seleccionado{selectedIds.size > 1 ? "s" : ""}</span>
+            <button onClick={() => batchDepositar(selectedIds, setSelectedIds)} disabled={batchProcessing} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-full hover:bg-emerald-700 transition disabled:opacity-50">
               {batchProcessing ? "Procesando..." : "Marcar depositados"}
             </button>
             <button onClick={() => setSelectedIds(new Set())} className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
+          </div>
+        )}
+        {selectedVencidos.size > 0 && (
+          <div className="flex items-center gap-3 mb-3 px-4 py-2 bg-amber-50 border border-amber-200 rounded-xl">
+            <span className="text-sm text-amber-700">{selectedVencidos.size} vencido{selectedVencidos.size > 1 ? "s" : ""} seleccionado{selectedVencidos.size > 1 ? "s" : ""}</span>
+            <button onClick={() => batchDepositar(selectedVencidos, setSelectedVencidos)} disabled={batchProcessing} className="text-xs bg-amber-600 text-white px-4 py-1.5 rounded-full hover:bg-amber-700 transition disabled:opacity-50">
+              {batchProcessing ? "Procesando..." : "Depositar seleccionados"}
+            </button>
+            <button onClick={() => setSelectedVencidos(new Set())} className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
           </div>
         )}
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -510,6 +524,11 @@ export default function ChequesPage() {
                   {c.estado === "pendiente" && (
                     <td className="py-3 pl-2 pr-0 w-8">
                       <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} className="accent-emerald-600 w-3.5 h-3.5" />
+                    </td>
+                  )}
+                  {c.estado === "vencido" && (
+                    <td className="py-3 pl-2 pr-0 w-8">
+                      <input type="checkbox" checked={selectedVencidos.has(c.id)} onChange={() => toggleSelectVencido(c.id)} className="accent-amber-600 w-3.5 h-3.5" />
                     </td>
                   )}
                   <td className={`py-3 px-4 ${c.estado !== "pendiente" ? "" : ""}`}>{fmtDate(c.fecha_deposito)}</td>
