@@ -10,6 +10,7 @@ import { resolveAlias } from "@/lib/aliases";
 import Papa from "papaparse";
 import * as XLSX from "xlsx-js-style";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { logActivityClient } from "@/lib/logActivityClient";
 
 // ── Empresas for the upload grid ──────────────────────────────────────────────
 
@@ -223,6 +224,11 @@ function UploadPageInner() {
         throw new Error("Ya hay un upload reciente para esta empresa. Espera 2 minutos e intenta de nuevo.");
       }
 
+      // Archive original file in Supabase Storage for audit trail
+      const today = new Date().toISOString().slice(0, 10);
+      const archivePath = `cxc-uploads/${companyKey}/${today}_${theFile.name}`;
+      await supabase.storage.from("backups").upload(archivePath, theFile, { upsert: true });
+
       const text = await readFileAsText(theFile);
       const delimiter = detectDelimiter(text);
       const parsed = Papa.parse(text, { delimiter, header: true, skipEmptyLines: true });
@@ -291,6 +297,7 @@ function UploadPageInner() {
       }
 
       await supabase.from("cxc_rows").delete().eq("company_key", companyKey).neq("upload_id", newUploadId);
+      logActivityClient({ action: "cxc_upload", module: "upload", details: { companyKey, filename: theFile.name, rowCount: rows.length } });
       setMessage({ text: `${theFile.name}: ${rows.length} registros cargados`, type: "ok" });
       loadCxcUploads();
     } catch (err: unknown) {

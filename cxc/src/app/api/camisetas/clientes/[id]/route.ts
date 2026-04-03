@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
+import { logActivity } from "@/lib/log-activity";
+import { getSession } from "@/lib/require-auth";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, ["admin", "vendedor"]);
@@ -22,6 +24,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if (auth instanceof NextResponse) return auth;
   const { id } = params;
 
+  const { data: existing } = await supabaseServer.from("camisetas_clientes").select("nombre").eq("id", id).maybeSingle();
+
   // Delete pedidos first, then client
   const { error: pedErr } = await supabaseServer.from("camisetas_pedidos").delete().eq("cliente_id", id);
   if (pedErr) {
@@ -34,5 +38,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     console.error("Error deleting client", id, error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
+
+  const session = getSession(req);
+  await logActivity(session?.role || "unknown", "camisetas_cliente_delete", "camisetas", { clienteId: id, nombre: existing?.nombre }, session?.userName);
+
   return NextResponse.json({ ok: true });
 }

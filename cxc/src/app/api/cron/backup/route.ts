@@ -142,14 +142,14 @@ export async function GET(req: NextRequest) {
 
   if (storageErr) console.error("Storage upload error:", storageErr);
 
-  // Clean old backups (keep last 7 days)
+  // Clean old backups (keep last 30 days)
   try {
-    const { data: files } = await supabaseServer.storage.from("backups").list("", { limit: 100 });
-    if (files && files.length > 7) {
+    const { data: files } = await supabaseServer.storage.from("backups").list("", { limit: 200 });
+    if (files && files.length > 30) {
       const sorted = files
         .filter((f) => f.name.startsWith("backup_"))
         .sort((a, b) => a.name.localeCompare(b.name));
-      const toDelete = sorted.slice(0, sorted.length - 7).map((f) => f.name);
+      const toDelete = sorted.slice(0, sorted.length - 30).map((f) => f.name);
       if (toDelete.length > 0) {
         await supabaseServer.storage.from("backups").remove(toDelete);
       }

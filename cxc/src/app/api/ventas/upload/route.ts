@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth, getSession } from "@/lib/require-auth";
+import { logActivity } from "@/lib/log-activity";
 import * as XLSX from "xlsx-js-style";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -239,6 +240,8 @@ export async function POST(req: NextRequest) {
     }
     inserted += batch.length;
   }
+
+  await logActivity(session?.role || "unknown", "ventas_upload", "ventas", { empresa, rowCount: inserted }, session?.userName);
 
   return NextResponse.json({ ok: true, count: inserted });
 }
