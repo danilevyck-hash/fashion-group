@@ -5,7 +5,7 @@ import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, ["admin", "secretaria", "upload"]);
   if (auth instanceof NextResponse) return auth;
   const { items } = await req.json();
 

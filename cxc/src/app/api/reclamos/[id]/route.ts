@@ -39,7 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, ["admin", "secretaria", "upload"]);
   if (auth instanceof NextResponse) return auth;
   const { id } = params;
   if (!uuidRegex.test(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });

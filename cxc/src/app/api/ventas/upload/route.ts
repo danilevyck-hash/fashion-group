@@ -183,7 +183,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): RawRow[] {
 // ─── Route ────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-  const authError = requireAuth(req, ["admin", "upload", "secretaria"]);
+  const authError = requireAuth(req, ["admin", "upload", "secretaria", "upload"]);
   if (authError) return authError;
 
   const session = getSession(req);

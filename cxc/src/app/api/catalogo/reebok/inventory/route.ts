@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ['admin', 'secretaria'])
+  const auth = requireRole(req, ['admin', 'secretaria', 'upload'])
   if (auth instanceof NextResponse) return auth
   const body = await req.json()
   const { data, error } = await supabase
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const auth = requireRole(req, ['admin', 'secretaria'])
+  const auth = requireRole(req, ['admin', 'secretaria', 'upload'])
   if (auth instanceof NextResponse) return auth
   const body = await req.json()
   const { id, ...fields } = body
@@ -38,7 +38,7 @@ export async function PUT(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const auth = requireRole(req, ['admin', 'secretaria'])
+  const auth = requireRole(req, ['admin', 'secretaria', 'upload'])
   if (auth instanceof NextResponse) return auth
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')

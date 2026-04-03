@@ -4,7 +4,7 @@ import { requireRole } from '@/lib/requireRole'
 
 // POST: bulk create/update products from Excel template
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ['admin', 'secretaria'])
+  const auth = requireRole(req, ['admin', 'secretaria', 'upload'])
   if (auth instanceof NextResponse) return auth
   try {
     const { products } = await req.json() as {

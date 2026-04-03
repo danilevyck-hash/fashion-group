@@ -3,7 +3,7 @@ import { reebokServer } from "@/lib/reebok-supabase-server";
 import { requireRole } from "@/lib/requireRole";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "vendedor", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria", "upload", "vendedor", "director"]);
   if (auth instanceof NextResponse) return auth;
   // Products summary
   const { data: products } = await reebokServer

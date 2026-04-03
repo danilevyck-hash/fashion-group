@@ -3,7 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 
-const GUIAS_ROLES = ["admin", "secretaria", "bodega", "director"];
+const GUIAS_ROLES = ["admin", "secretaria", "upload", "bodega", "director"];
 
 export async function GET(req: NextRequest) {
   const session = getSession(req);

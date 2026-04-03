@@ -22,7 +22,7 @@ function tdN(v: number, alt: boolean, bold = false, sz = 10, fg = "333333") {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, ["admin", "secretaria", "upload"]);
   if (auth instanceof NextResponse) return auth;
   const { periodo_id } = await req.json();
   if (!periodo_id) return NextResponse.json({ error: "No periodo_id" }, { status: 400 });

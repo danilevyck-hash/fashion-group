@@ -12,7 +12,7 @@ import GuiaDetail from "./components/GuiaDetail";
 export default function GuiasPage() {
   const { authChecked, role } = useAuth({
     moduleKey: "guias",
-    allowedRoles: ["admin", "secretaria", "bodega", "director"],
+    allowedRoles: ["admin", "secretaria", "upload", "bodega", "director"],
   });
 
   const s = useGuiasState();

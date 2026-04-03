@@ -3,8 +3,8 @@ import { reebokServer } from "@/lib/reebok-supabase-server";
 import { getSession } from "@/lib/require-auth";
 
 const PIEZAS = 12;
-const VIEW_ROLES = ["admin", "secretaria", "vendedor", "director"];
-const CREATE_ROLES = ["admin", "secretaria", "vendedor", "cliente"];
+const VIEW_ROLES = ["admin", "secretaria", "upload", "vendedor", "director"];
+const CREATE_ROLES = ["admin", "secretaria", "upload", "vendedor", "cliente"];
 
 export async function GET(req: NextRequest) {
   const session = getSession(req);

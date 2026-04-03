@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 
-const RECLAMOS_ROLES = ["admin", "secretaria"];
+const RECLAMOS_ROLES = ["admin", "secretaria", "upload"];
 const ALLOWED_FIELDS = ["empresa", "nombre", "nombre_contacto", "whatsapp", "correo", "activo"];
 
 function pick(body: Record<string, unknown>, fields: string[]) {

@@ -15,7 +15,7 @@ function esc(s: unknown): string {
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRole(req, ["admin", "secretaria"]);
+  const auth = requireRole(req, ["admin", "secretaria", "upload"]);
   if (auth instanceof NextResponse) return auth;
   try {
     const { id } = params;

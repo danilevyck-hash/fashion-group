@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
 
-const CHEQUES_ROLES = ["admin", "secretaria", "director"];
+const CHEQUES_ROLES = ["admin", "secretaria", "upload", "director"];
 
 export async function GET(req: NextRequest) {
   const session = getSession(req);

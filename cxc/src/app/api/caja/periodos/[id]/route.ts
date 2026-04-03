@@ -4,7 +4,7 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 
-const CAJA_ROLES = ["admin", "secretaria"];
+const CAJA_ROLES = ["admin", "secretaria", "upload"];
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, CAJA_ROLES);

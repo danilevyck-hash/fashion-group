@@ -12,7 +12,7 @@ function normalizeHeader(h: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ['admin', 'secretaria'])
+  const auth = requireRole(req, ['admin', 'secretaria', 'upload'])
   if (auth instanceof NextResponse) return auth
   try {
     const { items, empresa } = await req.json() as {
