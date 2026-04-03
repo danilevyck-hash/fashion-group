@@ -103,6 +103,18 @@ function UploadPageInner() {
     setMessage(null);
 
     try {
+      // ── Lock: reject if another upload for this company started < 2 min ago ──
+      const twoMinAgo = new Date(Date.now() - 120_000).toISOString();
+      const { data: recentUploads } = await supabase
+        .from("cxc_uploads")
+        .select("id")
+        .eq("company_key", companyKey)
+        .gte("uploaded_at", twoMinAgo)
+        .limit(1);
+      if (recentUploads && recentUploads.length > 0) {
+        throw new Error("Ya hay un upload reciente para esta empresa. Espera 2 minutos e intenta de nuevo.");
+      }
+
       const text = await readFileAsText(file);
       const parsed = Papa.parse(text, {
         delimiter: ";",
@@ -135,7 +147,7 @@ function UploadPageInner() {
           return true;
         });
 
-      // Create upload record
+      // ── Step 1: Create upload record (acts as batch_id) ──
       const { data: upload, error: uploadErr } = await supabase
         .from("cxc_uploads")
         .insert({ company_key: companyKey, filename: file.name, row_count: rows.length })
@@ -143,43 +155,70 @@ function UploadPageInner() {
         .single();
 
       if (uploadErr) throw uploadErr;
+      const newUploadId = upload.id;
 
-      // Delete previous rows for this company
-      await supabase.from("cxc_rows").delete().eq("company_key", companyKey);
-
-      // Insert rows in batches of 500
+      // ── Step 2: INSERT new rows with the new upload_id (old data untouched) ──
       const batchSize = 500;
-      for (let i = 0; i < rows.length; i += batchSize) {
-        const batch = rows.slice(i, i + batchSize).map((r) => ({
-          upload_id: upload.id,
-          company_key: companyKey,
-          codigo: r["CODIGO"] || "",
-          nombre: r["NOMBRE"] || "",
-          nombre_normalized: resolveAlias(normalizeName(r["NOMBRE"] || "")),
-          correo: r["CORREO"] || "",
-          telefono: r["TELEFONO"] || "",
-          celular: r["CELULAR"] || "",
-          contacto: r["CONTACTO"] || "",
-          pais: r["PAIS"] || "",
-          provincia: r["PROVINCIA"] || "",
-          distrito: r["DISTRITO"] || "",
-          corregimiento: r["CORREGIMIENTO"] || "",
-          limite_credito: parseNum(r["LIMITE CREDITO"]),
-          limite_morosidad: parseNum(r["LIMITE MOROSIDAD"]),
-          d0_30: parseNum(r["0-30"]),
-          d31_60: parseNum(r["31-60"]),
-          d61_90: parseNum(r["61-90"]),
-          d91_120: parseNum(r["91-120"]),
-          d121_180: parseNum(r["121-180"]),
-          d181_270: parseNum(r["181-270"]),
-          d271_365: parseNum(r["271-365"]),
-          mas_365: parseNum(r["Mas de 365"]),
-          total: parseNum(r["TOTAL"]),
-        }));
+      let insertedCount = 0;
+      try {
+        for (let i = 0; i < rows.length; i += batchSize) {
+          const batch = rows.slice(i, i + batchSize).map((r) => ({
+            upload_id: newUploadId,
+            company_key: companyKey,
+            codigo: r["CODIGO"] || "",
+            nombre: r["NOMBRE"] || "",
+            nombre_normalized: resolveAlias(normalizeName(r["NOMBRE"] || "")),
+            correo: r["CORREO"] || "",
+            telefono: r["TELEFONO"] || "",
+            celular: r["CELULAR"] || "",
+            contacto: r["CONTACTO"] || "",
+            pais: r["PAIS"] || "",
+            provincia: r["PROVINCIA"] || "",
+            distrito: r["DISTRITO"] || "",
+            corregimiento: r["CORREGIMIENTO"] || "",
+            limite_credito: parseNum(r["LIMITE CREDITO"]),
+            limite_morosidad: parseNum(r["LIMITE MOROSIDAD"]),
+            d0_30: parseNum(r["0-30"]),
+            d31_60: parseNum(r["31-60"]),
+            d61_90: parseNum(r["61-90"]),
+            d91_120: parseNum(r["91-120"]),
+            d121_180: parseNum(r["121-180"]),
+            d181_270: parseNum(r["181-270"]),
+            d271_365: parseNum(r["271-365"]),
+            mas_365: parseNum(r["Mas de 365"]),
+            total: parseNum(r["TOTAL"]),
+          }));
 
-        const { error: insertErr } = await supabase.from("cxc_rows").insert(batch);
-        if (insertErr) throw insertErr;
+          const { error: insertErr } = await supabase.from("cxc_rows").insert(batch);
+          if (insertErr) throw insertErr;
+          insertedCount += batch.length;
+        }
+      } catch (insertError) {
+        // ── Rollback: clean up partial new rows, keep old data intact ──
+        await supabase.from("cxc_rows").delete().eq("upload_id", newUploadId);
+        await supabase.from("cxc_uploads").delete().eq("id", newUploadId);
+        throw new Error(`Insert falló en fila ${insertedCount + 1}. Datos anteriores preservados. ${insertError instanceof Error ? insertError.message : ""}`);
       }
+
+      // ── Step 3: Verify count ──
+      const { count } = await supabase
+        .from("cxc_rows")
+        .select("id", { count: "exact", head: true })
+        .eq("upload_id", newUploadId);
+
+      if (count !== rows.length) {
+        // Count mismatch — rollback new rows
+        await supabase.from("cxc_rows").delete().eq("upload_id", newUploadId);
+        await supabase.from("cxc_uploads").delete().eq("id", newUploadId);
+        throw new Error(`Verificación falló: esperaba ${rows.length} filas, encontró ${count}. Datos anteriores preservados.`);
+      }
+
+      // ── Step 4: Safe swap — delete OLD rows (different upload_id) ──
+      await supabase
+        .from("cxc_rows")
+        .delete()
+        .eq("company_key", companyKey)
+        .neq("upload_id", newUploadId);
 
       setMessage({ text: `${file.name}: ${rows.length} registros cargados`, type: "ok" });
       loadCxcUploads();
