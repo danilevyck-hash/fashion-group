@@ -12,7 +12,14 @@ export async function GET(req: NextRequest) {
 
   if (error && error.code === "42P01") return NextResponse.json([]);
   if (error) return NextResponse.json({ error: "Error al cargar" }, { status: 500 });
-  return NextResponse.json(data || []);
+  // Never return raw passwords — only return whether set and last update
+  const safe = (data || []).map(r => ({
+    role: r.role,
+    has_password: !!r.password,
+    is_hashed: r.password?.startsWith("$2"),
+    updated_at: r.updated_at,
+  }));
+  return NextResponse.json(safe);
 }
 
 export async function POST(req: NextRequest) {

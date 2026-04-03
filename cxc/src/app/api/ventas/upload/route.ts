@@ -200,6 +200,11 @@ export async function POST(req: NextRequest) {
     if (!empresa) return NextResponse.json({ error: "empresa requerido" }, { status: 400 });
     if (!file) return NextResponse.json({ error: "file requerido" }, { status: 400 });
 
+    // Security: limit file size to 10MB
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: "Archivo demasiado grande (máx 10MB)" }, { status: 400 });
+    }
+
     const fileName = file.name.toLowerCase();
     const isExcel = fileName.endsWith(".xlsx") || fileName.endsWith(".xls");
 

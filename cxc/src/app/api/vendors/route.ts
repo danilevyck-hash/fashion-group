@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
 
 export async function GET(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria"]);
+  if (auth instanceof NextResponse) return auth;
   const { searchParams } = new URL(req.url);
   const companyKey = searchParams.get("company");
 
@@ -14,6 +17,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria"]);
+  if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const { company_key, client_name, vendor_name } = body;
 
@@ -29,6 +34,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria"]);
+  if (auth instanceof NextResponse) return auth;
   const { searchParams } = new URL(req.url);
   const companyKey = searchParams.get("company");
   const clientName = searchParams.get("client");

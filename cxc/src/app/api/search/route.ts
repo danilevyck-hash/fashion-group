@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export async function GET(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria", "director"]); if (auth instanceof NextResponse) return auth;
   const q = req.nextUrl.searchParams.get("q")?.trim();
   if (!q || q.length < 2) {
     return NextResponse.json({ cxc: [], reclamos: [], guias: [], directorio: [], cheques: [] });

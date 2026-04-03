@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria"]); if (auth instanceof NextResponse) return auth;
   const { data, error } = await supabaseServer
     .from("cxc_uploads")
     .select("*")

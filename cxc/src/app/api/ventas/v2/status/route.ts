@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria", "director"]); if (auth instanceof NextResponse) return auth;
   // Get latest fecha per empresa from ventas_raw
   // Paginate to ensure all empresas are covered
   const latest: Record<string, { date: string; label: string; count: number }> = {};

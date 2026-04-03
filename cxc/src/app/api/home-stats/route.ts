@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria", "director", "contabilidad", "bodega", "vendedor"]); if (auth instanceof NextResponse) return auth;
   const now = new Date();
   const weekFromNow = new Date(now.getTime() + 7 * 86400000);
   const todayStr = now.toISOString().slice(0, 10);

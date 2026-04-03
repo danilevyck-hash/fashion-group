@@ -1,7 +1,8 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { reebokServer } from "@/lib/reebok-supabase-server";
+import { requireRole } from "@/lib/requireRole";
 
 const BASE_SYSTEM_PROMPT = `Eres el asistente de inteligencia de negocios de Fashion Group Panamá, un grupo de distribución de moda.
 
@@ -443,6 +444,8 @@ async function buildSystemData(): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria", "director", "contabilidad", "vendedor"]);
+  if (auth instanceof NextResponse) return auth;
   try {
     const { message, history, action } = await req.json();
 
@@ -468,6 +471,15 @@ export async function POST(req: NextRequest) {
 
     if (!message || typeof message !== "string") {
       return Response.json({ error: "Mensaje requerido" }, { status: 400 });
+    }
+
+    // Security: limit message size (prevent cost attacks)
+    if (message.length > 10000) {
+      return Response.json({ error: "Mensaje demasiado largo (máx 10,000 caracteres)" }, { status: 400 });
+    }
+    // Security: limit history size
+    if (Array.isArray(history) && history.length > 20) {
+      return Response.json({ error: "Historial demasiado largo" }, { status: 400 });
     }
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
