@@ -141,9 +141,12 @@ function ReclamosPage() {
   async function changeEstado(e: string) {
     if (!current || current.estado === e) return;
     setConfirmingEstado(null);
-    await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: e }) });
-    setToast(`Estado actualizado a ${e}`); setTimeout(() => setToast(null), 3000);
-    await loadDetail(current.id); loadReclamos();
+    try {
+      const res = await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: e }) });
+      if (!res.ok) { setToast("No se pudo cambiar el estado. Intenta de nuevo."); setTimeout(() => setToast(null), 3000); return; }
+      setToast(`Estado actualizado a ${e}`); setTimeout(() => setToast(null), 3000);
+      await loadDetail(current.id); loadReclamos();
+    } catch { setToast("Error de conexion. Intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
   }
   function requestDeleteReclamo(id: string) {
     setShowDeleteConfirm(false);
@@ -154,20 +157,28 @@ function ReclamosPage() {
     if (!confirmDeleteId) return;
     const id = confirmDeleteId;
     setConfirmDeleteId(null);
-    await fetch(`/api/reclamos/${id}`, { method: "DELETE" });
-    setCurrent(null); setView("list"); loadReclamos();
+    try {
+      const res = await fetch(`/api/reclamos/${id}`, { method: "DELETE" });
+      if (!res.ok) { setToast("No se pudo eliminar el reclamo."); setTimeout(() => setToast(null), 3000); return; }
+      setCurrent(null); setView("list"); loadReclamos();
+    } catch { setToast("Error de conexion."); setTimeout(() => setToast(null), 3000); }
   }
 
   async function uploadFoto(file: File) {
     if (!current) return;
-    const fd = new FormData(); fd.append("file", file);
-    await fetch(`/api/reclamos/${current.id}/fotos`, { method: "POST", body: fd });
-    await loadDetail(current.id);
+    try {
+      const fd = new FormData(); fd.append("file", file);
+      const res = await fetch(`/api/reclamos/${current.id}/fotos`, { method: "POST", body: fd });
+      if (!res.ok) { setToast("No se pudo subir la foto."); setTimeout(() => setToast(null), 3000); return; }
+      await loadDetail(current.id);
+    } catch { setToast("Error al subir foto."); setTimeout(() => setToast(null), 3000); }
   }
   async function deleteFoto(fotoId: string, path: string) {
     if (!current) return;
-    await fetch(`/api/reclamos/${current.id}/fotos`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ foto_id: fotoId, storage_path: path }) });
-    await loadDetail(current.id);
+    try {
+      await fetch(`/api/reclamos/${current.id}/fotos`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ foto_id: fotoId, storage_path: path }) });
+      await loadDetail(current.id);
+    } catch { setToast("Error al eliminar foto."); setTimeout(() => setToast(null), 3000); }
   }
 
   async function saveEdit() {
@@ -183,10 +194,13 @@ function ReclamosPage() {
 
   async function handleAplicadaConfirm() {
     if (!current || !aplicadaNc.trim() || !aplicadaMonto) return;
-    await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "Resuelto con NC" }) });
-    await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seguimiento_nota: `Resuelto con NC — N/C ${aplicadaNc} por $${parseFloat(aplicadaMonto).toFixed(2)}`, autor: role }) });
-    setShowAplicadaModal(false); setAplicadaNc(""); setAplicadaMonto("");
-    await loadDetail(current.id); loadReclamos();
+    try {
+      const r1 = await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "Resuelto con NC" }) });
+      if (!r1.ok) { setToast("Error al aplicar NC."); setTimeout(() => setToast(null), 3000); return; }
+      await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seguimiento_nota: `Resuelto con NC — N/C ${aplicadaNc} por $${parseFloat(aplicadaMonto).toFixed(2)}`, autor: role }) });
+      setShowAplicadaModal(false); setAplicadaNc(""); setAplicadaMonto("");
+      await loadDetail(current.id); loadReclamos();
+    } catch { setToast("Error de conexion."); setTimeout(() => setToast(null), 3000); }
   }
 
   const pendientes = reclamos.filter((r) => r.estado !== "Resuelto con NC" && r.estado !== "Rechazado");

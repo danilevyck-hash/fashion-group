@@ -227,13 +227,19 @@ export default function CamisetasPage() {
       if (!clienteId) {
         const res = await fetch("/api/camisetas/clientes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre: nuevoNombre.trim() }) });
         if (res.ok) { const c = await res.json(); clienteId = c.id; }
+        else { showToast("No se pudo crear el cliente. Intenta de nuevo."); setNuevoSaving(false); return; }
       }
       if (clienteId) {
+        let pedidoFails = 0;
         for (const [prodId, paq] of Object.entries(nuevoQtys)) {
           if (paq > 0) {
-            await fetch("/api/camisetas/pedido", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: clienteId, producto_id: prodId, paquetes: paq }) });
+            try {
+              const r = await fetch("/api/camisetas/pedido", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: clienteId, producto_id: prodId, paquetes: paq }) });
+              if (!r.ok) pedidoFails++;
+            } catch { pedidoFails++; }
           }
         }
+        if (pedidoFails > 0) showToast(`${pedidoFails} producto(s) no se pudieron guardar.`);
         await load();
         setShowNuevo(false);
         setTab("resumen");

@@ -3,14 +3,15 @@
 import { useState, useEffect, useRef } from "react";
 
 interface DirClient { nombre: string; empresa: string; }
+interface CartItem { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
 
 interface Props {
+  items?: CartItem[];
   onClose: () => void;
-  onCreated: (orderId: string, orderNumber?: string, clientName?: string) => void;
-  autoAddProduct?: { product_id: string; sku: string; name: string; image_url: string; unit_price: number };
+  onCreated: (orderId: string) => void;
 }
 
-export default function NewOrderModal({ onClose, onCreated, autoAddProduct }: Props) {
+export default function NewOrderModal({ items = [], onClose, onCreated }: Props) {
   const [name, setName] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [suggestions, setSuggestions] = useState<DirClient[]>([]);
@@ -41,28 +42,17 @@ export default function NewOrderModal({ onClose, onCreated, autoAddProduct }: Pr
     if (!name.trim()) return;
     setCreating(true);
     try {
-      // Include cart items from localStorage if any, or single auto-add product
-      let items: { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number }[] = [];
-      try {
-        const cached = JSON.parse(localStorage.getItem("reebok_order_items") || "[]");
-        if (cached.length > 0) items = cached;
-      } catch { /* */ }
-      if (items.length === 0 && autoAddProduct) {
-        items = [{ product_id: autoAddProduct.product_id, sku: autoAddProduct.sku, name: autoAddProduct.name, image_url: autoAddProduct.image_url, quantity: 1, unit_price: autoAddProduct.unit_price }];
-      }
       const res = await fetch("/api/catalogo/reebok/orders", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_name: name.trim(), vendor_name: typeof window !== 'undefined' ? sessionStorage.getItem('fg_user_name') || null : null, items }),
+        body: JSON.stringify({
+          client_name: name.trim(),
+          vendor_name: typeof window !== 'undefined' ? sessionStorage.getItem('fg_user_name') || null : null,
+          items,
+        }),
       });
       if (res.ok) {
         const order = await res.json();
-        localStorage.setItem("reebok_active_order_id", order.id);
-        localStorage.setItem("reebok_active_order_number", order.order_number);
-        localStorage.setItem("reebok_active_order_client", name.trim());
-        if (items.length > 0) {
-          localStorage.setItem("reebok_order_items", JSON.stringify(items));
-        }
-        onCreated(order.id, order.order_number, name.trim());
+        onCreated(order.id);
       }
     } catch { /* */ }
     setCreating(false);
@@ -100,6 +90,7 @@ export default function NewOrderModal({ onClose, onCreated, autoAddProduct }: Pr
             </>
           )}
         </div>
+        <p className="text-xs text-gray-400 mt-2">{items.length} producto{items.length !== 1 ? "s" : ""} en el carrito</p>
         <button onClick={create} disabled={creating || !canCreate}
           className="w-full mt-4 bg-black text-white py-2.5 rounded text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
           {creating ? "Creando..." : "Crear pedido"}

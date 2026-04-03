@@ -47,11 +47,7 @@ export default function PedidosPage() {
   async function deleteOrder() {
     if (!deleteTarget) return;
     setDeleting(true);
-    const res = await fetch(`/api/catalogo/reebok/orders/${deleteTarget.id}`, { method: "DELETE" });
-    if (res.ok) {
-      const activeId = localStorage.getItem("reebok_active_order_id");
-      if (activeId === deleteTarget.id) { localStorage.removeItem("reebok_active_order_id"); localStorage.removeItem("reebok_active_order_number"); localStorage.removeItem("reebok_active_order_client"); }
-    }
+    await fetch(`/api/catalogo/reebok/orders/${deleteTarget.id}`, { method: "DELETE" });
     setDeleting(false);
     setDeleteTarget(null);
     load();

@@ -143,11 +143,16 @@ export default function ChequesPage() {
   async function batchDepositar(ids: Set<string>, clearFn: (v: Set<string>) => void) {
     if (ids.size === 0) return;
     setBatchProcessing(true);
+    let ok = 0, fail = 0;
     for (const cid of ids) {
-      await fetch(`/api/cheques/${cid}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "depositado", fecha_depositado: todayStr() }) });
+      try {
+        const res = await fetch(`/api/cheques/${cid}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "depositado", fecha_depositado: todayStr() }) });
+        if (res.ok) ok++; else fail++;
+      } catch { fail++; }
     }
     clearFn(new Set());
     setBatchProcessing(false);
+    showToast(fail === 0 ? `${ok} cheques depositados` : `${ok} depositados, ${fail} fallaron`);
     loadCheques();
   }
 
@@ -161,17 +166,21 @@ export default function ChequesPage() {
 
   async function marcarRebotado(id: string) {
     const cheque = cheques.find(c => c.id === id);
-    const res = await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rebotado", motivo_rebote: motivoRebote || null }) });
-    if (res.ok && cheque) {
-      await fetch("/api/overrides", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre_normalized: cheque.cliente.toUpperCase().trim(),
-          resultado_contacto: `⚠ Cheque rebotado: N° ${cheque.numero_cheque} por $${fmt(cheque.monto)} — ${motivoRebote || "Sin motivo"}`,
-        }),
-      });
-    }
+    try {
+      const res = await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rebotado", motivo_rebote: motivoRebote || null }) });
+      if (!res.ok) { showToast("No se pudo marcar como rebotado. Intenta de nuevo."); return; }
+      if (cheque) {
+        await fetch("/api/overrides", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre_normalized: cheque.cliente.toUpperCase().trim(),
+            resultado_contacto: `⚠ Cheque rebotado: N° ${cheque.numero_cheque} por $${fmt(cheque.monto)} — ${motivoRebote || "Sin motivo"}`,
+          }),
+        }).catch(() => {});
+      }
+      showToast("Cheque marcado como rebotado");
+    } catch { showToast("Error de conexion. Intenta de nuevo."); }
     setRebotandoId(null);
     setMotivoRebote("");
     loadCheques();

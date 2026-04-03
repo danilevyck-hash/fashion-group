@@ -43,12 +43,18 @@ export default function DirectorioPage() {
 
   const loadClientes = useCallback(async (searchTerm: string, pg: number) => {
     setLoading(true);
-    const params = new URLSearchParams({ search: searchTerm, page: String(pg), limit: String(PAGE_SIZE) });
-    const res = await fetch(`/api/directorio?${params}`);
-    if (res.ok) {
-      const result = await res.json();
-      setClientes(result.data || []);
-      setTotal(result.total || 0);
+    try {
+      const params = new URLSearchParams({ search: searchTerm, page: String(pg), limit: String(PAGE_SIZE) });
+      const res = await fetch(`/api/directorio?${params}`);
+      if (res.ok) {
+        const result = await res.json();
+        setClientes(result.data || []);
+        setTotal(result.total || 0);
+      } else {
+        showToast("No se pudieron cargar los contactos. Recarga la pagina.");
+      }
+    } catch {
+      showToast("Error de conexion al cargar contactos.");
     }
     setLoading(false);
   }, []);
