@@ -12,7 +12,15 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: "Solo admin puede aprobar préstamos" }, { status: 403 });
   }
 
-  const allowed = ["tipo", "monto", "fecha", "descripcion", "estado", "aprobado_por"];
+  // concepto is immutable after creation
+  if (body.concepto !== undefined) {
+    const { data: existing } = await supabaseServer.from("prestamos_movimientos").select("concepto").eq("id", params.id).single();
+    if (existing && body.concepto !== existing.concepto) {
+      return NextResponse.json({ error: "El tipo de movimiento no se puede cambiar después de creación" }, { status: 400 });
+    }
+  }
+
+  const allowed = ["monto", "fecha", "descripcion", "estado", "aprobado_por"];
   const update: Record<string, unknown> = {};
   for (const k of allowed) { if (body[k] !== undefined) update[k] = body[k]; }
 
@@ -25,14 +33,14 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const { data: existing } = await supabaseServer.from("prestamos_movimientos").select("id, tipo, monto, empleado_id").eq("id", params.id).maybeSingle();
+  const { data: existing } = await supabaseServer.from("prestamos_movimientos").select("id, concepto, monto, empleado_id").eq("id", params.id).maybeSingle();
   if (!existing) return NextResponse.json({ error: "Movimiento no encontrado" }, { status: 404 });
 
   const { error } = await supabaseServer.from("prestamos_movimientos").update({ deleted: true }).eq("id", params.id);
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
 
   const session = getSession(req);
-  await logActivity(session?.role || "unknown", "prestamo_mov_delete", "prestamos", { movimientoId: params.id, tipo: existing.tipo, monto: existing.monto }, session?.userName);
+  await logActivity(session?.role || "unknown", "prestamo_mov_delete", "prestamos", { movimientoId: params.id, concepto: existing.concepto, monto: existing.monto }, session?.userName);
 
   return NextResponse.json({ ok: true });
 }
