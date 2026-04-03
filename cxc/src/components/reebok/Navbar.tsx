@@ -19,6 +19,7 @@ export default function Navbar() {
     // Clear everything — fresh start
     sessionStorage.removeItem("reebok_draft_id");
     sessionStorage.removeItem("reebok_draft_client");
+    sessionStorage.removeItem("reebok_cart");
     setShowNewOrder(true);
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useCallback } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Product } from "@/components/reebok/supabase";
@@ -67,11 +67,22 @@ function Productos() {
           sessionStorage.removeItem("reebok_draft_id");
         }
       }).catch(() => { sessionStorage.removeItem("reebok_draft_id"); });
-    } else if (newClient) {
-      // Mode A: new order — client name set, catalog is empty
-      setDraftClient(newClient);
+    } else {
+      // Mode A: no DB draft — restore cart from sessionStorage
+      if (newClient) setDraftClient(newClient);
+      try {
+        const saved = sessionStorage.getItem("reebok_cart");
+        if (saved) setCart(JSON.parse(saved));
+      } catch { /* corrupt data — ignore */ }
     }
   }, []);
+
+  // Persist cart to sessionStorage on every change (skip initial empty)
+  const cartInitialized = useRef(false);
+  useEffect(() => {
+    if (!cartInitialized.current) { cartInitialized.current = true; return; }
+    sessionStorage.setItem("reebok_cart", JSON.stringify(cart));
+  }, [cart]);
 
   const handleQtyChange = useCallback((productId: string, qty: number, product: Product) => {
     setCart(prev => {
@@ -126,6 +137,7 @@ function Productos() {
           const order = await res.json();
           // Switch sessionStorage from "new" mode to "existing" mode
           sessionStorage.removeItem("reebok_draft_client");
+          sessionStorage.removeItem("reebok_cart");
           sessionStorage.setItem("reebok_draft_id", order.id);
           router.push(`/catalogo/reebok/pedido/${order.id}`);
         } else {
