@@ -193,14 +193,34 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (guiaErr) return NextResponse.json({ error: guiaErr.message }, { status: 500 });
 
   if (items !== undefined) {
-    await supabaseServer.from("guia_items").delete().eq("guia_id", id);
+    // Safe replace: insert new items first, then delete old ones
     if (items && items.length > 0) {
       const rows = items.map((item: Record<string, unknown>, i: number) => ({
-        guia_id: id, orden: i + 1, cliente: item.cliente || "", direccion: item.direccion || "",
-        empresa: item.empresa || "", facturas: item.facturas || "", bultos: item.bultos || 0, numero_guia_transp: item.numero_guia_transp || "",
+        guia_id: id, orden: -(i + 1), // negative orden = new batch (temp marker)
+        cliente: item.cliente || "", direccion: item.direccion || "",
+        empresa: item.empresa || "", facturas: item.facturas || "",
+        bultos: item.bultos || 0, numero_guia_transp: item.numero_guia_transp || "",
       }));
       const { error: itemsErr } = await supabaseServer.from("guia_items").insert(rows);
-      if (itemsErr) return NextResponse.json({ error: itemsErr.message }, { status: 500 });
+      if (itemsErr) {
+        // Cleanup: remove any partially inserted new items
+        await supabaseServer.from("guia_items").delete().eq("guia_id", id).lt("orden", 0);
+        return NextResponse.json({ error: itemsErr.message }, { status: 500 });
+      }
+      // New items inserted successfully — delete old items (positive orden)
+      await supabaseServer.from("guia_items").delete().eq("guia_id", id).gte("orden", 0);
+      // Fix orden: flip negative to positive
+      const { data: newItems } = await supabaseServer.from("guia_items").select("id, orden").eq("guia_id", id);
+      if (newItems) {
+        for (const ni of newItems) {
+          if (ni.orden < 0) {
+            await supabaseServer.from("guia_items").update({ orden: -ni.orden }).eq("id", ni.id);
+          }
+        }
+      }
+    } else {
+      // Empty items array = delete all
+      await supabaseServer.from("guia_items").delete().eq("guia_id", id);
     }
   }
 

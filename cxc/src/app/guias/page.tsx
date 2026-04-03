@@ -79,6 +79,10 @@ export default function GuiasPage() {
           bSaving={s.bSaving}
           onConfirmarDespacho={s.confirmarDespacho}
           showToast={s.showToast}
+          pendingFirma1={s.pendingFirma1}
+          pendingFirma2={s.pendingFirma2}
+          onFirma1Change={s.setPendingFirma1}
+          onFirma2Change={s.setPendingFirma2}
           onEdit={s.startEdit}
           onPrint={s.openPrint}
           onDelete={s.requestDeleteGuia}

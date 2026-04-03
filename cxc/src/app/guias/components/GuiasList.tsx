@@ -37,6 +37,10 @@ interface GuiasListProps {
   bSaving: boolean;
   onConfirmarDespacho: (firma1: string, firma2: string) => void;
   showToast: (msg: string) => void;
+  pendingFirma1?: string | null;
+  pendingFirma2?: string | null;
+  onFirma1Change?: (v: string | null) => void;
+  onFirma2Change?: (v: string | null) => void;
   // Actions
   onEdit: (id: string) => void;
   onPrint: (id: string) => void;
@@ -55,6 +59,7 @@ export default function GuiasList({
   tipoDespacho, setTipoDespacho,
   bPlaca, setBPlaca, bReceptor, setBReceptor, bCedula, setBCedula,
   bChofer, setBChofer, bSaving, onConfirmarDespacho, showToast,
+  pendingFirma1, pendingFirma2, onFirma1Change, onFirma2Change,
   onEdit, onPrint, onDelete,
 }: GuiasListProps) {
   const canCreate = role && CREATE_ROLES.includes(role);
@@ -296,6 +301,10 @@ export default function GuiasList({
                                       bSaving={bSaving}
                                       onConfirmar={onConfirmarDespacho}
                                       showToast={showToast}
+                                      pendingFirma1={pendingFirma1}
+                                      pendingFirma2={pendingFirma2}
+                                      onFirma1Change={onFirma1Change}
+                                      onFirma2Change={onFirma2Change}
                                     />
                                   )}
 

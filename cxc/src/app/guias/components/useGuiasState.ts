@@ -69,6 +69,8 @@ export function useGuiasState() {
   const [bSaving, setBSaving] = useState(false);
   const [showPending, setShowPending] = useState(false);
   const [tipoDespacho, setTipoDespacho] = useState<"externo" | "directo">("externo");
+  const [pendingFirma1, setPendingFirma1] = useState<string | null>(null);
+  const [pendingFirma2, setPendingFirma2] = useState<string | null>(null);
 
   // Print state
   const [printGuia, setPrintGuia] = useState<Guia | null>(null);
@@ -156,6 +158,8 @@ export function useGuiasState() {
     setBCedula("");
     setBChofer("");
     setTipoDespacho("externo");
+    setPendingFirma1(null);
+    setPendingFirma2(null);
   }
 
   // ── Delete ──
@@ -412,6 +416,8 @@ export function useGuiasState() {
     bCedula, setBCedula,
     bChofer, setBChofer,
     bSaving,
+    pendingFirma1, setPendingFirma1,
+    pendingFirma2, setPendingFirma2,
     // print
     printGuia, setPrintGuia, openPrint,
     // toast

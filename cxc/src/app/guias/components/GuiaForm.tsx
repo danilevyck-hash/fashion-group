@@ -60,12 +60,14 @@ export default function GuiaForm({
 
   // Auto-save with debounce (only when editing existing guía)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoSaveInFlight = useRef(false);
   useEffect(() => {
-    if (!editingId || !dirty || saving) return;
+    if (!editingId || !dirty || saving || autoSaveInFlight.current) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(() => {
-      if (items.some(i => i.cliente)) {
-        handleSave();
+    autoSaveTimer.current = setTimeout(async () => {
+      if (items.some(i => i.cliente) && !autoSaveInFlight.current) {
+        autoSaveInFlight.current = true;
+        try { handleSave(); } finally { autoSaveInFlight.current = false; }
       }
     }, 1500);
     return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
