@@ -7,12 +7,14 @@ interface CxcResult { id: string; nombre_normalized: string; total: number; comp
 interface ReclamoResult { id: string; nro_reclamo: string; nro_factura: string; empresa: string; estado: string; fecha_reclamo: string }
 interface GuiaResult { id: string; numero: number; fecha: string; transportista: string; estado: string }
 interface DirResult { id: string; nombre: string; empresa: string; correo: string; celular: string }
+interface ChequeResult { id: string; cliente: string; monto: number; fecha_deposito: string; estado: string }
 
 interface SearchResults {
   cxc: CxcResult[];
   reclamos: ReclamoResult[];
   guias: GuiaResult[];
   directorio: DirResult[];
+  cheques: ChequeResult[];
 }
 
 interface FlatItem {
@@ -23,14 +25,24 @@ interface FlatItem {
   icon: string;
 }
 
+function fmtMoney(n: number) {
+  return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtDate(d: string) {
+  if (!d) return "";
+  const [y, m, day] = d.split("-");
+  return `${day}/${m}/${y}`;
+}
+
 function flatten(r: SearchResults): FlatItem[] {
   const items: FlatItem[] = [];
   for (const c of r.cxc) {
     items.push({
       module: "CxC",
       label: c.nombre_normalized,
-      sub: `$${c.total.toLocaleString("en", { minimumFractionDigits: 2 })} — ${c.company_key}`,
-      href: "/admin",
+      sub: `$${fmtMoney(c.total)} — ${c.company_key}`,
+      href: `/admin?search=${encodeURIComponent(c.nombre_normalized)}`,
       icon: "📊",
     });
   }
@@ -38,7 +50,7 @@ function flatten(r: SearchResults): FlatItem[] {
     items.push({
       module: "Reclamos",
       label: rec.nro_reclamo,
-      sub: `Factura ${rec.nro_factura} — ${rec.empresa} — ${rec.estado}`,
+      sub: `${rec.empresa} — ${rec.estado}`,
       href: `/reclamos?view=detail&id=${rec.id}`,
       icon: "📝",
     });
@@ -47,7 +59,7 @@ function flatten(r: SearchResults): FlatItem[] {
     items.push({
       module: "Guías",
       label: `Guía #${g.numero}`,
-      sub: `${g.transportista || "—"} — ${g.estado}`,
+      sub: `${fmtDate(g.fecha)} — ${g.estado}`,
       href: `/guias?id=${g.id}`,
       icon: "🚚",
     });
@@ -61,16 +73,26 @@ function flatten(r: SearchResults): FlatItem[] {
       icon: "📋",
     });
   }
+  for (const ch of r.cheques) {
+    items.push({
+      module: "Cheques",
+      label: ch.cliente,
+      sub: `$${fmtMoney(ch.monto)} — ${fmtDate(ch.fecha_deposito)}`,
+      href: "/cheques",
+      icon: "🏦",
+    });
+  }
   return items;
 }
 
-export default function SearchBar({ darkMode }: { darkMode?: boolean }) {
+export default function SearchBar({ darkMode, compact }: { darkMode?: boolean; compact?: boolean }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
+  const [expanded, setExpanded] = useState(!compact);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -100,26 +122,48 @@ export default function SearchBar({ darkMode }: { darkMode?: boolean }) {
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
   }, [query, doSearch]);
 
+  // Cmd+K / Ctrl+K global shortcut
+  useEffect(() => {
+    function handleGlobalKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        if (compact) setExpanded(true);
+        setTimeout(() => inputRef.current?.focus(), 0);
+      }
+    }
+    document.addEventListener("keydown", handleGlobalKey);
+    return () => document.removeEventListener("keydown", handleGlobalKey);
+  }, [compact]);
+
   // Close on click outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
         setOpen(false);
+        if (compact && !query) setExpanded(false);
       }
     }
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
+  }, [compact, query]);
 
   function navigate(item: FlatItem) {
     setOpen(false);
     setQuery("");
     setResults(null);
+    if (compact) setExpanded(false);
     router.push(item.href);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Escape") { setOpen(false); inputRef.current?.blur(); return; }
+    if (e.key === "Escape") {
+      setOpen(false);
+      setQuery("");
+      setResults(null);
+      if (compact) setExpanded(false);
+      inputRef.current?.blur();
+      return;
+    }
     if (!open || !hasResults) return;
     if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, items.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, 0)); }
@@ -128,21 +172,33 @@ export default function SearchBar({ darkMode }: { darkMode?: boolean }) {
 
   // Group items by module for display
   const grouped: Record<string, FlatItem[]> = {};
-  let globalIdx = 0;
-  const idxMap: number[] = [];
   for (const item of items) {
     if (!grouped[item.module]) grouped[item.module] = [];
     grouped[item.module].push(item);
-    idxMap.push(globalIdx);
-    globalIdx++;
   }
 
   const bg = darkMode ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200";
   const inputBg = darkMode ? "bg-gray-800 text-gray-100 placeholder-gray-500" : "bg-gray-50 text-gray-900 placeholder-gray-400";
   const hoverBg = darkMode ? "bg-gray-800" : "bg-gray-50";
 
+  // Compact mode: show just the icon button until expanded
+  if (compact && !expanded) {
+    return (
+      <button
+        onClick={() => { setExpanded(true); setTimeout(() => inputRef.current?.focus(), 0); }}
+        className="text-gray-400 hover:text-black transition p-1 rounded-lg hover:bg-gray-100 flex items-center gap-1"
+        title="Buscar (Cmd+K)"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+        </svg>
+        <span className="text-[10px] text-gray-300 hidden sm:inline border border-gray-200 rounded px-1">⌘K</span>
+      </button>
+    );
+  }
+
   return (
-    <div ref={wrapperRef} className="relative w-full max-w-xl mx-auto mb-6">
+    <div ref={wrapperRef} className={`relative ${compact ? "w-56" : "w-full max-w-xl mx-auto mb-6"}`}>
       <div className={`relative flex items-center rounded-xl border ${darkMode ? "border-gray-700 bg-gray-800" : "border-gray-200 bg-gray-50"} transition focus-within:border-gray-400 focus-within:shadow-sm`}>
         {/* Search icon */}
         <svg className="absolute left-3 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -155,8 +211,9 @@ export default function SearchBar({ darkMode }: { darkMode?: boolean }) {
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => { if (searched) setOpen(true); }}
           onKeyDown={onKeyDown}
-          placeholder="Buscar clientes, reclamos, guías..."
-          className={`w-full pl-10 pr-10 py-2.5 text-sm rounded-xl outline-none ${inputBg} bg-transparent`}
+          placeholder="Buscar... (⌘K)"
+          className={`w-full pl-10 pr-10 py-2 text-sm rounded-xl outline-none ${inputBg} bg-transparent`}
+          autoFocus={compact}
         />
         {/* Loading spinner or clear */}
         {loading ? (
@@ -172,7 +229,7 @@ export default function SearchBar({ darkMode }: { darkMode?: boolean }) {
 
       {/* Dropdown */}
       {open && searched && (
-        <div className={`absolute z-50 mt-1 w-full rounded-xl border shadow-lg overflow-hidden ${bg}`}>
+        <div className={`absolute z-50 mt-1 w-full rounded-xl border shadow-lg overflow-hidden ${bg}`} style={{ minWidth: 320 }}>
           {hasResults ? (
             <div className="max-h-80 overflow-y-auto">
               {(() => {
