@@ -14,6 +14,17 @@ function getOrderCount(): number {
   } catch { return 0; }
 }
 
+function syncCartToDb() {
+  try {
+    const items = JSON.parse(localStorage.getItem("reebok_order_items") || "[]");
+    fetch("/api/catalogo/reebok/cart", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    }).catch(() => {});
+  } catch { /* */ }
+}
+
 export default function ProductosPage() {
   return <Suspense><Productos /></Suspense>;
 }
@@ -35,6 +46,8 @@ function Productos() {
   const [orderId, setOrderId] = useState("");
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [showNewOrder, setShowNewOrder] = useState(false);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 24;
 
   useEffect(() => {
     function handler(e: Event) { setToast((e as CustomEvent).detail); setTimeout(() => setToast(null), 3000); }
@@ -42,24 +55,35 @@ function Productos() {
     return () => window.removeEventListener("reebok-toast", handler);
   }, []);
 
-  // Load order state on mount
+  // Load order state on mount — restore cart from DB if localStorage is empty
   useEffect(() => {
     const id = localStorage.getItem("reebok_active_order_id") || "";
     setOrderId(id);
     if (id) {
       setOrderCount(getOrderCount());
-      // Also fetch from API to sync cache
       fetch(`/api/catalogo/reebok/orders/${id}`).then(r => r.ok ? r.json() : null).then(order => {
         if (order) {
           const items = order.reebok_order_items || [];
           localStorage.setItem("reebok_order_items", JSON.stringify(items));
           setOrderCount(items.reduce((s: number, i: { quantity: number }) => s + (i.quantity || 0), 0));
+          syncCartToDb();
         }
       }).catch(() => {});
+    } else {
+      // No active order — try restoring cart from DB
+      const localItems = JSON.parse(localStorage.getItem("reebok_order_items") || "[]");
+      if (localItems.length === 0) {
+        fetch("/api/catalogo/reebok/cart").then(r => r.ok ? r.json() : null).then(data => {
+          if (data?.items?.length) {
+            localStorage.setItem("reebok_order_items", JSON.stringify(data.items));
+            window.dispatchEvent(new Event("reebok-order-changed"));
+          }
+        }).catch(() => {});
+      }
     }
   }, []);
 
-  // Listen for order changes
+  // Listen for order changes — sync to DB
   useEffect(() => {
     function handler() {
       setOrderId(localStorage.getItem("reebok_active_order_id") || "");
@@ -68,6 +92,7 @@ function Productos() {
         const items = JSON.parse(localStorage.getItem("reebok_order_items") || "[]");
         setOrderTotal(items.reduce((s: number, i: { quantity: number; unit_price: number }) => s + (i.quantity || 0) * 12 * Number(i.unit_price || 0), 0));
       } catch { setOrderTotal(0); }
+      syncCartToDb();
     }
     window.addEventListener("reebok-order-changed", handler);
     handler();
@@ -82,9 +107,12 @@ function Productos() {
   }, []);
 
   useEffect(() => {
-    const t = setTimeout(() => setSearch(searchInput), 300);
+    const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
     return () => clearTimeout(t);
   }, [searchInput]);
+
+  // Reset page when filters change
+  useEffect(() => { setPage(1); }, [gender, category, onlyOferta, priceFilter]);
 
   useEffect(() => {
     async function load() {
@@ -134,6 +162,10 @@ function Productos() {
       return a.name.localeCompare(b.name);
     });
 
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   // Frequent products — products currently in the active order (shown at top when no filters)
   const noFiltersActive = !search && !gender && !category && !onlyOferta;
   const inOrderIds = new Set<string>();
@@ -141,15 +173,15 @@ function Productos() {
     const cached = JSON.parse(localStorage.getItem("reebok_order_items") || "[]");
     cached.forEach((i: { product_id: string }) => inOrderIds.add(i.product_id));
   } catch { /* */ }
-  const frequentProducts = noFiltersActive && inOrderIds.size > 0
+  const frequentProducts = noFiltersActive && inOrderIds.size > 0 && page === 1
     ? filtered.filter(p => inOrderIds.has(p.id))
     : [];
 
-  // Group products by category + gender for section headers
+  // Group paginated products by category + gender for section headers
   type Group = { cat: string; gen: string; label: string; items: typeof filtered };
   const groups: Group[] = [];
   let lastKey = '';
-  for (const p of filtered) {
+  for (const p of paginated) {
     const key = `${p.category}|${p.gender || 'unisex'}`;
     if (key !== lastKey) {
       groups.push({ cat: p.category, gen: p.gender || 'unisex', label: `${catLabel[p.category] || p.category} — ${genLabel[p.gender || 'unisex'] || p.gender}`, items: [] });
@@ -256,6 +288,17 @@ function Productos() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && totalPages > 1 && (
+        <div className="flex items-center justify-center gap-4 mt-8 mb-4">
+          <button onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} disabled={page === 1}
+            className="text-sm border border-gray-200 px-4 py-2 rounded-full hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">← Anterior</button>
+          <span className="text-xs text-gray-400">Página {page} de {totalPages}</span>
+          <button onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} disabled={page === totalPages}
+            className="text-sm border border-gray-200 px-4 py-2 rounded-full hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">Siguiente →</button>
         </div>
       )}
 

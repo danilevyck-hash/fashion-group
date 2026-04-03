@@ -24,8 +24,12 @@ export default function DirectorioPage() {
   const router = useRouter();
   const { authChecked, role } = useAuth({ moduleKey: "directorio", allowedRoles: ["admin","upload","secretaria","director","vendedor"] });
   const [clientes, setClientes] = useState<Cliente[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 50;
   const [expanded, setExpanded] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Cliente>>({});
@@ -36,22 +40,38 @@ export default function DirectorioPage() {
   const [cxcClients, setCxcClients] = useState<Set<string>>(new Set());
   const importRef = useRef<HTMLInputElement>(null);
 
-  const loadClientes = useCallback(async () => {
+  const loadClientes = useCallback(async (searchTerm: string, pg: number) => {
     setLoading(true);
-    const res = await fetch("/api/directorio");
-    if (res.ok) setClientes(await res.json());
+    const params = new URLSearchParams({ search: searchTerm, page: String(pg), limit: String(PAGE_SIZE) });
+    const res = await fetch(`/api/directorio?${params}`);
+    if (res.ok) {
+      const result = await res.json();
+      setClientes(result.data || []);
+      setTotal(result.total || 0);
+    }
     setLoading(false);
   }, []);
 
+  // Debounce search
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1); }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Load on search/page change
+  useEffect(() => {
+    if (authChecked) loadClientes(debouncedSearch, page);
+  }, [authChecked, debouncedSearch, page, loadClientes]);
+
+  // Load CXC clients for badge
   useEffect(() => {
     if (authChecked) {
-      loadClientes();
       fetch("/api/clients").then(r => r.ok ? r.json() : []).then(d => {
         const names = new Set<string>((d || []).map((r: {nombre_normalized: string}) => r.nombre_normalized));
         setCxcClients(names);
       }).catch(() => {});
     }
-  }, [authChecked, loadClientes]);
+  }, [authChecked]);
 
   if (!authChecked) return null;
 
@@ -70,7 +90,7 @@ export default function DirectorioPage() {
     if (res.ok) {
       setNewData({ nombre: "", empresa: "", whatsapp: "", correo: "", contacto: "", notas: "" });
       setShowNew(false);
-      loadClientes();
+      loadClientes(debouncedSearch, page);
     }
   }
 
@@ -82,7 +102,7 @@ export default function DirectorioPage() {
     });
     if (res.ok) {
       setEditing(null);
-      loadClientes();
+      loadClientes(debouncedSearch, page);
       // Sync to CXC overrides
       const cliente = editData as Partial<Cliente>;
       if (cliente.nombre) {
@@ -104,7 +124,7 @@ export default function DirectorioPage() {
 
   async function handleDelete(id: string) {
     const res = await fetch(`/api/directorio/${id}`, { method: "DELETE" });
-    if (res.ok) { setExpanded(null); loadClientes(); }
+    if (res.ok) { setExpanded(null); loadClientes(debouncedSearch, page); }
   }
 
   async function handleImport(file: File) {
@@ -113,34 +133,49 @@ export default function DirectorioPage() {
     let start = 0;
     if (lines[0] && lines[0].toLowerCase().startsWith("nombre")) start = 1;
 
-    let count = 0;
+    // Parse all rows
+    const rows = [];
     for (let i = start; i < lines.length; i++) {
       const parts = lines[i].split(";").map((s) => s.trim());
       if (!parts[0]) continue;
+      rows.push({
+        nombre: parts[0] || "", empresa: parts[1] || "", telefono: parts[2] || "",
+        celular: parts[3] || "", correo: parts[4] || "", contacto: parts[5] || "", notas: parts[6] || "",
+      });
+    }
+
+    // Check for duplicates
+    const names = rows.map(r => r.nombre);
+    let dupSet = new Set<string>();
+    try {
+      const res = await fetch("/api/directorio", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ names }),
+      });
+      if (res.ok) {
+        const { duplicates } = await res.json();
+        dupSet = new Set((duplicates || []).map((d: string) => d.toLowerCase().trim()));
+      }
+    } catch { /* proceed without dedup */ }
+
+    const newRows = rows.filter(r => !dupSet.has(r.nombre.toLowerCase().trim()));
+    const dupCount = rows.length - newRows.length;
+
+    let count = 0;
+    for (const row of newRows) {
       const res = await fetch("/api/directorio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          nombre: parts[0] || "",
-          empresa: parts[1] || "",
-          telefono: parts[2] || "",
-          celular: parts[3] || "",
-          correo: parts[4] || "",
-          contacto: parts[5] || "",
-          notas: parts[6] || "",
-        }),
+        body: JSON.stringify(row),
       });
       if (res.ok) count++;
     }
-    showToast(`${count} contactos importados`);
-    loadClientes();
+    showToast(`${count} importados${dupCount > 0 ? `, ${dupCount} duplicados omitidos` : ""}`);
+    loadClientes(debouncedSearch, page);
   }
 
-  const filtered = clientes.filter((c) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return c.nombre.toLowerCase().includes(q) || c.empresa.toLowerCase().includes(q);
-  });
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <div>
@@ -169,9 +204,11 @@ export default function DirectorioPage() {
           <button onClick={() => window.open("/api/directorio?format=csv")} className="text-sm text-gray-400 hover:text-black transition">
             Exportar CSV
           </button>
-          <button onClick={() => {
+          <button onClick={async () => {
+            const allRes = await fetch("/api/directorio");
+            const allClientes = allRes.ok ? await allRes.json() : [];
             const rows: string[][] = [["FASHION GROUP — Directorio de Clientes"], [], ["Nombre", "Empresa", "Teléfono", "Celular", "Correo", "Contacto", "Notas"]];
-            for (const c of clientes) rows.push([c.nombre, c.empresa, c.telefono, c.celular, c.correo, c.contacto, c.notas]);
+            for (const c of allClientes) rows.push([c.nombre, c.empresa, c.telefono, c.celular, c.correo, c.contacto, c.notas]);
             const ws = XLSX.utils.aoa_to_sheet(rows);
             ws["!cols"] = [{ wch: 32 }, { wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 28 }, { wch: 20 }, { wch: 20 }];
             ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
@@ -235,18 +272,21 @@ export default function DirectorioPage() {
       )}
 
       {/* Search */}
-      <input
-        type="text"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder="Buscar por nombre o empresa..."
-        className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black w-full max-w-sm mb-6"
-      />
+      <div className="flex items-end gap-4 mb-6">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por nombre o empresa..."
+          className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black w-full max-w-sm"
+        />
+        <span className="text-xs text-gray-400 pb-2">{total} contacto{total !== 1 ? "s" : ""}</span>
+      </div>
 
       {/* Table */}
       {loading ? (
         <SkeletonTable rows={5} cols={5} />
-      ) : filtered.length === 0 && !search ? (
+      ) : clientes.length === 0 && !search ? (
         <EmptyState
           title="Directorio vacío"
           subtitle="Agrega tu primer cliente al directorio"
@@ -269,7 +309,7 @@ export default function DirectorioPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((c) => {
+              {clientes.map((c) => {
                 const isExpanded = expanded === c.id;
                 const isEditing = editing === c.id;
                 return (
@@ -342,8 +382,18 @@ export default function DirectorioPage() {
           </table>
           </div>
           </div>
-          {filtered.length === 0 && search && (
+          {clientes.length === 0 && search && (
             <p className="text-center text-gray-300 text-sm py-12">Sin resultados para &quot;{search}&quot;</p>
+          )}
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-4 mt-6">
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                className="text-sm border border-gray-200 px-4 py-2 rounded-full hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">← Anterior</button>
+              <span className="text-xs text-gray-400">Página {page} de {totalPages}</span>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                className="text-sm border border-gray-200 px-4 py-2 rounded-full hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">Siguiente →</button>
+            </div>
           )}
         </>
       )}
