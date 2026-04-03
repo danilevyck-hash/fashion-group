@@ -83,8 +83,9 @@ export async function POST(req: NextRequest) {
       </div>
     </div>`;
 
-  const to = ["daniel@fashiongr.com"];
-  if (body.clientEmail) to.push(body.clientEmail);
+  // If clientEmail provided, send to client only (share flow).
+  // Otherwise send to admin (internal confirmation flow).
+  const to = body.clientEmail ? [body.clientEmail] : ["daniel@fashiongr.com"];
 
   try {
     const res = await fetch("https://api.resend.com/emails", {
