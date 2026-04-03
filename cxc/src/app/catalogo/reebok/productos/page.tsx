@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Product } from "@/components/reebok/supabase";
 import ProductCard from "@/components/reebok/ProductCard";
+import NewOrderModal from "@/components/reebok/NewOrderModal";
 import { Toast } from "@/components/ui";
 
 interface CartItem { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
@@ -28,6 +29,7 @@ function Productos() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [page, setPage] = useState(1);
   const [saving, setSaving] = useState(false);
+  const [showNameModal, setShowNameModal] = useState(false);
   const PAGE_SIZE = 24;
 
   // ── State: cart + draft context ──
@@ -83,6 +85,8 @@ function Productos() {
   // ── Floating bar action: create or update ──
   async function handleFloatingBarClick() {
     if (cart.length === 0) return;
+    // No context yet — ask for client name first
+    if (!draftId && !draftClient) { setShowNameModal(true); return; }
     setSaving(true);
 
     if (draftId) {
@@ -337,14 +341,19 @@ function Productos() {
           className="fixed bottom-20 right-4 z-30 w-10 h-10 bg-white border border-gray-200 rounded-full shadow-md flex items-center justify-center text-gray-400 hover:text-black transition">↑</button>
       )}
 
+      {/* ── Name modal (when no context) ── */}
+      {showNameModal && (
+        <NewOrderModal onClose={() => setShowNameModal(false)} />
+      )}
+
       {/* ── Floating bar ── */}
-      {cartCount > 0 && hasContext && (
+      {cartCount > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-40 p-3 bg-white border-t border-gray-100 shadow-lg">
           <button onClick={handleFloatingBarClick} disabled={saving}
             className={`w-full py-3.5 rounded-lg text-sm font-medium flex items-center justify-between px-4 transition disabled:opacity-50 ${
               draftId ? "bg-black text-white hover:bg-gray-800" : "bg-emerald-600 text-white hover:bg-emerald-700"
             }`}>
-            <span>{saving ? "Guardando..." : draftId ? `Actualizar pedido ${draftNumber}` : "Crear pedido"}</span>
+            <span>{saving ? "Guardando..." : draftId ? `Actualizar pedido ${draftNumber}` : draftClient ? `Crear pedido para ${draftClient}` : "Crear pedido"}</span>
             <span className="flex items-center gap-2">
               <span className="tabular-nums">{cartCount} bulto{cartCount !== 1 ? "s" : ""}</span>
               {cartTotal > 0 && <><span className="text-white/40">·</span><span className="tabular-nums font-semibold">${fmt(cartTotal)}</span></>}
