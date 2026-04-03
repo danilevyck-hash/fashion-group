@@ -7,7 +7,6 @@ import { supabase } from "@/lib/supabase";
 import { ALL_COMPANIES } from "@/lib/companies";
 import { normalizeName } from "@/lib/normalize";
 import { resolveAlias } from "@/lib/aliases";
-import { ConfirmModal } from "@/components/ui";
 import Papa from "papaparse";
 import * as XLSX from "xlsx-js-style";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -27,26 +26,36 @@ const UPLOAD_EMPRESAS = [
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface UploadStatus {
-  company_key: string;
-  uploaded_at: string;
-  row_count: number;
+interface UploadStatus { company_key: string; uploaded_at: string; row_count: number; }
+interface VentasStatus { date: string; label: string; count?: number; }
+
+interface CxcPreviewRow { values: string[]; errors: string[]; }
+interface CxcPreview {
+  companyKey: string; headers: string[]; rows: CxcPreviewRow[];
+  validCount: number; errorCount: number; duplicateNames: Set<string>;
+  formatError: string; delimiter: string;
 }
 
-interface VentasStatus {
-  date: string;
-  label: string;
-  count?: number;
+interface VentasPreviewRow {
+  fecha: string; tipo: string; nSistema: string; nFiscal: string;
+  cliente: string; subtotal: number; total: number; vendedor: string;
+  errors: string[]; isDuplicate: boolean;
+}
+interface VentasPreview {
+  empresaKey: string; empresaName: string; rows: VentasPreviewRow[];
+  validCount: number; errorCount: number; duplicateCount: number;
+  formatError: string; file: File;
 }
 
-// ── Inner component (needs useSearchParams inside Suspense) ───────────────────
+const VALID_TIPOS = new Set(["Factura", "Nota de Crédito", "Nota de Débito"]);
+
+// ── Inner component ─────────────────────────────────────────────────────────
 
 function UploadPageInner() {
   const { authChecked, role } = useAuth({ moduleKey: "upload", allowedRoles: ["admin", "secretaria"] });
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get("tab") === "ventas" ? "ventas" : "cxc") as "cxc" | "ventas";
 
-  // ── State ──
   const [activeTab, setActiveTab] = useState<"cxc" | "ventas">(initialTab);
   const [dragOver, setDragOver] = useState<string | null>(null);
 
@@ -54,181 +63,24 @@ function UploadPageInner() {
   const [cxcUploads, setCxcUploads] = useState<Record<string, UploadStatus>>({});
   const [uploading, setUploading] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: "ok" | "err" } | null>(null);
-  const [csvPreview, setCsvPreview] = useState<{ headers: string[]; rows: string[][]; totalRows: number; companyKey: string; valid: boolean; error: string } | null>(null);
-  const [pendingText, setPendingText] = useState("");
+  const [cxcPreview, setCxcPreview] = useState<CxcPreview | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   // Ventas state
   const [ventasUploads, setVentasUploads] = useState<Record<string, VentasStatus>>({});
   const [ventasUploading, setVentasUploading] = useState<string | null>(null);
-  const [confirmUpload, setConfirmUpload] = useState<{ key: string; name: string; file: File } | null>(null);
+  const [ventasPreview, setVentasPreview] = useState<VentasPreview | null>(null);
+  const [ventasPreviewLoading, setVentasPreviewLoading] = useState(false);
 
-  // Refs for file inputs (one per card)
   const cxcFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const ventasFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
-
-  // CXC uses ALL_COMPANIES keys
   const cxcCompanies = ALL_COMPANIES;
 
-  // ── Effects ──
   useEffect(() => { if (authChecked) { loadCxcUploads(); loadVentasStatus(); } }, [authChecked]);
 
   if (!authChecked) return null;
 
-  // ── CXC upload logic (preserved exactly) ──────────────────────────────────
-
-  async function loadCxcUploads() {
-    const { data } = await supabase
-      .from("cxc_uploads")
-      .select("*")
-      .order("uploaded_at", { ascending: false });
-
-    if (data) {
-      const latest: Record<string, UploadStatus> = {};
-      for (const row of data) {
-        if (!latest[row.company_key]) {
-          latest[row.company_key] = {
-            company_key: row.company_key,
-            uploaded_at: row.uploaded_at,
-            row_count: row.row_count,
-          };
-        }
-      }
-      setCxcUploads(latest);
-    }
-  }
-
-  async function handleUpload(companyKey: string, file: File) {
-    setUploading(companyKey);
-    setMessage(null);
-
-    try {
-      // ── Lock: reject if another upload for this company started < 2 min ago ──
-      const twoMinAgo = new Date(Date.now() - 120_000).toISOString();
-      const { data: recentUploads } = await supabase
-        .from("cxc_uploads")
-        .select("id")
-        .eq("company_key", companyKey)
-        .gte("uploaded_at", twoMinAgo)
-        .limit(1);
-      if (recentUploads && recentUploads.length > 0) {
-        throw new Error("Ya hay un upload reciente para esta empresa. Espera 2 minutos e intenta de nuevo.");
-      }
-
-      const text = await readFileAsText(file);
-      const parsed = Papa.parse(text, {
-        delimiter: ";",
-        header: true,
-        skipEmptyLines: true,
-      });
-
-      if (parsed.errors.length > 0 && parsed.data.length === 0) {
-        throw new Error("Error al parsear CSV: " + parsed.errors[0].message);
-      }
-
-      // Normalize CSV headers: trim and collapse spaces
-      const rows = (parsed.data as Record<string, string>[])
-        .map((row) => {
-          const clean: Record<string, string> = {};
-          for (const [key, val] of Object.entries(row)) {
-            const normalizedKey = key.trim().replace(/\s+/g, " ");
-            clean[normalizedKey] = (val || "").trim();
-          }
-          return clean;
-        })
-        // Filter out rows without a valid NOMBRE (junk rows, totals, empty)
-        .filter((r) => {
-          const nombre = (r["NOMBRE"] || "").trim();
-          if (!nombre) return false;
-          if (/^\d[\d.,\s-]*$/.test(nombre)) return false;
-          if (/^\d+-\d+$/.test(nombre)) return false;
-          if (/^Mas\s+de/i.test(nombre)) return false;
-          if (/^Total$/i.test(nombre)) return false;
-          return true;
-        });
-
-      // ── Step 1: Create upload record (acts as batch_id) ──
-      const { data: upload, error: uploadErr } = await supabase
-        .from("cxc_uploads")
-        .insert({ company_key: companyKey, filename: file.name, row_count: rows.length })
-        .select()
-        .single();
-
-      if (uploadErr) throw uploadErr;
-      const newUploadId = upload.id;
-
-      // ── Step 2: INSERT new rows with the new upload_id (old data untouched) ──
-      const batchSize = 500;
-      let insertedCount = 0;
-      try {
-        for (let i = 0; i < rows.length; i += batchSize) {
-          const batch = rows.slice(i, i + batchSize).map((r) => ({
-            upload_id: newUploadId,
-            company_key: companyKey,
-            codigo: r["CODIGO"] || "",
-            nombre: r["NOMBRE"] || "",
-            nombre_normalized: resolveAlias(normalizeName(r["NOMBRE"] || "")),
-            correo: r["CORREO"] || "",
-            telefono: r["TELEFONO"] || "",
-            celular: r["CELULAR"] || "",
-            contacto: r["CONTACTO"] || "",
-            pais: r["PAIS"] || "",
-            provincia: r["PROVINCIA"] || "",
-            distrito: r["DISTRITO"] || "",
-            corregimiento: r["CORREGIMIENTO"] || "",
-            limite_credito: parseNum(r["LIMITE CREDITO"]),
-            limite_morosidad: parseNum(r["LIMITE MOROSIDAD"]),
-            d0_30: parseNum(r["0-30"]),
-            d31_60: parseNum(r["31-60"]),
-            d61_90: parseNum(r["61-90"]),
-            d91_120: parseNum(r["91-120"]),
-            d121_180: parseNum(r["121-180"]),
-            d181_270: parseNum(r["181-270"]),
-            d271_365: parseNum(r["271-365"]),
-            mas_365: parseNum(r["Mas de 365"]),
-            total: parseNum(r["TOTAL"]),
-          }));
-
-          const { error: insertErr } = await supabase.from("cxc_rows").insert(batch);
-          if (insertErr) throw insertErr;
-          insertedCount += batch.length;
-        }
-      } catch (insertError) {
-        // ── Rollback: clean up partial new rows, keep old data intact ──
-        await supabase.from("cxc_rows").delete().eq("upload_id", newUploadId);
-        await supabase.from("cxc_uploads").delete().eq("id", newUploadId);
-        throw new Error(`Insert falló en fila ${insertedCount + 1}. Datos anteriores preservados. ${insertError instanceof Error ? insertError.message : ""}`);
-      }
-
-      // ── Step 3: Verify count ──
-      const { count } = await supabase
-        .from("cxc_rows")
-        .select("id", { count: "exact", head: true })
-        .eq("upload_id", newUploadId);
-
-      if (count !== rows.length) {
-        // Count mismatch — rollback new rows
-        await supabase.from("cxc_rows").delete().eq("upload_id", newUploadId);
-        await supabase.from("cxc_uploads").delete().eq("id", newUploadId);
-        throw new Error(`Verificación falló: esperaba ${rows.length} filas, encontró ${count}. Datos anteriores preservados.`);
-      }
-
-      // ── Step 4: Safe swap — delete OLD rows (different upload_id) ──
-      await supabase
-        .from("cxc_rows")
-        .delete()
-        .eq("company_key", companyKey)
-        .neq("upload_id", newUploadId);
-
-      setMessage({ text: `${file.name}: ${rows.length} registros cargados`, type: "ok" });
-      loadCxcUploads();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error desconocido";
-      setMessage({ text: msg, type: "err" });
-    } finally {
-      setUploading(null);
-    }
-  }
+  // ── Shared helpers ──────────────────────────────────────────────────────────
 
   function parseNum(val: string | undefined): number {
     if (!val) return 0;
@@ -247,34 +99,312 @@ function UploadPageInner() {
     return file.text();
   }
 
-  function parseCSVPreview(text: string, companyKey: string) {
-    const lines = text.split("\n").filter((l) => l.trim());
-    if (lines.length < 2) return { valid: false, error: "El archivo esta vacio.", headers: [] as string[], rows: [] as string[][], totalRows: 0, companyKey };
-    const sep = lines[0].includes(";") ? ";" : ",";
-    const headers = lines[0].split(sep).map((h) => h.trim());
-    const required = ["CODIGO", "NOMBRE", "TOTAL"];
-    const missing = required.filter((r) => !headers.some((h) => h.toUpperCase().includes(r)));
-    if (missing.length > 0) return { valid: false, error: `Faltan columnas: ${missing.join(", ")}. Verifica que sea el reporte CxC separado por '${sep}'.`, headers, rows: [] as string[][], totalRows: lines.length - 1, companyKey };
-    return { valid: true, error: "", headers, rows: lines.slice(1, 11).map((l) => l.split(sep).map((v) => v.trim())), totalRows: lines.length - 1, companyKey };
+  function detectDelimiter(text: string): string {
+    const firstLine = text.split("\n")[0] || "";
+    const semicolons = (firstLine.match(/;/g) || []).length;
+    const commas = (firstLine.match(/,/g) || []).length;
+    return semicolons >= commas ? ";" : ",";
   }
 
-  // ── Ventas upload logic ───────────────────────────────────────────────────
+  // ── CXC logic ─────────────────────────────────────────────────────────────
+
+  async function loadCxcUploads() {
+    const { data } = await supabase.from("cxc_uploads").select("*").order("uploaded_at", { ascending: false });
+    if (data) {
+      const latest: Record<string, UploadStatus> = {};
+      for (const row of data) {
+        if (!latest[row.company_key]) {
+          latest[row.company_key] = { company_key: row.company_key, uploaded_at: row.uploaded_at, row_count: row.row_count };
+        }
+      }
+      setCxcUploads(latest);
+    }
+  }
+
+  function buildCxcPreview(text: string, companyKey: string): CxcPreview {
+    const lines = text.split("\n").filter((l) => l.trim());
+    if (lines.length < 2) {
+      return { companyKey, headers: [], rows: [], validCount: 0, errorCount: 0, duplicateNames: new Set(), formatError: "El archivo esta vacio.", delimiter: ";" };
+    }
+
+    const delimiter = detectDelimiter(text);
+    const headers = lines[0].split(delimiter).map((h) => h.trim());
+    const required = ["CODIGO", "NOMBRE", "TOTAL"];
+    const missing = required.filter((r) => !headers.some((h) => h.toUpperCase().includes(r)));
+    if (missing.length > 0) {
+      return { companyKey, headers, rows: [], validCount: 0, errorCount: 0, duplicateNames: new Set(), formatError: `Faltan columnas: ${missing.join(", ")}. Verifica que sea el reporte CxC separado por '${delimiter}'.`, delimiter };
+    }
+
+    const nombreIdx = headers.findIndex((h) => h.toUpperCase().includes("NOMBRE"));
+    const totalIdx = headers.findIndex((h) => h.toUpperCase().includes("TOTAL"));
+    const codigoIdx = headers.findIndex((h) => h.toUpperCase().includes("CODIGO"));
+
+    // Count name occurrences for duplicate detection
+    const nameCounts: Record<string, number> = {};
+    const dataLines = lines.slice(1);
+    for (const line of dataLines) {
+      const vals = line.split(delimiter).map((v) => v.trim());
+      const nombre = (vals[nombreIdx] || "").trim();
+      if (nombre && !/^\d[\d.,\s-]*$/.test(nombre) && !/^\d+-\d+$/.test(nombre) && !/^Mas\s+de/i.test(nombre) && !/^Total$/i.test(nombre)) {
+        const norm = nombre.toUpperCase();
+        nameCounts[norm] = (nameCounts[norm] || 0) + 1;
+      }
+    }
+    const duplicateNames = new Set(Object.entries(nameCounts).filter(([, c]) => c > 1).map(([n]) => n));
+
+    let validCount = 0;
+    let errorCount = 0;
+    const rows: CxcPreviewRow[] = [];
+
+    for (const line of dataLines) {
+      const values = line.split(delimiter).map((v) => v.trim());
+      const nombre = (values[nombreIdx] || "").trim();
+
+      // Skip junk rows
+      if (!nombre) continue;
+      if (/^\d[\d.,\s-]*$/.test(nombre)) continue;
+      if (/^\d+-\d+$/.test(nombre)) continue;
+      if (/^Mas\s+de/i.test(nombre)) continue;
+      if (/^Total$/i.test(nombre)) continue;
+
+      const errors: string[] = [];
+      if (codigoIdx >= 0 && !(values[codigoIdx] || "").trim()) errors.push("CODIGO vacio");
+      const totalVal = parseNum(values[totalIdx]);
+      if (totalIdx >= 0 && totalVal < 0) errors.push("TOTAL negativo");
+      if (totalIdx >= 0 && totalVal === 0 && !(values[totalIdx] || "").trim()) errors.push("TOTAL vacio");
+      if (duplicateNames.has(nombre.toUpperCase())) errors.push("Nombre duplicado");
+
+      if (errors.length > 0) errorCount++;
+      else validCount++;
+
+      rows.push({ values, errors });
+    }
+
+    return { companyKey, headers, rows, validCount, errorCount, duplicateNames, formatError: "", delimiter };
+  }
+
+  async function openCxcPreview(companyKey: string, file: File) {
+    const text = await readFileAsText(file);
+    const preview = buildCxcPreview(text, companyKey);
+    setCxcPreview(preview);
+    setPendingFile(file);
+  }
+
+  async function handleCxcUpload() {
+    if (!cxcPreview || !pendingFile) return;
+    const companyKey = cxcPreview.companyKey;
+    const theFile = pendingFile;
+    setCxcPreview(null);
+    setPendingFile(null);
+    setUploading(companyKey);
+    setMessage(null);
+
+    try {
+      // Lock check
+      const twoMinAgo = new Date(Date.now() - 120_000).toISOString();
+      const { data: recentUploads } = await supabase.from("cxc_uploads").select("id").eq("company_key", companyKey).gte("uploaded_at", twoMinAgo).limit(1);
+      if (recentUploads && recentUploads.length > 0) {
+        throw new Error("Ya hay un upload reciente para esta empresa. Espera 2 minutos e intenta de nuevo.");
+      }
+
+      const text = await readFileAsText(theFile);
+      const delimiter = detectDelimiter(text);
+      const parsed = Papa.parse(text, { delimiter, header: true, skipEmptyLines: true });
+
+      if (parsed.errors.length > 0 && parsed.data.length === 0) {
+        throw new Error("Error al parsear CSV: " + parsed.errors[0].message);
+      }
+
+      const rows = (parsed.data as Record<string, string>[])
+        .map((row) => {
+          const clean: Record<string, string> = {};
+          for (const [key, val] of Object.entries(row)) {
+            clean[key.trim().replace(/\s+/g, " ")] = (val || "").trim();
+          }
+          return clean;
+        })
+        .filter((r) => {
+          const nombre = (r["NOMBRE"] || "").trim();
+          if (!nombre) return false;
+          if (/^\d[\d.,\s-]*$/.test(nombre)) return false;
+          if (/^\d+-\d+$/.test(nombre)) return false;
+          if (/^Mas\s+de/i.test(nombre)) return false;
+          if (/^Total$/i.test(nombre)) return false;
+          return true;
+        });
+
+      // Safe batch_id swap
+      const { data: upload, error: uploadErr } = await supabase.from("cxc_uploads").insert({ company_key: companyKey, filename: theFile.name, row_count: rows.length }).select().single();
+      if (uploadErr) throw uploadErr;
+      const newUploadId = upload.id;
+
+      const batchSize = 500;
+      let insertedCount = 0;
+      try {
+        for (let i = 0; i < rows.length; i += batchSize) {
+          const batch = rows.slice(i, i + batchSize).map((r) => ({
+            upload_id: newUploadId, company_key: companyKey,
+            codigo: r["CODIGO"] || "", nombre: r["NOMBRE"] || "",
+            nombre_normalized: resolveAlias(normalizeName(r["NOMBRE"] || "")),
+            correo: r["CORREO"] || "", telefono: r["TELEFONO"] || "",
+            celular: r["CELULAR"] || "", contacto: r["CONTACTO"] || "",
+            pais: r["PAIS"] || "", provincia: r["PROVINCIA"] || "",
+            distrito: r["DISTRITO"] || "", corregimiento: r["CORREGIMIENTO"] || "",
+            limite_credito: parseNum(r["LIMITE CREDITO"]), limite_morosidad: parseNum(r["LIMITE MOROSIDAD"]),
+            d0_30: parseNum(r["0-30"]), d31_60: parseNum(r["31-60"]),
+            d61_90: parseNum(r["61-90"]), d91_120: parseNum(r["91-120"]),
+            d121_180: parseNum(r["121-180"]), d181_270: parseNum(r["181-270"]),
+            d271_365: parseNum(r["271-365"]), mas_365: parseNum(r["Mas de 365"]),
+            total: parseNum(r["TOTAL"]),
+          }));
+          const { error: insertErr } = await supabase.from("cxc_rows").insert(batch);
+          if (insertErr) throw insertErr;
+          insertedCount += batch.length;
+        }
+      } catch (insertError) {
+        await supabase.from("cxc_rows").delete().eq("upload_id", newUploadId);
+        await supabase.from("cxc_uploads").delete().eq("id", newUploadId);
+        throw new Error(`Insert fallo en fila ${insertedCount + 1}. Datos anteriores preservados. ${insertError instanceof Error ? insertError.message : ""}`);
+      }
+
+      const { count } = await supabase.from("cxc_rows").select("id", { count: "exact", head: true }).eq("upload_id", newUploadId);
+      if (count !== rows.length) {
+        await supabase.from("cxc_rows").delete().eq("upload_id", newUploadId);
+        await supabase.from("cxc_uploads").delete().eq("id", newUploadId);
+        throw new Error(`Verificacion fallo: esperaba ${rows.length} filas, encontro ${count}. Datos anteriores preservados.`);
+      }
+
+      await supabase.from("cxc_rows").delete().eq("company_key", companyKey).neq("upload_id", newUploadId);
+      setMessage({ text: `${theFile.name}: ${rows.length} registros cargados`, type: "ok" });
+      loadCxcUploads();
+    } catch (err: unknown) {
+      setMessage({ text: err instanceof Error ? err.message : "Error desconocido", type: "err" });
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  // ── Ventas logic ──────────────────────────────────────────────────────────
 
   async function loadVentasStatus() {
     try {
       const res = await fetch("/api/ventas/v2/status");
-      if (res.ok) {
-        const data = await res.json();
-        setVentasUploads(data);
-      } else {
-        console.error("[upload] ventas status failed:", res.status, await res.text().catch(() => ""));
+      if (res.ok) setVentasUploads(await res.json());
+    } catch { /* */ }
+  }
+
+  function parseVentasFecha(raw: string): { valid: boolean; error: string } {
+    const s = (raw ?? "").trim();
+    const match = s.match(/^(\d{2})-(\d{2})-(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?/);
+    if (!match) return { valid: false, error: "Formato invalido" };
+    const [, dd, mm, yyyy] = match;
+    const day = parseInt(dd), month = parseInt(mm), year = parseInt(yyyy);
+    if (month < 1 || month > 12) return { valid: false, error: `Mes ${mm} invalido` };
+    const maxDay = new Date(year, month, 0).getDate();
+    if (day < 1 || day > maxDay) return { valid: false, error: `Dia ${dd} invalido` };
+    if (year < 2000 || year > 2099) return { valid: false, error: `Ano ${yyyy} fuera de rango` };
+    return { valid: true, error: "" };
+  }
+
+  function toNum(v: unknown): number {
+    if (v === null || v === undefined || v === "") return 0;
+    const n = typeof v === "number" ? v : parseFloat(String(v).replace(",", "."));
+    return isNaN(n) ? 0 : n;
+  }
+
+  async function openVentasPreview(empresaKey: string, empresaName: string, file: File) {
+    setVentasPreviewLoading(true);
+    try {
+      const text = await readFileAsText(file);
+      const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (lines.length < 2) {
+        setVentasPreview({ empresaKey, empresaName, rows: [], validCount: 0, errorCount: 0, duplicateCount: 0, formatError: "El archivo esta vacio.", file });
+        return;
       }
+
+      const delimiter = detectDelimiter(text);
+      const headerIdx = lines.findIndex((l) => l.toUpperCase().includes("FECHA") && l.includes(delimiter));
+      if (headerIdx === -1) {
+        setVentasPreview({ empresaKey, empresaName, rows: [], validCount: 0, errorCount: 0, duplicateCount: 0, formatError: "No se encontro la fila de encabezados (debe contener FECHA).", file });
+        return;
+      }
+
+      const headers = lines[headerIdx].split(delimiter).map((h) => h.trim().toUpperCase());
+      const getIdx = (key: string) => headers.indexOf(key);
+
+      const parsedRows: VentasPreviewRow[] = [];
+      const nSistemas: string[] = [];
+
+      for (let i = headerIdx + 1; i < lines.length; i++) {
+        const cols = lines[i].split(delimiter);
+        const get = (key: string) => (cols[getIdx(key)] ?? "").trim();
+
+        const subtotal = toNum(get("SUBTOTAL"));
+        const utilidad = toNum(get("UTILIDAD"));
+        if (subtotal === 0 && utilidad === 0) continue;
+        if (Math.abs(subtotal) < 1.00) continue;
+
+        const tipo = (get("TIPO") || "").trim().replace(/\s+/g, " ");
+        if (!VALID_TIPOS.has(tipo)) continue;
+
+        const fechaRaw = get("FECHA");
+        const fechaResult = parseVentasFecha(fechaRaw);
+        const nSistema = get("N.SISTEMA");
+        const errors: string[] = [];
+
+        if (!fechaResult.valid) errors.push(fechaResult.error);
+        if (!nSistema) errors.push("N.SISTEMA vacio");
+        if (!get("CLIENTE")) errors.push("CLIENTE vacio");
+
+        nSistemas.push(nSistema);
+        parsedRows.push({
+          fecha: fechaRaw, tipo, nSistema, nFiscal: get("N.FISCAL"),
+          cliente: get("CLIENTE"), subtotal, total: toNum(get("TOTAL")),
+          vendedor: get("VENDEDOR"), errors, isDuplicate: false,
+        });
+      }
+
+      if (parsedRows.length === 0) {
+        setVentasPreview({ empresaKey, empresaName, rows: [], validCount: 0, errorCount: 0, duplicateCount: 0, formatError: "No se encontraron filas validas (Factura, NC, ND con subtotal > 1).", file });
+        return;
+      }
+
+      // Check duplicates against DB
+      let existingSet = new Set<string>();
+      try {
+        const res = await fetch("/api/ventas/check-duplicates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ empresa: empresaName, n_sistemas: nSistemas.filter(Boolean) }),
+        });
+        if (res.ok) {
+          const { existing } = await res.json();
+          existingSet = new Set(existing);
+        }
+      } catch { /* */ }
+
+      let validCount = 0, errorCount = 0, duplicateCount = 0;
+      for (const row of parsedRows) {
+        if (row.nSistema && existingSet.has(row.nSistema)) {
+          row.isDuplicate = true;
+          duplicateCount++;
+        }
+        if (row.errors.length > 0) errorCount++;
+        else validCount++;
+      }
+
+      setVentasPreview({ empresaKey, empresaName, rows: parsedRows, validCount, errorCount, duplicateCount, formatError: "", file });
     } catch (err) {
-      console.error("[upload] ventas status error:", err);
+      setVentasPreview({ empresaKey, empresaName, rows: [], validCount: 0, errorCount: 0, duplicateCount: 0, formatError: err instanceof Error ? err.message : "Error al parsear", file });
+    } finally {
+      setVentasPreviewLoading(false);
     }
   }
 
-  async function handleVentasUpload(empresaName: string, file: File) {
+  async function handleVentasUpload() {
+    if (!ventasPreview) return;
+    const { empresaName, file } = ventasPreview;
+    setVentasPreview(null);
     setVentasUploading(empresaName);
     setMessage(null);
     try {
@@ -287,28 +417,21 @@ function UploadPageInner() {
       setMessage({ text: `${file.name}: ${json.count} registros cargados para ${empresaName}`, type: "ok" });
       await loadVentasStatus();
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Error desconocido";
-      setMessage({ text: msg, type: "err" });
+      setMessage({ text: err instanceof Error ? err.message : "Error desconocido", type: "err" });
     } finally {
       setVentasUploading(null);
     }
-  }
-
-  function handleVentasFileSelect(key: string, name: string, file: File) {
-    setConfirmUpload({ key, name, file });
   }
 
   // ── Status indicator ──────────────────────────────────────────────────────
 
   function formatPeriod(dateStr: string, count?: number) {
     const d = new Date(dateStr);
-    // Period label
     const mes = d.toLocaleDateString("es-PA", { month: "short", timeZone: "America/Panama" });
-    const año = d.getFullYear();
-    // Exact time in Panama
+    const ano = d.getFullYear();
     const dia = d.toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "America/Panama" });
     const hora = d.toLocaleTimeString("es-PA", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Panama" }).toLowerCase();
-    const parts = [`${mes} ${año}`];
+    const parts = [`${mes} ${ano}`];
     if (count) parts.push(`${count.toLocaleString()} reg.`);
     parts.push(`${dia} ${hora}`);
     return parts.join(" · ");
@@ -335,6 +458,76 @@ function UploadPageInner() {
     }
   }
 
+  // ── Preview Modal (shared) ────────────────────────────────────────────────
+
+  function PreviewOverlay({ title, subtitle, badge, formatError, summary, headerRow, bodyRows, onConfirm, onCancel, confirmDisabled, confirmLabel }: {
+    title: string; subtitle: string; badge: { ok: boolean; label: string };
+    formatError: string; summary: React.ReactNode;
+    headerRow: string[]; bodyRows: { cells: string[]; hasError: boolean; tooltip: string }[];
+    onConfirm: () => void; onCancel: () => void; confirmDisabled: boolean; confirmLabel: string;
+  }) {
+    return (
+      <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl w-full max-w-[950px] max-h-[85vh] flex flex-col">
+          {/* Header */}
+          <div className="px-6 pt-5 pb-4 border-b border-gray-100 flex-shrink-0">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="font-semibold text-[15px]">{title}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{subtitle}</p>
+              </div>
+              <span className={`px-3 py-1 rounded-full text-xs font-medium flex-shrink-0 ${badge.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                {badge.label}
+              </span>
+            </div>
+            {formatError && (
+              <div className="mt-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">{formatError}</div>
+            )}
+            {!formatError && summary && <div className="mt-3">{summary}</div>}
+          </div>
+
+          {/* Scrollable table */}
+          {bodyRows.length > 0 && (
+            <div className="flex-1 overflow-auto min-h-0">
+              <table className="w-full text-[11px] border-collapse">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left px-2 py-2 text-gray-400 font-semibold text-[10px] uppercase tracking-wider w-8">#</th>
+                    {headerRow.map((h, i) => (
+                      <th key={i} className="text-left px-2 py-2 text-gray-400 font-semibold text-[10px] uppercase tracking-wider whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {bodyRows.map((row, ri) => (
+                    <tr key={ri} className={`border-b border-gray-50 ${row.hasError ? "bg-red-50/60" : ri % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`} title={row.tooltip}>
+                      <td className="px-2 py-1.5 text-gray-300 tabular-nums">{ri + 1}</td>
+                      {row.cells.map((c, ci) => (
+                        <td key={ci} className={`px-2 py-1.5 max-w-[180px] truncate ${row.hasError ? "text-red-700" : "text-gray-700"}`}>{c}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="px-6 py-4 border-t border-gray-100 flex gap-3 flex-shrink-0">
+            <button onClick={onConfirm} disabled={confirmDisabled}
+              className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-800 transition disabled:opacity-30 disabled:cursor-not-allowed">
+              {confirmLabel}
+            </button>
+            <button onClick={onCancel}
+              className="border border-gray-300 px-5 py-2.5 rounded-full text-sm text-gray-600 hover:bg-gray-50 transition">
+              Cancelar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -344,11 +537,10 @@ function UploadPageInner() {
 
         {/* Tab bar */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 mb-6 max-w-xs">
-          <button onClick={() => setActiveTab("cxc")} className={`flex-1 py-2 px-4 text-sm rounded-full transition ${activeTab === "cxc" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>CxC</button>
-          <button onClick={() => setActiveTab("ventas")} className={`flex-1 py-2 px-4 text-sm rounded-full transition ${activeTab === "ventas" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Ventas</button>
+          <button onClick={() => setActiveTab("cxc")} className={`flex-1 py-2 px-4 text-sm rounded-md transition ${activeTab === "cxc" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>CxC</button>
+          <button onClick={() => setActiveTab("ventas")} className={`flex-1 py-2 px-4 text-sm rounded-md transition ${activeTab === "ventas" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Ventas</button>
         </div>
 
-        {/* Message banner */}
         {message && (
           <div className={`mb-6 px-4 py-3 rounded-lg text-sm ${message.type === "ok" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
             {message.text}
@@ -358,7 +550,6 @@ function UploadPageInner() {
         {/* ── CXC Tab ──────────────────────────────────────────────────────── */}
         {activeTab === "cxc" && (
           <>
-            {/* Instructions */}
             <details className="mb-6 bg-blue-50 border border-blue-200 rounded-xl overflow-hidden">
               <summary className="px-4 py-3 text-xs text-blue-700 cursor-pointer hover:bg-blue-100 transition flex items-center gap-2">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -373,51 +564,22 @@ function UploadPageInner() {
                 </ol>
               </div>
             </details>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {cxcCompanies.map((co) => (
-                <div
-                  key={co.key}
-                  className={`border rounded-xl p-4 transition cursor-pointer relative ${
-                    dragOver === co.key ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"
-                  }`}
+                <div key={co.key}
+                  className={`border rounded-xl p-4 transition cursor-pointer relative ${dragOver === co.key ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"} ${uploading === co.key ? "opacity-60 pointer-events-none" : ""}`}
                   onDragOver={(e) => { e.preventDefault(); setDragOver(co.key); }}
                   onDragLeave={() => setDragOver(null)}
-                  onDrop={async (e) => {
-                    e.preventDefault();
-                    setDragOver(null);
-                    const f = e.dataTransfer.files[0];
-                    if (f) {
-                      const text = await readFileAsText(f);
-                      const preview = parseCSVPreview(text, co.key);
-                      setCsvPreview(preview);
-                      setPendingText(text);
-                      setPendingFile(f);
-                    }
-                  }}
-                  onClick={() => cxcFileRefs.current[co.key]?.click()}
-                >
+                  onDrop={async (e) => { e.preventDefault(); setDragOver(null); const f = e.dataTransfer.files[0]; if (f) openCxcPreview(co.key, f); }}
+                  onClick={() => cxcFileRefs.current[co.key]?.click()}>
+                  {uploading === co.key && <span className="text-[9px] bg-black text-white px-2 py-0.5 rounded-full font-medium absolute top-3 right-3">Subiendo...</span>}
                   <div className="text-sm font-medium mb-0.5">{co.name}</div>
                   <div className="text-xs text-gray-400 mb-3">{co.brand}</div>
                   {getStatusIndicator(co.key, "cxc")}
                   <div className="text-[10px] text-gray-300 mt-3">Arrastra el CSV aqui o haz click</div>
-                  <input
-                    ref={(el) => { cxcFileRefs.current[co.key] = el; }}
-                    type="file"
-                    accept=".csv,.txt,.xlsx,.xls"
-                    className="hidden"
+                  <input ref={(el) => { cxcFileRefs.current[co.key] = el; }} type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden"
                     onClick={(e) => e.stopPropagation()}
-                    onChange={async (e) => {
-                      const f = e.target.files?.[0];
-                      if (!f) return;
-                      const text = await readFileAsText(f);
-                      const preview = parseCSVPreview(text, co.key);
-                      setCsvPreview(preview);
-                      setPendingText(text);
-                      setPendingFile(f);
-                      e.target.value = "";
-                    }}
-                  />
+                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) openCxcPreview(co.key, f); e.target.value = ""; }} />
                 </div>
               ))}
             </div>
@@ -427,7 +589,6 @@ function UploadPageInner() {
         {/* ── Ventas Tab ───────────────────────────────────────────────────── */}
         {activeTab === "ventas" && (
           <>
-            {/* Instructions */}
             <details className="mb-6 bg-blue-50 border border-blue-200 rounded-xl overflow-hidden">
               <summary className="px-4 py-3 text-xs text-blue-700 cursor-pointer hover:bg-blue-100 transition flex items-center gap-2">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -443,148 +604,86 @@ function UploadPageInner() {
                 <p className="mt-2 text-blue-500">Nota: Multifashion se carga semanalmente. Las demas empresas se cargan mensualmente.</p>
               </div>
             </details>
-
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {UPLOAD_EMPRESAS.map((co) => (
-                <div
-                  key={co.key}
-                  className={`border rounded-xl p-4 transition cursor-pointer relative ${
-                    dragOver === co.key ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"
-                  } ${co.key === "multifashion" ? "bg-amber-50/30" : ""}`}
+                <div key={co.key}
+                  className={`border rounded-xl p-4 transition cursor-pointer relative ${dragOver === co.key ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"} ${co.key === "multifashion" ? "bg-amber-50/30" : ""} ${ventasUploading === co.name ? "opacity-60 pointer-events-none" : ""}`}
                   onDragOver={(e) => { e.preventDefault(); setDragOver(co.key); }}
                   onDragLeave={() => setDragOver(null)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragOver(null);
-                    const f = e.dataTransfer.files[0];
-                    if (f) handleVentasFileSelect(co.key, co.name, f);
-                  }}
-                  onClick={() => ventasFileRefs.current[co.key]?.click()}
-                >
+                  onDrop={(e) => { e.preventDefault(); setDragOver(null); const f = e.dataTransfer.files[0]; if (f) openVentasPreview(co.key, co.name, f); }}
+                  onClick={() => ventasFileRefs.current[co.key]?.click()}>
                   {"weekly" in co && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium absolute top-3 right-3">Semanal</span>}
+                  {ventasUploading === co.name && <span className="text-[9px] bg-black text-white px-2 py-0.5 rounded-full font-medium absolute top-3 right-3">Subiendo...</span>}
                   <div className="text-sm font-medium mb-0.5">{co.name}</div>
                   <div className="text-xs text-gray-400 mb-3">{co.brand}</div>
                   {getStatusIndicator(co.key, "ventas")}
-                  <div className="text-[10px] text-gray-300 mt-3">
-                    {ventasUploading === co.name ? "Cargando..." : "Arrastra el CSV aqui o haz click"}
-                  </div>
-                  <input
-                    ref={(el) => { ventasFileRefs.current[co.key] = el; }}
-                    type="file"
-                    accept=".csv,.txt,.xlsx,.xls"
-                    className="hidden"
+                  <div className="text-[10px] text-gray-300 mt-3">{ventasPreviewLoading ? "Analizando..." : "Arrastra el CSV aqui o haz click"}</div>
+                  <input ref={(el) => { ventasFileRefs.current[co.key] = el; }} type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden"
                     onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (!f) return;
-                      handleVentasFileSelect(co.key, co.name, f);
-                      e.target.value = "";
-                    }}
-                  />
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) openVentasPreview(co.key, co.name, f); e.target.value = ""; }} />
                 </div>
               ))}
             </div>
           </>
         )}
 
-        {/* ── CXC CSV Preview Overlay ──────────────────────────────────────── */}
-        {csvPreview && (
-          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
-            <div style={{ background: "white", borderRadius: "12px", padding: "24px", maxWidth: "900px", width: "100%", maxHeight: "85vh", overflowY: "auto" }}>
-              {/* Header */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-                <div>
-                  <p style={{ fontWeight: 600, fontSize: "15px", marginBottom: "4px" }}>{cxcCompanies.find((c) => c.key === csvPreview.companyKey)?.name}</p>
-                  <p style={{ color: "#6b7280", fontSize: "12px" }}>
-                    {csvPreview.totalRows} filas detectadas, {csvPreview.headers.length} columnas
-                    {csvPreview.valid && csvPreview.rows.length > 0 && (
-                      <span style={{ marginLeft: "8px", color: "#9ca3af" }}>&mdash; mostrando primeras {csvPreview.rows.length} filas</span>
-                    )}
-                  </p>
-                </div>
-                {csvPreview.valid
-                  ? <span style={{ background: "#f0fdf4", color: "#16a34a", padding: "4px 12px", borderRadius: "99px", fontSize: "12px", whiteSpace: "nowrap", flexShrink: 0 }}>&#10003; Formato valido</span>
-                  : <span style={{ background: "#fef2f2", color: "#dc2626", padding: "4px 12px", borderRadius: "99px", fontSize: "12px", whiteSpace: "nowrap", flexShrink: 0 }}>&#10007; Error de formato</span>
-                }
+        {/* ── CXC Preview Modal ───────────────────────────────────────────── */}
+        {cxcPreview && (
+          <PreviewOverlay
+            title={cxcCompanies.find((c) => c.key === cxcPreview.companyKey)?.name || cxcPreview.companyKey}
+            subtitle={`${cxcPreview.rows.length} registros · delimitador: "${cxcPreview.delimiter}"`}
+            badge={cxcPreview.formatError ? { ok: false, label: "Error de formato" } : { ok: true, label: "Formato valido" }}
+            formatError={cxcPreview.formatError}
+            summary={
+              <div className="flex gap-3 text-xs flex-wrap">
+                <span className="text-green-700 bg-green-50 px-2.5 py-1 rounded-full">{cxcPreview.validCount} validos</span>
+                {cxcPreview.errorCount > 0 && <span className="text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">{cxcPreview.errorCount} con advertencias</span>}
+                {cxcPreview.duplicateNames.size > 0 && <span className="text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full">{cxcPreview.duplicateNames.size} nombres duplicados</span>}
               </div>
-
-              {/* Error message */}
-              {csvPreview.error && (
-                <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", padding: "10px 14px", color: "#dc2626", fontSize: "13px", marginBottom: "16px" }}>
-                  {csvPreview.error}
-                </div>
-              )}
-
-              {/* Preview table */}
-              {csvPreview.valid && csvPreview.rows.length > 0 && (
-                <div style={{ overflowX: "auto", marginBottom: "20px", border: "1px solid #e5e7eb", borderRadius: "8px" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "11px" }}>
-                    <thead>
-                      <tr style={{ background: "#f9fafb", borderBottom: "1px solid #e5e7eb" }}>
-                        {csvPreview.headers.map((h, i) => (
-                          <th key={i} style={{ textAlign: "left", padding: "8px 10px", color: "#6b7280", fontWeight: 600, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: "0.04em", fontSize: "10px" }}>
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {csvPreview.rows.map((row, ri) => (
-                        <tr key={ri} style={{ borderBottom: "1px solid #f3f4f6" }}>
-                          {csvPreview.headers.map((_, ci) => (
-                            <td key={ci} style={{ padding: "7px 10px", color: "#374151", whiteSpace: "nowrap", maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {row[ci] ?? ""}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* Action buttons */}
-              <div style={{ display: "flex", gap: "10px" }}>
-                {csvPreview.valid && pendingFile && (
-                  <button
-                    onClick={async () => { await handleUpload(csvPreview.companyKey, pendingFile); setCsvPreview(null); setPendingText(""); setPendingFile(null); }}
-                    style={{ background: "#111827", color: "white", border: "none", padding: "10px 24px", borderRadius: "99px", cursor: "pointer", fontSize: "14px", fontWeight: 500 }}
-                  >
-                    Confirmar subida
-                  </button>
-                )}
-                <button
-                  onClick={() => { setCsvPreview(null); setPendingText(""); setPendingFile(null); }}
-                  style={{ background: "white", border: "1px solid #d1d5db", padding: "10px 18px", borderRadius: "99px", cursor: "pointer", fontSize: "14px", color: "#6b7280" }}
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
+            }
+            headerRow={cxcPreview.headers}
+            bodyRows={cxcPreview.rows.map((r) => ({
+              cells: r.values.slice(0, cxcPreview.headers.length),
+              hasError: r.errors.length > 0,
+              tooltip: r.errors.length > 0 ? r.errors.join(", ") : "",
+            }))}
+            onConfirm={handleCxcUpload}
+            onCancel={() => { setCxcPreview(null); setPendingFile(null); }}
+            confirmDisabled={!!cxcPreview.formatError || cxcPreview.rows.length === 0}
+            confirmLabel={`Confirmar subida (${cxcPreview.rows.length} registros)`}
+          />
         )}
 
-        {/* ── Ventas Confirm Modal ─────────────────────────────────────────── */}
-        <ConfirmModal
-          open={!!confirmUpload}
-          onClose={() => setConfirmUpload(null)}
-          onConfirm={async () => {
-            if (!confirmUpload) return;
-            const { name, file } = confirmUpload;
-            setConfirmUpload(null);
-            await handleVentasUpload(name, file);
-          }}
-          title="Confirmar carga de ventas"
-          message={confirmUpload ? `Estas cargando datos de ${confirmUpload.name}?` : ""}
-          confirmLabel="Cargar"
-          loading={!!ventasUploading}
-        />
+        {/* ── Ventas Preview Modal ────────────────────────────────────────── */}
+        {ventasPreview && (
+          <PreviewOverlay
+            title={ventasPreview.empresaName}
+            subtitle={`${ventasPreview.rows.length} facturas parseadas`}
+            badge={ventasPreview.formatError ? { ok: false, label: "Error de formato" } : { ok: true, label: "Formato valido" }}
+            formatError={ventasPreview.formatError}
+            summary={
+              <div className="flex gap-3 text-xs flex-wrap">
+                <span className="text-green-700 bg-green-50 px-2.5 py-1 rounded-full">{ventasPreview.validCount} nuevas</span>
+                {ventasPreview.duplicateCount > 0 && <span className="text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full">{ventasPreview.duplicateCount} existentes (se actualizaran)</span>}
+                {ventasPreview.errorCount > 0 && <span className="text-red-700 bg-red-50 px-2.5 py-1 rounded-full">{ventasPreview.errorCount} con errores</span>}
+              </div>
+            }
+            headerRow={["Fecha", "Tipo", "N.Sistema", "N.Fiscal", "Cliente", "Vendedor", "Subtotal", "Total"]}
+            bodyRows={ventasPreview.rows.map((r) => ({
+              cells: [r.fecha, r.tipo, r.nSistema, r.nFiscal, r.cliente, r.vendedor, `$${r.subtotal.toFixed(2)}`, `$${r.total.toFixed(2)}`],
+              hasError: r.errors.length > 0,
+              tooltip: r.errors.length > 0 ? r.errors.join(", ") : r.isDuplicate ? "Ya existe — se actualizara" : "",
+            }))}
+            onConfirm={handleVentasUpload}
+            onCancel={() => setVentasPreview(null)}
+            confirmDisabled={!!ventasPreview.formatError || (ventasPreview.validCount === 0 && ventasPreview.duplicateCount === 0)}
+            confirmLabel={`Confirmar subida (${ventasPreview.rows.length} registros)`}
+          />
+        )}
       </div>
     </div>
   );
 }
-
-// ── Default export with Suspense boundary ─────────────────────────────────────
 
 export default function UploadPage() {
   return (
