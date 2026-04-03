@@ -149,7 +149,7 @@ export default function ReclamoDetail({
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
           Excel
         </button>
-        <button onClick={() => openPdfWindow(buildSingleReclamoPdfHtml(current))} className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
+        <button onClick={() => openPdfWindow(buildSingleReclamoPdfHtml(current, fotos))} className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>
           PDF
         </button>
@@ -296,7 +296,7 @@ export default function ReclamoDetail({
         <button onClick={startEdit} title="Editar todos los campos de este reclamo" className="text-sm text-gray-400 hover:text-black transition">Editar</button>
         <button onClick={sendWA} title="Enviar recordatorio por WhatsApp" className="text-sm text-gray-400 hover:text-black transition">WhatsApp</button>
         <button onClick={() => window.open(`/api/reclamos/${current.id}/excel`)} title="Descargar este reclamo en formato Excel" className="text-sm text-gray-400 hover:text-black transition">Excel</button>
-        <button onClick={() => openPdfWindow(buildSingleReclamoPdfHtml(current))} title="Descargar este reclamo en formato PDF" className="text-sm text-gray-400 hover:text-black transition">PDF</button>
+        <button onClick={() => openPdfWindow(buildSingleReclamoPdfHtml(current, fotos))} title="Descargar este reclamo en formato PDF" className="text-sm text-gray-400 hover:text-black transition">PDF</button>
         {(role === "admin" || role === "secretaria") && (
           <button onClick={() => setShowDeleteConfirm(true)} title="Eliminar permanentemente este reclamo" className="text-sm text-gray-300 hover:text-red-500 transition ml-auto">Eliminar Reclamo</button>
         )}

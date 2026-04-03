@@ -92,7 +92,7 @@ export function buildReclamosPdfHtml(reclamosArr: Reclamo[], titulo: string) {
   </body></html>`;
 }
 
-export function buildSingleReclamoPdfHtml(r: Reclamo) {
+export function buildSingleReclamoPdfHtml(r: Reclamo, fotos?: { url?: string; storage_path: string }[]) {
   const items = r.reclamo_items || [];
   const sub = calcSub(items);
   const itemRows = items.map((i) => `<tr><td>${i.referencia || ""}</td><td>${i.descripcion || ""}</td><td>${i.talla || ""}</td><td class="right">${Number(i.cantidad) || 0}</td><td class="right">$${fmt(i.precio_unitario)}</td><td class="right">$${fmt((Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0))}</td><td>${i.motivo || ""}</td></tr>`).join("");
@@ -136,6 +136,16 @@ export function buildSingleReclamoPdfHtml(r: Reclamo) {
   </div>
   <table><thead><tr><th>Código</th><th>Descripción</th><th>Talla</th><th class="right">Cant.</th><th class="right">Precio U.</th><th class="right">Subtotal</th><th>Motivo</th></tr></thead><tbody>${itemRows}</tbody></table>
   ${r.notas ? `<p style="margin-top:12px;color:#666;">Notas: ${r.notas}</p>` : ""}
+  ${fotos && fotos.length > 0 ? `
+  <div style="margin-top:20px;">
+    <div style="background:#1b3a5c;color:white;padding:6px 8px;font-size:10px;text-transform:uppercase;font-weight:600;border-radius:4px 4px 0 0;">Evidencia Fotográfica</div>
+    <div style="padding:12px;border:1px solid #eee;border-top:none;border-radius:0 0 4px 4px;">
+      ${fotos.map(f => {
+        const src = f.url || `${typeof window !== "undefined" ? (process.env.NEXT_PUBLIC_SUPABASE_URL || "") : ""}/storage/v1/object/public/reclamo-fotos/${f.storage_path}`;
+        return `<img src="${src}" style="max-width:300px;border-radius:8px;margin:8px;display:inline-block;border:1px solid #eee;" />`;
+      }).join("")}
+    </div>
+  </div>` : ""}
   <div class="footer">Generado el ${new Date().toLocaleDateString("es-HN")}</div>
   <script>window.onload=function(){window.print();}</script>
   </body></html>`;
