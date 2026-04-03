@@ -9,6 +9,7 @@ import type { ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
 import { VENDOR_MAP } from "@/lib/vendors";
 import AppHeader from "@/components/AppHeader";
+import { Toast } from "@/components/ui";
 import UploadFreshness from "./components/UploadFreshness";
 import KpiCards from "./components/KpiCards";
 import CompanySummary from "./components/CompanySummary";
@@ -16,6 +17,7 @@ import ClientTable from "./components/ClientTable";
 import { SkeletonRow } from "./components/Skeleton";
 import { generatePDFResumen, generatePDFDetallado } from "@/lib/pdf-cxc";
 import useAdminData from "./hooks/useAdminData";
+import { exportConsolidado } from "@/lib/excel-cxc-consolidado";
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -24,29 +26,27 @@ type SortKey = "name" | "current" | "watch" | "overdue" | "total" | "follow_up";
 type SortDir = "asc" | "desc";
 
 function buildWhatsAppMsg(client: ConsolidatedClient) {
+  const contactName = client.contacto || "cliente";
+  const d91_plus = client.d91_120 + client.d121_plus;
   const lines = [
-    `Estimado/a cliente,`,
+    `Estimado/a ${contactName},`,
     ``,
-    `Le escribimos de Fashion Group para informarle sobre su estado de cuenta actualizado:`,
+    `Le escribimos de Fashion Group para darle seguimiento a su cuenta por cobrar.`,
     ``,
-    `*Estado de Cuenta - ${client.nombre_normalized}*`,
-    ``,
+    `Saldo pendiente: *$${fmt(client.total)}*`,
   ];
-  for (const co of COMPANIES) {
-    const d = client.companies[co.key];
-    if (!d || d.total === 0) continue;
-    lines.push(`*${co.name}* (${co.brand}): $${fmt(d.total)}`);
+  if (d91_plus > 0) {
+    lines.push(`Facturas vencidas: *$${fmt(d91_plus)}* (más de 90 días)`);
   }
   lines.push(``);
-  if (client.current > 0) lines.push(`Corriente (0-90d): $${fmt(client.current)}`);
-  if (client.watch > 0) lines.push(`Vigilancia (91-120d): $${fmt(client.watch)}`);
-  if (client.overdue > 0) lines.push(`*Vencido (121d+): $${fmt(client.overdue)}*`);
-  lines.push(`*Total: $${fmt(client.total)}*`);
+  lines.push(`Detalle por antigüedad:`);
+  lines.push(`- 0-30 días: $${fmt(client.d0_30)}`);
+  lines.push(`- 31-60 días: $${fmt(client.d31_60)}`);
+  lines.push(`- 61-90 días: $${fmt(client.d61_90)}`);
+  lines.push(`- 91+ días: $${fmt(d91_plus)}`);
   lines.push(``);
-  lines.push(`Agradecemos su pronta atencion a este saldo. Quedamos a su disposicion para cualquier consulta.`);
-  lines.push(``);
-  lines.push(`Atentamente,`);
-  lines.push(`Fashion Group - Departamento de Cobros`);
+  lines.push(`Agradecemos su pronta gestión. Quedamos atentos.`);
+  lines.push(`Fashion Group Panamá`);
   return lines.join("\n");
 }
 
@@ -133,6 +133,9 @@ export default function AdminDashboard() {
   const [companyFilter, setCompanyFilter] = useState<string>("all");
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [toast, setToast] = useState<string | null>(null);
+
+  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
   const [showExport, setShowExport] = useState(false);
   const [favorites, setFavorites] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("cxc_favorites") || "[]")); } catch { return new Set(); }
@@ -301,12 +304,21 @@ export default function AdminDashboard() {
 
   function openWhatsApp(client: ConsolidatedClient) {
     let phone = (client.celular || client.telefono).replace(/[^0-9]/g, "");
-    if (!phone) { alert("Este cliente no tiene numero de telefono registrado. Edite el contacto primero."); return; }
+    if (!phone) { showToast("No hay WhatsApp registrado para este cliente"); return; }
     if (!phone.startsWith("507") && phone.length <= 8) {
       phone = "507" + phone;
     }
     const msg = encodeURIComponent(buildWhatsAppMsg(client));
     window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
+  }
+
+  function copyCollectionMsg(client: ConsolidatedClient) {
+    const msg = buildWhatsAppMsg(client);
+    navigator.clipboard.writeText(msg).then(() => {
+      showToast("Mensaje copiado al portapapeles");
+    }).catch(() => {
+      showToast("Error al copiar");
+    });
   }
 
   function sendVendorWhatsApp(companyKey: string) {
@@ -441,6 +453,13 @@ export default function AdminDashboard() {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Cargar archivo
           </button>
+          <button
+            onClick={() => exportConsolidado(roleClients, cxcCompanies)}
+            className="text-sm border border-gray-200 text-gray-700 px-5 py-2 rounded-full font-medium hover:bg-gray-50 transition flex items-center gap-2"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+            Consolidado
+          </button>
           <div className="relative">
             <button
               onClick={() => setShowExport(!showExport)}
@@ -535,6 +554,7 @@ export default function AdminDashboard() {
         clients={clients}
         contactLog={contactLog}
         onOpenWhatsApp={openWhatsApp}
+        onCopyCollectionMsg={copyCollectionMsg}
         onOpenEmail={openEmail}
         onMarkContacted={markContacted}
         onSaveEdit={handleSaveEdit}
@@ -543,6 +563,7 @@ export default function AdminDashboard() {
         onToggleFavorite={toggleFavorite}
       />
 
+      <Toast message={toast} />
     </div>
     </div>
   );
