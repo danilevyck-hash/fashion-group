@@ -100,7 +100,7 @@ export default function VentasDashboard() {
   const { authChecked, role } = useAuth({ moduleKey: "ventas", allowedRoles: ["admin", "director"] });
 
   useEffect(() => {
-    if (authChecked && (role === "secretaria" || role === "upload")) router.push("/ventas/carga");
+    if (authChecked && (role === "secretaria" || role === "secretaria")) router.push("/ventas/carga");
   }, [authChecked, role, router]);
 
   const [año, setAño] = useState(new Date().getFullYear());

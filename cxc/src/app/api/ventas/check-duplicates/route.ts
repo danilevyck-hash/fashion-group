@@ -3,7 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "upload"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   const { empresa, n_sistemas } = await req.json();

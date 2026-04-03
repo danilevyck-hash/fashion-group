@@ -160,7 +160,7 @@ async function buildPdf(reclamos: Record<string, unknown>[]) {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "upload", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria", "director"]);
   if (auth instanceof NextResponse) return auth;
   try {
     const { ids } = await req.json();
@@ -190,7 +190,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const auth2 = requireRole(req, ["admin", "secretaria", "upload", "director"]);
+  const auth2 = requireRole(req, ["admin", "secretaria", "director"]);
   if (auth2 instanceof NextResponse) return auth2;
   try {
     const empresa = req.nextUrl.searchParams.get("empresa");

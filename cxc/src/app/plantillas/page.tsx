@@ -16,7 +16,7 @@ const ALL_MODULES = [
   { key: "directorio", label: "Directorio", subtitle: "Clientes y contactos", icon: "📋", href: "/directorio", roles: ["admin", "secretaria", "director", "contabilidad", "vendedor"] },
   { key: "cheques", label: "Cheques", subtitle: "Posfechados", icon: "🏦", href: "/cheques", roles: ["admin", "secretaria", "director"] },
   { key: "prestamos", label: "Préstamos", subtitle: "Colaboradores", icon: "🤝", href: "/prestamos", roles: ["admin", "contabilidad"] },
-  { key: "reclamos", label: "Reclamos", subtitle: "Seguimiento", icon: "📝", href: "/reclamos", roles: ["admin", "upload", "secretaria", "director"] },
+  { key: "reclamos", label: "Reclamos", subtitle: "Seguimiento", icon: "📝", href: "/reclamos", roles: ["admin", "secretaria", "director"] },
   { key: "ventas", label: "Ventas", subtitle: "Mensuales", icon: "📈", href: "/ventas", roles: ["admin", "director"] },
   { key: "reebok", label: "Catálogo Reebok", subtitle: "Productos y pedidos", icon: "👟", href: "/catalogo/reebok", roles: ["admin", "vendedor", "cliente", "secretaria"] },
   { key: "camisetas", label: "Camisetas Selección", subtitle: "Pedidos y stock", icon: "👕", href: "/camisetas", roles: ["admin", "vendedor"] },
@@ -121,7 +121,7 @@ export default function PlantillasPage() {
   if (!authChecked) return null;
 
   // Build alerts — only show alerts relevant to the user's role
-  const alertRoles = ['admin', 'secretaria', 'director', 'contabilidad', 'upload'];
+  const alertRoles = ['admin', 'secretaria', 'director', 'contabilidad'];
   const showAlerts = alertRoles.includes(role);
   const alerts: { label: string; count: number; href: string; color: "red" | "yellow" | "blue" }[] = [];
   if (stats && showAlerts) {

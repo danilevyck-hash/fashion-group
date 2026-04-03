@@ -16,7 +16,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 };
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRole(req, ["admin", "secretaria", "upload", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria", "director"]);
   if (auth instanceof NextResponse) return auth;
   const { id } = params;
   if (!uuidRegex.test(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRole(req, ["admin", "secretaria", "upload"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   const { id } = params;
   if (!uuidRegex.test(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });

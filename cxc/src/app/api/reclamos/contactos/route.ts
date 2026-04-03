@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 
-const RECLAMOS_ROLES = ["admin", "secretaria", "upload"];
+const RECLAMOS_ROLES = ["admin", "secretaria"];
 const ALLOWED_FIELDS = ["empresa", "nombre", "nombre_contacto", "whatsapp", "correo", "activo"];
 
 function pick(body: Record<string, unknown>, fields: string[]) {
@@ -12,7 +12,7 @@ function pick(body: Record<string, unknown>, fields: string[]) {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "upload", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria", "director"]);
   if (auth instanceof NextResponse) return auth;
   const { data, error } = await supabaseServer
     .from("reclamo_contactos")

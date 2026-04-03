@@ -7,7 +7,7 @@ const SYSTEM_ROLES = [
   { key: "admin", label: "Administrador", password_env: "ADMIN_PASSWORD" },
   { key: "director", label: "Director", password_env: "DIRECTOR_PASSWORD" },
   { key: "contabilidad", label: "Contabilidad", password_env: "CONTABILIDAD_PASSWORD" },
-  { key: "upload", label: "Secretaria", password_env: "UPLOAD_PASSWORD" },
+  { key: "secretaria", label: "Secretaria", password_env: "UPLOAD_PASSWORD" },
   { key: "vendedor", label: "Vendedor", password_env: "VENDEDOR_PASSWORD" },
   { key: "cliente", label: "Cliente", password_env: "CLIENTE_PASSWORD" },
 ];
@@ -22,7 +22,7 @@ const DEFAULT_MODULES: Record<string, string[]> = {
   admin: ALL_MODULES,
   director: ALL_MODULES,
   contabilidad: ["prestamos", "ventas"],
-  upload: ["upload", "guias", "caja", "reclamos", "cheques", "directorio"],
+  secretaria: ["upload", "guias", "caja", "reclamos", "cheques", "directorio"],
   vendedor: ["reebok", "cxc", "directorio"],
   cliente: ["reebok"],
 };

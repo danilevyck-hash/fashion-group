@@ -3,7 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "upload", "vendedor"]);
+  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
   if (auth instanceof NextResponse) return auth;
   const q = req.nextUrl.searchParams.get("q");
   if (!q || q.length < 2) return NextResponse.json([]);

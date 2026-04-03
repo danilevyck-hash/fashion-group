@@ -52,7 +52,7 @@ const VALID_TIPOS = new Set(["Factura", "Nota de Crédito", "Nota de Débito"]);
 // ── Inner component ─────────────────────────────────────────────────────────
 
 function UploadPageInner() {
-  const { authChecked, role } = useAuth({ moduleKey: "upload", allowedRoles: ["admin", "secretaria", "upload"] });
+  const { authChecked, role } = useAuth({ moduleKey: "upload", allowedRoles: ["admin", "secretaria"] });
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get("tab") === "ventas" ? "ventas" : "cxc") as "cxc" | "ventas";
 

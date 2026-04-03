@@ -19,7 +19,7 @@ function ReclamosPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const { authChecked, role } = useAuth({ moduleKey: "reclamos", allowedRoles: ["admin", "upload", "secretaria", "director"] });
+  const { authChecked, role } = useAuth({ moduleKey: "reclamos", allowedRoles: ["admin", "secretaria", "director"] });
   const [view, _setView] = useState<RView>((searchParams.get("view") as RView) || "list");
   const [urlId] = useState(searchParams.get("id") || "");
   const [reclamos, setReclamos] = useState<Reclamo[]>([]);

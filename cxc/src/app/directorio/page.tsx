@@ -22,7 +22,7 @@ interface Cliente {
 
 export default function DirectorioPage() {
   const router = useRouter();
-  const { authChecked, role } = useAuth({ moduleKey: "directorio", allowedRoles: ["admin","upload","secretaria","director","vendedor"] });
+  const { authChecked, role } = useAuth({ moduleKey: "directorio", allowedRoles: ["admin","secretaria","director","vendedor"] });
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);

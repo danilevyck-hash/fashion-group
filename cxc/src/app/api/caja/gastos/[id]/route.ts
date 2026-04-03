@@ -13,7 +13,7 @@ function pick(body: Record<string, unknown>, fields: string[]) {
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRole(req, ["admin", "secretaria", "upload"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const fields = pick(body, ALLOWED_FIELDS);
@@ -29,7 +29,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRole(req, ["admin", "secretaria", "upload"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   const { data: existing } = await supabaseServer.from("caja_gastos").select("id, descripcion, total").eq("id", params.id).maybeSingle();
   if (!existing) return NextResponse.json({ error: "Gasto no encontrado" }, { status: 404 });

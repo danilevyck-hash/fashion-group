@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/requireRole";
 const P = 12;
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "upload", "vendedor"]);
+  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
   if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const RESEND_KEY = process.env.RESEND_API_KEY;

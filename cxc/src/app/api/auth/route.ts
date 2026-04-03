@@ -78,9 +78,8 @@ export async function POST(req: NextRequest) {
             const DEFAULTS: Record<string, string[]> = {
               admin: ALL, director: ALL,
               contabilidad: ["prestamos","ventas"],
-              upload: ["upload","guias","caja","reclamos","cheques","directorio"],
-              vendedor: ["reebok","cxc","directorio"],
               secretaria: ["upload","guias","caja","reclamos","cheques","directorio"],
+              vendedor: ["reebok","cxc","directorio"],
               cliente: ["reebok"],
             };
             modules = DEFAULTS[user.role] || [];
@@ -142,7 +141,7 @@ export async function POST(req: NextRequest) {
     const envRoles: Record<string, string> = {};
     if (process.env.ADMIN_PASSWORD) envRoles[process.env.ADMIN_PASSWORD] = "admin";
     if (process.env.DIRECTOR_PASSWORD) envRoles[process.env.DIRECTOR_PASSWORD] = "director";
-    if (process.env.UPLOAD_PASSWORD) envRoles[process.env.UPLOAD_PASSWORD] = "upload";
+    if (process.env.UPLOAD_PASSWORD) envRoles[process.env.UPLOAD_PASSWORD] = "secretaria";
     if (process.env.CONTABILIDAD_PASSWORD) envRoles[process.env.CONTABILIDAD_PASSWORD] = "contabilidad";
     role = envRoles[password] || null;
   }

@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/requireRole";
 import XLSX from "xlsx-js-style";
 import { buildReclamoSheet } from "@/lib/excel-reclamo";
 
-const RECLAMOS_ROLES = ["admin", "secretaria", "upload", "director"];
+const RECLAMOS_ROLES = ["admin", "secretaria", "director"];
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
