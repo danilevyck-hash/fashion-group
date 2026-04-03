@@ -35,11 +35,14 @@ function Productos() {
   // Active draft: if user came from an existing draft order, we add to it instead of creating new
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null);
   const [activeDraftNumber, setActiveDraftNumber] = useState("");
+  const [activeDraftClient, setActiveDraftClient] = useState("");
+  // Track which items were already in the draft (to only PATCH changes)
+  const [draftItemIds, setDraftItemIds] = useState<Set<string>>(new Set());
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
   const cartTotal = cart.reduce((s, i) => s + i.quantity * 12 * Number(i.unit_price || 0), 0);
 
-  // Check for active draft on mount
+  // Check for active draft on mount — load its items into cart
   useEffect(() => {
     const draftId = sessionStorage.getItem("reebok_active_draft_id");
     if (draftId) {
@@ -47,6 +50,14 @@ function Productos() {
         if (order && order.status === "borrador") {
           setActiveDraftId(order.id);
           setActiveDraftNumber(order.order_number);
+          setActiveDraftClient(order.client_name || "");
+          // Pre-load draft items into cart so ProductCards show current quantities
+          const existingItems: CartItem[] = (order.reebok_order_items || []).map((i: { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number }) => ({
+            product_id: i.product_id, sku: i.sku || "", name: i.name || "",
+            image_url: i.image_url || "", quantity: i.quantity, unit_price: i.unit_price,
+          }));
+          setCart(existingItems);
+          setDraftItemIds(new Set(existingItems.map(i => i.product_id)));
         } else {
           sessionStorage.removeItem("reebok_active_draft_id");
         }
@@ -152,6 +163,21 @@ function Productos() {
         <p className="text-sm text-gray-400">Panamá</p>
       </div>
 
+      {/* Active draft banner */}
+      {activeDraftId && (
+        <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 mb-4">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="w-2 h-2 rounded-full bg-black" />
+            <span className="text-gray-600">Editando pedido</span>
+            <span className="font-medium">{activeDraftNumber}</span>
+            {activeDraftClient && <span className="text-gray-400">— {activeDraftClient}</span>}
+          </div>
+          <button onClick={() => router.push(`/catalogo/reebok/pedido/${activeDraftId}`)} className="text-xs text-black hover:underline transition">
+            Ver pedido →
+          </button>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex flex-wrap items-end gap-3 mb-6">
         <div>
@@ -251,22 +277,31 @@ function Productos() {
       {cartCount > 0 && (
         <div className="fixed bottom-0 left-0 right-0 z-40 p-3 bg-white border-t border-gray-100 shadow-lg">
           {activeDraftId ? (
-            // Add to existing draft
+            // Save changes to existing draft
             <button onClick={async () => {
-              setToast("Agregando al pedido...");
+              setToast("Guardando pedido...");
               try {
+                // PATCH all items (upsert handles new + updated, qty=0 deletes)
                 for (const item of cart) {
                   await fetch(`/api/catalogo/reebok/orders/${activeDraftId}/item`, {
                     method: "PATCH", headers: { "Content-Type": "application/json" },
                     body: JSON.stringify(item),
                   });
                 }
-                setCart([]);
+                // Delete items that were in the draft but removed from cart
+                for (const pid of draftItemIds) {
+                  if (!cart.find(i => i.product_id === pid)) {
+                    await fetch(`/api/catalogo/reebok/orders/${activeDraftId}/item`, {
+                      method: "PATCH", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ product_id: pid, quantity: 0 }),
+                    });
+                  }
+                }
                 router.push(`/catalogo/reebok/pedido/${activeDraftId}`);
-              } catch { setToast("Error al agregar productos"); }
+              } catch { setToast("Error al guardar pedido"); }
             }}
               className="w-full bg-black text-white py-3.5 rounded-lg text-sm font-medium flex items-center justify-between px-4 hover:bg-gray-800 transition">
-              <span>Agregar al pedido {activeDraftNumber}</span>
+              <span>Guardar pedido {activeDraftNumber}</span>
               <span className="flex items-center gap-2">
                 <span className="tabular-nums">{cartCount} bulto{cartCount !== 1 ? "s" : ""}</span>
                 {cartTotal > 0 && <><span className="text-white/40">·</span><span className="tabular-nums font-semibold">${fmt(cartTotal)}</span></>}
