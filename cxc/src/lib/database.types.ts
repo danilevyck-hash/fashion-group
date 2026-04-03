@@ -183,6 +183,8 @@ export type Database = {
           // from add-guias-detalle.sql
           monto_total: number | null
           estado: string | null
+          tipo_despacho: string | null
+          nombre_chofer: string | null
         }
         Insert: {
           id?: string
@@ -197,6 +199,8 @@ export type Database = {
           firma_transportista?: string | null
           monto_total?: number | null
           estado?: string | null
+          tipo_despacho?: string | null
+          nombre_chofer?: string | null
         }
         Update: {
           id?: string
@@ -211,6 +215,8 @@ export type Database = {
           firma_transportista?: string | null
           monto_total?: number | null
           estado?: string | null
+          tipo_despacho?: string | null
+          nombre_chofer?: string | null
         }
       }
       guia_items: {

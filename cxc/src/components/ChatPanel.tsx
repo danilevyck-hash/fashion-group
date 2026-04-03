@@ -120,6 +120,15 @@ export default function ChatPanel() {
   async function handleSend() {
     const text = input.trim();
     if (!text || streaming) return;
+
+    // Check if user is confirming a pending action
+    const confirmWords = ["sí", "si", "confirmar", "dale", "ok", "confirmo", "hazlo", "yes"];
+    const lastMsg = messages[messages.length - 1];
+    if (lastMsg?.role === "assistant" && confirmWords.includes(text.toLowerCase())) {
+      const pendingAction = extractAction(lastMsg.content);
+      if (pendingAction) { setInput(""); executeAction(pendingAction); return; }
+    }
+
     const userMsg: Message = { role: "user", content: text };
     const hist = messages.map(m => ({ role: m.role, content: m.content }));
     setMessages(prev => [...prev, userMsg]);

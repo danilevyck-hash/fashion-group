@@ -32,19 +32,24 @@ const BASE_SYSTEM_PROMPT = `Eres el asistente de inteligencia de negocios de Fas
 - Si no puedes responder algo técnico: "Para esta consulta, contacta al técnico del sistema: Daniel Levy".
 
 ## Acciones que puedes ejecutar
-Puedes ejecutar acciones en el sistema. Cuando el usuario pida algo que implique cambiar datos:
-1. Muestra un RESUMEN claro de lo que vas a hacer
-2. Termina con: "¿Confirmo? (responde sí o no)"
-3. Solo ejecuta si el usuario responde "sí", "confirmar", "dale", "hazlo"
-4. NUNCA ejecutes sin confirmación
+Puedes ejecutar SOLO estas acciones. NUNCA crear registros nuevos (guías, reclamos, cheques, etc.) — solo cambiar estados de registros existentes.
 
-Para indicar una acción pendiente, usa EXACTAMENTE este formato al final de tu respuesta:
+Cuando el usuario pida algo que implique cambiar datos:
+1. Busca el registro en los datos que tienes
+2. Muestra un RESUMEN con los datos encontrados
+3. Termina con: "¿Confirmo? (responde sí o no)"
+4. NUNCA ejecutes sin confirmación explícita
+5. Si te piden CREAR algo nuevo (guía, reclamo, cheque, gasto), responde: "Para crear registros nuevos, ve al módulo correspondiente en el dashboard."
+
+Para indicar una acción pendiente, usa EXACTAMENTE este formato al final de tu respuesta (en una línea separada):
 [ACTION:tipo|id|datos]
 
 Acciones disponibles:
-- [ACTION:despachar_guia|{id}|{numero}] — Marcar guía como despachada
-- [ACTION:depositar_cheque|{id}|{cliente},{monto}] — Marcar cheque como depositado
-- [ACTION:cambiar_estado_reclamo|{id}|{estado}] — Cambiar estado de reclamo
+- [ACTION:despachar_guia|{id}|{numero}] — Solo si la guía está en "Pendiente Bodega"
+- [ACTION:depositar_cheque|{id}|{cliente},{monto}] — Solo cheques en estado "pendiente"
+- [ACTION:cambiar_estado_reclamo|{id}|{nuevo_estado}] — Solo reclamos existentes
+
+IMPORTANTE: El {id} debe ser el UUID real del registro que aparece en los datos de búsqueda. Si no tienes el ID, NO propongas la acción.
 
 ## Alertas automáticas
 Si detectas estas situaciones, menciónalo proactivamente:
@@ -493,40 +498,65 @@ export async function POST(req: NextRequest) {
 
     const systemData = await buildSystemData();
 
-    // Smart search based on message content
+    // Smart search — aggressively detect entities in message
     let searchContext = "";
     const msgLower = message.toLowerCase();
 
-    // Extract search terms from various patterns
+    // Extract ANY potential entity name from the message
+    // Patterns: "debe X", "saldo X", "cuanto X", "cliente X", "de X", known names
     const termPatterns = [
-      /(?:cliente|cuenta de|saldo de|deuda de|factur\w+ (?:de|a|para))\s+[""""]?([A-ZÁ-Úa-zá-ú][A-ZÁ-Úa-zá-ú\s&.'-]{2,})/i,
-      /(?:city|mall|jerusalem|golden|plaza|kheriddine|bouti|outlet|sporting|frontera)[A-ZÁ-Úa-zá-ú\s&.'-]*/i,
+      /(?:debe|deuda|saldo|cobrar|factur\w+|pago|cuenta)\s+(?:de\s+|a\s+)?[""""]?([A-ZÁ-Úa-zá-ú][A-ZÁ-Úa-zá-ú\s&.'-]{2,})/i,
+      /(?:cu[aá]nto)\s+(?:debe|le\s+debemos|nos\s+debe)\s+[""""]?([A-ZÁ-Úa-zá-ú][A-ZÁ-Úa-zá-ú\s&.'-]{2,})/i,
+      /(?:cliente|cuenta de|saldo de|deuda de)\s+[""""]?([A-ZÁ-Úa-zá-ú][A-ZÁ-Úa-zá-ú\s&.'-]{2,})/i,
+      /(?:city|mall|jerusalem|golden|plaza|kheriddine|bouti|outlet|sporting|frontera|la frontera|duty free)[A-ZÁ-Úa-zá-ú\s&.'-]*/i,
     ];
     let searchTerm = "";
     for (const p of termPatterns) { const m = message.match(p); if (m) { searchTerm = (m[1] || m[0]).trim(); break; } }
 
-    // Search CxC if mentions client/saldo/deuda
-    if (searchTerm && searchTerm.length >= 3) {
+    // Also detect empresa names in message
+    const empresaMap: Record<string, string> = {
+      "vistana": "vistana", "calvin": "vistana", "fashion wear": "fashion_wear", "fashion shoes": "fashion_shoes",
+      "active shoes": "active_shoes", "active wear": "active_wear", "reebok": "active_wear", "joystep": "joystep", "boston": "confecciones_boston",
+    };
+    let empresaFilter = "";
+    for (const [name, key] of Object.entries(empresaMap)) {
+      if (msgLower.includes(name)) { empresaFilter = key; break; }
+    }
+
+    // Search CxC — aggressive: search if any term found OR if mentions debt/client keywords
+    const shouldSearchCxC = searchTerm.length >= 3 || msgLower.includes("debe") || msgLower.includes("deuda") || msgLower.includes("saldo") || msgLower.includes("cobrar") || msgLower.includes("cartera");
+    if (shouldSearchCxC && searchTerm.length >= 3) {
       const term = searchTerm.toUpperCase();
-      let { data: cxcMatches } = await supabaseServer.from("cxc_rows").select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365").ilike("nombre_normalized", `%${term}%`).limit(5);
+      let { data: cxcMatches } = await supabaseServer.from("cxc_rows").select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365").ilike("nombre_normalized", `%${term}%`).limit(10);
       if (!cxcMatches?.length) {
         for (const word of term.split(/\s+/).filter(w => w.length >= 3).sort((a, b) => b.length - a.length)) {
-          const { data } = await supabaseServer.from("cxc_rows").select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365").ilike("nombre_normalized", `%${word}%`).limit(5);
+          const { data } = await supabaseServer.from("cxc_rows").select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365").ilike("nombre_normalized", `%${word}%`).limit(10);
           if (data?.length) { cxcMatches = data; break; }
         }
       }
+      // Filter by empresa if mentioned
+      if (cxcMatches?.length && empresaFilter) {
+        const filtered = cxcMatches.filter(r => r.company_key === empresaFilter);
+        if (filtered.length > 0) cxcMatches = filtered;
+      }
       if (cxcMatches?.length) {
-        searchContext += `\n\n## CxC de "${searchTerm}"`;
-        for (const r of cxcMatches.slice(0, 3)) {
+        searchContext += `\n\n## CxC de "${searchTerm}"${empresaFilter ? ` (empresa: ${empresaFilter})` : ""}`;
+        for (const r of cxcMatches.slice(0, 5)) {
           const vencido = (Number(r.d121_180) || 0) + (Number(r.d181_270) || 0) + (Number(r.d271_365) || 0) + (Number(r.mas_365) || 0);
-          searchContext += `\n- ${r.nombre_normalized} (${r.company_key}): total $${fmt(Number(r.total) || 0)}, vencido $${fmt(vencido)}`;
+          searchContext += `\n- ${r.nombre_normalized} (${r.company_key}): total $${fmt(Number(r.total) || 0)}, 0-30d $${fmt(Number(r.d0_30) || 0)}, 31-60d $${fmt(Number(r.d31_60) || 0)}, 61-90d $${fmt(Number(r.d61_90) || 0)}, 91-120d $${fmt(Number(r.d91_120) || 0)}, vencido $${fmt(vencido)}`;
         }
       }
-      // Facturas
-      const { data: facturas } = await supabaseServer.from("ventas_raw").select("fecha, tipo, n_fiscal, cliente, empresa, vendedor, total").ilike("cliente", `%${term}%`).order("fecha", { ascending: false }).limit(5);
+    }
+
+    // Search facturas — by client name OR by empresa
+    if (searchTerm.length >= 3 || empresaFilter) {
+      let facturaQuery = supabaseServer.from("ventas_raw").select("fecha, tipo, n_fiscal, cliente, empresa, vendedor, total").order("fecha", { ascending: false }).limit(10);
+      if (searchTerm.length >= 3) facturaQuery = facturaQuery.ilike("cliente", `%${searchTerm}%`);
+      else if (empresaFilter) facturaQuery = facturaQuery.eq("empresa", empresaFilter);
+      const { data: facturas } = await facturaQuery;
       if (facturas?.length) {
-        searchContext += `\n\n## Facturas de "${searchTerm}"`;
-        for (const v of facturas) searchContext += `\n- ${v.fecha} | ${v.tipo} ${v.n_fiscal || ""} | ${v.empresa} | $${fmt(Number(v.total) || 0)}`;
+        searchContext += `\n\n## Facturas${searchTerm ? ` de "${searchTerm}"` : ""}${empresaFilter ? ` (${empresaFilter})` : ""}`;
+        for (const v of facturas) searchContext += `\n- ${v.fecha} | ${v.tipo} ${v.n_fiscal || ""} | ${v.cliente} | ${v.empresa} | vendedor: ${v.vendedor || "?"} | $${fmt(Number(v.total) || 0)}`;
       }
     }
 

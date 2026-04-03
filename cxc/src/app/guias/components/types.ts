@@ -26,6 +26,8 @@ export interface Guia {
   firma_entregador_base64?: string;
   entregado_por?: string;
   numero_guia_transp?: string;
+  tipo_despacho?: string;
+  nombre_chofer?: string;
   guia_items?: GuiaItem[];
 }
 
