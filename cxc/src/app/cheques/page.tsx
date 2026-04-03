@@ -39,6 +39,9 @@ export default function ChequesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista");
+  const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
+  const [calPopover, setCalPopover] = useState<string | null>(null);
   const [showResumen, setShowResumen] = useState(false);
   const [resumenSort, setResumenSort] = useState<"monto" | "count">("monto");
 
@@ -379,8 +382,14 @@ export default function ChequesPage() {
         </div>
       )}
 
+      {/* View toggle */}
+      <div className="flex gap-1 bg-gray-100 rounded-full p-0.5 mb-6 w-fit">
+        <button onClick={() => setViewMode("lista")} className={`py-1.5 px-4 text-xs rounded-full transition ${viewMode === "lista" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Lista</button>
+        <button onClick={() => setViewMode("calendario")} className={`py-1.5 px-4 text-xs rounded-full transition ${viewMode === "calendario" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Calendario</button>
+      </div>
+
       {/* Filter tabs + search — CAMBIO 40 search by cliente */}
-      <div className="flex flex-wrap items-center gap-4 mb-6">
+      {viewMode === "lista" && <div className="flex flex-wrap items-center gap-4 mb-6">
         <div className="flex gap-4 flex-wrap">
           {([
             ["all", "Todos", cheques.length],
@@ -404,10 +413,10 @@ export default function ChequesPage() {
             className="text-sm border border-gray-200 rounded-full px-4 py-1.5 outline-none focus:border-black transition w-56"
           />
         </div>
-      </div>
+      </div>}
 
       {/* Resumen por cliente — CAMBIO 41 */}
-      {cheques.length > 0 && (
+      {viewMode === "lista" && cheques.length > 0 && (
         <div className="mb-8">
           <button
             onClick={() => setShowResumen(!showResumen)}
@@ -468,8 +477,129 @@ export default function ChequesPage() {
         </div>
       )}
 
+      {/* ══ Calendar view ══ */}
+      {viewMode === "calendario" && !loading && (() => {
+        const { year, month } = calMonth;
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        const startDow = (firstDay.getDay() + 6) % 7; // Monday = 0
+        const daysInMonth = lastDay.getDate();
+        const monthLabel = firstDay.toLocaleDateString("es-PA", { month: "long", year: "numeric" });
+        const todayDate = todayStr();
+
+        // Build day→cheques map for this month
+        const monthPrefix = `${year}-${String(month + 1).padStart(2, "0")}`;
+        const monthCheques = cheques.filter(c => c.fecha_deposito.startsWith(monthPrefix));
+        const byDay: Record<number, Cheque[]> = {};
+        for (const c of monthCheques) {
+          const d = parseInt(c.fecha_deposito.slice(8, 10));
+          if (!byDay[d]) byDay[d] = [];
+          byDay[d].push(c);
+        }
+        const totalMonth = monthCheques.reduce((s, c) => s + (Number(c.monto) || 0), 0);
+
+        const goToday = () => { const d = new Date(); setCalMonth({ year: d.getFullYear(), month: d.getMonth() }); };
+        const goPrev = () => setCalMonth(p => p.month === 0 ? { year: p.year - 1, month: 11 } : { ...p, month: p.month - 1 });
+        const goNext = () => setCalMonth(p => p.month === 11 ? { year: p.year + 1, month: 0 } : { ...p, month: p.month + 1 });
+
+        const pillColor = (estado: string) => {
+          if (estado === "pendiente") return "bg-emerald-100 text-emerald-700";
+          if (estado === "vencido") return "bg-red-100 text-red-700";
+          if (estado === "rebotado") return "bg-red-50 text-red-400";
+          return "bg-gray-100 text-gray-500";
+        };
+
+        const cells = [];
+        for (let i = 0; i < startDow; i++) cells.push(null);
+        for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+        return (
+          <div>
+            {/* Nav */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <button onClick={goPrev} className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 hover:border-gray-400 transition text-gray-500">‹</button>
+                <h2 className="text-sm font-medium capitalize w-40 text-center">{monthLabel}</h2>
+                <button onClick={goNext} className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 hover:border-gray-400 transition text-gray-500">›</button>
+                <button onClick={goToday} className="text-xs text-gray-400 hover:text-black transition ml-2">Hoy</button>
+              </div>
+              <span className="text-xs text-gray-400">{monthCheques.length} cheques · ${fmt(totalMonth)}</span>
+            </div>
+
+            {/* Desktop grid */}
+            <div className="hidden sm:block">
+              <div className="grid grid-cols-7 text-center text-[10px] text-gray-400 uppercase tracking-wider mb-1">
+                {["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"].map(d => <div key={d} className="py-1">{d}</div>)}
+              </div>
+              <div className="grid grid-cols-7 border-t border-l border-gray-200">
+                {cells.map((day, i) => {
+                  if (day === null) return <div key={`e${i}`} className="border-r border-b border-gray-100 bg-gray-50/50 min-h-[80px]" />;
+                  const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                  const isToday = dateStr === todayDate;
+                  const dayCheques = byDay[day] || [];
+                  return (
+                    <div key={day} className={`border-r border-b border-gray-100 min-h-[80px] p-1 ${isToday ? "bg-blue-50/60" : ""}`}>
+                      <div className={`text-[11px] mb-0.5 ${isToday ? "font-bold text-blue-600" : "text-gray-400"}`}>{day}</div>
+                      <div className="space-y-0.5">
+                        {dayCheques.slice(0, 3).map(c => (
+                          <div key={c.id} className="relative">
+                            <button onClick={() => setCalPopover(calPopover === c.id ? null : c.id)}
+                              className={`w-full text-left text-[10px] px-1.5 py-0.5 rounded truncate ${pillColor(c.estado)}`}>
+                              {c.cliente.length > 12 ? c.cliente.slice(0, 12) + "…" : c.cliente} ${fmt(c.monto)}
+                            </button>
+                            {calPopover === c.id && (
+                              <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg p-3 w-56" onClick={e => e.stopPropagation()}>
+                                <div className="text-xs font-medium mb-1">{c.cliente}</div>
+                                <div className="text-[11px] text-gray-500 mb-0.5">{c.banco} · {c.numero_cheque}</div>
+                                <div className="text-sm font-semibold mb-2">${fmt(c.monto)}</div>
+                                <StatusBadge estado={c.estado} />
+                                {(c.estado === "pendiente" || c.estado === "vencido") && (
+                                  <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
+                                    <button onClick={() => { depositar(c.id); setCalPopover(null); }} className="text-[11px] text-emerald-600 hover:underline">Depositar</button>
+                                    <button onClick={() => { setRebotandoId(c.id); setCalPopover(null); }} className="text-[11px] text-red-500 hover:underline">Rebotado</button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {dayCheques.length > 3 && <div className="text-[9px] text-gray-400 px-1">+{dayCheques.length - 3} más</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Mobile: grouped by day */}
+            <div className="sm:hidden space-y-2">
+              {Array.from({ length: daysInMonth }, (_, i) => i + 1).filter(d => byDay[d]?.length).map(day => {
+                const dateStr = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                const isToday = dateStr === todayDate;
+                return (
+                  <div key={day} className={`rounded-xl border p-3 ${isToday ? "border-blue-200 bg-blue-50/50" : "border-gray-100"}`}>
+                    <div className={`text-xs mb-2 ${isToday ? "font-bold text-blue-600" : "text-gray-400"}`}>{fmtDate(dateStr)}{isToday ? " — Hoy" : ""}</div>
+                    <div className="space-y-1.5">
+                      {byDay[day].map(c => (
+                        <div key={c.id} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${pillColor(c.estado)}`}>{c.estado}</span>
+                            <span className="text-sm truncate">{c.cliente}</span>
+                          </div>
+                          <span className="text-sm font-medium tabular-nums ml-2">${fmt(c.monto)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Table */}
-      {loading ? (
+      {viewMode === "lista" && (loading ? (
         <SkeletonTable rows={5} cols={6} />
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -565,7 +695,7 @@ export default function ChequesPage() {
           </div>
         </div>
         </>
-      )}
+      ))}
       <Toast message={error} type="error" />
       <Toast message={toast} />
       <ConfirmModal
