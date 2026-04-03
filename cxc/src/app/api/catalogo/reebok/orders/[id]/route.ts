@@ -47,26 +47,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const { error } = await reebokServer.from("reebok_orders").update(update).eq("id", params.id);
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
 
-  // Send email notification when confirmed
-  if (status === "confirmado") {
-    try {
-      const { data: order } = await reebokServer.from("reebok_orders").select("*, reebok_order_items(*)").eq("id", params.id).single();
-      if (order) {
-        const { Resend } = await import("resend");
-        const resend = new Resend(process.env.RESEND_API_KEY);
-        const oi = (order.reebok_order_items || []) as { name: string; sku: string; quantity: number; unit_price: number }[];
-        const totalB = oi.reduce((s, i) => s + (i.quantity || 0), 0);
-        const totalM = oi.reduce((s, i) => s + (i.quantity || 0) * PIEZAS * Number(i.unit_price || 0), 0);
-        const itemsHtml = oi.map(i => `<tr><td style="padding:4px 8px">${i.sku || ""}</td><td style="padding:4px 8px">${i.name}</td><td style="padding:4px 8px;text-align:center">${i.quantity}</td><td style="padding:4px 8px;text-align:right">$${Number(i.unit_price).toFixed(2)}</td></tr>`).join("");
-        await resend.emails.send({
-          from: "Fashion Group <notificaciones@fashiongr.com>",
-          to: ["daniel@fashiongr.com"],
-          subject: `📦 Pedido ${order.order_number} confirmado — ${order.client_name}`,
-          html: `<h2>Pedido ${order.order_number} confirmado</h2><p><strong>Cliente:</strong> ${order.client_name}<br><strong>Vendedor:</strong> ${order.vendor_name || "—"}<br><strong>Total:</strong> ${totalB} bultos · $${totalM.toFixed(2)}</p><table style="border-collapse:collapse;width:100%;font-size:13px"><tr style="background:#1a1a1a;color:white"><th style="padding:6px 8px;text-align:left">SKU</th><th style="padding:6px 8px;text-align:left">Producto</th><th style="padding:6px 8px;text-align:center">Bultos</th><th style="padding:6px 8px;text-align:right">Precio</th></tr>${itemsHtml}</table><p style="color:#888;font-size:11px;margin-top:16px">Fashion Group Panamá — Reebok</p>`,
-        });
-      }
-    } catch { /* email failed */ }
-  }
+  // Email is sent separately via /api/catalogo/reebok/send-order
+  // to avoid duplicate emails when the frontend also calls send-order
 
   return NextResponse.json({ ok: true });
 }

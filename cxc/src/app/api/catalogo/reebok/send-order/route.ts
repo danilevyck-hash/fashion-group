@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
       </div>
     </div>`;
 
-  const to = ["daniel@fashiongr.com", "respinosa1721@gmail.com"];
+  const to = ["daniel@fashiongr.com"];
   if (body.clientEmail) to.push(body.clientEmail);
 
   try {
