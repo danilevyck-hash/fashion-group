@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         from: "Reebok Panama <pedidos@fashiongr.com>",
         to,
-        subject: `Pedido ${orderNumber} — ${clientName}`,
+        subject: `Nuevo pedido ${orderNumber} — ${clientName} — $${total.toFixed(2)}`,
         html,
       }),
     });

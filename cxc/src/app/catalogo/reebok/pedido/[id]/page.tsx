@@ -4,14 +4,13 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
-import { useToast } from "@/components/ToastSystem";
 import { ConfirmDeleteModal, Toast } from "@/components/ui";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
 interface Order { id: string; order_number: string; client_name: string; comment: string; status: string; total: number; reebok_order_items: OrderItem[]; created_at: string; }
 interface DirClient { nombre: string; empresa: string; }
 
-const P = 12; // piezas por bulto
+const P = 12;
 
 export default function OrderDetailPage() {
   const router = useRouter();
@@ -22,16 +21,18 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [items, setItems] = useState<OrderItem[]>([]);
   const [clientName, setClientName] = useState("");
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingOrder, setDeletingOrder] = useState(false);
-  const [waNumber, setWaNumber] = useState("+507");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<DirClient[]>([]);
   const [showSugg, setShowSugg] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"saved" | "saving" | "dirty" | null>(null);
   const nameRef = useRef<HTMLDivElement>(null);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveInFlight = useRef(false);
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 3000); };
 
@@ -41,9 +42,8 @@ export default function OrderDetailPage() {
       const res = await fetch(`/api/catalogo/reebok/orders/${id}`);
       if (res.ok) {
         const d = await res.json();
-        // Cliente can only view their own orders
-        const role = sessionStorage.getItem("cxc_role") || "";
-        if (role === "cliente") {
+        const r = sessionStorage.getItem("cxc_role") || "";
+        if (r === "cliente") {
           const userName = sessionStorage.getItem("fg_user_name") || "";
           if (userName && d.client_name && d.client_name.toLowerCase() !== userName.toLowerCase()) {
             router.push("/catalogo/reebok/productos"); return;
@@ -61,7 +61,10 @@ export default function OrderDetailPage() {
   useEffect(() => {
     if (clientName.length < 2) { setSuggestions([]); return; }
     const t = setTimeout(async () => {
-      try { const r = await fetch(`/api/catalogo/reebok/clientes-search?q=${encodeURIComponent(clientName)}`); if (r.ok) { const d = await r.json(); setSuggestions(d || []); setShowSugg((d || []).length > 0); } } catch { /* */ }
+      try {
+        const r = await fetch(`/api/catalogo/reebok/clientes-search?q=${encodeURIComponent(clientName)}`);
+        if (r.ok) { const d = await r.json(); setSuggestions(d || []); setShowSugg((d || []).length > 0); }
+      } catch { /* */ }
     }, 300);
     return () => clearTimeout(t);
   }, [clientName]);
@@ -71,146 +74,75 @@ export default function OrderDetailPage() {
     document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  if (loading || !order) return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-3xl mx-auto px-4 py-6">
-        <div className="h-4 shimmer w-24 mb-6" />
-        <div className="h-7 shimmer w-56 mb-2" />
-        <div className="h-4 shimmer w-36 mb-8" />
-        <div className="space-y-0">
-          {[0, 1, 2, 3, 4].map(i => (
-            <div key={i} className="flex items-center gap-4 py-4 border-b border-gray-50" style={{ animationDelay: `${i * 80}ms` }}>
-              <div className="w-14 h-14 shimmer rounded-lg flex-shrink-0" />
-              <div className="flex-1 space-y-2">
-                <div className="h-3.5 shimmer" style={{ width: `${70 - i * 5}%` }} />
-                <div className="h-3 shimmer" style={{ width: `${40 - i * 3}%` }} />
-              </div>
-              <div className="h-9 shimmer w-16 rounded-lg" />
-            </div>
-          ))}
-        </div>
-        <div className="mt-8 pt-4 border-t border-gray-200 flex justify-between items-center">
-          <div className="h-4 shimmer w-16" />
-          <div className="h-8 shimmer w-32 rounded-lg" />
-        </div>
-      </div>
-    </div>
-  );
+  // ── AUTO-SAVE (2s debounce) ──
+  const changeCount = useRef(0);
+  useEffect(() => {
+    changeCount.current++;
+    if (changeCount.current <= 1 || !order || order.status === "confirmado") return;
+    setAutoSaveStatus("dirty");
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => {
+      if (!saveInFlight.current) doAutoSave();
+    }, 2000);
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, clientName]);
 
-  const totalBultos = items.reduce((s, i) => s + (i.quantity || 0), 0);
-  const totalPiezas = totalBultos * P;
-  const totalMoney = items.reduce((s, i) => s + (i.quantity || 0) * P * Number(i.unit_price || 0), 0);
-
-  function updateItem(idx: number, field: string, value: number) { setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it)); }
-  function removeItem(idx: number) { setItems(prev => prev.filter((_, i) => i !== idx)); }
-
-  async function saveOrder() {
-    setSaving(true);
-    const res = await fetch(`/api/catalogo/reebok/orders/${id}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ client_name: clientName, items }),
-    });
-    if (res.ok) { showToast("Guardado"); load(); } else showToast("Error");
-    setSaving(false);
-  }
-
-  async function fetchImageB64(url: string): Promise<string | null> {
-    try { const r = await fetch(url); const b = await r.blob(); return new Promise(res => { const rd = new FileReader(); rd.onload = () => res(rd.result as string); rd.readAsDataURL(b); }); } catch { return null; }
-  }
-
-  async function generatePDFBlob(): Promise<{ blob: Blob; filename: string } | null> {
-    if (!order) return null;
-    const { jsPDF } = await import("jspdf");
-    const { default: autoTable } = await import("jspdf-autotable");
-    const doc = new jsPDF("portrait");
-
-    const imgs: Record<number, string> = {};
-    for (let i = 0; i < items.length; i++) { if (items[i].image_url) { const b = await fetchImageB64(items[i].image_url); if (b) imgs[i] = b; } }
-
-    doc.setFillColor(26, 26, 26);
-    doc.rect(0, 0, 210, 18, "F");
-    doc.setFontSize(12); doc.setTextColor(255); doc.setFont("helvetica", "bold");
-    doc.text("REEBOK", 14, 12);
-    doc.setFontSize(8); doc.setFont("helvetica", "normal");
-    doc.text("Fashion Group · Panamá", 196, 12, { align: "right" });
-
-    doc.setTextColor(100); doc.setFontSize(9);
-    doc.text(`Cliente: ${clientName}`, 14, 26);
-    doc.text(`Pedido: ${order.order_number}`, 90, 26);
-    doc.text(`Fecha: ${new Date(order.created_at).toLocaleDateString("es-PA")}`, 150, 26);
-
-    autoTable(doc, {
-      startY: 32,
-      head: [["", "Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
-      body: items.map(i => ["", i.name, i.sku || "", String(i.quantity), String(i.quantity * P), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * P * Number(i.unit_price))}`]),
-      styles: { fontSize: 8, cellPadding: 2, minCellHeight: 16 },
-      headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
-      alternateRowStyles: { fillColor: [249, 249, 249] },
-      columnStyles: { 0: { cellWidth: 18 }, 3: { halign: "center" }, 4: { halign: "center" }, 5: { halign: "right" }, 6: { halign: "right" } },
-      didDrawCell: (data: { row: { index: number; section: string }; column: { index: number }; cell: { x: number; y: number } }) => {
-        if (data.column.index === 0 && data.row.section === "body" && imgs[data.row.index]) {
-          try { doc.addImage(imgs[data.row.index], "JPEG", data.cell.x + 1, data.cell.y + 1, 14, 14); } catch { /* */ }
-        }
-      },
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const fy = (doc as any).lastAutoTable.finalY + 8;
-    doc.setFontSize(10); doc.setTextColor(26); doc.setFont("helvetica", "bold");
-    doc.text(`${totalBultos} bultos · ${totalPiezas} piezas`, 14, fy);
-    doc.text(`$${fmt(totalMoney)}`, 196, fy, { align: "right" });
-    doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
-    doc.text("Fashion Group Panamá · Reebok Authorized Distributor", 14, fy + 10);
-
-    const filename = `${order.order_number}-${clientName.replace(/\s+/g, "-")}.pdf`;
-    return { blob: doc.output("blob"), filename };
-  }
-
-  async function downloadPDF() {
-    showToast("Generando PDF...");
-    const result = await generatePDFBlob();
-    if (!result) return;
-    const url = URL.createObjectURL(result.blob);
-    const a = document.createElement("a"); a.href = url; a.download = result.filename; a.click();
-    URL.revokeObjectURL(url);
-    showToast("PDF descargado");
-  }
-
-  async function shareWhatsApp() {
-    showToast("Generando PDF...");
-    await saveOrder();
-    const result = await generatePDFBlob();
-    if (result) {
-      const url = URL.createObjectURL(result.blob);
-      const a = document.createElement("a"); a.href = url; a.download = result.filename; a.click();
-      URL.revokeObjectURL(url);
+  async function doAutoSave() {
+    if (saveInFlight.current) return;
+    saveInFlight.current = true;
+    setAutoSaveStatus("saving");
+    try {
+      await fetch(`/api/catalogo/reebok/orders/${id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_name: clientName, items }),
+      });
+      setAutoSaveStatus("saved");
+    } catch {
+      setAutoSaveStatus("dirty");
     }
-    const itemLines = items.map(i => `• ${i.name} — ${i.quantity} bultos × $${fmt(i.unit_price)} = $${fmt(i.quantity * P * Number(i.unit_price))}`);
-    const text = `*Pedido ${order!.order_number}*\nCliente: ${clientName}\n\n${itemLines.join("\n")}\n\n*Total: ${totalBultos} bultos · ${totalPiezas} piezas · $${fmt(totalMoney)}*\n\n_PDF descargado por separado_`;
-    const phone = waNumber.replace(/[^0-9]/g, "");
-    window.open(`https://wa.me/${phone.length >= 8 ? phone : ""}?text=${encodeURIComponent(text)}`, "_blank");
-    showToast("Listo");
+    saveInFlight.current = false;
   }
 
+  // ── CONFIRM ORDER (save + set status + send email with PDF) ──
   async function confirmOrder() {
+    setConfirming(true);
     showToast("Confirmando pedido...");
-    await saveOrder();
-    const res = await fetch(`/api/catalogo/reebok/orders/${id}`, {
+
+    // Save first
+    await fetch(`/api/catalogo/reebok/orders/${id}`, {
       method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "confirmado" }),
+      body: JSON.stringify({ client_name: clientName, items, status: "confirmado" }),
     });
-    if (!res.ok) { showToast("Error al confirmar"); return; }
 
-    setShowConfirmModal(false);
-
-    // Send WhatsApp to the client if number provided
-    const phone = waNumber.replace(/[^0-9]/g, "");
-    if (phone.length >= 8) {
-      const msg = `Hola ${clientName}, tu pedido ${order!.order_number} ha sido recibido.\n\n${totalBultos} bultos · ${totalPiezas} piezas · $${fmt(totalMoney)}\n\nTe estaremos confirmando disponibilidad pronto.\nFashion Group Panamá`;
-      window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank");
-      showToast("Pedido confirmado");
-    } else {
-      showToast("Pedido confirmado. No se envió WhatsApp porque no hay número.");
+    // Send email with order summary via existing API
+    try {
+      const res = await fetch("/api/catalogo/reebok/send-order", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: id }),
+      });
+      if (res.ok) {
+        showToast("Pedido confirmado. Se envio por email a Fashion Group.");
+      } else {
+        showToast("Pedido confirmado, pero el email no se pudo enviar.");
+      }
+    } catch {
+      showToast("Pedido confirmado, pero el email fallo.");
     }
+
+    setConfirming(false);
+    load();
+  }
+
+  // ── EDIT (revert to borrador) ──
+  async function editOrder() {
+    setSaving(true);
+    await fetch(`/api/catalogo/reebok/orders/${id}`, {
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "borrador" }),
+    });
+    setSaving(false);
+    showToast("Pedido en modo edicion");
     load();
   }
 
@@ -222,38 +154,84 @@ export default function OrderDetailPage() {
     router.push("/catalogo/reebok/pedidos");
   }
 
+  function updateItem(idx: number, field: string, value: number) {
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it));
+  }
+  function removeItem(idx: number) {
+    setItems(prev => prev.filter((_, i) => i !== idx));
+  }
+
   const canEdit = ["admin", "secretaria", "vendedor"].includes(role);
   const canDelete = ["admin", "secretaria"].includes(role);
   const isConfirmed = order?.status === "confirmado";
 
+  // ── LOADING SKELETON ──
+  if (loading || !order) return (
+    <div className="min-h-screen bg-white">
+      <div className="max-w-3xl mx-auto px-4 py-6">
+        <div className="h-4 shimmer w-24 mb-6" />
+        <div className="h-7 shimmer w-56 mb-2" />
+        <div className="h-4 shimmer w-36 mb-8" />
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className="flex items-center gap-4 py-4 border-b border-gray-50" style={{ animationDelay: `${i * 80}ms` }}>
+            <div className="w-14 h-14 shimmer rounded-lg flex-shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-3.5 shimmer" style={{ width: `${70 - i * 5}%` }} />
+              <div className="h-3 shimmer" style={{ width: `${40 - i * 3}%` }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const totalBultos = items.reduce((s, i) => s + (i.quantity || 0), 0);
+  const totalPiezas = totalBultos * P;
+  const totalMoney = items.reduce((s, i) => s + (i.quantity || 0) * P * Number(i.unit_price || 0), 0);
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
       {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mt-1" ref={nameRef}>
-            <span className="text-sm font-mono text-gray-400">{order.order_number}</span>
-            <div className="relative flex-1">
-              <input value={clientName} onChange={e => { if (canEdit) setClientName(e.target.value); }}
-                onFocus={() => { if (canEdit && suggestions.length) setShowSugg(true); }}
-                readOnly={!canEdit}
-                className={`text-xl font-semibold border-b border-transparent outline-none transition w-full bg-transparent ${canEdit ? "hover:border-gray-200 focus:border-black" : ""}`} />
-              {showSugg && suggestions.length > 0 && (
-                <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg overflow-hidden">
-                  {suggestions.slice(0, 5).map((c, i) => (
-                    <button key={i} onClick={() => { setClientName(c.nombre); setShowSugg(false); }}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0">{c.nombre}</button>
-                  ))}
-                </div>
-              )}
-            </div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3" ref={nameRef}>
+          <span className="text-sm font-mono text-gray-400">{order.order_number}</span>
+          <div className="relative flex-1">
+            {!isConfirmed && canEdit ? (
+              <>
+                <input value={clientName} onChange={e => setClientName(e.target.value)}
+                  onFocus={() => { if (suggestions.length) setShowSugg(true); }}
+                  className="text-xl font-semibold border-b border-transparent outline-none transition w-full bg-transparent hover:border-gray-200 focus:border-black" />
+                {showSugg && suggestions.length > 0 && (
+                  <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg overflow-hidden">
+                    {suggestions.slice(0, 5).map((c, i) => (
+                      <button key={i} onClick={() => { setClientName(c.nombre); setShowSugg(false); }}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-50 last:border-0">{c.nombre}</button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <span className="text-xl font-semibold">{clientName}</span>
+            )}
           </div>
-          <p className="text-xs text-gray-400 mt-1">{new Date(order.created_at).toLocaleDateString("es-PA")}</p>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {/* Auto-save indicator */}
+          {autoSaveStatus === "saving" && <span className="text-[11px] text-gray-400">Guardando...</span>}
+          {autoSaveStatus === "saved" && <span className="text-[11px] text-green-600">Guardado</span>}
+          {/* Catalog link */}
+          {!isConfirmed && (
+            <Link href="/catalogo/reebok/productos" className="text-xs text-gray-500 hover:text-black transition">
+              Ver catalogo
+            </Link>
+          )}
         </div>
       </div>
 
-      {/* Items */}
-      {items.length > 0 && (
+      <p className="text-xs text-gray-400 mb-4">{new Date(order.created_at).toLocaleDateString("es-PA")}</p>
+
+      {/* Items table */}
+      {items.length > 0 ? (
         <div className="mb-4">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white z-10">
@@ -264,7 +242,7 @@ export default function OrderDetailPage() {
                 <th className="py-2 text-center text-[10px] uppercase text-gray-400 font-normal w-14">Pzas</th>
                 <th className="py-2 text-right text-[10px] uppercase text-gray-400 font-normal w-16">Precio</th>
                 <th className="py-2 text-right text-[10px] uppercase text-gray-400 font-normal w-20">Subtotal</th>
-                <th className="w-8"></th>
+                {!isConfirmed && <th className="w-8"></th>}
               </tr>
             </thead>
             <tbody>
@@ -280,101 +258,80 @@ export default function OrderDetailPage() {
                     <div className="text-[10px] text-gray-400 font-mono">{item.sku}</div>
                   </td>
                   <td className="py-2 text-center">
-                    <input type="number" min={1} step={1} value={item.quantity} onChange={e => updateItem(idx, "quantity", parseInt(e.target.value) || 1)}
-                      className="w-12 text-center border-b border-gray-200 text-sm py-0.5 outline-none focus:border-black tabular-nums" />
+                    {!isConfirmed ? (
+                      <input type="number" min={1} step={1} value={item.quantity}
+                        onChange={e => updateItem(idx, "quantity", parseInt(e.target.value) || 1)}
+                        className="w-12 text-center border-b border-gray-200 text-sm py-0.5 outline-none focus:border-black tabular-nums" />
+                    ) : (
+                      <span className="tabular-nums">{item.quantity}</span>
+                    )}
                   </td>
                   <td className="py-2 text-center text-xs text-gray-400 tabular-nums">{item.quantity * P}</td>
                   <td className="py-2 text-right">
-                    <input type="number" step={1} min={0} value={item.unit_price} onChange={e => updateItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
-                      className="w-14 text-right border-b border-gray-200 text-sm py-0.5 outline-none focus:border-black tabular-nums" />
+                    {!isConfirmed ? (
+                      <input type="number" step={1} min={0} value={item.unit_price}
+                        onChange={e => updateItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
+                        className="w-14 text-right border-b border-gray-200 text-sm py-0.5 outline-none focus:border-black tabular-nums" />
+                    ) : (
+                      <span className="tabular-nums">${fmt(item.unit_price)}</span>
+                    )}
                   </td>
                   <td className="py-2 text-right tabular-nums text-sm">${fmt(item.quantity * P * Number(item.unit_price))}</td>
-                  <td className="py-2 text-center">
-                    <button onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-500 transition text-xs">×</button>
-                  </td>
+                  {!isConfirmed && (
+                    <td className="py-2 text-center">
+                      <button onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-500 transition text-xs">x</button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+      ) : (
+        <div className="py-12 text-center text-sm text-gray-400 border border-dashed border-gray-200 rounded-lg mb-4">
+          No hay productos. <Link href="/catalogo/reebok/productos" className="text-black underline">Agregar desde el catalogo</Link>
+        </div>
       )}
 
-        <div className="mt-6 mb-6 text-sm text-gray-500">
-          {totalBultos} bultos · {totalPiezas} piezas · <span className="text-black font-medium">${fmt(totalMoney)}</span>
-        </div>
+      {/* Totals */}
+      <div className="flex items-center justify-between py-3 border-t border-gray-200 mb-6">
+        <span className="text-sm text-gray-500">{totalBultos} bultos · {totalPiezas} piezas</span>
+        <span className="text-lg font-semibold tabular-nums">${fmt(totalMoney)}</span>
+      </div>
 
-        <div className="flex flex-col gap-2">
-          {isConfirmed ? (
-            <>
-              <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-4 text-center mb-1">
-                <span className="text-emerald-700 font-medium">&#10003; Pedido confirmado y enviado</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={downloadPDF} className="border border-gray-200 text-black py-3 rounded-lg text-sm hover:border-gray-400 transition">Descargar PDF</button>
-                <button onClick={shareWhatsApp} disabled={saving} className="bg-green-600 text-white py-3 rounded-lg text-sm hover:bg-green-700 transition disabled:opacity-40">Enviar por WhatsApp</button>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Primary: confirm and send */}
-              <button onClick={() => setShowConfirmModal(true)} disabled={saving || !items.length}
-                className="w-full bg-emerald-600 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-40">
-                Confirmar y enviar pedido
-              </button>
-              <p className="text-[11px] text-gray-400 text-center -mt-1">Envia el pedido por email a Fashion Group</p>
-
-              {/* Secondary: save draft */}
-              {canEdit && (
-                <button onClick={saveOrder} disabled={saving} className="w-full border border-gray-300 text-black py-3 rounded-lg text-sm font-medium hover:border-gray-500 transition disabled:opacity-40">
-                  {saving ? "Guardando..." : "Guardar borrador"}
-                </button>
-              )}
-
-              <Link href="/catalogo/reebok/productos" className="w-full text-center text-sm text-gray-500 hover:text-black transition py-2 block">
-                ← Seguir agregando productos
-              </Link>
-
-              <div className="grid grid-cols-2 gap-2 mt-1">
-                <button onClick={downloadPDF} className="border border-gray-200 text-black py-2.5 rounded-lg text-xs hover:border-gray-400 transition">Descargar PDF</button>
-                <button onClick={shareWhatsApp} disabled={saving} className="bg-green-600 text-white py-2.5 rounded-lg text-xs hover:bg-green-700 transition disabled:opacity-40">Enviar por WhatsApp</button>
-              </div>
-            </>
-          )}
-          {canDelete && <button onClick={() => setShowDeleteModal(true)} className="text-xs text-gray-400 hover:text-red-500 transition mt-4 py-1">Eliminar pedido</button>}
-        </div>
-
-        {/* Confirm modal */}
-        {showConfirmModal && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowConfirmModal(false)}>
-            <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
-              <h3 className="text-sm font-medium mb-3">Confirmar pedido {order?.order_number}</h3>
-              <div className="text-xs text-gray-500 space-y-1 mb-4">
-                <p>Cliente: {clientName}</p>
-                <p>{totalBultos} bultos · {totalPiezas} piezas · ${fmt(totalMoney)}</p>
-              </div>
-              {role !== "cliente" && (
-                <div className="mb-4">
-                  <label className="text-[10px] text-gray-400 uppercase tracking-wider block mb-1">WhatsApp del cliente (opcional)</label>
-                  <input type="tel" value={waNumber} onChange={e => setWaNumber(e.target.value)}
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-black" placeholder="+50760001234" />
-                  <p className="text-[10px] text-gray-400 mt-1">Se abrirá WhatsApp con un mensaje de confirmación para el cliente</p>
-                </div>
-              )}
-              <div className="flex gap-2">
-                <button onClick={() => setShowConfirmModal(false)} className="flex-1 py-2.5 text-sm text-gray-500 hover:text-black transition">Cancelar</button>
-                <button onClick={confirmOrder} disabled={saving}
-                  className="flex-1 py-2.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition disabled:opacity-50">
-                  {saving ? "Enviando..." : "Confirmar"}
-                </button>
-              </div>
-            </div>
+      {/* Actions — ONE primary button */}
+      {isConfirmed ? (
+        <div className="space-y-3">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-center">
+            <span className="text-emerald-700 font-medium text-sm">&#10003; Pedido confirmado</span>
+            <span className="text-emerald-600 text-xs block mt-0.5">Enviado por email a Fashion Group</span>
           </div>
-        )}
+          {canEdit && (
+            <button onClick={editOrder} disabled={saving}
+              className="w-full border border-gray-300 text-black py-2.5 rounded-lg text-sm hover:border-gray-500 transition disabled:opacity-40">
+              Editar pedido
+            </button>
+          )}
+        </div>
+      ) : (
+        <button onClick={confirmOrder} disabled={confirming || !items.length}
+          className="w-full bg-emerald-600 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-emerald-700 transition disabled:opacity-40">
+          {confirming ? "Confirmando..." : "Confirmar pedido"}
+        </button>
+      )}
+
+      {/* Delete — only draft, small text at bottom */}
+      {canDelete && !isConfirmed && (
+        <button onClick={() => setShowDeleteModal(true)}
+          className="text-xs text-gray-400 hover:text-red-500 transition mt-6 py-1 block mx-auto">
+          Eliminar pedido
+        </button>
+      )}
 
       <ConfirmDeleteModal
         open={showDeleteModal}
-        title={`¿Eliminar pedido ${order?.order_number || ""}?`}
-        description={`Se eliminará el pedido de ${clientName} con ${items.length} productos ($${fmt(totalMoney)}). Esta acción no se puede deshacer.`}
+        title={`Eliminar pedido ${order?.order_number || ""}?`}
+        description={`Se eliminara el pedido de ${clientName} con ${items.length} productos ($${fmt(totalMoney)}).`}
         onConfirm={deleteOrder}
         onCancel={() => setShowDeleteModal(false)}
         loading={deletingOrder}
