@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { fmt, fmtDate } from "@/lib/format";
-import { Toast, StatusBadge, ConfirmDeleteModal } from "@/components/ui";
+import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
 import { ESTADOS, EMPRESAS, EC, TALLAS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, buildSingleReclamoPdfHtml, openPdfWindow, loadCustomMotivos, saveCustomMotivo } from "./constants";
 
@@ -72,6 +72,7 @@ export default function ReclamoDetail({
   const fotoRef = useRef<HTMLInputElement>(null);
   const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
   const [deleteFotoTarget, setDeleteFotoTarget] = useState<{ id: string; path: string } | null>(null);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   const items = current.reclamo_items ?? [];
   const seg = current.reclamo_seguimiento ?? [];
@@ -235,12 +236,15 @@ export default function ReclamoDetail({
         <div className="text-xs uppercase tracking-widest text-gray-400 mb-3">Fotos de Evidencia</div>
         {fotos.length === 0 ? <p className="text-[12px] text-gray-400 italic">Sin fotos adjuntas</p> : (
           <div className="flex gap-3 flex-wrap">
-            {fotos.map((f) => (
-              <div key={f.id} className="relative">
-                <img src={f.url || `${SUPA_URL}/storage/v1/object/public/reclamo-fotos/${f.storage_path}`} alt="" className="w-24 h-24 object-cover rounded-xl border border-gray-100" />
-                <button onClick={() => setDeleteFotoTarget({ id: f.id, path: f.storage_path })} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
-              </div>
-            ))}
+            {fotos.map((f) => {
+              const src = f.url || `${SUPA_URL}/storage/v1/object/public/reclamo-fotos/${f.storage_path}`;
+              return (
+                <div key={f.id} className="relative cursor-pointer" onClick={() => setLightboxSrc(src)}>
+                  <img src={src} alt="" className="w-24 h-24 object-cover rounded-xl border border-gray-100" />
+                  <button onClick={(e) => { e.stopPropagation(); setDeleteFotoTarget({ id: f.id, path: f.storage_path }); }} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
+                </div>
+              );
+            })}
           </div>
         )}
         {fotos.length < 3 && (
@@ -294,6 +298,8 @@ export default function ReclamoDetail({
         onConfirm={() => { if (deleteFotoTarget) { onDeleteFoto(deleteFotoTarget.id, deleteFotoTarget.path); setDeleteFotoTarget(null); } }}
         onCancel={() => setDeleteFotoTarget(null)}
       />
+
+      <FotoLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
 
       {/* Edit mode panel */}
       {editMode && (

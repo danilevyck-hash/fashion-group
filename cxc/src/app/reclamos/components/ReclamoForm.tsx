@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { fmt } from "@/lib/format";
 import { RItem, Foto } from "./types";
-import { ConfirmDeleteModal } from "@/components/ui";
+import { ConfirmDeleteModal, FotoLightbox } from "@/components/ui";
 import { EMPRESAS, EMPRESAS_MAP, TALLAS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo } from "./constants";
 
 interface Props {
@@ -49,6 +49,7 @@ export default function ReclamoForm({
 }: Props) {
   const formFotoRef = useRef<HTMLInputElement>(null);
   const [deleteFotoTarget, setDeleteFotoTarget] = useState<Foto | null>(null);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const empInfo = fEmpresa ? EMPRESAS_MAP[fEmpresa] : null;
   const fSubtotal = fItems.reduce((s, i) => s + (i.subtotal || 0), 0);
   const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
@@ -181,9 +182,9 @@ export default function ReclamoForm({
             {formFotos.length > 0 && (
               <div className="flex gap-3 flex-wrap mb-3">
                 {formFotos.map((f) => (
-                  <div key={f.id} className="relative">
+                  <div key={f.id} className="relative cursor-pointer" onClick={() => setLightboxSrc(f.url)}>
                     <img src={f.url} alt="" className="w-20 h-20 object-cover rounded-xl border border-gray-100" />
-                    <button onClick={() => setDeleteFotoTarget(f)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
+                    <button onClick={(e) => { e.stopPropagation(); setDeleteFotoTarget(f); }} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
                   </div>
                 ))}
               </div>
@@ -234,6 +235,8 @@ export default function ReclamoForm({
         }}
         onCancel={() => setDeleteFotoTarget(null)}
       />
+
+      <FotoLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
   );
 }

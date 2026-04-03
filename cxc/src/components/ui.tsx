@@ -227,6 +227,25 @@ export function ConfirmDeleteModal({
   );
 }
 
+// ── ESTÉTICA 7d: Foto Lightbox ──
+export function FotoLightbox({ src, onClose }: { src: string | null; onClose: () => void }) {
+  useEffect(() => {
+    if (!src) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [src, onClose]);
+
+  if (!src) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+      <img src={src} alt="" className="relative max-w-3xl max-h-[90vh] w-auto h-auto object-contain rounded-xl shadow-2xl" onClick={(e) => e.stopPropagation()} />
+    </div>
+  );
+}
+
 // ── ESTÉTICA 8: Badge Component ──
 const BADGE_COLORS: Record<string, string> = {
   green: "bg-emerald-50 text-emerald-700",
