@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast, SkeletonTable, EmptyState, ConfirmModal, StatusBadge, Modal } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState, ConfirmDeleteModal, StatusBadge, Modal } from "@/components/ui";
 
 interface Producto { id: string; nombre: string; genero: string; color: string; precio_panama: number; rrp: number; stock_comprado: number; }
 interface Cliente { id: string; nombre: string; estado?: string; }
@@ -40,7 +40,7 @@ export default function CamisetasPage() {
   const [newClientName, setNewClientName] = useState("");
   const [showNewClient, setShowNewClient] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Cliente | null>(null);
   const [showMatrix, setShowMatrix] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [infoTab, setInfoTab] = useState<"precios" | "tallas">("precios");
@@ -493,7 +493,7 @@ export default function CamisetasPage() {
                         className={`px-4 py-2 rounded-full text-sm transition ${isEntregado ? "border border-gray-200 text-gray-600 hover:border-gray-400" : "bg-green-600 text-white hover:bg-green-700"}`}>
                         {isEntregado ? "Marcar como Pendiente" : "Marcar como Entregado"}
                       </button>
-                      <button onClick={() => setConfirmDeleteId(cl.id)} className="border border-red-200 text-red-600 px-4 py-2 rounded-full text-sm hover:border-red-400 transition">
+                      <button onClick={() => setDeleteTarget(cl)} className="border border-red-200 text-red-600 px-4 py-2 rounded-full text-sm hover:border-red-400 transition">
                         Cancelar Pedido
                       </button>
                     </div>
@@ -705,14 +705,12 @@ export default function CamisetasPage() {
       </Modal>
 
       <Toast message={toast} />
-      <ConfirmModal
-        open={!!confirmDeleteId}
-        onClose={() => setConfirmDeleteId(null)}
-        onConfirm={() => { deleteClient(confirmDeleteId!); setConfirmDeleteId(null); }}
-        title="Eliminar cliente"
-        message={`¿Seguro que deseas eliminar a ${clientes.find(c => c.id === confirmDeleteId)?.nombre ?? "este cliente"}? Se borrarán todos sus pedidos.`}
-        confirmLabel="Eliminar"
-        destructive
+      <ConfirmDeleteModal
+        open={!!deleteTarget}
+        title={`¿Eliminar cliente ${deleteTarget?.nombre || ""}?`}
+        description="Se eliminarán todos los pedidos asociados a este cliente. Esta acción no se puede deshacer."
+        onConfirm={() => { if (deleteTarget) { deleteClient(deleteTarget.id); setDeleteTarget(null); } }}
+        onCancel={() => setDeleteTarget(null)}
       />
     </div>
   );

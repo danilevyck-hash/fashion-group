@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast, SkeletonTable, EmptyState, ConfirmModal } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState, ConfirmDeleteModal } from "@/components/ui";
 import XLSX from "xlsx-js-style";
 
 interface Cliente {
@@ -32,7 +32,7 @@ export default function DirectorioPage() {
   const [showNew, setShowNew] = useState(false);
   const [newData, setNewData] = useState({ nombre: "", empresa: "", whatsapp: "", correo: "", contacto: "", notas: "" });
   const [toast, setToast] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Cliente | null>(null);
   const [cxcClients, setCxcClients] = useState<Set<string>>(new Set());
   const importRef = useRef<HTMLInputElement>(null);
 
@@ -307,7 +307,7 @@ export default function DirectorioPage() {
                             <button onClick={(e) => { e.stopPropagation(); router.push(`/admin?search=${encodeURIComponent(c.nombre)}`); }}
                               title="Ver posición CXC de este cliente" className="text-xs text-gray-400 hover:text-black transition">Ver en CXC →</button>
                             {role === "admin" && (
-                              <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(c.id); }}
+                              <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
                                 className="text-sm text-gray-300 hover:text-red-500 transition">Eliminar</button>
                             )}
                           </div>
@@ -349,14 +349,12 @@ export default function DirectorioPage() {
       )}
 
       <Toast message={toast} />
-      <ConfirmModal
-        open={!!confirmDeleteId}
-        onClose={() => setConfirmDeleteId(null)}
-        onConfirm={() => { handleDelete(confirmDeleteId!); setConfirmDeleteId(null); }}
-        title="Eliminar cliente"
-        message="Se eliminará este contacto del directorio."
-        confirmLabel="Eliminar"
-        destructive
+      <ConfirmDeleteModal
+        open={!!deleteTarget}
+        title={`¿Eliminar ${deleteTarget?.nombre || "contacto"}?`}
+        description="Se eliminará el contacto y su información de la base de datos."
+        onConfirm={() => { if (deleteTarget) { handleDelete(deleteTarget.id); setDeleteTarget(null); } }}
+        onCancel={() => setDeleteTarget(null)}
       />
     </div>
     </div>
