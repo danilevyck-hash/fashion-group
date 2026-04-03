@@ -61,13 +61,30 @@ export async function POST(req: NextRequest) {
           : password === user.password;
 
         if (match) {
-          const { data: mods } = await supabaseServer
-            .from("fg_user_modules")
-            .select("module_key")
-            .eq("user_id", user.id)
-            .eq("enabled", true);
+          // Modules come from the role, not the individual user
+          let modules: string[] = [];
+          try {
+            const { data: rolePerm } = await supabaseServer
+              .from("role_permissions")
+              .select("modulos")
+              .eq("role", user.role)
+              .single();
+            if (rolePerm?.modulos) modules = rolePerm.modulos;
+          } catch { /* use defaults below if table missing */ }
 
-          const modules = (mods || []).map((m: { module_key: string }) => m.module_key);
+          // Fallback to hardcoded defaults if no role_permissions entry
+          if (modules.length === 0) {
+            const ALL = ["cxc","guias","caja","directorio","reclamos","prestamos","ventas","upload","cheques","reebok","camisetas"];
+            const DEFAULTS: Record<string, string[]> = {
+              admin: ALL, director: ALL,
+              contabilidad: ["prestamos","ventas"],
+              upload: ["upload","guias","caja","reclamos","cheques","directorio"],
+              vendedor: ["reebok","cxc","directorio"],
+              secretaria: ["upload","guias","caja","reclamos","cheques","directorio"],
+              cliente: ["reebok"],
+            };
+            modules = DEFAULTS[user.role] || [];
+          }
 
           const payload = {
             authenticated: true,

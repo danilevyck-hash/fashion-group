@@ -57,7 +57,7 @@ export default function UsuariosPage() {
   const [revokingSession, setRevokingSession] = useState<string | null>(null);
 
   // New user system
-  interface FgUser { id: string; name: string; password: string; role: string; active: boolean; associated_company: string; modules: string[]; }
+  interface FgUser { id: string; name: string; password: string; role: string; active: boolean; associated_company: string; }
   const [fgUsers, setFgUsers] = useState<FgUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [showUserModal, setShowUserModal] = useState(false);
@@ -66,7 +66,6 @@ export default function UsuariosPage() {
   const [uPassword, setUPassword] = useState("");
   const [uRole, setURole] = useState("vendedor");
   const [uCompany, setUCompany] = useState("");
-  const [uModules, setUModules] = useState<string[]>([]);
   const [savingUser, setSavingUser] = useState(false);
   const [showUserPw, setShowUserPw] = useState<Record<string, boolean>>({});
 
@@ -192,18 +191,18 @@ export default function UsuariosPage() {
   }
 
   function openNewUser() {
-    setEditUserId(null); setUName(""); setUPassword(""); setURole("vendedor"); setUCompany(""); setUModules([]);
+    setEditUserId(null); setUName(""); setUPassword(""); setURole("vendedor"); setUCompany("");
     setShowUserModal(true);
   }
   function openEditUser(u: FgUser) {
-    setEditUserId(u.id); setUName(u.name); setUPassword(u.password); setURole(u.role); setUCompany(u.associated_company || ""); setUModules(u.modules || []);
+    setEditUserId(u.id); setUName(u.name); setUPassword(u.password); setURole(u.role); setUCompany(u.associated_company || "");
     setShowUserModal(true);
   }
   async function saveUser() {
     if (!uName.trim() || !uPassword.trim()) { showToast("Nombre y contraseña requeridos"); return; }
     setSavingUser(true);
     try {
-      const body = { id: editUserId, name: uName.trim(), password: uPassword.trim(), role: uRole, associated_company: uCompany || null, modules: uModules };
+      const body = { id: editUserId, name: uName.trim(), password: uPassword.trim(), role: uRole, associated_company: uCompany || null };
       const method = editUserId ? "PUT" : "POST";
       const res = await fetch("/api/admin/users", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (res.ok) { showToast(editUserId ? "Usuario actualizado" : "Usuario creado"); setShowUserModal(false); loadFgUsers(); }
@@ -215,8 +214,10 @@ export default function UsuariosPage() {
     await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, active }) });
     loadFgUsers();
   }
-  function toggleUserModule(key: string) {
-    setUModules(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  // Helper: get modules for a role from loaded roles data
+  function getModulesForRole(roleName: string): string[] {
+    const r = roles.find(r => r.role === roleName);
+    return r ? r.modulos : [];
   }
 
   async function revokeSession(sessionId: string) {
@@ -295,7 +296,6 @@ export default function UsuariosPage() {
                     <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Nombre</th>
                     <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Rol</th>
                     <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Empresa</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Módulos</th>
                     <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Contraseña</th>
                     <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Estado</th>
                     <th className="px-4 py-2.5"></th>
@@ -307,7 +307,6 @@ export default function UsuariosPage() {
                       <td className="px-4 py-3 font-medium">{u.name}</td>
                       <td className="px-4 py-3 text-gray-500">{u.role}</td>
                       <td className="px-4 py-3 text-gray-500">{u.associated_company || "—"}</td>
-                      <td className="px-4 py-3"><span className="text-xs text-gray-400">{(u.modules || []).length} módulos</span></td>
                       <td className="px-4 py-3">
                         <span className="font-mono text-xs">{showUserPw[u.id] ? u.password : "••••••"}</span>
                         <button onClick={() => setShowUserPw(p => ({ ...p, [u.id]: !p[u.id] }))} className="text-[10px] text-gray-400 hover:text-gray-600 ml-1">{showUserPw[u.id] ? "ocultar" : "ver"}</button>
@@ -357,15 +356,21 @@ export default function UsuariosPage() {
                   <input value={uCompany} onChange={e => setUCompany(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
                 </div>
                 <div>
-                  <label className="text-[11px] text-gray-400 uppercase block mb-1">Módulos</label>
+                  <label className="text-[11px] text-gray-400 uppercase block mb-1">Módulos del rol {ROLE_LABELS[uRole] || uRole}</label>
                   <div className="grid grid-cols-2 gap-1 mt-1">
-                    {MODULES.map(m => (
-                      <label key={m.key} className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer text-xs ${uModules.includes(m.key) ? "bg-green-50" : "hover:bg-gray-50"}`}>
-                        <input type="checkbox" checked={uModules.includes(m.key)} onChange={() => toggleUserModule(m.key)} className="accent-black w-3.5 h-3.5" />
-                        {m.label}
-                      </label>
-                    ))}
+                    {MODULES.map(m => {
+                      const has = uRole === "admin" || getModulesForRole(uRole).includes(m.key);
+                      return (
+                        <div key={m.key} className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs ${has ? "bg-green-50 text-green-700" : "text-gray-300"}`}>
+                          <span className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] ${has ? "bg-green-600 text-white" : "bg-gray-100"}`}>
+                            {has ? "✓" : ""}
+                          </span>
+                          {m.label}
+                        </div>
+                      );
+                    })}
                   </div>
+                  <p className="text-[10px] text-gray-400 mt-2">Los módulos se configuran en Roles y Permisos</p>
                 </div>
               </div>
               <div className="flex gap-2 mt-6">
@@ -447,12 +452,8 @@ export default function UsuariosPage() {
 
         <hr className="mb-8 border-gray-100" />
 
-        <h2 className="text-sm font-medium uppercase tracking-wide text-gray-400 mb-4">Roles del Sistema (legacy)</h2>
-
-        {/* Info banner */}
-        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-6 text-xs text-blue-700">
-          <strong>Sistema de autenticación:</strong> cada rol tiene una contraseña compartida configurada en variables de entorno (.env.local). Para agregar un nuevo usuario, comparte la contraseña del rol correspondiente. Los módulos marcados determinan qué puede ver cada rol.
-        </div>
+        <h2 className="text-sm font-medium uppercase tracking-wide text-gray-400 mb-4">Roles y Permisos</h2>
+        <p className="text-xs text-gray-400 mb-6">Los módulos configurados aquí determinan el acceso de todos los usuarios con ese rol.</p>
 
         {loading ? (
           <div className="text-center py-20 text-gray-400 text-sm">Cargando...</div>
