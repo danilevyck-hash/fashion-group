@@ -72,6 +72,10 @@ function UploadPageInner() {
   const [ventasPreview, setVentasPreview] = useState<VentasPreview | null>(null);
   const [ventasPreviewLoading, setVentasPreviewLoading] = useState(false);
 
+  // CXC verification summary
+  const [cxcSummary, setCxcSummary] = useState<{ key: string; top5: { nombre: string; total: number }[]; totalCartera: number } | null>(null);
+  const [cxcSummaryLoading, setCxcSummaryLoading] = useState<string | null>(null);
+
   const cxcFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const ventasFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const cxcCompanies = ALL_COMPANIES;
@@ -119,6 +123,18 @@ function UploadPageInner() {
       }
       setCxcUploads(latest);
     }
+  }
+
+  async function loadCxcSummary(companyKey: string) {
+    if (cxcSummary?.key === companyKey) { setCxcSummary(null); return; }
+    setCxcSummaryLoading(companyKey);
+    try {
+      const { data: top5 } = await supabase.from("cxc_rows").select("nombre, total").eq("company_key", companyKey).order("total", { ascending: false }).limit(5);
+      const { data: totalData } = await supabase.from("cxc_rows").select("total").eq("company_key", companyKey);
+      const totalCartera = (totalData || []).reduce((s, r) => s + (Number(r.total) || 0), 0);
+      setCxcSummary({ key: companyKey, top5: (top5 || []).map(r => ({ nombre: r.nombre, total: Number(r.total) || 0 })), totalCartera });
+    } catch { setCxcSummary(null); }
+    setCxcSummaryLoading(null);
   }
 
   function buildCxcPreview(text: string, companyKey: string): CxcPreview {
@@ -576,6 +592,29 @@ function UploadPageInner() {
                   <div className="text-sm font-medium mb-0.5">{co.name}</div>
                   <div className="text-xs text-gray-400 mb-3">{co.brand}</div>
                   {getStatusIndicator(co.key, "cxc")}
+                  {cxcUploads[co.key] && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); loadCxcSummary(co.key); }}
+                      className="text-[10px] text-blue-600 hover:text-blue-800 transition mt-2 block"
+                    >
+                      {cxcSummaryLoading === co.key ? "Cargando..." : cxcSummary?.key === co.key ? "Ocultar resumen" : "Ver resumen"}
+                    </button>
+                  )}
+                  {cxcSummary?.key === co.key && (
+                    <div className="mt-2 bg-gray-50 rounded-lg p-3 text-xs" onClick={(e) => e.stopPropagation()}>
+                      <div className="font-medium text-gray-700 mb-2">Top 5 clientes</div>
+                      {cxcSummary.top5.map((r, i) => (
+                        <div key={i} className="flex justify-between py-0.5 text-gray-600">
+                          <span className="truncate mr-2">{r.nombre}</span>
+                          <span className="tabular-nums font-medium flex-shrink-0">${r.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                      ))}
+                      <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between font-medium text-gray-800">
+                        <span>Total cartera</span>
+                        <span className="tabular-nums">${cxcSummary.totalCartera.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  )}
                   <div className="text-[10px] text-gray-300 mt-3">Arrastra el CSV aqui o haz click</div>
                   <input ref={(el) => { cxcFileRefs.current[co.key] = el; }} type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden"
                     onClick={(e) => e.stopPropagation()}

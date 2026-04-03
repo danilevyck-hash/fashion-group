@@ -91,7 +91,20 @@ export default function CamisetasPage() {
       return clientTotal(b.id) - clientTotal(a.id);
     });
 
+  function checkStockWarning(pId: string, extraPaq: number = 0) {
+    const prod = productos.find(x => x.id === pId);
+    if (!prod) return;
+    const comp = Math.floor(prod.stock_comprado / PPQ);
+    const totalPaq = prodTotalPaq(pId) + extraPaq;
+    if (totalPaq > comp) {
+      setToast(`⚠️ Stock insuficiente para ${prod.nombre}. Disponible: ${comp} paq, Pedido: ${totalPaq} paq`);
+      setTimeout(() => setToast(null), 5000);
+    }
+  }
+
   async function savePedido(cId: string, pId: string, paq: number) {
+    const prevPaq = getPaq(cId, pId);
+    const diff = paq - prevPaq;
     setPedidos(prev => {
       const idx = prev.findIndex(p => p.cliente_id === cId && p.producto_id === pId);
       if (paq <= 0) {
@@ -101,9 +114,10 @@ export default function CamisetasPage() {
       return [...prev, { id: "", cliente_id: cId, producto_id: pId, paquetes: paq }];
     });
     setEditCell(null);
+    if (diff > 0) checkStockWarning(pId, diff);
     const res = await fetch("/api/camisetas/pedido", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: cId, producto_id: pId, paquetes: paq }) });
     if (res.ok) {
-      showToast("Guardado");
+      if (diff <= 0 || prodTotalPaq(pId) + diff <= Math.floor((productos.find(x => x.id === pId)?.stock_comprado || 0) / PPQ)) showToast("Guardado");
     } else {
       showToast("Error al guardar");
       load();
@@ -223,7 +237,18 @@ export default function CamisetasPage() {
         await load();
         setShowNuevo(false);
         setTab("resumen");
-        showToast(`Pedido de ${nuevoNombre.trim()} guardado`);
+        // Check for oversold products
+        const warnings = sortedProductos.filter(prod => {
+          const comp = Math.floor(prod.stock_comprado / PPQ);
+          const totalAfter = prodTotalPaq(prod.id) + (nuevoQtys[prod.id] || 0);
+          return totalAfter > comp;
+        });
+        if (warnings.length > 0) {
+          showToast(`⚠️ Stock insuficiente: ${warnings.map(p => p.nombre).join(", ")}`);
+          setTimeout(() => setToast(null), 5000);
+        } else {
+          showToast(`Pedido de ${nuevoNombre.trim()} guardado`);
+        }
       }
     } catch { showToast("Error al guardar"); }
     setNuevoSaving(false);
@@ -314,6 +339,7 @@ export default function CamisetasPage() {
                         <Dot color={prod.color} size="md" />
                         <span className="text-sm font-medium">{prod.nombre}</span>
                         <span className={`text-[9px] px-1.5 py-0.5 rounded-full ${GENERO_BADGE[prod.genero]}`}>{prod.genero}</span>
+                        {disp < 0 && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">Sobrevendido</span>}
                       </div>
                       <div className="grid grid-cols-3 gap-2 text-center">
                         <div><div className="text-lg font-semibold">{tPaq}</div><div className="text-[10px] text-gray-400">vendidos</div></div>
