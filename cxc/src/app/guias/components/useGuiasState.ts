@@ -315,8 +315,8 @@ export function useGuiasState() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            subject: `Nueva Guia #${guia.numero} — Pendiente Bodega`,
-            body: `<h2>Guia #${guia.numero}</h2><p><strong>Transportista:</strong> ${transp}</p><p><strong>Total bultos:</strong> ${totalB}</p><p>Pendiente de completar en bodega.</p>`,
+            subject: `Nueva Guia GT-${String(guia.numero).padStart(3, "0")} — Pendiente Bodega`,
+            body: `<h2>Guia GT-${String(guia.numero).padStart(3, "0")}</h2><p><strong>Transportista:</strong> ${transp}</p><p><strong>Total bultos:</strong> ${totalB}</p><p>Pendiente de completar en bodega.</p>`,
           }),
         }).catch(() => {});
       }
@@ -362,12 +362,12 @@ export function useGuiasState() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          subject: `Guia #${expandedGuia.numero} completada — ${tipoDespacho === "externo" ? "Transportista" : "Entrega directa"}`,
-          body: `<h2>Guia #${expandedGuia.numero}</h2><p><strong>Transportista:</strong> ${expandedGuia.transportista}</p><p><strong>Tipo:</strong> ${tipoDespacho === "externo" ? "Transportista externo" : "Entrega directa"}</p><p><strong>Total bultos:</strong> ${bultos}</p>`,
+          subject: `Guia GT-${String(expandedGuia.numero).padStart(3, "0")} completada — ${tipoDespacho === "externo" ? "Transportista" : "Entrega directa"}`,
+          body: `<h2>Guia GT-${String(expandedGuia.numero).padStart(3, "0")}</h2><p><strong>Transportista:</strong> ${expandedGuia.transportista}</p><p><strong>Tipo:</strong> ${tipoDespacho === "externo" ? "Transportista externo" : "Entrega directa"}</p><p><strong>Total bultos:</strong> ${bultos}</p>`,
         }),
       }).catch(() => {});
 
-      showToast(`Guia #${expandedGuia.numero} despachada`);
+      showToast(`Guia GT-${String(expandedGuia.numero).padStart(3, "0")} despachada`);
 
       // Refresh expanded guia
       const fullRes = await fetch(`/api/guias/${expandedGuia.id}`);

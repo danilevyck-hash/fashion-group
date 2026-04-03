@@ -56,8 +56,6 @@ export default function GuiasPage() {
           error={s.error}
           search={s.search}
           setSearch={s.setSearch}
-          monthFilter={s.monthFilter}
-          setMonthFilter={s.setMonthFilter}
           showPending={s.showPending}
           setShowPending={s.setShowPending}
           role={role}

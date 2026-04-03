@@ -1,4 +1,4 @@
-import { fmtDate } from "@/lib/format";
+import { fmtDate, fmtGuia } from "@/lib/format";
 import type { Guia } from "./types";
 
 interface PrintDocumentProps {
@@ -47,7 +47,7 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
         <div className="print-header grid grid-cols-2 gap-4 mb-4 text-sm">
           <div className="flex gap-2">
             <span className="font-medium">N GUIA:</span>
-            <span className="border-b border-gray-300 flex-1 text-center">{g.numero}</span>
+            <span className="border-b border-gray-300 flex-1 text-center">{fmtGuia(g.numero)}</span>
           </div>
           <div className="flex gap-2">
             <span className="font-medium">FECHA:</span>

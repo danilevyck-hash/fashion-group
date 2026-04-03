@@ -1,8 +1,9 @@
 "use client";
 
-import { fmtDate } from "@/lib/format";
+import { useState } from "react";
+import { fmtDate, fmtGuia } from "@/lib/format";
 import type { Guia, GuiaItem } from "./types";
-import { clientesSummary, getMonthOptions } from "./constants";
+import { clientesSummary } from "./constants";
 import { SkeletonTable, EmptyState, StatusBadge } from "@/components/ui";
 import DespachoForm from "./DespachoForm";
 
@@ -12,8 +13,6 @@ interface GuiasListProps {
   error: string | null;
   search: string;
   setSearch: (v: string) => void;
-  monthFilter: string;
-  setMonthFilter: (v: string) => void;
   showPending: boolean;
   setShowPending: (v: boolean) => void;
   role: string | null;
@@ -52,7 +51,7 @@ const CREATE_ROLES = ["admin", "secretaria", "bodega"];
 const DELETE_ROLES = ["admin", "secretaria"];
 
 export default function GuiasList({
-  guias, loading, error, search, setSearch, monthFilter, setMonthFilter,
+  guias, loading, error, search, setSearch,
   showPending, setShowPending, role,
   onNewGuia,
   expandedId, expandedGuia, expandedLoading, onToggleExpand,
@@ -62,6 +61,7 @@ export default function GuiasList({
   pendingFirma1, pendingFirma2, onFirma1Change, onFirma2Change,
   onEdit, onPrint, onDelete,
 }: GuiasListProps) {
+  const [visibleCount, setVisibleCount] = useState(15);
   const canCreate = role && CREATE_ROLES.includes(role);
   const canDespacho = role && DESPACHO_ROLES.includes(role);
   const canDelete = role && DELETE_ROLES.includes(role);
@@ -114,7 +114,7 @@ export default function GuiasList({
           />
         ) : (
           <>
-            <div className="flex items-end gap-4 mb-4">
+            <div className="mb-4">
               <input
                 type="text"
                 value={search}
@@ -122,24 +122,11 @@ export default function GuiasList({
                 placeholder="Buscar por transportista, cliente o factura..."
                 className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-black w-full max-w-sm transition"
               />
-              <div className="flex items-center gap-2 shrink-0">
-                <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Mes</label>
-                <select
-                  value={monthFilter}
-                  onChange={(e) => setMonthFilter(e.target.value)}
-                  className="border border-gray-200 rounded-lg px-2 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none"
-                >
-                  {getMonthOptions().map((o) => (
-                    <option key={o.value} value={o.value}>{o.label}</option>
-                  ))}
-                </select>
-              </div>
             </div>
 
             <div className="space-y-1">
               {(() => {
                 const filtered = guias
-                  .filter((g) => g.fecha && g.fecha.slice(0, 7) === monthFilter)
                   .filter((g) => {
                     if (!search) return true;
                     const q = search.toLowerCase();
@@ -155,14 +142,17 @@ export default function GuiasList({
                   .filter((g) => !showPending || g.estado === "Pendiente Bodega");
 
                 if (filtered.length === 0) {
-                  return <p className="text-sm text-gray-400 py-8 text-center">No hay guias en este periodo</p>;
+                  return <p className="text-sm text-gray-400 py-8 text-center">No hay guias</p>;
                 }
+
+                const visible = filtered.slice(0, visibleCount);
+                const hasMore = filtered.length > visibleCount;
 
                 const totalBultos = filtered.reduce((s, g) => s + (g.total_bultos || 0), 0);
 
                 return (
                   <>
-                    {filtered.map((g) => {
+                    {visible.map((g) => {
                       const isExpanded = expandedId === g.id;
                       const isDispatched = g.estado === "Completada" || g.estado === "Listo para Imprimir";
 
@@ -173,8 +163,8 @@ export default function GuiasList({
                             onClick={() => onToggleExpand(g.id)}
                             className="w-full flex items-center gap-4 px-4 py-3 text-left text-sm"
                           >
-                            <span className="font-medium w-10 shrink-0">{g.numero}</span>
-                            <span className="text-gray-500 w-24 shrink-0">{fmtDate(g.fecha)}</span>
+                            <span className="font-medium w-16 shrink-0 font-mono text-xs">{fmtGuia(g.numero)}</span>
+                            <span className="text-gray-500 w-36 shrink-0 text-xs">{fmtDate(g.fecha)}</span>
                             <span className="flex-1 truncate">{g.transportista}</span>
                             <span className="text-gray-400 text-xs hidden sm:block w-40 truncate">
                               {clientesSummary(g.guia_items || [])}
@@ -337,6 +327,14 @@ export default function GuiasList({
                         </div>
                       );
                     })}
+
+                    {/* Ver más */}
+                    {hasMore && (
+                      <button onClick={() => setVisibleCount(c => c + 15)}
+                        className="w-full py-3 text-sm text-gray-500 hover:text-black transition border-t border-gray-200 mt-1">
+                        Ver mas ({filtered.length - visibleCount} restantes)
+                      </button>
+                    )}
 
                     {/* Totals */}
                     <div className="flex items-center justify-between px-4 py-3 text-sm border-t border-gray-200 mt-2">

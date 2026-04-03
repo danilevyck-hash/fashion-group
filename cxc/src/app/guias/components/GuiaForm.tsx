@@ -121,7 +121,7 @@ export default function GuiaForm({
       <div className="sticky top-0 z-20 bg-white/95 backdrop-blur -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mb-6 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition">← Guías</button>
-          <span className="text-sm text-gray-300">N° {formNumero}</span>
+          <span className="text-sm text-gray-300 font-mono">GT-{String(formNumero).padStart(3, "0")}</span>
           <StatusBadge />
         </div>
         <SaveButton size="small" />
@@ -224,7 +224,7 @@ export default function GuiaForm({
                   {validationErrors.has(`item-${idx}-facturas-format`) && !validationErrors.has(`item-${idx}-facturas-separator`) && <p className="text-[9px] text-red-500 mt-0.5">Mín. 4 dígitos por factura</p>}
                 </td>
                 <td className="py-2 pr-2">
-                  <input type="number" min={0} value={item.bultos} onChange={e => onUpdateItem(idx, "bultos", parseInt(e.target.value) || 0)}
+                  <input type="number" min={0} value={item.bultos || ""} placeholder="0" onChange={e => onUpdateItem(idx, "bultos", parseInt(e.target.value) || 0)}
                     className={inputClass(`item-${idx}-bultos`, "w-full border-b border-gray-200 py-1 text-sm outline-none text-center focus:border-black transition")} />
                 </td>
                 <td className="py-2 text-center">
@@ -237,9 +237,8 @@ export default function GuiaForm({
         </div>
         </div>
 
-        <div className="flex items-center justify-between mt-3">
+        <div className="mt-3">
           <button onClick={onAddRow} className="text-sm text-gray-400 hover:text-black transition">+ Agregar fila</button>
-          <SaveButton size="small" />
         </div>
       </div>
 
@@ -260,7 +259,6 @@ export default function GuiaForm({
 
       {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
       <div className="flex flex-wrap items-center gap-6">
-        <SaveButton />
         <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
         <StatusBadge />
       </div>
