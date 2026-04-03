@@ -220,14 +220,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No se encontraron filas válidas en el archivo" }, { status: 400 });
   }
 
-  // Upsert in batches of 500 — duplicates (same n_sistema + empresa) are silently ignored
+  // Upsert in batches of 500 — ON CONFLICT (n_sistema, empresa) DO UPDATE all fields
   const BATCH = 500;
   let inserted = 0;
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH).map(r => ({ ...r, uploaded_by: uploadedBy }));
     const { error: upsErr } = await supabaseServer
       .from("ventas_raw")
-      .upsert(batch, { onConflict: "n_sistema,empresa", ignoreDuplicates: true });
+      .upsert(batch, { onConflict: "n_sistema,empresa" });
     if (upsErr) {
       console.error("[ventas/upload] upsert FULL ERROR:", JSON.stringify(upsErr));
       return NextResponse.json({ error: `Error: ${upsErr.code} — ${upsErr.message}` }, { status: 500 });

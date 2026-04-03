@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       nro_factura,
       nro_orden_compra: nro_orden_compra || "",
       fecha_reclamo,
-      estado: "Enviado",
+      estado: "Borrador",
       notas: notas || "",
     })
     .select()

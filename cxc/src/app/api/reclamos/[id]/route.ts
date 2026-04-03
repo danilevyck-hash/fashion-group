@@ -7,6 +7,14 @@ import { requireRole } from "@/lib/requireRole";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  "Borrador": ["Enviado"],
+  "Enviado": ["En revisión"],
+  "En revisión": ["Resuelto con NC", "Rechazado"],
+  "Resuelto con NC": [],
+  "Rechazado": [],
+};
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, ["admin", "secretaria", "upload", "director"]);
   if (auth instanceof NextResponse) return auth;
@@ -43,6 +51,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     await supabaseServer.from("reclamo_seguimiento").insert({
       reclamo_id: id, nota: seguimiento_nota, autor: autor || "",
     });
+  }
+
+  // Validate estado transition
+  if (fields.estado !== undefined) {
+    const { data: current } = await supabaseServer.from("reclamos").select("estado").eq("id", id).single();
+    if (current && fields.estado !== current.estado) {
+      const allowed = VALID_TRANSITIONS[current.estado] || [];
+      if (!allowed.includes(fields.estado)) {
+        return NextResponse.json({ error: `Transición inválida: ${current.estado} → ${fields.estado}` }, { status: 400 });
+      }
+    }
   }
 
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };

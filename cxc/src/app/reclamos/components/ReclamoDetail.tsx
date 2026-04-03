@@ -6,6 +6,14 @@ import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox } from "@/componen
 import { Reclamo, RItem, Contacto } from "./types";
 import { ESTADOS, EMPRESAS, EC, TALLAS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, buildSingleReclamoPdfHtml, openPdfWindow, loadCustomMotivos, saveCustomMotivo } from "./constants";
 
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  "Borrador": ["Enviado"],
+  "Enviado": ["En revisión"],
+  "En revisión": ["Resuelto con NC", "Rechazado"],
+  "Resuelto con NC": [],
+  "Rechazado": [],
+};
+
 interface Props {
   current: Reclamo;
   role: string;
@@ -150,18 +158,29 @@ export default function ReclamoDetail({
         )}
       </div>
 
+      {/* Enviar button for Borrador */}
+      {current.estado === "Borrador" && (
+        <button onClick={() => onChangeEstado("Enviado")} className="mb-6 bg-blue-600 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-700 transition flex items-center gap-2">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+          Enviar Reclamo
+        </button>
+      )}
+
       {/* Estado buttons */}
       <div className="flex items-center gap-1 mb-8 flex-wrap gap-y-2">
         {ESTADOS.map((e) => {
           const isCurrent = current.estado === e;
+          const allowedNext = VALID_TRANSITIONS[current.estado] || [];
+          const canTransition = allowedNext.includes(e);
           return (
             <div key={e} className="relative">
               <button
-                onClick={() => { if (!isCurrent) setConfirmingEstado(confirmingEstado === e ? null : e); }}
-                className={`h-8 text-xs text-center transition px-4 py-2 rounded-full ${isCurrent ? `${EC[e] || "bg-gray-100 text-gray-500"} ring-1 ring-current font-medium` : "bg-gray-100 text-gray-400 hover:bg-gray-200"}`}>
+                onClick={() => { if (!isCurrent && canTransition) setConfirmingEstado(confirmingEstado === e ? null : e); }}
+                disabled={!isCurrent && !canTransition}
+                className={`h-8 text-xs text-center transition px-4 py-2 rounded-full ${isCurrent ? `${EC[e] || "bg-gray-100 text-gray-500"} ring-1 ring-current font-medium` : canTransition ? "bg-gray-100 text-gray-400 hover:bg-gray-200" : "bg-gray-50 text-gray-300 cursor-not-allowed"}`}>
                 {e}
               </button>
-              {confirmingEstado === e && !isCurrent && (
+              {confirmingEstado === e && !isCurrent && canTransition && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-10 text-center" style={{ minWidth: 140 }}>
                   <p className="text-[11px] text-gray-500 mb-1.5">Cambiar a {e}?</p>
                   <div className="flex gap-1 justify-center">
