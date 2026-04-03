@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
+import { requireRole } from "@/lib/requireRole";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+const PRESTAMOS_ROLES = ["admin", "contabilidad"];
+
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, PRESTAMOS_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const { data, error } = await supabaseServer
     .from("prestamos_empleados").select("*, prestamos_movimientos(*)").eq("id", params.id).single();
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
@@ -11,6 +16,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, PRESTAMOS_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const { nombre, empresa, deduccion_quincenal, notas, activo } = body;
   const update: Record<string, unknown> = {};
@@ -30,6 +37,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, ["admin"]);
+  if (auth instanceof NextResponse) return auth;
   const { data: existing } = await supabaseServer.from("prestamos_empleados").select("id, nombre").eq("id", params.id).maybeSingle();
   if (!existing) return NextResponse.json({ error: "Empleado no encontrado" }, { status: 404 });
 

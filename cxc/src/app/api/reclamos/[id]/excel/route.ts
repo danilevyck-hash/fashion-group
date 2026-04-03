@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
 import XLSX from "xlsx-js-style";
 import { buildReclamoSheet } from "@/lib/excel-reclamo";
 
+const RECLAMOS_ROLES = ["admin", "secretaria", "upload", "director"];
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, RECLAMOS_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const { id } = params;
   if (!uuidRegex.test(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 

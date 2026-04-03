@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
 
+const RECLAMOS_ROLES = ["admin", "secretaria"];
 const ALLOWED_FIELDS = ["empresa", "nombre", "nombre_contacto", "whatsapp", "correo", "activo"];
 
 function pick(body: Record<string, unknown>, fields: string[]) {
@@ -9,7 +11,9 @@ function pick(body: Record<string, unknown>, fields: string[]) {
   return result;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria", "upload", "director"]);
+  if (auth instanceof NextResponse) return auth;
   const { data, error } = await supabaseServer
     .from("reclamo_contactos")
     .select("*")
@@ -21,6 +25,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, RECLAMOS_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const fields = pick(body, ALLOWED_FIELDS);
   if (!fields.empresa) return NextResponse.json({ error: "Empresa requerida" }, { status: 400 });
@@ -36,6 +42,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const auth = requireRole(req, RECLAMOS_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const { id } = body;
   if (!id) return NextResponse.json({ error: "ID requerido" }, { status: 400 });

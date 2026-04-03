@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
 
-export async function GET() {
+const CAJA_ROLES = ["admin", "secretaria"];
+
+export async function GET(req: NextRequest) {
+  const auth = requireRole(req, CAJA_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const { data, error } = await supabaseServer
     .from("caja_responsables")
     .select("*")
@@ -13,6 +18,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, CAJA_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const { nombre } = body;
 

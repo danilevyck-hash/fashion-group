@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { reebokServer } from "@/lib/reebok-supabase-server";
-
-export const runtime = "edge";
+import { requireRole } from "@/lib/requireRole";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
+  if (auth instanceof NextResponse) return auth;
   const { product_id, sku, name, image_url, quantity, unit_price } = await req.json();
   if (!product_id) return NextResponse.json({ error: "product_id requerido" }, { status: 400 });
 

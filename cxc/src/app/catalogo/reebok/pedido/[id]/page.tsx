@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { useToast } from "@/components/ToastSystem";
+import { ConfirmDeleteModal } from "@/components/ui";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
 interface Order { id: string; order_number: string; client_name: string; comment: string; status: string; total: number; reebok_order_items: OrderItem[]; created_at: string; }
@@ -14,7 +15,6 @@ const P = 12; // piezas por bulto
 
 export default function OrderDetailPage() {
   const router = useRouter();
-  const { confirm: confirmAction } = useToast();
   const params = useParams();
   const id = params.id as string;
 
@@ -23,6 +23,8 @@ export default function OrderDetailPage() {
   const [items, setItems] = useState<OrderItem[]>([]);
   const [clientName, setClientName] = useState("");
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingOrder, setDeletingOrder] = useState(false);
   const [waNumber, setWaNumber] = useState("+507");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -224,8 +226,10 @@ export default function OrderDetailPage() {
   }
 
   async function deleteOrder() {
-    if (!await confirmAction("¿Eliminar este pedido?")) return;
+    setDeletingOrder(true);
     await fetch(`/api/catalogo/reebok/orders/${id}`, { method: "DELETE" });
+    setDeletingOrder(false);
+    setShowDeleteModal(false);
     router.push("/catalogo/reebok/pedidos");
   }
 
@@ -336,7 +340,7 @@ export default function OrderDetailPage() {
             <button onClick={downloadPDF} className="border border-gray-200 text-black py-3 rounded-lg text-sm hover:border-gray-400 transition">Descargar PDF</button>
             <button onClick={shareWhatsApp} disabled={saving} className="bg-green-600 text-white py-3 rounded-lg text-sm hover:bg-green-700 transition disabled:opacity-40">WhatsApp</button>
           </div>
-          {canDelete && <button onClick={deleteOrder} className="text-xs text-gray-400 hover:text-red-500 transition mt-4 py-1">Eliminar pedido</button>}
+          {canDelete && <button onClick={() => setShowDeleteModal(true)} className="text-xs text-gray-400 hover:text-red-500 transition mt-4 py-1">Eliminar pedido</button>}
         </div>
 
         {/* Confirm modal */}
@@ -365,6 +369,15 @@ export default function OrderDetailPage() {
             </div>
           </div>
         )}
+
+      <ConfirmDeleteModal
+        open={showDeleteModal}
+        title={`¿Eliminar pedido ${order?.order_number || ""}?`}
+        description={`Se eliminará el pedido de ${clientName} con ${items.length} productos ($${fmt(totalMoney)}). Esta acción no se puede deshacer.`}
+        onConfirm={deleteOrder}
+        onCancel={() => setShowDeleteModal(false)}
+        loading={deletingOrder}
+      />
 
       {toast && <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-black text-white px-5 py-2 rounded-full text-sm z-50">{toast}</div>}
     </div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
+import { requireRole } from "@/lib/requireRole";
 
 const DIRECTORIO_ROLES = ["admin", "secretaria", "director", "contabilidad", "vendedor"];
 
@@ -37,6 +38,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, DIRECTORIO_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const { nombre, empresa, telefono, celular, correo, contacto, notas } = body;
 

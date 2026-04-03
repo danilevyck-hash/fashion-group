@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/components/reebok/supabase'
 import { reebokServer } from '@/lib/reebok-supabase-server'
+import { requireRole } from '@/lib/requireRole'
 
 function normalizeHeader(h: string): string {
   return h
@@ -11,6 +12,8 @@ function normalizeHeader(h: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, ['admin', 'secretaria'])
+  if (auth instanceof NextResponse) return auth
   try {
     const { items, empresa } = await req.json() as {
       items: { codigo: string; existencia: number; descripcion: string }[]

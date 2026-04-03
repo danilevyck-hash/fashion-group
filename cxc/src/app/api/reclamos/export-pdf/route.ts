@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 
@@ -104,6 +105,8 @@ function buildPdf(reclamos: Record<string, unknown>[]) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria", "upload", "director"]);
+  if (auth instanceof NextResponse) return auth;
   try {
     const { ids } = await req.json();
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -132,6 +135,8 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  const auth2 = requireRole(req, ["admin", "secretaria", "upload", "director"]);
+  if (auth2 instanceof NextResponse) return auth2;
   try {
     const empresa = req.nextUrl.searchParams.get("empresa");
     if (!empresa) {

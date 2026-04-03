@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { getSession } from "@/lib/require-auth";
+import { requireRole } from "@/lib/requireRole";
 
 const CAJA_ROLES = ["admin", "secretaria"];
 
 export async function GET(req: NextRequest) {
-  const session = getSession(req);
-  if (!session || !CAJA_ROLES.includes(session.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
+  const auth = requireRole(req, CAJA_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const { data, error } = await supabaseServer
     .from("caja_periodos")
     .select("*, caja_gastos(total)")
@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, CAJA_ROLES);
+  if (auth instanceof NextResponse) return auth;
   let fondo = 200;
   try {
     const body = await req.json();

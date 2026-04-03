@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
 import XLSX from "xlsx-js-style";
 
 function fmtDate(d: string) { if (!d) return ""; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }
@@ -21,6 +22,8 @@ function tdN(v: number, alt: boolean, bold = false, sz = 10, fg = "333333") {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria"]);
+  if (auth instanceof NextResponse) return auth;
   const { periodo_id } = await req.json();
   if (!periodo_id) return NextResponse.json({ error: "No periodo_id" }, { status: 400 });
 

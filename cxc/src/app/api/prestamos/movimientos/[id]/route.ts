@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
+import { requireRole } from "@/lib/requireRole";
+
+const PRESTAMOS_ROLES = ["admin", "contabilidad"];
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, PRESTAMOS_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const session = getSession(req);
   const body = await req.json();
 
@@ -33,6 +38,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, ["admin"]);
+  if (auth instanceof NextResponse) return auth;
   const { data: existing } = await supabaseServer.from("prestamos_movimientos").select("id, concepto, monto, empleado_id").eq("id", params.id).maybeSingle();
   if (!existing) return NextResponse.json({ error: "Movimiento no encontrado" }, { status: 404 });
 

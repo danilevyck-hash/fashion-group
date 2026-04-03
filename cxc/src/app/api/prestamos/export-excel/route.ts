@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
 import XLSX from "xlsx-js-style";
 
 function addr(r: number, c: number) { return XLSX.utils.encode_cell({ r, c }); }
@@ -15,6 +16,8 @@ const B = {
 };
 
 export async function GET(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "contabilidad"]);
+  if (auth instanceof NextResponse) return auth;
   const quincena = req.nextUrl.searchParams.get("quincena") || "1";
   const mes = req.nextUrl.searchParams.get("mes") || String(new Date().getMonth() + 1);
   const año = req.nextUrl.searchParams.get("año") || String(new Date().getFullYear());

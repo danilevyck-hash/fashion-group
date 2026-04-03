@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { reebokServer } from "@/lib/reebok-supabase-server";
+import { requireRole } from "@/lib/requireRole";
 
 const P = 12;
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
+  if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const RESEND_KEY = process.env.RESEND_API_KEY;
   if (!RESEND_KEY) return NextResponse.json({ error: "RESEND_API_KEY not configured" }, { status: 500 });

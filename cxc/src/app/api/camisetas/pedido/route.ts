@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "vendedor"]);
+  if (auth instanceof NextResponse) return auth;
   const { cliente_id, producto_id, paquetes } = await req.json();
   if (!cliente_id || !producto_id) return NextResponse.json({ error: "cliente_id and producto_id required" }, { status: 400 });
 

@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, ["admin", "vendedor"]);
+  if (auth instanceof NextResponse) return auth;
   const { estado } = await req.json();
   if (!estado) return NextResponse.json({ error: "estado required" }, { status: 400 });
 
@@ -14,7 +17,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, ["admin"]);
+  if (auth instanceof NextResponse) return auth;
   const { id } = params;
 
   // Delete pedidos first, then client

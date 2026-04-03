@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
 import XLSX from "xlsx-js-style";
 import { buildReclamoSheet } from "@/lib/excel-reclamo";
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria", "upload", "director"]);
+  if (auth instanceof NextResponse) return auth;
   const { ids } = await req.json();
   if (!ids || !Array.isArray(ids) || ids.length === 0) return NextResponse.json({ error: "No IDs" }, { status: 400 });
 

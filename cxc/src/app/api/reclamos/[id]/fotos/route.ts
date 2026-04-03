@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
 
+const RECLAMOS_ROLES = ["admin", "secretaria"];
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, RECLAMOS_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const { id } = params;
   if (!uuidRegex.test(id)) return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
 
@@ -52,6 +56,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function DELETE(req: NextRequest) {
+  const auth = requireRole(req, RECLAMOS_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const { foto_id, storage_path } = body;
 

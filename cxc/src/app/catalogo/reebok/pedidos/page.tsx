@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { useToast } from "@/components/ToastSystem";
+import { ConfirmDeleteModal } from "@/components/ui";
 
 interface Order { id: string; order_number: string; client_name: string; vendor_name: string | null; status: string; total: number; item_count: number; created_at: string; }
 
@@ -17,11 +18,13 @@ const STATUS_COLORS: Record<string, string> = {
 
 export default function PedidosPage() {
   const router = useRouter();
-  const { confirm, toast } = useToast();
+  const { toast } = useToast();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [dateFilter, setDateFilter] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const [role, setRole] = useState("");
   const [clientFilter, setClientFilter] = useState("");
@@ -41,13 +44,16 @@ export default function PedidosPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  async function deleteOrder(id: string) {
-    if (!await confirm("¿Eliminar este pedido?")) return;
-    const res = await fetch(`/api/catalogo/reebok/orders/${id}`, { method: "DELETE" });
+  async function deleteOrder() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    const res = await fetch(`/api/catalogo/reebok/orders/${deleteTarget.id}`, { method: "DELETE" });
     if (res.ok) {
       const activeId = localStorage.getItem("reebok_active_order_id");
-      if (activeId === id) { localStorage.removeItem("reebok_active_order_id"); localStorage.removeItem("reebok_active_order_number"); localStorage.removeItem("reebok_active_order_client"); }
+      if (activeId === deleteTarget.id) { localStorage.removeItem("reebok_active_order_id"); localStorage.removeItem("reebok_active_order_number"); localStorage.removeItem("reebok_active_order_client"); }
     }
+    setDeleting(false);
+    setDeleteTarget(null);
     load();
   }
 
@@ -136,7 +142,7 @@ export default function PedidosPage() {
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                 </button>
                 {canDelete && (
-                  <button onClick={() => deleteOrder(o.id)} className="text-xs text-gray-300 hover:text-red-500 transition px-1" title="Eliminar">
+                  <button onClick={() => setDeleteTarget(o)} className="text-xs text-gray-300 hover:text-red-500 transition px-1" title="Eliminar">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
                   </button>
                 )}
@@ -145,6 +151,15 @@ export default function PedidosPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDeleteModal
+        open={!!deleteTarget}
+        title={`¿Eliminar pedido ${deleteTarget?.order_number || ""}?`}
+        description={`Se eliminará el pedido de ${deleteTarget?.client_name || ""} con ${deleteTarget?.item_count || 0} items ($${fmt(deleteTarget?.total || 0)}). Esta acción no se puede deshacer.`}
+        onConfirm={deleteOrder}
+        onCancel={() => setDeleteTarget(null)}
+        loading={deleting}
+      />
     </div>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { fmt } from "@/lib/format";
 import { RItem, Foto } from "./types";
+import { ConfirmDeleteModal } from "@/components/ui";
 import { EMPRESAS, EMPRESAS_MAP, TALLAS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo } from "./constants";
 
 interface Props {
@@ -47,6 +48,7 @@ export default function ReclamoForm({
   newMotivoText, setNewMotivoText, onSave, onCancel, onViewSaved, onResetAndCreateAnother,
 }: Props) {
   const formFotoRef = useRef<HTMLInputElement>(null);
+  const [deleteFotoTarget, setDeleteFotoTarget] = useState<Foto | null>(null);
   const empInfo = fEmpresa ? EMPRESAS_MAP[fEmpresa] : null;
   const fSubtotal = fItems.reduce((s, i) => s + (i.subtotal || 0), 0);
   const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
@@ -181,10 +183,7 @@ export default function ReclamoForm({
                 {formFotos.map((f) => (
                   <div key={f.id} className="relative">
                     <img src={f.url} alt="" className="w-20 h-20 object-cover rounded-xl border border-gray-100" />
-                    <button onClick={async () => {
-                      await fetch(`/api/reclamos/${savedReclamoId}/fotos`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ foto_id: f.id, storage_path: f.storage_path }) });
-                      setFormFotos((p) => p.filter((x) => x.id !== f.id));
-                    }} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
+                    <button onClick={() => setDeleteFotoTarget(f)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
                   </div>
                 ))}
               </div>
@@ -221,6 +220,20 @@ export default function ReclamoForm({
           </div>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        open={!!deleteFotoTarget}
+        title="¿Eliminar esta foto?"
+        description="Se eliminará la foto de evidencia del reclamo. Esta acción no se puede deshacer."
+        onConfirm={async () => {
+          if (deleteFotoTarget && savedReclamoId) {
+            await fetch(`/api/reclamos/${savedReclamoId}/fotos`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ foto_id: deleteFotoTarget.id, storage_path: deleteFotoTarget.storage_path }) });
+            setFormFotos((p) => p.filter((x) => x.id !== deleteFotoTarget.id));
+          }
+          setDeleteFotoTarget(null);
+        }}
+        onCancel={() => setDeleteFotoTarget(null)}
+      />
     </div>
   );
 }

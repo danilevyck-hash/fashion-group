@@ -2,8 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
+import { requireRole } from "@/lib/requireRole";
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+const CAJA_ROLES = ["admin", "secretaria"];
+
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, CAJA_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const { data, error } = await supabaseServer
     .from("caja_periodos").select("*, caja_gastos(*)").eq("id", params.id).single();
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
@@ -16,6 +21,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, CAJA_ROLES);
+  if (auth instanceof NextResponse) return auth;
   let body: Record<string, unknown> = {};
   try { body = await req.json(); } catch { /* empty body = close period */ }
 
@@ -36,6 +43,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, ["admin"]);
+  if (auth instanceof NextResponse) return auth;
   const { data: existing } = await supabaseServer.from("caja_periodos").select("id, numero").eq("id", params.id).maybeSingle();
   if (!existing) return NextResponse.json({ error: "Período no encontrado" }, { status: 404 });
 

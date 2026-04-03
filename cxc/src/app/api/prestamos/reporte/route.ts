@@ -1,7 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
 
-export async function GET() {
+const PRESTAMOS_ROLES = ["admin", "contabilidad"];
+
+export async function GET(req: NextRequest) {
+  const auth = requireRole(req, PRESTAMOS_ROLES);
+  if (auth instanceof NextResponse) return auth;
   // Get active employees with their movements
   const { data, error } = await supabaseServer
     .from("prestamos_empleados")

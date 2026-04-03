@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Product, InventoryItem } from '@/components/reebok/supabase'
 import { useToast } from '@/components/ToastSystem'
+import { ConfirmDeleteModal } from '@/components/ui'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -124,9 +125,12 @@ function ProductsListSection({
   setInventory: React.Dispatch<React.SetStateAction<InventoryItem[]>>
   reloadInventory: () => Promise<void>
 }) {
-  const { toast, confirm } = useToast()
+  const { toast } = useToast()
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [deleteProductTarget, setDeleteProductTarget] = useState<Product | null>(null)
+  const [deletingProduct, setDeletingProduct] = useState(false)
+  const [deleteSizeTarget, setDeleteSizeTarget] = useState<{ invId: string; size: string; productName: string } | null>(null)
 
   const getInv = (pid: string) => inventory.filter(i => i.product_id === pid)
   const getTotal = (pid: string) => getInv(pid).reduce((s, i) => s + i.quantity, 0)
@@ -148,14 +152,17 @@ function ProductsListSection({
     setProducts(prev => prev.map(x => x.id === p.id ? { ...x, [field]: !x[field] } : x))
   }
 
-  const deleteProduct = async (id: string) => {
-    if (!await confirm('Eliminar este producto? No se puede deshacer.')) return
+  const deleteProduct = async () => {
+    if (!deleteProductTarget) return
+    setDeletingProduct(true)
     try {
-      const res = await fetch(`/api/catalogo/reebok/products?id=${id}`, { method: 'DELETE' })
-      if (!res.ok) { const d = await res.json().catch(() => ({})); toast(`Error: ${d.error || res.status}`, 'error'); return }
-      setProducts(prev => prev.filter(p => p.id !== id))
-      setInventory(prev => prev.filter(i => i.product_id !== id))
+      const res = await fetch(`/api/catalogo/reebok/products?id=${deleteProductTarget.id}`, { method: 'DELETE' })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); toast(`Error: ${d.error || res.status}`, 'error'); setDeletingProduct(false); return }
+      setProducts(prev => prev.filter(p => p.id !== deleteProductTarget.id))
+      setInventory(prev => prev.filter(i => i.product_id !== deleteProductTarget.id))
     } catch (err) { toast(`Error: ${err}`, 'error') }
+    setDeletingProduct(false)
+    setDeleteProductTarget(null)
   }
 
   const addSize = async (productId: string, size: string, quantity: number) => {
@@ -174,9 +181,11 @@ function ProductsListSection({
     setInventory(prev => prev.map(i => i.id === invId ? { ...i, quantity } : i))
   }
 
-  const deleteSize = async (invId: string) => {
-    await fetch(`/api/catalogo/reebok/inventory?id=${invId}`, { method: 'DELETE' })
-    setInventory(prev => prev.filter(i => i.id !== invId))
+  const deleteSize = async () => {
+    if (!deleteSizeTarget) return
+    await fetch(`/api/catalogo/reebok/inventory?id=${deleteSizeTarget.invId}`, { method: 'DELETE' })
+    setInventory(prev => prev.filter(i => i.id !== deleteSizeTarget.invId))
+    setDeleteSizeTarget(null)
   }
 
   if (loading) return <div className="flex justify-center py-10"><Spinner /></div>
@@ -237,7 +246,7 @@ function ProductsListSection({
                   {p.on_sale ? 'Oferta' : '—'}
                 </button>
                 <Link href={`/catalogo/reebok/admin/productos/nuevo?id=${p.id}`} className="text-blue-600 text-[11px] px-1 hover:underline">Editar</Link>
-                <button onClick={() => deleteProduct(p.id)} className="text-red-500 text-[11px] px-1 hover:underline">Eliminar</button>
+                <button onClick={() => setDeleteProductTarget(p)} className="text-red-500 text-[11px] px-1 hover:underline">Eliminar</button>
               </div>
             </div>
 
@@ -259,7 +268,7 @@ function ProductsListSection({
                               className="w-20 border rounded px-2 py-1 text-sm" />
                           </td>
                           <td className="py-1">
-                            <button onClick={() => deleteSize(inv.id)} className="text-red-500 text-xs hover:underline">Quitar</button>
+                            <button onClick={() => setDeleteSizeTarget({ invId: inv.id, size: inv.size, productName: products.find(pp => pp.id === p.id)?.name || '' })} className="text-red-500 text-xs hover:underline">Quitar</button>
                           </td>
                         </tr>
                       ))}
@@ -273,6 +282,23 @@ function ProductsListSection({
         ))}
         {filtered.length === 0 && <p className="text-center py-8 text-gray-400 text-sm">{search ? 'Sin resultados' : 'No hay productos'}</p>}
       </div>
+
+      <ConfirmDeleteModal
+        open={!!deleteProductTarget}
+        title={`¿Eliminar ${deleteProductTarget?.name || "producto"}?`}
+        description="Se eliminará el producto y todo su inventario asociado. Esta acción no se puede deshacer."
+        onConfirm={deleteProduct}
+        onCancel={() => setDeleteProductTarget(null)}
+        loading={deletingProduct}
+      />
+
+      <ConfirmDeleteModal
+        open={!!deleteSizeTarget}
+        title={`¿Quitar talla ${deleteSizeTarget?.size || ""}?`}
+        description={`Se eliminará la talla ${deleteSizeTarget?.size || ""} del producto ${deleteSizeTarget?.productName || ""}. El inventario de esta talla se perderá.`}
+        onConfirm={deleteSize}
+        onCancel={() => setDeleteSizeTarget(null)}
+      />
     </div>
   )
 }

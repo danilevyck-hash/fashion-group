@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, ReactNode } from "react";
+import { useEffect, useRef, useState, ReactNode } from "react";
 
 // ── ESTÉTICA 5: Skeleton Loaders ──
 export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
@@ -162,6 +162,64 @@ export function ConfirmModal({
           </button>
           <button onClick={onClose} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-full text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
             {cancelLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── ESTÉTICA 7c: Confirm Delete Modal (Apple-style) ──
+export function ConfirmDeleteModal({
+  open,
+  title,
+  description,
+  onConfirm,
+  onCancel,
+  loading = false,
+}: {
+  open: boolean;
+  title: string;
+  description: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading?: boolean;
+}) {
+  const [enabled, setEnabled] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setEnabled(false);
+      const t = setTimeout(() => setEnabled(true), 1000);
+      return () => clearTimeout(t);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onCancel]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onCancel}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="relative bg-white sm:rounded-2xl rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-semibold mb-1">{title}</h3>
+        <p className="text-sm text-gray-500 mb-6">{description}</p>
+        <div className="flex gap-3">
+          <button
+            onClick={onConfirm}
+            disabled={!enabled || loading}
+            className="flex-1 px-4 py-2.5 rounded-full text-sm font-medium transition bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 min-h-[44px]"
+          >
+            {loading ? "Eliminando..." : !enabled ? "Eliminar..." : "Eliminar"}
+          </button>
+          <button onClick={onCancel} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-full text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
+            Cancelar
           </button>
         </div>
       </div>

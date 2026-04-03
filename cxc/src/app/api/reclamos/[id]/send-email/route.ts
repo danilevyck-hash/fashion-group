@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
 import { Resend } from "resend";
 import XLSX from "xlsx-js-style";
 
@@ -13,7 +14,9 @@ function esc(s: unknown): string {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, ["admin", "secretaria"]);
+  if (auth instanceof NextResponse) return auth;
   try {
     const { id } = params;
 

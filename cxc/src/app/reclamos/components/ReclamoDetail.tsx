@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { fmt, fmtDate } from "@/lib/format";
-import { Toast, StatusBadge } from "@/components/ui";
+import { Toast, StatusBadge, ConfirmDeleteModal } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
 import { ESTADOS, EMPRESAS, EC, TALLAS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, buildSingleReclamoPdfHtml, openPdfWindow, loadCustomMotivos, saveCustomMotivo } from "./constants";
 
@@ -71,6 +71,7 @@ export default function ReclamoDetail({
 }: Props) {
   const fotoRef = useRef<HTMLInputElement>(null);
   const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
+  const [deleteFotoTarget, setDeleteFotoTarget] = useState<{ id: string; path: string } | null>(null);
 
   const items = current.reclamo_items ?? [];
   const seg = current.reclamo_seguimiento ?? [];
@@ -237,7 +238,7 @@ export default function ReclamoDetail({
             {fotos.map((f) => (
               <div key={f.id} className="relative">
                 <img src={f.url || `${SUPA_URL}/storage/v1/object/public/reclamo-fotos/${f.storage_path}`} alt="" className="w-24 h-24 object-cover rounded-xl border border-gray-100" />
-                <button onClick={() => onDeleteFoto(f.id, f.storage_path)} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
+                <button onClick={() => setDeleteFotoTarget({ id: f.id, path: f.storage_path })} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
               </div>
             ))}
           </div>
@@ -278,19 +279,21 @@ export default function ReclamoDetail({
         )}
       </div>
 
-      {/* Delete confirm modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => setShowDeleteConfirm(false)}>
-          <div className="bg-white rounded-2xl p-6 max-w-sm mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <p className="text-sm font-medium mb-1">Eliminar reclamo</p>
-            <p className="text-sm text-gray-500 mb-5">¿Seguro que deseas eliminar {current.nro_reclamo}? Esta acción no se puede deshacer.</p>
-            <div className="flex items-center gap-3 justify-end">
-              <button onClick={() => setShowDeleteConfirm(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
-              <button onClick={() => onDeleteReclamo(current.id)} className="text-sm bg-red-600 text-white px-5 py-2 rounded-full hover:bg-red-700 transition">Eliminar</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDeleteModal
+        open={showDeleteConfirm}
+        title={`¿Eliminar reclamo ${current.nro_reclamo}?`}
+        description={`Se eliminará el reclamo de ${current.empresa} (Factura: ${current.nro_factura}) con ${items.length} ítems y todas sus notas de seguimiento. Esta acción no se puede deshacer.`}
+        onConfirm={() => onDeleteReclamo(current.id)}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
+
+      <ConfirmDeleteModal
+        open={!!deleteFotoTarget}
+        title="¿Eliminar esta foto?"
+        description="Se eliminará la foto de evidencia del reclamo. Esta acción no se puede deshacer."
+        onConfirm={() => { if (deleteFotoTarget) { onDeleteFoto(deleteFotoTarget.id, deleteFotoTarget.path); setDeleteFotoTarget(null); } }}
+        onCancel={() => setDeleteFotoTarget(null)}
+      />
 
       {/* Edit mode panel */}
       {editMode && (

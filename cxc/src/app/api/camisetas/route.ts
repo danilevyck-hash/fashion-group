@@ -1,7 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "vendedor"]);
+  if (auth instanceof NextResponse) return auth;
   const errors: string[] = [];
 
   const { data: productos, error: e1 } = await supabaseServer

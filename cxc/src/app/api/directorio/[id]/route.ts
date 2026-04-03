@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
+import { requireRole } from "@/lib/requireRole";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, ["admin", "secretaria", "director", "vendedor"]);
+  if (auth instanceof NextResponse) return auth;
   if (!UUID_RE.test(params.id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const body = await req.json();
   const { nombre, empresa, telefono, celular, correo, contacto, notas } = body;
@@ -19,6 +22,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, ["admin"]);
+  if (auth instanceof NextResponse) return auth;
   if (!UUID_RE.test(params.id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const { data: existing } = await supabaseServer.from("directorio_clientes").select("id, nombre").eq("id", params.id).maybeSingle();
   if (!existing) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
