@@ -44,6 +44,8 @@ export default function CamisetasPage() {
   const [showMatrix, setShowMatrix] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [infoTab, setInfoTab] = useState<"precios" | "tallas">("precios");
+  const [editingStock, setEditingStock] = useState(false);
+  const [stockEdits, setStockEdits] = useState<Record<string, number>>({});
 
   // Nuevo Pedido modal
   const [showNuevo, setShowNuevo] = useState(false);
@@ -260,6 +262,24 @@ export default function CamisetasPage() {
     setNuevoSaving(false);
   }
 
+  async function saveStock() {
+    let fails = 0;
+    for (const [id, stock_comprado] of Object.entries(stockEdits)) {
+      const prod = productos.find(p => p.id === id);
+      if (prod && prod.stock_comprado !== stock_comprado) {
+        try {
+          const res = await fetch(`/api/camisetas/productos/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stock_comprado }) });
+          if (!res.ok) fails++;
+        } catch { fails++; }
+      }
+    }
+    if (fails > 0) showToast(`${fails} producto(s) no se pudieron actualizar.`);
+    else showToast("Stock actualizado");
+    setEditingStock(false);
+    setStockEdits({});
+    load();
+  }
+
   const tabs = [
     { key: "resumen" as const, label: "Resumen" },
     { key: "cliente" as const, label: "Por Cliente" },
@@ -299,6 +319,7 @@ export default function CamisetasPage() {
               <div className="text-[10px] text-gray-400 uppercase tracking-widest">Paquetes</div>
               <div className="text-xl font-semibold mt-1">{gPaq.toLocaleString()}</div>
               <div className="text-[10px] text-gray-400">{(gPaq * PPQ).toLocaleString()} piezas</div>
+              <div className="text-[10px] text-gray-400 mt-0.5">1 paquete = 13 piezas</div>
             </div>
             {!isVendedor && (
               <div className="border border-gray-200 rounded-lg p-3">
@@ -334,6 +355,7 @@ export default function CamisetasPage() {
             /* ═══ RESUMEN ═══ */
             <div>
               {/* Product summary cards */}
+              <p className="text-xs text-gray-400 mb-3">Catálogo fijo — 9 productos de la Selección Panamá</p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8">
                 {sortedProductos.map(prod => {
                   const tPaq = prodTotalPaq(prod.id);
@@ -353,6 +375,7 @@ export default function CamisetasPage() {
                         <div><div className={`text-lg font-semibold ${disp < 0 ? "text-red-600" : ""}`}>{disp}</div><div className="text-[10px] text-gray-400">disponible</div></div>
                       </div>
                       {!isVendedor && <div className="text-xs text-gray-600 mt-2 text-center">${fmt(tPaq * PPQ * prod.precio_panama)}</div>}
+                      {isVendedor && <div className="text-xs text-gray-400 mt-2 text-center">{tPaq} paq · {tPaq * PPQ} pzas</div>}
                     </div>
                   );
                 })}
@@ -366,6 +389,7 @@ export default function CamisetasPage() {
                 </button>
                 {showMatrix && (
                   <div className="overflow-x-auto -mx-6 px-6">
+                    <div className="sm:hidden bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 mb-3">Usa la vista &quot;Por Cliente&quot; en móvil para mejor experiencia.</div>
                     <p className="text-[10px] text-gray-400 mb-3">Haz click en cualquier celda para editar</p>
                     <table className="text-xs w-max min-w-full border-collapse">
                       <thead className="sticky top-0 bg-white z-10">
@@ -414,7 +438,7 @@ export default function CamisetasPage() {
                                     const paq = getPaq(c.id, prod.id);
                                     const editing = editCell?.cId === c.id && editCell?.pId === prod.id;
                                     return (
-                                      <td key={c.id} className="py-1 px-0.5 text-center border-b border-gray-200">
+                                      <td key={c.id} className="py-1 px-0.5 text-center border-b border-gray-200 hover:bg-gray-50 transition">
                                         {editing ? (
                                           <input type="number" min={0} value={editVal} onChange={e => setEditVal(parseInt(e.target.value) || 0)}
                                             onBlur={() => savePedido(c.id, prod.id, editVal)}
@@ -422,10 +446,12 @@ export default function CamisetasPage() {
                                             className="w-10 text-center border-b border-black text-xs py-0.5 outline-none bg-transparent" autoFocus />
                                         ) : paq > 0 ? (
                                           <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(paq); }}
+                                            title="Click para editar"
                                             className="inline-block bg-gray-800 text-white rounded px-1.5 py-0.5 text-[10px] tabular-nums font-medium hover:bg-red-600 transition min-w-[22px]">{paq}</button>
                                         ) : (
                                           <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(0); }}
-                                            className="text-gray-200 hover:text-gray-400 hover:cursor-cell transition text-[10px]">—</button>
+                                            title="Click para editar"
+                                            className="text-gray-200 hover:text-gray-400 cursor-pointer hover:bg-gray-100 transition text-[10px]">—</button>
                                         )}
                                       </td>
                                     );
@@ -570,6 +596,16 @@ export default function CamisetasPage() {
           ) : (
             /* ═══ STOCK ═══ */
             <div>
+              {!isVendedor && (
+                <div className="flex justify-end mb-4 gap-2">
+                  {editingStock ? (<>
+                    <button onClick={() => { setEditingStock(false); setStockEdits({}); }} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
+                    <button onClick={saveStock} className="bg-black text-white px-4 py-2 rounded-md text-sm hover:bg-gray-800 transition">Guardar Stock</button>
+                  </>) : (
+                    <button onClick={() => { setEditingStock(true); const edits: Record<string, number> = {}; productos.forEach(p => { edits[p.id] = p.stock_comprado; }); setStockEdits(edits); }} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Editar Stock</button>
+                  )}
+                </div>
+              )}
               {stockProducts.map(prod => {
                 const ped = prodTotalPaq(prod.id);
                 const comp = Math.floor(prod.stock_comprado / PPQ);
@@ -593,6 +629,14 @@ export default function CamisetasPage() {
                       </div>
                       <span className="text-[10px] text-gray-400 tabular-nums w-16">{ped}/{comp} paq</span>
                     </div>
+                    {editingStock && (
+                      <div className="flex items-center gap-1 w-28 flex-shrink-0">
+                        <input type="number" min={0} value={stockEdits[prod.id] ?? prod.stock_comprado}
+                          onChange={e => setStockEdits(prev => ({ ...prev, [prod.id]: parseInt(e.target.value) || 0 }))}
+                          className="w-20 text-center border border-gray-200 rounded py-1 text-xs outline-none focus:border-black tabular-nums" />
+                        <span className="text-[10px] text-gray-400">pzas</span>
+                      </div>
+                    )}
                     <div className="text-right w-24 flex-shrink-0">
                       <span className={`text-sm font-medium tabular-nums ${disp < 0 ? "text-red-600" : "text-black"}`}>{disp}</span>
                       <span className="text-xs text-gray-400 ml-1">disp.</span>
@@ -740,7 +784,7 @@ export default function CamisetasPage() {
       <ConfirmDeleteModal
         open={!!deleteTarget}
         title={`¿Eliminar cliente ${deleteTarget?.nombre || ""}?`}
-        description="Se eliminarán todos los pedidos asociados a este cliente. Esta acción no se puede deshacer."
+        description="Se cancelará el pedido de este cliente. Los datos se preservan internamente."
         onConfirm={() => { if (deleteTarget) { deleteClient(deleteTarget.id); setDeleteTarget(null); } }}
         onCancel={() => setDeleteTarget(null)}
       />

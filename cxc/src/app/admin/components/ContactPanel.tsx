@@ -1,10 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
 import ContactModal from "./ContactModal";
+
+type InvoiceRow = { company_key: string; codigo: string; nombre: string; d0_30: number; d31_60: number; d61_90: number; d91_120: number; d121_180: number; d181_270: number; d271_365: number; mas_365: number; total: number };
 
 interface Props {
   client: ConsolidatedClient;
@@ -36,6 +38,32 @@ export default function ContactPanel({
   const [copied, setCopied] = useState<string | null>(null);
   const [waSending, setWaSending] = useState(false);
   const [contactModalOpen, setContactModalOpen] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const editDataRef = useRef(editData);
+  editDataRef.current = editData;
+
+  // FIX 9: Invoices fetched on demand
+  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
+  const [invoicesOpen, setInvoicesOpen] = useState(false);
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchInvoices() {
+      setInvoicesLoading(true);
+      try {
+        const res = await fetch(`/api/cxc-rows?name=${encodeURIComponent(client.nombre_normalized)}`);
+        if (!cancelled) {
+          const data = await res.json();
+          setInvoices(data || []);
+        }
+      } catch { /* */ }
+      if (!cancelled) setInvoicesLoading(false);
+    }
+    fetchInvoices();
+    return () => { cancelled = true; };
+  }, [client.nombre_normalized]);
 
   function startEdit() {
     setEditing(true);
@@ -43,14 +71,27 @@ export default function ContactPanel({
       correo: client.correo, telefono: client.telefono,
       celular: client.celular, contacto: client.contacto,
     });
+    setAutoSaveStatus("idle");
   }
 
   const [noteSaved, setNoteSaved] = useState(false);
 
-  function saveEdit() {
-    onSaveEdit(client.nombre_normalized, editData);
-    setEditing(false);
-  }
+  // FIX 10: Auto-save with debounce
+  const doAutoSave = useCallback(() => {
+    setAutoSaveStatus("saving");
+    onSaveEdit(client.nombre_normalized, editDataRef.current);
+    setAutoSaveStatus("saved");
+    setTimeout(() => setAutoSaveStatus((s) => s === "saved" ? "idle" : s), 2000);
+  }, [client.nombre_normalized, onSaveEdit]);
+
+  useEffect(() => {
+    if (!editing) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      doAutoSave();
+    }, 2000);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [editData, editing, doAutoSave]);
 
   // CAMBIO 7: Phone validation helper
   function phoneWarning(v: string) {
@@ -103,9 +144,10 @@ export default function ContactPanel({
               </div>
               <input className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300" placeholder="Nombre contacto"
                 value={editData.contacto} onChange={(e) => setEditData({ ...editData, contacto: e.target.value })} />
-              <div className="col-span-2 flex gap-2 mt-1">
-                <button onClick={saveEdit} className="text-xs bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 transition font-medium">Guardar Contacto</button>
-                <button onClick={() => setEditing(false)} className="text-xs text-gray-500 hover:text-black transition">Cancelar</button>
+              <div className="col-span-2 flex gap-2 mt-1 items-center">
+                <button onClick={() => { if (debounceRef.current) { clearTimeout(debounceRef.current); doAutoSave(); } setEditing(false); }} className="text-xs text-gray-500 hover:text-black transition">Cerrar edicion</button>
+                {autoSaveStatus === "saved" && <span className="text-[10px] text-green-600 transition">Guardado ✓</span>}
+                {autoSaveStatus === "saving" && <span className="text-[10px] text-gray-400 transition">Guardando...</span>}
               </div>
             </div>
           ) : (
@@ -217,6 +259,57 @@ export default function ContactPanel({
           onSave={onRegisterContact}
         />
       )}
+
+      {/* FIX 9: Facturas (raw cxc_rows) */}
+      <div className="mt-4">
+        <button
+          onClick={() => setInvoicesOpen(!invoicesOpen)}
+          className="text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5 hover:text-gray-700 transition"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${invoicesOpen ? "rotate-90" : ""}`} fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg>
+          Facturas {invoicesLoading ? "(cargando...)" : `(${invoices.length})`}
+        </button>
+        {invoicesOpen && (
+          invoicesLoading ? (
+            <div className="text-xs text-gray-400 py-2">Cargando facturas...</div>
+          ) : invoices.length === 0 ? (
+            <div className="text-xs text-gray-400 py-2">Sin facturas encontradas.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-[10px] text-gray-400 uppercase tracking-wider">
+                    <th className="text-left py-1.5 font-medium">Empresa</th>
+                    <th className="text-left py-1.5 font-medium">Codigo</th>
+                    <th className="text-right py-1.5 font-medium">0-90d</th>
+                    <th className="text-right py-1.5 font-medium text-amber-600">91-120d</th>
+                    <th className="text-right py-1.5 font-medium text-red-500">121d+</th>
+                    <th className="text-right py-1.5 font-medium">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map((inv, i) => {
+                    const current = (inv.d0_30 || 0) + (inv.d31_60 || 0) + (inv.d61_90 || 0);
+                    const watch = inv.d91_120 || 0;
+                    const overdue = (inv.d121_180 || 0) + (inv.d181_270 || 0) + (inv.d271_365 || 0) + (inv.mas_365 || 0);
+                    const totalColor = overdue > 0 ? "text-red-600" : watch > 0 ? "text-amber-600" : "text-emerald-600";
+                    return (
+                      <tr key={i} className="border-t border-gray-200 hover:bg-white transition">
+                        <td className="py-1.5 font-medium">{inv.company_key}</td>
+                        <td className="py-1.5 text-gray-400">{inv.codigo}</td>
+                        <td className="text-right py-1.5 tabular-nums">{fmt(current)}</td>
+                        <td className="text-right py-1.5 tabular-nums text-amber-600">{fmt(watch)}</td>
+                        <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(overdue)}</td>
+                        <td className={`text-right py-1.5 tabular-nums font-semibold ${totalColor}`}>{fmt(inv.total)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )
+        )}
+      </div>
 
       {/* Internal note */}
       <ClientNote clientName={client.nombre_normalized} />

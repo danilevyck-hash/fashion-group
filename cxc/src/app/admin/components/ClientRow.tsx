@@ -39,8 +39,30 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
   return (
     <>
       <div className={`border-l-4 ${risk.border} group`} data-tooltip={risk.tooltip}>
+        {/* Mobile card layout */}
         <div
-          className={`grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm cursor-pointer transition-colors border-b border-gray-200 ${isExpanded ? "bg-gray-50" : "hover:bg-gray-50/70"}`}
+          className={`sm:hidden px-3 py-3 cursor-pointer transition-colors border-b border-gray-200 ${isExpanded ? "bg-gray-50" : "hover:bg-gray-50/70"}`}
+          onClick={onToggle}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 min-w-0">
+              {!selectionMode && onToggleFavorite && (
+                <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }} className="flex-shrink-0 text-sm leading-none">
+                  {isFavorite ? <span className="text-amber-400">★</span> : <span className="text-gray-300">☆</span>}
+                </button>
+              )}
+              {selectionMode && (
+                <input type="checkbox" checked={!!isSelected} readOnly className="accent-emerald-600 w-3.5 h-3.5 flex-shrink-0" />
+              )}
+              <span className="text-xs font-medium truncate">{client.nombre_normalized}</span>
+            </div>
+            <span className="text-sm font-semibold tabular-nums flex-shrink-0 ml-2">{fmt(client.total)}</span>
+          </div>
+        </div>
+
+        {/* Desktop grid layout */}
+        <div
+          className={`hidden sm:grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm cursor-pointer transition-colors border-b border-gray-200 ${isExpanded ? "bg-gray-50" : "hover:bg-gray-50/70"}`}
           onClick={onToggle}
         >
           <>
@@ -49,7 +71,7 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
                 <input type="checkbox" checked={!!isSelected} readOnly className="accent-emerald-600 w-3.5 h-3.5" />
               </div>
             )}
-            <div className={`${selectionMode ? "col-span-4 sm:col-span-3" : "col-span-5 sm:col-span-4"} font-medium truncate flex items-center gap-1.5`}>
+            <div className={`${selectionMode ? "col-span-3" : "col-span-4"} font-medium truncate flex items-center gap-1.5`}>
               {!selectionMode && onToggleFavorite && (
                 <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }} className="flex-shrink-0 text-sm leading-none hover:scale-110 transition-transform">
                   {isFavorite ? <span className="text-amber-400">★</span> : <span className="text-gray-300 group-hover:text-gray-400">☆</span>}
@@ -63,25 +85,25 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
               <span className="truncate">{client.nombre_normalized}</span>
               {/* Follow-up overdue badge */}
               {!selectionMode && followUpOverdue && (
-                <span className="hidden sm:inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 flex-shrink-0" title={`Seguimiento vencido: ${client.proximo_seguimiento}`}>
+                <span className="inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 flex-shrink-0" title={`Seguimiento vencido: ${client.proximo_seguimiento}`}>
                   Seg.
                 </span>
               )}
               {daysSinceContact !== null ? (
                 daysSinceContact > 30 ? (
-                  <span className="hidden sm:inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 flex-shrink-0">30d+</span>
+                  <span className="inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 flex-shrink-0">30d+</span>
                 ) : (
-                  <span className={`hidden sm:inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${daysSinceContact <= 7 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`} title={`Contactado hace ${daysSinceContact} dias via ${lastContact?.method}`}>
+                  <span className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${daysSinceContact <= 7 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`} title={`Contactado hace ${daysSinceContact} dias via ${lastContact?.method}`}>
                     {daysSinceContact}d
                   </span>
                 )
               ) : (
-                <span className="hidden sm:inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 flex-shrink-0">Sin contacto</span>
+                <span className="inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 flex-shrink-0">Sin contacto</span>
               )}
             </div>
-            <div className="hidden sm:block col-span-2 text-right tabular-nums text-emerald-700">{fmt(client.current)}</div>
-            <div className="hidden sm:block col-span-2 text-right tabular-nums text-amber-600">{fmt(client.watch)}</div>
-            <div className="col-span-3 sm:col-span-2 text-right tabular-nums text-red-600 relative">
+            <div className="col-span-2 text-right tabular-nums text-emerald-700">{fmt(client.current)}</div>
+            <div className="col-span-2 text-right tabular-nums text-amber-600">{fmt(client.watch)}</div>
+            <div className="col-span-2 text-right tabular-nums text-red-600 relative">
               {fmt(client.overdue)}
               {/* Quick actions on hover — only when not in selection mode */}
               {!selectionMode && (
@@ -108,7 +130,7 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
                 </span>
               )}
             </div>
-            <div className="col-span-4 sm:col-span-2 text-right tabular-nums font-semibold">{fmt(client.total)}</div>
+            <div className="col-span-2 text-right tabular-nums font-semibold">{fmt(client.total)}</div>
           </>
         </div>
       </div>

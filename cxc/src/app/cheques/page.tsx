@@ -5,6 +5,12 @@ import AppHeader from "@/components/AppHeader";
 import { SkeletonTable, EmptyState, Toast, StatusBadge, ConfirmModal } from "@/components/ui";
 import XLSX from "xlsx-js-style";
 import { fmt, fmtDate } from "@/lib/format";
+
+function fmtShort(d: string): string {
+  if (!d) return "";
+  try { return new Date(d + "T12:00:00").toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }); }
+  catch { return d; }
+}
 import { EMPRESAS } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
 
@@ -38,6 +44,7 @@ export default function ChequesPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingEstado, setEditingEstado] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista");
   const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
@@ -50,6 +57,7 @@ export default function ChequesPage() {
   const [selectedVencidos, setSelectedVencidos] = useState<Set<string>>(new Set());
   const [batchProcessing, setBatchProcessing] = useState(false);
   const [depositingId, setDepositingId] = useState<string | null>(null);
+  const [confirmDepositId, setConfirmDepositId] = useState<string | null>(null);
 
   // Rebotado modal
   const [rebotandoId, setRebotandoId] = useState<string | null>(null);
@@ -108,12 +116,12 @@ export default function ChequesPage() {
   if (!authChecked) return null;
 
   function resetForm() {
-    setFCliente(""); setFEmpresa(""); setFBanco(""); setFNumero(""); setFMonto(""); setFFecha(todayStr()); setFNotas(""); setFWhatsapp(""); setEditingId(null); setError(null);
+    setFCliente(""); setFEmpresa(""); setFBanco(""); setFNumero(""); setFMonto(""); setFFecha(todayStr()); setFNotas(""); setFWhatsapp(""); setEditingId(null); setEditingEstado(null); setError(null);
   }
 
   function startEdit(c: Cheque) {
     setFCliente(c.cliente); setFEmpresa(c.empresa); setFBanco(c.banco); setFNumero(c.numero_cheque);
-    setFMonto(String(c.monto)); setFFecha(c.fecha_deposito); setFNotas(c.notas); setFWhatsapp(c.whatsapp || ""); setEditingId(c.id); setShowForm(true);
+    setFMonto(String(c.monto)); setFFecha(c.fecha_deposito); setFNotas(c.notas); setFWhatsapp(c.whatsapp || ""); setEditingId(c.id); setEditingEstado(c.estado); setShowForm(true);
   }
 
   async function saveCheque() {
@@ -467,7 +475,7 @@ export default function ChequesPage() {
                       <td className="py-3 px-4 font-medium">{r.cliente}</td>
                       <td className="py-3 px-4 text-right tabular-nums">{r.count}</td>
                       <td className="py-3 px-4 text-right tabular-nums">${fmt(r.total)}</td>
-                      <td className="py-3 px-4 text-right text-gray-500">{fmtDate(r.ultimo)}</td>
+                      <td className="py-3 px-4 text-right text-gray-500">{fmtShort(r.ultimo)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -578,7 +586,7 @@ export default function ChequesPage() {
                                 <StatusBadge estado={ve} />
                                 {(ve === "pendiente" || ve === "vencido") && (
                                   <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
-                                    <button onClick={() => { depositar(c.id); setCalPopover(null); }} className="text-[11px] text-emerald-600 hover:underline">Depositar</button>
+                                    <button onClick={() => { setConfirmDepositId(c.id); setCalPopover(null); }} className="text-[11px] text-emerald-600 hover:underline">Depositar</button>
                                     <button onClick={() => { setRebotandoId(c.id); setCalPopover(null); }} className="text-[11px] text-red-500 hover:underline">Rebotado</button>
                                   </div>
                                 )}
@@ -617,7 +625,7 @@ export default function ChequesPage() {
                           </div>
                           {(ve === "pendiente" || ve === "vencido") && (
                             <div className="flex gap-3 mt-1 ml-1">
-                              <button onClick={() => depositar(c.id)} className="text-xs text-emerald-600 hover:underline py-1">Depositar</button>
+                              <button onClick={() => setConfirmDepositId(c.id)} className="text-xs text-emerald-600 hover:underline py-1">Depositar</button>
                               <button onClick={() => setRebotandoId(c.id)} className="text-xs text-red-500 hover:underline py-1">Rebotado</button>
                             </div>
                           )}
@@ -632,6 +640,13 @@ export default function ChequesPage() {
           </div>
         );
       })()}
+      {viewMode === "calendario" && !loading && (
+        <div className="flex items-center gap-4 text-[11px] text-gray-500 mt-3 px-1">
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Pendiente</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Vencido / Rebotado</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300" /> Depositado</span>
+        </div>
+      )}
 
       {/* Table */}
       {viewMode === "lista" && (loading ? (
@@ -697,7 +712,7 @@ export default function ChequesPage() {
                       <input type="checkbox" checked={selectedVencidos.has(c.id)} onChange={() => toggleSelectVencido(c.id)} className="accent-amber-600 w-3.5 h-3.5" />
                     </td>
                   )}
-                  <td className={`py-3 px-4 ${ve !== "pendiente" ? "" : ""}`}>{fmtDate(c.fecha_deposito)}</td>
+                  <td className={`py-3 px-4 ${ve !== "pendiente" ? "" : ""}`}>{fmtShort(c.fecha_deposito)}</td>
                   <td className="py-3 px-4 font-medium">{c.cliente}</td>
                   <td className="py-3 px-4 text-gray-500">{c.empresa}</td>
                   <td className="py-3 px-4 text-gray-500">{c.banco}</td>
@@ -708,7 +723,7 @@ export default function ChequesPage() {
                   </td>
                   <td className="py-3 px-4 text-right flex items-center justify-end gap-2">
                     {(ve === "pendiente" || ve === "vencido") && (<>
-                      <button onClick={() => depositar(c.id)} className="text-sm text-gray-500 hover:text-black transition">Depositar</button>
+                      <button onClick={() => setConfirmDepositId(c.id)} className="text-sm text-gray-500 hover:text-black transition">Depositar</button>
                       <span className="text-gray-200">·</span>
                       <button onClick={() => setRebotandoId(c.id)} className="text-sm text-gray-500 hover:text-red-600 transition">Rebotado</button>
                       <span className="text-gray-200">·</span>
@@ -734,6 +749,15 @@ export default function ChequesPage() {
       ))}
       <Toast message={error} type="error" />
       <Toast message={toast} />
+      {/* Confirm deposit */}
+      <ConfirmModal
+        open={!!confirmDepositId}
+        onClose={() => setConfirmDepositId(null)}
+        onConfirm={() => { depositar(confirmDepositId!); setConfirmDepositId(null); }}
+        title="Depositar cheque"
+        message={(() => { const c = cheques.find(x => x.id === confirmDepositId); return c ? `¿Depositar cheque N° ${c.numero_cheque} por $${fmt(c.monto)}?` : ""; })()}
+        confirmLabel="Si, depositar"
+      />
       <ConfirmModal
         open={!!confirmDeleteId}
         onClose={() => setConfirmDeleteId(null)}

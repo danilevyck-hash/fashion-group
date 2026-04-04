@@ -232,7 +232,8 @@ export default function ClientTable({
         )}
 
         {(() => {
-          const paged = pageSize === 0 ? filtered : filtered.slice(page * pageSize, (page + 1) * pageSize);
+          const effectivePageSize = pageSize === 0 ? 100 : pageSize;
+          const paged = filtered.slice(page * effectivePageSize, (page + 1) * effectivePageSize);
           return paged.map((client) => {
             const isExpanded = expanded === client.nombre_normalized;
             const isSelected = selectedNames.has(client.nombre_normalized);

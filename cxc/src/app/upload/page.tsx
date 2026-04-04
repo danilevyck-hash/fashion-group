@@ -66,6 +66,7 @@ function UploadPageInner() {
   const [message, setMessage] = useState<{ text: string; type: "ok" | "err" } | null>(null);
   const [cxcPreview, setCxcPreview] = useState<CxcPreview | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
 
   // Ventas state
   const [ventasUploads, setVentasUploads] = useState<Record<string, VentasStatus>>({});
@@ -270,6 +271,7 @@ function UploadPageInner() {
       let insertedCount = 0;
       try {
         for (let i = 0; i < rows.length; i += batchSize) {
+          setUploadProgress(`Subiendo lote ${Math.floor(i/batchSize)+1} de ${Math.ceil(rows.length/batchSize)}...`);
           const batch = rows.slice(i, i + batchSize).map((r) => ({
             upload_id: newUploadId, company_key: companyKey,
             codigo: r["CODIGO"] || "", nombre: r["NOMBRE"] || "",
@@ -290,10 +292,12 @@ function UploadPageInner() {
           insertedCount += batch.length;
         }
       } catch (insertError) {
+        setUploadProgress(null);
         await supabase.from("cxc_rows").delete().eq("upload_id", newUploadId);
         await supabase.from("cxc_uploads").delete().eq("id", newUploadId);
         throw new Error(`Insert fallo en fila ${insertedCount + 1}. Datos anteriores preservados. ${insertError instanceof Error ? insertError.message : ""}`);
       }
+      setUploadProgress(null);
 
       const { count } = await supabase.from("cxc_rows").select("id", { count: "exact", head: true }).eq("upload_id", newUploadId);
       if (count !== rows.length) {
@@ -495,6 +499,8 @@ function UploadPageInner() {
     headerRow: string[]; bodyRows: { cells: string[]; hasError: boolean; tooltip: string }[];
     onConfirm: () => void; onCancel: () => void; confirmDisabled: boolean; confirmLabel: string;
   }) {
+    const displayRows = bodyRows.slice(0, 100);
+    const hasMore = bodyRows.length > 100;
     return (
       <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
         <div className="bg-white rounded-lg w-full max-w-[950px] max-h-[85vh] flex flex-col">
@@ -528,7 +534,7 @@ function UploadPageInner() {
                   </tr>
                 </thead>
                 <tbody>
-                  {bodyRows.map((row, ri) => (
+                  {displayRows.map((row, ri) => (
                     <tr key={ri} className={`border-b border-gray-50 ${row.hasError ? "bg-red-50/60" : ri % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`} title={row.tooltip}>
                       <td className="px-2 py-1.5 text-gray-300 tabular-nums">{ri + 1}</td>
                       {row.cells.map((c, ci) => (
@@ -536,6 +542,13 @@ function UploadPageInner() {
                       ))}
                     </tr>
                   ))}
+                  {hasMore && (
+                    <tr>
+                      <td colSpan={headerRow.length + 1} className="py-3 text-center text-xs text-gray-500 bg-amber-50">
+                        Mostrando 100 de {bodyRows.length} filas. Las demas se procesaran al confirmar.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -601,7 +614,7 @@ function UploadPageInner() {
                   onDragLeave={() => setDragOver(null)}
                   onDrop={async (e) => { e.preventDefault(); setDragOver(null); const f = e.dataTransfer.files[0]; if (f) openCxcPreview(co.key, f); }}
                   onClick={() => cxcFileRefs.current[co.key]?.click()}>
-                  {uploading === co.key && <span className="text-[9px] bg-black text-white px-2 py-0.5 rounded-full font-medium absolute top-3 right-3">Subiendo...</span>}
+                  {uploading === co.key && <span className="text-[9px] bg-black text-white px-2 py-0.5 rounded-full font-medium absolute top-3 right-3">{uploadProgress || "Subiendo..."}</span>}
                   <div className="text-sm font-medium mb-0.5">{co.name}</div>
                   <div className="text-xs text-gray-400 mb-3">{co.brand}</div>
                   {getStatusIndicator(co.key, "cxc")}

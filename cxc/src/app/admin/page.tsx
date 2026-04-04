@@ -385,6 +385,15 @@ export default function AdminDashboard() {
       { onConflict: "nombre_normalized" }
     );
     if (!error) loadData();
+
+    // Sync to directorio
+    try {
+      await fetch(`/api/directorio/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre_normalized: nombre, ...data }),
+      });
+    } catch {} // Don't fail if directorio sync fails
   }
 
   async function handleRegisterContact(clientName: string, data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) {
@@ -522,6 +531,10 @@ export default function AdminDashboard() {
             </>)}
           </div>
       </div>
+
+      {userRole === "vendedor" && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700 mb-4">Mostrando todos los clientes. Contacta al administrador para filtrar por vendedor.</div>
+      )}
 
       <UploadFreshness roleCompanies={cxcCompanies} uploads={uploads} />
 

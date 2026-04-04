@@ -39,12 +39,16 @@ export default function DirectorioPage() {
   const [savingNew, setSavingNew] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Cliente | null>(null);
   const [cxcClients, setCxcClients] = useState<Set<string>>(new Set());
+  const [isDirty, setIsDirty] = useState(false);
+  const [empresaFilter, setEmpresaFilter] = useState("");
+  const [empresas, setEmpresas] = useState<string[]>([]);
   const importRef = useRef<HTMLInputElement>(null);
 
-  const loadClientes = useCallback(async (searchTerm: string, pg: number) => {
+  const loadClientes = useCallback(async (searchTerm: string, pg: number, empFilter?: string) => {
     setLoading(true);
     try {
       const params = new URLSearchParams({ search: searchTerm, page: String(pg), limit: String(PAGE_SIZE) });
+      if ((empFilter ?? empresaFilter) ) params.set("empresa", (empFilter ?? empresaFilter));
       const res = await fetch(`/api/directorio?${params}`);
       if (res.ok) {
         const result = await res.json();
@@ -65,10 +69,10 @@ export default function DirectorioPage() {
     return () => clearTimeout(t);
   }, [search]);
 
-  // Load on search/page change
+  // Load on search/page/empresa change
   useEffect(() => {
-    if (authChecked) loadClientes(debouncedSearch, page);
-  }, [authChecked, debouncedSearch, page, loadClientes]);
+    if (authChecked) loadClientes(debouncedSearch, page, empresaFilter);
+  }, [authChecked, debouncedSearch, page, empresaFilter, loadClientes]);
 
   // Load CXC clients for badge
   useEffect(() => {
@@ -80,6 +84,26 @@ export default function DirectorioPage() {
     }
   }, [authChecked]);
 
+  // Load unique empresas on mount
+  useEffect(() => {
+    if (authChecked) {
+      fetch("/api/directorio").then(r => r.ok ? r.json() : []).then(d => {
+        const list = (Array.isArray(d) ? d : d.data || [])
+          .map((r: { empresa: string }) => (r.empresa || "").trim())
+          .filter(Boolean);
+        setEmpresas([...new Set(list as string[])].sort());
+      }).catch(() => {});
+    }
+  }, [authChecked]);
+
+  // Warn on unsaved changes (beforeunload)
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
+
   if (!authChecked) return null;
 
   function showToast(msg: string) {
@@ -87,10 +111,35 @@ export default function DirectorioPage() {
     setTimeout(() => setToast(null), 3000);
   }
 
+  function detectDelimiter(text: string): string {
+    const firstLine = text.split("\n")[0] || "";
+    const semicolons = (firstLine.match(/;/g) || []).length;
+    const commas = (firstLine.match(/,/g) || []).length;
+    return semicolons >= commas ? ";" : ",";
+  }
+
   async function handleCreate() {
     if (!newData.nombre.trim()) return;
     setSavingNew(true);
     try {
+      // Duplicate detection
+      try {
+        const dupRes = await fetch(`/api/directorio?search=${encodeURIComponent(newData.nombre.trim())}&page=1&limit=50`);
+        if (dupRes.ok) {
+          const dupResult = await dupRes.json();
+          const matches = (dupResult.data || []).filter((c: Cliente) =>
+            c.nombre.toLowerCase().trim() === newData.nombre.toLowerCase().trim() &&
+            c.empresa.toLowerCase().trim() === (newData.empresa || "").toLowerCase().trim()
+          );
+          if (matches.length > 0) {
+            const match = matches[0];
+            if (!confirm(`Ya existe un contacto similar: ${match.nombre} en ${match.empresa || "(sin empresa)"}. ¿Crear de todos modos?`)) {
+              setSavingNew(false);
+              return;
+            }
+          }
+        }
+      } catch { /* proceed if dedup check fails */ }
       const res = await fetch("/api/directorio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -114,6 +163,7 @@ export default function DirectorioPage() {
     });
     if (res.ok) {
       setEditing(null);
+      setIsDirty(false);
       showToast("Contacto actualizado");
       loadClientes(debouncedSearch, page);
       // Sync to CXC overrides
@@ -146,13 +196,14 @@ export default function DirectorioPage() {
   async function handleImport(file: File) {
     const text = await file.text();
     const lines = text.split("\n").filter((l) => l.trim());
+    const delimiter = detectDelimiter(text);
     let start = 0;
     if (lines[0] && lines[0].toLowerCase().startsWith("nombre")) start = 1;
 
     // Parse all rows
     const rows = [];
     for (let i = start; i < lines.length; i++) {
-      const parts = lines[i].split(";").map((s) => s.trim());
+      const parts = lines[i].split(delimiter).map((s) => s.trim());
       if (!parts[0]) continue;
       rows.push({
         nombre: parts[0] || "", empresa: parts[1] || "", telefono: parts[2] || "",
@@ -221,9 +272,14 @@ export default function DirectorioPage() {
               if (importRef.current) importRef.current.value = "";
             }}
           />
-          <button onClick={() => importRef.current?.click()} className="text-sm text-gray-400 hover:text-black transition">
+          {(role === "admin" || role === "secretaria") && (
+          <button onClick={() => importRef.current?.click()} title="Formato: CSV separado por ; (punto y coma). Columnas: Nombre, Empresa, Teléfono, Celular, Correo, Contacto, Notas" className="text-sm text-gray-400 hover:text-black transition">
             Importar CSV
           </button>
+          )}
+          {(role === "admin" || role === "secretaria") && !showNew && (
+            <span className="text-[10px] text-gray-300 hidden lg:inline">Formato: ; separado</span>
+          )}
           <button onClick={() => window.open("/api/directorio?format=csv")} className="text-sm text-gray-400 hover:text-black transition">
             Exportar CSV
           </button>
@@ -243,10 +299,12 @@ export default function DirectorioPage() {
             const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
             const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Directorio-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url);
           }} title="Exportar a Excel" className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full transition">↓ Excel</button>
+          {(role === "admin" || role === "secretaria") && (
           <button onClick={() => setShowNew(true)}
             className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition">
             Nuevo Contacto
           </button>
+          )}
         </div>
       </div>
 
@@ -306,6 +364,16 @@ export default function DirectorioPage() {
           placeholder="Buscar por nombre o empresa..."
           className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black w-full max-w-sm"
         />
+        <select
+          value={empresaFilter}
+          onChange={(e) => { setEmpresaFilter(e.target.value); setPage(1); }}
+          className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black bg-transparent"
+        >
+          <option value="">Todas las empresas</option>
+          {empresas.map((emp) => (
+            <option key={emp} value={emp}>{emp}</option>
+          ))}
+        </select>
         <span className="text-xs text-gray-400 pb-2">{total} contacto{total !== 1 ? "s" : ""}</span>
       </div>
 
@@ -344,12 +412,19 @@ export default function DirectorioPage() {
                       {/* Main row */}
                       <div
                         className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1 py-3 cursor-pointer"
-                        onClick={() => setExpanded(isExpanded ? null : c.id)}
+                        onClick={() => {
+                          if (isDirty && editing && editing !== c.id) {
+                            if (!confirm("Tienes cambios sin guardar. ¿Salir sin guardar?")) return;
+                            setEditing(null);
+                            setIsDirty(false);
+                          }
+                          setExpanded(isExpanded ? null : c.id);
+                        }}
                       >
                         <div className="font-medium">{c.nombre}{cxcClients.has(c.nombre.toUpperCase().trim().replace(/\s+/g, " ")) && (
-                          <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full ml-1">CxC</span>
+                          <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full ml-1" title="Este contacto también aparece en Cuentas por Cobrar">En CxC</span>
                         )}</div>
-                        <div className="text-gray-500">{c.empresa}</div>
+                        <div className="text-gray-500">{c.empresa || <span className="text-gray-300">—</span>}</div>
                         <div className="text-gray-500">{c.whatsapp ? (
                           <a href={`https://wa.me/${(c.whatsapp).replace(/[^0-9]/g, "")}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="inline-flex items-center gap-1 text-emerald-600 hover:text-emerald-800">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a3.04 3.04 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
@@ -359,19 +434,21 @@ export default function DirectorioPage() {
                         <div className="text-gray-500">{c.correo ? (
                           <a href={`mailto:${c.correo}`} onClick={(e) => e.stopPropagation()} className="text-gray-600 hover:text-black underline underline-offset-2">{c.correo}</a>
                         ) : <span className="text-gray-300">—</span>}</div>
-                        <div className="text-gray-500">{c.contacto}</div>
+                        <div className="text-gray-500">{c.contacto || <span className="text-gray-300">—</span>}</div>
                         <div className="text-right text-gray-300 text-xs">{isExpanded ? "▼" : "▶"}</div>
                       </div>
 
                       {/* Expanded detail */}
                       {isExpanded && !isEditing && (
                         <div className="bg-gray-50 px-4 py-3 mb-1 rounded-lg text-sm">
-                          {c.telefono && <div className="text-gray-500 mb-1">Teléfono: {c.telefono}</div>}
-                          {c.notas && <div className="text-gray-500 mb-1">Notas: {c.notas}</div>}
+                          <div className="text-gray-500 mb-1">Teléfono: {c.telefono || <span className="text-gray-300">—</span>}</div>
+                          <div className="text-gray-500 mb-1">Notas: {c.notas || <span className="text-gray-300">—</span>}</div>
                           <div className="text-gray-400 text-xs mb-3">Creado: {new Date(c.created_at).toLocaleDateString("es-PA")}</div>
                           <div className="flex gap-3">
-                            <button onClick={(e) => { e.stopPropagation(); setEditing(c.id); setEditData(c); }}
+                            {(role === "admin" || role === "secretaria") && (
+                            <button onClick={(e) => { e.stopPropagation(); setEditing(c.id); setEditData(c); setIsDirty(false); }}
                               className="text-sm text-gray-400 hover:text-black transition py-2.5 sm:py-1.5">Editar</button>
+                            )}
                             <button onClick={(e) => { e.stopPropagation(); router.push(`/admin?search=${encodeURIComponent(c.nombre)}`); }}
                               title="Ver deuda de este cliente en Cuentas por Cobrar" className="text-xs text-gray-400 hover:text-black transition py-2.5 sm:py-1.5">Ver en CXC →</button>
                             {role === "admin" && (

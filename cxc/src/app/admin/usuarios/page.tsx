@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast, SkeletonTable, EmptyState } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState, ConfirmModal } from "@/components/ui";
+import XLSX from "xlsx-js-style";
 
 interface RolePermission {
   role: string;
@@ -68,6 +69,8 @@ export default function UsuariosPage() {
   const [uCompany, setUCompany] = useState("");
   const [savingUser, setSavingUser] = useState(false);
   const [showUserPw, setShowUserPw] = useState<Record<string, boolean>>({});
+  const [deactivateTarget, setDeactivateTarget] = useState<{id: string, name: string, active: boolean} | null>(null);
+  const currentUserId = typeof window !== "undefined" ? sessionStorage.getItem("fg_user_id") : null;
 
   // Password management
   const [passwords, setPasswords] = useState<Record<string, { password: string; updated_at: string }>>({});
@@ -190,6 +193,24 @@ export default function UsuariosPage() {
     setSavingPw(false);
   }
 
+  function exportUsersExcel() {
+    const rows: string[][] = [["FASHION GROUP \u2014 Usuarios del Sistema"], [], ["Nombre", "Rol", "Empresa", "Estado"]];
+    for (const u of fgUsers) {
+      rows.push([u.name, u.role, u.associated_company || "", u.active ? "Activo" : "Inactivo"]);
+    }
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 24 }, { wch: 14 }, { wch: 20 }, { wch: 10 }];
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Usuarios");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url;
+    a.download = `Usuarios-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    a.click(); URL.revokeObjectURL(url);
+  }
+
   function openNewUser() {
     setEditUserId(null); setUName(""); setUPassword(""); setURole("vendedor"); setUCompany("");
     setShowUserModal(true);
@@ -286,7 +307,10 @@ export default function UsuariosPage() {
             <div>
               <h2 className="text-sm font-medium uppercase tracking-wide text-gray-400">Usuarios del Sistema</h2>
             </div>
-            <button onClick={openNewUser} className="text-sm bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition">+ Nuevo Usuario</button>
+            <div className="flex gap-2">
+              <button onClick={exportUsersExcel} className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition">{"\u2193"} Excel</button>
+              <button onClick={openNewUser} className="text-sm bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition">+ Nuevo Usuario</button>
+            </div>
           </div>
           {loadingUsers ? (
             <SkeletonTable rows={3} cols={4} />
@@ -294,13 +318,14 @@ export default function UsuariosPage() {
             <EmptyState title="No hay usuarios" subtitle="Crea el primer usuario del sistema" actionLabel="+ Nuevo Usuario" onAction={openNewUser} />
           ) : (
             <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto -mx-4 sm:mx-0"><div className="min-w-[600px] px-4 sm:px-0">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-white z-10">
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Nombre</th>
                     <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Rol</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Empresa</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Contraseña</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal hidden sm:table-cell">Empresa</th>
+                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal hidden sm:table-cell">Contraseña</th>
                     <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Estado</th>
                     <th className="px-4 py-2.5"></th>
                   </tr>
@@ -310,22 +335,23 @@ export default function UsuariosPage() {
                     <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 font-medium">{u.name}</td>
                       <td className="px-4 py-3 text-gray-500">{u.role}</td>
-                      <td className="px-4 py-3 text-gray-500">{u.associated_company || "—"}</td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">{u.associated_company || "—"}</td>
+                      <td className="px-4 py-3 hidden sm:table-cell">
                         <span className="font-mono text-xs">{showUserPw[u.id] ? u.password : "••••••"}</span>
-                        <button onClick={() => setShowUserPw(p => ({ ...p, [u.id]: !p[u.id] }))} className="text-[10px] text-gray-400 hover:text-gray-600 ml-1">{showUserPw[u.id] ? "ocultar" : "ver"}</button>
+                        <button onClick={() => setShowUserPw(p => ({ ...p, [u.id]: !p[u.id] }))} className="text-[10px] text-gray-400 hover:text-gray-600 ml-1 min-w-[44px] min-h-[44px] inline-flex items-center justify-center">{showUserPw[u.id] ? "ocultar" : "ver"}</button>
                       </td>
                       <td className="px-4 py-3">
                         <span className={`text-[11px] px-2 py-0.5 rounded-full ${u.active ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>{u.active ? "Activo" : "Inactivo"}</span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button onClick={() => openEditUser(u)} className="text-xs text-blue-600 hover:underline mr-2 py-2.5 sm:py-1.5 px-1">Editar</button>
-                        <button onClick={() => toggleUserActive(u.id, !u.active)} className="text-xs text-gray-400 hover:text-black py-2.5 sm:py-1.5 px-1">{u.active ? "Desactivar" : "Activar"}</button>
+                        <button onClick={() => setDeactivateTarget({id: u.id, name: u.name, active: u.active})} className="text-xs text-gray-400 hover:text-black py-2.5 sm:py-1.5 px-1">{u.active ? "Desactivar" : "Activar"}</button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div></div>
             </div>
           )}
         </div>
@@ -347,13 +373,17 @@ export default function UsuariosPage() {
                 <div>
                   <label className="text-[11px] text-gray-400 uppercase block mb-1">Rol</label>
                   <select value={uRole} onChange={e => setURole(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
-                    <option value="admin">Admin</option>
-                    <option value="vendedor">Vendedor</option>
-                    <option value="contabilidad">Contabilidad</option>
-                    <option value="bodega">Bodega</option>
-                    <option value="secretaria">Secretaria</option>
-                    <option value="cliente">Cliente</option>
+                    <option value="admin">admin — Acceso total</option>
+                    <option value="director">director — Lectura y reportes</option>
+                    <option value="secretaria">secretaria — Operaciones diarias</option>
+                    <option value="vendedor">vendedor — Catálogo y CXC</option>
+                    <option value="contabilidad">contabilidad — Préstamos y ventas</option>
+                    <option value="bodega">bodega — Despacho de guías</option>
+                    <option value="cliente">cliente — Catálogo Reebok</option>
                   </select>
+                  {editUserId === currentUserId && uRole !== "admin" && (
+                    <p className="text-xs text-amber-600 mt-1">¡Cuidado! Cambiar tu propio rol te quitará acceso de administrador.</p>
+                  )}
                 </div>
                 <div>
                   <label className="text-[11px] text-gray-400 uppercase block mb-1">Empresa (opcional)</label>
@@ -457,7 +487,8 @@ export default function UsuariosPage() {
         <hr className="mb-8 border-gray-200" />
 
         <h2 className="text-sm font-medium uppercase tracking-wide text-gray-400 mb-4">Roles y Permisos</h2>
-        <p className="text-xs text-gray-400 mb-6">Los módulos configurados aquí determinan el acceso de todos los usuarios con ese rol.</p>
+        <p className="text-xs text-gray-400 mb-1">Los módulos configurados aquí determinan el acceso de todos los usuarios con ese rol.</p>
+        <p className="text-xs text-gray-400 mt-1 mb-6">Las contraseñas de rol son compartidas por todos los usuarios del mismo rol. Las contraseñas de usuario (arriba) son individuales y tienen prioridad al iniciar sesión.</p>
 
         {loading ? (
           <div className="py-20 flex justify-center"><svg className="animate-spin h-6 w-6 text-gray-300" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
