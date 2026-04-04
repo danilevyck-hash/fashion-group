@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { fmt } from "@/lib/format";
 import { EMPRESAS } from "@/lib/companies";
 
@@ -85,12 +86,14 @@ export default function GastoForm({
     setGResponsable, setGEmpresa, setGEmpresaOtro,
   } = setters;
 
+  const [showMoreDetails, setShowMoreDetails] = useState(false);
+
   return (
     <div className="mb-10">
       <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">
         Agregar Gasto
       </div>
-      <div className="grid grid-cols-5 gap-3 items-end mb-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 items-end mb-3">
         <div>
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
             Fecha
@@ -114,7 +117,7 @@ export default function GastoForm({
             className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition"
           />
         </div>
-        <div>
+        <div className="hidden lg:block">
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
             Proveedor
           </label>
@@ -126,7 +129,7 @@ export default function GastoForm({
             className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition"
           />
         </div>
-        <div>
+        <div className="hidden lg:block">
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
             N° Factura
           </label>
@@ -216,8 +219,35 @@ export default function GastoForm({
         </div>
       </div>
 
-      <div className="grid grid-cols-6 gap-3 items-end">
-        <div>
+      {/* Mobile-only collapsible for optional fields */}
+      <div className="lg:hidden mb-3">
+        <button onClick={() => setShowMoreDetails(!showMoreDetails)} className="text-xs text-gray-400 hover:text-black transition flex items-center gap-1">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${showMoreDetails ? "rotate-90" : ""}`}><polyline points="9 18 15 12 9 6"/></svg>
+          {showMoreDetails ? "Ocultar detalles opcionales" : "Mas detalles (Proveedor, Factura, Responsable)"}
+        </button>
+        {showMoreDetails && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end mt-2">
+            <div>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Proveedor</label>
+              <input type="text" value={gProveedor} onChange={(e) => setGProveedor(e.target.value)} placeholder="Dónde se compró" className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
+            </div>
+            <div>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">N° Factura</label>
+              <input type="text" value={gNroFactura} onChange={(e) => setGNroFactura(e.target.value)} placeholder="Opcional" className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
+            </div>
+            <div>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Responsable</label>
+              <select value={gResponsable} onChange={(e) => setGResponsable(e.target.value)} className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
+                <option value="">—</option>
+                {responsables.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
+        <div className="hidden lg:block">
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
             Responsable
             {!showAddResponsable && (

@@ -63,7 +63,7 @@ export default function MovimientoModal({
               </button>
               <h2 className="font-medium">{mLabel}</h2>
             </div>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs text-gray-400 uppercase">Fecha *</label>
                 <input type="date" value={mFecha} onChange={e => onChangeFecha(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
@@ -73,11 +73,11 @@ export default function MovimientoModal({
                 <input type="number" step="0.01" min="0.01" value={mMonto} onChange={e => onChangeMonto(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
               </div>
               {(mConcepto === "Préstamo" || mConcepto === "Responsabilidad por daño") && Number(mMonto) >= 500 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 sm:col-span-2">
                   ⚠ Este movimiento requiere aprobación por el monto (≥ $500)
                 </div>
               )}
-              <div>
+              <div className="sm:col-span-2">
                 <label className="text-xs text-gray-400 uppercase">Notas</label>
                 <textarea value={mNotas} onChange={e => onChangeNotas(e.target.value)} rows={2} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
               </div>

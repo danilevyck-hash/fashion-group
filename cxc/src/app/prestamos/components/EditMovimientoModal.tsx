@@ -41,7 +41,7 @@ export default function EditMovimientoModal({
           </div>
           <div>
             <label className="text-xs text-gray-400 uppercase">Concepto</label>
-            <select value={emConcepto} onChange={e => onChangeConcepto(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
+            <select value={emConcepto} disabled title="El tipo de movimiento no se puede cambiar" className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent text-gray-400 cursor-not-allowed">
               <option value="Préstamo">Préstamo</option>
               <option value="Pago">Pago</option>
               <option value="Abono extra">Abono extra</option>

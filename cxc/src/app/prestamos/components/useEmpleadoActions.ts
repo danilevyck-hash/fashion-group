@@ -84,6 +84,7 @@ export function useEmpleadoActions({ empleadoId, empleado, movs, onSuccess, onDe
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [clearInput, setClearInput] = useState("");
   const [showForceArchive, setShowForceArchive] = useState(false);
+  const [clearProgress, setClearProgress] = useState("");
 
   async function deleteEmployee() {
     const res = await fetch(`/api/prestamos/empleados/${empleadoId}`, { method: "DELETE" });
@@ -93,9 +94,11 @@ export function useEmpleadoActions({ empleadoId, empleado, movs, onSuccess, onDe
   }
 
   async function clearHistory() {
-    for (const m of movs) {
-      await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "DELETE" });
+    for (let i = 0; i < movs.length; i++) {
+      setClearProgress(`Eliminando movimiento ${i + 1} de ${movs.length}...`);
+      await fetch(`/api/prestamos/movimientos/${movs[i].id}`, { method: "DELETE" });
     }
+    setClearProgress("");
     showToast("Historial eliminado");
     setClearInput(""); setShowClearConfirm(false);
     onSuccess();
@@ -131,6 +134,7 @@ export function useEmpleadoActions({ empleadoId, empleado, movs, onSuccess, onDe
     deleteInput, setDeleteInput,
     showClearConfirm, setShowClearConfirm,
     clearInput, setClearInput,
+    clearProgress,
     showForceArchive, setShowForceArchive,
     deleteEmployee, clearHistory, forceArchive,
   };

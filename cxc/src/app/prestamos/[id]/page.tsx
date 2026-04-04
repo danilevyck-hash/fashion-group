@@ -206,6 +206,7 @@ export default function PrestamoDetallePage() {
         show={actions.showClearConfirm}
         movCount={movs.length}
         clearInput={actions.clearInput}
+        clearProgress={actions.clearProgress}
         onChangeInput={actions.setClearInput}
         onClose={() => actions.setShowClearConfirm(false)}
         onConfirm={actions.clearHistory}
