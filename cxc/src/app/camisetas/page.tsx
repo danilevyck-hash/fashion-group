@@ -46,6 +46,7 @@ export default function CamisetasPage() {
   const [infoTab, setInfoTab] = useState<"precios" | "tallas">("precios");
   const [editingStock, setEditingStock] = useState(false);
   const [stockEdits, setStockEdits] = useState<Record<string, number>>({});
+  const [savingStock, setSavingStock] = useState(false);
 
   // Nuevo Pedido modal
   const [showNuevo, setShowNuevo] = useState(false);
@@ -263,21 +264,27 @@ export default function CamisetasPage() {
   }
 
   async function saveStock() {
-    let fails = 0;
-    for (const [id, stock_comprado] of Object.entries(stockEdits)) {
-      const prod = productos.find(p => p.id === id);
-      if (prod && prod.stock_comprado !== stock_comprado) {
-        try {
-          const res = await fetch(`/api/camisetas/productos/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stock_comprado }) });
-          if (!res.ok) fails++;
-        } catch { fails++; }
+    if (savingStock) return;
+    setSavingStock(true);
+    try {
+      let fails = 0;
+      for (const [id, stock_comprado] of Object.entries(stockEdits)) {
+        const prod = productos.find(p => p.id === id);
+        if (prod && prod.stock_comprado !== stock_comprado) {
+          try {
+            const res = await fetch(`/api/camisetas/productos/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ stock_comprado }) });
+            if (!res.ok) fails++;
+          } catch { fails++; }
+        }
       }
+      if (fails > 0) showToast(`${fails} producto(s) no se pudieron actualizar.`);
+      else showToast("Stock actualizado");
+      setEditingStock(false);
+      setStockEdits({});
+      load();
+    } finally {
+      setSavingStock(false);
     }
-    if (fails > 0) showToast(`${fails} producto(s) no se pudieron actualizar.`);
-    else showToast("Stock actualizado");
-    setEditingStock(false);
-    setStockEdits({});
-    load();
   }
 
   const tabs = [
@@ -612,7 +619,7 @@ export default function CamisetasPage() {
                 <div className="flex justify-end mb-4 gap-2">
                   {editingStock ? (<>
                     <button onClick={() => { setEditingStock(false); setStockEdits({}); }} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
-                    <button onClick={saveStock} className="bg-black text-white px-4 py-2 rounded-md text-sm hover:bg-gray-800 transition">Guardar Stock</button>
+                    <button onClick={saveStock} disabled={savingStock} className="bg-black text-white px-4 py-2 rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed">{savingStock ? "Guardando..." : "Guardar Stock"}</button>
                   </>) : (
                     <button onClick={() => { setEditingStock(true); const edits: Record<string, number> = {}; productos.forEach(p => { edits[p.id] = p.stock_comprado; }); setStockEdits(edits); }} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Editar Stock</button>
                   )}
@@ -692,7 +699,7 @@ export default function CamisetasPage() {
               <div className="flex gap-2 mt-6">
                 <button onClick={() => setShowNuevo(false)} className="flex-1 py-2.5 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
                 <button onClick={() => setNuevoStep("productos")} disabled={!nuevoNombre.trim()}
-                  className="flex-1 py-2.5 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40">
+                  className="flex-1 py-2.5 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50">
                   Continuar →
                 </button>
               </div>
@@ -731,7 +738,7 @@ export default function CamisetasPage() {
               <div className="flex gap-2 mt-4">
                 <button onClick={() => setShowNuevo(false)} className="flex-1 py-2.5 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
                 <button onClick={saveNuevo} disabled={nuevoSaving || nuevoTotalPaq === 0}
-                  className="flex-1 py-2.5 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40">
+                  className="flex-1 py-2.5 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50">
                   {nuevoSaving ? "Guardando..." : "Guardar Pedido"}
                 </button>
               </div>

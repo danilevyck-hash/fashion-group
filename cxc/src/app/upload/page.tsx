@@ -249,7 +249,8 @@ function UploadPageInner() {
 
       // Archive original file in Supabase Storage for audit trail
       const today = new Date().toISOString().slice(0, 10);
-      const archivePath = `cxc-uploads/${companyKey}/${today}_${theFile.name}`;
+      const safeName = theFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const archivePath = `cxc-uploads/${companyKey}/${today}_${safeName}`;
       await supabase.storage.from("backups").upload(archivePath, theFile, { upsert: true });
 
       const text = await readFileAsText(theFile);
@@ -576,7 +577,7 @@ function UploadPageInner() {
             {warning && <div className="mb-3">{warning}</div>}
             <div className="flex gap-3">
             <button onClick={onConfirm} disabled={confirmDisabled}
-              className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-30 disabled:cursor-not-allowed">
+              className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed">
               {confirmLabel}
             </button>
             <button onClick={onCancel}

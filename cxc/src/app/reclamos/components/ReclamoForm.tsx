@@ -202,7 +202,7 @@ export default function ReclamoForm({
                   setUploadingFormFoto(false);
                   if (formFotoRef.current) formFotoRef.current.value = "";
                 }} />
-                <button onClick={() => formFotoRef.current?.click()} disabled={uploadingFormFoto} className="text-sm text-gray-400 hover:text-black transition disabled:opacity-40">
+                <button onClick={() => formFotoRef.current?.click()} disabled={uploadingFormFoto} className="text-sm text-gray-400 hover:text-black transition disabled:opacity-50">
                   {uploadingFormFoto ? "Subiendo..." : "+ Agregar foto"}
                 </button>
               </>
@@ -215,7 +215,7 @@ export default function ReclamoForm({
         <div className="mt-8">
           {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
           <div className="flex items-center gap-6">
-            <button onClick={onSave} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
+            <button onClick={onSave} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50">
               {saving ? "Guardando..." : "Guardar Reclamo"}
             </button>
             <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>

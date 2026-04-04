@@ -332,11 +332,11 @@ export default function ClientTable({
           return filtered.length > eff ? (
             <div className="flex items-center gap-2">
               <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-                className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed">
                 Anterior
               </button>
               <button onClick={() => setPage(p => p + 1)} disabled={(page + 1) * eff >= filtered.length}
-                className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed">
                 Siguiente
               </button>
             </div>

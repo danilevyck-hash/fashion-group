@@ -375,7 +375,7 @@ export default function GastoForm({
           <button
             onClick={() => { onAddGasto(); setJustSaved(true); setTimeout(() => setJustSaved(false), 2000); }}
             disabled={addingGasto || !gDescripcion || subtotalNum <= 0}
-            className="bg-black text-white px-6 py-1.5 rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40"
+            className="bg-black text-white px-6 py-1.5 rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50"
           >
             {justSaved ? "Guardado \u2713" : "Agregar"}
           </button>

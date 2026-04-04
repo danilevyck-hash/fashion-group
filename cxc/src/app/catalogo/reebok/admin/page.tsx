@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { useAuth } from '@/lib/hooks/useAuth'
 import { Product, InventoryItem } from '@/components/reebok/supabase'
 import { useToast } from '@/components/ToastSystem'
 import { ConfirmDeleteModal } from '@/components/ui'
@@ -56,19 +57,12 @@ function SectionDivider({ title }: { title: string }) {
 
 export default function ReebokAdmin() {
   const router = useRouter()
-  const [authorized, setAuthorized] = useState(false)
+  const { authChecked } = useAuth({ moduleKey: "reebok-admin", allowedRoles: ["admin", "secretaria"] })
 
   // Shared data — loaded once, passed to sections that need it
   const [products, setProducts] = useState<Product[]>([])
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const role = sessionStorage.getItem('cxc_role')
-    if (!role || !['admin', 'secretaria'].includes(role)) { router.replace('/'); return }
-    setAuthorized(true)
-    loadData()
-  }, [router])
 
   const loadData = async () => {
     const [p, i] = await Promise.all([
@@ -80,7 +74,9 @@ export default function ReebokAdmin() {
     setLoading(false)
   }
 
-  if (!authorized) return null
+  useEffect(() => { if (authChecked) loadData() }, [authChecked])
+
+  if (!authChecked) return null
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">

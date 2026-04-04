@@ -149,7 +149,7 @@ export default function EmpresaList({
                 {allSelected ? "Deseleccionar todo" : "Seleccionar todo"}
               </button>
               {selectedIds.length > 0 && <>
-                <button onClick={() => sendBulkEmail(selectedIds)} disabled={!!emailProgress} className="text-sm bg-black text-white px-5 py-2 rounded-md hover:bg-gray-800 transition disabled:opacity-40 flex items-center gap-1">
+                <button onClick={() => sendBulkEmail(selectedIds)} disabled={!!emailProgress} className="text-sm bg-black text-white px-5 py-2 rounded-md hover:bg-gray-800 transition disabled:opacity-50 flex items-center gap-1">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
                   {emailProgress || "Enviar por Email"}
                 </button>
@@ -213,7 +213,7 @@ export default function EmpresaList({
                   className="border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer">
                   {selectionMode && (
                     <td className="py-3">
-                      <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!isOpen} className="accent-black disabled:opacity-30" />
+                      <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!isOpen} className="accent-black disabled:opacity-50" />
                     </td>
                   )}
                   <td className="py-3 font-medium text-xs">{r.nro_reclamo}</td>

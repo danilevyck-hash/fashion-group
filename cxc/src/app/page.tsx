@@ -36,6 +36,11 @@ function LoginForm() {
         return;
       }
 
+      // NOTE: sessionStorage stores non-secret UI data (role, name, modules) for
+      // client-side rendering (nav visibility, display names, module access).
+      // Auth is enforced server-side via httpOnly cookie (cxc_session) — these
+      // values are NOT trusted for authorization, only for UX convenience.
+      // Tradeoff: XSS could read these, but they contain no secrets (no tokens/passwords).
       sessionStorage.setItem("cxc_role", data.role);
       if (data.userId) sessionStorage.setItem("fg_user_id", data.userId);
       if (data.userName) sessionStorage.setItem("fg_user_name", data.userName);

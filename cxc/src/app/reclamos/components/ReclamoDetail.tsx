@@ -170,7 +170,7 @@ export default function ReclamoDetail({
           Editar
         </button>
         <div className="relative">
-          <button onClick={() => setShowEmailConfirm(!showEmailConfirm)} disabled={sendingEmail} className="text-xs bg-black text-white px-4 py-2.5 sm:py-1.5 rounded-full hover:bg-gray-800 transition flex items-center gap-1 disabled:opacity-40">
+          <button onClick={() => setShowEmailConfirm(!showEmailConfirm)} disabled={sendingEmail} className="text-xs bg-black text-white px-4 py-2.5 sm:py-1.5 rounded-full hover:bg-gray-800 transition flex items-center gap-1 disabled:opacity-50">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
             {sendingEmail ? "Enviando..." : "Enviar por Email"}
           </button>
@@ -329,7 +329,7 @@ export default function ReclamoDetail({
         <div className="text-xs uppercase tracking-widest text-gray-400 mb-3">Seguimiento</div>
         <div className="flex gap-2 mb-3">
           <input type="text" value={nota} onChange={(e) => setNota(e.target.value)} onBlur={() => { if (nota.trim()) onAddNota(); }} placeholder="Agregar nota..." className="flex-1 border-b border-gray-200 py-1.5 text-sm outline-none" />
-          <button onClick={onAddNota} disabled={!nota.trim()} className="text-sm bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 transition disabled:opacity-40">Agregar</button>
+          <button onClick={onAddNota} disabled={!nota.trim()} className="text-sm bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 transition disabled:opacity-50">Agregar</button>
         </div>
         {seg.map((s) => (
           <div key={s.id} className="border-b border-gray-50 py-2">
@@ -441,7 +441,7 @@ export default function ReclamoDetail({
           </div>
           <button onClick={() => setEditItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition mb-6">+ Agregar fila</button>
           <div className="flex items-center gap-6">
-            <button onClick={onSaveEdit} disabled={editSaving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">
+            <button onClick={onSaveEdit} disabled={editSaving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50">
               {editSaving ? "Guardando..." : "Guardar Cambios"}
             </button>
             <button onClick={() => setEditMode(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
@@ -468,7 +468,7 @@ export default function ReclamoDetail({
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={onAplicadaConfirm} disabled={!aplicadaNc.trim() || !aplicadaMonto} className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">Confirmar</button>
+              <button onClick={onAplicadaConfirm} disabled={!aplicadaNc.trim() || !aplicadaMonto} className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50">Confirmar</button>
               <button onClick={() => { setShowAplicadaModal(false); setConfirmingEstado(null); }} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition">Cancelar</button>
             </div>
           </div>

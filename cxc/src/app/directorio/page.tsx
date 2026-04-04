@@ -350,7 +350,7 @@ export default function DirectorioPage() {
           </div>
           <div className="flex items-center gap-4 mt-6">
             <button onClick={handleCreate} disabled={savingNew}
-              className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition disabled:opacity-40">
+              className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition disabled:opacity-50">
               {savingNew ? "Guardando..." : "Guardar Cliente"}
             </button>
             <button onClick={() => setShowNew(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
@@ -514,10 +514,10 @@ export default function DirectorioPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-4 mt-6" data-print-hide>
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed min-h-[44px]">← Anterior</button>
+                className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]">← Anterior</button>
               <span className="text-xs text-gray-400">Página {page} de {totalPages}</span>
               <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed min-h-[44px]">Siguiente →</button>
+                className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]">Siguiente →</button>
             </div>
           )}
         </>
