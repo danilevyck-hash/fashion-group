@@ -165,7 +165,7 @@ export function useGuiasState() {
           if (saved2) _setPendingFirma2(saved2);
         } catch { /* */ }
       }
-    } catch { /* */ }
+    } catch { showToast("Error al cargar detalles"); }
     setExpandedLoading(false);
   }
 

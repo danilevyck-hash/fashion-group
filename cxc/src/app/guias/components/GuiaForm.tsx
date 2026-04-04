@@ -150,7 +150,7 @@ export default function GuiaForm({
   function SaveButton({ size = "normal" }: { size?: "normal" | "small" }) {
     const cls = size === "small"
       ? "bg-black text-white px-4 py-2 rounded-md text-xs font-medium hover:bg-gray-800 transition disabled:opacity-40"
-      : "bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40";
+      : "bg-black text-white px-6 py-3 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40";
     return (
       <button onClick={handleSave} disabled={saving || !items.some(i => i.cliente)} className={cls}>
         {saving ? "Guardando..." : editingId ? "Guardar Cambios" : "Guardar Guía"}

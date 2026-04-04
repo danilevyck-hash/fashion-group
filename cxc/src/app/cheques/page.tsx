@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import AppHeader from "@/components/AppHeader";
 import { SkeletonTable, EmptyState, Toast, StatusBadge, ConfirmModal } from "@/components/ui";
 import XLSX from "xlsx-js-style";
@@ -35,6 +35,33 @@ const BANCOS = ["Banistmo", "BAC", "General", "Global", "Multibank", "Otro"];
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 type Filter = "all" | "pendiente" | "depositado" | "vencido" | "rebotado" | "vencen_hoy" | "vencen_semana";
+
+function ChequeMoreMenu({ cheque, ve, role, onRebotado, onWA, onDelete }: {
+  cheque: Cheque; ve: string; role: string;
+  onRebotado: () => void; onWA: () => void; onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
+  const hasActions = isPending || cheque.whatsapp || role === "admin";
+  if (!hasActions) return null;
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(!open)} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] px-1">&#x22EF;</button>
+      {open && (<>
+        <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 min-w-[160px]">
+          {isPending && (
+            <button onClick={() => { onRebotado(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Rebotado</button>
+          )}
+          <button onClick={() => { onWA(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">WhatsApp</button>
+          {role === "admin" && (
+            <button onClick={() => { onDelete(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-gray-50 transition">Eliminar Cheque</button>
+          )}
+        </div>
+      </>)}
+    </div>
+  );
+}
 
 export default function ChequesPage() {
   const { authChecked, role } = useAuth({ moduleKey: "cheques", allowedRoles: ["admin","secretaria","upload","director"] });
@@ -82,10 +109,14 @@ export default function ChequesPage() {
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
 
+  const loadingRef = useRef(false);
   const loadCheques = useCallback(async () => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     try { const res = await fetch("/api/cheques"); if (res.ok) { const d = await res.json(); setCheques(Array.isArray(d) ? d : []); } }
-    catch { setError("No se pudieron cargar los cheques. Recarga la página."); } setLoading(false);
+    catch { setError("No se pudieron cargar los cheques. Recarga la página."); }
+    finally { setLoading(false); loadingRef.current = false; }
   }, []);
 
   useEffect(() => {
@@ -143,7 +174,8 @@ export default function ChequesPage() {
   async function depositar(id: string) {
     setDepositingId(id);
     try {
-      await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "depositado", fecha_depositado: todayStr() }) });
+      const res = await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "depositado", fecha_depositado: todayStr() }) });
+      if (!res.ok) { showToast("No se pudo depositar. Intenta de nuevo."); return; }
       showToast("Cheque marcado como depositado");
       loadCheques();
     } catch { showToast("No se pudo depositar. Intenta de nuevo."); }
@@ -187,7 +219,7 @@ export default function ChequesPage() {
             nombre_normalized: cheque.cliente.toUpperCase().trim(),
             resultado_contacto: `⚠ Cheque rebotado: N° ${cheque.numero_cheque} por $${fmt(cheque.monto)} — ${motivoRebote || "Sin motivo"}`,
           }),
-        }).catch(() => {});
+        }).catch(() => { console.error('Override failed'); });
       }
       showToast("Cheque marcado como rebotado");
     } catch { showToast("Error de conexion. Intenta de nuevo."); }
@@ -250,6 +282,7 @@ export default function ChequesPage() {
     a.download = `cheques-pendientes-${todayStr()}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
+    showToast("Excel descargado");
   }
 
   const today = todayStr();
@@ -511,7 +544,7 @@ export default function ChequesPage() {
               onChange={(e) => setMotivoRebote(e.target.value)}
               rows={3}
               placeholder="Fondos insuficientes, firma incorrecta, etc."
-              className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm outline-none focus:border-black transition resize-none mt-1"
+              className="w-full border border-gray-200 rounded-lg py-2 px-3 text-sm outline-none focus:border-black transition resize-none mt-1 min-h-[48px]"
             />
             <div className="flex items-center gap-3 mt-4">
               <button onClick={() => marcarRebotado(rebotandoId)} className="bg-red-600 text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-red-700 transition">Confirmar rebotado</button>
@@ -737,26 +770,28 @@ export default function ChequesPage() {
                   <td className="py-3 px-4">
                     <StatusBadge estado={ve} />
                   </td>
-                  <td className="py-3 px-4 text-right flex items-center justify-end gap-2">
-                    {(ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido") && (<>
-                      <button onClick={() => setConfirmDepositId(c.id)} className="text-sm text-gray-500 hover:text-black transition">Depositar</button>
-                      <span className="text-gray-200">·</span>
-                      <button onClick={() => setRebotandoId(c.id)} className="text-sm text-gray-500 hover:text-red-600 transition">Rebotado</button>
-                      <span className="text-gray-200">·</span>
-                    </>)}
-                    {isRebotado && (<>
-                      <button onClick={() => redepositar(c.id)} className="text-sm text-gray-500 hover:text-emerald-600 transition">Re-depositar</button>
-                      <span className="text-gray-200">·</span>
-                    </>)}
-                    {c.whatsapp && (<>
-                      <button onClick={() => {
+                  <td className="py-3 px-4 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                    {(ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido") && (
+                      <button onClick={() => setConfirmDepositId(c.id)} className="text-sm text-gray-500 hover:text-black transition min-h-[44px]">Depositar</button>
+                    )}
+                    {isRebotado && (
+                      <button onClick={() => redepositar(c.id)} className="text-sm text-gray-500 hover:text-emerald-600 transition min-h-[44px]">Re-depositar</button>
+                    )}
+                    <button onClick={() => startEdit(c)} className="text-sm text-gray-500 hover:text-black transition min-h-[44px]">Editar</button>
+                    <ChequeMoreMenu
+                      cheque={c}
+                      ve={ve}
+                      role={role}
+                      onRebotado={() => setRebotandoId(c.id)}
+                      onWA={() => {
+                        if (!c.whatsapp) { showToast("Este cheque no tiene WhatsApp"); return; }
                         const msg = `Hola, le escribo de Fashion Group respecto al cheque N° ${c.numero_cheque} por $${fmt(c.monto)} con fecha de depósito ${fmtDate(c.fecha_deposito)}. ${ve === "pendiente" ? "Queda pendiente de depósito." : ve === "rebotado" ? "El cheque fue rebotado." : ""} Gracias.`;
-                        window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
-                      }} className="text-sm text-gray-500 hover:text-green-600 transition">WA</button>
-                      <span className="text-gray-200">·</span>
-                    </>)}
-                    <button onClick={() => startEdit(c)} className="text-sm text-gray-500 hover:text-black transition">Editar</button>
-                    {role === "admin" && <><span className="text-gray-200">·</span><button onClick={() => setConfirmDeleteId(c.id)} className="text-sm text-gray-400 hover:text-red-500 transition">Eliminar Cheque</button></>}
+                        try { window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
+                      }}
+                      onDelete={() => setConfirmDeleteId(c.id)}
+                    />
+                    </div>
                   </td>
                 </tr>
               );

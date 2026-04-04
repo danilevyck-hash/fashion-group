@@ -104,7 +104,7 @@ export function useCajaState(urlId: string, initialView: View) {
       .then((data: string[] | null) => {
         if (data && data.length > 0) setCategorias(data);
       })
-      .catch(() => { /* keep CATEGORIAS_DEFAULT */ });
+      .catch(() => { console.error('Failed to load categorias'); });
     loadPeriodos();
     fetch("/api/caja/responsables")
       .then((r) => (r.ok ? r.json() : []))
@@ -114,11 +114,12 @@ export function useCajaState(urlId: string, initialView: View) {
           setResponsables(names);
           localStorage.setItem("fg_responsables", JSON.stringify(names));
         } else {
-          try { const cached = JSON.parse(localStorage.getItem("fg_responsables") || "[]"); if (cached.length > 0) setResponsables(cached); } catch { /* */ }
+          try { const cached = JSON.parse(localStorage.getItem("fg_responsables") || "[]"); if (cached.length > 0) setResponsables(cached); } catch { console.error('Failed to parse cached responsables'); }
         }
       })
       .catch(() => {
-        try { const cached = JSON.parse(localStorage.getItem("fg_responsables") || "[]"); if (cached.length > 0) setResponsables(cached); } catch { /* */ }
+        console.error('Failed to load responsables');
+        try { const cached = JSON.parse(localStorage.getItem("fg_responsables") || "[]"); if (cached.length > 0) setResponsables(cached); } catch { console.error('Failed to parse cached responsables'); }
       });
   }, []);
 
@@ -188,9 +189,13 @@ export function useCajaState(urlId: string, initialView: View) {
     if (!confirmClosePeriodo) return;
     const id = confirmClosePeriodo;
     setConfirmClosePeriodo(null);
-    await fetch(`/api/caja/periodos/${id}`, { method: "PATCH" });
-    await loadDetail(id);
-    loadPeriodos();
+    try {
+      await fetch(`/api/caja/periodos/${id}`, { method: "PATCH" });
+      await loadDetail(id);
+      loadPeriodos();
+    } catch {
+      setError("Error al cerrar periodo");
+    }
   }
 
   function requestDeletePeriodo(id: string) {

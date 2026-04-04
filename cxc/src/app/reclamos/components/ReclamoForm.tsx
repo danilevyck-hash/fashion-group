@@ -151,7 +151,7 @@ export default function ReclamoForm({
                     )}
                   </td>
                   <td className="py-2 text-right tabular-nums text-gray-500 text-xs">${fmt((item.cantidad || 0) * (item.precio_unitario || 0))}</td>
-                  <td className="py-2 text-center">{fItems.length > 1 && <button onClick={() => setFItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm">×</button>}</td>
+                  <td className="py-2 text-center">{fItems.length > 1 && <button onClick={() => setFItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm py-1.5 px-2 min-h-[44px]">×</button>}</td>
                 </tr>
               ))}
             </tbody>
@@ -197,7 +197,8 @@ export default function ReclamoForm({
                   setUploadingFormFoto(true);
                   const fd = new FormData(); fd.append("file", file);
                   const res = await fetch(`/api/reclamos/${savedReclamoId}/fotos`, { method: "POST", body: fd });
-                  if (res.ok) { const data = await res.json(); setFormFotos((p) => [...p, data]); }
+                  if (!res.ok) { console.error('Photo upload failed:', res.status); }
+                  else { const data = await res.json(); setFormFotos((p) => [...p, data]); }
                   setUploadingFormFoto(false);
                   if (formFotoRef.current) formFotoRef.current.value = "";
                 }} />

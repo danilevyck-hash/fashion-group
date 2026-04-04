@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmDeleteModal } from "@/components/ui";
+import { fmtDate } from "@/lib/format";
 import XLSX from "xlsx-js-style";
 
 interface Cliente {
@@ -40,6 +41,8 @@ export default function DirectorioPage() {
   const [deleteTarget, setDeleteTarget] = useState<Cliente | null>(null);
   const [cxcClients, setCxcClients] = useState<Set<string>>(new Set());
   const [isDirty, setIsDirty] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"" | "saving" | "saved">("");
+  const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [empresaFilter, setEmpresaFilter] = useState("");
   const [empresas, setEmpresas] = useState<string[]>([]);
   const importRef = useRef<HTMLInputElement>(null);
@@ -443,17 +446,17 @@ export default function DirectorioPage() {
                         <div className="bg-gray-50 px-4 py-3 mb-1 rounded-lg text-sm">
                           <div className="text-gray-500 mb-1">Teléfono: {c.telefono || <span className="text-gray-300">—</span>}</div>
                           <div className="text-gray-500 mb-1">Notas: {c.notas || <span className="text-gray-300">—</span>}</div>
-                          <div className="text-gray-400 text-xs mb-3">Creado: {new Date(c.created_at).toLocaleDateString("es-PA")}</div>
+                          <div className="text-gray-400 text-xs mb-3">Creado: {fmtDate(c.created_at.slice(0, 10))}</div>
                           <div className="flex gap-3">
                             {(role === "admin" || role === "secretaria") && (
                             <button onClick={(e) => { e.stopPropagation(); setEditing(c.id); setEditData(c); setIsDirty(false); }}
-                              className="text-sm text-gray-400 hover:text-black transition py-2.5 sm:py-1.5">Editar</button>
+                              className="text-sm text-gray-400 hover:text-black transition py-2.5 sm:py-1.5 min-h-[44px]">Editar</button>
                             )}
                             <button onClick={(e) => { e.stopPropagation(); router.push(`/admin?search=${encodeURIComponent(c.nombre)}`); }}
-                              title="Ver deuda de este cliente en Cuentas por Cobrar" className="text-xs text-gray-400 hover:text-black transition py-2.5 sm:py-1.5">Ver en CXC →</button>
+                              title="Ver deuda de este cliente en Cuentas por Cobrar" className="text-xs text-gray-400 hover:text-black transition py-2.5 sm:py-1.5 min-h-[44px]">Ver en CXC →</button>
                             {role === "admin" && (
                               <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
-                                className="text-sm text-gray-400 hover:text-red-500 transition py-2.5 sm:py-1.5">Eliminar Contacto</button>
+                                className="text-sm text-gray-400 hover:text-red-500 transition py-2.5 sm:py-1.5 min-h-[44px]">Eliminar Contacto</button>
                             )}
                           </div>
                         </div>
@@ -467,15 +470,32 @@ export default function DirectorioPage() {
                               <div key={field}>
                                 <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">{field}</label>
                                 <input type="text" value={(editData as Record<string, string>)[field] || ""}
-                                  onChange={(e) => { setEditData({ ...editData, [field]: e.target.value }); setIsDirty(true); }}
+                                  onChange={(e) => {
+                                    const next = { ...editData, [field]: e.target.value };
+                                    setEditData(next);
+                                    setIsDirty(true);
+                                    if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
+                                    autoSaveRef.current = setTimeout(async () => {
+                                      setAutoSaveStatus("saving");
+                                      const res = await fetch(`/api/directorio/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) });
+                                      if (res.ok) {
+                                        setIsDirty(false);
+                                        setAutoSaveStatus("saved");
+                                        setTimeout(() => setAutoSaveStatus(""), 2000);
+                                        loadClientes(debouncedSearch, page);
+                                      } else { setAutoSaveStatus(""); }
+                                    }, 2000);
+                                  }}
                                   className="w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition bg-transparent" />
                               </div>
                             ))}
                           </div>
-                          <div className="flex gap-3 mt-4">
+                          <div className="flex items-center gap-3 mt-4">
                             <button onClick={() => handleUpdate(c.id)}
                               className="text-sm bg-black text-white px-5 py-1.5 rounded-full hover:bg-gray-800 transition">Guardar Cliente</button>
-                            <button onClick={() => { if (isDirty && !confirm("Tienes cambios sin guardar. ¿Salir sin guardar?")) return; setEditing(null); setIsDirty(false); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+                            <button onClick={() => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current); if (isDirty && !confirm("Tienes cambios sin guardar. ¿Salir sin guardar?")) return; setEditing(null); setIsDirty(false); setAutoSaveStatus(""); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+                            {autoSaveStatus === "saving" && <span className="text-xs text-gray-400">Guardando...</span>}
+                            {autoSaveStatus === "saved" && <span className="text-xs text-green-600">Guardado ✓</span>}
                           </div>
                         </div>
                       )}
@@ -494,10 +514,10 @@ export default function DirectorioPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-center gap-4 mt-6" data-print-hide>
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
-                className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">← Anterior</button>
+                className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed min-h-[44px]">← Anterior</button>
               <span className="text-xs text-gray-400">Página {page} de {totalPages}</span>
               <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
-                className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">Siguiente →</button>
+                className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed min-h-[44px]">Siguiente →</button>
             </div>
           )}
         </>

@@ -144,12 +144,14 @@ function ProductsListSection({
   )
 
   const toggleField = async (p: Product, field: 'active' | 'on_sale') => {
-    const res = await fetch('/api/catalogo/reebok/products', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: p.id, [field]: !p[field] }),
-    })
-    if (!res.ok) { toast('Error al actualizar', 'error'); return }
-    setProducts(prev => prev.map(x => x.id === p.id ? { ...x, [field]: !x[field] } : x))
+    try {
+      const res = await fetch('/api/catalogo/reebok/products', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: p.id, [field]: !p[field] }),
+      })
+      if (!res.ok) { toast('Error al actualizar', 'error'); return }
+      setProducts(prev => prev.map(x => x.id === p.id ? { ...x, [field]: !x[field] } : x))
+    } catch { toast('Error de conexion', 'error'); }
   }
 
   const deleteProduct = async () => {
@@ -269,7 +271,7 @@ function ProductsListSection({
                               className="w-20 border rounded px-2 py-1 text-sm" />
                           </td>
                           <td className="py-1">
-                            <button onClick={() => setDeleteSizeTarget({ invId: inv.id, size: inv.size, productName: products.find(pp => pp.id === p.id)?.name || '' })} className="text-red-500 text-xs hover:underline">Quitar</button>
+                            <button onClick={() => setDeleteSizeTarget({ invId: inv.id, size: inv.size, productName: products.find(pp => pp.id === p.id)?.name || '' })} className="text-red-500 text-xs hover:underline px-3 py-1.5">Quitar</button>
                           </td>
                         </tr>
                       ))}
@@ -686,7 +688,7 @@ function ExportPanel({ products, inventory }: { products: Product[]; inventory: 
       const { default: autoTable } = await import('jspdf-autotable')
       const doc = new jsPDF('landscape')
       doc.setFontSize(18); doc.text('Catálogo Reebok Panamá', 14, 20)
-      doc.setFontSize(10); doc.text(`Generado: ${new Date().toLocaleDateString('es-PA')}`, 14, 28)
+      doc.setFontSize(10); doc.text(`Generado: ${new Date().toLocaleDateString('es-PA', { year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 28)
       const active = products.filter(p => p.active)
       const rows = active.slice(0, 100).map(p => [p.sku || '-', p.name, p.color || '-', p.price ? `$${p.price}` : '-', p.category, getSizes(p.id) || '-'])
       autoTable(doc, { startY: 35, head: [['SKU', 'Nombre', 'Color', 'Precio', 'Categoría', 'Tallas']], body: rows, styles: { cellPadding: 3, fontSize: 8 } })

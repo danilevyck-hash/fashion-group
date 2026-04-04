@@ -309,7 +309,7 @@ export default function AdminDashboard() {
       phone = "507" + phone;
     }
     const msg = encodeURIComponent(buildWhatsAppMsg(client));
-    window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
+    try { window.open(`https://wa.me/${phone}?text=${msg}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
   }
 
   function copyCollectionMsg(client: ConsolidatedClient) {
@@ -405,7 +405,7 @@ export default function AdminDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombre_normalized: nombre, ...data }),
       });
-    } catch {} // Don't fail if directorio sync fails
+    } catch (err) { console.error('Directorio sync error:', err); }
   }
 
   async function handleRegisterContact(clientName: string, data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) {

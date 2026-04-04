@@ -151,7 +151,6 @@ export default function VentasDashboard() {
         fetch(`/api/ventas/metas?anio=${año}`).then(r => r.ok ? r.json() : []).catch(() => []),
       ]);
       const v2 = v2Raw as { byEmpresaMes?: VentaRow[]; prevYear?: { empresa: string; mes: number; subtotal: number; utilidad: number }[]; clientesDetalle?: ClienteDetalle[] } | null;
-      console.log("[ventas] v2 response:", v2 ? `byEmpresaMes=${v2.byEmpresaMes?.length} prevYear=${v2.prevYear?.length} clientes=${v2.clientesDetalle?.length}` : "NULL", "v2Raw type:", typeof v2Raw);
       setVentas(Array.isArray(v2?.byEmpresaMes) ? v2.byEmpresaMes : []);
       setVentasPrev(Array.isArray(v2?.prevYear) ? v2.prevYear.map(r => ({ ...r, costo: 0 })) : []);
       setMetas(Array.isArray(metasRes) ? metasRes : []);
@@ -546,7 +545,7 @@ export default function VentasDashboard() {
                   {displayClients.map(c => {
                     const margen = c.subtotal ? (c.utilidad / c.subtotal * 100) : 0;
                     const pct = totalVentas ? (c.subtotal / totalVentas * 100) : 0;
-                    const lastCompra = c.lastFecha ? MES_NAMES[new Date(c.lastFecha).getMonth()] + " " + new Date(c.lastFecha).getFullYear() : "—";
+                    const lastCompra = c.lastFecha ? new Date(c.lastFecha).toLocaleDateString("es-PA", { month: "long", year: "numeric" }) : "—";
                     const expanded = expandedClient === c.cliente;
                     return [
                       <tr key={c.cliente} className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer" onClick={() => setExpandedClient(expanded ? null : c.cliente)}>
@@ -567,7 +566,7 @@ export default function VentasDashboard() {
                           <td className="text-right px-3 py-1.5 tabular-nums text-gray-400 text-[11px]">{fmtK(e.utilidad)}</td>
                           <td className="text-right px-3 py-1.5 tabular-nums text-gray-400 text-[11px]">{e.subtotal ? ((e.utilidad / e.subtotal) * 100).toFixed(1) : 0}%</td>
                           <td></td>
-                          <td className="text-right px-3 py-1.5 text-gray-400 text-[11px]">{e.lastFecha ? MES_NAMES[new Date(e.lastFecha).getMonth()] + " " + new Date(e.lastFecha).getFullYear() : "—"}</td>
+                          <td className="text-right px-3 py-1.5 text-gray-400 text-[11px]">{e.lastFecha ? new Date(e.lastFecha).toLocaleDateString("es-PA", { month: "long", year: "numeric" }) : "—"}</td>
                         </tr>
                       )),
                     ];

@@ -133,9 +133,9 @@ export default function EmpresaSelector({
                     <p className="text-sm font-semibold">{empresa}</p>
                     <div className="flex gap-1.5">
                       <button onClick={(ev) => downloadEmpresaPdf(empresa, ev)} title="Descargar todos los reclamos de esta empresa en PDF"
-                        className="text-gray-400 hover:text-black transition text-xs border border-gray-200 px-3 py-1 rounded-full flex-shrink-0">↓ PDF</button>
+                        className="text-gray-400 hover:text-black transition text-xs border border-gray-200 px-4 py-2 rounded-full flex-shrink-0">↓ PDF</button>
                       <button onClick={(ev) => downloadEmpresaExcel(empresa, ev)} title="Descargar todos los reclamos de esta empresa en Excel"
-                        className="text-gray-400 hover:text-black transition text-xs border border-gray-200 px-3 py-1 rounded-full flex-shrink-0">↓ Excel</button>
+                        className="text-gray-400 hover:text-black transition text-xs border border-gray-200 px-4 py-2 rounded-full flex-shrink-0">↓ Excel</button>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mb-4">

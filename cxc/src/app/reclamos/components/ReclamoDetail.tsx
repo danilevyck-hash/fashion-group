@@ -97,9 +97,13 @@ export default function ReclamoDetail({
     setSendingEmail(true);
     try {
       const res = await fetch(`/api/reclamos/${current.id}/send-email`, { method: "POST" });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || `HTTP ${res.status}`);
+      }
       showToast("Email enviado al proveedor");
-    } catch {
+    } catch (err) {
+      console.error("Send email error:", err);
       showToast("Error al enviar el email");
     } finally {
       setSendingEmail(false);
@@ -142,7 +146,7 @@ export default function ReclamoDetail({
     const nombre = c.nombre_contacto || c.nombre || "equipo";
     const total = calcSub(current.reclamo_items ?? []) * FACTOR_TOTAL;
     const msg = `Hola ${nombre}, te escribo de parte de Fashion Group para dar seguimiento al reclamo ${current.nro_reclamo}.\n\nFactura: ${current.nro_factura}\nTotal a acreditar: $${fmt(total)}\nEstado: ${current.estado}\nFecha: ${fmtDate(current.fecha_reclamo)}\n\n¿Nos puedes confirmar el estado? Gracias.`;
-    window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
+    try { window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
   }
 
   return (
@@ -304,7 +308,7 @@ export default function ReclamoDetail({
               return (
                 <div key={f.id} className="relative cursor-pointer" onClick={() => setLightboxSrc(src)}>
                   <img src={src} alt="" className="w-24 h-24 object-cover rounded-lg border border-gray-200" />
-                  <button onClick={(e) => { e.stopPropagation(); setDeleteFotoTarget({ id: f.id, path: f.storage_path }); }} className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
+                  <button onClick={(e) => { e.stopPropagation(); setDeleteFotoTarget({ id: f.id, path: f.storage_path }); }} className="absolute -top-1.5 -right-1.5 w-10 h-10 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
                 </div>
               );
             })}
@@ -324,13 +328,13 @@ export default function ReclamoDetail({
       <div className="mb-8">
         <div className="text-xs uppercase tracking-widest text-gray-400 mb-3">Seguimiento</div>
         <div className="flex gap-2 mb-3">
-          <input type="text" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Agregar nota..." className="flex-1 border-b border-gray-200 py-1.5 text-sm outline-none" />
+          <input type="text" value={nota} onChange={(e) => setNota(e.target.value)} onBlur={() => { if (nota.trim()) onAddNota(); }} placeholder="Agregar nota..." className="flex-1 border-b border-gray-200 py-1.5 text-sm outline-none" />
           <button onClick={onAddNota} disabled={!nota.trim()} className="text-sm bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 transition disabled:opacity-40">Agregar</button>
         </div>
         {seg.map((s) => (
           <div key={s.id} className="border-b border-gray-50 py-2">
             <p className="text-sm">{s.nota}</p>
-            <p className="text-[10px] text-gray-400 mt-0.5">{new Date(s.created_at).toLocaleString("es-PA")} — {s.autor}</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">{fmtDate(s.created_at.slice(0, 10))} {new Date(s.created_at).toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" })} — {s.autor}</p>
           </div>
         ))}
       </div>
@@ -416,8 +420,8 @@ export default function ReclamoDetail({
                         <div className="flex items-center gap-1">
                           <input type="text" value={newMotivoText} onChange={(e) => setNewMotivoText(e.target.value)} placeholder="Nuevo motivo..." className="w-full border-b border-gray-200 py-1 text-sm outline-none" autoFocus
                             onKeyDown={(e) => { if (e.key === "Enter" && newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateEditItem(idx, "motivo", newMotivoText.trim()); setNewMotivoText(""); setAddingEditMotivo(null); } }} />
-                          <button onClick={() => { if (newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateEditItem(idx, "motivo", newMotivoText.trim()); } setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-400 hover:text-black">OK</button>
-                          <button onClick={() => { setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-300 hover:text-black">x</button>
+                          <button onClick={() => { if (newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateEditItem(idx, "motivo", newMotivoText.trim()); } setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-400 hover:text-black py-2 px-3">OK</button>
+                          <button onClick={() => { setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-300 hover:text-black py-2 px-3">x</button>
                         </div>
                       ) : (
                         <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingEditMotivo(idx); setNewMotivoText(""); } else updateEditItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent">

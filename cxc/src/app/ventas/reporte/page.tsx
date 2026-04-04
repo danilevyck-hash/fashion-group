@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
-import { fmt } from "@/lib/format";
+import { fmt, fmtDate } from "@/lib/format";
 
 const EMPRESAS = ["Vistana International", "Fashion Wear", "Fashion Shoes", "Active Shoes", "Active Wear", "Joystep", "Confecciones Boston", "Multifashion"];
 const MES_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -96,7 +96,7 @@ function ReportePage() {
           </p>
         </div>
         <div className="text-xs text-gray-400 text-right">
-          Generado: {new Date().toLocaleDateString("es-PA")}<br />
+          Generado: {new Date().toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}<br />
           Vista: {vista === "mensual" ? "Mensual" : "Trimestral"}
         </div>
       </div>
@@ -222,7 +222,7 @@ function ReportePage() {
                 const mg = c.subtotal > 0 ? (c.utilidad / c.subtotal) * 100 : 0;
                 const pct = ventasNetas > 0 ? (c.subtotal / ventasNetas) * 100 : 0;
                 const ultima = c.ultima_compra
-                  ? new Date(c.ultima_compra).toLocaleDateString("es-PA")
+                  ? fmtDate(c.ultima_compra)
                   : "—";
                 return (
                   <tr key={c.cliente} className="border-b border-gray-200">

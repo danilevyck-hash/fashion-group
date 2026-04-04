@@ -80,7 +80,7 @@ export default function GuiasList({
           {canCreate && (
             <button
               onClick={onNewGuia}
-              className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition"
+              className="text-sm bg-black text-white px-6 py-3 rounded-md font-medium hover:bg-gray-800 transition"
             >
               Nueva Guia
             </button>

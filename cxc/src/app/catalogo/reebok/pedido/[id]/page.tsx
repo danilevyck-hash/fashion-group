@@ -424,7 +424,7 @@ export default function OrderDetailPage() {
                     onKeyDown={e => e.key === "Enter" && sendToClient()}
                     className="flex-1 border border-gray-200 rounded-md px-2.5 py-1.5 text-xs outline-none focus:border-black transition" />
                   <button onClick={sendToClient} disabled={sendingToClient}
-                    className="text-xs bg-black text-white px-3 py-1.5 rounded-md hover:bg-gray-800 transition disabled:opacity-40">
+                    className="text-xs bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition disabled:opacity-40">
                     {sendingToClient ? "Enviando..." : "Enviar"}
                   </button>
                   <button onClick={() => { setShowEmailInput(false); setClientEmail(""); }}

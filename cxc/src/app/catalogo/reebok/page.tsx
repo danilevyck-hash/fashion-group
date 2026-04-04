@@ -70,7 +70,7 @@ export default function ReebokLanding() {
           Ver catálogo
         </button>
         <button
-          onClick={() => window.open("https://wa.me/50766745522?text=Hola%2C%20tengo%20una%20consulta%20sobre%20productos%20Reebok", "_blank")}
+          onClick={() => { try { window.open("https://wa.me/50766745522?text=Hola%2C%20tengo%20una%20consulta%20sobre%20productos%20Reebok", "_blank"); } catch { alert("No se pudo abrir WhatsApp"); } }}
           className="w-full bg-white text-black border border-black py-4 rounded text-sm font-medium hover:bg-gray-50 transition"
         >
           Contactar vendedor

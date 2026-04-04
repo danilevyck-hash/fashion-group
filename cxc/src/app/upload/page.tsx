@@ -339,7 +339,7 @@ function UploadPageInner() {
     try {
       const res = await fetch("/api/ventas/v2/status");
       if (res.ok) setVentasUploads(await res.json());
-    } catch { /* */ }
+    } catch { console.error('Failed to load ventas status'); }
   }
 
   function parseVentasFecha(raw: string): { valid: boolean; error: string } {
@@ -430,7 +430,7 @@ function UploadPageInner() {
           const { existing } = await res.json();
           existingSet = new Set(existing);
         }
-      } catch { /* */ }
+      } catch { console.error('Duplicate check failed'); }
 
       let validCount = 0, errorCount = 0, duplicateCount = 0;
       for (const row of parsedRows) {

@@ -179,9 +179,11 @@ export default function PrestamosPage() {
     if (!confirmDeleteEmp) return;
     const emp = confirmDeleteEmp;
     setConfirmDeleteEmp(null);
-    const res = await fetch(`/api/prestamos/empleados/${emp.id}`, { method: "DELETE" });
-    if (res.ok) { showToast("Empleado eliminado"); loadEmpleados(); }
-    else { const err = await res.json(); showToast(err.error || "Error al eliminar"); }
+    try {
+      const res = await fetch(`/api/prestamos/empleados/${emp.id}`, { method: "DELETE" });
+      if (res.ok) { showToast("Empleado eliminado"); loadEmpleados(); }
+      else { const err = await res.json().catch(() => null); showToast(err?.error || "Error al eliminar"); }
+    } catch { showToast("Error al eliminar"); }
   }
 
   // ── Movement modal handlers ──
@@ -274,8 +276,8 @@ export default function PrestamosPage() {
                     <span className="text-xs text-gray-400">{m.fecha}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={async () => { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "aprobado" }) }); if (res.ok) { showToast("Movimiento aprobado"); loadEmpleados(); } else showToast("Error al aprobar"); }} className="text-xs bg-green-600 text-white px-3 py-1 rounded-full hover:bg-green-700 transition">Aprobar</button>
-                    <button onClick={async () => { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rechazado" }) }); if (res.ok) { showToast("Movimiento rechazado"); loadEmpleados(); } else showToast("Error al rechazar"); }} className="text-xs text-red-500 hover:text-red-700 transition px-2 py-1">Rechazar</button>
+                    <button onClick={async () => { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "aprobado" }) }); if (res.ok) { showToast("Movimiento aprobado"); loadEmpleados(); } else showToast("Error al aprobar"); }} className="text-xs bg-green-600 text-white px-4 py-2 rounded-full hover:bg-green-700 transition">Aprobar</button>
+                    <button onClick={async () => { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rechazado" }) }); if (res.ok) { showToast("Movimiento rechazado"); loadEmpleados(); } else showToast("Error al rechazar"); }} className="text-xs text-red-500 hover:text-red-700 transition px-4 py-2">Rechazar</button>
                   </div>
                 </div>
               ))}

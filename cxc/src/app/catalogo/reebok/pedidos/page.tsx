@@ -169,11 +169,11 @@ export default function PedidosPage() {
               </div>
               <span className="text-sm font-semibold tabular-nums">${fmt(o.total)}</span>
               <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                <button onClick={() => duplicateOrder(o)} className="text-xs text-gray-300 hover:text-blue-500 transition px-1" title="Duplicar">
+                <button onClick={() => duplicateOrder(o)} className="text-xs text-gray-300 hover:text-blue-500 hover:bg-gray-100 transition px-3 py-2 rounded" title="Duplicar">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
                 </button>
                 {canDelete && (
-                  <button onClick={() => setDeleteTarget(o)} className="text-xs text-gray-300 hover:text-red-500 transition px-1" title="Eliminar">
+                  <button onClick={() => setDeleteTarget(o)} className="text-xs text-gray-300 hover:text-red-500 hover:bg-gray-100 transition px-3 py-2 rounded" title="Eliminar">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
                   </button>
                 )}

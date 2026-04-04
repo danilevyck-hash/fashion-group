@@ -68,7 +68,7 @@ export default function PlantillasPage() {
     try {
       const mods = sessionStorage.getItem("fg_modules");
       if (mods) setFgModules(JSON.parse(mods));
-    } catch { /* */ }
+    } catch { console.error('Failed to parse fg_modules'); }
 
     setAuthChecked(true);
   }, [router]);
@@ -83,7 +83,7 @@ export default function PlantillasPage() {
           const data = await res.json();
           if (data.module_order?.length) setModuleOrder(data.module_order);
         }
-      } catch { /* */ }
+      } catch { console.error('Failed to load module order'); }
     } else {
       // Legacy: load from localStorage
       const r = sessionStorage.getItem("cxc_role") || "";
@@ -93,7 +93,7 @@ export default function PlantillasPage() {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) setModuleOrder(parsed);
         }
-      } catch { /* */ }
+      } catch { console.error('Failed to parse saved module order'); }
     }
   }, []);
 
@@ -114,7 +114,7 @@ export default function PlantillasPage() {
     try {
       const res = await fetch("/api/home-stats");
       if (res.ok) setStats(await res.json());
-    } catch { /* */ }
+    } catch { console.error('Failed to load home stats'); }
     setStatsLoading(false);
   }, []);
 

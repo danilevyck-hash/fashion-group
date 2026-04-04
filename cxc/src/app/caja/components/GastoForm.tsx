@@ -144,6 +144,7 @@ export default function GastoForm({
   } = setters;
 
   const [showMoreDetails, setShowMoreDetails] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
 
   return (
     <div className="mb-10">
@@ -372,11 +373,11 @@ export default function GastoForm({
         </div>
         <div>
           <button
-            onClick={onAddGasto}
+            onClick={() => { onAddGasto(); setJustSaved(true); setTimeout(() => setJustSaved(false), 2000); }}
             disabled={addingGasto || !gDescripcion || subtotalNum <= 0}
             className="bg-black text-white px-6 py-1.5 rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-40"
           >
-            Agregar
+            {justSaved ? "Guardado \u2713" : "Agregar"}
           </button>
         </div>
       </div>
