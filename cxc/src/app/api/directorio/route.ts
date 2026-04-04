@@ -55,6 +55,11 @@ export async function GET(req: NextRequest) {
     query = query.or(`nombre.ilike.%${search}%,empresa.ilike.%${search}%`);
   }
 
+  const empresa = req.nextUrl.searchParams.get("empresa");
+  if (empresa) {
+    query = query.eq("empresa", empresa);
+  }
+
   const { data, count, error } = await query
     .order("nombre")
     .range(offset, offset + limit - 1);

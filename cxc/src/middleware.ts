@@ -71,7 +71,7 @@ function touchSession(sessionToken: string) {
 function clearSessionAndRedirect(req: NextRequest, pathname: string): NextResponse {
   const res = pathname.startsWith("/api/")
     ? NextResponse.json({ error: "Sesión revocada" }, { status: 401 })
-    : NextResponse.redirect(new URL("/", req.url));
+    : NextResponse.redirect(new URL("/?expired=1", req.url));
   res.cookies.delete(COOKIE_NAME);
   return res;
 }

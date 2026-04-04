@@ -493,11 +493,12 @@ function UploadPageInner() {
 
   // ── Preview Modal (shared) ────────────────────────────────────────────────
 
-  function PreviewOverlay({ title, subtitle, badge, formatError, summary, headerRow, bodyRows, onConfirm, onCancel, confirmDisabled, confirmLabel }: {
+  function PreviewOverlay({ title, subtitle, badge, formatError, summary, headerRow, bodyRows, onConfirm, onCancel, confirmDisabled, confirmLabel, warning }: {
     title: string; subtitle: string; badge: { ok: boolean; label: string };
     formatError: string; summary: React.ReactNode;
     headerRow: string[]; bodyRows: { cells: string[]; hasError: boolean; tooltip: string }[];
     onConfirm: () => void; onCancel: () => void; confirmDisabled: boolean; confirmLabel: string;
+    warning?: React.ReactNode;
   }) {
     const displayRows = bodyRows.slice(0, 100);
     const hasMore = bodyRows.length > 100;
@@ -555,7 +556,9 @@ function UploadPageInner() {
           )}
 
           {/* Actions */}
-          <div className="px-6 py-4 border-t border-gray-200 flex gap-3 flex-shrink-0">
+          <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0">
+            {warning && <div className="mb-3">{warning}</div>}
+            <div className="flex gap-3">
             <button onClick={onConfirm} disabled={confirmDisabled}
               className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-30 disabled:cursor-not-allowed">
               {confirmLabel}
@@ -564,6 +567,7 @@ function UploadPageInner() {
               className="border border-gray-300 px-5 py-2.5 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition">
               Cancelar
             </button>
+            </div>
           </div>
         </div>
       </div>
@@ -716,6 +720,11 @@ function UploadPageInner() {
             onCancel={() => { setCxcPreview(null); setPendingFile(null); }}
             confirmDisabled={!!cxcPreview.formatError || cxcPreview.rows.length === 0}
             confirmLabel={`Confirmar subida (${cxcPreview.rows.length} registros)`}
+            warning={cxcUploads[cxcPreview.companyKey] ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700">
+                {"\u26A0"} Esto reemplazara los {cxcUploads[cxcPreview.companyKey].row_count} registros actuales de {cxcCompanies.find((c) => c.key === cxcPreview.companyKey)?.name || cxcPreview.companyKey}.
+              </div>
+            ) : undefined}
           />
         )}
 

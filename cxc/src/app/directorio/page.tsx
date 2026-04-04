@@ -460,14 +460,14 @@ export default function DirectorioPage() {
                       )}
 
                       {/* Edit form */}
-                      {isExpanded && isEditing && (
+                      {isExpanded && isEditing && (role === "admin" || role === "secretaria") && (
                         <div className="bg-gray-50 px-4 py-3 mb-1 rounded-lg" onClick={(e) => e.stopPropagation()}>
                           <div className="grid grid-cols-2 gap-3">
                             {(["nombre", "empresa", "whatsapp", "correo", "contacto", "notas"] as const).map((field) => (
                               <div key={field}>
                                 <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">{field}</label>
                                 <input type="text" value={(editData as Record<string, string>)[field] || ""}
-                                  onChange={(e) => setEditData({ ...editData, [field]: e.target.value })}
+                                  onChange={(e) => { setEditData({ ...editData, [field]: e.target.value }); setIsDirty(true); }}
                                   className="w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition bg-transparent" />
                               </div>
                             ))}
@@ -475,7 +475,7 @@ export default function DirectorioPage() {
                           <div className="flex gap-3 mt-4">
                             <button onClick={() => handleUpdate(c.id)}
                               className="text-sm bg-black text-white px-5 py-1.5 rounded-full hover:bg-gray-800 transition">Guardar Cliente</button>
-                            <button onClick={() => setEditing(null)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+                            <button onClick={() => { if (isDirty && !confirm("Tienes cambios sin guardar. ¿Salir sin guardar?")) return; setEditing(null); setIsDirty(false); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
                           </div>
                         </div>
                       )}

@@ -279,11 +279,18 @@ export default function ClientTable({
       {/* Pagination controls */}
       <div className="flex items-center justify-between mt-3 px-1">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-gray-400">
-            {pageSize === 0
-              ? `${filtered.length} clientes`
-              : `Mostrando ${page * pageSize + 1}-${Math.min((page + 1) * pageSize, filtered.length)} de ${filtered.length}`}
-          </span>
+          {(() => {
+            const eff = pageSize === 0 ? 100 : pageSize;
+            const start = page * eff + 1;
+            const end = Math.min((page + 1) * eff, filtered.length);
+            return (
+              <span className="text-[11px] text-gray-400">
+                {pageSize === 0 && filtered.length > 100
+                  ? `Mostrando 100 de ${filtered.length}. Usa filtros para refinar.`
+                  : `Mostrando ${start}-${end} de ${filtered.length}`}
+              </span>
+            );
+          })()}
           <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }}
             className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 text-gray-500 bg-transparent">
             <option value={25}>25</option>
@@ -292,18 +299,21 @@ export default function ClientTable({
             <option value={0}>Todos</option>
           </select>
         </div>
-        {pageSize > 0 && filtered.length > pageSize && (
-          <div className="flex items-center gap-2">
-            <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-              className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-30 disabled:cursor-not-allowed">
-              Anterior
-            </button>
-            <button onClick={() => setPage(p => p + 1)} disabled={(page + 1) * pageSize >= filtered.length}
-              className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-30 disabled:cursor-not-allowed">
-              Siguiente
-            </button>
-          </div>
-        )}
+        {(() => {
+          const eff = pageSize === 0 ? 100 : pageSize;
+          return filtered.length > eff ? (
+            <div className="flex items-center gap-2">
+              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+                className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                Anterior
+              </button>
+              <button onClick={() => setPage(p => p + 1)} disabled={(page + 1) * eff >= filtered.length}
+                className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                Siguiente
+              </button>
+            </div>
+          ) : null;
+        })()}
       </div>
 
       <div className="mt-3 text-[11px] text-gray-400 text-center">

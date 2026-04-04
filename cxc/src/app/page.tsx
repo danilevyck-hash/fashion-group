@@ -1,15 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 
-export default function LoginPage() {
+function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [expiredMsg, setExpiredMsg] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const expired = searchParams.get("expired") === "1";
+
+  useEffect(() => {
+    if (expired) setExpiredMsg(true);
+  }, [expired]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -66,6 +73,7 @@ export default function LoginPage() {
           </div>
         </div>
 
+        {expiredMsg && <p className="text-amber-600 text-sm text-center mb-4">Tu sesión expiró. Inicia sesión de nuevo.</p>}
         {error && <p className="text-red-600 text-sm text-center">{error}</p>}
 
         <button
@@ -77,5 +85,13 @@ export default function LoginPage() {
         </button>
       </form>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

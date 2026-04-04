@@ -575,7 +575,7 @@ export default function UsuariosPage() {
                             <span className="text-xs text-gray-400 italic">Solo en env var</span>
                           )}
                           {passwords[r.role] && (
-                            <button onClick={() => setShowPw(prev => ({ ...prev, [r.role]: !prev[r.role] }))} className="text-[10px] text-gray-400 hover:text-gray-600">
+                            <button onClick={() => setShowPw(prev => ({ ...prev, [r.role]: !prev[r.role] }))} className="text-[10px] text-gray-400 hover:text-gray-600 min-w-[44px] min-h-[44px] inline-flex items-center justify-center">
                               {showPw[r.role] ? "ocultar" : "ver"}
                             </button>
                           )}
@@ -647,6 +647,22 @@ export default function UsuariosPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        open={!!deactivateTarget}
+        onClose={() => setDeactivateTarget(null)}
+        onConfirm={() => { if (deactivateTarget) { toggleUserActive(deactivateTarget.id, !deactivateTarget.active); setDeactivateTarget(null); } }}
+        title={deactivateTarget?.active ? "Desactivar usuario" : "Reactivar usuario"}
+        message={deactivateTarget?.active
+          ? (deactivateTarget?.id === currentUserId
+            ? `¿Desactivar a ${deactivateTarget?.name}? No podrá iniciar sesión. ¡Cuidado! Perderás acceso de administrador.`
+            : `¿Desactivar a ${deactivateTarget?.name}? No podrá iniciar sesión.`)
+          : (deactivateTarget?.id === currentUserId
+            ? `¿Reactivar a ${deactivateTarget?.name}? Podrá iniciar sesión de nuevo. ¡Cuidado! Perderás acceso de administrador.`
+            : `¿Reactivar a ${deactivateTarget?.name}? Podrá iniciar sesión de nuevo.`)}
+        confirmLabel={deactivateTarget?.active ? "Desactivar" : "Reactivar"}
+        destructive={deactivateTarget?.active || false}
+      />
 
       <Toast message={toast} />
     </div>
