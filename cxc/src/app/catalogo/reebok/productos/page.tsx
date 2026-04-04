@@ -67,13 +67,16 @@ function Productos() {
           sessionStorage.removeItem("reebok_draft_id");
         }
       }).catch(() => { sessionStorage.removeItem("reebok_draft_id"); });
-    } else {
-      // Mode A: no DB draft — restore cart from sessionStorage
-      if (newClient) setDraftClient(newClient);
+    } else if (newClient) {
+      // Mode A: client set, restore cart from sessionStorage
+      setDraftClient(newClient);
       try {
         const saved = sessionStorage.getItem("reebok_cart");
         if (saved) setCart(JSON.parse(saved));
       } catch { /* corrupt data — ignore */ }
+    } else {
+      // No context — clean orphan cart
+      sessionStorage.removeItem("reebok_cart");
     }
   }, []);
 
@@ -233,7 +236,7 @@ function Productos() {
       </div>
 
       {/* ── Banner: order context ── */}
-      {hasContext && (
+      {hasContext ? (
         <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 mb-4">
           <div className="flex items-center gap-2 text-sm">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
@@ -250,11 +253,15 @@ function Productos() {
               </>
             )}
           </div>
-          {draftId && (
-            <Link href={`/catalogo/reebok/pedido/${draftId}`} className="text-xs text-black hover:underline transition">
-              Ver pedido →
-            </Link>
-          )}
+          <div className="flex items-center gap-3">
+            {!draftId && <button onClick={() => setShowNameModal(true)} className="text-xs text-gray-400 hover:text-black transition">Cambiar</button>}
+            {draftId && <Link href={`/catalogo/reebok/pedido/${draftId}`} className="text-xs text-black hover:underline transition">Ver pedido →</Link>}
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
+          <span className="text-sm text-amber-800">Para hacer un pedido, primero selecciona el cliente</span>
+          <button onClick={() => setShowNameModal(true)} className="text-sm bg-black text-white px-4 py-1.5 rounded-md hover:bg-gray-800 transition">Seleccionar cliente</button>
         </div>
       )}
 
@@ -327,7 +334,7 @@ function Productos() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 {g.items.map(p => (
-                  <ProductCard key={p.id} product={p} stock={p._stock} qty={cartMap.get(p.id) || 0} onQtyChange={handleQtyChange} />
+                  <ProductCard key={p.id} product={p} stock={p._stock} qty={cartMap.get(p.id) || 0} onQtyChange={handleQtyChange} disabled={!hasContext} />
                 ))}
               </div>
             </div>
@@ -359,7 +366,7 @@ function Productos() {
       )}
 
       {/* ── Floating bar ── */}
-      {cartCount > 0 && (
+      {cartCount > 0 && hasContext && (
         <div className="fixed bottom-0 left-0 right-0 z-40 p-3 bg-white border-t border-gray-100 shadow-lg">
           <button onClick={handleFloatingBarClick} disabled={saving}
             className={`w-full py-3.5 rounded-lg text-sm font-medium flex items-center justify-between px-4 transition disabled:opacity-50 ${

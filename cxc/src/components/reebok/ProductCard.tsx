@@ -8,9 +8,10 @@ interface Props {
   stock?: number;
   qty: number;
   onQtyChange: (productId: string, qty: number, product: Product) => void;
+  disabled?: boolean;
 }
 
-export default function ProductCard({ product, stock = 0, qty, onQtyChange }: Props) {
+export default function ProductCard({ product, stock = 0, qty, onQtyChange, disabled }: Props) {
   const [showLightbox, setShowLightbox] = useState(false);
   const [showQtyInput, setShowQtyInput] = useState(false);
   const [qtyInputVal, setQtyInputVal] = useState("");
@@ -73,8 +74,8 @@ export default function ProductCard({ product, stock = 0, qty, onQtyChange }: Pr
               </div>
             </div>
           ) : (
-            <button onClick={() => setQty(1)}
-              className="w-full mt-2 py-3 rounded text-xs font-medium uppercase tracking-wider transition bg-black text-white hover:bg-gray-800 min-h-[48px]">
+            <button onClick={() => { if (!disabled) setQty(1); }} disabled={disabled}
+              className={`w-full mt-2 py-3 rounded text-xs font-medium uppercase tracking-wider transition min-h-[48px] ${disabled ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-black text-white hover:bg-gray-800"}`}>
               Agregar
             </button>
           )}
