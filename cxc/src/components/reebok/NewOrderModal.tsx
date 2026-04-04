@@ -13,7 +13,13 @@ interface Props {
 // The order is created later when the user adds products and clicks "Crear pedido".
 export default function NewOrderModal({ onClose }: Props) {
   const router = useRouter();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(() => {
+    try {
+      const role = sessionStorage.getItem("cxc_role") || "";
+      if (role === "cliente") return sessionStorage.getItem("fg_user_name") || "";
+    } catch { /* */ }
+    return "";
+  });
   const [confirmed, setConfirmed] = useState(false);
   const [suggestions, setSuggestions] = useState<DirClient[]>([]);
   const [showSugg, setShowSugg] = useState(false);

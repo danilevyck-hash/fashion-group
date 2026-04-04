@@ -331,8 +331,8 @@ export default function GuiasList({
                     {/* Ver más */}
                     {hasMore && (
                       <button onClick={() => setVisibleCount(c => c + 15)}
-                        className="w-full py-3 text-sm text-gray-500 hover:text-black transition border-t border-gray-200 mt-1">
-                        Ver mas ({filtered.length - visibleCount} restantes)
+                        className="w-full py-3 text-sm text-gray-600 hover:text-black transition border border-gray-200 rounded-lg mt-2">
+                        Ver más ({filtered.length - visibleCount} restantes)
                       </button>
                     )}
 

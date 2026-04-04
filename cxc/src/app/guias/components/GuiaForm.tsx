@@ -47,6 +47,33 @@ export default function GuiaForm({
 }: GuiaFormProps) {
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
 
+  // Undo delete row
+  const [undoRow, setUndoRow] = useState<{ idx: number; item: GuiaItem; timer: ReturnType<typeof setTimeout> } | null>(null);
+  function handleRemoveRow(idx: number) {
+    const removed = items[idx];
+    onRemoveRow(idx);
+    if (undoRow) clearTimeout(undoRow.timer);
+    const timer = setTimeout(() => setUndoRow(null), 3000);
+    setUndoRow({ idx, item: removed, timer });
+  }
+  function handleUndoRemove() {
+    if (!undoRow) return;
+    clearTimeout(undoRow.timer);
+    // Re-insert at original position by adding row and updating it
+    onAddRow();
+    // After add, the new row is at the end — we need to update it with the removed data
+    // Since we can't insert at position, we update the last item
+    setTimeout(() => {
+      const lastIdx = items.length; // after addRow, new item is at this index
+      onUpdateItem(lastIdx, "cliente", undoRow.item.cliente);
+      onUpdateItem(lastIdx, "direccion", undoRow.item.direccion);
+      onUpdateItem(lastIdx, "empresa", undoRow.item.empresa);
+      onUpdateItem(lastIdx, "facturas", undoRow.item.facturas);
+      onUpdateItem(lastIdx, "bultos", undoRow.item.bultos);
+    }, 0);
+    setUndoRow(null);
+  }
+
   // Track unsaved changes
   const [dirty, setDirty] = useState(false);
   const [lastSaved, setLastSaved] = useState<string | null>(null);
@@ -228,7 +255,7 @@ export default function GuiaForm({
                     className={inputClass(`item-${idx}-bultos`, "w-full border-b border-gray-200 py-1 text-sm outline-none text-center focus:border-black transition")} />
                 </td>
                 <td className="py-2 text-center">
-                  {items.length > 1 && <button onClick={() => onRemoveRow(idx)} className="text-gray-400 hover:text-black transition text-sm">×</button>}
+                  {items.length > 1 && <button onClick={() => handleRemoveRow(idx)} className="text-gray-400 hover:text-red-500 transition text-sm">×</button>}
                 </td>
               </tr>
             ))}
@@ -262,6 +289,14 @@ export default function GuiaForm({
         <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
         <StatusBadge />
       </div>
+
+      {/* Undo delete row toast */}
+      {undoRow && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-3 z-50 text-sm">
+          <span>Fila eliminada</span>
+          <button onClick={handleUndoRemove} className="font-medium underline hover:no-underline">Deshacer</button>
+        </div>
+      )}
     </div>
   );
 }

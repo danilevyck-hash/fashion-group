@@ -434,7 +434,7 @@ export default function OrderDetailPage() {
           {canEdit && (
             <button onClick={editOrder} disabled={saving}
               className="w-full border border-gray-300 text-black py-2.5 rounded-lg text-sm hover:border-gray-500 transition disabled:opacity-40">
-              Editar pedido
+              Editar y re-enviar pedido
             </button>
           )}
         </div>
