@@ -343,7 +343,9 @@ export default function DirectorioPage() {
                             {c.whatsapp}
                           </a>
                         ) : <span className="text-gray-300">—</span>}</div>
-                        <div className="text-gray-500">{c.correo}</div>
+                        <div className="text-gray-500">{c.correo ? (
+                          <a href={`mailto:${c.correo}`} onClick={(e) => e.stopPropagation()} className="text-gray-600 hover:text-black underline underline-offset-2">{c.correo}</a>
+                        ) : <span className="text-gray-300">—</span>}</div>
                         <div className="text-gray-500">{c.contacto}</div>
                         <div className="text-right text-gray-300 text-xs">{isExpanded ? "▼" : "▶"}</div>
                       </div>

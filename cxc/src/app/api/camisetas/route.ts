@@ -12,11 +12,11 @@ export async function GET(req: NextRequest) {
   if (e1) { console.error("camisetas_productos error:", e1.message); errors.push(`productos: ${e1.message}`); }
 
   const { data: clientes, error: e2 } = await supabaseServer
-    .from("camisetas_clientes").select("*").order("nombre");
+    .from("camisetas_clientes").select("*").eq("deleted", false).order("nombre");
   if (e2) { console.error("camisetas_clientes error:", e2.message); errors.push(`clientes: ${e2.message}`); }
 
   const { data: pedidos, error: e3 } = await supabaseServer
-    .from("camisetas_pedidos").select("*");
+    .from("camisetas_pedidos").select("*").eq("deleted", false);
   if (e3) { console.error("camisetas_pedidos error:", e3.message); errors.push(`pedidos: ${e3.message}`); }
 
   return NextResponse.json({

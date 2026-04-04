@@ -213,8 +213,12 @@ export async function POST(req: NextRequest) {
       const buffer = await file.arrayBuffer();
       rows = parseExcel(buffer, empresa);
     } else {
-      // Assume CSV / text
-      const text = await file.text();
+      // Decode CSV: try UTF-8 first, fall back to latin-1 if replacement chars found
+      const buffer = await file.arrayBuffer();
+      let text = new TextDecoder("utf-8").decode(buffer);
+      if (text.includes("\uFFFD")) {
+        text = new TextDecoder("latin1").decode(buffer);
+      }
       rows = parseCSV(text, empresa);
     }
   } catch (err) {

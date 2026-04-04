@@ -8,6 +8,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { periodo_id, fecha, descripcion, proveedor, nro_factura, responsable, categoria, empresa, subtotal, itbms, total } = body;
 
+  if (!subtotal || Number(subtotal) <= 0) return NextResponse.json({ error: "El monto debe ser mayor a 0" }, { status: 400 });
+
   const roundedItbms = Math.round((Number(itbms) || 0) * 100) / 100;
   const roundedTotal = Math.round((Number(total) || 0) * 100) / 100;
 

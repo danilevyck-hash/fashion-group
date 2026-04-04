@@ -151,7 +151,7 @@ function aggregatePrevYear(rows: VentasRawRow[]): PrevYearAgg[] {
 // ─── Route ────────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  const authError = requireAuth(req, ["admin", "director"]);
+  const authError = requireAuth(req, ["admin", "director", "contabilidad"]);
   if (authError) return authError;
 
   const params = req.nextUrl.searchParams;

@@ -26,16 +26,18 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   const { data: existing } = await supabaseServer.from("camisetas_clientes").select("nombre").eq("id", id).maybeSingle();
 
-  // Delete pedidos first, then client
-  const { error: pedErr } = await supabaseServer.from("camisetas_pedidos").delete().eq("cliente_id", id);
+  // Soft delete: mark pedidos and client as deleted
+  // Requires: ALTER TABLE camisetas_pedidos ADD COLUMN IF NOT EXISTS deleted boolean DEFAULT false;
+  const { error: pedErr } = await supabaseServer.from("camisetas_pedidos").update({ deleted: true }).eq("cliente_id", id);
   if (pedErr) {
-    console.error("Error deleting pedidos for client", id, pedErr.message);
+    console.error("Error soft-deleting pedidos for client", id, pedErr.message);
     return NextResponse.json({ error: `Error al eliminar pedidos: ${pedErr.message}` }, { status: 500 });
   }
 
-  const { error } = await supabaseServer.from("camisetas_clientes").delete().eq("id", id);
+  // Requires: ALTER TABLE camisetas_clientes ADD COLUMN IF NOT EXISTS deleted boolean DEFAULT false;
+  const { error } = await supabaseServer.from("camisetas_clientes").update({ deleted: true }).eq("id", id);
   if (error) {
-    console.error("Error deleting client", id, error);
+    console.error("Error soft-deleting client", id, error);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 

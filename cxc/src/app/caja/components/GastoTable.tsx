@@ -280,15 +280,15 @@ export default function GastoTable({
                                   itbms: g.itbms,
                                 });
                               }}
-                              className="text-gray-400 hover:text-black transition mr-1"
+                              className="text-xs text-gray-400 hover:text-black transition mr-1 py-2.5 sm:py-1.5 px-2"
                             >
                               Editar
                             </button>
                             <button
                               onClick={() => onDeleteGasto(g.id)}
-                              className="text-gray-300 hover:text-red-500 transition"
+                              className="text-xs text-gray-300 hover:text-red-500 transition py-2.5 sm:py-1.5 px-2"
                             >
-                              ×
+                              Eliminar
                             </button>
                           </>
                         )}
