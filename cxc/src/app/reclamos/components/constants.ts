@@ -146,6 +146,16 @@ export function buildSingleReclamoPdfHtml(r: Reclamo, fotos?: { url?: string; st
       }).join("")}
     </div>
   </div>` : ""}
+  ${(r.reclamo_seguimiento && r.reclamo_seguimiento.length > 0) ? `
+  <div style="margin-top:20px;">
+    <div style="background:#1b3a5c;color:white;padding:6px 8px;font-size:10px;text-transform:uppercase;font-weight:600;border-radius:4px 4px 0 0;">Seguimiento</div>
+    <div style="padding:12px;border:1px solid #eee;border-top:none;border-radius:0 0 4px 4px;">
+      ${r.reclamo_seguimiento.map(s => `<div style="padding:6px 0;border-bottom:1px solid #f0f0f0;">
+        <div style="font-size:11px;">${s.nota}</div>
+        <div style="font-size:9px;color:#888;margin-top:2px;">${new Date(s.created_at).toLocaleString("es-PA")} — ${s.autor || ""}</div>
+      </div>`).join("")}
+    </div>
+  </div>` : ""}
   <div class="footer">Generado el ${new Date().toLocaleDateString("es-HN")}</div>
   <script>window.onload=function(){window.print();}</script>
   </body></html>`;
