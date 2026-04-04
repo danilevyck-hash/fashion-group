@@ -69,8 +69,18 @@ export function useGuiasState() {
   const [bSaving, setBSaving] = useState(false);
   const [showPending, setShowPending] = useState(false);
   const [tipoDespacho, setTipoDespacho] = useState<"externo" | "directo">("externo");
-  const [pendingFirma1, setPendingFirma1] = useState<string | null>(null);
-  const [pendingFirma2, setPendingFirma2] = useState<string | null>(null);
+  const [pendingFirma1, _setPendingFirma1] = useState<string | null>(null);
+  const [pendingFirma2, _setPendingFirma2] = useState<string | null>(null);
+
+  // Persist signatures to localStorage so they survive browser close
+  function setPendingFirma1(v: string | null) {
+    _setPendingFirma1(v);
+    try { if (expandedId) { if (v) localStorage.setItem(`guia_firma_${expandedId}_transportista`, v); else localStorage.removeItem(`guia_firma_${expandedId}_transportista`); } } catch { /* */ }
+  }
+  function setPendingFirma2(v: string | null) {
+    _setPendingFirma2(v);
+    try { if (expandedId) { if (v) localStorage.setItem(`guia_firma_${expandedId}_entregador`, v); else localStorage.removeItem(`guia_firma_${expandedId}_entregador`); } } catch { /* */ }
+  }
 
   // Print state
   const [printGuia, setPrintGuia] = useState<Guia | null>(null);
@@ -147,6 +157,13 @@ export function useGuiasState() {
         setBCedula(g.cedula || "");
         setBChofer(g.nombre_chofer || "");
         setTipoDespacho(g.tipo_despacho || "externo");
+        // Restore saved signatures from localStorage
+        try {
+          const saved1 = localStorage.getItem(`guia_firma_${id}_transportista`);
+          const saved2 = localStorage.getItem(`guia_firma_${id}_entregador`);
+          if (saved1) _setPendingFirma1(saved1);
+          if (saved2) _setPendingFirma2(saved2);
+        } catch { /* */ }
       }
     } catch { /* */ }
     setExpandedLoading(false);
@@ -358,6 +375,8 @@ export function useGuiasState() {
 
     if (res.ok) {
       showToast(`Guia GT-${String(expandedGuia.numero).padStart(3, "0")} despachada`);
+      // Clear saved signatures from localStorage
+      try { localStorage.removeItem(`guia_firma_${expandedGuia.id}_transportista`); localStorage.removeItem(`guia_firma_${expandedGuia.id}_entregador`); } catch { /* */ }
 
       // Refresh expanded guia
       const fullRes = await fetch(`/api/guias/${expandedGuia.id}`);
@@ -418,5 +437,24 @@ export function useGuiasState() {
     confirmDeleteId, setConfirmDeleteId,
     requestDeleteGuia, confirmDeleteGuia,
     confirmarDespacho,
+    rejectGuia,
   };
+
+  async function rejectGuia(id: string, motivo: string) {
+    const res = await fetch(`/api/guias/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado: "Rechazada", observaciones: motivo }),
+    });
+    if (res.ok) {
+      showToast("Guia rechazada");
+      if (expandedId === id) {
+        const fullRes = await fetch(`/api/guias/${id}`);
+        if (fullRes.ok) setExpandedGuia(await fullRes.json());
+      }
+      loadGuias();
+    } else {
+      showToast("Error al rechazar");
+    }
+  }
 }

@@ -84,6 +84,7 @@ export default function GuiasPage() {
           onEdit={s.startEdit}
           onPrint={s.openPrint}
           onDelete={s.requestDeleteGuia}
+          onReject={s.rejectGuia}
         />
         <ConfirmModal
           open={!!s.confirmDeleteId}

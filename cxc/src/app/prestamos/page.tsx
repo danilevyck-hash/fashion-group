@@ -255,6 +255,34 @@ export default function PrestamosPage() {
           </button>
         )}
 
+        {/* Inline approval list when filtering pendientes */}
+        {filterPendientes && isAdmin && (() => {
+          const pendingMovs = allCalcs.flatMap(c => (c.emp.prestamos_movimientos || []).filter(m => m.estado === "pendiente_aprobacion").map(m => ({ ...m, empNombre: c.emp.nombre })));
+          if (pendingMovs.length === 0) return null;
+          return (
+            <div className="mb-6 border border-amber-200 rounded-lg overflow-hidden">
+              <div className="text-xs uppercase tracking-wide text-amber-700 bg-amber-50 px-4 py-2 font-medium">Movimientos pendientes de aprobacion</div>
+              {pendingMovs.map(m => (
+                <div key={m.id} className="flex items-center justify-between px-4 py-2.5 border-t border-amber-100 text-sm">
+                  <div>
+                    <span className="font-medium">{m.empNombre}</span>
+                    <span className="text-gray-400 mx-2">·</span>
+                    <span className="text-gray-500">{m.concepto}</span>
+                    <span className="text-gray-400 mx-2">·</span>
+                    <span className="tabular-nums font-medium">${fmt(m.monto)}</span>
+                    <span className="text-gray-400 mx-2">·</span>
+                    <span className="text-xs text-gray-400">{m.fecha}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={async () => { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "aprobado" }) }); if (res.ok) { showToast("Movimiento aprobado"); loadEmpleados(); } else showToast("Error al aprobar"); }} className="text-xs bg-green-600 text-white px-3 py-1 rounded-full hover:bg-green-700 transition">Aprobar</button>
+                    <button onClick={async () => { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rechazado" }) }); if (res.ok) { showToast("Movimiento rechazado"); loadEmpleados(); } else showToast("Error al rechazar"); }} className="text-xs text-red-500 hover:text-red-700 transition px-2 py-1">Rechazar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
         {/* Actions + Filters */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
           <button onClick={openNewEmp} className="border border-gray-200 px-5 py-2.5 sm:py-2 rounded-md text-sm hover:border-gray-400 transition">+ Nuevo Empleado</button>

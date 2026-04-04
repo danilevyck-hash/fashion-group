@@ -34,6 +34,7 @@ interface CxcPreviewRow { values: string[]; errors: string[]; }
 interface CxcPreview {
   companyKey: string; headers: string[]; rows: CxcPreviewRow[];
   validCount: number; errorCount: number; duplicateNames: Set<string>;
+  bucketExceedsTotal: number;
   formatError: string; delimiter: string;
 }
 
@@ -149,7 +150,7 @@ function UploadPageInner() {
   function buildCxcPreview(text: string, companyKey: string): CxcPreview {
     const lines = text.split("\n").filter((l) => l.trim());
     if (lines.length < 2) {
-      return { companyKey, headers: [], rows: [], validCount: 0, errorCount: 0, duplicateNames: new Set(), formatError: "El archivo esta vacio.", delimiter: ";" };
+      return { companyKey, headers: [], rows: [], validCount: 0, errorCount: 0, duplicateNames: new Set(), bucketExceedsTotal: 0, formatError: "El archivo esta vacio.", delimiter: ";" };
     }
 
     const delimiter = detectDelimiter(text);
@@ -157,7 +158,7 @@ function UploadPageInner() {
     const required = ["CODIGO", "NOMBRE", "TOTAL"];
     const missing = required.filter((r) => !headers.some((h) => h.toUpperCase().includes(r)));
     if (missing.length > 0) {
-      return { companyKey, headers, rows: [], validCount: 0, errorCount: 0, duplicateNames: new Set(), formatError: `Faltan columnas: ${missing.join(", ")}. Verifica que sea el reporte CxC separado por '${delimiter}'.`, delimiter };
+      return { companyKey, headers, rows: [], validCount: 0, errorCount: 0, duplicateNames: new Set(), bucketExceedsTotal: 0, formatError: `Faltan columnas: ${missing.join(", ")}. Verifica que sea el reporte CxC separado por '${delimiter}'.`, delimiter };
     }
 
     const nombreIdx = headers.findIndex((h) => h.toUpperCase().includes("NOMBRE"));
@@ -301,15 +302,15 @@ function UploadPageInner() {
       setUploadProgress(null);
 
       const { count } = await supabase.from("cxc_rows").select("id", { count: "exact", head: true }).eq("upload_id", newUploadId);
-      if (count !== rows.length) {
-        await supabase.from("cxc_rows").delete().eq("upload_id", newUploadId);
-        await supabase.from("cxc_uploads").delete().eq("id", newUploadId);
-        throw new Error(`Verificacion fallo: esperaba ${rows.length} filas, encontro ${count}. Datos anteriores preservados.`);
-      }
+      const countMismatch = count !== rows.length;
 
       await supabase.from("cxc_rows").delete().eq("company_key", companyKey).neq("upload_id", newUploadId);
-      logActivityClient({ action: "cxc_upload", module: "upload", details: { companyKey, filename: theFile.name, rowCount: rows.length } });
-      setMessage({ text: `${theFile.name}: ${rows.length} registros cargados`, type: "ok" });
+      logActivityClient({ action: "cxc_upload", module: "upload", details: { companyKey, filename: theFile.name, rowCount: rows.length, actualCount: count } });
+      if (countMismatch) {
+        setMessage({ text: `${theFile.name}: Verificacion — se esperaban ${rows.length} filas, se insertaron ${count}. Los datos fueron guardados — verifica manualmente.`, type: "err" });
+      } else {
+        setMessage({ text: `${theFile.name}: ${rows.length} registros cargados`, type: "ok" });
+      }
       loadCxcUploads();
     } catch (err: unknown) {
       setMessage({ text: err instanceof Error ? err.message : "Error desconocido", type: "err" });

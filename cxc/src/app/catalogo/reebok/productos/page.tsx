@@ -44,7 +44,9 @@ function Productos() {
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
   const cartTotal = cart.reduce((s, i) => s + i.quantity * 12 * Number(i.unit_price || 0), 0);
 
-  // ── On mount: determine mode from sessionStorage ──
+  const [restoredDraftBanner, setRestoredDraftBanner] = useState<string | null>(null);
+
+  // ── On mount: determine mode from sessionStorage, fallback to localStorage ──
   useEffect(() => {
     const existingDraftId = sessionStorage.getItem("reebok_draft_id");
     const newClient = sessionStorage.getItem("reebok_draft_client");
@@ -63,7 +65,6 @@ function Productos() {
           setCart(items);
           setDraftOriginalIds(new Set(items.map(i => i.product_id)));
         } else {
-          // Draft no longer valid
           sessionStorage.removeItem("reebok_draft_id");
         }
       }).catch(() => { sessionStorage.removeItem("reebok_draft_id"); });
@@ -75,17 +76,51 @@ function Productos() {
         if (saved) setCart(JSON.parse(saved));
       } catch { /* corrupt data — ignore */ }
     } else {
-      // No context — clean orphan cart
+      // No sessionStorage context — check localStorage for recovered draft
+      try {
+        const lsClient = localStorage.getItem("reebok_draft_client");
+        const lsCart = localStorage.getItem("reebok_cart");
+        if (lsClient && lsCart) {
+          const parsed = JSON.parse(lsCart);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setRestoredDraftBanner(lsClient);
+            return; // Don't clean — wait for user decision
+          }
+        }
+      } catch { /* */ }
       sessionStorage.removeItem("reebok_cart");
     }
   }, []);
 
-  // Persist cart to sessionStorage on every change (skip initial empty)
+  function restoreDraft() {
+    try {
+      const lsClient = localStorage.getItem("reebok_draft_client") || "";
+      const lsCart = localStorage.getItem("reebok_cart");
+      sessionStorage.setItem("reebok_draft_client", lsClient);
+      setDraftClient(lsClient);
+      if (lsCart) { setCart(JSON.parse(lsCart)); sessionStorage.setItem("reebok_cart", lsCart); }
+    } catch { /* */ }
+    setRestoredDraftBanner(null);
+  }
+
+  function discardDraft() {
+    localStorage.removeItem("reebok_draft_client");
+    localStorage.removeItem("reebok_cart");
+    sessionStorage.removeItem("reebok_cart");
+    setRestoredDraftBanner(null);
+  }
+
+  // Persist cart to sessionStorage + localStorage on every change (skip initial empty)
   const cartInitialized = useRef(false);
   useEffect(() => {
     if (!cartInitialized.current) { cartInitialized.current = true; return; }
     sessionStorage.setItem("reebok_cart", JSON.stringify(cart));
-  }, [cart]);
+    // Also persist to localStorage for recovery
+    try {
+      localStorage.setItem("reebok_cart", JSON.stringify(cart));
+      if (draftClient) localStorage.setItem("reebok_draft_client", draftClient);
+    } catch { /* */ }
+  }, [cart, draftClient]);
 
   const handleQtyChange = useCallback((productId: string, qty: number, product: Product) => {
     setCart(prev => {
@@ -234,6 +269,17 @@ function Productos() {
         <h1 className="text-2xl font-light">Catálogo Reebok</h1>
         <p className="text-sm text-gray-400">Panamá</p>
       </div>
+
+      {/* ── Banner: recovered draft from localStorage ── */}
+      {restoredDraftBanner && (
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
+          <span className="text-sm text-amber-700">Tienes un pedido sin terminar para <strong>{restoredDraftBanner}</strong>.</span>
+          <div className="flex gap-2">
+            <button onClick={restoreDraft} className="text-xs bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 transition">Continuar</button>
+            <button onClick={discardDraft} className="text-xs text-gray-500 hover:text-black transition px-2">Descartar</button>
+          </div>
+        </div>
+      )}
 
       {/* ── Banner: order context ── */}
       {hasContext ? (

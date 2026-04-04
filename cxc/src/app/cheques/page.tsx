@@ -56,6 +56,7 @@ export default function ChequesPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectedVencidos, setSelectedVencidos] = useState<Set<string>>(new Set());
   const [batchProcessing, setBatchProcessing] = useState(false);
+  const [confirmBatch, setConfirmBatch] = useState<{ ids: Set<string>; clearFn: (v: Set<string>) => void } | null>(null);
   const [depositingId, setDepositingId] = useState<string | null>(null);
   const [confirmDepositId, setConfirmDepositId] = useState<string | null>(null);
 
@@ -192,6 +193,20 @@ export default function ChequesPage() {
     } catch { showToast("Error de conexion. Intenta de nuevo."); }
     setRebotandoId(null);
     setMotivoRebote("");
+    loadCheques();
+  }
+
+  async function redepositar(id: string) {
+    const cheque = cheques.find(c => c.id === id);
+    if (!cheque) return;
+    const hoy = todayStr();
+    const notaExtra = `Re-depósito desde rebote (${hoy})`;
+    const notas = cheque.notas ? `${cheque.notas}\n${notaExtra}` : notaExtra;
+    try {
+      const res = await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "pendiente", motivo_rebote: null, notas }) });
+      if (!res.ok) { showToast("No se pudo re-depositar. Intenta de nuevo."); return; }
+      showToast("Cheque marcado para re-depósito");
+    } catch { showToast("Error de conexión. Intenta de nuevo."); }
     loadCheques();
   }
 
@@ -663,7 +678,7 @@ export default function ChequesPage() {
         {selectedIds.size > 0 && (
           <div className="flex items-center gap-3 mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
             <span className="text-sm text-emerald-700">{selectedIds.size} pendiente{selectedIds.size > 1 ? "s" : ""} seleccionado{selectedIds.size > 1 ? "s" : ""}</span>
-            <button onClick={() => batchDepositar(selectedIds, setSelectedIds)} disabled={batchProcessing} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-full hover:bg-emerald-700 transition disabled:opacity-50">
+            <button onClick={() => setConfirmBatch({ ids: selectedIds, clearFn: setSelectedIds })} disabled={batchProcessing} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-full hover:bg-emerald-700 transition disabled:opacity-50">
               {batchProcessing ? "Procesando..." : "Marcar depositados"}
             </button>
             <button onClick={() => setSelectedIds(new Set())} className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
@@ -672,7 +687,7 @@ export default function ChequesPage() {
         {selectedVencidos.size > 0 && (
           <div className="flex items-center gap-3 mb-3 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg">
             <span className="text-sm text-amber-700">{selectedVencidos.size} vencido{selectedVencidos.size > 1 ? "s" : ""} seleccionado{selectedVencidos.size > 1 ? "s" : ""}</span>
-            <button onClick={() => batchDepositar(selectedVencidos, setSelectedVencidos)} disabled={batchProcessing} className="text-xs bg-amber-600 text-white px-4 py-1.5 rounded-full hover:bg-amber-700 transition disabled:opacity-50">
+            <button onClick={() => setConfirmBatch({ ids: selectedVencidos, clearFn: setSelectedVencidos })} disabled={batchProcessing} className="text-xs bg-amber-600 text-white px-4 py-1.5 rounded-full hover:bg-amber-700 transition disabled:opacity-50">
               {batchProcessing ? "Procesando..." : "Depositar seleccionados"}
             </button>
             <button onClick={() => setSelectedVencidos(new Set())} className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
@@ -728,6 +743,10 @@ export default function ChequesPage() {
                       <button onClick={() => setRebotandoId(c.id)} className="text-sm text-gray-500 hover:text-red-600 transition">Rebotado</button>
                       <span className="text-gray-200">·</span>
                     </>)}
+                    {isRebotado && (<>
+                      <button onClick={() => redepositar(c.id)} className="text-sm text-gray-500 hover:text-emerald-600 transition">Re-depositar</button>
+                      <span className="text-gray-200">·</span>
+                    </>)}
                     {c.whatsapp && (<>
                       <button onClick={() => {
                         const msg = `Hola, le escribo de Fashion Group respecto al cheque N° ${c.numero_cheque} por $${fmt(c.monto)} con fecha de depósito ${fmtDate(c.fecha_deposito)}. ${ve === "pendiente" ? "Queda pendiente de depósito." : ve === "rebotado" ? "El cheque fue rebotado." : ""} Gracias.`;
@@ -766,6 +785,14 @@ export default function ChequesPage() {
         message="¿Seguro que deseas eliminar este cheque? Esta acción no se puede deshacer."
         confirmLabel="Eliminar"
         destructive
+      />
+      <ConfirmModal
+        open={!!confirmBatch}
+        onClose={() => setConfirmBatch(null)}
+        onConfirm={() => { if (confirmBatch) { batchDepositar(confirmBatch.ids, confirmBatch.clearFn); setConfirmBatch(null); } }}
+        title="Depositar cheques"
+        message={confirmBatch ? `¿Depositar ${confirmBatch.ids.size} cheques por un total de $${fmt(cheques.filter(c => confirmBatch.ids.has(c.id)).reduce((s, c) => s + c.monto, 0))}?` : ""}
+        confirmLabel="Si, depositar todos"
       />
     </div>
     </div>

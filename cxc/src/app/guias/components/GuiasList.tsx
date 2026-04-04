@@ -44,11 +44,13 @@ interface GuiasListProps {
   onEdit: (id: string) => void;
   onPrint: (id: string) => void;
   onDelete: (id: string) => void;
+  onReject: (id: string, motivo: string) => void;
 }
 
 const DESPACHO_ROLES = ["admin", "secretaria", "bodega", "director"];
 const CREATE_ROLES = ["admin", "secretaria", "bodega"];
 const DELETE_ROLES = ["admin", "secretaria"];
+const REJECT_ROLES = ["admin", "secretaria"];
 
 export default function GuiasList({
   guias, loading, error, search, setSearch,
@@ -59,13 +61,16 @@ export default function GuiasList({
   bPlaca, setBPlaca, bReceptor, setBReceptor, bCedula, setBCedula,
   bChofer, setBChofer, bSaving, onConfirmarDespacho, showToast,
   pendingFirma1, pendingFirma2, onFirma1Change, onFirma2Change,
-  onEdit, onPrint, onDelete,
+  onEdit, onPrint, onDelete, onReject,
 }: GuiasListProps) {
   const [visibleCount, setVisibleCount] = useState(15);
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+  const [rejectMotivo, setRejectMotivo] = useState("");
   const canCreate = role && CREATE_ROLES.includes(role);
   const canDespacho = role && DESPACHO_ROLES.includes(role);
   const canDelete = role && DELETE_ROLES.includes(role);
   const canEdit = role && ["admin", "secretaria", "bodega"].includes(role);
+  const canReject = role && REJECT_ROLES.includes(role);
 
   return (
     <div>
@@ -154,7 +159,7 @@ export default function GuiasList({
                   <>
                     {visible.map((g) => {
                       const isExpanded = expandedId === g.id;
-                      const isDispatched = g.estado === "Completada" || g.estado === "Listo para Imprimir";
+                      const isDispatched = g.estado === "Completada" || g.estado === "Rechazada";
 
                       return (
                         <div key={g.id} className={`border rounded-lg transition-all ${isExpanded ? "border-gray-300 shadow-sm" : "border-gray-200 hover:border-gray-200"}`}>
@@ -171,7 +176,7 @@ export default function GuiasList({
                             </span>
                             <span className="tabular-nums w-14 text-right shrink-0">{g.total_bultos}</span>
                             <span className="w-24 shrink-0">
-                              <StatusBadge estado={isDispatched ? "despachada" : "pendiente"} />
+                              <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : isDispatched ? "despachada" : "pendiente"} />
                             </span>
                             <svg
                               className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`}
@@ -311,6 +316,17 @@ export default function GuiasList({
                                     >
                                       Imprimir
                                     </button>
+                                    {canReject && isDispatched && expandedGuia.estado !== "Rechazada" && (
+                                      rejectingId === expandedGuia.id ? (
+                                        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                          <input type="text" value={rejectMotivo} onChange={e => setRejectMotivo(e.target.value)} placeholder="Motivo de rechazo..." className="border-b border-gray-200 py-1 text-xs outline-none w-40" autoFocus />
+                                          <button onClick={() => { if (rejectMotivo.trim()) { onReject(expandedGuia.id, rejectMotivo.trim()); setRejectingId(null); setRejectMotivo(""); } }} disabled={!rejectMotivo.trim()} className="text-xs text-red-600 hover:text-red-800 transition disabled:opacity-40">Confirmar</button>
+                                          <button onClick={() => { setRejectingId(null); setRejectMotivo(""); }} className="text-xs text-gray-400 hover:text-black transition">Cancelar</button>
+                                        </div>
+                                      ) : (
+                                        <button onClick={() => setRejectingId(expandedGuia.id)} className="text-xs text-amber-600 hover:text-red-600 transition">Rechazar/Devolver</button>
+                                      )
+                                    )}
                                     {canDelete && (
                                       <button
                                         onClick={() => onDelete(expandedGuia.id)}

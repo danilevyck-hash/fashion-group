@@ -257,7 +257,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   if (!UUID_RE.test(params.id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const body = await req.json();
-  const allowed = ["placa", "observaciones", "estado", "receptor_nombre", "cedula", "firma_base64", "firma_entregador_base64", "entregado_por", "numero_guia_transp", "nombre_entregador", "cedula_entregador", "firma_transportista", "tipo_despacho", "nombre_chofer"];
+  const allowed = ["placa", "observaciones", "estado", "receptor_nombre", "cedula", "firma_base64", "firma_entregador_base64", "entregado_por", "numero_guia_transp", "nombre_entregador", "cedula_entregador", "firma_transportista", "tipo_despacho", "nombre_chofer", "motivo_rechazo"];
   const update: Record<string, unknown> = {};
   for (const key of allowed) {
     if (body[key] !== undefined) update[key] = body[key];
@@ -272,7 +272,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!updated) return NextResponse.json({ error: "Guía no encontrada o sin cambios" }, { status: 404 });
 
   // Send email with PDF if dispatched
-  if (body.estado === "Completada" || body.estado === "Listo para Imprimir") {
+  if (body.estado === "Completada") {
     const { data: guia } = await supabaseServer.from("guia_transporte").select("*, guia_items(*)").eq("id", params.id).single();
     if (guia) {
       if (guia.guia_items) {

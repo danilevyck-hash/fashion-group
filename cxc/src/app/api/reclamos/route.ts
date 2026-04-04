@@ -47,7 +47,19 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
     if (!existing) nro_reclamo = candidate;
   }
-  if (!nro_reclamo) nro_reclamo = `REC-${year}-${Date.now()}`;
+  if (!nro_reclamo) {
+    // Fallback: use MAX sequence + random to guarantee uniqueness
+    const { data: maxRow } = await supabaseServer
+      .from("reclamos")
+      .select("nro_reclamo")
+      .like("nro_reclamo", `REC-${year}-%`)
+      .order("nro_reclamo", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const maxSeq = maxRow ? parseInt(maxRow.nro_reclamo.split("-").pop() || "0", 10) : 0;
+    const rand = Math.floor(1000 + Math.random() * 9000);
+    nro_reclamo = `REC-${year}-${String(maxSeq + rand).padStart(4, "0")}`;
+  }
 
   const { data: reclamo, error: recErr } = await supabaseServer
     .from("reclamos")
@@ -106,7 +118,9 @@ export async function POST(req: NextRequest) {
       const { error: err2 } = await supabaseServer.from("reclamo_items").insert(rowsMin);
       if (err2) {
         console.error("Items retry error:", JSON.stringify(err2));
-        itemsWarning = err2.message;
+        // Rollback: delete the orphan reclamo
+        await supabaseServer.from("reclamos").delete().eq("id", reclamo.id);
+        return NextResponse.json({ error: "Error al crear items del reclamo. No se guardo el reclamo." }, { status: 500 });
       }
     }
   }
