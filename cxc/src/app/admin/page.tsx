@@ -369,13 +369,25 @@ export default function AdminDashboard() {
   }
 
   async function markContacted(clientName: string, method: string) {
+    const now = new Date().toISOString();
+    // Audit trail: keep insert to contact_log
     await supabase.from("cxc_contact_log").insert({
       nombre_normalized: clientName,
       method,
     });
+    // Source of truth: upsert overrides with last contact info
+    await supabase.from("cxc_client_overrides").upsert(
+      {
+        nombre_normalized: clientName,
+        ultimo_contacto_fecha: now,
+        ultimo_contacto_metodo: method.toLowerCase(),
+        updated_at: now,
+      },
+      { onConflict: "nombre_normalized" }
+    );
     setContactLog((prev) => ({
       ...prev,
-      [clientName]: { date: new Date().toISOString(), method },
+      [clientName]: { date: now, method },
     }));
   }
 
@@ -399,6 +411,7 @@ export default function AdminDashboard() {
   async function handleRegisterContact(clientName: string, data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) {
     // Save resultado + proximo_seguimiento to cxc_client_overrides (merge with existing contact fields)
     const existingClient = clients.find((c) => c.nombre_normalized === clientName);
+    const now = new Date().toISOString();
     await supabase.from("cxc_client_overrides").upsert(
       {
         nombre_normalized: clientName,
@@ -408,7 +421,9 @@ export default function AdminDashboard() {
         contacto: existingClient?.contacto || "",
         resultado_contacto: data.resultado_contacto,
         proximo_seguimiento: data.proximo_seguimiento || null,
-        updated_at: new Date().toISOString(),
+        ultimo_contacto_fecha: now,
+        ultimo_contacto_metodo: data.metodo.toLowerCase(),
+        updated_at: now,
       },
       { onConflict: "nombre_normalized" }
     );

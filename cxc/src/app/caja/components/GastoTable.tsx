@@ -2,7 +2,7 @@
 
 import { fmt, fmtDate } from "@/lib/format";
 import { CajaGasto } from "./types";
-import { CAJA_EMPRESAS } from "./GastoForm";
+import { CAJA_EMPRESAS, AutocompleteInput } from "./GastoForm";
 import { EmptyState } from "@/components/ui";
 
 interface Props {
@@ -113,41 +113,26 @@ export default function GastoTable({
                         />
                       </td>
                       <td className="py-2 pr-1 hidden sm:table-cell">
-                        <select
+                        <AutocompleteInput
                           value={editGasto.responsable || ""}
-                          onChange={(e) =>
-                            setEditGasto({
-                              ...editGasto,
-                              responsable: e.target.value,
-                            })
+                          onChange={(v) =>
+                            setEditGasto({ ...editGasto, responsable: v })
                           }
+                          options={responsables}
+                          placeholder="Responsable"
                           className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"
-                        >
-                          <option value="">—</option>
-                          {responsables.map((r) => (
-                            <option key={r} value={r}>
-                              {r}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </td>
                       <td className="py-2 pr-1">
-                        <select
+                        <AutocompleteInput
                           value={editGasto.categoria || "Varios"}
-                          onChange={(e) =>
-                            setEditGasto({
-                              ...editGasto,
-                              categoria: e.target.value,
-                            })
+                          onChange={(v) =>
+                            setEditGasto({ ...editGasto, categoria: v })
                           }
+                          options={categorias}
+                          placeholder="Categoría"
                           className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"
-                        >
-                          {categorias.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
+                        />
                       </td>
                       <td className="py-2 pr-1">
                         <select

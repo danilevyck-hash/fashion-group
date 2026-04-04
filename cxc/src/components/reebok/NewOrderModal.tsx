@@ -46,6 +46,14 @@ export default function NewOrderModal({ onClose }: Props) {
 
   function proceed() {
     if (!name.trim()) return;
+    // Auto-add new client to directorio if not from suggestions
+    if (!confirmed && name.trim().length > 2) {
+      fetch("/api/directorio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre: name.trim() }),
+      }).catch(() => { /* best-effort */ });
+    }
     // Clear any existing draft and set new client name
     sessionStorage.removeItem("reebok_draft_id");
     sessionStorage.setItem("reebok_draft_client", name.trim());
@@ -82,6 +90,9 @@ export default function NewOrderModal({ onClose }: Props) {
                     </button>
                   ))}
                 </div>
+              )}
+              {!confirmed && name.length > 2 && suggestions.length === 0 && !showSugg && (
+                <p className="text-xs text-amber-600 mt-1">Cliente nuevo — se agregará al directorio</p>
               )}
             </>
           )}

@@ -61,8 +61,22 @@ export async function DELETE(req: NextRequest) {
   const body = await req.json();
   const { foto_id, storage_path } = body;
 
-  await supabaseServer.storage.from("reclamo-fotos").remove([storage_path]);
-  await supabaseServer.from("reclamo_fotos").delete().eq("id", foto_id);
+  // 1. Delete from DB first
+  const { error: dbError } = await supabaseServer.from("reclamo_fotos").delete().eq("id", foto_id);
+  if (dbError) {
+    console.error("[foto-delete] DB delete failed:", dbError.message);
+    return NextResponse.json({ error: dbError.message }, { status: 500 });
+  }
+
+  // 2. Then delete from storage (best-effort — DB record is already gone)
+  try {
+    const { error: storageError } = await supabaseServer.storage.from("reclamo-fotos").remove([storage_path]);
+    if (storageError) {
+      console.warn("[foto-delete] Storage delete failed (DB record already removed):", storageError.message);
+    }
+  } catch (err) {
+    console.warn("[foto-delete] Storage delete exception (DB record already removed):", err);
+  }
 
   return NextResponse.json({ ok: true });
 }

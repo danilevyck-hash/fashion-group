@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
 
   const { data: cheques } = await supabaseServer
     .from("cheques")
-    .select("cliente, empresa, monto, fecha_deposito")
+    .select("cliente, empresa, monto, fecha_deposito, responsable")
     .eq("estado", "pendiente")
     .or(`fecha_deposito.eq.${today},fecha_deposito.eq.${tomorrow}`)
     .order("fecha_deposito");
@@ -67,18 +67,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: "No hay cheques por vencer", count: 0 });
   }
 
-  const lines = cheques.map(c =>
-    `• ${c.cliente} — ${c.empresa} — $${Number(c.monto).toLocaleString()} — ${c.fecha_deposito === today ? "HOY" : "MAÑANA"}`
-  );
-
   const totalMonto = cheques.reduce((s, c) => s + (Number(c.monto) || 0), 0);
 
   const html = `
     <h2 style="color:#1a1a1a">Cheques por vencer</h2>
     <p>${cheques.length} cheque${cheques.length > 1 ? "s" : ""} por un total de <strong>$${totalMonto.toLocaleString()}</strong></p>
     <table style="border-collapse:collapse;width:100%;font-size:14px">
-      <tr style="background:#f5f5f5"><th style="padding:8px;text-align:left">Cliente</th><th style="padding:8px">Empresa</th><th style="padding:8px;text-align:right">Monto</th><th style="padding:8px">Vence</th></tr>
-      ${cheques.map(c => `<tr style="border-bottom:1px solid #eee"><td style="padding:8px">${c.cliente}</td><td style="padding:8px">${c.empresa}</td><td style="padding:8px;text-align:right">$${Number(c.monto).toLocaleString()}</td><td style="padding:8px">${c.fecha_deposito === today ? "HOY" : "MAÑANA"}</td></tr>`).join("")}
+      <tr style="background:#f5f5f5"><th style="padding:8px;text-align:left">Cliente</th><th style="padding:8px">Empresa</th><th style="padding:8px;text-align:right">Monto</th><th style="padding:8px">Fecha Depósito</th><th style="padding:8px">Responsable</th><th style="padding:8px">Vence</th></tr>
+      ${cheques.map(c => `<tr style="border-bottom:1px solid #eee"><td style="padding:8px">${c.cliente}</td><td style="padding:8px">${c.empresa}</td><td style="padding:8px;text-align:right">$${Number(c.monto).toLocaleString()}</td><td style="padding:8px">${c.fecha_deposito}</td><td style="padding:8px">${c.responsable || "—"}</td><td style="padding:8px;font-weight:600;color:${c.fecha_deposito === today ? "#d97706" : "#2563eb"}">${c.fecha_deposito === today ? "HOY" : "MAÑANA"}</td></tr>`).join("")}
     </table>
     <p style="margin-top:16px;color:#888;font-size:12px">WhatsApp para seguimiento: ${WA_NUMBERS.join(", ")}</p>
     <p style="color:#888;font-size:11px">Fashion Group Panamá — Alerta automática</p>

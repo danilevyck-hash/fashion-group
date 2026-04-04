@@ -49,7 +49,7 @@ export default function MovimientoTable({ sortedMovs, isAdmin, isAdminOrDirector
                       {m.estado === "pendiente_aprobacion" && isAdmin && (
                         <button onClick={() => onApprove(m.id)} className="text-xs bg-green-600 text-white px-3 py-1 rounded-full hover:bg-green-700 transition">Aprobar</button>
                       )}
-                      {canEdit && (
+                      {canEdit && (m.estado !== "aprobado" || (Date.now() - new Date(m.created_at).getTime() < 24 * 60 * 60 * 1000)) && (
                         <button onClick={() => onEdit(m)} className="p-1.5 hover:bg-blue-50 rounded-lg transition text-gray-400 hover:text-blue-500" title="Editar">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
                         </button>
