@@ -195,9 +195,19 @@ export default function DirectorioPage() {
 
   return (
     <div>
+      <style jsx global>{`
+        @media print {
+          nav, [data-print-hide] { display: none !important; }
+          body { font-size: 11px; color: #000; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border-bottom: 1px solid #ccc; padding: 4px 8px; text-align: left; }
+          th { font-weight: 600; border-bottom: 2px solid #000; }
+          .max-w-6xl { max-width: 100% !important; padding: 0 !important; }
+        }
+      `}</style>
       <AppHeader module="Directorio de Clientes" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-5" data-print-hide>
         <h1 className="text-xl font-light tracking-tight">Directorio</h1>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -217,6 +227,9 @@ export default function DirectorioPage() {
           <button onClick={() => window.open("/api/directorio?format=csv")} className="text-sm text-gray-400 hover:text-black transition">
             Exportar CSV
           </button>
+          <button onClick={() => window.print()} className="text-sm text-gray-400 hover:text-black transition">
+            Imprimir
+          </button>
           <button onClick={async () => {
             const allRes = await fetch("/api/directorio");
             const allClientes = allRes.ok ? await allRes.json() : [];
@@ -229,7 +242,7 @@ export default function DirectorioPage() {
             const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
             const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
             const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Directorio-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url);
-          }} title="Exportar a Excel" className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-full transition">↓ Excel</button>
+          }} title="Exportar a Excel" className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full transition">↓ Excel</button>
           <button onClick={() => setShowNew(true)}
             className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition">
             Nuevo Contacto
@@ -238,7 +251,7 @@ export default function DirectorioPage() {
       </div>
 
       {/* New contact form */}
-      {showNew && (
+      {showNew && ( /* data-print-hide applied via parent */
         <div className="border border-gray-200 rounded-lg p-6 mb-8">
           <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Nuevo Contacto</div>
           <div className="grid grid-cols-2 gap-4">
@@ -285,7 +298,7 @@ export default function DirectorioPage() {
       )}
 
       {/* Search */}
-      <div className="flex items-end gap-4 mb-6">
+      <div className="flex items-end gap-4 mb-6" data-print-hide>
         <input
           type="text"
           value={search}
@@ -330,7 +343,7 @@ export default function DirectorioPage() {
                     <td colSpan={6} className="p-0">
                       {/* Main row */}
                       <div
-                        className="grid grid-cols-6 py-3 cursor-pointer"
+                        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1 py-3 cursor-pointer"
                         onClick={() => setExpanded(isExpanded ? null : c.id)}
                       >
                         <div className="font-medium">{c.nombre}{cxcClients.has(c.nombre.toUpperCase().trim().replace(/\s+/g, " ")) && (
@@ -358,12 +371,12 @@ export default function DirectorioPage() {
                           <div className="text-gray-400 text-xs mb-3">Creado: {new Date(c.created_at).toLocaleDateString("es-PA")}</div>
                           <div className="flex gap-3">
                             <button onClick={(e) => { e.stopPropagation(); setEditing(c.id); setEditData(c); }}
-                              className="text-sm text-gray-400 hover:text-black transition">Editar</button>
+                              className="text-sm text-gray-400 hover:text-black transition py-2.5 sm:py-1.5">Editar</button>
                             <button onClick={(e) => { e.stopPropagation(); router.push(`/admin?search=${encodeURIComponent(c.nombre)}`); }}
-                              title="Ver deuda de este cliente en Cuentas por Cobrar" className="text-xs text-gray-400 hover:text-black transition">Ver en CXC →</button>
+                              title="Ver deuda de este cliente en Cuentas por Cobrar" className="text-xs text-gray-400 hover:text-black transition py-2.5 sm:py-1.5">Ver en CXC →</button>
                             {role === "admin" && (
                               <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
-                                className="text-sm text-gray-400 hover:text-red-500 transition">Eliminar Contacto</button>
+                                className="text-sm text-gray-400 hover:text-red-500 transition py-2.5 sm:py-1.5">Eliminar Contacto</button>
                             )}
                           </div>
                         </div>
@@ -402,7 +415,7 @@ export default function DirectorioPage() {
           )}
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-4 mt-6">
+            <div className="flex items-center justify-center gap-4 mt-6" data-print-hide>
               <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
                 className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">← Anterior</button>
               <span className="text-xs text-gray-400">Página {page} de {totalPages}</span>
