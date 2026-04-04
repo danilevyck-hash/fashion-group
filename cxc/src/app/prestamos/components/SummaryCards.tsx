@@ -15,22 +15,22 @@ export default function SummaryCards({ prestado, pagado, saldo, pct }: Props) {
     <>
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
           <div className="text-xs text-gray-400 uppercase tracking-wide">Total Prestado</div>
           <div className="text-2xl font-semibold mt-1 tabular-nums">${fmt(prestado)}</div>
         </div>
-        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
           <div className="text-xs text-gray-400 uppercase tracking-wide">Total Pagado</div>
           <div className="text-2xl font-semibold mt-1 tabular-nums text-green-600">${fmt(pagado)}</div>
         </div>
-        <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+        <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
           <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo Pendiente</div>
           <div className="text-2xl font-semibold mt-1 tabular-nums text-red-600">${fmt(saldo)}</div>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex items-center justify-between mb-1">
           <span className="text-xs text-gray-400">Progreso de pago</span>
           <span className={`text-sm font-medium tabular-nums ${progressColorText(pct)}`}>{pct.toFixed(1)}%</span>

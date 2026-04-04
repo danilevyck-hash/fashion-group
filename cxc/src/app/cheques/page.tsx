@@ -372,22 +372,22 @@ export default function ChequesPage() {
         const vencenSemanaKPI = pendientes.filter((c) => c.fecha_deposito >= today && c.fecha_deposito <= weekFromNow);
         return (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Total a cobrar</div>
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Total a cobrar</div>
               <div className="text-xl font-semibold tabular-nums">${fmt(totalPendiente)}</div>
               <div className="text-xs text-gray-400 mt-0.5">{pendientes.length} cheques</div>
             </div>
-            <div className={`rounded-lg p-4 border border-gray-200 ${vencenSemanaKPI.length > 0 ? "bg-amber-50" : "bg-gray-50"}`}>
-              <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Vencen esta semana</div>
+            <div className={`rounded-lg p-3 border border-gray-200 ${vencenSemanaKPI.length > 0 ? "bg-amber-50" : "bg-gray-50"}`}>
+              <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Vencen esta semana</div>
               <div className={`text-xl font-semibold tabular-nums ${vencenSemanaKPI.length > 0 ? "text-amber-600" : ""}`}>{vencenSemanaKPI.length}</div>
               <div className="text-xs text-gray-400 mt-0.5">${fmt(vencenSemanaKPI.reduce((s, c) => s + (Number(c.monto) || 0), 0))}</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Próximo depósito</div>
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Próximo depósito</div>
               <div className="text-xl font-semibold">{proximo ? fmtDate(proximo) : "—"}</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-              <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Depositados</div>
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Depositados</div>
               <div className="text-xl font-semibold tabular-nums text-green-600">{depositados.length}</div>
               <div className="text-xs text-gray-400 mt-0.5">${fmt(depositados.reduce((s, c) => s + (Number(c.monto) || 0), 0))}</div>
             </div>
@@ -397,9 +397,9 @@ export default function ChequesPage() {
 
       {/* Form */}
       {showForm && (
-        <div className="bg-gray-50 rounded-lg p-6 mb-8 overflow-visible">
+        <div className="bg-gray-50 rounded-lg p-4 mb-8 overflow-visible">
           <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">{editingId ? "Editar Cheque" : "Nuevo Cheque"}</div>
-          <div className="grid grid-cols-2 gap-x-8 gap-y-4 overflow-visible">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 overflow-visible">
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Cliente <span className="text-red-500">*</span></label>
               <div className="relative">
@@ -503,14 +503,14 @@ export default function ChequesPage() {
             Resumen por cliente
           </button>
           {showResumen && (
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-50 rounded-lg p-3">
               <div className="flex gap-3 mb-3">
                 <button onClick={() => setResumenSort("monto")} className={`text-xs transition ${resumenSort === "monto" ? "font-medium text-black" : "text-gray-400"}`}>Por monto</button>
                 <button onClick={() => setResumenSort("count")} className={`text-xs transition ${resumenSort === "count" ? "font-medium text-black" : "text-gray-400"}`}>Por cantidad</button>
               </div>
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-white z-10">
-                  <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
+                  <tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500">
                     <th className="text-left py-3 px-4 font-normal">Cliente</th>
                     <th className="text-right py-3 px-4 font-normal">Cant. cheques</th>
                     <th className="text-right py-3 px-4 font-normal">Monto total</th>
@@ -606,7 +606,7 @@ export default function ChequesPage() {
 
             {/* Desktop grid */}
             <div className="hidden sm:block">
-              <div className="grid grid-cols-7 text-center text-[10px] text-gray-400 uppercase tracking-wider mb-1">
+              <div className="grid grid-cols-7 text-center text-xs text-gray-500 uppercase tracking-wider mb-1">
                 {["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"].map(d => <div key={d} className="py-1">{d}</div>)}
               </div>
               <div className="grid grid-cols-7 border-t border-l border-gray-200">
@@ -731,7 +731,7 @@ export default function ChequesPage() {
           <div className="min-w-[700px] px-4 sm:px-0">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-white z-10">
-            <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
+            <tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500">
               <th className="text-left py-3 px-4 font-normal">Fecha Depósito</th>
               <th className="text-left py-3 px-4 font-normal">Cliente</th>
               <th className="text-left py-3 px-4 font-normal">Empresa</th>

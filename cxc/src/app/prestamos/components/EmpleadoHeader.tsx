@@ -22,7 +22,7 @@ export default function EmpleadoHeader({ empleado, saldo, onEdit, onToggleArchiv
           </span>
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-3">
         <button onClick={onEdit} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Editar</button>
         {empleado.activo && saldo === 0 && (
           <button onClick={onToggleArchive} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Archivar</button>

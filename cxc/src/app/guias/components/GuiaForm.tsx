@@ -166,7 +166,7 @@ export default function GuiaForm({
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       {/* Sticky top bar */}
       <div className="sticky top-0 z-20 bg-white/95 backdrop-blur -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 mb-6 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -177,23 +177,23 @@ export default function GuiaForm({
         <SaveButton size="small" />
       </div>
 
-      <div className="flex flex-wrap items-baseline gap-4 mb-10">
+      <div className="flex flex-wrap items-baseline gap-4 mb-6">
         <h1 className="text-xl font-light tracking-tight">
           {editingId ? "Editar" : "Nueva"} Guía de Transporte
         </h1>
       </div>
 
       {/* Header fields */}
-      <div className="mb-10">
-        <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Información General</div>
+      <div className="mb-6">
+        <div className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-4">Información General</div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
           <div>
-            <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Fecha <span className="text-red-500">*</span></label>
+            <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">Fecha <span className="text-red-500">*</span></label>
             <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
               className={inputClass("fecha", "w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition")} />
           </div>
           <div>
-            <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
+            <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">
               Transportista <span className="text-red-500">*</span>
               <AddNewInline placeholder="Nombre" onAdd={onAddTransportista} />
             </label>
@@ -209,7 +209,7 @@ export default function GuiaForm({
             )}
           </div>
           <div>
-            <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
+            <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">
               Entregado por <span className="text-red-500">*</span>
               <AddNewInline placeholder="Nombre" onAdd={addEntregador} />
             </label>
@@ -230,9 +230,9 @@ export default function GuiaForm({
       </div>
 
       {/* Items table */}
-      <div className="mb-10">
+      <div className="mb-6">
         <div className="flex items-center justify-between mb-4">
-          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Detalle de Envío</div>
+          <div className="text-xs uppercase tracking-[0.05em] text-gray-400">Detalle de Envío</div>
           <StatusBadge />
         </div>
 
@@ -247,7 +247,7 @@ export default function GuiaForm({
         <div className="min-w-[800px] px-4 sm:px-0">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-white z-10">
-            <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
+            <tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-400">
               <th className="py-3 px-4 font-normal w-10 text-left">#</th>
               <th className="py-3 px-4 font-normal text-left">Cliente <span className="text-red-500">*</span><AddNewInline placeholder="Cliente" onAdd={onAddCliente} /></th>
               <th className="py-3 px-4 font-normal text-left">Dirección <span className="text-red-500">*</span><AddNewInline placeholder="Ciudad" onAdd={onAddDireccion} /></th>
@@ -302,16 +302,16 @@ export default function GuiaForm({
       </div>
 
       {/* Observaciones */}
-      <div className="mb-10">
-        <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Observaciones (opcional)</label>
+      <div className="mb-6">
+        <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">Observaciones (opcional)</label>
         <textarea value={observaciones} onChange={e => setObservaciones(e.target.value)} rows={2}
           className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" />
       </div>
 
       {/* Footer */}
-      <div className="mb-10">
+      <div className="mb-6">
         <div className="flex items-center gap-2">
-          <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Total de bultos:</span>
+          <span className="text-xs uppercase tracking-[0.05em] text-gray-400">Total de bultos:</span>
           <span className="text-lg font-semibold tabular-nums">{totalBultos}</span>
         </div>
       </div>

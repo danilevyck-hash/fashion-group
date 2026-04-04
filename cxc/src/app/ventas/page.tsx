@@ -319,7 +319,7 @@ export default function VentasDashboard() {
   return (
     <>
       <AppHeader module="Ventas" />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-semibold">Dashboard de Ventas</h1>
@@ -388,14 +388,14 @@ export default function VentasDashboard() {
         {loading ? <SkeletonKPI count={5} /> : (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
             {kpiCards.map(k => (
-              <div key={k.key} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <div key={k.key} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                 <div className="flex items-center mb-1">
-                  <p className="text-[10px] uppercase tracking-wide text-gray-400">{k.label}</p>
-                  <button onClick={() => setKpiTooltip(kpiTooltip === k.key ? null : k.key)} className="text-gray-300 hover:text-gray-500 text-[10px] ml-1">?</button>
+                  <p className="text-xs uppercase tracking-wide text-gray-500">{k.label}</p>
+                  <button onClick={() => setKpiTooltip(kpiTooltip === k.key ? null : k.key)} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
                 </div>
                 <p className={`text-xl font-semibold ${k.flag ? "text-red-600" : ""}`}>{k.value}</p>
-                {k.valueExtra && <p className="text-xs text-gray-400">{k.valueExtra}</p>}
-                {kpiTooltip === k.key && <p className="text-[10px] text-gray-400 mt-1">{k.tooltip}</p>}
+                {k.valueExtra && <p className="text-xs text-gray-500">{k.valueExtra}</p>}
+                {kpiTooltip === k.key && <p className="text-xs text-gray-500 mt-1">{k.tooltip}</p>}
               </div>
             ))}
           </div>
@@ -404,7 +404,7 @@ export default function VentasDashboard() {
         {/* Monthly Bar Chart */}
         {!loading && hasData && filterMes === null && (
           <div className="mb-6 border border-gray-200 rounded-lg p-4 print:hidden">
-            <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-3">Ventas mensuales {año}</p>
+            <p className="text-xs uppercase tracking-wide text-gray-500 mb-3">Ventas mensuales {año}</p>
             <ResponsiveContainer width="100%" height={180}>
               <BarChart data={chartData} barCategoryGap="20%">
                 <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
@@ -414,7 +414,7 @@ export default function VentasDashboard() {
                 <Bar dataKey="prev" fill="#e5e7eb" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-            <p className="text-[10px] text-gray-400 mt-1 text-center">Negro: {año} · Gris: {año - 1}</p>
+            <p className="text-xs text-gray-500 mt-1 text-center">Negro: {año} · Gris: {año - 1}</p>
           </div>
         )}
 
@@ -429,11 +429,11 @@ export default function VentasDashboard() {
         )}
 
         {/* Mobile hint */}
-        {vista === "quarter" && <p className="text-[10px] text-gray-400 mb-2 sm:hidden">Vista trimestral activa en mobile</p>}
+        {vista === "quarter" && <p className="text-xs text-gray-500 mb-2 sm:hidden">Vista trimestral activa en mobile</p>}
 
         {/* Period indicator */}
         {!loading && kpi.monthsWithData.length > 0 && (
-          <p className="text-[11px] text-gray-400 mb-4">
+          <p className="text-xs text-gray-500 mb-4">
             Mostrando {(() => {
               const sorted = [...kpi.monthsWithData].sort((a, b) => a - b);
               const from = MES_NAMES[sorted[0] - 1];
@@ -460,8 +460,8 @@ export default function VentasDashboard() {
               <div className="overflow-x-auto mb-6 border border-gray-200 rounded-lg">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-white z-10">
-                    <tr className="border-b border-gray-200 bg-gray-50/50">
-                      <th className="text-left px-3 py-2 font-medium text-gray-500 sticky left-0 bg-gray-50/50">Empresa</th>
+                    <tr className="border-b border-gray-200 bg-white">
+                      <th className="text-left px-3 py-2 font-medium text-gray-500 sticky left-0 bg-white">Empresa</th>
                       {table.periods.map(p => <th key={p} className="text-right px-2 py-2 font-medium text-gray-500">{p}</th>)}
                       <th className="text-right px-3 py-2 font-medium text-gray-500">Total</th>
                       <th className="text-right px-3 py-2 font-medium text-gray-500">Margen%</th>
@@ -507,20 +507,20 @@ export default function VentasDashboard() {
           <>
             {/* Client KPIs */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Top Cliente</p>
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Top Cliente</p>
                 <p className="text-sm font-semibold">{topClient?.cliente || "—"}</p>
-                <p className="text-xs text-gray-400">{topClient ? fmtK(topClient.subtotal) : ""}</p>
+                <p className="text-xs text-gray-500">{topClient ? fmtK(topClient.subtotal) : ""}</p>
               </div>
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Concentración Top 5</p>
+              <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Concentración Top 5</p>
                 <p className={`text-xl font-semibold ${top5Pct > 60 ? "text-amber-600" : ""}`}>{top5Pct.toFixed(0)}%</p>
-                <p className="text-xs text-gray-400">del total de ventas</p>
+                <p className="text-xs text-gray-500">del total de ventas</p>
               </div>
-              <div className={`rounded-lg p-4 cursor-pointer transition ${showInactive ? "bg-red-50 border border-red-200" : "bg-gray-50 border border-gray-200"}`} onClick={() => setShowInactive(!showInactive)}>
-                <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Sin compra 60+ días</p>
+              <div className={`rounded-lg p-3 cursor-pointer transition ${showInactive ? "bg-red-50 border border-red-200" : "bg-gray-50 border border-gray-200"}`} onClick={() => setShowInactive(!showInactive)}>
+                <p className="text-xs uppercase tracking-wide text-gray-500 mb-1">Sin compra 60+ días</p>
                 <p className={`text-xl font-semibold ${inactiveCount > 0 ? "text-red-600" : ""}`}>{inactiveCount}</p>
-                <p className="text-xs text-gray-400">{showInactive ? "Mostrando inactivos" : "Click para filtrar"}</p>
+                <p className="text-xs text-gray-500">{showInactive ? "Mostrando inactivos" : "Click para filtrar"}</p>
               </div>
             </div>
 
@@ -533,13 +533,13 @@ export default function VentasDashboard() {
             {/* Client Table */}
             <div className="overflow-x-auto border border-gray-200 rounded-lg mb-6">
               <table className="w-full text-xs">
-                <thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 bg-gray-50/50">
-                  <th className="text-left px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("ventas")}>Cliente</th>
-                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("ventas")}>Ventas</th>
-                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("utilidad")}>Utilidad</th>
-                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("margen")}>Margen%</th>
-                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("pct")}>% Total</th>
-                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("fecha")}>Última Compra</th>
+                <thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 bg-white">
+                  <th className="text-left px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("ventas")}>Cliente {clientSort === "ventas" ? (clientSortDir === "desc" ? "↓" : "↑") : ""}</th>
+                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("ventas")}>Ventas {clientSort === "ventas" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
+                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("utilidad")}>Utilidad {clientSort === "utilidad" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
+                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("margen")}>Margen% {clientSort === "margen" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
+                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("pct")}>% Total {clientSort === "pct" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
+                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("fecha")}>Última Compra {clientSort === "fecha" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
                 </tr></thead>
                 <tbody>
                   {displayClients.map(c => {
@@ -550,7 +550,7 @@ export default function VentasDashboard() {
                     return [
                       <tr key={c.cliente} className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer" onClick={() => setExpandedClient(expanded ? null : c.cliente)}>
                         <td className="px-3 py-2 text-gray-700 flex items-center gap-1">
-                          <span className={`text-gray-300 text-[10px] transition ${expanded ? "rotate-90" : ""}`}>▶</span>
+                          <span className={`text-gray-300 text-xs transition ${expanded ? "rotate-90" : ""}`}>▶</span>
                           {c.cliente}
                         </td>
                         <td className="text-right px-3 py-2 tabular-nums">{fmtK(c.subtotal)}</td>
@@ -561,12 +561,12 @@ export default function VentasDashboard() {
                       </tr>,
                       expanded && c.empresas.map(e => (
                         <tr key={`${c.cliente}-${e.empresa}`} className="bg-gray-50/30">
-                          <td className="px-3 py-1.5 pl-8 text-gray-400 text-[11px]">{e.empresa}</td>
-                          <td className="text-right px-3 py-1.5 tabular-nums text-gray-400 text-[11px]">{fmtK(e.subtotal)}</td>
-                          <td className="text-right px-3 py-1.5 tabular-nums text-gray-400 text-[11px]">{fmtK(e.utilidad)}</td>
-                          <td className="text-right px-3 py-1.5 tabular-nums text-gray-400 text-[11px]">{e.subtotal ? ((e.utilidad / e.subtotal) * 100).toFixed(1) : 0}%</td>
+                          <td className="px-3 py-1.5 pl-8 text-gray-500 text-xs">{e.empresa}</td>
+                          <td className="text-right px-3 py-1.5 tabular-nums text-gray-500 text-xs">{fmtK(e.subtotal)}</td>
+                          <td className="text-right px-3 py-1.5 tabular-nums text-gray-500 text-xs">{fmtK(e.utilidad)}</td>
+                          <td className="text-right px-3 py-1.5 tabular-nums text-gray-500 text-xs">{e.subtotal ? ((e.utilidad / e.subtotal) * 100).toFixed(1) : 0}%</td>
                           <td></td>
-                          <td className="text-right px-3 py-1.5 text-gray-400 text-[11px]">{e.lastFecha ? new Date(e.lastFecha).toLocaleDateString("es-PA", { month: "long", year: "numeric" }) : "—"}</td>
+                          <td className="text-right px-3 py-1.5 text-gray-500 text-xs">{e.lastFecha ? new Date(e.lastFecha).toLocaleDateString("es-PA", { month: "long", year: "numeric" }) : "—"}</td>
                         </tr>
                       )),
                     ];

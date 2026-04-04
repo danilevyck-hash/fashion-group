@@ -66,13 +66,13 @@ export default function SignatureCanvas({ label, canvasRef, initialImage, onChan
 
   return (
     <div>
-      <label className="text-[11px] uppercase tracking-wider text-gray-400 mb-2 block">
+      <label className="text-xs uppercase tracking-wider text-gray-400 mb-2 block">
         {label}
       </label>
       <canvas
         ref={canvasRef}
         className="w-full border border-gray-200 rounded-lg bg-white touch-none"
-        style={{ height: 100 }}
+        style={{ height: 150 }}
       />
       <div className="flex gap-4 mt-1.5">
         <button

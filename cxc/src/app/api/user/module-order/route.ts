@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 
+const ALL_ROLES = ["admin", "secretaria", "director", "contabilidad", "bodega", "vendedor"];
+
 export async function GET(req: NextRequest) {
+  const auth = requireRole(req, ALL_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const userId = req.nextUrl.searchParams.get("userId");
   if (!userId) return NextResponse.json({ module_order: [] });
 
@@ -16,6 +20,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, ALL_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const { userId, moduleOrder } = await req.json();
   if (!userId) return NextResponse.json({ error: "userId required" }, { status: 400 });
 

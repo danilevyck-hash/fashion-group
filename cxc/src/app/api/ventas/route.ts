@@ -3,6 +3,8 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export async function GET(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "director", "contabilidad"]);
+  if (auth instanceof NextResponse) return auth;
   const año = req.nextUrl.searchParams.get("anio");
   const empresa = req.nextUrl.searchParams.get("empresa");
   if (!año) return NextResponse.json({ error: "año required" }, { status: 400 });
@@ -17,6 +19,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, ["admin"]);
+  if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const { empresa, año, mes, ventas_brutas, notas_credito, notas_debito, costo_total } = body;
   if (!empresa || !año || !mes) return NextResponse.json({ error: "Missing fields" }, { status: 400 });

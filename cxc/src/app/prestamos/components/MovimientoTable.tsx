@@ -16,8 +16,8 @@ interface Props {
 
 export default function MovimientoTable({ sortedMovs, isAdmin, isAdminOrDirector, canEdit, onApprove, onEdit, onDelete }: Props) {
   return (
-    <div className="mb-8">
-      <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Historial de Movimientos</h2>
+    <div className="mb-6">
+      <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Historial de Movimientos</h2>
       {sortedMovs.length === 0 ? (
         <EmptyState title="Sin movimientos registrados" subtitle="Registra el primer movimiento" />
       ) : (
@@ -26,12 +26,12 @@ export default function MovimientoTable({ sortedMovs, isAdmin, isAdminOrDirector
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Fecha</th>
-                <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Concepto</th>
-                <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Monto</th>
-                <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Notas</th>
-                <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Estado</th>
-                <th className="py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Acciones</th>
+                <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Fecha</th>
+                <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Concepto</th>
+                <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Monto</th>
+                <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Notas</th>
+                <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Estado</th>
+                <th className="py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Acciones</th>
               </tr>
             </thead>
             <tbody>

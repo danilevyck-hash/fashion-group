@@ -23,6 +23,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const s = getSession(req);
+  if (!s || !["admin", "contabilidad"].includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const body = await req.json();
   const { empleado_id, fecha, concepto, monto, notas } = body;
 
@@ -40,7 +42,8 @@ export async function POST(req: NextRequest) {
       .from("prestamos_movimientos")
       .select("concepto, monto, estado")
       .eq("empleado_id", empleado_id)
-      .eq("estado", "aprobado");
+      .eq("estado", "aprobado")
+      .or("deleted.is.null,deleted.eq.false");
 
     const rows = movs || [];
     const prestado = rows.filter(m => m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño").reduce((s, m) => s + Number(m.monto), 0);

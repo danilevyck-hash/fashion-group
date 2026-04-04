@@ -95,7 +95,7 @@ function ReportePage() {
             {empresaFilter === "all" ? "Todas las empresas" : empresaFilter} — {año}
           </p>
         </div>
-        <div className="text-xs text-gray-400 text-right">
+        <div className="text-xs text-gray-500 text-right">
           Generado: {new Date().toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}<br />
           Vista: {vista === "mensual" ? "Mensual" : "Trimestral"}
         </div>
@@ -105,24 +105,24 @@ function ReportePage() {
       <div className="grid grid-cols-5 gap-3 mb-6 text-center">
         {/* 1. Ventas Netas */}
         <div className="border border-gray-200 rounded-lg p-3">
-          <div className="text-[9px] uppercase text-gray-400">Ventas Netas</div>
+          <div className="text-xs uppercase text-gray-500">Ventas Netas</div>
           <div className="text-base font-semibold">${fmt(ventasNetas)}</div>
         </div>
 
         {/* 2. vs Año Ant. */}
         <div className="border border-gray-200 rounded-lg p-3">
-          <div className="text-[9px] uppercase text-gray-400">vs Año Ant.</div>
+          <div className="text-xs uppercase text-gray-500">vs Año Ant.</div>
           <div className={`text-base font-semibold ${vsAnterior !== null && vsAnterior < -20 ? "text-red-600" : vsAnterior !== null && vsAnterior >= 0 ? "text-green-600" : ""}`}>
             {vsAnterior === null ? "—" : `${vsAnterior > 0 ? "+" : ""}${vsAnterior.toFixed(1)}%`}
           </div>
           {vsAnterior !== null && (
-            <div className="text-[9px] text-gray-400 mt-0.5">{fmt(prevTotal)} ant.</div>
+            <div className="text-xs text-gray-500 mt-0.5">{fmt(prevTotal)} ant.</div>
           )}
         </div>
 
         {/* 3. Utilidad Total */}
         <div className="border border-gray-200 rounded-lg p-3">
-          <div className="text-[9px] uppercase text-gray-400">Utilidad Total</div>
+          <div className="text-xs uppercase text-gray-500">Utilidad Total</div>
           <div className={`text-base font-semibold ${totalUtilidad < 0 ? "text-red-600" : ""}`}>
             B/. {fmt(totalUtilidad)}
           </div>
@@ -130,12 +130,12 @@ function ReportePage() {
 
         {/* 4. Margen Bruto */}
         <div className="border border-gray-200 rounded-lg p-3">
-          <div className="text-[9px] uppercase text-gray-400">Margen Bruto</div>
+          <div className="text-xs uppercase text-gray-500">Margen Bruto</div>
           <div className={`text-base font-semibold ${margen < 20 ? "text-red-600" : ""}`}>
             {margen.toFixed(1)}%
           </div>
           {margenDelta !== null && (
-            <div className={`text-[9px] mt-0.5 ${margenDelta >= 0 ? "text-green-600" : "text-red-500"}`}>
+            <div className={`text-xs mt-0.5 ${margenDelta >= 0 ? "text-green-600" : "text-red-500"}`}>
               {margenDelta > 0 ? "▲" : "▼"} {Math.abs(margenDelta).toFixed(1)} pp vs ant.
             </div>
           )}
@@ -143,20 +143,20 @@ function ReportePage() {
 
         {/* 5. vs Meta */}
         <div className="border border-gray-200 rounded-lg p-3">
-          <div className="text-[9px] uppercase text-gray-400">vs Meta</div>
+          <div className="text-xs uppercase text-gray-500">vs Meta</div>
           <div className={`text-base font-semibold ${vsMeta < 80 && metaTotal > 0 ? "text-red-600" : vsMeta >= 100 && metaTotal > 0 ? "text-green-600" : ""}`}>
             {metaTotal > 0 ? `${vsMeta.toFixed(1)}%` : "—"}
           </div>
           {metaTotal > 0 && (
-            <div className="text-[9px] text-gray-400 mt-0.5">Meta: {fmt(metaTotal)}</div>
+            <div className="text-xs text-gray-500 mt-0.5">Meta: {fmt(metaTotal)}</div>
           )}
         </div>
       </div>
 
       {/* Empresa Table */}
-      <table className="w-full text-[11px] border-collapse mb-6">
+      <table className="w-full text-xs border-collapse mb-6">
         <thead>
-          <tr className="border-b-2 border-gray-300">
+          <tr className="border-b border-gray-300">
             <th className="text-left py-2 font-semibold">Empresa</th>
             {vista === "mensual"
               ? MES_NAMES.map(m => <th key={m} className="text-right py-2 font-semibold">{m}</th>)
@@ -205,10 +205,10 @@ function ReportePage() {
       {/* Top 10 Clientes */}
       {top10Clients.length > 0 && (
         <>
-          <h3 className="text-xs font-semibold uppercase text-gray-400 mb-2">Top 10 Clientes del Período</h3>
-          <table className="w-full text-[11px] border-collapse mb-8">
+          <h3 className="text-xs font-semibold uppercase text-gray-500 mb-2">Top 10 Clientes del Período</h3>
+          <table className="w-full text-xs border-collapse mb-8">
             <thead>
-              <tr className="border-b-2 border-gray-300">
+              <tr className="border-b border-gray-300">
                 <th className="text-left py-1.5 font-semibold">Cliente</th>
                 <th className="text-right py-1.5 font-semibold">Ventas B/.</th>
                 <th className="text-right py-1.5 font-semibold">Utilidad B/.</th>
@@ -243,7 +243,7 @@ function ReportePage() {
       )}
 
       {/* Footer */}
-      <div className="text-[9px] text-gray-400 text-center border-t border-gray-200 pt-3">
+      <div className="text-xs text-gray-500 text-center border-t border-gray-200 pt-3">
         Generado por fashiongr.com — uso interno confidencial
       </div>
 
@@ -268,7 +268,7 @@ function ReportePage() {
           /* Ensure table borders survive print */
           table { border-collapse: collapse; width: 100%; }
           th, td { border-bottom: 1px solid #e5e7eb; padding: 4px 6px; }
-          thead tr { border-bottom: 2px solid #d1d5db; }
+          thead tr { border-bottom: 1px solid #d1d5db; }
 
           /* Color adjustments for print */
           .text-red-600 { color: #dc2626 !important; }

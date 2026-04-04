@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
+import { requireRole } from "@/lib/requireRole";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const GUIAS_ROLES = ["admin", "secretaria", "bodega", "director"];
 
 // ── Shared: generate PDF + send email ──
 
@@ -139,7 +141,9 @@ async function sendDispatchEmail(guia: GuiaEmail, dispatchedBy: string) {
 
 // ── GET ──
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, GUIAS_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const { id } = params;
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
 
@@ -156,6 +160,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 // ── PUT (bodega full dispatch with items/signatures) ──
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, GUIAS_ROLES);
+  if (auth instanceof NextResponse) return auth;
   const { id } = params;
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const body = await req.json();
@@ -255,6 +261,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 // ── PATCH (quick dispatch from list / bodega partial update) ──
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, GUIAS_ROLES);
+  if (auth instanceof NextResponse) return auth;
   if (!UUID_RE.test(params.id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const body = await req.json();
   const allowed = ["placa", "observaciones", "estado", "receptor_nombre", "cedula", "firma_base64", "firma_entregador_base64", "entregado_por", "numero_guia_transp", "nombre_entregador", "cedula_entregador", "firma_transportista", "tipo_despacho", "nombre_chofer", "motivo_rechazo"];
@@ -263,6 +271,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body[key] !== undefined) update[key] = body[key];
   }
   if (Object.keys(update).length === 0) return NextResponse.json({ error: "No fields to update" }, { status: 400 });
+
+  // Block double-dispatch: if guia is already Completada, reject state changes
+  if (body.estado) {
+    const { data: current } = await supabaseServer.from("guia_transporte").select("estado").eq("id", params.id).single();
+    if (current?.estado === "Completada" && body.estado === "Completada") {
+      return NextResponse.json({ error: "Esta guía ya fue despachada" }, { status: 400 });
+    }
+    if (current?.estado === "Completada" && body.estado !== "Completada") {
+      return NextResponse.json({ error: "Guía ya despachada, no se puede editar" }, { status: 400 });
+    }
+  }
 
   const session = getSession(req);
   await logActivity(session?.role || "unknown", "guia_patch", "guias", { guiaId: params.id, fields: Object.keys(update) }, session?.userName);
@@ -288,6 +307,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 // ── DELETE (soft delete) ──
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireRole(req, ["admin", "secretaria"]);
+  if (auth instanceof NextResponse) return auth;
   const { id } = params;
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const { error } = await supabaseServer.from("guia_transporte").update({ deleted: true }).eq("id", id);

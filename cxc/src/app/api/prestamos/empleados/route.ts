@@ -24,6 +24,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const s = getSession(req);
+  if (!s || !PRESTAMOS_ROLES.includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const body = await req.json();
   const { nombre, empresa, deduccion_quincenal, notas } = body;
 

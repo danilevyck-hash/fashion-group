@@ -5,6 +5,8 @@ import { requireAuth } from "@/lib/require-auth";
 // ventas_metas table has column "año" (with ñ) — never renamed
 
 export async function GET(req: NextRequest) {
+  const authError = requireAuth(req, ["admin", "director", "contabilidad"]);
+  if (authError) return authError;
   const anio = req.nextUrl.searchParams.get("anio");
   if (!anio) return NextResponse.json({ error: "anio requerido" }, { status: 400 });
 

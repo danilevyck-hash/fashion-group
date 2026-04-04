@@ -98,10 +98,10 @@ export default function ActivityLog({ darkMode }: { darkMode: boolean }) {
       ) : (
         <div className="space-y-2">
           {logs.map(log => (
-            <div key={log.id} className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
+            <div key={log.id} className={`flex items-center gap-3 p-3 rounded-lg border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`text-[10px] uppercase font-medium px-2 py-0.5 rounded-full ${MODULE_COLORS[log.module] || "bg-gray-100 text-gray-600"}`}>
+                  <span className={`text-xs uppercase font-medium px-2 py-0.5 rounded-full ${MODULE_COLORS[log.module] || "bg-gray-100 text-gray-600"}`}>
                     {log.module}
                   </span>
                   <span className={`text-sm ${darkMode ? "text-gray-200" : "text-gray-800"}`}>

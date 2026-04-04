@@ -2,6 +2,8 @@ import { requireRole } from "@/lib/requireRole";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria", "bodega"]);
+  if (auth instanceof NextResponse) return auth;
   const { subject, body } = await req.json();
   const RESEND_KEY = process.env.RESEND_API_KEY;
   if (!RESEND_KEY) return NextResponse.json({ error: "RESEND_API_KEY not configured" }, { status: 500 });

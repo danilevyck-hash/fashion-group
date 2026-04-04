@@ -305,21 +305,21 @@ export default function GuiasList({
                                     {canEdit && !isDispatched && (
                                       <button
                                         onClick={() => onEdit(expandedGuia.id)}
-                                        className="text-xs text-gray-500 hover:text-black transition"
+                                        className="text-xs text-gray-500 hover:text-black transition min-h-[44px] inline-flex items-center"
                                       >
                                         Editar
                                       </button>
                                     )}
                                     <button
                                       onClick={() => onPrint(expandedGuia.id)}
-                                      className="text-xs text-gray-500 hover:text-black transition"
+                                      className="text-xs text-gray-500 hover:text-black transition min-h-[44px] inline-flex items-center"
                                     >
                                       Imprimir
                                     </button>
                                     {canReject && isDispatched && expandedGuia.estado !== "Rechazada" && (
                                       rejectingId === expandedGuia.id ? (
                                         <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                                          <input type="text" value={rejectMotivo} onChange={e => setRejectMotivo(e.target.value)} placeholder="Motivo de rechazo..." className="border-b border-gray-200 py-1 text-xs outline-none w-40" autoFocus />
+                                          <input type="text" value={rejectMotivo} onChange={e => setRejectMotivo(e.target.value)} placeholder="Motivo de rechazo..." className="border-b border-gray-200 py-1 text-xs outline-none w-full max-w-[200px]" autoFocus />
                                           <button onClick={() => { if (rejectMotivo.trim()) { onReject(expandedGuia.id, rejectMotivo.trim()); setRejectingId(null); setRejectMotivo(""); } }} disabled={!rejectMotivo.trim()} className="text-xs text-red-600 hover:text-red-800 transition disabled:opacity-40">Confirmar</button>
                                           <button onClick={() => { setRejectingId(null); setRejectMotivo(""); }} className="text-xs text-gray-400 hover:text-black transition">Cancelar</button>
                                         </div>

@@ -223,24 +223,24 @@ export default function PrestamosPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
-          <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
-            <div className="text-[10px] text-gray-400 uppercase tracking-wide">Total Prestado</div>
+          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+            <div className="text-xs text-gray-400 uppercase tracking-wide">Total Prestado</div>
             <div className="text-lg font-semibold mt-0.5 tabular-nums">${fmt(totalPrestado)}</div>
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
-            <div className="text-[10px] text-gray-400 uppercase tracking-wide">Saldo Pendiente</div>
+          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+            <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo Pendiente</div>
             <div className="text-lg font-semibold mt-0.5 tabular-nums text-red-600">${fmt(totalSaldo)}</div>
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
-            <div className="text-[10px] text-gray-400 uppercase tracking-wide">Empleados Activos</div>
+          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+            <div className="text-xs text-gray-400 uppercase tracking-wide">Empleados Activos</div>
             <div className="text-lg font-semibold mt-0.5 tabular-nums">{empleadosActivos}</div>
           </div>
-          <div className={`rounded-lg px-3 py-2.5 ${deduccionesCompletas ? "bg-green-50" : "bg-amber-50"}`}>
-            <div className="text-[10px] text-gray-400 uppercase tracking-wide">Deducciones Quincena</div>
+          <div className={`rounded-lg p-3 ${deduccionesCompletas ? "bg-green-50" : "bg-amber-50"}`}>
+            <div className="text-xs text-gray-400 uppercase tracking-wide">Deducciones Quincena</div>
             <div className={`text-lg font-semibold mt-0.5 tabular-nums ${deduccionesCompletas ? "text-green-600" : "text-amber-600"}`}>
               {deduccionesAplicadas} / {deduccionesTotal}
             </div>
-            <div className="text-[10px] text-gray-400">{quincena.label}</div>
+            <div className="text-xs text-gray-400">{quincena.label}</div>
           </div>
         </div>
 
@@ -345,16 +345,16 @@ export default function PrestamosPage() {
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Empleado</th>
-                  <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Empresa</th>
-                  <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Ded. Quincenal</th>
-                  <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Total Prestado</th>
-                  <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Pagado</th>
-                  <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Saldo</th>
-                  <th className="py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal w-32">Progreso</th>
-                  <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Notas</th>
-                  <th className="py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Deducción</th>
-                  <th className="py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Acciones</th>
+                  <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Empleado</th>
+                  <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Empresa</th>
+                  <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Ded. Quincenal</th>
+                  <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Total Prestado</th>
+                  <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Pagado</th>
+                  <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Saldo</th>
+                  <th className="py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal w-32">Progreso</th>
+                  <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Notas</th>
+                  <th className="py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Deducción</th>
+                  <th className="py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -434,7 +434,7 @@ export default function PrestamosPage() {
                 <textarea value={fNotas} onChange={e => setFNotas(e.target.value)} rows={2} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" placeholder="Notas opcionales..." />
               </div>
             </div>
-            <div className="flex gap-2 mt-6">
+            <div className="flex gap-3 mt-6">
               <button onClick={() => setShowEmpModal(false)} className="flex-1 py-2 border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
               <button onClick={saveEmp} disabled={saving} className="flex-1 py-2 bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
                 {saving ? "Guardando..." : editingEmp ? "Guardar Cambios" : "Crear Empleado"}
@@ -506,7 +506,7 @@ export default function PrestamosPage() {
                 <textarea value={mNotas} onChange={e => setMNotas(e.target.value)} rows={2} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition resize-none" placeholder="Notas opcionales..." />
               </div>
             </div>
-            <div className="flex gap-2 mt-6">
+            <div className="flex gap-3 mt-6">
               <button onClick={() => setShowMovModal(false)} className="flex-1 py-2 border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
               <button onClick={saveMov} disabled={savingMov} className="flex-1 py-2 bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
                 {savingMov ? "Guardando..." : "Registrar"}

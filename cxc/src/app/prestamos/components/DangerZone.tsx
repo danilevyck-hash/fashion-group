@@ -71,7 +71,7 @@ export default function DangerZone({
                     onClick={onDeleteEmployee}
                     disabled={hasMovs}
                     title={hasMovs ? "Debes borrar todos los movimientos primero" : ""}
-                    className="px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    className="px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                   >
                     <TrashIcon />
                     Eliminar
@@ -87,7 +87,7 @@ export default function DangerZone({
                   <button
                     onClick={onClearHistory}
                     disabled={!hasMovs}
-                    className="px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    className="px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                   >
                     <WarnIcon />
                     Borrar Historial

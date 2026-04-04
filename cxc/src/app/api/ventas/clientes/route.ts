@@ -3,6 +3,8 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export async function GET(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "director", "contabilidad"]);
+  if (auth instanceof NextResponse) return auth;
   const empresa = req.nextUrl.searchParams.get("empresa");
   const año = req.nextUrl.searchParams.get("anio");
   const mes = req.nextUrl.searchParams.get("mes");
@@ -22,6 +24,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, ["admin"]);
+  if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   if (!Array.isArray(body)) return NextResponse.json({ error: "Expected array" }, { status: 400 });
 

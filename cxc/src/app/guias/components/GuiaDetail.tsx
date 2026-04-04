@@ -10,7 +10,7 @@ interface GuiaDetailProps {
 
 export default function GuiaDetail({ guia, onBack }: GuiaDetailProps) {
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       <div className="flex items-center gap-4 mb-8 no-print">
         <button onClick={onBack} className="text-sm text-gray-400 hover:text-black transition">
           ← Volver

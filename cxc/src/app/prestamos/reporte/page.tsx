@@ -121,11 +121,11 @@ export default function ReportePage() {
         ]}
       />
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="max-w-6xl mx-auto px-6 py-6">
         <h1 className="text-xl font-semibold mb-6">Reporte de Deducciones Quincenales</h1>
 
         {/* Period selector */}
-        <div className="flex flex-wrap items-end gap-4 mb-8 bg-gray-50 rounded-lg p-4">
+        <div className="flex flex-wrap items-end gap-4 mb-6 bg-gray-50 rounded-lg p-4">
           <div>
             <label className="text-xs text-gray-400 uppercase block mb-1">Quincena</label>
             <select value={quincena} onChange={e => setQuincena(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition">
@@ -192,7 +192,7 @@ export default function ReportePage() {
           </div>
         )}
 
-        <div className="mt-8">
+        <div className="mt-6">
           <button onClick={() => router.push("/prestamos")} className="border border-gray-200 px-5 py-2 rounded-md text-sm hover:border-gray-400 transition">← Volver a Préstamos</button>
         </div>
       </div>

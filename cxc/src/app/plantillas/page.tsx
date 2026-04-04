@@ -181,7 +181,7 @@ export default function PlantillasPage() {
     <div className={`min-h-screen ${darkMode ? "bg-gray-950 text-gray-100" : ""}`}>
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <FGLogo variant="horizontal" theme="light" size={30} />
           <span className={`text-lg font-light ${darkMode ? "text-gray-100" : "text-gray-800"}`}>{getGreeting()}{displayName ? `, ${displayName}` : ""}</span>
@@ -200,14 +200,14 @@ export default function PlantillasPage() {
       {/* KPI Cards — admin and director only */}
       {(role === "admin" || role === "director") && (
         statsLoading ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 sm:grid-cols-4 gap-2 mb-6">
             {[1,2,3,4].map(i => <div key={i} className="h-20 rounded-lg bg-gray-50 border border-gray-200 animate-pulse" />)}
           </div>
         ) : stats ? (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 sm:grid-cols-4 gap-2 mb-6">
             {/* Ventas */}
-            <div className={`rounded-lg px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
-              <p className="text-[10px] uppercase tracking-wider text-gray-400">Ventas del mes</p>
+            <div className={`rounded-lg p-3 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
+              <p className="text-xs uppercase tracking-wider text-gray-500">Ventas del mes</p>
               <p className="text-lg font-semibold tabular-nums mt-0.5">${stats.ventasMes > 0 ? (stats.ventasMes / 1000).toFixed(0) + "K" : "—"}</p>
               {stats.ventasPrev > 0 && stats.ventasMes > 0 ? (() => {
                 const pct = ((stats.ventasMes - stats.ventasPrev) / stats.ventasPrev * 100);
@@ -215,8 +215,8 @@ export default function PlantillasPage() {
               })() : <p className="text-xs text-gray-300 mt-1">—</p>}
             </div>
             {/* Reclamos */}
-            <div className={`rounded-lg px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
-              <p className="text-[10px] uppercase tracking-wider text-gray-400">Reclamos</p>
+            <div className={`rounded-lg p-3 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
+              <p className="text-xs uppercase tracking-wider text-gray-500">Reclamos</p>
               <p className="text-lg font-semibold tabular-nums mt-0.5">{stats.reclamosPendientes}</p>
               <div className="flex items-center gap-2 mt-1">
                 {stats.reclamosViejos > 0 && <span className="text-xs text-red-500">{stats.reclamosViejos} +45d</span>}
@@ -225,18 +225,18 @@ export default function PlantillasPage() {
               </div>
             </div>
             {/* CxC */}
-            <div className={`rounded-lg px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
-              <p className="text-[10px] uppercase tracking-wider text-gray-400">Cuentas por Cobrar</p>
+            <div className={`rounded-lg p-3 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
+              <p className="text-xs uppercase tracking-wider text-gray-500">Cuentas por Cobrar</p>
               <p className="text-lg font-semibold tabular-nums mt-0.5">${stats.cxcTotal > 0 ? (stats.cxcTotal / 1000).toFixed(0) + "K" : "—"}</p>
               {stats.cxcVencida > 0
                 ? <p className="text-xs text-red-500 mt-1">${(stats.cxcVencida / 1000).toFixed(0)}K vencida</p>
                 : <p className="text-xs text-green-600 mt-1">Sin vencidos</p>}
             </div>
             {/* Cheques */}
-            <div className={`rounded-lg px-3 py-2.5 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
-              <p className="text-[10px] uppercase tracking-wider text-gray-400">Cheques</p>
+            <div className={`rounded-lg p-3 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
+              <p className="text-xs uppercase tracking-wider text-gray-500">Cheques</p>
               <p className="text-lg font-semibold tabular-nums mt-0.5">{stats.vencenEstaSemana}</p>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 {stats.chequesTotalPendiente > 0 ? `$${(stats.chequesTotalPendiente / 1000).toFixed(0)}K pendiente` : "—"}
               </p>
             </div>
@@ -314,7 +314,7 @@ export default function PlantillasPage() {
                       {...prov.draggableProps}
                       {...(editMode ? prov.dragHandleProps : {})}
                       onClick={() => { if (!editMode) router.push(mod.href); }}
-                      className={`relative border rounded-lg px-3 py-3 transition cursor-pointer select-none ${
+                      className={`relative border rounded-lg p-3 transition cursor-pointer select-none ${
                         snapshot.isDragging ? "border-gray-300 bg-white z-50" : `${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 hover:border-gray-300 bg-white"}`
                       } ${editMode ? "cursor-grab active:cursor-grabbing" : ""}`}
                     >

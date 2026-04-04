@@ -31,7 +31,7 @@ export function PagoQuincenalConfirm({ show, nombreEmpleado, deduccionQuincenal,
         <p className="text-sm text-gray-500">
           ¿Registrar pago quincenal de <strong className="text-black">${fmt(deduccionQuincenal)}</strong> para <strong className="text-black">{nombreEmpleado}</strong>?
         </p>
-        <div className="flex gap-2 mt-6">
+        <div className="flex gap-3 mt-6">
           <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
           <button onClick={onConfirm} className="flex-1 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700 transition">Confirmar Pago</button>
         </div>
@@ -60,9 +60,9 @@ export function DeleteEmpleadoConfirm({ show, nombreEmpleado, deleteInput, onCha
         <p className="text-sm text-gray-500 mb-4">Esta acción es irreversible. Escribe el nombre del empleado para confirmar:</p>
         <p className="text-sm font-medium mb-2">{nombreEmpleado}</p>
         <input value={deleteInput} onChange={e => onChangeInput(e.target.value)} placeholder="Escribe el nombre..." className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-red-500 transition" />
-        <div className="flex gap-2 mt-6">
+        <div className="flex gap-3 mt-6">
           <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
-          <button onClick={onConfirm} disabled={deleteInput !== nombreEmpleado} className="flex-1 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition disabled:opacity-40">
+          <button onClick={onConfirm} disabled={deleteInput !== nombreEmpleado} className="flex-1 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition disabled:opacity-50">
             Eliminar
           </button>
         </div>
@@ -97,9 +97,9 @@ export function ClearHistoryConfirm({ show, movCount, clearInput, clearProgress,
               Esta acción eliminará {movCount} movimiento{movCount > 1 ? "s" : ""} de forma irreversible. Escribe CONFIRMAR para continuar:
             </p>
             <input value={clearInput} onChange={e => onChangeInput(e.target.value)} placeholder='Escribe "CONFIRMAR"' className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-red-500 transition" />
-            <div className="flex gap-2 mt-6">
+            <div className="flex gap-3 mt-6">
               <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
-              <button onClick={onConfirm} disabled={clearInput !== "CONFIRMAR"} className="flex-1 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition disabled:opacity-40">
+              <button onClick={onConfirm} disabled={clearInput !== "CONFIRMAR"} className="flex-1 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition disabled:opacity-50">
                 Borrar Todo
               </button>
             </div>
@@ -128,7 +128,7 @@ export function ForceArchiveConfirm({ show, saldo, onClose, onConfirm }: ForceAr
         <p className="text-sm text-gray-500 mb-4">
           Este empleado tiene saldo pendiente de <strong className="text-red-600">${fmt(saldo)}</strong>. ¿Confirmas que deseas archivarlo?
         </p>
-        <div className="flex gap-2 mt-4">
+        <div className="flex gap-3 mt-4">
           <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
           <button onClick={onConfirm} className="flex-1 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition">
             Confirmar Archivado
