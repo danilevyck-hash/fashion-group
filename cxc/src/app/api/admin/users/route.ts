@@ -23,11 +23,19 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
 
   const { name, password, role, associated_company } = await req.json();
-  if (!name || !password) return NextResponse.json({ error: "name and password required" }, { status: 400 });
+  if (!name || !password) return NextResponse.json({ error: "Nombre y contraseña requeridos" }, { status: 400 });
+  if (password.length < 6) return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres" }, { status: 400 });
+
+  // Check for duplicate name
+  const { data: existing } = await supabaseServer.from("fg_users").select("id").eq("name", name.trim()).limit(1);
+  if (existing && existing.length > 0) return NextResponse.json({ error: "Ya existe un usuario con ese nombre" }, { status: 400 });
+
+  const bcrypt = (await import("bcryptjs")).default;
+  const hashed = await bcrypt.hash(password, 10);
 
   const { data: user, error } = await supabaseServer
     .from("fg_users")
-    .insert({ name, password, role: role || "vendedor", associated_company: associated_company || null })
+    .insert({ name: name.trim(), password: hashed, role: role || "vendedor", associated_company: associated_company || null })
     .select()
     .single();
 
@@ -46,7 +54,11 @@ export async function PUT(req: NextRequest) {
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (name !== undefined) update.name = name;
-  if (password !== undefined) update.password = password;
+  if (password !== undefined) {
+    if (password.length < 6) return NextResponse.json({ error: "La contraseña debe tener al menos 6 caracteres" }, { status: 400 });
+    const bcrypt = (await import("bcryptjs")).default;
+    update.password = await bcrypt.hash(password, 10);
+  }
   if (role !== undefined) update.role = role;
   if (associated_company !== undefined) update.associated_company = associated_company;
 

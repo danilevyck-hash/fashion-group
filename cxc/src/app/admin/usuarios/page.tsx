@@ -319,8 +319,8 @@ export default function UsuariosPage() {
                         <span className={`text-[11px] px-2 py-0.5 rounded-full ${u.active ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>{u.active ? "Activo" : "Inactivo"}</span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button onClick={() => openEditUser(u)} className="text-xs text-blue-600 hover:underline mr-2">Editar</button>
-                        <button onClick={() => toggleUserActive(u.id, !u.active)} className="text-xs text-gray-400 hover:text-black">{u.active ? "Desactivar" : "Activar"}</button>
+                        <button onClick={() => openEditUser(u)} className="text-xs text-blue-600 hover:underline mr-2 py-2.5 sm:py-1.5 px-1">Editar</button>
+                        <button onClick={() => toggleUserActive(u.id, !u.active)} className="text-xs text-gray-400 hover:text-black py-2.5 sm:py-1.5 px-1">{u.active ? "Desactivar" : "Activar"}</button>
                       </td>
                     </tr>
                   ))}
