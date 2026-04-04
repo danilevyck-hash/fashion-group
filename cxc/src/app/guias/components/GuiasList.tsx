@@ -162,7 +162,7 @@ export default function GuiasList({
                       const isDispatched = g.estado === "Completada" || g.estado === "Rechazada";
 
                       return (
-                        <div key={g.id} className={`border rounded-lg transition-all ${isExpanded ? "border-gray-300 shadow-sm" : "border-gray-200 hover:border-gray-200"}`}>
+                        <div key={g.id} className={`border rounded-lg transition-all ${isExpanded ? "border-gray-300" : "border-gray-200 hover:border-gray-200"}`}>
                           {/* Row header */}
                           <button
                             onClick={() => onToggleExpand(g.id)}

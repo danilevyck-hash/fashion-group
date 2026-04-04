@@ -57,8 +57,8 @@ export default function EditEmpleadoModal({
           </div>
         </div>
         <div className="flex gap-2 mt-6">
-          <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
-          <button onClick={onSave} disabled={saving} className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50">
+          <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
+          <button onClick={onSave} disabled={saving} className="flex-1 py-2 bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
             {saving ? "Guardando..." : "Guardar Cambios"}
           </button>
         </div>

@@ -223,15 +223,15 @@ export default function PrestamosPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {/* KPI Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
-          <div className="bg-gray-50 rounded-lg px-3 py-2.5">
+          <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
             <div className="text-[10px] text-gray-400 uppercase tracking-wide">Total Prestado</div>
             <div className="text-lg font-semibold mt-0.5 tabular-nums">${fmt(totalPrestado)}</div>
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2.5">
+          <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
             <div className="text-[10px] text-gray-400 uppercase tracking-wide">Saldo Pendiente</div>
             <div className="text-lg font-semibold mt-0.5 tabular-nums text-red-600">${fmt(totalSaldo)}</div>
           </div>
-          <div className="bg-gray-50 rounded-lg px-3 py-2.5">
+          <div className="bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
             <div className="text-[10px] text-gray-400 uppercase tracking-wide">Empleados Activos</div>
             <div className="text-lg font-semibold mt-0.5 tabular-nums">{empleadosActivos}</div>
           </div>
@@ -276,7 +276,7 @@ export default function PrestamosPage() {
                     <span className="text-xs text-gray-400">{m.fecha}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={async () => { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "aprobado" }) }); if (res.ok) { showToast("Movimiento aprobado"); loadEmpleados(); } else showToast("Error al aprobar"); }} className="text-xs bg-green-600 text-white px-4 py-2 rounded-full hover:bg-green-700 transition">Aprobar</button>
+                    <button onClick={async () => { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "aprobado" }) }); if (res.ok) { showToast("Movimiento aprobado"); loadEmpleados(); } else showToast("Error al aprobar"); }} className="text-xs bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">Aprobar</button>
                     <button onClick={async () => { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rechazado" }) }); if (res.ok) { showToast("Movimiento rechazado"); loadEmpleados(); } else showToast("Error al rechazar"); }} className="text-xs text-red-500 hover:text-red-700 transition px-4 py-2">Rechazar</button>
                   </div>
                 </div>
@@ -362,8 +362,8 @@ export default function PrestamosPage() {
                   <tr key={emp.id} onClick={() => router.push(`/prestamos/${emp.id}`)} className={`${i % 2 === 1 ? "bg-gray-50/50" : ""} ${!emp.activo ? "opacity-50" : ""} cursor-pointer hover:bg-gray-50 transition-colors`}>
                     <td className="py-3 px-4">
                       <span className="font-medium">{emp.nombre}</span>
-                      {!emp.activo && <span className="ml-2 text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-full">Archivado</span>}
-                      {pendientes > 0 && <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{pendientes} pendiente{pendientes > 1 ? "s" : ""}</span>}
+                      {!emp.activo && <span className="ml-2 text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span>}
+                      {pendientes > 0 && <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md">{pendientes} pendiente{pendientes > 1 ? "s" : ""}</span>}
                     </td>
                     <td className="py-3 px-4 text-gray-500">{emp.empresa || "—"}</td>
                     <td className="py-3 px-4 text-right tabular-nums hidden sm:table-cell">${fmt(emp.deduccion_quincenal)}</td>
@@ -372,8 +372,8 @@ export default function PrestamosPage() {
                     <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(saldo)}</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
-                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                          <div className={`h-full ${progressColor(pct)} rounded-full transition-all`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                        <div className="flex-1 h-2 bg-gray-200 rounded-md overflow-hidden">
+                          <div className={`h-full ${progressColor(pct)} rounded-md transition-all`} style={{ width: `${Math.min(pct, 100)}%` }} />
                         </div>
                         <span className="text-xs text-gray-400 tabular-nums w-10 text-right">{pct.toFixed(0)}%</span>
                       </div>
@@ -382,8 +382,8 @@ export default function PrestamosPage() {
                     <td className="py-3 px-4 hidden sm:table-cell">
                       {emp.deduccion_quincenal > 0 ? (
                         hasDeduccionEnQuincena(emp.prestamos_movimientos || [], quincena.start, quincena.end)
-                          ? <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">✓ Deducida</span>
-                          : <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-full">⚠ Pendiente</span>
+                          ? <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-md">✓ Deducida</span>
+                          : <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md">⚠ Pendiente</span>
                       ) : null}
                     </td>
                     <td className="py-3 px-4">
@@ -435,8 +435,8 @@ export default function PrestamosPage() {
               </div>
             </div>
             <div className="flex gap-2 mt-6">
-              <button onClick={() => setShowEmpModal(false)} className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
-              <button onClick={saveEmp} disabled={saving} className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50">
+              <button onClick={() => setShowEmpModal(false)} className="flex-1 py-2 border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
+              <button onClick={saveEmp} disabled={saving} className="flex-1 py-2 bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
                 {saving ? "Guardando..." : editingEmp ? "Guardar Cambios" : "Crear Empleado"}
               </button>
             </div>
@@ -507,8 +507,8 @@ export default function PrestamosPage() {
               </div>
             </div>
             <div className="flex gap-2 mt-6">
-              <button onClick={() => setShowMovModal(false)} className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
-              <button onClick={saveMov} disabled={savingMov} className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50">
+              <button onClick={() => setShowMovModal(false)} className="flex-1 py-2 border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
+              <button onClick={saveMov} disabled={savingMov} className="flex-1 py-2 bg-black text-white rounded-md text-sm hover:bg-gray-800 transition disabled:opacity-50">
                 {savingMov ? "Guardando..." : "Registrar"}
               </button>
             </div>

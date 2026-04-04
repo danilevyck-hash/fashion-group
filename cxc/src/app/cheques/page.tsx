@@ -49,7 +49,7 @@ function ChequeMoreMenu({ cheque, ve, role, onRebotado, onWA, onDelete }: {
       <button onClick={() => setOpen(!open)} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] px-1">&#x22EF;</button>
       {open && (<>
         <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 py-1 min-w-[160px]">
+        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg z-20 py-1 min-w-[160px]">
           {isPending && (
             <button onClick={() => { onRebotado(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Rebotado</button>
           )}
@@ -338,7 +338,7 @@ export default function ChequesPage() {
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-light tracking-tight">Cheques Posfechados</h1>
         <div className="flex flex-wrap items-center gap-3">
-          <button onClick={exportPendientes} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-full transition">
+          <button onClick={exportPendientes} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-md transition">
             ↓ Exportar pendientes
           </button>
           <button onClick={() => { resetForm(); setShowForm(!showForm); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition">
@@ -372,21 +372,21 @@ export default function ChequesPage() {
         const vencenSemanaKPI = pendientes.filter((c) => c.fecha_deposito >= today && c.fecha_deposito <= weekFromNow);
         return (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
               <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Total a cobrar</div>
               <div className="text-xl font-semibold tabular-nums">${fmt(totalPendiente)}</div>
               <div className="text-xs text-gray-400 mt-0.5">{pendientes.length} cheques</div>
             </div>
-            <div className={`rounded-lg p-4 ${vencenSemanaKPI.length > 0 ? "bg-amber-50" : "bg-gray-50"}`}>
+            <div className={`rounded-lg p-4 border border-gray-200 ${vencenSemanaKPI.length > 0 ? "bg-amber-50" : "bg-gray-50"}`}>
               <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Vencen esta semana</div>
               <div className={`text-xl font-semibold tabular-nums ${vencenSemanaKPI.length > 0 ? "text-amber-600" : ""}`}>{vencenSemanaKPI.length}</div>
               <div className="text-xs text-gray-400 mt-0.5">${fmt(vencenSemanaKPI.reduce((s, c) => s + (Number(c.monto) || 0), 0))}</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
               <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Próximo depósito</div>
               <div className="text-xl font-semibold">{proximo ? fmtDate(proximo) : "—"}</div>
             </div>
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
               <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">Depositados</div>
               <div className="text-xl font-semibold tabular-nums text-green-600">{depositados.length}</div>
               <div className="text-xs text-gray-400 mt-0.5">${fmt(depositados.reduce((s, c) => s + (Number(c.monto) || 0), 0))}</div>
@@ -407,7 +407,7 @@ export default function ChequesPage() {
                 {showSuggestions && fCliente.length >= 2 && (() => {
                   const matches = dirClientes.filter(n => n.toLowerCase().includes(fCliente.toLowerCase())).slice(0, 5);
                   return matches.length > 0 ? (
-                    <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 mt-1">
+                    <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg z-50 mt-1">
                       {matches.map(n => (
                         <button key={n} onMouseDown={() => { setFCliente(n); setShowSuggestions(false); }} className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition">{n}</button>
                       ))}
@@ -487,7 +487,7 @@ export default function ChequesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar cheque o cliente..."
-            className="text-sm border border-gray-200 rounded-full px-4 py-1.5 outline-none focus:border-black transition w-56"
+            className="text-sm border border-gray-200 rounded-full px-4 py-1.5 outline-none focus:border-black transition w-full max-w-xs"
           />
         </div>
       </div>}
@@ -536,7 +536,7 @@ export default function ChequesPage() {
       {/* Rebotado modal */}
       {rebotandoId && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => { setRebotandoId(null); setMotivoRebote(""); }}>
-          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-lg p-6 w-full max-w-md border border-gray-200" onClick={(e) => e.stopPropagation()}>
             <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Marcar como Rebotado</div>
             <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Motivo (opcional)</label>
             <textarea
@@ -596,9 +596,9 @@ export default function ChequesPage() {
             {/* Nav */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <button onClick={goPrev} className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 hover:border-gray-400 transition text-gray-500">‹</button>
+                <button onClick={goPrev} className="w-8 h-8 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full border border-gray-200 hover:border-gray-400 transition text-gray-500">‹</button>
                 <h2 className="text-sm font-medium capitalize w-40 text-center">{monthLabel}</h2>
-                <button onClick={goNext} className="w-8 h-8 flex items-center justify-center rounded-full border border-gray-200 hover:border-gray-400 transition text-gray-500">›</button>
+                <button onClick={goNext} className="w-8 h-8 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full border border-gray-200 hover:border-gray-400 transition text-gray-500">›</button>
                 <button onClick={goToday} className="text-xs text-gray-400 hover:text-black transition ml-2">Hoy</button>
               </div>
               <span className="text-xs text-gray-400">{monthCheques.length} cheques · ${fmt(totalMonth)}</span>
@@ -628,7 +628,7 @@ export default function ChequesPage() {
                               {c.cliente.length > 12 ? c.cliente.slice(0, 12) + "…" : c.cliente} ${fmt(c.monto)}
                             </button>
                             {calPopover === c.id && (
-                              <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 w-56" onClick={e => e.stopPropagation()}>
+                              <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg p-3 w-56" onClick={e => e.stopPropagation()}>
                                 <div className="text-xs font-medium mb-1">{c.cliente}</div>
                                 <div className="text-[11px] text-gray-500 mb-0.5">{c.banco} · {c.numero_cheque}</div>
                                 <div className="text-sm font-semibold mb-2">${fmt(c.monto)}</div>
@@ -712,7 +712,7 @@ export default function ChequesPage() {
         {selectedIds.size > 0 && (
           <div className="flex items-center gap-3 mb-3 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-lg">
             <span className="text-sm text-emerald-700">{selectedIds.size} pendiente{selectedIds.size > 1 ? "s" : ""} seleccionado{selectedIds.size > 1 ? "s" : ""}</span>
-            <button onClick={() => setConfirmBatch({ ids: selectedIds, clearFn: setSelectedIds })} disabled={batchProcessing} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-full hover:bg-emerald-700 transition disabled:opacity-50">
+            <button onClick={() => setConfirmBatch({ ids: selectedIds, clearFn: setSelectedIds })} disabled={batchProcessing} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-md hover:bg-emerald-700 transition disabled:opacity-50">
               {batchProcessing ? "Procesando..." : "Marcar depositados"}
             </button>
             <button onClick={() => setSelectedIds(new Set())} className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
@@ -721,7 +721,7 @@ export default function ChequesPage() {
         {selectedVencidos.size > 0 && (
           <div className="flex items-center gap-3 mb-3 px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg">
             <span className="text-sm text-amber-700">{selectedVencidos.size} vencido{selectedVencidos.size > 1 ? "s" : ""} seleccionado{selectedVencidos.size > 1 ? "s" : ""}</span>
-            <button onClick={() => setConfirmBatch({ ids: selectedVencidos, clearFn: setSelectedVencidos })} disabled={batchProcessing} className="text-xs bg-amber-600 text-white px-4 py-1.5 rounded-full hover:bg-amber-700 transition disabled:opacity-50">
+            <button onClick={() => setConfirmBatch({ ids: selectedVencidos, clearFn: setSelectedVencidos })} disabled={batchProcessing} className="text-xs bg-amber-600 text-white px-4 py-1.5 rounded-md hover:bg-amber-700 transition disabled:opacity-50">
               {batchProcessing ? "Procesando..." : "Depositar seleccionados"}
             </button>
             <button onClick={() => setSelectedVencidos(new Set())} className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>

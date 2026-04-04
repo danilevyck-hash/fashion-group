@@ -201,7 +201,7 @@ export default function PlantillasPage() {
       {(role === "admin" || role === "director") && (
         statsLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
-            {[1,2,3,4].map(i => <div key={i} className="h-20 rounded-lg bg-gray-50 animate-pulse" />)}
+            {[1,2,3,4].map(i => <div key={i} className="h-20 rounded-lg bg-gray-50 border border-gray-200 animate-pulse" />)}
           </div>
         ) : stats ? (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
@@ -276,7 +276,7 @@ export default function PlantillasPage() {
         <div className="mb-4 flex flex-wrap gap-2">
           {alerts.map((a, i) => (
             <button key={i} onClick={() => router.push(a.href)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium transition hover:shadow-sm ${
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-medium transition ${
                 a.color === "red" ? "border-red-200 bg-red-50 text-red-700 hover:border-red-300" :
                 a.color === "yellow" ? "border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300" :
                 "border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300"
@@ -295,7 +295,7 @@ export default function PlantillasPage() {
       {/* Edit toggle */}
       <div className="flex justify-end mb-2">
         {editMode ? (
-          <button onClick={saveOrder} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 transition">Guardar</button>
+          <button onClick={saveOrder} className="text-[11px] bg-black text-white px-3 py-1 rounded-md hover:bg-gray-800 transition">Guardar</button>
         ) : (
           <button onClick={() => setEditMode(true)} className="text-[11px] text-gray-400 hover:text-black transition">Editar orden</button>
         )}
@@ -315,7 +315,7 @@ export default function PlantillasPage() {
                       {...(editMode ? prov.dragHandleProps : {})}
                       onClick={() => { if (!editMode) router.push(mod.href); }}
                       className={`relative border rounded-lg px-3 py-3 transition cursor-pointer select-none ${
-                        snapshot.isDragging ? "shadow-lg border-gray-300 bg-white z-50" : `${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 hover:border-gray-300 bg-white"}`
+                        snapshot.isDragging ? "border-gray-300 bg-white z-50" : `${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 hover:border-gray-300 bg-white"}`
                       } ${editMode ? "cursor-grab active:cursor-grabbing" : ""}`}
                     >
                       {editMode && (

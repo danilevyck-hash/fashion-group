@@ -24,7 +24,7 @@ export default function MovimientoTable({ sortedMovs, isAdmin, isAdminOrDirector
         <div className="overflow-x-auto -mx-4 sm:mx-0">
           <div className="min-w-[600px] px-4 sm:px-0">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Fecha</th>
                 <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Concepto</th>
@@ -47,7 +47,7 @@ export default function MovimientoTable({ sortedMovs, isAdmin, isAdminOrDirector
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-1">
                       {m.estado === "pendiente_aprobacion" && isAdmin && (
-                        <button onClick={() => onApprove(m.id)} className="text-xs bg-green-600 text-white px-3 py-1 rounded-full hover:bg-green-700 transition">Aprobar</button>
+                        <button onClick={() => onApprove(m.id)} className="text-xs bg-green-600 text-white px-3 py-1 rounded-md hover:bg-green-700 transition">Aprobar</button>
                       )}
                       {canEdit && (m.estado !== "aprobado" || (Date.now() - new Date(m.created_at).getTime() < 24 * 60 * 60 * 1000)) && (
                         <button onClick={() => onEdit(m)} className="p-1.5 hover:bg-blue-50 rounded-lg transition text-gray-400 hover:text-blue-500" title="Editar">

@@ -186,7 +186,7 @@ export default function GuiaForm({
       {/* Header fields */}
       <div className="mb-10">
         <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Información General</div>
-        <div className="grid grid-cols-2 gap-x-12 gap-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
           <div>
             <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Fecha <span className="text-red-500">*</span></label>
             <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
@@ -246,7 +246,7 @@ export default function GuiaForm({
         <div className="overflow-x-auto -mx-4 sm:mx-0">
         <div className="min-w-[800px] px-4 sm:px-0">
         <table className="w-full text-sm">
-          <thead>
+          <thead className="sticky top-0 bg-white z-10">
             <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
               <th className="py-3 px-4 font-normal w-10 text-left">#</th>
               <th className="py-3 px-4 font-normal text-left">Cliente <span className="text-red-500">*</span><AddNewInline placeholder="Cliente" onAdd={onAddCliente} /></th>
@@ -324,7 +324,7 @@ export default function GuiaForm({
 
       {/* Undo delete row toast */}
       {undoRow && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-lg shadow-lg flex items-center gap-3 z-50 text-sm">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-gray-900 text-white px-4 py-2.5 rounded-lg border border-gray-700 flex items-center gap-3 z-50 text-sm">
           <span>Fila eliminada</span>
           <button onClick={handleUndoRemove} className="font-medium underline hover:no-underline">Deshacer</button>
         </div>

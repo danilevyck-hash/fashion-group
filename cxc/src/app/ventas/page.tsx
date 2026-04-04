@@ -325,15 +325,15 @@ export default function VentasDashboard() {
           <h1 className="text-xl font-semibold">Dashboard de Ventas</h1>
           <div className="flex items-center gap-2">
             <button onClick={() => router.push("/upload?tab=ventas&from=ventas")}
-              className="text-xs border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-50 transition print:hidden">
+              className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 transition print:hidden">
               Cargar datos
             </button>
             <button onClick={exportExcel}
-              className="text-xs border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-50 transition print:hidden">
+              className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 transition print:hidden">
               ↓ Excel
             </button>
             <button onClick={() => window.open(`/ventas/reporte?anio=${año}&empresa=${empresaFilter.join(",") || "all"}&vista=${vista}`, "_blank")}
-              className="text-xs border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-50 transition print:hidden">
+              className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 transition print:hidden">
               Imprimir
             </button>
           </div>
@@ -341,44 +341,44 @@ export default function VentasDashboard() {
 
         {/* Filter Bar */}
         <div className="flex flex-wrap items-center gap-3 mb-6 print:hidden">
-          <div className="flex gap-1 bg-gray-100 rounded-full p-1">
+          <div className="flex gap-1 bg-gray-100 rounded-md p-1">
             {(años.length ? años : [año]).map(y => (
               <button key={y} onClick={() => setAño(y)}
-                className={`px-3 py-1 text-xs rounded-full transition ${y === año ? "bg-white shadow font-medium" : "text-gray-500 hover:text-gray-700"}`}>
+                className={`px-3 py-1 text-xs rounded-md transition ${y === año ? "bg-white shadow font-medium" : "text-gray-500 hover:text-gray-700"}`}>
                 {y}
               </button>
             ))}
           </div>
-          <div className="flex gap-1 bg-gray-100 rounded-full p-1">
+          <div className="flex gap-1 bg-gray-100 rounded-md p-1">
             {(["mensual", "quarter"] as const).map(v => (
               <button key={v} onClick={() => setVista(v)}
-                className={`px-3 py-1 text-xs rounded-full transition capitalize ${v === vista ? "bg-white shadow font-medium" : "text-gray-500 hover:text-gray-700"}`}>
+                className={`px-3 py-1 text-xs rounded-md transition capitalize ${v === vista ? "bg-white shadow font-medium" : "text-gray-500 hover:text-gray-700"}`}>
                 {v === "mensual" ? "Mensual" : "Quarter"}
               </button>
             ))}
           </div>
           <div className="flex flex-wrap gap-1.5">
             <button onClick={() => setEmpresaFilter([])}
-              className={`px-3 py-1 text-xs rounded-full transition ${empresaFilter.length === 0 ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+              className={`px-3 py-1 text-xs rounded-md transition ${empresaFilter.length === 0 ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
               Todas
             </button>
             {EMPRESAS.map(e => {
               const active = empresaFilter.includes(e);
               return (
                 <button key={e} onClick={() => setEmpresaFilter(prev => active ? prev.filter(x => x !== e) : [...prev, e])}
-                  className={`px-3 py-1 text-xs rounded-full transition ${active ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                  className={`px-3 py-1 text-xs rounded-md transition ${active ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
                   {e.replace("International", "Intl.").replace("Confecciones ", "")}
                 </button>
               );
             })}
           </div>
           <select value={filterMes ?? ""} onChange={e => setFilterMes(e.target.value ? Number(e.target.value) : null)}
-            className="text-xs border border-gray-200 rounded-full px-3 py-1.5 bg-white">
+            className="text-xs border border-gray-200 rounded-md px-3 py-1.5 bg-white">
             <option value="">Todos los meses</option>
             {MES_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
           </select>
           {role === "admin" && (
-            <button onClick={openMetas} className="ml-auto text-xs bg-black text-white rounded-full px-4 py-1.5 hover:bg-gray-800 transition">
+            <button onClick={openMetas} className="ml-auto text-xs bg-black text-white rounded-md px-4 py-1.5 hover:bg-gray-800 transition">
               Editar metas
             </button>
           )}
@@ -388,7 +388,7 @@ export default function VentasDashboard() {
         {loading ? <SkeletonKPI count={5} /> : (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
             {kpiCards.map(k => (
-              <div key={k.key} className="bg-gray-50 rounded-lg p-4">
+              <div key={k.key} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                 <div className="flex items-center mb-1">
                   <p className="text-[10px] uppercase tracking-wide text-gray-400">{k.label}</p>
                   <button onClick={() => setKpiTooltip(kpiTooltip === k.key ? null : k.key)} className="text-gray-300 hover:text-gray-500 text-[10px] ml-1">?</button>
@@ -449,8 +449,8 @@ export default function VentasDashboard() {
 
         {/* Tab Bar */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 mb-6 max-w-xs print:hidden">
-          <button onClick={() => setActiveTab("resumen")} className={`flex-1 py-2 px-4 text-sm rounded-full transition ${activeTab === "resumen" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Resumen</button>
-          <button onClick={() => setActiveTab("clientes")} className={`flex-1 py-2 px-4 text-sm rounded-full transition ${activeTab === "clientes" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Clientes</button>
+          <button onClick={() => setActiveTab("resumen")} className={`flex-1 py-2 px-4 text-sm rounded-md transition ${activeTab === "resumen" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Resumen</button>
+          <button onClick={() => setActiveTab("clientes")} className={`flex-1 py-2 px-4 text-sm rounded-md transition ${activeTab === "clientes" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Clientes</button>
         </div>
 
         {/* Resumen Tab */}
@@ -507,17 +507,17 @@ export default function VentasDashboard() {
           <>
             {/* Client KPIs */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                 <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Top Cliente</p>
                 <p className="text-sm font-semibold">{topClient?.cliente || "—"}</p>
                 <p className="text-xs text-gray-400">{topClient ? fmtK(topClient.subtotal) : ""}</p>
               </div>
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                 <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Concentración Top 5</p>
                 <p className={`text-xl font-semibold ${top5Pct > 60 ? "text-amber-600" : ""}`}>{top5Pct.toFixed(0)}%</p>
                 <p className="text-xs text-gray-400">del total de ventas</p>
               </div>
-              <div className={`rounded-lg p-4 cursor-pointer transition ${showInactive ? "bg-red-50 border border-red-200" : "bg-gray-50"}`} onClick={() => setShowInactive(!showInactive)}>
+              <div className={`rounded-lg p-4 cursor-pointer transition ${showInactive ? "bg-red-50 border border-red-200" : "bg-gray-50 border border-gray-200"}`} onClick={() => setShowInactive(!showInactive)}>
                 <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-1">Sin compra 60+ días</p>
                 <p className={`text-xl font-semibold ${inactiveCount > 0 ? "text-red-600" : ""}`}>{inactiveCount}</p>
                 <p className="text-xs text-gray-400">{showInactive ? "Mostrando inactivos" : "Click para filtrar"}</p>
@@ -607,9 +607,9 @@ export default function VentasDashboard() {
           </table>
         </div>
         <div className="flex justify-end gap-2 mt-4">
-          <button onClick={() => setShowMetas(false)} className="text-xs border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-50">Cancelar</button>
+          <button onClick={() => setShowMetas(false)} className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50">Cancelar</button>
           <button onClick={saveMetas} disabled={savingMetas}
-            className="text-xs bg-black text-white rounded-full px-4 py-2 hover:bg-gray-800 disabled:opacity-50">
+            className="text-xs bg-black text-white rounded-md px-4 py-2 hover:bg-gray-800 disabled:opacity-50">
             {savingMetas ? "Guardando..." : "Guardar metas"}
           </button>
         </div>

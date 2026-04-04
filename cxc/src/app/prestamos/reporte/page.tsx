@@ -165,7 +165,7 @@ export default function ReportePage() {
           <div className="overflow-x-auto -mx-4 sm:mx-0">
             <div className="min-w-[600px] px-4 sm:px-0">
             <table className="w-full text-sm">
-              <thead>
+              <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-3 text-xs uppercase text-gray-400">Empleado</th>
                   <th className="text-left py-3 px-3 text-xs uppercase text-gray-400">Empresa</th>

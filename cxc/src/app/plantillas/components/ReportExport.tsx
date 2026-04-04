@@ -151,7 +151,7 @@ export default function ReportExport({ stats, darkMode }: { stats: Stats; darkMo
   return (
     <div className="relative mb-4 flex justify-end">
       <button onClick={() => setOpen(!open)}
-        className={`text-xs px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${darkMode ? "text-gray-400 hover:text-gray-200 border border-gray-700" : "text-gray-500 hover:text-black border border-gray-200"}`}>
+        className={`text-xs px-3 py-1.5 rounded-md transition flex items-center gap-1.5 ${darkMode ? "text-gray-400 hover:text-gray-200 border border-gray-700" : "text-gray-500 hover:text-black border border-gray-200"}`}>
         {generating ? (
           <><svg className="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Generando...</>
         ) : (
@@ -159,7 +159,7 @@ export default function ReportExport({ stats, darkMode }: { stats: Stats; darkMo
         )}
       </button>
       {open && (
-        <div className={`absolute right-0 top-full mt-1 rounded-lg shadow-lg border z-20 overflow-hidden w-56 ${darkMode ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
+        <div className={`absolute right-0 top-full mt-1 rounded-lg border z-20 overflow-hidden w-56 ${darkMode ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
           <button onClick={generateVentasExcel} className={`w-full text-left px-4 py-3 text-sm transition ${darkMode ? "hover:bg-gray-800" : "hover:bg-gray-50"}`}>
             <span className="font-medium">Ventas consolidado</span>
             <span className="block text-[10px] text-gray-400 mt-0.5">Excel por empresa</span>

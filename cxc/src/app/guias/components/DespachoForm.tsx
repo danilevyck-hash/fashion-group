@@ -82,11 +82,11 @@ export default function DespachoForm({
       {/* Toggle tipo despacho */}
       <div className="flex rounded-lg bg-gray-100 p-0.5 mb-6">
         <button type="button" onClick={() => setTipoDespacho("externo")}
-          className={`flex-1 text-sm py-2 px-4 rounded-md transition font-medium ${tipoDespacho === "externo" ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+          className={`flex-1 text-sm py-2 px-4 rounded-md transition font-medium ${tipoDespacho === "externo" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
           Transportista externo
         </button>
         <button type="button" onClick={() => setTipoDespacho("directo")}
-          className={`flex-1 text-sm py-2 px-4 rounded-md transition font-medium ${tipoDespacho === "directo" ? "bg-white text-black shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
+          className={`flex-1 text-sm py-2 px-4 rounded-md transition font-medium ${tipoDespacho === "directo" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
           Entrega directa
         </button>
       </div>
