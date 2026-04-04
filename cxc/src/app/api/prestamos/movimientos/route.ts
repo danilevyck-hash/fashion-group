@@ -33,6 +33,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "El monto debe ser positivo" }, { status: 400 });
   }
 
+  // Validate payment does not exceed pending balance
+  const PAGO_CONCEPTOS = ["Pago", "Abono extra", "Pago de responsabilidad"];
+  if (PAGO_CONCEPTOS.includes(concepto)) {
+    const { data: movs } = await supabaseServer
+      .from("prestamos_movimientos")
+      .select("concepto, monto, estado")
+      .eq("empleado_id", empleado_id)
+      .eq("estado", "aprobado");
+
+    const rows = movs || [];
+    const prestado = rows.filter(m => m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño").reduce((s, m) => s + Number(m.monto), 0);
+    const pagado = rows.filter(m => PAGO_CONCEPTOS.includes(m.concepto)).reduce((s, m) => s + Number(m.monto), 0);
+    const saldo = prestado - pagado;
+
+    if (Number(monto) > saldo) {
+      return NextResponse.json({ error: `El pago excede el saldo pendiente de $${saldo.toFixed(2)}` }, { status: 400 });
+    }
+  }
+
   // Determine estado based on concepto and monto
   let estado = "aprobado";
   if ((concepto === "Préstamo" || concepto === "Responsabilidad por daño") && Number(monto) >= 500) {

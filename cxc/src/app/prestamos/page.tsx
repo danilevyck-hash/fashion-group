@@ -257,9 +257,9 @@ export default function PrestamosPage() {
 
         {/* Actions + Filters */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
-          <button onClick={openNewEmp} className="bg-black text-white px-5 py-2 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo Empleado</button>
-          <button onClick={openNewMov} className="bg-black text-white px-5 py-2 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo Préstamo</button>
-          <button onClick={() => router.push("/prestamos/reporte")} className="border border-gray-200 px-5 py-2 rounded-md text-sm hover:border-gray-400 transition">Reporte Deducciones</button>
+          <button onClick={openNewEmp} className="bg-black text-white px-5 py-2.5 sm:py-2 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo Empleado</button>
+          <button onClick={openNewMov} className="bg-black text-white px-5 py-2.5 sm:py-2 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo Préstamo</button>
+          <button onClick={() => router.push("/prestamos/reporte")} className="border border-gray-200 px-5 py-2.5 sm:py-2 rounded-md text-sm hover:border-gray-400 transition">Reporte Deducciones</button>
 
           <div className="flex-1" />
 
@@ -337,11 +337,11 @@ export default function PrestamosPage() {
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-1">
-                        <button onClick={(e) => { e.stopPropagation(); openEditEmp(emp); }} className="p-1.5 hover:bg-gray-100 rounded-lg transition" title="Editar">
+                        <button onClick={(e) => { e.stopPropagation(); openEditEmp(emp); }} className="p-2.5 sm:p-1.5 hover:bg-gray-100 rounded-lg transition" title="Editar">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
                         </button>
                         {isAdmin && (
-                          <button onClick={(e) => { e.stopPropagation(); requestDeleteEmp(emp); }} className="p-1.5 hover:bg-red-50 rounded-lg transition text-gray-400 hover:text-red-500" title="Eliminar">
+                          <button onClick={(e) => { e.stopPropagation(); requestDeleteEmp(emp); }} className="p-2.5 sm:p-1.5 hover:bg-red-50 rounded-lg transition text-gray-400 hover:text-red-500" title="Eliminar">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                           </button>
                         )}

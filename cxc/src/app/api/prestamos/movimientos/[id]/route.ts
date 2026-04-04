@@ -25,7 +25,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     }
   }
 
-  const allowed = ["monto", "fecha", "descripcion", "estado", "aprobado_por"];
+  const allowed = ["monto", "fecha", "notas", "estado", "aprobado_por"];
   const update: Record<string, unknown> = {};
   for (const k of allowed) { if (body[k] !== undefined) update[k] = body[k]; }
 
