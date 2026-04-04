@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas, whatsapp } = body;
 
+  if (!monto || monto <= 0) return NextResponse.json({ error: "El monto debe ser mayor a 0" }, { status: 400 });
+
   const { data, error } = await supabaseServer
     .from("cheques")
     .insert({ cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas: notas || "", whatsapp: whatsapp || "", estado: "pendiente" })
