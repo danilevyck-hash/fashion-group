@@ -33,26 +33,51 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { fecha, transportista, placa, observaciones, items, monto_total, estado, firma_transportista, entregado_por } = body;
 
-  // Auto-increment numero
-  const { data: last } = await supabaseServer
-    .from("guia_transporte")
-    .select("numero")
-    .order("numero", { ascending: false })
-    .limit(1)
-    .single();
+  // Validate items
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return NextResponse.json({ error: "La guía debe tener al menos un item" }, { status: 400 });
+  }
+  const totalBultos = items.reduce((s: number, i: { bultos?: number }) => s + (i.bultos || 0), 0);
+  if (totalBultos === 0) {
+    return NextResponse.json({ error: "La guía debe tener al menos un item con bultos > 0" }, { status: 400 });
+  }
 
-  const numero = (last?.numero || 0) + 1;
+  // Auto-increment numero with retry for race conditions (UNIQUE constraint)
+  let guia: Record<string, unknown> | null = null;
+  let guiaErr: { message: string } | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data: last } = await supabaseServer
+      .from("guia_transporte")
+      .select("numero")
+      .order("numero", { ascending: false })
+      .limit(1)
+      .single();
 
-  const insertData: Record<string, unknown> = { numero, fecha, transportista, placa: placa || null, observaciones: observaciones || null, monto_total: monto_total || 0, estado: estado || "Pendiente Bodega", entregado_por: entregado_por || null };
-  if (firma_transportista) insertData.firma_transportista = firma_transportista;
+    const numero = (last?.numero || 0) + 1;
 
-  const { data: guia, error: guiaErr } = await supabaseServer
-    .from("guia_transporte")
-    .insert(insertData)
-    .select()
-    .single();
+    const insertData: Record<string, unknown> = { numero, fecha, transportista, placa: placa || null, observaciones: observaciones || null, monto_total: monto_total || 0, estado: estado || "Pendiente Bodega", entregado_por: entregado_por || null };
+    if (firma_transportista) insertData.firma_transportista = firma_transportista;
 
-  if (guiaErr) return NextResponse.json({ error: guiaErr.message }, { status: 500 });
+    const { data, error } = await supabaseServer
+      .from("guia_transporte")
+      .insert(insertData)
+      .select()
+      .single();
+
+    if (!error) {
+      guia = data;
+      guiaErr = null;
+      break;
+    }
+    // Retry on unique constraint violation (code 23505)
+    if (error.message?.includes("unique") || error.message?.includes("duplicate") || error.message?.includes("23505")) {
+      continue;
+    }
+    guiaErr = error;
+    break;
+  }
+
+  if (guiaErr || !guia) return NextResponse.json({ error: guiaErr?.message || "Error al crear guía" }, { status: 500 });
 
   if (items && items.length > 0) {
     const rows = items.map((item: Record<string, unknown>, i: number) => ({
@@ -71,6 +96,6 @@ export async function POST(req: NextRequest) {
   }
 
   const session = getSession(req);
-  await logActivity(session?.role || "unknown", "guia_create", "guias", { guiaId: guia.id, numero }, session?.userName);
+  await logActivity(session?.role || "unknown", "guia_create", "guias", { guiaId: guia.id, numero: guia.numero }, session?.userName);
   return NextResponse.json(guia);
 }

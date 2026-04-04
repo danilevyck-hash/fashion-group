@@ -357,16 +357,6 @@ export function useGuiasState() {
     });
 
     if (res.ok) {
-      const bultos = (expandedGuia.guia_items || []).reduce((s, i) => s + (i.bultos || 0), 0);
-      fetch("/api/guias/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          subject: `Guia GT-${String(expandedGuia.numero).padStart(3, "0")} completada — ${tipoDespacho === "externo" ? "Transportista" : "Entrega directa"}`,
-          body: `<h2>Guia GT-${String(expandedGuia.numero).padStart(3, "0")}</h2><p><strong>Transportista:</strong> ${expandedGuia.transportista}</p><p><strong>Tipo:</strong> ${tipoDespacho === "externo" ? "Transportista externo" : "Entrega directa"}</p><p><strong>Total bultos:</strong> ${bultos}</p>`,
-        }),
-      }).catch(() => {});
-
       showToast(`Guia GT-${String(expandedGuia.numero).padStart(3, "0")} despachada`);
 
       // Refresh expanded guia

@@ -297,7 +297,7 @@ export default function GuiasList({
 
                                   {/* Action buttons */}
                                   <div className="flex items-center gap-4 mt-6 pt-4 border-t border-gray-200">
-                                    {canEdit && (
+                                    {canEdit && !isDispatched && (
                                       <button
                                         onClick={() => onEdit(expandedGuia.id)}
                                         className="text-xs text-gray-500 hover:text-black transition"

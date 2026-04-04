@@ -173,6 +173,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   const { data: previous } = await supabaseServer.from("guia_transporte").select("estado, placa, transportista").eq("id", id).single();
 
+  // Block edits on dispatched guías (only dispatch flow itself can update)
+  if (previous?.estado === "Completada" && estado !== "Completada") {
+    return NextResponse.json({ error: "Guía ya despachada, no se puede editar" }, { status: 400 });
+  }
+
   const updateData: Record<string, unknown> = {};
   if (fecha !== undefined) updateData.fecha = fecha;
   if (transportista !== undefined) updateData.transportista = transportista;
