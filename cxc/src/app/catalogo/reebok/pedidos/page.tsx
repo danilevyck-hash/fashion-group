@@ -22,6 +22,7 @@ export default function PedidosPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [dateFilter, setDateFilter] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Order | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -76,18 +77,34 @@ export default function PedidosPage() {
 
   // Date filtering
   const now = new Date();
-  const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay());
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const sevenDaysAgo = new Date(now); sevenDaysAgo.setDate(now.getDate() - 7);
+  const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(now.getDate() - 30);
 
   const canDelete = role === "admin" || role === "secretaria";
   const visibleOrders = orders;
+
+  // Status counts for tabs
+  const countByStatus = {
+    todos: visibleOrders.length,
+    borrador: visibleOrders.filter(o => o.status === "borrador").length,
+    enviado: visibleOrders.filter(o => o.status === "enviado").length,
+    confirmado: visibleOrders.filter(o => o.status === "confirmado").length,
+  };
+
   const filtered = visibleOrders
-    .filter(o => !search || o.client_name.toLowerCase().includes(search.toLowerCase()) || o.order_number.toLowerCase().includes(search.toLowerCase()))
+    .filter(o => {
+      if (!search) return true;
+      const s = search.toLowerCase();
+      return o.client_name.toLowerCase().includes(s)
+        || o.order_number.toLowerCase().includes(s)
+        || (o.vendor_name || "").toLowerCase().includes(s);
+    })
+    .filter(o => statusFilter === "todos" || o.status === statusFilter)
     .filter(o => {
       if (!dateFilter) return true;
       const d = new Date(o.created_at);
-      if (dateFilter === "week") return d >= startOfWeek;
-      if (dateFilter === "month") return d >= startOfMonth;
+      if (dateFilter === "7") return d >= sevenDaysAgo;
+      if (dateFilter === "30") return d >= thirtyDaysAgo;
       return true;
     });
 
@@ -96,14 +113,32 @@ export default function PedidosPage() {
       <Link href="/catalogo/reebok" className="text-xs text-gray-400 hover:text-gray-600 transition">← Catálogo</Link>
       <h1 className="text-2xl font-light mt-2 mb-6">Pedidos</h1>
 
+      {/* Status filter tabs */}
+      <div className="flex flex-wrap items-center gap-4 mb-4">
+        <div className="flex gap-4 flex-wrap">
+          {([
+            ["todos", "Todos", countByStatus.todos],
+            ["borrador", "Borrador", countByStatus.borrador],
+            ["enviado", "Enviado", countByStatus.enviado],
+            ["confirmado", "Confirmado", countByStatus.confirmado],
+          ] as [string, string, number][]).map(([key, label, count]) => (
+            <button key={key} onClick={() => setStatusFilter(key)}
+              className={`text-sm transition ${statusFilter === key ? "font-medium text-black" : "text-gray-400 hover:text-black"}`}>
+              {label} <span className="text-xs text-gray-300 ml-1">{count}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Search + date filter */}
       <div className="flex flex-wrap items-center gap-3 mb-6">
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por cliente o #..."
-          className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition w-56" />
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar cliente, # pedido, vendedor..."
+          className="text-sm border border-gray-200 rounded-full px-4 py-1.5 outline-none focus:border-black transition w-64" />
         <select value={dateFilter} onChange={e => setDateFilter(e.target.value)}
-          className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
-          <option value="">Todos</option>
-          <option value="week">Esta semana</option>
-          <option value="month">Este mes</option>
+          className="text-sm border border-gray-200 rounded-full px-3 py-1.5 outline-none focus:border-black transition bg-transparent">
+          <option value="">Todos los dias</option>
+          <option value="7">Ultimos 7 dias</option>
+          <option value="30">Ultimos 30 dias</option>
         </select>
         <span className="text-xs text-gray-400 ml-auto">{filtered.length} pedidos</span>
       </div>
@@ -111,7 +146,7 @@ export default function PedidosPage() {
       {loading ? (
         <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="h-14 bg-gray-100 rounded-lg animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
-        <EmptyState title={search || dateFilter ? "Sin resultados" : "No hay pedidos"} subtitle={search || dateFilter ? "Intenta con otros filtros" : "Los pedidos aparecerán aquí"} />
+        <EmptyState title={search || dateFilter || statusFilter !== "todos" ? "Sin resultados" : "No hay pedidos"} subtitle={search || dateFilter || statusFilter !== "todos" ? "Intenta con otros filtros" : "Los pedidos aparecerán aquí"} />
       ) : (
         <div className="space-y-2">
           {filtered.map(o => (

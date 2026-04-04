@@ -6,6 +6,12 @@ import { requireRole } from "@/lib/requireRole";
 
 const ALLOWED_FIELDS = ["fecha", "descripcion", "proveedor", "categoria", "subtotal", "itbms", "total", "responsable", "metodo_pago", "numero_factura", "empresa"];
 
+function normalizeStr(s: string): string {
+  const t = s.trim();
+  if (!t) return t;
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+}
+
 function pick(body: Record<string, unknown>, fields: string[]) {
   const result: Record<string, unknown> = {};
   for (const f of fields) { if (f in body) result[f] = body[f]; }
@@ -17,6 +23,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const fields = pick(body, ALLOWED_FIELDS);
+  if (typeof fields.categoria === "string") fields.categoria = normalizeStr(fields.categoria) || "Varios";
+  if (typeof fields.responsable === "string") fields.responsable = normalizeStr(fields.responsable);
   if (fields.itbms !== undefined) fields.itbms = Math.round((Number(fields.itbms) || 0) * 100) / 100;
   if (fields.total !== undefined) fields.total = Math.round((Number(fields.total) || 0) * 100) / 100;
   const { data, error } = await supabaseServer.from("caja_gastos").update(fields).eq("id", params.id).select().single();

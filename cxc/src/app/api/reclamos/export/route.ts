@@ -25,8 +25,8 @@ export async function GET(req: NextRequest) {
     } else {
       for (const item of items) {
         const sub = item.subtotal || 0;
-        const imp = sub * 0.10;
-        const itbms = sub * 0.07;
+        const imp = sub * 0.10;   // Tasa de importación 10%
+        const itbms = sub * 0.077; // ITBMS 7.7%
         const tot = sub + imp + itbms;
         rows.push([r.nro_reclamo, r.empresa, r.proveedor, r.marca, r.nro_factura, r.nro_orden_compra, r.fecha_reclamo, r.estado, item.referencia, item.descripcion, item.talla, item.cantidad, item.precio_unitario, sub.toFixed(2), imp.toFixed(2), itbms.toFixed(2), tot.toFixed(2), item.motivo, r.notas].join(";"));
       }

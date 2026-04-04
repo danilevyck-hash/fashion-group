@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
-import { ESTADOS, daysSince, calcSub, buildReclamosPdfHtml, openPdfWindow } from "./constants";
+import { ESTADOS, daysSince, calcSub, buildReclamosPdfHtml, openPdfWindow, FACTOR_TOTAL } from "./constants";
 import { EmptyState, StatusBadge, Toast } from "@/components/ui";
 
 interface Props {
@@ -53,7 +53,7 @@ export default function EmpresaList({
     let av: number | string = 0, bv: number | string = 0;
     if (sortCol === "fecha") { av = a.fecha_reclamo || ""; bv = b.fecha_reclamo || ""; }
     if (sortCol === "dias") { av = daysSince(a.fecha_reclamo); bv = daysSince(b.fecha_reclamo); }
-    if (sortCol === "total") { av = calcSub(a.reclamo_items ?? []) * 1.177; bv = calcSub(b.reclamo_items ?? []) * 1.177; }
+    if (sortCol === "total") { av = calcSub(a.reclamo_items ?? []) * FACTOR_TOTAL; bv = calcSub(b.reclamo_items ?? []) * FACTOR_TOTAL; }
     if (sortCol === "estado") { av = ESTADOS.indexOf(a.estado); bv = ESTADOS.indexOf(b.estado); }
     if (av < bv) return sortDir === "asc" ? -1 : 1;
     if (av > bv) return sortDir === "asc" ? 1 : -1;
@@ -98,10 +98,10 @@ export default function EmpresaList({
     const nombre = c.nombre_contacto || c.nombre || "equipo";
     const lines = sel.map((r) => {
       const factura = (r.nro_factura || "").length > 30 ? (r.nro_factura || "").slice(0, 27) + "..." : (r.nro_factura || "");
-      const total = calcSub(r.reclamo_items ?? []) * 1.177;
+      const total = calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL;
       return `📋 ${r.nro_reclamo} | Factura: ${factura} | $${fmt(total)} | ${r.estado}`;
     }).join("\n");
-    const grandTotal = sel.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * 1.177, 0);
+    const grandTotal = sel.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
     const msg = `Hola ${nombre}, te escribimos de parte de Fashion Group.\n\nTe enviamos el resumen de reclamos pendientes de ${activeEmpresa}:\n\n${lines}\n\nTotal a acreditar: $${fmt(grandTotal)}\n\nPor favor confirmar recepción y estado de cada reclamo.\nGracias.`;
     window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
   }
@@ -127,7 +127,7 @@ export default function EmpresaList({
     if (!c?.whatsapp) { showToast("No hay contacto con WhatsApp para esta empresa."); return; }
     const nombre = c.nombre_contacto || c.nombre || "equipo";
     const factura = (r.nro_factura || "").length > 30 ? (r.nro_factura || "").slice(0, 27) + "..." : (r.nro_factura || "");
-    const total = calcSub(r.reclamo_items ?? []) * 1.177;
+    const total = calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL;
     const msg = `Hola ${nombre}, te escribimos de parte de Fashion Group.\n\nReclamo pendiente de ${activeEmpresa}:\n\n📋 ${r.nro_reclamo} | Factura: ${factura} | $${fmt(total)} | ${r.estado}\n\nPor favor confirmar recepción y estado.\nGracias.`;
     window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
   }
@@ -204,7 +204,7 @@ export default function EmpresaList({
           <tbody>
             {sortedRecs.map((r) => {
               const days = daysSince(r.fecha_reclamo);
-              const total = calcSub(r.reclamo_items ?? []) * 1.177;
+              const total = calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL;
               const isOpen = r.estado !== "Resuelto con NC" && r.estado !== "Rechazado";
               return (
                 <tr key={r.id}

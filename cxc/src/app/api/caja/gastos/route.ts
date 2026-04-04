@@ -2,11 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
 
+function normalizeStr(s: string): string {
+  const t = s.trim();
+  if (!t) return t;
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+}
+
 export async function POST(req: NextRequest) {
   const session = getSession(req);
   if (!session || !["admin", "secretaria"].includes(session.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const body = await req.json();
-  const { periodo_id, fecha, descripcion, proveedor, nro_factura, responsable, categoria, empresa, subtotal, itbms, total } = body;
+  const { periodo_id, fecha, descripcion, proveedor, nro_factura, empresa, subtotal, itbms, total } = body;
+  const responsable = normalizeStr(body.responsable || "");
+  const categoria = normalizeStr(body.categoria || "") || "Varios";
 
   if (!subtotal || Number(subtotal) <= 0) return NextResponse.json({ error: "El monto debe ser mayor a 0" }, { status: 400 });
 
@@ -20,8 +28,8 @@ export async function POST(req: NextRequest) {
       descripcion: descripcion || "",
       proveedor: proveedor || "",
       nro_factura: nro_factura || "",
-      responsable: responsable || "",
-      categoria: categoria || "Varios",
+      responsable,
+      categoria,
       empresa: empresa || "",
       subtotal, itbms: roundedItbms, total: roundedTotal,
       // Keep old fields populated for backwards compat

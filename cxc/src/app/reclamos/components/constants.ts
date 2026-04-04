@@ -1,6 +1,13 @@
 import { RItem, Reclamo } from "./types";
 import { fmt, fmtDate } from "@/lib/format";
 
+/** Tasa de importación — 10% */
+export const TASA_IMPORTACION = 0.10;
+/** ITBMS — 7.7% sobre valor + importación */
+export const TASA_ITBMS = 0.077;
+/** Factor total: 1 + importación + ITBMS */
+export const FACTOR_TOTAL = 1 + TASA_IMPORTACION + TASA_ITBMS;
+
 export const EMPRESAS_MAP: Record<string, { proveedor: string; marca: string }> = {
   "Vistana International": { proveedor: "American Designer Fashion", marca: "Calvin Klein" },
   "Fashion Wear": { proveedor: "American Fashion Wear", marca: "Tommy Hilfiger" },
@@ -58,11 +65,11 @@ export function buildReclamosPdfHtml(reclamosArr: Reclamo[], titulo: string) {
   const rows = reclamosArr.map((r) => {
     const items = r.reclamo_items || [];
     const sub = calcSub(items);
-    const total = sub * 1.177;
+    const total = sub * FACTOR_TOTAL;
     const itemsDesc = items.map((i) => `${i.descripcion || "Item"} x ${Number(i.cantidad) || 0}`).join(", ");
     return `<tr><td>${r.nro_reclamo}</td><td>${fmtDate(r.fecha_reclamo)}</td><td>${r.nro_factura || ""}</td><td><span class="badge ${r.estado === "Resuelto con NC" ? "badge-green" : r.estado === "Rechazado" ? "badge-red" : "badge-blue"}">${r.estado}</span></td><td>${itemsDesc}</td><td class="right">$${fmt(total)}</td></tr>`;
   }).join("");
-  const grandTotal = reclamosArr.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * 1.177, 0);
+  const grandTotal = reclamosArr.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titulo}</title><style>
     @media print { @page { margin: 15mm; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -130,9 +137,9 @@ export function buildSingleReclamoPdfHtml(r: Reclamo, fotos?: { url?: string; st
   </div>
   <div class="totals">
     <div class="total-box"><div class="total-label">Subtotal</div><div class="total-val">$${fmt(sub)}</div></div>
-    <div class="total-box"><div class="total-label">Import. 10%</div><div class="total-val">$${fmt(sub * 0.10)}</div></div>
-    <div class="total-box"><div class="total-label">ITBMS</div><div class="total-val">$${fmt(sub * 0.077)}</div></div>
-    <div class="total-box dark"><div class="total-label">Total</div><div class="total-val">$${fmt(sub * 1.177)}</div></div>
+    <div class="total-box"><div class="total-label">Import. 10%</div><div class="total-val">$${fmt(sub * TASA_IMPORTACION)}</div></div>
+    <div class="total-box"><div class="total-label">ITBMS</div><div class="total-val">$${fmt(sub * TASA_ITBMS)}</div></div>
+    <div class="total-box dark"><div class="total-label">Total</div><div class="total-val">$${fmt(sub * FACTOR_TOTAL)}</div></div>
   </div>
   <table><thead><tr><th>Código</th><th>Descripción</th><th>Talla</th><th class="right">Cant.</th><th class="right">Precio U.</th><th class="right">Subtotal</th><th>Motivo</th></tr></thead><tbody>${itemRows}</tbody></table>
   ${r.notas ? `<p style="margin-top:12px;color:#666;">Notas: ${r.notas}</p>` : ""}

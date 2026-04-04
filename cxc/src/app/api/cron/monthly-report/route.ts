@@ -4,6 +4,9 @@ import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
+/** Factor total reclamos: importación 10% + ITBMS 7.7% */
+const FACTOR_TOTAL_RECLAMOS = 1.177;
+
 function fmt(n: number): string {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -175,7 +178,7 @@ export async function GET(req: NextRequest) {
     recByEmpresa[emp].count++;
     recTotalCount++;
     const monto = ((r.reclamo_items || []) as { cantidad: number; precio_unitario: number }[])
-      .reduce((s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0), 0) * 1.177;
+      .reduce((s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0), 0) * FACTOR_TOTAL_RECLAMOS;
     recByEmpresa[emp].monto += monto;
     recTotalMonto += monto;
     const days = Math.floor((Date.now() - new Date(r.created_at).getTime()) / 86400000);

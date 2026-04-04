@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { ConfirmModal } from "@/components/ui";
 import { Reclamo, RItem, Foto, Contacto, RView } from "./components/types";
-import { EMPRESAS_MAP, calcSub, daysSince, emptyItem, loadCustomMotivos } from "./components/constants";
+import { EMPRESAS_MAP, calcSub, daysSince, emptyItem, loadCustomMotivos, FACTOR_TOTAL } from "./components/constants";
 import EmpresaSelector from "./components/EmpresaSelector";
 import EmpresaList from "./components/EmpresaList";
 import ReclamoForm from "./components/ReclamoForm";
@@ -204,7 +204,7 @@ function ReclamosPage() {
   }
 
   const pendientes = reclamos.filter((r) => r.estado !== "Resuelto con NC" && r.estado !== "Rechazado");
-  const totalPendiente = pendientes.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * 1.177, 0);
+  const totalPendiente = pendientes.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
   const alertas = pendientes.filter((r) => daysSince(r.fecha_reclamo) > 45).length;
   // ── Confirm modal — always rendered (used by list + detail views) ──
   const deleteModal = (

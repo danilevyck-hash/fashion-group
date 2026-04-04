@@ -36,9 +36,9 @@ function CajaPage() {
   const {
     view, setView,
     periodos, loading, current, setCurrent, error,
-    categorias, setCategorias, showManageCat, setShowManageCat, newCatName, setNewCatName,
+    categorias, setCategorias, allCategorias, showManageCat, setShowManageCat, newCatName, setNewCatName,
     showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,
-    responsables, setResponsables, showAddResponsable, setShowAddResponsable, newResponsable, setNewResponsable,
+    responsables, setResponsables, allResponsables, showAddResponsable, setShowAddResponsable, newResponsable, setNewResponsable,
     addingGasto, subtotalNum, totalNum,
     editingGastoId, setEditingGastoId, editGasto, setEditGasto,
     formValues, formSetters,
@@ -152,7 +152,9 @@ function CajaPage() {
             subtotalNum={subtotalNum}
             totalNum={totalNum}
             categorias={categorias}
+            allCategorias={allCategorias}
             responsables={responsables}
+            allResponsables={allResponsables}
             showManageCat={showManageCat}
             showAddResponsable={showAddResponsable}
             newCatName={newCatName}
@@ -170,8 +172,8 @@ function CajaPage() {
         <GastoTable
           gastos={gastos}
           isOpen={isOpen}
-          categorias={categorias}
-          responsables={responsables}
+          categorias={allCategorias}
+          responsables={allResponsables}
           editingGastoId={editingGastoId}
           editGasto={editGasto}
           setEditingGastoId={setEditingGastoId}

@@ -219,7 +219,7 @@ export default function ChequesPage() {
   }
 
   function exportPendientes() {
-    const pend = cheques.filter((c) => c.estado === "pendiente" || c.estado === "vencido");
+    const pend = cheques.filter((c) => c.estado === "pendiente" || c.estado === "vencido" || visualEstado(c) === "pendiente_vencido");
     if (pend.length === 0) return;
     const rows: (string | number)[][] = [
       ["FASHION GROUP — Cheques Pendientes"],
@@ -256,15 +256,15 @@ export default function ChequesPage() {
   const now = new Date();
   const weekFromNow = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10);
 
-  // Derive visual estado: pendiente + fecha < hoy → show as vencido
+  // Derive visual estado: pendiente + fecha < hoy → show as pendiente_vencido (NOT "vencido" — only the cron sets that in DB)
   function visualEstado(c: Cheque): string {
-    if (c.estado === "pendiente" && c.fecha_deposito < today) return "vencido";
+    if (c.estado === "pendiente" && c.fecha_deposito < today) return "pendiente_vencido";
     return c.estado;
   }
 
   const pendientes = cheques.filter((c) => visualEstado(c) === "pendiente");
   const depositados = cheques.filter((c) => visualEstado(c) === "depositado");
-  const vencidos = cheques.filter((c) => visualEstado(c) === "vencido");
+  const vencidos = cheques.filter((c) => visualEstado(c) === "pendiente_vencido" || visualEstado(c) === "vencido");
   const rebotados = cheques.filter((c) => visualEstado(c) === "rebotado");
   const totalPendiente = pendientes.reduce((s, c) => s + (Number(c.monto) || 0), 0);
   const proximo = pendientes.length > 0 ? pendientes[0].fecha_deposito : null;
@@ -548,6 +548,7 @@ export default function ChequesPage() {
 
         const pillColor = (estado: string) => {
           if (estado === "pendiente") return "bg-emerald-100 text-emerald-700";
+          if (estado === "pendiente_vencido") return "bg-amber-100 text-amber-700";
           if (estado === "vencido") return "bg-red-100 text-red-700";
           if (estado === "rebotado") return "bg-red-50 text-red-400";
           return "bg-gray-100 text-gray-500";
@@ -599,7 +600,7 @@ export default function ChequesPage() {
                                 <div className="text-[11px] text-gray-500 mb-0.5">{c.banco} · {c.numero_cheque}</div>
                                 <div className="text-sm font-semibold mb-2">${fmt(c.monto)}</div>
                                 <StatusBadge estado={ve} />
-                                {(ve === "pendiente" || ve === "vencido") && (
+                                {(ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido") && (
                                   <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
                                     <button onClick={() => { setConfirmDepositId(c.id); setCalPopover(null); }} className="text-[11px] text-emerald-600 hover:underline">Depositar</button>
                                     <button onClick={() => { setRebotandoId(c.id); setCalPopover(null); }} className="text-[11px] text-red-500 hover:underline">Rebotado</button>
@@ -633,12 +634,12 @@ export default function ChequesPage() {
                         <div key={c.id}>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${pillColor(ve)}`}>{ve}</span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${pillColor(ve)}`}>{ve === "pendiente_vencido" ? "vencido" : ve}</span>
                               <span className="text-sm truncate">{c.cliente}</span>
                             </div>
                             <span className="text-sm font-medium tabular-nums ml-2">${fmt(c.monto)}</span>
                           </div>
-                          {(ve === "pendiente" || ve === "vencido") && (
+                          {(ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido") && (
                             <div className="flex gap-3 mt-1 ml-1">
                               <button onClick={() => setConfirmDepositId(c.id)} className="text-xs text-emerald-600 hover:underline py-1">Depositar</button>
                               <button onClick={() => setRebotandoId(c.id)} className="text-xs text-red-500 hover:underline py-1">Rebotado</button>
@@ -712,17 +713,17 @@ export default function ChequesPage() {
             {filtered.map((c) => {
               const ve = visualEstado(c);
               const isToday = c.fecha_deposito === today && ve === "pendiente";
-              const isVencido = ve === "vencido";
+              const isVencido = ve === "pendiente_vencido" || ve === "vencido";
               const isDep = ve === "depositado";
               const isRebotado = ve === "rebotado";
               return (
-                <tr key={c.id} className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${isToday ? "bg-yellow-50 border-l-4 border-l-yellow-400" : isVencido ? "bg-red-50/30" : isRebotado ? "bg-red-50/20" : ""} ${isDep || isVencido ? "text-gray-400" : ""}`}>
+                <tr key={c.id} className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${isToday ? "bg-yellow-50 border-l-4 border-l-yellow-400" : isVencido ? "bg-amber-50/30" : isRebotado ? "bg-red-50/20" : ""} ${isDep ? "text-gray-400" : ""}`}>
                   {ve === "pendiente" && (
                     <td className="py-3 pl-2 pr-0 w-8">
                       <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} className="accent-emerald-600 w-3.5 h-3.5" />
                     </td>
                   )}
-                  {ve === "vencido" && (
+                  {(ve === "pendiente_vencido" || ve === "vencido") && (
                     <td className="py-3 pl-2 pr-0 w-8">
                       <input type="checkbox" checked={selectedVencidos.has(c.id)} onChange={() => toggleSelectVencido(c.id)} className="accent-amber-600 w-3.5 h-3.5" />
                     </td>
@@ -737,7 +738,7 @@ export default function ChequesPage() {
                     <StatusBadge estado={ve} />
                   </td>
                   <td className="py-3 px-4 text-right flex items-center justify-end gap-2">
-                    {(ve === "pendiente" || ve === "vencido") && (<>
+                    {(ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido") && (<>
                       <button onClick={() => setConfirmDepositId(c.id)} className="text-sm text-gray-500 hover:text-black transition">Depositar</button>
                       <span className="text-gray-200">·</span>
                       <button onClick={() => setRebotandoId(c.id)} className="text-sm text-gray-500 hover:text-red-600 transition">Rebotado</button>

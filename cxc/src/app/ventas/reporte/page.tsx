@@ -40,7 +40,6 @@ function ReportePage() {
       setMetas(m || []);
       setClientesDetalle(v2?.clientesDetalle || []);
       setLoading(false);
-      setTimeout(() => window.print(), 500);
     });
   }, [año]);
 
@@ -80,6 +79,14 @@ function ReportePage() {
 
   return (
     <div className="print-report max-w-[900px] mx-auto p-6">
+      {/* Print button */}
+      <button
+        onClick={() => window.print()}
+        className="print:hidden mb-4 px-4 py-2 rounded-md bg-black text-white text-sm font-medium hover:bg-gray-800 transition-colors"
+      >
+        Imprimir reporte
+      </button>
+
       {/* Header */}
       <div className="flex items-start justify-between mb-6 border-b border-gray-200 pb-4">
         <div>

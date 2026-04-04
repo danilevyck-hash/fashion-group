@@ -4,6 +4,13 @@ import { requireRole } from "@/lib/requireRole";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 
+/** Tasa de importación — 10% */
+const TASA_IMPORTACION = 0.10;
+/** ITBMS — 7.7% sobre valor + importación */
+const TASA_ITBMS = 0.077;
+/** Factor total: 1 + importación + ITBMS */
+const FACTOR_TOTAL = 1 + TASA_IMPORTACION + TASA_ITBMS;
+
 function fmtDate(d: string) {
   if (!d) return "";
   const [y, m, day] = d.split("-");
@@ -58,7 +65,7 @@ async function buildPdf(reclamos: Record<string, unknown>[]) {
       (s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0),
       0
     );
-    const total = subtotal * 1.177;
+    const total = subtotal * FACTOR_TOTAL;
     grandTotal += total;
 
     const itemsDesc = items

@@ -34,6 +34,59 @@ export interface GastoFormSetters {
   setGEmpresaOtro: (v: string) => void;
 }
 
+export function normalizeStr(s: string): string {
+  const t = s.trim();
+  if (!t) return t;
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+}
+
+export function AutocompleteInput({
+  value,
+  onChange,
+  options,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+  placeholder?: string;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const matches = value.length >= 1
+    ? options.filter((o) => o.toLowerCase().includes(value.toLowerCase())).slice(0, 8)
+    : options.slice(0, 8);
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 200)}
+        placeholder={placeholder}
+        className={className}
+      />
+      {open && matches.length > 0 && (
+        <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 mt-1 max-h-48 overflow-y-auto">
+          {matches.map((m) => (
+            <button
+              key={m}
+              type="button"
+              onMouseDown={() => { onChange(m); setOpen(false); }}
+              className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition"
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface Props {
   values: GastoFormValues;
   setters: GastoFormSetters;
@@ -41,7 +94,9 @@ interface Props {
   subtotalNum: number;
   totalNum: number;
   categorias: string[];
+  allCategorias: string[];
   responsables: string[];
+  allResponsables: string[];
   showManageCat: boolean;
   showAddResponsable: boolean;
   newCatName: string;
@@ -62,7 +117,9 @@ export default function GastoForm({
   subtotalNum,
   totalNum,
   categorias,
+  allCategorias,
   responsables,
+  allResponsables,
   showManageCat,
   showAddResponsable,
   newCatName,
@@ -145,29 +202,13 @@ export default function GastoForm({
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
             Categoría <span className="text-red-500">*</span>
           </label>
-          <select
+          <AutocompleteInput
             value={gCategoria}
-            onChange={(e) => {
-              setGCategoria(e.target.value);
-              if (e.target.value !== "Otro") setGCategoriaOtro("");
-            }}
-            className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none"
-          >
-            {categorias.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-          {gCategoria === "Otro" && (
-            <input
-              type="text"
-              value={gCategoriaOtro}
-              onChange={(e) => setGCategoriaOtro(e.target.value)}
-              placeholder="Especificar categoría"
-              className="w-full border-b border-gray-200 py-1 text-xs outline-none focus:border-black transition mt-1"
-            />
-          )}
+            onChange={(v) => setGCategoria(v)}
+            options={allCategorias}
+            placeholder="Ej: Transporte"
+            className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition"
+          />
           <button
             onClick={() => setShowManageCat(!showManageCat)}
             className="text-[10px] text-gray-300 hover:text-gray-500 mt-1 block"
@@ -199,14 +240,15 @@ export default function GastoForm({
                 />
                 <button
                   onClick={async () => {
-                    if (!newCatName.trim() || categorias.includes(newCatName.trim()))
+                    const normalized = normalizeStr(newCatName);
+                    if (!normalized || categorias.includes(normalized))
                       return;
                     await fetch("/api/caja/categorias", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ nombre: newCatName.trim() }),
+                      body: JSON.stringify({ nombre: normalized }),
                     });
-                    setCategorias([...categorias, newCatName.trim()]);
+                    setCategorias([...categorias, normalized]);
                     setNewCatName("");
                   }}
                   className="text-xs text-gray-500 hover:text-black"
@@ -237,10 +279,13 @@ export default function GastoForm({
             </div>
             <div>
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Responsable</label>
-              <select value={gResponsable} onChange={(e) => setGResponsable(e.target.value)} className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none">
-                <option value="">—</option>
-                {responsables.map((r) => <option key={r} value={r}>{r}</option>)}
-              </select>
+              <AutocompleteInput
+                value={gResponsable}
+                onChange={(v) => setGResponsable(v)}
+                options={allResponsables}
+                placeholder="Nombre"
+                className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition"
+              />
             </div>
           </div>
         )}
@@ -250,66 +295,14 @@ export default function GastoForm({
         <div className="hidden lg:block">
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
             Responsable
-            {!showAddResponsable && (
-              <button
-                onClick={() => setShowAddResponsable(true)}
-                className="text-gray-300 hover:text-gray-500 transition text-xs ml-1"
-              >
-                ＋
-              </button>
-            )}
           </label>
-          {showAddResponsable ? (
-            <div className="flex items-center gap-1">
-              <input
-                type="text"
-                value={newResponsable}
-                onChange={(e) => setNewResponsable(e.target.value)}
-                placeholder="Nombre"
-                className="flex-1 border-b border-gray-300 py-1 text-xs outline-none focus:border-black"
-                autoFocus
-              />
-              <button
-                onClick={async () => {
-                  if (!newResponsable.trim()) return;
-                  await fetch("/api/caja/responsables", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ nombre: newResponsable.trim() }),
-                  });
-                  setResponsables([...responsables, newResponsable.trim()]);
-                  setGResponsable(newResponsable.trim());
-                  setNewResponsable("");
-                  setShowAddResponsable(false);
-                }}
-                className="text-xs text-gray-500 hover:text-black"
-              >
-                OK
-              </button>
-              <button
-                onClick={() => {
-                  setNewResponsable("");
-                  setShowAddResponsable(false);
-                }}
-                className="text-xs text-gray-300 hover:text-black"
-              >
-                ×
-              </button>
-            </div>
-          ) : (
-            <select
-              value={gResponsable}
-              onChange={(e) => setGResponsable(e.target.value)}
-              className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none"
-            >
-              <option value="">—</option>
-              {responsables.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          )}
+          <AutocompleteInput
+            value={gResponsable}
+            onChange={(v) => setGResponsable(v)}
+            options={allResponsables}
+            placeholder="Nombre"
+            className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition"
+          />
         </div>
         <div>
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">

@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { fmt } from "@/lib/format";
 import { RItem, Foto } from "./types";
 import { ConfirmDeleteModal, FotoLightbox } from "@/components/ui";
-import { EMPRESAS, EMPRESAS_MAP, TALLAS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo } from "./constants";
+import { EMPRESAS, EMPRESAS_MAP, TALLAS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "./constants";
 
 interface Props {
   fEmpresa: string;
@@ -160,9 +160,9 @@ export default function ReclamoForm({
         <button onClick={() => setFItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition mt-3">+ Agregar fila</button>
         <div className="mt-6 text-right text-sm space-y-1">
           <div>Subtotal: <span className="tabular-nums font-medium">${fmt(fSubtotal)}</span></div>
-          <div className="text-gray-400">Importación (10%): ${fmt(fSubtotal * 0.10)}</div>
-          <div className="text-gray-400">ITBMS (7% s/imp.): ${fmt(fSubtotal * 0.077)}</div>
-          <div className="text-lg font-semibold">Total: ${fmt(fSubtotal * 1.177)}</div>
+          <div className="text-gray-400">Importación (10%): ${fmt(fSubtotal * TASA_IMPORTACION)}</div>
+          <div className="text-gray-400">ITBMS (7% s/imp.): ${fmt(fSubtotal * TASA_ITBMS)}</div>
+          <div className="text-lg font-semibold">Total: ${fmt(fSubtotal * FACTOR_TOTAL)}</div>
         </div>
       </div>
 

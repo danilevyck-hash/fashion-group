@@ -165,6 +165,10 @@ function UploadPageInner() {
     const totalIdx = headers.findIndex((h) => h.toUpperCase().includes("TOTAL"));
     const codigoIdx = headers.findIndex((h) => h.toUpperCase().includes("CODIGO"));
 
+    // Bucket column indices for sum validation
+    const bucketPatterns = ["0-30", "31-60", "61-90", "91-120", "121-180", "181-270", "271-365", "Mas de 365"];
+    const bucketIdxs = bucketPatterns.map((p) => headers.findIndex((h) => h.trim() === p || h.trim().toUpperCase() === p.toUpperCase())).filter((i) => i >= 0);
+
     // Count name occurrences for duplicate detection
     const nameCounts: Record<string, number> = {};
     const dataLines = lines.slice(1);
@@ -180,6 +184,7 @@ function UploadPageInner() {
 
     let validCount = 0;
     let errorCount = 0;
+    let bucketExceedsTotal = 0;
     const rows: CxcPreviewRow[] = [];
 
     for (const line of dataLines) {
@@ -200,13 +205,22 @@ function UploadPageInner() {
       if (totalIdx >= 0 && totalVal === 0 && !(values[totalIdx] || "").trim()) errors.push("TOTAL vacio");
       if (duplicateNames.has(nombre.toUpperCase())) errors.push("Nombre duplicado");
 
+      // Check if sum of aging buckets exceeds TOTAL
+      if (totalIdx >= 0 && bucketIdxs.length > 0) {
+        const bucketSum = bucketIdxs.reduce((sum, idx) => sum + parseNum(values[idx]), 0);
+        if (bucketSum > totalVal + 0.01) {
+          errors.push("Suma de buckets excede TOTAL");
+          bucketExceedsTotal++;
+        }
+      }
+
       if (errors.length > 0) errorCount++;
       else validCount++;
 
       rows.push({ values, errors });
     }
 
-    return { companyKey, headers, rows, validCount, errorCount, duplicateNames, formatError: "", delimiter };
+    return { companyKey, headers, rows, validCount, errorCount, duplicateNames, bucketExceedsTotal, formatError: "", delimiter };
   }
 
   async function openCxcPreview(companyKey: string, file: File) {
@@ -714,6 +728,7 @@ function UploadPageInner() {
                 <span className="text-green-700 bg-green-50 px-2.5 py-1 rounded-full">{cxcPreview.validCount} validos</span>
                 {cxcPreview.errorCount > 0 && <span className="text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">{cxcPreview.errorCount} con advertencias</span>}
                 {cxcPreview.duplicateNames.size > 0 && <span className="text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full">{cxcPreview.duplicateNames.size} nombres duplicados</span>}
+                {cxcPreview.bucketExceedsTotal > 0 && <span className="text-orange-700 bg-orange-50 px-2.5 py-1 rounded-full">{cxcPreview.bucketExceedsTotal} filas donde suma de buckets excede el total</span>}
               </div>
             }
             headerRow={cxcPreview.headers}
@@ -746,6 +761,7 @@ function UploadPageInner() {
                 <span className="text-green-700 bg-green-50 px-2.5 py-1 rounded-full">{ventasPreview.validCount} nuevas</span>
                 {ventasPreview.duplicateCount > 0 && <span className="text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full">{ventasPreview.duplicateCount} existentes (se actualizaran)</span>}
                 {ventasPreview.errorCount > 0 && <span className="text-red-700 bg-red-50 px-2.5 py-1 rounded-full">{ventasPreview.errorCount} con errores</span>}
+                {ventasPreview.errorCount > 0 && (() => { const dateErrors = ventasPreview.rows.filter(r => r.errors.some(e => e.includes("invalido") || e.includes("fuera de rango") || e.includes("Formato invalido"))).length; return dateErrors > 0 ? <span className="text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">{dateErrors} filas con fecha invalida</span> : null; })()}
               </div>
             }
             headerRow={["Fecha", "Tipo", "N.Sistema", "N.Fiscal", "Cliente", "Vendedor", "Subtotal", "Total"]}

@@ -14,6 +14,13 @@ function esc(s: unknown): string {
   return String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+/** Tasa de importación — 10% */
+const TASA_IMPORTACION = 0.10;
+/** ITBMS — 7.7% sobre valor + importación */
+const TASA_ITBMS = 0.077;
+/** Factor total: 1 + importación + ITBMS */
+const FACTOR_TOTAL = 1 + TASA_IMPORTACION + TASA_ITBMS;
+
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
@@ -59,9 +66,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
     xlRows.push([]);
     xlRows.push([null, null, null, null, "Subtotal", subtotal]);
-    xlRows.push([null, null, null, null, "Importación (10%)", subtotal * 0.10]);
-    xlRows.push([null, null, null, null, "ITBMS (7%)", subtotal * 0.077]);
-    xlRows.push([null, null, null, null, "TOTAL", subtotal * 1.177]);
+    xlRows.push([null, null, null, null, "Importación (10%)", subtotal * TASA_IMPORTACION]);
+    xlRows.push([null, null, null, null, "ITBMS (7%)", subtotal * TASA_ITBMS]);
+    xlRows.push([null, null, null, null, "TOTAL", subtotal * FACTOR_TOTAL]);
 
     const ws = XLSX.utils.aoa_to_sheet(xlRows);
     ws["!cols"] = [{ wch: 18 }, { wch: 28 }, { wch: 10 }, { wch: 8 }, { wch: 12 }, { wch: 14 }, { wch: 24 }, { wch: 16 }, { wch: 14 }];
@@ -98,7 +105,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     // Build HTML
-    const total = subtotal * 1.177;
+    const total = subtotal * FACTOR_TOTAL;
     const itemRowsHtml = items.map((item) => `
       <tr>
         <td style="padding:6px 8px;border-bottom:1px solid #f0f0f0">${esc(item.referencia)}</td>
@@ -137,8 +144,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           <tbody>${itemRowsHtml}</tbody>
           <tfoot>
             <tr><td colspan="5" style="padding:8px;text-align:right;color:#666;font-size:11px">Subtotal</td><td style="padding:8px;text-align:right">$${fmt(subtotal)}</td><td colspan="2"></td></tr>
-            <tr><td colspan="5" style="padding:4px 8px;text-align:right;color:#666;font-size:11px">Importación (10%)</td><td style="padding:4px 8px;text-align:right;font-size:11px">$${fmt(subtotal * 0.10)}</td><td colspan="2"></td></tr>
-            <tr><td colspan="5" style="padding:4px 8px;text-align:right;color:#666;font-size:11px">ITBMS (7%)</td><td style="padding:4px 8px;text-align:right;font-size:11px">$${fmt(subtotal * 0.077)}</td><td colspan="2"></td></tr>
+            <tr><td colspan="5" style="padding:4px 8px;text-align:right;color:#666;font-size:11px">Importación (10%)</td><td style="padding:4px 8px;text-align:right;font-size:11px">$${fmt(subtotal * TASA_IMPORTACION)}</td><td colspan="2"></td></tr>
+            <tr><td colspan="5" style="padding:4px 8px;text-align:right;color:#666;font-size:11px">ITBMS (7%)</td><td style="padding:4px 8px;text-align:right;font-size:11px">$${fmt(subtotal * TASA_ITBMS)}</td><td colspan="2"></td></tr>
             <tr style="border-top:2px solid #000"><td colspan="5" style="padding:8px;text-align:right;font-weight:600">TOTAL</td><td style="padding:8px;text-align:right;font-weight:600">$${fmt(total)}</td><td colspan="2"></td></tr>
           </tfoot>
         </table>

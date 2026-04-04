@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { fmt, fmtDate } from "@/lib/format";
 import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
-import { ESTADOS, EMPRESAS, EC, TALLAS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, buildSingleReclamoPdfHtml, openPdfWindow, loadCustomMotivos, saveCustomMotivo } from "./constants";
+import { ESTADOS, EMPRESAS, EC, TALLAS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, buildSingleReclamoPdfHtml, openPdfWindow, loadCustomMotivos, saveCustomMotivo, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "./constants";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   "Borrador": ["Enviado"],
@@ -87,6 +87,12 @@ export default function ReclamoDetail({
   const [showEmailConfirm, setShowEmailConfirm] = useState(false);
 
   async function sendEmail() {
+    const c = getC(current.empresa);
+    if (!c?.correo) {
+      showToast(`No hay contacto con email para ${current.empresa}. Agrega un contacto primero.`);
+      setShowEmailConfirm(false);
+      return;
+    }
     setShowEmailConfirm(false);
     setSendingEmail(true);
     try {
@@ -134,7 +140,7 @@ export default function ReclamoDetail({
     const c = getC(current.empresa);
     if (!c?.whatsapp) { showToast("No hay contacto WhatsApp para esta empresa."); return; }
     const nombre = c.nombre_contacto || c.nombre || "equipo";
-    const total = calcSub(current.reclamo_items ?? []) * 1.177;
+    const total = calcSub(current.reclamo_items ?? []) * FACTOR_TOTAL;
     const msg = `Hola ${nombre}, te escribo de parte de Fashion Group para dar seguimiento al reclamo ${current.nro_reclamo}.\n\nFactura: ${current.nro_factura}\nTotal a acreditar: $${fmt(total)}\nEstado: ${current.estado}\nFecha: ${fmtDate(current.fecha_reclamo)}\n\n¿Nos puedes confirmar el estado? Gracias.`;
     window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
   }
@@ -242,9 +248,9 @@ export default function ReclamoDetail({
       {/* Totals */}
       <div className="grid grid-cols-4 gap-4 mb-8 mt-6">
         <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Subtotal</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub)}</div></div>
-        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Import. 10%</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * 0.10)}</div></div>
-        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * 0.077)}</div></div>
-        <div className="bg-gray-900 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Total</div><div className="text-xl font-semibold tabular-nums mt-1 text-white">${fmt(sub * 1.177)}</div></div>
+        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Import. 10%</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * TASA_IMPORTACION)}</div></div>
+        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * TASA_ITBMS)}</div></div>
+        <div className="bg-gray-900 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Total</div><div className="text-xl font-semibold tabular-nums mt-1 text-white">${fmt(sub * FACTOR_TOTAL)}</div></div>
       </div>
 
       {/* Items table */}

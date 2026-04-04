@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { CajaPeriodo, CajaGasto, View, CATEGORIAS_DEFAULT } from "../components/types";
 import { GastoFormValues, GastoFormSetters } from "../components/GastoForm";
+
+function normalizeStr(s: string): string {
+  const t = s.trim();
+  if (!t) return t;
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+}
 
 export function useCajaState(urlId: string, initialView: View) {
   const [view, _setView] = useState<View>(initialView);
@@ -62,6 +68,21 @@ export function useCajaState(urlId: string, initialView: View) {
     setGSubtotal, setGItbmsPct, setGCategoria, setGCategoriaOtro,
     setGResponsable, setGEmpresa, setGEmpresaOtro,
   };
+
+  // Merge distinct categories/responsables from loaded gastos with managed lists
+  const allCategorias = useMemo(() => {
+    const gastos = current?.caja_gastos || [];
+    const fromGastos = gastos.map((g) => normalizeStr(g.categoria || "")).filter(Boolean);
+    const merged = new Set([...categorias, ...fromGastos]);
+    return Array.from(merged).sort((a, b) => a.localeCompare(b, "es"));
+  }, [categorias, current]);
+
+  const allResponsables = useMemo(() => {
+    const gastos = current?.caja_gastos || [];
+    const fromGastos = gastos.map((g) => normalizeStr(g.responsable || "")).filter(Boolean);
+    const merged = new Set([...responsables, ...fromGastos]);
+    return Array.from(merged).sort((a, b) => a.localeCompare(b, "es"));
+  }, [responsables, current]);
 
   const loadPeriodos = useCallback(async () => {
     setLoading(true);
@@ -204,14 +225,15 @@ export function useCajaState(urlId: string, initialView: View) {
     setAddingGasto(true);
     setError(null);
     try {
-      const resolvedCategoria = gCategoria === "Otro" ? gCategoriaOtro.trim() || "Otro" : gCategoria;
+      const resolvedCategoria = normalizeStr(gCategoria === "Otro" ? gCategoriaOtro.trim() || "Otro" : gCategoria);
       const resolvedEmpresa = gEmpresa === "Otro / General" ? gEmpresaOtro.trim() || "Otro / General" : gEmpresa;
+      const resolvedResponsable = normalizeStr(gResponsable);
       const res = await fetch("/api/caja/gastos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           periodo_id: current.id, fecha: gFecha, descripcion: gDescripcion,
-          proveedor: gProveedor, nro_factura: gNroFactura, responsable: gResponsable,
+          proveedor: gProveedor, nro_factura: gNroFactura, responsable: resolvedResponsable,
           categoria: resolvedCategoria, empresa: resolvedEmpresa,
           subtotal: subtotalNum, itbms: itbmsNum, total: totalNum,
         }),
@@ -247,10 +269,16 @@ export function useCajaState(urlId: string, initialView: View) {
     const sub = parseFloat(String(editGasto.subtotal)) || 0;
     const tax = Math.round((parseFloat(String(editGasto.itbms)) || 0) * 100) / 100;
     const total = Math.round((sub + tax) * 100) / 100;
+    const normalizedEdit = {
+      ...editGasto,
+      subtotal: sub, itbms: tax, total,
+      categoria: normalizeStr(editGasto.categoria || ""),
+      responsable: normalizeStr(editGasto.responsable || ""),
+    };
     await fetch(`/api/caja/gastos/${editingGastoId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...editGasto, subtotal: sub, itbms: tax, total }),
+      body: JSON.stringify(normalizedEdit),
     });
     setEditingGastoId(null); setEditGasto({});
     await loadDetail(current.id); loadPeriodos();
@@ -277,9 +305,9 @@ export function useCajaState(urlId: string, initialView: View) {
   return {
     view, setView, _setView,
     periodos, loading, current, setCurrent, error,
-    categorias, setCategorias, showManageCat, setShowManageCat, newCatName, setNewCatName,
+    categorias, setCategorias, allCategorias, showManageCat, setShowManageCat, newCatName, setNewCatName,
     showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,
-    responsables, setResponsables, showAddResponsable, setShowAddResponsable, newResponsable, setNewResponsable,
+    responsables, setResponsables, allResponsables, showAddResponsable, setShowAddResponsable, newResponsable, setNewResponsable,
     addingGasto, subtotalNum, totalNum,
     editingGastoId, setEditingGastoId, editGasto, setEditGasto,
     formValues, formSetters,
