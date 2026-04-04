@@ -4,7 +4,7 @@ import { useState } from "react";
 import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
 import { ESTADOS, daysSince, calcSub, buildReclamosPdfHtml, openPdfWindow } from "./constants";
-import { EmptyState, StatusBadge } from "@/components/ui";
+import { EmptyState, StatusBadge, Toast } from "@/components/ui";
 
 interface Props {
   role: string;
@@ -35,6 +35,8 @@ export default function EmpresaList({
   selectedIds, setSelectedIds, sortCol, setSortCol, sortDir, setSortDir,
   onBack, onNewReclamo, onLoadDetail, onDeleteReclamo,
 }: Props) {
+  const [toast, setToast] = useState<string | null>(null);
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
   const allEmpresaRecs = reclamos.filter((r) => r.empresa === activeEmpresa);
   const empresaRecs = allEmpresaRecs.filter((r) => {
     if (filterEstado !== "all" && r.estado !== filterEstado) return false;
@@ -90,9 +92,9 @@ export default function EmpresaList({
   }
 
   function sendBulkWA(ids: string[]) {
-    if (!c?.whatsapp) { alert("No hay contacto con WhatsApp para esta empresa."); return; }
+    if (!c?.whatsapp) { showToast("No hay contacto con WhatsApp para esta empresa."); return; }
     const sel = reclamos.filter((r) => ids.includes(r.id));
-    if (!sel.length) { alert("No hay reclamos para enviar."); return; }
+    if (!sel.length) { showToast("No hay reclamos seleccionados."); return; }
     const nombre = c.nombre_contacto || c.nombre || "equipo";
     const lines = sel.map((r) => {
       const factura = (r.nro_factura || "").length > 30 ? (r.nro_factura || "").slice(0, 27) + "..." : (r.nro_factura || "");
@@ -118,11 +120,11 @@ export default function EmpresaList({
       } catch {}
     }
     setEmailProgress(null);
-    alert(`${sent} email${sent !== 1 ? "s" : ""} enviado${sent !== 1 ? "s" : ""}`);
+    showToast(`${sent} email${sent !== 1 ? "s" : ""} enviado${sent !== 1 ? "s" : ""}`);
   }
 
   function sendSingleWA(r: Reclamo) {
-    if (!c?.whatsapp) { alert("No hay contacto con WhatsApp para esta empresa."); return; }
+    if (!c?.whatsapp) { showToast("No hay contacto con WhatsApp para esta empresa."); return; }
     const nombre = c.nombre_contacto || c.nombre || "equipo";
     const factura = (r.nro_factura || "").length > 30 ? (r.nro_factura || "").slice(0, 27) + "..." : (r.nro_factura || "");
     const total = calcSub(r.reclamo_items ?? []) * 1.177;
@@ -237,6 +239,7 @@ export default function EmpresaList({
           </div>
         </div>
       )}
+      <Toast message={toast} />
     </div>
   );
 }

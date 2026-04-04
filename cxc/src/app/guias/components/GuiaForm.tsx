@@ -47,6 +47,29 @@ export default function GuiaForm({
 }: GuiaFormProps) {
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
 
+  // Dynamic "Entregado por" list (persisted in localStorage)
+  const DEFAULT_ENTREGADORES = ["Julio", "Rodrigo"];
+  const [entregadores, setEntregadores] = useState(DEFAULT_ENTREGADORES);
+  const [entregadoPorOtro, setEntregadoPorOtro] = useState("");
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("fg_entregadores") || "[]") as string[];
+      const merged = [...DEFAULT_ENTREGADORES];
+      for (const s of stored) { if (s && !merged.includes(s)) merged.push(s); }
+      setEntregadores(merged);
+    } catch { /* */ }
+  }, []);
+  function addEntregador(name: string) {
+    if (!name.trim()) return;
+    const n = name.trim();
+    const updated = [...entregadores, n];
+    setEntregadores(updated);
+    const custom = updated.filter(s => !DEFAULT_ENTREGADORES.includes(s));
+    localStorage.setItem("fg_entregadores", JSON.stringify(custom));
+    setEntregadoPor(n);
+    setEntregadoPorOtro("");
+  }
+
   // Undo delete row
   const [undoRow, setUndoRow] = useState<{ idx: number; item: GuiaItem; timer: ReturnType<typeof setTimeout> } | null>(null);
   function handleRemoveRow(idx: number) {
@@ -186,13 +209,22 @@ export default function GuiaForm({
             )}
           </div>
           <div>
-            <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Entregado por <span className="text-red-500">*</span></label>
+            <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
+              Entregado por <span className="text-red-500">*</span>
+              <AddNewInline placeholder="Nombre" onAdd={addEntregador} />
+            </label>
             <select value={entregadoPor} onChange={e => setEntregadoPor(e.target.value)}
               className={inputClass("entregadoPor", "w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none")}>
               <option value="">Seleccionar...</option>
-              <option value="Julio">Julio</option>
-              <option value="Rodrigo">Rodrigo</option>
+              {entregadores.map(e => <option key={e} value={e}>{e}</option>)}
+              <option value="__other__">Otro...</option>
             </select>
+            {entregadoPor === "__other__" && (
+              <input type="text" placeholder="Nombre de quien entrega" value={entregadoPorOtro}
+                onChange={e => setEntregadoPorOtro(e.target.value)}
+                onBlur={() => { if (entregadoPorOtro.trim()) addEntregador(entregadoPorOtro); }}
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition mt-3" />
+            )}
           </div>
         </div>
       </div>

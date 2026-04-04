@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useEffect, useMemo } from "react";
 import { isCanvasClear } from "./canvasUtils";
 import SignatureCanvas from "./SignatureCanvas";
 
@@ -34,6 +34,19 @@ export default function DespachoForm({
 }: DespachoFormProps) {
   const canvas1Ref = useRef<HTMLCanvasElement>(null);
   const canvas2Ref = useRef<HTMLCanvasElement>(null);
+
+  // Warn before leaving if user has filled any field
+  const isDirty = useMemo(() =>
+    !!(bPlaca || bReceptor || bCedula || bChofer || pendingFirma1 || pendingFirma2),
+    [bPlaca, bReceptor, bCedula, bChofer, pendingFirma1, pendingFirma2]
+  );
+  useEffect(() => {
+    function handler(e: BeforeUnloadEvent) {
+      if (isDirty && !bSaving) { e.preventDefault(); e.returnValue = ""; }
+    }
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty, bSaving]);
 
   function handleConfirmar() {
     if (tipoDespacho === "externo") {
