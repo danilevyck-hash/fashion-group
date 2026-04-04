@@ -337,6 +337,7 @@ function ReclamosPage() {
         onUploadFoto={uploadFoto}
         onDeleteFoto={deleteFoto}
         onAplicadaConfirm={handleAplicadaConfirm}
+        showToast={(msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); }}
       />
       {deleteModal}
     </>

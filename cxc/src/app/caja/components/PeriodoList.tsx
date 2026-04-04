@@ -35,7 +35,7 @@ export default function PeriodoList({
         <div>
           <h1 className="text-xl font-light tracking-tight">Caja Menuda</h1>
           <p className="text-sm text-gray-400 mt-1">
-            Fondo rotativo para gastos menores
+            Cada periodo representa un ciclo de caja menuda. Crea uno nuevo cuando se reponga el fondo.
           </p>
         </div>
         {!hasOpenPeriod && (

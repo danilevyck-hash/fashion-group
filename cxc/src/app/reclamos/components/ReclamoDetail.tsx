@@ -11,7 +11,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   "Enviado": ["En revisión"],
   "En revisión": ["Resuelto con NC", "Rechazado"],
   "Resuelto con NC": [],
-  "Rechazado": [],
+  "Rechazado": ["Borrador"],
 };
 
 interface Props {
@@ -62,6 +62,7 @@ interface Props {
   onUploadFoto: (file: File) => void;
   onDeleteFoto: (fotoId: string, path: string) => void;
   onAplicadaConfirm: () => void;
+  showToast: (msg: string) => void;
 }
 
 const SUPA_URL = typeof window !== "undefined" ? (process.env.NEXT_PUBLIC_SUPABASE_URL || "") : "";
@@ -76,21 +77,24 @@ export default function ReclamoDetail({
   customMotivos, setCustomMotivos, addingEditMotivo, setAddingEditMotivo,
   newMotivoText, setNewMotivoText, onBack, onAddNota, onChangeEstado,
   onDeleteReclamo, onSaveEdit, onUploadFoto, onDeleteFoto, onAplicadaConfirm,
+  showToast,
 }: Props) {
   const fotoRef = useRef<HTMLInputElement>(null);
   const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
   const [deleteFotoTarget, setDeleteFotoTarget] = useState<{ id: string; path: string } | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
+  const [showEmailConfirm, setShowEmailConfirm] = useState(false);
 
   async function sendEmail() {
+    setShowEmailConfirm(false);
     setSendingEmail(true);
     try {
       const res = await fetch(`/api/reclamos/${current.id}/send-email`, { method: "POST" });
       if (!res.ok) throw new Error();
-      alert("Email enviado al proveedor");
+      showToast("Email enviado al proveedor");
     } catch {
-      alert("Error al enviar el email");
+      showToast("Error al enviar el email");
     } finally {
       setSendingEmail(false);
     }
@@ -128,7 +132,7 @@ export default function ReclamoDetail({
 
   function sendWA() {
     const c = getC(current.empresa);
-    if (!c?.whatsapp) { alert("No hay contacto WhatsApp para esta empresa."); return; }
+    if (!c?.whatsapp) { showToast("No hay contacto WhatsApp para esta empresa."); return; }
     const nombre = c.nombre_contacto || c.nombre || "equipo";
     const total = calcSub(current.reclamo_items ?? []) * 1.177;
     const msg = `Hola ${nombre}, te escribo de parte de Fashion Group para dar seguimiento al reclamo ${current.nro_reclamo}.\n\nFactura: ${current.nro_factura}\nTotal a acreditar: $${fmt(total)}\nEstado: ${current.estado}\nFecha: ${fmtDate(current.fecha_reclamo)}\n\n¿Nos puedes confirmar el estado? Gracias.`;
@@ -155,10 +159,26 @@ export default function ReclamoDetail({
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
           Editar
         </button>
-        <button onClick={sendEmail} disabled={sendingEmail} className="text-xs bg-black text-white px-4 py-2.5 sm:py-1.5 rounded-full hover:bg-gray-800 transition flex items-center gap-1 disabled:opacity-40">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
-          {sendingEmail ? "Enviando..." : "Enviar por Email"}
-        </button>
+        <div className="relative">
+          <button onClick={() => setShowEmailConfirm(!showEmailConfirm)} disabled={sendingEmail} className="text-xs bg-black text-white px-4 py-2.5 sm:py-1.5 rounded-full hover:bg-gray-800 transition flex items-center gap-1 disabled:opacity-40">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
+            {sendingEmail ? "Enviando..." : "Enviar por Email"}
+          </button>
+          {showEmailConfirm && (() => { const c = getC(current.empresa); return (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-10" style={{ minWidth: 220 }}>
+              {c?.correo ? (<>
+                <p className="text-xs text-gray-500 mb-2">Enviar a <strong>{c.correo}</strong>?</p>
+                <div className="flex gap-1">
+                  <button onClick={sendEmail} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 transition">Enviar</button>
+                  <button onClick={() => setShowEmailConfirm(false)} className="text-[11px] text-gray-400 px-2 py-1 hover:text-black transition">Cancelar</button>
+                </div>
+              </>) : (<>
+                <p className="text-xs text-red-500 mb-2">No hay correo configurado para {current.empresa}</p>
+                <button onClick={() => setShowEmailConfirm(false)} className="text-[11px] text-gray-400 px-2 py-1 hover:text-black transition">Cerrar</button>
+              </>)}
+            </div>
+          ); })()}
+        </div>
         <button onClick={sendWA} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
           WhatsApp

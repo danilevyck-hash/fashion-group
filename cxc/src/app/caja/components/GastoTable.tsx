@@ -44,17 +44,17 @@ export default function GastoTable({
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-white z-10">
             <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
+              {isOpen && <th className="w-20 py-3 px-4 font-normal"></th>}
               <th className="text-left py-3 px-4 font-normal">Fecha</th>
               <th className="text-left py-3 px-4 font-normal">Descripción</th>
-              <th className="text-left py-3 px-4 font-normal">Proveedor</th>
-              <th className="text-left py-3 px-4 font-normal">Responsable</th>
+              <th className="text-left py-3 px-4 font-normal hidden sm:table-cell">Proveedor</th>
+              <th className="text-left py-3 px-4 font-normal hidden sm:table-cell">Responsable</th>
               <th className="text-left py-3 px-4 font-normal">Categoría</th>
               <th className="text-left py-3 px-4 font-normal">Empresa</th>
-              <th className="text-left py-3 px-4 font-normal">N° Factura</th>
+              <th className="text-left py-3 px-4 font-normal hidden sm:table-cell">N° Factura</th>
               <th className="text-right py-3 px-4 font-normal">Sub-total</th>
               <th className="text-right py-3 px-4 font-normal">ITBMS</th>
               <th className="text-right py-3 px-4 font-normal">Total</th>
-              <th className="w-16"></th>
             </tr>
           </thead>
           <tbody>
@@ -72,6 +72,10 @@ export default function GastoTable({
                 {gastos.map((g) =>
                   editingGastoId === g.id ? (
                     <tr key={g.id} className="border-b border-gray-200 bg-gray-50">
+                      {isOpen && <td className="py-2 px-4 text-xs">
+                        <button onClick={onSaveEdit} className="text-gray-500 hover:text-black mr-1">Guardar</button>
+                        <button onClick={() => setEditingGastoId(null)} className="text-gray-300 hover:text-black">x</button>
+                      </td>}
                       <td className="py-2 pr-1">
                         <input
                           type="date"
@@ -95,7 +99,7 @@ export default function GastoTable({
                           className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"
                         />
                       </td>
-                      <td className="py-2 pr-1">
+                      <td className="py-2 pr-1 hidden sm:table-cell">
                         <input
                           type="text"
                           value={editGasto.proveedor || ""}
@@ -108,7 +112,7 @@ export default function GastoTable({
                           className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"
                         />
                       </td>
-                      <td className="py-2 pr-1">
+                      <td className="py-2 pr-1 hidden sm:table-cell">
                         <select
                           value={editGasto.responsable || ""}
                           onChange={(e) =>
@@ -164,7 +168,7 @@ export default function GastoTable({
                           ))}
                         </select>
                       </td>
-                      <td className="py-2 pr-1">
+                      <td className="py-2 pr-1 hidden sm:table-cell">
                         <input
                           type="text"
                           value={editGasto.nro_factura || ""}
@@ -212,59 +216,15 @@ export default function GastoTable({
                             (parseFloat(String(editGasto.itbms)) || 0)
                         )}
                       </td>
-                      <td className="py-2 text-center text-xs">
-                        <button
-                          onClick={onSaveEdit}
-                          className="text-gray-500 hover:text-black mr-1"
-                        >
-                          Guardar Gasto
-                        </button>
-                        <button
-                          onClick={() => setEditingGastoId(null)}
-                          className="text-gray-300 hover:text-black"
-                        >
-                          ×
-                        </button>
-                      </td>
                     </tr>
                   ) : (
                     <tr
                       key={g.id}
                       className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
                     >
-                      <td className="py-3 px-4 text-gray-500">
-                        {fmtDate(g.fecha)}
-                      </td>
-                      <td className="py-3 px-4">
-                        {g.descripcion || g.nombre}
-                      </td>
-                      <td className="py-3 px-4 text-gray-500">
-                        {g.proveedor || "—"}
-                      </td>
-                      <td className="py-3 px-4 text-gray-500">
-                        {g.responsable || "—"}
-                      </td>
-                      <td className="py-3 px-4 text-gray-500">
-                        {g.categoria || "Varios"}
-                      </td>
-                      <td className="py-3 px-4 text-gray-500">
-                        {g.empresa || "—"}
-                      </td>
-                      <td className="py-3 px-4 text-gray-500">
-                        {g.nro_factura || "—"}
-                      </td>
-                      <td className="py-3 px-4 text-right tabular-nums">
-                        ${fmt(g.subtotal)}
-                      </td>
-                      <td className="py-3 px-4 text-right tabular-nums text-gray-500">
-                        ${fmt(g.itbms)}
-                      </td>
-                      <td className="py-3 px-4 text-right tabular-nums font-medium">
-                        ${fmt(g.total)}
-                      </td>
-                      <td className="py-3 px-4 text-center text-xs">
-                        {isOpen && (
-                          <>
+                      {isOpen && (
+                        <td className="py-3 px-4 text-xs">
+                          <div className="flex items-center gap-1">
                             <button
                               onClick={() => {
                                 setEditingGastoId(g.id);
@@ -280,25 +240,57 @@ export default function GastoTable({
                                   itbms: g.itbms,
                                 });
                               }}
-                              className="text-xs text-gray-400 hover:text-black transition mr-1 py-2.5 sm:py-1.5 px-2"
+                              className="text-xs text-gray-400 hover:text-black transition py-2.5 sm:py-1.5 px-1.5 flex items-center gap-1"
                             >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
                               Editar
                             </button>
                             <button
                               onClick={() => onDeleteGasto(g.id)}
-                              className="text-xs text-gray-300 hover:text-red-500 transition py-2.5 sm:py-1.5 px-2"
+                              className="text-xs text-gray-300 hover:text-red-500 transition py-2.5 sm:py-1.5 px-1.5 flex items-center gap-1"
                             >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                               Eliminar
                             </button>
-                          </>
-                        )}
+                          </div>
+                        </td>
+                      )}
+                      <td className="py-3 px-4 text-gray-500">
+                        {fmtDate(g.fecha)}
+                      </td>
+                      <td className="py-3 px-4">
+                        {g.descripcion || g.nombre}
+                      </td>
+                      <td className="py-3 px-4 text-gray-500 hidden sm:table-cell">
+                        {g.proveedor || "—"}
+                      </td>
+                      <td className="py-3 px-4 text-gray-500 hidden sm:table-cell">
+                        {g.responsable || "—"}
+                      </td>
+                      <td className="py-3 px-4 text-gray-500">
+                        {g.categoria || "Varios"}
+                      </td>
+                      <td className="py-3 px-4 text-gray-500">
+                        {g.empresa || "—"}
+                      </td>
+                      <td className="py-3 px-4 text-gray-500 hidden sm:table-cell">
+                        {g.nro_factura || "—"}
+                      </td>
+                      <td className="py-3 px-4 text-right tabular-nums">
+                        ${fmt(g.subtotal)}
+                      </td>
+                      <td className="py-3 px-4 text-right tabular-nums text-gray-500">
+                        ${fmt(g.itbms)}
+                      </td>
+                      <td className="py-3 px-4 text-right tabular-nums font-medium">
+                        ${fmt(g.total)}
                       </td>
                     </tr>
                   )
                 )}
                 <tr className="border-t border-gray-300">
                   <td
-                    colSpan={7}
+                    colSpan={isOpen ? 8 : 7}
                     className="py-3 px-4 text-right text-[11px] uppercase tracking-[0.05em] text-gray-400"
                   >
                     Totales
@@ -312,7 +304,6 @@ export default function GastoTable({
                   <td className="py-3 px-4 text-right tabular-nums font-semibold">
                     ${fmt(totalGastado)}
                   </td>
-                  <td></td>
                 </tr>
               </>
             )}

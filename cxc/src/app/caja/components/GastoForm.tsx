@@ -140,7 +140,7 @@ export default function GastoForm({
         </div>
         <div>
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
-            Categoría
+            Categoría <span className="text-red-500">*</span>
           </label>
           <select
             value={gCategoria}
@@ -283,7 +283,7 @@ export default function GastoForm({
         </div>
         <div>
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
-            Empresa
+            Empresa <span className="text-red-500">*</span>
           </label>
           <select
             value={gEmpresa}
@@ -312,7 +312,7 @@ export default function GastoForm({
         </div>
         <div>
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
-            Sub-total
+            Sub-total <span className="text-red-500">*</span>
           </label>
           <input
             type="number"
@@ -321,6 +321,7 @@ export default function GastoForm({
             onChange={(e) => setGSubtotal(e.target.value)}
             className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition"
           />
+          {gSubtotal && subtotalNum <= 0 && <p className="text-[10px] text-red-500 mt-0.5">El monto debe ser mayor a $0</p>}
         </div>
         <div>
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
