@@ -104,7 +104,7 @@ export default function VentasDashboard() {
   useEffect(() => {
     if (authChecked && role === "secretaria") {
       showToast("Tu rol permite cargar datos pero no ver el dashboard");
-      setTimeout(() => router.push("/upload?tab=ventas"), 1500);
+      setTimeout(() => router.push("/upload?tab=ventas&from=ventas"), 1500);
     }
   }, [authChecked, role, router]);
 
@@ -325,7 +325,7 @@ export default function VentasDashboard() {
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-semibold">Dashboard de Ventas</h1>
           <div className="flex items-center gap-2">
-            <button onClick={() => router.push("/upload?tab=ventas")}
+            <button onClick={() => router.push("/upload?tab=ventas&from=ventas")}
               className="text-xs border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-50 transition print:hidden">
               Cargar datos
             </button>
@@ -425,7 +425,7 @@ export default function VentasDashboard() {
             title={`Sin datos para ${año}`}
             subtitle="Carga un CSV de ventas para ver el dashboard"
             actionLabel="Cargar datos"
-            onAction={() => router.push("/upload?tab=ventas")}
+            onAction={() => router.push("/upload?tab=ventas&from=ventas")}
           />
         )}
 

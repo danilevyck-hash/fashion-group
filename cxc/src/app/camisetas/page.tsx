@@ -321,10 +321,20 @@ export default function CamisetasPage() {
               <div className="text-[10px] text-gray-400">{(gPaq * PPQ).toLocaleString()} piezas</div>
               <div className="text-[10px] text-gray-400 mt-0.5">1 paquete = 13 piezas</div>
             </div>
-            {!isVendedor && (
+            {!isVendedor ? (
               <div className="border border-gray-200 rounded-lg p-3">
                 <div className="text-[10px] text-gray-400 uppercase tracking-widest">Monto Total</div>
                 <div className="text-xl font-semibold mt-1">{fmtK(gVal)}</div>
+              </div>
+            ) : (
+              <div className="border border-gray-200 rounded-lg p-3">
+                <div className="text-[10px] text-gray-400 uppercase tracking-widest">Desglose</div>
+                <div className="text-sm mt-1 space-y-0.5">
+                  {GENERO_ORDER.map(gen => {
+                    const genPaq = sortedProductos.filter(p => p.genero === gen).reduce((s, p) => s + prodTotalPaq(p.id), 0);
+                    return genPaq > 0 ? <div key={gen} className="flex justify-between"><span className="text-gray-500">{gen}</span><span className="font-medium tabular-nums">{genPaq} paq</span></div> : null;
+                  })}
+                </div>
               </div>
             )}
             {sobrev > 0 && (
@@ -382,14 +392,16 @@ export default function CamisetasPage() {
               </div>
 
               {/* Collapsible detailed matrix */}
-              <div>
+              <div className="sm:hidden bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-500 mb-4">
+                Vista Resumen no disponible en móvil. Usa la pestaña <button onClick={() => setTab("cliente")} className="font-medium text-black underline">Por Cliente</button>.
+              </div>
+              <div className="hidden sm:block">
                 <button onClick={() => setShowMatrix(!showMatrix)} className="text-sm text-gray-400 hover:text-black transition flex items-center gap-1 mb-3">
                   <span style={{ transform: showMatrix ? "rotate(90deg)" : "rotate(0)", transition: "transform 0.2s" }}>▶</span>
                   Tabla detallada por cliente
                 </button>
                 {showMatrix && (
                   <div className="overflow-x-auto -mx-6 px-6">
-                    <div className="sm:hidden bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-700 mb-3">Usa la vista &quot;Por Cliente&quot; en móvil para mejor experiencia.</div>
                     <p className="text-[10px] text-gray-400 mb-3">Haz click en cualquier celda para editar</p>
                     <table className="text-xs w-max min-w-full border-collapse">
                       <thead className="sticky top-0 bg-white z-10">

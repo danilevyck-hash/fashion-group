@@ -57,6 +57,7 @@ function UploadPageInner() {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get("tab") === "ventas" ? "ventas" : "cxc") as "cxc" | "ventas";
 
+  const fromVentas = searchParams.get("from") === "ventas";
   const [activeTab, setActiveTab] = useState<"cxc" | "ventas">(initialTab);
   const [dragOver, setDragOver] = useState<string | null>(null);
 
@@ -580,6 +581,10 @@ function UploadPageInner() {
     <div>
       <AppHeader module="Carga de Archivos" />
       <div className="max-w-6xl mx-auto px-6 py-6">
+
+        {fromVentas && (
+          <a href="/ventas" className="text-sm text-gray-400 hover:text-black transition mb-4 block">← Volver a Ventas</a>
+        )}
 
         {/* Tab bar */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 mb-6 max-w-xs">

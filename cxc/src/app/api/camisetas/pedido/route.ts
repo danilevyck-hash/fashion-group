@@ -22,7 +22,9 @@ export async function POST(req: NextRequest) {
 
   if (paquetes <= 0) {
     await supabaseServer.from("camisetas_pedidos").delete().eq("cliente_id", cliente_id).eq("producto_id", producto_id);
-    await logActivity(session?.role || "unknown", "pedido_change", "camisetas", { previous_paquetes, new_paquetes: 0, cliente_id, producto_id }, session?.userName);
+    if (previous_paquetes > 0) {
+      await logActivity(session?.role || "unknown", "pedido_update", "camisetas", { previous_paquetes, new_paquetes: 0, cliente_id, producto_id }, session?.userName);
+    }
     return NextResponse.json({ ok: true });
   }
 
@@ -31,6 +33,7 @@ export async function POST(req: NextRequest) {
     .upsert({ cliente_id, producto_id, paquetes }, { onConflict: "cliente_id,producto_id" });
 
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
-  await logActivity(session?.role || "unknown", "pedido_change", "camisetas", { previous_paquetes, new_paquetes: paquetes, cliente_id, producto_id }, session?.userName);
+  const action = previous_paquetes > 0 && previous_paquetes !== paquetes ? "pedido_update" : "pedido_create";
+  await logActivity(session?.role || "unknown", action, "camisetas", { previous_paquetes, new_paquetes: paquetes, cliente_id, producto_id }, session?.userName);
   return NextResponse.json({ ok: true });
 }
