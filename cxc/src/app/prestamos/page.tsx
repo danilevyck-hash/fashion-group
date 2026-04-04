@@ -257,7 +257,7 @@ export default function PrestamosPage() {
 
         {/* Actions + Filters */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
-          <button onClick={openNewEmp} className="bg-black text-white px-5 py-2.5 sm:py-2 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo Empleado</button>
+          <button onClick={openNewEmp} className="border border-gray-200 px-5 py-2.5 sm:py-2 rounded-md text-sm hover:border-gray-400 transition">+ Nuevo Empleado</button>
           <button onClick={openNewMov} className="bg-black text-white px-5 py-2.5 sm:py-2 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo Préstamo</button>
           <button onClick={() => router.push("/prestamos/reporte")} className="border border-gray-200 px-5 py-2.5 sm:py-2 rounded-md text-sm hover:border-gray-400 transition">Reporte Deducciones</button>
 
@@ -296,13 +296,13 @@ export default function PrestamosPage() {
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Empleado</th>
                   <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Empresa</th>
-                  <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Ded. Quincenal</th>
-                  <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Total Prestado</th>
-                  <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Pagado</th>
+                  <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Ded. Quincenal</th>
+                  <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Total Prestado</th>
+                  <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Pagado</th>
                   <th className="text-right py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Saldo</th>
                   <th className="py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal w-32">Progreso</th>
-                  <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Notas</th>
-                  <th className="py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Deducción</th>
+                  <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Notas</th>
+                  <th className="py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Deducción</th>
                   <th className="py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Acciones</th>
                 </tr>
               </thead>
@@ -315,9 +315,9 @@ export default function PrestamosPage() {
                       {pendientes > 0 && <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">{pendientes} pendiente{pendientes > 1 ? "s" : ""}</span>}
                     </td>
                     <td className="py-3 px-4 text-gray-500">{emp.empresa || "—"}</td>
-                    <td className="py-3 px-4 text-right tabular-nums">${fmt(emp.deduccion_quincenal)}</td>
-                    <td className="py-3 px-4 text-right tabular-nums">${fmt(prestado)}</td>
-                    <td className="py-3 px-4 text-right tabular-nums">${fmt(pagado)}</td>
+                    <td className="py-3 px-4 text-right tabular-nums hidden sm:table-cell">${fmt(emp.deduccion_quincenal)}</td>
+                    <td className="py-3 px-4 text-right tabular-nums hidden sm:table-cell">${fmt(prestado)}</td>
+                    <td className="py-3 px-4 text-right tabular-nums hidden sm:table-cell">${fmt(pagado)}</td>
                     <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(saldo)}</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
@@ -327,8 +327,8 @@ export default function PrestamosPage() {
                         <span className="text-xs text-gray-400 tabular-nums w-10 text-right">{pct.toFixed(0)}%</span>
                       </div>
                     </td>
-                    <td className="py-3 px-4 text-gray-400 text-xs max-w-[120px] truncate" title={emp.notas || ""}>{emp.notas || "—"}</td>
-                    <td className="py-3 px-4">
+                    <td className="py-3 px-4 text-gray-400 text-xs max-w-[120px] truncate hidden sm:table-cell" title={emp.notas || ""}>{emp.notas || "—"}</td>
+                    <td className="py-3 px-4 hidden sm:table-cell">
                       {emp.deduccion_quincenal > 0 ? (
                         hasDeduccionEnQuincena(emp.prestamos_movimientos || [], quincena.start, quincena.end)
                           ? <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-full">✓ Deducida</span>
@@ -376,6 +376,7 @@ export default function PrestamosPage() {
               <div>
                 <label className="text-xs text-gray-400 uppercase">Deducción Quincenal ($)</label>
                 <input type="number" step="0.01" min="0" value={fDeduccion} onChange={e => setFDeduccion(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
+                <p className="text-[10px] text-gray-400 mt-1">Monto que se deduce cada quincena del salario del colaborador</p>
               </div>
               <div>
                 <label className="text-xs text-gray-400 uppercase">Notas</label>

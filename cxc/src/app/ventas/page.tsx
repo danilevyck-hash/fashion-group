@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { fmt } from "@/lib/format";
-import { SkeletonTable, SkeletonKPI, Toast, Modal } from "@/components/ui";
+import { SkeletonTable, SkeletonKPI, Toast, Modal, EmptyState } from "@/components/ui";
+import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer } from "recharts";
+import XLSX from "xlsx-js-style";
 
 const EMPRESAS = ["Vistana International", "Fashion Wear", "Fashion Shoes", "Active Shoes", "Active Wear", "Joystep", "Confecciones Boston", "Multifashion"];
 const MES_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -100,12 +102,16 @@ export default function VentasDashboard() {
   const { authChecked, role } = useAuth({ moduleKey: "ventas", allowedRoles: ["admin", "director", "contabilidad"] });
 
   useEffect(() => {
-    if (authChecked && role === "secretaria") router.push("/upload?tab=ventas");
+    if (authChecked && role === "secretaria") {
+      showToast("Tu rol permite cargar datos pero no ver el dashboard");
+      setTimeout(() => router.push("/upload?tab=ventas"), 1500);
+    }
   }, [authChecked, role, router]);
 
   const [año, setAño] = useState(new Date().getFullYear());
-  const [vista, setVista] = useState<"mensual" | "quarter">("mensual");
+  const [vista, setVista] = useState<"mensual" | "quarter">(() => typeof window !== "undefined" && window.innerWidth < 640 ? "quarter" : "mensual");
   const [empresaFilter, setEmpresaFilter] = useState<string[]>([]); // empty = all
+  const [filterMes, setFilterMes] = useState<number | null>(null); // null = all months
   const [loading, setLoading] = useState(true);
   const [ventas, setVentas] = useState<VentaRow[]>([]);
   const [ventasPrev, setVentasPrev] = useState<VentaRow[]>([]);
@@ -156,9 +162,21 @@ export default function VentasDashboard() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const filtered = useMemo(() => empresaFilter.length === 0 ? ventas : ventas.filter(r => empresaFilter.includes(r.empresa)), [ventas, empresaFilter]);
-  const filteredPrev = useMemo(() => empresaFilter.length === 0 ? ventasPrev : ventasPrev.filter(r => empresaFilter.includes(r.empresa)), [ventasPrev, empresaFilter]);
-  const filteredMetas = useMemo(() => empresaFilter.length === 0 ? metas : metas.filter(m => empresaFilter.includes(m.empresa)), [metas, empresaFilter]);
+  const filtered = useMemo(() => {
+    let rows = empresaFilter.length === 0 ? ventas : ventas.filter(r => empresaFilter.includes(r.empresa));
+    if (filterMes !== null) rows = rows.filter(r => r.mes === filterMes);
+    return rows;
+  }, [ventas, empresaFilter, filterMes]);
+  const filteredPrev = useMemo(() => {
+    let rows = empresaFilter.length === 0 ? ventasPrev : ventasPrev.filter(r => empresaFilter.includes(r.empresa));
+    if (filterMes !== null) rows = rows.filter(r => r.mes === filterMes);
+    return rows;
+  }, [ventasPrev, empresaFilter, filterMes]);
+  const filteredMetas = useMemo(() => {
+    let rows = empresaFilter.length === 0 ? metas : metas.filter(m => empresaFilter.includes(m.empresa));
+    if (filterMes !== null) rows = rows.filter(m => m.mes === filterMes);
+    return rows;
+  }, [metas, empresaFilter, filterMes]);
 
   const kpi = useMemo(() => calcKPIs(filtered, filteredPrev, filteredMetas, vista), [filtered, filteredPrev, filteredMetas, vista]);
   const table = useMemo(() => buildTable(filtered, filteredPrev, vista), [filtered, filteredPrev, vista]);
@@ -244,6 +262,51 @@ export default function VentasDashboard() {
     setSavingMetas(false);
   };
 
+  // Chart data: monthly sales bars
+  const chartData = useMemo(() => {
+    return MES_NAMES.map((label, i) => {
+      const mes = i + 1;
+      const ventas = filtered.filter(r => r.mes === mes).reduce((s, r) => s + r.subtotal, 0);
+      const prev = filteredPrev.filter(r => r.mes === mes).reduce((s, r) => s + r.subtotal, 0);
+      return { name: label, ventas, prev };
+    });
+  }, [filtered, filteredPrev]);
+
+  const hasData = ventas.length > 0;
+
+  // Excel export
+  function exportExcel() {
+    const rows: (string | number)[][] = [
+      [`FASHION GROUP — Ventas ${año}`],
+      [],
+      ["Empresa", ...table.periods, "Total", "Margen%"],
+    ];
+    for (const row of table.tableRows) {
+      if (row.total === 0 && empresaFilter.length === 0) continue;
+      rows.push([row.empresa, ...row.values, row.total, Number(row.margen.toFixed(1))]);
+    }
+    rows.push(["TOTAL", ...table.totalValues, table.grandTotal, Number(table.grandMargen.toFixed(1))]);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 24 }, ...table.periods.map(() => ({ wch: 12 })), { wch: 14 }, { wch: 10 }];
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: table.periods.length + 2 } }];
+    const titleCell = ws[XLSX.utils.encode_cell({ r: 0, c: 0 })];
+    if (titleCell) titleCell.s = { font: { bold: true, sz: 14 } };
+    for (let c = 0; c < table.periods.length + 3; c++) {
+      const cell = ws[XLSX.utils.encode_cell({ r: 2, c })];
+      if (cell) cell.s = { font: { bold: true } };
+    }
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ventas");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ventas-${año}-${vista}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   if (!authChecked) return null;
 
   const kpiCards = [
@@ -265,6 +328,10 @@ export default function VentasDashboard() {
             <button onClick={() => router.push("/upload?tab=ventas")}
               className="text-xs border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-50 transition print:hidden">
               Cargar datos
+            </button>
+            <button onClick={exportExcel}
+              className="text-xs border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-50 transition print:hidden">
+              ↓ Excel
             </button>
             <button onClick={() => window.open(`/ventas/reporte?anio=${año}&empresa=${empresaFilter.join(",") || "all"}&vista=${vista}`, "_blank")}
               className="text-xs border border-gray-200 rounded-full px-4 py-2 hover:bg-gray-50 transition print:hidden">
@@ -306,6 +373,11 @@ export default function VentasDashboard() {
               );
             })}
           </div>
+          <select value={filterMes ?? ""} onChange={e => setFilterMes(e.target.value ? Number(e.target.value) : null)}
+            className="text-xs border border-gray-200 rounded-full px-3 py-1.5 bg-white">
+            <option value="">Todos los meses</option>
+            {MES_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
+          </select>
           {role === "admin" && (
             <button onClick={openMetas} className="ml-auto text-xs bg-black text-white rounded-full px-4 py-1.5 hover:bg-gray-800 transition">
               Editar metas
@@ -329,6 +401,36 @@ export default function VentasDashboard() {
             ))}
           </div>
         )}
+
+        {/* Monthly Bar Chart */}
+        {!loading && hasData && filterMes === null && (
+          <div className="mb-6 border border-gray-200 rounded-lg p-4 print:hidden">
+            <p className="text-[10px] uppercase tracking-wide text-gray-400 mb-3">Ventas mensuales {año}</p>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={chartData} barCategoryGap="20%">
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
+                <RTooltip formatter={(v) => [`$${fmt(Number(v))}`, ""]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                <Bar dataKey="ventas" fill="#1a1a1a" radius={[3, 3, 0, 0]} />
+                <Bar dataKey="prev" fill="#e5e7eb" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+            <p className="text-[10px] text-gray-400 mt-1 text-center">Negro: {año} · Gris: {año - 1}</p>
+          </div>
+        )}
+
+        {/* Empty state — no data for selected year */}
+        {!loading && !hasData && (
+          <EmptyState
+            title={`Sin datos para ${año}`}
+            subtitle="Carga un CSV de ventas para ver el dashboard"
+            actionLabel="Cargar datos"
+            onAction={() => router.push("/upload?tab=ventas")}
+          />
+        )}
+
+        {/* Mobile hint */}
+        {vista === "quarter" && <p className="text-[10px] text-gray-400 mb-2 sm:hidden">Vista trimestral activa en mobile</p>}
 
         {/* Period indicator */}
         {!loading && kpi.monthsWithData.length > 0 && (
@@ -374,8 +476,10 @@ export default function VentasDashboard() {
                           <td className="px-3 py-2 font-medium text-gray-700 sticky left-0 bg-white whitespace-nowrap">{row.empresa}</td>
                           {row.values.map((v, i) => {
                             const prev = row.prevValues[i];
-                            const drop = v > 0 && prev > 0 && v < prev * 0.85;
-                            return <td key={i} className="text-right px-2 py-2 tabular-nums text-gray-600">{v > 0 ? fmtK(v) : "—"}{drop ? " ↓" : ""}</td>;
+                            const drop = v > 0 && prev > 0 && v < prev * 0.9;
+                            const grow = v > 0 && prev > 0 && v > prev * 1.1;
+                            const cellBg = drop ? "bg-red-50" : grow ? "bg-green-50" : "";
+                            return <td key={i} className={`text-right px-2 py-2 tabular-nums text-gray-600 ${cellBg}`}>{v > 0 ? fmtK(v) : "—"}{drop ? " ↓" : ""}</td>;
                           })}
                           <td className="text-right px-3 py-2 font-medium tabular-nums">{fmtK(row.total)}</td>
                           <td className={`text-right px-3 py-2 tabular-nums ${row.margen < 15 ? "bg-red-50 text-red-600" : "text-gray-600"}`}>

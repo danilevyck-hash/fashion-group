@@ -27,6 +27,9 @@ export default function EmpleadoHeader({ empleado, saldo, onEdit, onToggleArchiv
         {empleado.activo && saldo === 0 && (
           <button onClick={onToggleArchive} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Archivar</button>
         )}
+        {empleado.activo && saldo > 0 && (
+          <button disabled title={`Saldo pendiente de $${saldo.toFixed(2)} — paga el saldo para archivar`} className="border border-gray-200 px-4 py-2 rounded-md text-sm text-gray-300 cursor-not-allowed">Archivar</button>
+        )}
         {!empleado.activo && (
           <button onClick={onToggleArchive} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Reactivar</button>
         )}
