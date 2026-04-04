@@ -566,8 +566,8 @@ function UploadPageInner() {
 
         {/* Tab bar */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 mb-6 max-w-xs">
-          <button onClick={() => setActiveTab("cxc")} className={`flex-1 py-2 px-4 text-sm rounded-md transition ${activeTab === "cxc" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>CxC</button>
-          <button onClick={() => setActiveTab("ventas")} className={`flex-1 py-2 px-4 text-sm rounded-md transition ${activeTab === "ventas" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Ventas</button>
+          <button onClick={() => setActiveTab("cxc")} className={`flex-1 py-2.5 sm:py-2 px-4 text-sm rounded-md transition ${activeTab === "cxc" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>CxC</button>
+          <button onClick={() => setActiveTab("ventas")} className={`flex-1 py-2.5 sm:py-2 px-4 text-sm rounded-md transition ${activeTab === "ventas" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Ventas</button>
         </div>
 
         {message && (
@@ -628,7 +628,7 @@ function UploadPageInner() {
                       </div>
                     </div>
                   )}
-                  <div className="text-[10px] text-gray-300 mt-3">Arrastra el CSV aqui o haz click</div>
+                  <div className="text-[10px] text-gray-300 mt-3"><span className="sm:hidden">Toca para seleccionar</span><span className="hidden sm:inline">Arrastra el CSV aqui o haz click</span></div>
                   <input ref={(el) => { cxcFileRefs.current[co.key] = el; }} type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden"
                     onClick={(e) => e.stopPropagation()}
                     onChange={async (e) => { const f = e.target.files?.[0]; if (f) openCxcPreview(co.key, f); e.target.value = ""; }} />
@@ -669,7 +669,7 @@ function UploadPageInner() {
                   <div className="text-sm font-medium mb-0.5">{co.name}</div>
                   <div className="text-xs text-gray-400 mb-3">{co.brand}</div>
                   {getStatusIndicator(co.key, "ventas")}
-                  <div className="text-[10px] text-gray-300 mt-3">{ventasPreviewLoading ? "Analizando..." : "Arrastra el CSV aqui o haz click"}</div>
+                  <div className="text-[10px] text-gray-300 mt-3">{ventasPreviewLoading ? "Analizando..." : <><span className="sm:hidden">Toca para seleccionar</span><span className="hidden sm:inline">Arrastra el CSV aqui o haz click</span></>}</div>
                   <input ref={(el) => { ventasFileRefs.current[co.key] = el; }} type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden"
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) openVentasPreview(co.key, co.name, f); e.target.value = ""; }} />
