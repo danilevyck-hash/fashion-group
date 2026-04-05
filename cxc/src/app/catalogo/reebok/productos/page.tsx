@@ -280,11 +280,11 @@ function Productos() {
       const { jsPDF } = await import("jspdf");
 
       // Layout constants (letter portrait in mm)
-      const PW = 215.9, PH = 279.4, M = 12;
-      const COLS = 4, GAP = 4;
+      const PW = 215.9, PH = 279.4, M = 14;
+      const COLS = 3, GAP = 5;
       const CW = (PW - 2 * M - (COLS - 1) * GAP) / COLS;
-      const IH = 40, TH = 16, CH = IH + TH, RGAP = 4;
-      const GENDER_H = 8;
+      const IH = 52, TH = 18, CH = IH + TH, RGAP = 5;
+      const GENDER_H = 10;
 
       // Load an image as base64 via canvas
       function loadImg(url: string): Promise<{ data: string; w: number; h: number }> {
@@ -370,18 +370,18 @@ function Productos() {
 
         // Gender section header
         needPage(GENDER_H + CH);
-        doc.setFontSize(10);
+        doc.setFontSize(12);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(30);
-        doc.text(g.label, M, y + 5);
+        doc.text(g.label, M, y + 6);
         const tw = doc.getTextWidth(g.label);
-        doc.setDrawColor(220);
-        doc.setLineWidth(0.15);
-        doc.line(M + tw + 3, y + 3, PW - M, y + 3);
-        doc.setFontSize(7);
+        doc.setDrawColor(210);
+        doc.setLineWidth(0.2);
+        doc.line(M + tw + 4, y + 4, PW - M, y + 4);
+        doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(180);
-        doc.text(`${gItems.length}`, PW - M, y + 5, { align: "right" });
+        doc.setTextColor(170);
+        doc.text(`${gItems.length}`, PW - M, y + 6, { align: "right" });
         y += GENDER_H;
 
         // Render products in rows
@@ -414,38 +414,38 @@ function Productos() {
             // OFERTA badge
             if (p.on_sale) {
               doc.setFillColor(204, 0, 0);
-              doc.roundedRect(x + CW - 14, y + 1.5, 12.5, 4, 0.8, 0.8, "F");
-              doc.setFontSize(5.5);
+              doc.roundedRect(x + CW - 16, y + 2, 14, 4.5, 1, 1, "F");
+              doc.setFontSize(6.5);
               doc.setTextColor(255, 255, 255);
               doc.setFont("helvetica", "bold");
-              doc.text("OFERTA", x + CW - 13.2, y + 4.2);
+              doc.text("OFERTA", x + CW - 15, y + 5.2);
             }
 
             // Product info below image
-            let ty = y + IH + 3.5;
+            let ty = y + IH + 4;
             doc.setTextColor(30);
-            doc.setFontSize(7.5);
+            doc.setFontSize(9);
             doc.setFont("helvetica", "bold");
-            const name = p.name.length > 26 ? p.name.substring(0, 24) + "…" : p.name;
-            doc.text(name, x + 1.5, ty);
+            const name = p.name.length > 32 ? p.name.substring(0, 30) + "…" : p.name;
+            doc.text(name, x + 2, ty);
 
-            ty += 3.2;
-            doc.setFontSize(6);
+            ty += 3.8;
+            doc.setFontSize(7);
             doc.setFont("helvetica", "normal");
-            doc.setTextColor(160);
-            doc.text(p.sku || "", x + 1.5, ty);
+            doc.setTextColor(150);
+            doc.text(p.sku || "", x + 2, ty);
 
             if (p.color) {
-              ty += 2.8;
-              doc.setTextColor(120);
-              doc.text(p.color, x + 1.5, ty);
+              const skuW = doc.getTextWidth(p.sku || "");
+              doc.setTextColor(180);
+              doc.text(" · " + p.color, x + 2 + skuW, ty);
             }
 
-            ty = y + IH + TH - 1.5;
-            doc.setFontSize(10);
+            ty = y + IH + TH - 1;
+            doc.setFontSize(11);
             doc.setFont("helvetica", "bold");
             doc.setTextColor(30);
-            doc.text(p.price ? `$${p.price.toFixed(0)}` : "—", x + 1.5, ty);
+            doc.text(p.price ? `$${p.price.toFixed(0)}` : "—", x + 2, ty);
           }
           y += CH + RGAP;
         }
