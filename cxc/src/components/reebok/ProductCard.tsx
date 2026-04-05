@@ -51,7 +51,7 @@ export default function ProductCard({ product, stock = 0, qty, onQtyChange, disa
           </div>
           <div className="flex items-center gap-2 mt-1.5">
             <p className="text-base font-semibold text-black">
-              {product.price ? <>{`$${product.price.toFixed(0)}`}<span className="text-[11px] text-gray-400 font-normal ml-1">/unidad ({`$${(product.price * 12).toFixed(0)}`}/bulto)</span></> : "Consultar"}
+              {product.price ? `$${product.price.toFixed(0)}` : "Consultar"}
             </p>
             {product.on_sale && <span className="text-[11px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">OFERTA</span>}
           </div>

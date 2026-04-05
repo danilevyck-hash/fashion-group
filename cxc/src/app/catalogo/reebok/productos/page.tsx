@@ -221,20 +221,23 @@ function Productos() {
   }, []);
 
   // ── Derived state ──
-  const ofertaPrices = onlyOferta
-    ? [...new Set(products.filter(p => p.on_sale && p.price).map(p => p.price!))].sort((a, b) => a - b)
-    : [];
-
   const catOrder: Record<string, number> = { footwear: 0, apparel: 1, accessories: 2 };
   const genOrder: Record<string, number> = { male: 0, female: 1, kids: 2, unisex: 3 };
   const catLabel: Record<string, string> = { footwear: 'Calzado', apparel: 'Ropa', accessories: 'Accesorios' };
   const genLabel: Record<string, string> = { male: 'Hombre', female: 'Mujer', kids: 'Niños', unisex: 'Unisex' };
 
-  const filtered = products
+  // Pre-price filtered set (all filters EXCEPT price) — used for price dropdown options
+  const filteredBeforePrice = products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => !gender || p.gender === gender)
     .filter(p => !category || p.category === category)
-    .filter(p => !onlyOferta || p.on_sale)
+    .filter(p => !onlyOferta || p.on_sale);
+
+  const ofertaPrices = onlyOferta
+    ? [...new Set(filteredBeforePrice.filter(p => p.price).map(p => p.price!))].sort((a, b) => a - b)
+    : [];
+
+  const filtered = filteredBeforePrice
     .filter(p => !priceFilter || p.price === Number(priceFilter))
     .sort((a, b) => {
       const ca = catOrder[a.category] ?? 9, cb = catOrder[b.category] ?? 9;
@@ -282,7 +285,6 @@ function Productos() {
     const rows = items.map(p => {
       const imgSrc = p.image_url || "";
       const priceUnit = p.price ? `$${p.price.toFixed(0)}` : "—";
-      const priceBulto = p.price ? `$${(p.price * 12).toFixed(0)}` : "";
       return `
         <div class="product">
           <div class="img-wrap">
@@ -294,7 +296,7 @@ function Productos() {
             <div class="sku">${p.sku || ""}</div>
             ${p.color ? `<div class="color">${p.color}</div>` : ""}
             ${p.sub_category ? `<div class="subcat">${p.sub_category}</div>` : ""}
-            <div class="price">${priceUnit}/ud ${priceBulto ? `<span class="price-bulto">(${priceBulto}/bulto)</span>` : ""}</div>
+            <div class="price">${priceUnit}</div>
           </div>
         </div>`;
     }).join("");
@@ -324,7 +326,6 @@ function Productos() {
     .sku { font-size: 11px; color: #999; font-family: 'SF Mono', 'Consolas', monospace; margin-bottom: 4px; }
     .color, .subcat { font-size: 11px; color: #666; }
     .price { font-size: 14px; font-weight: 700; margin-top: 6px; }
-    .price-bulto { font-size: 11px; font-weight: 400; color: #888; }
     .toolbar { padding: 16px 40px; display: flex; gap: 12px; }
     .toolbar button { padding: 10px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; }
     .btn-print { background: #1a1a1a; color: white; }
