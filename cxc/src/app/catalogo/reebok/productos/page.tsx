@@ -266,123 +266,199 @@ function Productos() {
   const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   const hasContext = draftClient || draftId; // user is in an order flow
 
-  // ── Download catalog as printable page ──
-  function handleDownloadCatalog() {
+  // ── Download catalog as PDF ──
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownloadCatalog() {
     const items = filtered;
-    if (items.length === 0) return;
+    if (!items.length || downloading) return;
 
-    const filterDesc: string[] = [];
-    if (gender) filterDesc.push(genLabel[gender] || gender);
-    if (category) filterDesc.push(catLabel[category] || category);
-    if (onlyOferta) filterDesc.push("Oferta");
-    if (priceFilter) filterDesc.push(`$${Number(priceFilter).toFixed(0)}`);
-    if (search) filterDesc.push(`"${search}"`);
-    const subtitle = filterDesc.length > 0 ? filterDesc.join(" · ") : "Todos los productos";
+    setDownloading(true);
+    setToast("Generando catálogo PDF...");
 
-    const w = window.open("", "_blank");
-    if (!w) return;
+    try {
+      const { jsPDF } = await import("jspdf");
 
-    const logoUrl = window.location.origin + "/reebok/reebok-logo.png";
-    const COLS = 5;
-    const ROWS_FIRST = 4; // first page has header
-    const ROWS_REST = 5;
-    const perFirst = COLS * ROWS_FIRST;
-    const perRest = COLS * ROWS_REST;
+      // Layout constants (letter portrait in mm)
+      const PW = 215.9, PH = 279.4, M = 12;
+      const COLS = 4, GAP = 4;
+      const CW = (PW - 2 * M - (COLS - 1) * GAP) / COLS;
+      const IH = 40, TH = 16, CH = IH + TH, RGAP = 4;
+      const GENDER_H = 8;
 
-    function card(p: typeof items[0]) {
-      const imgSrc = p.image_url || "";
-      const priceUnit = p.price ? `$${p.price.toFixed(0)}` : "—";
-      return `<div class="product">
-        <div class="img-wrap">
-          ${imgSrc ? `<img src="${imgSrc}" alt="${p.name}" />` : `<div class="no-img">Sin foto</div>`}
-          ${p.on_sale ? `<span class="badge-sale">OFERTA</span>` : ""}
-        </div>
-        <div class="info">
-          <div class="name">${p.name}</div>
-          <div class="sku">${p.sku || ""}</div>
-          ${p.color ? `<div class="color">${p.color}</div>` : ""}
-          <div class="price">${priceUnit}</div>
-        </div>
-      </div>`;
+      // Load an image as base64 via canvas
+      function loadImg(url: string): Promise<{ data: string; w: number; h: number }> {
+        return new Promise(resolve => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => {
+            const c = document.createElement("canvas");
+            c.width = img.naturalWidth; c.height = img.naturalHeight;
+            c.getContext("2d")!.drawImage(img, 0, 0);
+            try { resolve({ data: c.toDataURL("image/jpeg", 0.75), w: img.naturalWidth, h: img.naturalHeight }); }
+            catch { resolve({ data: "", w: 0, h: 0 }); }
+          };
+          img.onerror = () => resolve({ data: "", w: 0, h: 0 });
+          img.src = url;
+        });
+      }
+
+      // Load all product images + logo in parallel
+      const urls = [...new Set(items.filter(p => p.image_url).map(p => p.image_url!))];
+      const imgCache: Record<string, { data: string; w: number; h: number }> = {};
+      const [logoResult, ...imgResults] = await Promise.all([
+        loadImg("/reebok/reebok-logo.png"),
+        ...urls.map(u => loadImg(u).then(r => { imgCache[u] = r; })),
+      ]);
+      void imgResults;
+
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+      let y = M;
+
+      function needPage(h: number) {
+        if (y + h > PH - M) { doc.addPage(); y = M; return true; }
+        return false;
+      }
+
+      // ── Header (page 1) ──
+      if (logoResult.data) {
+        const logoH = 10;
+        const logoW = (logoResult.w / logoResult.h) * logoH;
+        doc.addImage(logoResult.data, "PNG", M, y, logoW, logoH);
+      }
+      // Right side info
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(150);
+      const dateStr = new Date().toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" });
+      doc.text(dateStr, PW - M, y + 4, { align: "right" });
+      doc.setFontSize(12);
+      doc.setTextColor(30);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${items.length} productos`, PW - M, y + 9, { align: "right" });
+      y += 14;
+      // Red line
+      doc.setDrawColor(204, 0, 0);
+      doc.setLineWidth(0.6);
+      doc.line(M, y, PW - M, y);
+      y += 2;
+      // Subtitle (filters)
+      const filterDesc: string[] = [];
+      if (gender) filterDesc.push(genLabel[gender] || gender);
+      if (category) filterDesc.push(catLabel[category] || category);
+      if (onlyOferta) filterDesc.push("Oferta");
+      if (priceFilter) filterDesc.push(`$${Number(priceFilter).toFixed(0)}`);
+      if (search) filterDesc.push(`"${search}"`);
+      const subtitle = filterDesc.length > 0 ? filterDesc.join(" · ") : "Todos los productos";
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(140);
+      doc.text(subtitle, M, y + 3);
+      y += 7;
+
+      // ── Group by gender ──
+      const genders = [
+        { key: "male", label: "Hombre" },
+        { key: "female", label: "Mujer" },
+        { key: "kids", label: "Niños" },
+        { key: "unisex", label: "Unisex" },
+      ];
+
+      for (const g of genders) {
+        const gItems = items.filter(p => (p.gender || "unisex") === g.key);
+        if (!gItems.length) continue;
+
+        // Gender section header
+        needPage(GENDER_H + CH);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30);
+        doc.text(g.label, M, y + 5);
+        const tw = doc.getTextWidth(g.label);
+        doc.setDrawColor(220);
+        doc.setLineWidth(0.15);
+        doc.line(M + tw + 3, y + 3, PW - M, y + 3);
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(180);
+        doc.text(`${gItems.length}`, PW - M, y + 5, { align: "right" });
+        y += GENDER_H;
+
+        // Render products in rows
+        for (let i = 0; i < gItems.length; i += COLS) {
+          needPage(CH);
+          const row = gItems.slice(i, i + COLS);
+
+          for (let j = 0; j < row.length; j++) {
+            const p = row[j];
+            const x = M + j * (CW + GAP);
+
+            // Image background
+            doc.setFillColor(248, 248, 248);
+            doc.setDrawColor(230);
+            doc.setLineWidth(0.2);
+            doc.roundedRect(x, y, CW, IH, 1.5, 1.5, "FD");
+
+            // Product image (fit inside keeping aspect ratio)
+            const cached = p.image_url ? imgCache[p.image_url] : null;
+            if (cached?.data) {
+              const pad = 3;
+              const boxW = CW - pad * 2, boxH = IH - pad * 2;
+              const scale = Math.min(boxW / cached.w, boxH / cached.h);
+              const dw = cached.w * scale, dh = cached.h * scale;
+              const dx = x + pad + (boxW - dw) / 2;
+              const dy = y + pad + (boxH - dh) / 2;
+              doc.addImage(cached.data, "JPEG", dx, dy, dw, dh);
+            }
+
+            // OFERTA badge
+            if (p.on_sale) {
+              doc.setFillColor(204, 0, 0);
+              doc.roundedRect(x + CW - 14, y + 1.5, 12.5, 4, 0.8, 0.8, "F");
+              doc.setFontSize(5.5);
+              doc.setTextColor(255, 255, 255);
+              doc.setFont("helvetica", "bold");
+              doc.text("OFERTA", x + CW - 13.2, y + 4.2);
+            }
+
+            // Product info below image
+            let ty = y + IH + 3.5;
+            doc.setTextColor(30);
+            doc.setFontSize(7.5);
+            doc.setFont("helvetica", "bold");
+            const name = p.name.length > 26 ? p.name.substring(0, 24) + "…" : p.name;
+            doc.text(name, x + 1.5, ty);
+
+            ty += 3.2;
+            doc.setFontSize(6);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(160);
+            doc.text(p.sku || "", x + 1.5, ty);
+
+            if (p.color) {
+              ty += 2.8;
+              doc.setTextColor(120);
+              doc.text(p.color, x + 1.5, ty);
+            }
+
+            ty = y + IH + TH - 1.5;
+            doc.setFontSize(10);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(30);
+            doc.text(p.price ? `$${p.price.toFixed(0)}` : "—", x + 1.5, ty);
+          }
+          y += CH + RGAP;
+        }
+      }
+
+      doc.save(`catalogo-reebok-${new Date().toISOString().slice(0, 10)}.pdf`);
+      setToast("Catálogo descargado");
+    } catch (e) {
+      console.error(e);
+      setToast("Error al generar PDF");
+    } finally {
+      setDownloading(false);
     }
-
-    // Build pages
-    const pages: string[] = [];
-    let idx = 0;
-
-    // Page 1 with header
-    const firstItems = items.slice(0, perFirst);
-    idx = perFirst;
-    pages.push(`<div class="page">
-      <div class="header">
-        <div class="header-left">
-          <img src="${logoUrl}" alt="Reebok" />
-          <div class="subtitle">${subtitle}</div>
-        </div>
-        <div class="header-right">
-          <div class="count">${items.length} productos</div>
-          <div>${new Date().toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}</div>
-        </div>
-      </div>
-      <div class="grid grid-${ROWS_FIRST}">${firstItems.map(card).join("")}</div>
-    </div>`);
-
-    // Remaining pages
-    while (idx < items.length) {
-      const chunk = items.slice(idx, idx + perRest);
-      idx += perRest;
-      pages.push(`<div class="page">
-        <div class="grid grid-${ROWS_REST}">${chunk.map(card).join("")}</div>
-      </div>`);
-    }
-
-    w.document.write(`<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8" />
-  <title>Catálogo Reebok — ${subtitle}</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    @page { size: letter portrait; margin: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .page { width: 216mm; height: 279mm; padding: 8mm; overflow: hidden; page-break-after: always; display: flex; flex-direction: column; }
-    .page:last-child { page-break-after: auto; }
-    .header { padding: 0 0 8px; border-bottom: 2px solid #cc0000; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-shrink: 0; }
-    .header-left { display: flex; align-items: center; gap: 12px; }
-    .header-left img { height: 28px; }
-    .header-left .subtitle { font-size: 11px; color: #888; }
-    .header-right { text-align: right; font-size: 10px; color: #999; }
-    .header-right .count { font-size: 14px; font-weight: 600; color: #1a1a1a; }
-    .grid { display: grid; grid-template-columns: repeat(${COLS}, 1fr); gap: 6px; flex: 1; align-content: start; }
-    .product { border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; }
-    .img-wrap { position: relative; aspect-ratio: 1; background: #f8f8f8; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    .img-wrap img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
-    .no-img { color: #ccc; font-size: 9px; }
-    .badge-sale { position: absolute; top: 3px; right: 3px; background: #cc0000; color: white; font-size: 7px; font-weight: 700; padding: 1px 5px; border-radius: 2px; }
-    .info { padding: 5px 6px; }
-    .name { font-size: 8.5px; font-weight: 600; line-height: 1.2; margin-bottom: 1px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-    .sku { font-size: 7.5px; color: #999; font-family: 'SF Mono', 'Consolas', monospace; }
-    .color { font-size: 7.5px; color: #666; }
-    .price { font-size: 11px; font-weight: 700; margin-top: 2px; }
-  </style>
-</head>
-<body>
-${pages.join("\n")}
-<script>
-  const imgs = document.querySelectorAll('img');
-  let loaded = 0;
-  const total = imgs.length;
-  if (total === 0) { setTimeout(() => window.print(), 100); }
-  else {
-    imgs.forEach(img => {
-      if (img.complete) { loaded++; if (loaded >= total) setTimeout(() => window.print(), 300); }
-      else { img.onload = img.onerror = () => { loaded++; if (loaded >= total) setTimeout(() => window.print(), 300); }; }
-    });
-  }
-</script>
-</body>
-</html>`);
-    w.document.close();
   }
 
   return (
@@ -474,10 +550,10 @@ ${pages.join("\n")}
         <div className="flex items-center gap-2 ml-auto mb-1">
           <span className="text-xs text-gray-400">{filtered.length}</span>
           {filtered.length > 0 && (
-            <button onClick={handleDownloadCatalog}
-              className="text-xs border border-gray-200 text-gray-500 px-3 py-1.5 rounded-full hover:border-gray-400 hover:text-black transition flex items-center gap-1">
+            <button onClick={handleDownloadCatalog} disabled={downloading}
+              className="text-xs border border-gray-200 text-gray-500 px-3 py-1.5 rounded-full hover:border-gray-400 hover:text-black transition flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Catálogo
+              {downloading ? "Generando..." : "PDF"}
             </button>
           )}
         </div>
