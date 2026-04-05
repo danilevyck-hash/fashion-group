@@ -263,6 +263,103 @@ function Productos() {
   const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   const hasContext = draftClient || draftId; // user is in an order flow
 
+  // ── Download catalog as printable page ──
+  function handleDownloadCatalog() {
+    const items = filtered;
+    if (items.length === 0) return;
+
+    const filterDesc: string[] = [];
+    if (gender) filterDesc.push(genLabel[gender] || gender);
+    if (category) filterDesc.push(catLabel[category] || category);
+    if (onlyOferta) filterDesc.push("Oferta");
+    if (priceFilter) filterDesc.push(`$${Number(priceFilter).toFixed(0)}`);
+    if (search) filterDesc.push(`"${search}"`);
+    const subtitle = filterDesc.length > 0 ? filterDesc.join(" · ") : "Todos los productos";
+
+    const w = window.open("", "_blank");
+    if (!w) return;
+
+    const rows = items.map(p => {
+      const imgSrc = p.image_url || "";
+      const priceUnit = p.price ? `$${p.price.toFixed(0)}` : "—";
+      const priceBulto = p.price ? `$${(p.price * 12).toFixed(0)}` : "";
+      return `
+        <div class="product">
+          <div class="img-wrap">
+            ${imgSrc ? `<img src="${imgSrc}" alt="${p.name}" />` : `<div class="no-img">Sin foto</div>`}
+            ${p.on_sale ? `<span class="badge-sale">OFERTA</span>` : ""}
+          </div>
+          <div class="info">
+            <div class="name">${p.name}</div>
+            <div class="sku">${p.sku || ""}</div>
+            ${p.color ? `<div class="color">${p.color}</div>` : ""}
+            ${p.sub_category ? `<div class="subcat">${p.sub_category}</div>` : ""}
+            <div class="price">${priceUnit}/ud ${priceBulto ? `<span class="price-bulto">(${priceBulto}/bulto)</span>` : ""}</div>
+          </div>
+        </div>`;
+    }).join("");
+
+    w.document.write(`<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Catálogo Reebok — ${subtitle}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; background: #fff; }
+    .header { padding: 32px 40px 24px; border-bottom: 2px solid #cc0000; display: flex; align-items: center; justify-content: space-between; }
+    .header-left h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+    .header-left h1 span { color: #cc0000; }
+    .header-left .subtitle { font-size: 13px; color: #888; margin-top: 4px; }
+    .header-right { text-align: right; font-size: 12px; color: #999; }
+    .header-right .count { font-size: 20px; font-weight: 600; color: #1a1a1a; }
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 32px 40px; }
+    .product { border: 1px solid #e5e5e5; border-radius: 8px; overflow: hidden; break-inside: avoid; }
+    .img-wrap { position: relative; aspect-ratio: 1; background: #f5f5f5; display: flex; align-items: center; justify-content: center; }
+    .img-wrap img { width: 100%; height: 100%; object-fit: contain; padding: 8px; }
+    .no-img { color: #ccc; font-size: 12px; }
+    .badge-sale { position: absolute; top: 8px; right: 8px; background: #cc0000; color: white; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
+    .info { padding: 12px; }
+    .name { font-size: 13px; font-weight: 600; line-height: 1.3; margin-bottom: 4px; }
+    .sku { font-size: 11px; color: #999; font-family: 'SF Mono', 'Consolas', monospace; margin-bottom: 4px; }
+    .color, .subcat { font-size: 11px; color: #666; }
+    .price { font-size: 14px; font-weight: 700; margin-top: 6px; }
+    .price-bulto { font-size: 11px; font-weight: 400; color: #888; }
+    .toolbar { padding: 16px 40px; display: flex; gap: 12px; }
+    .toolbar button { padding: 10px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; }
+    .btn-print { background: #1a1a1a; color: white; }
+    .btn-print:hover { background: #333; }
+    @media print {
+      .toolbar { display: none; }
+      .header { padding: 20px 24px 16px; }
+      .grid { padding: 20px 24px; gap: 12px; grid-template-columns: repeat(4, 1fr); }
+      .product { border: 1px solid #ddd; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    }
+    @page { size: landscape; margin: 10mm; }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button class="btn-print" onclick="window.print()">Descargar PDF / Imprimir</button>
+  </div>
+  <div class="header">
+    <div class="header-left">
+      <h1><span>Reebok</span> Panamá</h1>
+      <div class="subtitle">${subtitle}</div>
+    </div>
+    <div class="header-right">
+      <div class="count">${items.length}</div>
+      <div>productos</div>
+      <div style="margin-top:4px">${new Date().toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}</div>
+    </div>
+  </div>
+  <div class="grid">${rows}</div>
+</body>
+</html>`);
+    w.document.close();
+  }
+
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
       <div className="mb-6">
@@ -349,7 +446,16 @@ function Productos() {
         {(searchInput || gender || category || onlyOferta) && (
           <button onClick={() => { setSearchInput(""); setSearch(""); setGender(""); setCategory(""); setOnlyOferta(false); setPriceFilter(""); }} className="text-sm text-gray-400 hover:text-black transition py-2 mb-0.5">Limpiar</button>
         )}
-        <span className="text-xs text-gray-400 ml-auto mb-1">{filtered.length}</span>
+        <div className="flex items-center gap-2 ml-auto mb-1">
+          <span className="text-xs text-gray-400">{filtered.length}</span>
+          {filtered.length > 0 && (
+            <button onClick={handleDownloadCatalog}
+              className="text-xs border border-gray-200 text-gray-500 px-3 py-1.5 rounded-full hover:border-gray-400 hover:text-black transition flex items-center gap-1">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Catálogo
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── Grid ── */}
