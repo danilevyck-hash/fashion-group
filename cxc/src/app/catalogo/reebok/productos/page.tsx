@@ -282,26 +282,59 @@ function Productos() {
     const w = window.open("", "_blank");
     if (!w) return;
 
-    const rows = items.map(p => {
+    const logoUrl = window.location.origin + "/reebok/reebok-logo.png";
+    const COLS = 5;
+    const ROWS_FIRST = 4; // first page has header
+    const ROWS_REST = 5;
+    const perFirst = COLS * ROWS_FIRST;
+    const perRest = COLS * ROWS_REST;
+
+    function card(p: typeof items[0]) {
       const imgSrc = p.image_url || "";
       const priceUnit = p.price ? `$${p.price.toFixed(0)}` : "—";
-      return `
-        <div class="product">
-          <div class="img-wrap">
-            ${imgSrc ? `<img src="${imgSrc}" alt="${p.name}" />` : `<div class="no-img">Sin foto</div>`}
-            ${p.on_sale ? `<span class="badge-sale">OFERTA</span>` : ""}
-          </div>
-          <div class="info">
-            <div class="name">${p.name}</div>
-            <div class="sku">${p.sku || ""}</div>
-            ${p.color ? `<div class="color">${p.color}</div>` : ""}
-            ${p.sub_category ? `<div class="subcat">${p.sub_category}</div>` : ""}
-            <div class="price">${priceUnit}</div>
-          </div>
-        </div>`;
-    }).join("");
+      return `<div class="product">
+        <div class="img-wrap">
+          ${imgSrc ? `<img src="${imgSrc}" alt="${p.name}" />` : `<div class="no-img">Sin foto</div>`}
+          ${p.on_sale ? `<span class="badge-sale">OFERTA</span>` : ""}
+        </div>
+        <div class="info">
+          <div class="name">${p.name}</div>
+          <div class="sku">${p.sku || ""}</div>
+          ${p.color ? `<div class="color">${p.color}</div>` : ""}
+          <div class="price">${priceUnit}</div>
+        </div>
+      </div>`;
+    }
 
-    const logoUrl = window.location.origin + "/reebok/reebok-logo.png";
+    // Build pages
+    const pages: string[] = [];
+    let idx = 0;
+
+    // Page 1 with header
+    const firstItems = items.slice(0, perFirst);
+    idx = perFirst;
+    pages.push(`<div class="page">
+      <div class="header">
+        <div class="header-left">
+          <img src="${logoUrl}" alt="Reebok" />
+          <div class="subtitle">${subtitle}</div>
+        </div>
+        <div class="header-right">
+          <div class="count">${items.length} productos</div>
+          <div>${new Date().toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}</div>
+        </div>
+      </div>
+      <div class="grid grid-${ROWS_FIRST}">${firstItems.map(card).join("")}</div>
+    </div>`);
+
+    // Remaining pages
+    while (idx < items.length) {
+      const chunk = items.slice(idx, idx + perRest);
+      idx += perRest;
+      pages.push(`<div class="page">
+        <div class="grid grid-${ROWS_REST}">${chunk.map(card).join("")}</div>
+      </div>`);
+    }
 
     w.document.write(`<!DOCTYPE html>
 <html lang="es">
@@ -310,60 +343,43 @@ function Productos() {
   <title>Catálogo Reebok — ${subtitle}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; background: #fff; }
-    .header { padding: 24px 32px 18px; border-bottom: 2px solid #cc0000; display: flex; align-items: center; justify-content: space-between; }
-    .header-left { display: flex; align-items: center; gap: 16px; }
-    .header-left img { height: 32px; }
-    .header-left .subtitle { font-size: 12px; color: #888; }
-    .header-right { text-align: right; font-size: 11px; color: #999; }
-    .header-right .count { font-size: 18px; font-weight: 600; color: #1a1a1a; }
-    .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; padding: 20px 32px; }
-    .product { border: 1px solid #e5e5e5; border-radius: 6px; overflow: hidden; break-inside: avoid; }
-    .img-wrap { position: relative; aspect-ratio: 1; background: #f8f8f8; display: flex; align-items: center; justify-content: center; }
-    .img-wrap img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
-    .no-img { color: #ccc; font-size: 10px; }
-    .badge-sale { position: absolute; top: 4px; right: 4px; background: #cc0000; color: white; font-size: 8px; font-weight: 700; padding: 1px 6px; border-radius: 3px; }
-    .info { padding: 8px; }
-    .name { font-size: 10px; font-weight: 600; line-height: 1.3; margin-bottom: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-    .sku { font-size: 9px; color: #999; font-family: 'SF Mono', 'Consolas', monospace; margin-bottom: 2px; }
-    .color, .subcat { font-size: 9px; color: #666; }
-    .price { font-size: 12px; font-weight: 700; margin-top: 4px; }
-    @media print {
-      .header { padding: 16px 20px 12px; }
-      .grid { padding: 12px 20px; gap: 8px; }
-      .product { border: 1px solid #ddd; }
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    }
-    @page { size: letter portrait; margin: 8mm; }
+    @page { size: letter portrait; margin: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; background: #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .page { width: 216mm; height: 279mm; padding: 8mm; overflow: hidden; page-break-after: always; display: flex; flex-direction: column; }
+    .page:last-child { page-break-after: auto; }
+    .header { padding: 0 0 8px; border-bottom: 2px solid #cc0000; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-shrink: 0; }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-left img { height: 28px; }
+    .header-left .subtitle { font-size: 11px; color: #888; }
+    .header-right { text-align: right; font-size: 10px; color: #999; }
+    .header-right .count { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+    .grid { display: grid; grid-template-columns: repeat(${COLS}, 1fr); gap: 6px; flex: 1; align-content: start; }
+    .product { border: 1px solid #e0e0e0; border-radius: 4px; overflow: hidden; display: flex; flex-direction: column; }
+    .img-wrap { position: relative; aspect-ratio: 1; background: #f8f8f8; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .img-wrap img { width: 100%; height: 100%; object-fit: contain; padding: 3px; }
+    .no-img { color: #ccc; font-size: 9px; }
+    .badge-sale { position: absolute; top: 3px; right: 3px; background: #cc0000; color: white; font-size: 7px; font-weight: 700; padding: 1px 5px; border-radius: 2px; }
+    .info { padding: 5px 6px; }
+    .name { font-size: 8.5px; font-weight: 600; line-height: 1.2; margin-bottom: 1px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .sku { font-size: 7.5px; color: #999; font-family: 'SF Mono', 'Consolas', monospace; }
+    .color { font-size: 7.5px; color: #666; }
+    .price { font-size: 11px; font-weight: 700; margin-top: 2px; }
   </style>
 </head>
 <body>
-  <div class="header">
-    <div class="header-left">
-      <img src="${logoUrl}" alt="Reebok" />
-      <div class="subtitle">${subtitle}</div>
-    </div>
-    <div class="header-right">
-      <div class="count">${items.length} productos</div>
-      <div>${new Date().toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}</div>
-    </div>
-  </div>
-  <div class="grid">${rows}</div>
-  <script>
-    // Wait for all images to load, then auto-print
-    const imgs = document.querySelectorAll('img');
-    let loaded = 0;
-    const total = imgs.length;
-    if (total === 0) { setTimeout(() => window.print(), 100); }
-    else {
-      imgs.forEach(img => {
-        if (img.complete) { loaded++; if (loaded >= total) setTimeout(() => window.print(), 200); }
-        else {
-          img.onload = img.onerror = () => { loaded++; if (loaded >= total) setTimeout(() => window.print(), 200); };
-        }
-      });
-    }
-  </script>
+${pages.join("\n")}
+<script>
+  const imgs = document.querySelectorAll('img');
+  let loaded = 0;
+  const total = imgs.length;
+  if (total === 0) { setTimeout(() => window.print(), 100); }
+  else {
+    imgs.forEach(img => {
+      if (img.complete) { loaded++; if (loaded >= total) setTimeout(() => window.print(), 300); }
+      else { img.onload = img.onerror = () => { loaded++; if (loaded >= total) setTimeout(() => window.print(), 300); }; }
+    });
+  }
+</script>
 </body>
 </html>`);
     w.document.close();
