@@ -301,6 +301,8 @@ function Productos() {
         </div>`;
     }).join("");
 
+    const logoUrl = window.location.origin + "/reebok/reebok-logo.png";
+
     w.document.write(`<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -309,53 +311,59 @@ function Productos() {
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a1a1a; background: #fff; }
-    .header { padding: 32px 40px 24px; border-bottom: 2px solid #cc0000; display: flex; align-items: center; justify-content: space-between; }
-    .header-left h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
-    .header-left h1 span { color: #cc0000; }
-    .header-left .subtitle { font-size: 13px; color: #888; margin-top: 4px; }
-    .header-right { text-align: right; font-size: 12px; color: #999; }
-    .header-right .count { font-size: 20px; font-weight: 600; color: #1a1a1a; }
-    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; padding: 32px 40px; }
-    .product { border: 1px solid #e5e5e5; border-radius: 8px; overflow: hidden; break-inside: avoid; }
-    .img-wrap { position: relative; aspect-ratio: 1; background: #f5f5f5; display: flex; align-items: center; justify-content: center; }
-    .img-wrap img { width: 100%; height: 100%; object-fit: contain; padding: 8px; }
-    .no-img { color: #ccc; font-size: 12px; }
-    .badge-sale { position: absolute; top: 8px; right: 8px; background: #cc0000; color: white; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 4px; }
-    .info { padding: 12px; }
-    .name { font-size: 13px; font-weight: 600; line-height: 1.3; margin-bottom: 4px; }
-    .sku { font-size: 11px; color: #999; font-family: 'SF Mono', 'Consolas', monospace; margin-bottom: 4px; }
-    .color, .subcat { font-size: 11px; color: #666; }
-    .price { font-size: 14px; font-weight: 700; margin-top: 6px; }
-    .toolbar { padding: 16px 40px; display: flex; gap: 12px; }
-    .toolbar button { padding: 10px 24px; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; }
-    .btn-print { background: #1a1a1a; color: white; }
-    .btn-print:hover { background: #333; }
+    .header { padding: 24px 32px 18px; border-bottom: 2px solid #cc0000; display: flex; align-items: center; justify-content: space-between; }
+    .header-left { display: flex; align-items: center; gap: 16px; }
+    .header-left img { height: 32px; }
+    .header-left .subtitle { font-size: 12px; color: #888; }
+    .header-right { text-align: right; font-size: 11px; color: #999; }
+    .header-right .count { font-size: 18px; font-weight: 600; color: #1a1a1a; }
+    .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; padding: 20px 32px; }
+    .product { border: 1px solid #e5e5e5; border-radius: 6px; overflow: hidden; break-inside: avoid; }
+    .img-wrap { position: relative; aspect-ratio: 1; background: #f8f8f8; display: flex; align-items: center; justify-content: center; }
+    .img-wrap img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+    .no-img { color: #ccc; font-size: 10px; }
+    .badge-sale { position: absolute; top: 4px; right: 4px; background: #cc0000; color: white; font-size: 8px; font-weight: 700; padding: 1px 6px; border-radius: 3px; }
+    .info { padding: 8px; }
+    .name { font-size: 10px; font-weight: 600; line-height: 1.3; margin-bottom: 2px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .sku { font-size: 9px; color: #999; font-family: 'SF Mono', 'Consolas', monospace; margin-bottom: 2px; }
+    .color, .subcat { font-size: 9px; color: #666; }
+    .price { font-size: 12px; font-weight: 700; margin-top: 4px; }
     @media print {
-      .toolbar { display: none; }
-      .header { padding: 20px 24px 16px; }
-      .grid { padding: 20px 24px; gap: 12px; grid-template-columns: repeat(4, 1fr); }
+      .header { padding: 16px 20px 12px; }
+      .grid { padding: 12px 20px; gap: 8px; }
       .product { border: 1px solid #ddd; }
       body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     }
-    @page { size: landscape; margin: 10mm; }
+    @page { size: letter portrait; margin: 8mm; }
   </style>
 </head>
 <body>
-  <div class="toolbar">
-    <button class="btn-print" onclick="window.print()">Descargar PDF / Imprimir</button>
-  </div>
   <div class="header">
     <div class="header-left">
-      <h1><span>Reebok</span> Panamá</h1>
+      <img src="${logoUrl}" alt="Reebok" />
       <div class="subtitle">${subtitle}</div>
     </div>
     <div class="header-right">
-      <div class="count">${items.length}</div>
-      <div>productos</div>
-      <div style="margin-top:4px">${new Date().toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}</div>
+      <div class="count">${items.length} productos</div>
+      <div>${new Date().toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}</div>
     </div>
   </div>
   <div class="grid">${rows}</div>
+  <script>
+    // Wait for all images to load, then auto-print
+    const imgs = document.querySelectorAll('img');
+    let loaded = 0;
+    const total = imgs.length;
+    if (total === 0) { setTimeout(() => window.print(), 100); }
+    else {
+      imgs.forEach(img => {
+        if (img.complete) { loaded++; if (loaded >= total) setTimeout(() => window.print(), 200); }
+        else {
+          img.onload = img.onerror = () => { loaded++; if (loaded >= total) setTimeout(() => window.print(), 200); };
+        }
+      });
+    }
+  </script>
 </body>
 </html>`);
     w.document.close();
