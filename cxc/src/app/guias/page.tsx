@@ -3,8 +3,9 @@
 import { useEffect } from "react";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { ConfirmModal, Toast } from "@/components/ui";
+import { ConfirmModal, Toast, PullToRefresh } from "@/components/ui";
 import { useGuiasState } from "./components/useGuiasState";
+import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import GuiasList from "./components/GuiasList";
 import GuiaForm from "./components/GuiaForm";
 import GuiaDetail from "./components/GuiaDetail";
@@ -16,11 +17,15 @@ export default function GuiasPage() {
   });
 
   const s = useGuiasState();
+  usePersistedScroll("guias", !s.loading && s.guias.length > 0);
 
   useEffect(() => {
     if (authChecked) {
       s.loadGuias();
       if (role === "bodega") s.setShowPending(true);
+      // Support ?pendientes=1 from search quick actions
+      const pendientesParam = new URLSearchParams(window.location.search).get("pendientes");
+      if (pendientesParam === "1") s.setShowPending(true);
     }
   }, [authChecked]);
 
@@ -48,6 +53,7 @@ export default function GuiasPage() {
   // ── LIST VIEW ──
   if (s.view === "list") {
     return (
+      <PullToRefresh onRefresh={s.loadGuias}>
       <div>
         <AppHeader module="Guias de Transporte" />
         <GuiasList
@@ -97,6 +103,7 @@ export default function GuiasPage() {
         />
         <Toast message={s.toast} />
       </div>
+      </PullToRefresh>
     );
   }
 
@@ -133,6 +140,10 @@ export default function GuiasPage() {
         onRemoveRow={s.removeRow}
         onSave={s.saveGuia}
         onCancel={() => { s.setView("list"); s.resetForm(); }}
+        hasDraft={s.hasGuiaDraft}
+        draftTimeAgo={s.guiaDraftTimeAgo}
+        onRestoreDraft={s.restoreGuiaDraft}
+        onDiscardDraft={s.clearGuiaDraft}
       />
     );
   }

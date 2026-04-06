@@ -87,7 +87,7 @@ export default function UsuariosPage() {
       const res = await fetch("/api/admin/usuarios");
       if (res.status === 401) { sessionStorage.clear(); window.location.href = "/"; return; }
       if (res.ok) setRoles(await res.json());
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setLoading(false);
   }, []);
 
@@ -148,7 +148,7 @@ export default function UsuariosPage() {
         const err = await res.json();
         showToast(err.error || "Error al guardar");
       }
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSaving(null);
   }
 
@@ -170,7 +170,7 @@ export default function UsuariosPage() {
       } else {
         showToast("Error al guardar");
       }
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSaving(null);
     setShowDeactivate(null);
   }
@@ -189,7 +189,7 @@ export default function UsuariosPage() {
         showToast("Contraseña actualizada");
         setShowPwModal(null); setNewPw("");
       } else { showToast("Error al guardar"); }
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSavingPw(false);
   }
 
@@ -228,7 +228,7 @@ export default function UsuariosPage() {
       const res = await fetch("/api/admin/users", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (res.ok) { showToast(editUserId ? "Usuario actualizado" : "Usuario creado"); setShowUserModal(false); loadFgUsers(); }
       else { const err = await res.json(); showToast(err.error || "Error"); }
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSavingUser(false);
   }
   async function toggleUserActive(id: string, active: boolean) {
@@ -236,7 +236,7 @@ export default function UsuariosPage() {
       const res = await fetch("/api/admin/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, active }) });
       if (res.ok) showToast(active ? "Usuario activado" : "Usuario desactivado");
       else showToast("Error al actualizar");
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     loadFgUsers();
   }
   // Helper: get modules for a role from loaded roles data
@@ -251,7 +251,7 @@ export default function UsuariosPage() {
       const res = await fetch("/api/admin/sessions", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId }) });
       if (res.ok) { showToast("Sesión revocada"); loadSessions(); }
       else showToast("Error al revocar");
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setRevokingSession(null);
   }
 
@@ -261,7 +261,7 @@ export default function UsuariosPage() {
       const res = await fetch("/api/admin/sessions", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userName }) });
       if (res.ok) { showToast(`Todas las sesiones de ${userName} revocadas`); loadSessions(); }
       else showToast("Error al revocar");
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setRevokingSession(null);
   }
 

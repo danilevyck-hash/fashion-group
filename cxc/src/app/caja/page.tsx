@@ -1,10 +1,11 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Modal, ConfirmModal } from "@/components/ui";
+import UndoToast from "@/components/UndoToast";
 
 import { View } from "./components/types";
 import { useCajaState } from "./hooks/useCajaState";
@@ -15,6 +16,8 @@ import ResumenGastos from "./components/ResumenGastos";
 import GastoForm from "./components/GastoForm";
 import GastoTable from "./components/GastoTable";
 import PrintView from "./components/PrintView";
+import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
+import SuggestionCard from "@/components/SuggestionCard";
 
 export default function CajaPageWrapper() {
   return (
@@ -50,6 +53,7 @@ function CajaPage() {
     requestDeletePeriodo, doDeletePeriodo,
     aprobarReposicion,
     addGasto, requestDeleteGasto, doDeleteGasto, saveEditGasto, exportExcel,
+    pendingUndoCaja, undoActionCaja,
   } = useCajaState(urlId, initialView);
 
   if (!authChecked) return null;
@@ -122,6 +126,23 @@ function CajaPage() {
     );
   }
 
+  // ── Smart suggestion: period close ──
+  const cajaSuggestions = useMemo<SmartSuggestion[]>(() => {
+    if (!current || current.estado !== "abierto") return [];
+    const apertura = new Date(current.fecha_apertura).getTime();
+    const now = Date.now();
+    const daysSinceOpen = Math.floor((now - apertura) / (24 * 60 * 60 * 1000));
+    if (daysSinceOpen <= 30) return [];
+    return [{
+      id: `caja-close-${current.id}`,
+      message: `Este período lleva ${daysSinceOpen} días abierto. ¿Cerrarlo y crear uno nuevo?`,
+      actionLabel: "Cerrar período",
+      onAction: () => requestClosePeriodo(current.id),
+    }];
+  }, [current, requestClosePeriodo]);
+
+  const { suggestion: cajaSuggestion, dismiss: dismissCaja } = useSmartSuggestions(cajaSuggestions);
+
   // ── DETAIL VIEW ──
   if (view === "detail" && current) {
     const gastos = current.caja_gastos || [];
@@ -139,6 +160,8 @@ function CajaPage() {
           pctUsed={pctUsed}
           onBack={() => { setView("list", undefined); setCurrent(null); }}
         />
+
+        {cajaSuggestion && <SuggestionCard suggestion={cajaSuggestion} onDismiss={dismissCaja} />}
 
         <ResumenGastos gastos={gastos} />
 
@@ -215,15 +238,7 @@ function CajaPage() {
         confirmLabel="Eliminar"
         destructive
       />
-      <ConfirmModal
-        open={!!confirmDeleteGastoId}
-        onClose={() => setConfirmDeleteGastoId(null)}
-        onConfirm={doDeleteGasto}
-        title="Eliminar gasto"
-        message="¿Eliminar este gasto?"
-        confirmLabel="Eliminar"
-        destructive
-      />
+      {pendingUndoCaja && <UndoToast message={pendingUndoCaja.message} startedAt={pendingUndoCaja.startedAt} onUndo={undoActionCaja} />}
     </>
   );
 }

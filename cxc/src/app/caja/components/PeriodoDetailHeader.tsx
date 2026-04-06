@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { fmt, fmtDate } from "@/lib/format";
+import { AnimatedNumber } from "@/components/ui";
 import { CajaPeriodo } from "./types";
 
 interface Props {
@@ -20,7 +21,18 @@ export default function PeriodoDetailHeader({
   onBack,
 }: Props) {
   const [kpiTooltip, setKpiTooltip] = useState<string | null>(null);
+  const [shaking, setShaking] = useState(false);
+  const prevPctUsed = useRef(pctUsed);
   const isOpen = current.estado === "abierto";
+
+  useEffect(() => {
+    if (pctUsed < 20 && prevPctUsed.current >= 20) {
+      setShaking(true);
+      const t = setTimeout(() => setShaking(false), 500);
+      return () => clearTimeout(t);
+    }
+    prevPctUsed.current = pctUsed;
+  }, [pctUsed]);
 
   return (
     <>
@@ -71,11 +83,21 @@ export default function PeriodoDetailHeader({
             <button onClick={() => setKpiTooltip(kpiTooltip === "gastado" ? null : "gastado")} className="text-gray-300 hover:text-gray-500 text-xs ml-1 mb-1">?</button>
           </div>
           <div className="text-2xl font-semibold tabular-nums">
-            ${fmt(totalGastado)}
+            $<AnimatedNumber value={totalGastado} formatter={(n: number) => fmt(n)} />
+          </div>
+          <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${Math.min(100, current.fondo_inicial > 0 ? (totalGastado / current.fondo_inicial) * 100 : 0)}%`,
+                transition: "width 500ms ease-out",
+                backgroundColor: pctUsed < 10 ? "#dc2626" : pctUsed < 20 ? "#d97706" : "#059669",
+              }}
+            />
           </div>
           {kpiTooltip === "gastado" && <p className="text-xs text-gray-500 mt-1">Total de gastos registrados en este período</p>}
         </div>
-        <div>
+        <div className={shaking ? "saldo-shake" : ""}>
           <div className="flex items-center">
             <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">
               Saldo
@@ -85,7 +107,7 @@ export default function PeriodoDetailHeader({
           <div
             className={`text-2xl font-semibold tabular-nums ${saldo < 0 ? "text-red-600" : ""}`}
           >
-            ${fmt(saldo)}
+            $<AnimatedNumber value={saldo} formatter={(n: number) => fmt(n)} />
           </div>
           {kpiTooltip === "saldo" && <p className="text-xs text-gray-500 mt-1">Dinero disponible: Fondo menos lo gastado</p>}
         </div>

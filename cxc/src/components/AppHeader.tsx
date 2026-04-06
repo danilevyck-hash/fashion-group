@@ -4,6 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 import SearchBar from "@/components/SearchBar";
 import NotificationCenter from "@/components/NotificationCenter";
+import { getModuleColor } from "@/lib/moduleColors";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin", secretaria: "Secretaria", bodega: "Bodega",
@@ -57,13 +58,19 @@ export default function AppHeader({ module, breadcrumbs }: AppHeaderProps) {
     return () => { document.body.style.overflow = ""; };
   }, [drawerOpen]);
 
+  const moduleColor = getModuleColor(pathname);
+  const currentNav = NAV_MODULES.find(m => moduleColor && pathname.startsWith(m.href));
+
   return (
     <>
-      <div className="w-full border-b border-gray-200 bg-white sticky top-0 z-10">
+      <div className={`w-full border-b bg-white sticky top-0 z-10 ${moduleColor ? moduleColor.border : "border-gray-200"}`} style={moduleColor ? { borderBottomWidth: "2px" } : undefined}>
         <div className="h-11 flex items-center px-4 sm:px-6 gap-3">
           <FGLogo variant="icon" theme="light" size={22} />
           <div className="w-px h-4 bg-gray-200" />
           <div className="flex items-center gap-1 text-sm text-gray-500 flex-1 min-w-0">
+            {currentNav && (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={`flex-shrink-0 ${moduleColor!.text}`}><path d={currentNav.icon}/></svg>
+            )}
             <span className="truncate">{module}</span>
             {breadcrumbs?.map((b, i) => (
               <span key={i} className="flex items-center gap-1">

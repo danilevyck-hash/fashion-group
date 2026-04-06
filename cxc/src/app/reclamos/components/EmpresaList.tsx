@@ -183,7 +183,33 @@ export default function EmpresaList({
         <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="border-b border-gray-200 py-2 text-sm outline-none w-full max-w-xs" />
       </div>
 
-      {sortedRecs.length === 0 ? <EmptyState title="Sin reclamos" subtitle="No hay reclamos registrados para esta empresa" /> : (
+      {sortedRecs.length === 0 ? (() => {
+        const openCount = allEmpresaRecs.filter(r => r.estado !== "Resuelto con NC" && r.estado !== "Rechazado").length;
+        // Empresa has reclamos but all are resolved — celebration state
+        if (allEmpresaRecs.length > 0 && openCount === 0 && filterEstado === "all" && !search) {
+          return (
+            <div className="flex flex-col items-center py-16 text-center">
+              <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center mb-4">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+              </div>
+              <p className="text-sm font-medium text-gray-600 mb-1">No hay reclamos abiertos para {activeEmpresa}</p>
+              <p className="text-xs text-emerald-600">Todo al dia — {allEmpresaRecs.length} reclamo{allEmpresaRecs.length > 1 ? "s" : ""} resuelto{allEmpresaRecs.length > 1 ? "s" : ""}</p>
+            </div>
+          );
+        }
+        // Filter/search produced no results
+        if (allEmpresaRecs.length > 0) {
+          return (
+            <div className="flex flex-col items-center py-12 text-center">
+              <p className="text-sm text-gray-400 mb-1">
+                {search ? `No encontramos reclamos para "${search}"` : `No hay reclamos ${filterEstado !== "all" ? estadoLabel(filterEstado).toLowerCase() : ""} para esta empresa`}
+              </p>
+              <p className="text-xs text-gray-300">{search ? "Intenta con otro termino" : "Prueba con otro filtro"}</p>
+            </div>
+          );
+        }
+        return <EmptyState title="Sin reclamos" subtitle="No hay reclamos registrados para esta empresa" />;
+      })() : (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
           <div className="min-w-[600px] px-4 sm:px-0">
         <table className="w-full text-sm">

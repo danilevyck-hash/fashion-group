@@ -70,7 +70,7 @@ export default function ClientesPage() {
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (res.ok) { showToast(editingId ? "Cliente actualizado" : "Cliente creado"); setShowModal(false); load(); }
       else showToast("Error al guardar");
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSaving(false);
   }
 
@@ -92,7 +92,7 @@ export default function ClientesPage() {
       {loading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <div key={i} className="h-10 bg-gray-100 rounded animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
-        <EmptyState title={search ? "Sin resultados" : "No hay clientes registrados"} subtitle={search ? `No se encontraron clientes para "${search}"` : "Los clientes aparecerán aquí al crear pedidos"} />
+        <EmptyState title={search ? "No encontramos clientes" : "No hay clientes registrados"} subtitle={search ? `Intenta con otro termino en vez de "${search}"` : "Los clientes aparecerán aquí al crear pedidos"} />
       ) : (
         <div className="border border-gray-200 rounded-lg overflow-hidden">
           <table className="w-full text-sm">

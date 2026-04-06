@@ -16,6 +16,7 @@ interface Props {
   setEditGasto: (g: Partial<CajaGasto>) => void;
   onSaveEdit: () => void;
   onDeleteGasto: (id: string) => void;
+  recentlyAddedIds?: Set<string>;
 }
 
 export default function GastoTable({
@@ -29,6 +30,7 @@ export default function GastoTable({
   setEditGasto,
   onSaveEdit,
   onDeleteGasto,
+  recentlyAddedIds = new Set(),
 }: Props) {
   const totalGastado = gastos.reduce((s, g) => s + (g.total || 0), 0);
   const totalSubtotal = gastos.reduce((s, g) => s + (g.subtotal || 0), 0);
@@ -204,7 +206,7 @@ export default function GastoTable({
                   ) : (
                     <tr
                       key={g.id}
-                      className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
+                      className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${recentlyAddedIds.has(g.id) ? "new-row-highlight" : ""}`}
                     >
                       {isOpen && (
                         <td className="py-3 px-4 text-xs">

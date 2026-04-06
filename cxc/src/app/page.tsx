@@ -59,7 +59,7 @@ function LoginForm() {
       if (data.modules) sessionStorage.setItem("fg_modules", JSON.stringify(data.modules));
       router.push(data.role === "cliente" ? "/catalogo/reebok" : "/plantillas");
     } catch {
-      setError("Error de conexión");
+      setError("Sin conexión. Verifica tu internet e intenta de nuevo.");
     } finally {
       setLoading(false);
     }

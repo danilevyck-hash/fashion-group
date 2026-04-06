@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Movimiento, MOV_TYPES } from "./types";
+import { useUndoAction } from "@/lib/hooks/useUndoAction";
 
 interface UseMovimientoFormProps {
   empleadoId: string;
@@ -20,6 +21,7 @@ export function useMovimientoForm({ empleadoId, deduccionQuincenal, onSuccess, s
   const [mNotas, setMNotas] = useState("");
   const [saving, setSaving] = useState(false);
   const [confirmDeleteMovId, setConfirmDeleteMovId] = useState<string | null>(null);
+  const { pendingUndo: pendingUndoMov, scheduleAction: scheduleUndoMov, undoAction: undoActionMov } = useUndoAction();
 
   function openMovModal() { setMovStep("type"); setShowMovModal(true); }
 
@@ -49,7 +51,7 @@ export function useMovimientoForm({ empleadoId, deduccionQuincenal, onSuccess, s
       });
       if (res.ok) { showToast("Movimiento registrado"); setShowMovModal(false); onSuccess(); }
       else { const err = await res.json(); showToast(err.error || "Error"); }
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSaving(false);
   }
 
@@ -86,6 +88,7 @@ export function useMovimientoForm({ empleadoId, deduccionQuincenal, onSuccess, s
     confirmDeleteMovId, setConfirmDeleteMovId,
     openMovModal, selectMovType, saveMov,
     requestDeleteMov, doDeleteMov,
+    pendingUndoMov, undoActionMov,
     approveMov,
   };
 }
@@ -121,7 +124,7 @@ export function useEditMovimiento({ onSuccess, showToast }: UseEditMovimientoPro
       });
       if (res.ok) { showToast("Movimiento actualizado"); setShowEditMovModal(false); onSuccess(); }
       else { const err = await res.json(); showToast(err.error || "Error"); }
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSaving(false);
   }
 

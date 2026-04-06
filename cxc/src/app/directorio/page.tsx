@@ -5,8 +5,11 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmDeleteModal, AccordionContent, Modal, ScrollableTable } from "@/components/ui";
+import UndoToast from "@/components/UndoToast";
+import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { fmtDate } from "@/lib/format";
 import XLSX from "xlsx-js-style";
+import { usePersistedState, usePersistedScroll } from "@/lib/hooks/usePersistedState";
 
 interface Cliente {
   id: string;
@@ -31,12 +34,14 @@ export default function DirectorioPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 50;
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = usePersistedState<string | null>("directorio", "expanded", null);
+  usePersistedScroll("directorio", !loading && clientes.length > 0);
   const [editing, setEditing] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Cliente>>({});
   const [showNew, setShowNew] = useState(false);
   const [newData, setNewData] = useState({ nombre: "", empresa: "", whatsapp: "", correo: "", contacto: "", notas: "" });
   const [toast, setToast] = useState<string | null>(null);
+  const { pendingUndo: pendingUndoDir, scheduleAction: scheduleUndoDir, undoAction: undoActionDir } = useUndoAction();
   const [savingNew, setSavingNew] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Cliente | null>(null);
   const [cxcClients, setCxcClients] = useState<Set<string>>(new Set());
@@ -46,6 +51,10 @@ export default function DirectorioPage() {
   const [empresaFilter, setEmpresaFilter] = useState("");
   const [empresas, setEmpresas] = useState<string[]>([]);
   const importRef = useRef<HTMLInputElement>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchDeleting, setBatchDeleting] = useState(false);
+  const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
 
   const loadClientes = useCallback(async (searchTerm: string, pg: number, empFilter?: string) => {
     setLoading(true);
@@ -188,12 +197,23 @@ export default function DirectorioPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    try {
-      const res = await fetch(`/api/directorio/${id}`, { method: "DELETE" });
-      if (res.ok) { setExpanded(null); showToast("Contacto eliminado"); loadClientes(debouncedSearch, page); }
-      else showToast("Error al eliminar");
-    } catch { showToast("Error de conexión"); }
+  function handleDelete(id: string) {
+    const contacto = clientes.find(c => c.id === id);
+    const nombre = contacto?.nombre || "contacto";
+    setClientes(prev => prev.filter(c => c.id !== id));
+    setExpanded(null);
+    setDeleteTarget(null);
+    scheduleUndoDir({
+      id: `delete-contacto-${id}`,
+      message: `${nombre} eliminado`,
+      execute: async () => {
+        try {
+          const res = await fetch(`/api/directorio/${id}`, { method: "DELETE" });
+          if (!res.ok) { showToast("No se pudo eliminar. Intenta de nuevo."); loadClientes(debouncedSearch, page); }
+        } catch { showToast("Sin conexion. Intenta de nuevo."); loadClientes(debouncedSearch, page); }
+      },
+      onRevert: () => loadClientes(debouncedSearch, page),
+    });
   }
 
   async function handleImport(file: File) {
@@ -245,6 +265,48 @@ export default function DirectorioPage() {
     loadClientes(debouncedSearch, page);
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function exportSelectedExcel() {
+    if (selectedIds.size === 0) return;
+    const selected = clientes.filter(c => selectedIds.has(c.id));
+    const rows: string[][] = [["FASHION GROUP — Directorio Seleccionados"], [], ["Nombre", "Empresa", "Teléfono", "Celular", "WhatsApp", "Correo", "Contacto", "Notas"]];
+    for (const c of selected) rows.push([c.nombre, c.empresa, c.telefono, c.celular, c.whatsapp, c.correo, c.contacto, c.notas]);
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"] = [{ wch: 32 }, { wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 28 }, { wch: 20 }, { wch: 20 }];
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Directorio");
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+    const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Directorio-seleccionados-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url);
+  }
+
+  async function doBatchDelete() {
+    if (selectedIds.size === 0) return;
+    setBatchDeleting(true);
+    setConfirmBatchDelete(false);
+    const ids = Array.from(selectedIds);
+    let deleted = 0;
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/directorio/${id}`, { method: "DELETE" });
+        if (res.ok) deleted++;
+      } catch { /* continue */ }
+    }
+    showToast(`${deleted} contacto${deleted !== 1 ? "s" : ""} eliminado${deleted !== 1 ? "s" : ""}`);
+    setSelectedIds(new Set());
+    setSelectionMode(false);
+    setBatchDeleting(false);
+    loadClientes(debouncedSearch, page);
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
@@ -261,7 +323,7 @@ export default function DirectorioPage() {
       `}</style>
       <AppHeader module="Directorio de Clientes" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-      <div className="flex items-center justify-between mb-5" data-print-hide>
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3" data-print-hide>
         <h1 className="text-xl font-light tracking-tight">Directorio</h1>
         <div className="flex flex-wrap items-center gap-3">
           <input
@@ -275,49 +337,69 @@ export default function DirectorioPage() {
               if (importRef.current) importRef.current.value = "";
             }}
           />
-          {(role === "admin" || role === "secretaria") && (
-          <>
-          <button onClick={() => importRef.current?.click()} title="Formato: CSV separado por ; (punto y coma). Columnas: Nombre, Empresa, Teléfono, Celular, Correo, Contacto, Notas" className="text-sm text-gray-400 hover:text-black transition">
-            Importar CSV
-          </button>
-          <button onClick={() => {
-            const headers = "Nombre;Empresa;Teléfono;Celular;Correo;Contacto;Notas";
-            const blob = new Blob([headers + "\n"], { type: "text/csv;charset=utf-8;" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "plantilla-directorio.csv";
-            a.click();
-            URL.revokeObjectURL(url);
-          }} className="text-sm text-gray-400 hover:text-black transition">
-            Descargar plantilla
-          </button>
-          </>
-          )}
-          <button onClick={() => window.open("/api/directorio?format=csv")} className="text-sm text-gray-400 hover:text-black transition">
-            Exportar CSV
-          </button>
-          <button onClick={() => window.print()} className="text-sm text-gray-400 hover:text-black transition">
-            Imprimir
-          </button>
-          <button onClick={async () => {
-            const allRes = await fetch("/api/directorio");
-            const allClientes = allRes.ok ? await allRes.json() : [];
-            const rows: string[][] = [["FASHION GROUP — Directorio de Clientes"], [], ["Nombre", "Empresa", "Teléfono", "Celular", "Correo", "Contacto", "Notas"]];
-            for (const c of allClientes) rows.push([c.nombre, c.empresa, c.telefono, c.celular, c.correo, c.contacto, c.notas]);
-            const ws = XLSX.utils.aoa_to_sheet(rows);
-            ws["!cols"] = [{ wch: 32 }, { wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 28 }, { wch: 20 }, { wch: 20 }];
-            ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
-            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Directorio");
-            const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
-            const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-            const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Directorio-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url);
-          }} title="Exportar a Excel" className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full transition">↓ Excel</button>
-          {(role === "admin" || role === "secretaria") && (
-          <button onClick={() => setShowNew(true)}
-            className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition">
-            Nuevo Contacto
-          </button>
+          {selectionMode ? (
+            <>
+              <span className="text-sm text-gray-400">{selectedIds.size} seleccionado{selectedIds.size !== 1 ? "s" : ""}</span>
+              {selectedIds.size > 0 && (
+                <>
+                  <button onClick={exportSelectedExcel} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md active:bg-gray-100 transition-all">Exportar seleccionados</button>
+                  {role === "admin" && (
+                    <button onClick={() => setConfirmBatchDelete(true)} disabled={batchDeleting} className="text-sm text-red-500 hover:text-red-700 border border-red-200 px-4 py-2 rounded-md active:bg-red-50 transition-all disabled:opacity-50">
+                      {batchDeleting ? "Eliminando..." : "Eliminar seleccionados"}
+                    </button>
+                  )}
+                </>
+              )}
+              <button onClick={() => { setSelectionMode(false); setSelectedIds(new Set()); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+            </>
+          ) : (
+            <>
+              {(role === "admin" || role === "secretaria") && (
+              <>
+              <button onClick={() => importRef.current?.click()} title="Formato: CSV separado por ; (punto y coma). Columnas: Nombre, Empresa, Teléfono, Celular, Correo, Contacto, Notas" className="text-sm text-gray-400 hover:text-black transition">
+                Importar CSV
+              </button>
+              <button onClick={() => {
+                const headers = "Nombre;Empresa;Teléfono;Celular;Correo;Contacto;Notas";
+                const blob = new Blob([headers + "\n"], { type: "text/csv;charset=utf-8;" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "plantilla-directorio.csv";
+                a.click();
+                URL.revokeObjectURL(url);
+              }} className="text-sm text-gray-400 hover:text-black transition">
+                Descargar plantilla
+              </button>
+              </>
+              )}
+              <button onClick={() => { setSelectionMode(true); setSelectedIds(new Set()); }} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md transition">Seleccionar</button>
+              <button onClick={() => window.open("/api/directorio?format=csv")} className="text-sm text-gray-400 hover:text-black transition">
+                Exportar CSV
+              </button>
+              <button onClick={() => window.print()} className="text-sm text-gray-400 hover:text-black transition">
+                Imprimir
+              </button>
+              <button onClick={async () => {
+                const allRes = await fetch("/api/directorio");
+                const allClientes = allRes.ok ? await allRes.json() : [];
+                const rows: string[][] = [["FASHION GROUP — Directorio de Clientes"], [], ["Nombre", "Empresa", "Teléfono", "Celular", "Correo", "Contacto", "Notas"]];
+                for (const c of allClientes) rows.push([c.nombre, c.empresa, c.telefono, c.celular, c.correo, c.contacto, c.notas]);
+                const ws = XLSX.utils.aoa_to_sheet(rows);
+                ws["!cols"] = [{ wch: 32 }, { wch: 20 }, { wch: 14 }, { wch: 14 }, { wch: 28 }, { wch: 20 }, { wch: 20 }];
+                ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+                const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Directorio");
+                const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+                const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+                const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Directorio-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click(); URL.revokeObjectURL(url);
+              }} title="Exportar a Excel" className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full transition">↓ Excel</button>
+              {(role === "admin" || role === "secretaria") && (
+              <button onClick={() => setShowNew(true)}
+                className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition">
+                Nuevo Contacto
+              </button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -404,6 +486,11 @@ export default function DirectorioPage() {
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b border-gray-200">
+                {selectionMode && (
+                  <th className="py-3 px-2 w-8">
+                    <input type="checkbox" checked={clientes.length > 0 && clientes.every(c => selectedIds.has(c.id))} onChange={() => { const allIds = clientes.map(c => c.id); const allSel = allIds.length > 0 && allIds.every(id => selectedIds.has(id)); if (allSel) setSelectedIds(new Set()); else setSelectedIds(new Set(allIds)); }} className="accent-black" title="Seleccionar todos" />
+                  </th>
+                )}
                 <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Nombre</th>
                 <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">Empresa</th>
                 <th className="text-left py-3 px-4 text-[11px] uppercase tracking-[0.05em] text-gray-400 font-normal">WhatsApp</th>
@@ -418,11 +505,12 @@ export default function DirectorioPage() {
                 const isEditing = editing === c.id;
                 return (
                   <tr key={c.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors align-top">
-                    <td colSpan={6} className="p-0">
+                    <td colSpan={selectionMode ? 7 : 6} className="p-0">
                       {/* Main row */}
                       <div
-                        className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1 py-3 cursor-pointer"
+                        className={`grid gap-1 py-3 cursor-pointer ${selectionMode ? "grid-cols-[auto_1fr_1fr] sm:grid-cols-[auto_1fr_1fr_1fr] lg:grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_auto]" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"}`}
                         onClick={() => {
+                          if (selectionMode) { toggleSelect(c.id); return; }
                           if (isDirty && editing && editing !== c.id) {
                             if (!confirm("Tienes cambios sin guardar. ¿Salir sin guardar?")) return;
                             setEditing(null);
@@ -442,6 +530,11 @@ export default function DirectorioPage() {
                           setIsDirty(false);
                         }}
                       >
+                        {selectionMode && (
+                          <div className="flex items-center px-2" onClick={(e) => { e.stopPropagation(); toggleSelect(c.id); }}>
+                            <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} className="accent-black" />
+                          </div>
+                        )}
                         <div className="font-medium">{c.nombre}{cxcClients.has(c.nombre.toUpperCase().trim().replace(/\s+/g, " ")) && (
                           <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full ml-1" title="Este contacto también aparece en Cuentas por Cobrar">En CxC</span>
                         )}</div>
@@ -474,7 +567,7 @@ export default function DirectorioPage() {
                               <button onClick={(e) => { e.stopPropagation(); router.push(`/admin?search=${encodeURIComponent(c.nombre)}`); }}
                                 title="Ver deuda de este cliente en Cuentas por Cobrar" className="text-xs text-gray-400 hover:text-black transition py-2.5 sm:py-1.5 min-h-[44px]">Ver en CXC →</button>
                               {role === "admin" && (
-                                <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
+                                <button onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
                                   className="text-sm text-gray-400 hover:text-red-500 transition py-2.5 sm:py-1.5 min-h-[44px]">Eliminar Contacto</button>
                               )}
                             </div>
@@ -513,7 +606,7 @@ export default function DirectorioPage() {
                                 className="text-sm bg-black text-white px-5 py-1.5 rounded-full hover:bg-gray-800 transition">Guardar Cliente</button>
                               <button onClick={() => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current); if (isDirty && !confirm("Tienes cambios sin guardar. ¿Salir sin guardar?")) return; setEditing(null); setIsDirty(false); setAutoSaveStatus(""); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
                               {autoSaveStatus === "saving" && <span className="text-xs text-gray-400">Guardando...</span>}
-                              {autoSaveStatus === "saved" && <span className="text-xs text-green-600">Guardado ✓</span>}
+                              {autoSaveStatus === "saved" && <span className="text-xs text-green-600">Listo, guardado</span>}
                             </div>
                           </div>
                         )}
@@ -526,7 +619,7 @@ export default function DirectorioPage() {
           </table>
           </ScrollableTable>
           {clientes.length === 0 && search && (
-            <p className="text-center text-gray-300 text-sm py-12">Sin resultados para &quot;{search}&quot;</p>
+            <p className="text-center text-gray-300 text-sm py-12">No encontramos nada para &quot;{search}&quot;. Intenta con otro termino.</p>
           )}
           {/* Pagination */}
           {totalPages > 1 && (
@@ -541,14 +634,15 @@ export default function DirectorioPage() {
         </>
       )}
 
-      <Toast message={toast} />
       <ConfirmDeleteModal
-        open={!!deleteTarget}
-        title={`¿Eliminar ${deleteTarget?.nombre || "contacto"}?`}
-        description="Se eliminará el contacto y su información de la base de datos."
-        onConfirm={() => { if (deleteTarget) { handleDelete(deleteTarget.id); setDeleteTarget(null); } }}
-        onCancel={() => setDeleteTarget(null)}
+        open={confirmBatchDelete}
+        onCancel={() => setConfirmBatchDelete(false)}
+        onConfirm={doBatchDelete}
+        title="Eliminar contactos"
+        description={`¿Seguro que deseas eliminar ${selectedIds.size} contacto${selectedIds.size !== 1 ? "s" : ""}? Esta acción no se puede deshacer.`}
       />
+      <Toast message={toast} />
+      {pendingUndoDir && <UndoToast message={pendingUndoDir.message} startedAt={pendingUndoDir.startedAt} onUndo={undoActionDir} />}
     </div>
     </div>
   );

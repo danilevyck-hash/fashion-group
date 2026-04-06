@@ -4,9 +4,12 @@ import { useState } from "react";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import type { Guia, GuiaItem } from "./types";
 import { clientesSummary } from "./constants";
-import { SkeletonTable, EmptyState, StatusBadge, AccordionContent, ScrollableTable } from "@/components/ui";
+import { SkeletonTable, EmptyState, StatusBadge, AccordionContent, ScrollableTable, SwipeableRow } from "@/components/ui";
+import type { SwipeAction } from "@/components/ui";
 import DespachoForm from "./DespachoForm";
 import { exportGuiasExcel } from "./excel-guias";
+import { groupByTimePeriod } from "@/lib/group-by-time";
+import TimeGroupHeader from "@/components/TimeGroupHeader";
 
 interface GuiasListProps {
   guias: Guia[];
@@ -65,8 +68,33 @@ export default function GuiasList({
   onEdit, onPrint, onDelete, onReject,
 }: GuiasListProps) {
   const [visibleCount, setVisibleCount] = useState(15);
+  const [groupedView, setGroupedView] = useState(true);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectMotivo, setRejectMotivo] = useState("");
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function printSelected() {
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
+    // Open each in a new tab for printing
+    ids.forEach(id => window.open(`/guias?id=${id}`, '_blank'));
+  }
+
+  function exportSelectedExcel() {
+    if (selectedIds.size === 0) return;
+    const selected = guias.filter(g => selectedIds.has(g.id));
+    exportGuiasExcel(selected, `${selected.length} guías seleccionadas`);
+  }
   const canCreate = role && CREATE_ROLES.includes(role);
   const canDespacho = role && DESPACHO_ROLES.includes(role);
   const canDelete = role && DELETE_ROLES.includes(role);
@@ -76,45 +104,63 @@ export default function GuiasList({
   return (
     <div>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
           <h1 className="text-xl font-light tracking-tight">Guias de Transporte</h1>
-          <div className="flex items-center gap-2">
-            {guias.length > 0 && (
-              <button
-                onClick={() => {
-                  const filtered = guias
-                    .filter((g) => {
-                      if (!search) return true;
-                      const q = search.toLowerCase();
-                      return (
-                        g.transportista.toLowerCase().includes(q) ||
-                        (g.guia_items || []).some(
-                          (item: GuiaItem) =>
-                            (item.facturas || "").toLowerCase().includes(q) ||
-                            (item.cliente || "").toLowerCase().includes(q),
-                        )
-                      );
-                    })
-                    .filter((g) => !showPending || g.estado === "Pendiente Bodega");
-                  const subtitle = search
-                    ? `Filtrado: "${search}"`
-                    : showPending
-                      ? "Pendientes de bodega"
-                      : "Todas las gu\u00edas";
-                  exportGuiasExcel(filtered, subtitle);
-                }}
-                className="text-sm border border-gray-200 text-gray-600 px-4 py-3 rounded-md font-medium hover:border-gray-400 hover:text-black transition"
-              >
-                &darr; Excel
-              </button>
-            )}
-            {canCreate && (
-              <button
-                onClick={onNewGuia}
-                className="text-sm bg-black text-white px-6 py-3 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all"
-              >
-                Nueva Guia
-              </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {selectionMode ? (
+              <>
+                <span className="text-sm text-gray-400">{selectedIds.size} seleccionada{selectedIds.size !== 1 ? "s" : ""}</span>
+                {selectedIds.size > 0 && (
+                  <>
+                    <button onClick={printSelected} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md active:bg-gray-100 transition-all">Imprimir todas</button>
+                    <button onClick={exportSelectedExcel} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md active:bg-gray-100 transition-all">&darr; Excel</button>
+                  </>
+                )}
+                <button onClick={() => { setSelectionMode(false); setSelectedIds(new Set()); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+              </>
+            ) : (
+              <>
+                {guias.length > 0 && (
+                  <>
+                    <button onClick={() => { setSelectionMode(true); setSelectedIds(new Set()); }} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md transition">Seleccionar</button>
+                    <button
+                      onClick={() => {
+                        const filtered = guias
+                          .filter((g) => {
+                            if (!search) return true;
+                            const q = search.toLowerCase();
+                            return (
+                              g.transportista.toLowerCase().includes(q) ||
+                              (g.guia_items || []).some(
+                                (item: GuiaItem) =>
+                                  (item.facturas || "").toLowerCase().includes(q) ||
+                                  (item.cliente || "").toLowerCase().includes(q),
+                              )
+                            );
+                          })
+                          .filter((g) => !showPending || g.estado === "Pendiente Bodega");
+                        const subtitle = search
+                          ? `Filtrado: "${search}"`
+                          : showPending
+                            ? "Pendientes de bodega"
+                            : "Todas las gu\u00edas";
+                        exportGuiasExcel(filtered, subtitle);
+                      }}
+                      className="text-sm border border-gray-200 text-gray-600 px-4 py-3 rounded-md font-medium hover:border-gray-400 hover:text-black transition"
+                    >
+                      &darr; Excel
+                    </button>
+                  </>
+                )}
+                {canCreate && (
+                  <button
+                    onClick={onNewGuia}
+                    className="text-sm bg-black text-white px-6 py-3 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all"
+                  >
+                    Nueva Guia
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -151,7 +197,13 @@ export default function GuiasList({
           />
         ) : (
           <>
-            <div className="mb-4">
+            <div className="mb-4 flex items-center gap-4">
+              {selectionMode && (
+                <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer shrink-0">
+                  <input type="checkbox" checked={(() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return g.transportista.toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).filter(g => !showPending || g.estado === "Pendiente Bodega").map(g => g.id); return ids.length > 0 && ids.every(id => selectedIds.has(id)); })()} onChange={() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return g.transportista.toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).filter(g => !showPending || g.estado === "Pendiente Bodega").map(g => g.id); const allSel = ids.length > 0 && ids.every(id => selectedIds.has(id)); if (allSel) { setSelectedIds(new Set()); } else { setSelectedIds(new Set(ids)); } }} className="accent-black" />
+                  Todas
+                </label>
+              )}
               <input
                 type="text"
                 value={search}
@@ -159,6 +211,9 @@ export default function GuiasList({
                 placeholder="Buscar por transportista, cliente o factura..."
                 className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-black w-full max-w-sm transition"
               />
+              <button onClick={() => setGroupedView(!groupedView)} className={`text-xs transition whitespace-nowrap ${groupedView ? "text-black font-medium" : "text-gray-400 hover:text-black"}`}>
+                {groupedView ? "Lista plana" : "Agrupar por fecha"}
+              </button>
             </div>
 
             <div className="space-y-1">
@@ -187,19 +242,34 @@ export default function GuiasList({
 
                 const totalBultos = filtered.reduce((s, g) => s + (g.total_bultos || 0), 0);
 
-                return (
-                  <>
-                    {visible.map((g) => {
+                const allFilteredIds = filtered.map(g => g.id);
+                const allSelected = allFilteredIds.length > 0 && allFilteredIds.every(id => selectedIds.has(id));
+
+                const _gg = groupedView ? groupByTimePeriod(visible, "fecha" as keyof Guia, "guias") : null;
+                const _rc = (g: Guia) => {
                       const isExpanded = expandedId === g.id;
                       const isDispatched = g.estado === "Completada" || g.estado === "Rechazada";
+                      const isPendingDespacho = g.estado === "Pendiente Bodega" && canDespacho;
 
-                      return (
-                        <div key={g.id} className={`border rounded-lg transition-all ${isExpanded ? "border-gray-300" : "border-gray-200 hover:border-gray-200"}`}>
+                      const despachoSwipeAction: SwipeAction | undefined = isPendingDespacho ? {
+                        label: "Despachar",
+                        color: "bg-blue-500",
+                        icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>,
+                        onAction: () => onToggleExpand(g.id),
+                      } : undefined;
+
+                      const cardContent = (
+                        <div className={`border rounded-lg transition-all ${isExpanded ? "border-gray-300" : "border-gray-200 hover:border-gray-200"}`}>
                           {/* Row header */}
                           <button
-                            onClick={() => onToggleExpand(g.id)}
+                            onClick={() => selectionMode ? toggleSelect(g.id) : onToggleExpand(g.id)}
                             className="w-full flex items-center gap-4 px-4 py-3 text-left text-sm"
                           >
+                            {selectionMode && (
+                              <span onClick={(e) => { e.stopPropagation(); toggleSelect(g.id); }} className="shrink-0">
+                                <input type="checkbox" checked={selectedIds.has(g.id)} onChange={() => toggleSelect(g.id)} className="accent-black" />
+                              </span>
+                            )}
                             <span className="font-medium w-16 shrink-0 font-mono text-xs">{fmtGuia(g.numero)}</span>
                             <span className="text-gray-500 w-36 shrink-0 text-xs">{fmtDate(g.fecha)}</span>
                             <span className="flex-1 truncate">{g.transportista}</span>
@@ -379,7 +449,31 @@ export default function GuiasList({
                           </AccordionContent>
                         </div>
                       );
-                    })}
+
+                      if (despachoSwipeAction) {
+                        return (
+                          <SwipeableRow key={g.id} rightAction={despachoSwipeAction} className="rounded-lg">
+                            {cardContent}
+                          </SwipeableRow>
+                        );
+                      }
+
+                      return <div key={g.id}>{cardContent}</div>;
+                };
+
+                return (
+                  <>
+                    {_gg ? (
+                      <div className="space-y-0">
+                        {_gg.map((group) => (
+                          <TimeGroupHeader key={group.key} label={group.label} count={group.items.length} color={group.color} bgColor={group.bgColor}>
+                            <div className="space-y-1 p-1">{group.items.map(_rc)}</div>
+                          </TimeGroupHeader>
+                        ))}
+                      </div>
+                    ) : (
+                      visible.map(_rc)
+                    )}
 
                     {/* Ver más */}
                     {hasMore && (

@@ -188,7 +188,7 @@ function Productos() {
           setToast(err.error || "Error al crear pedido");
           setSaving(false);
         }
-      } catch { setToast("Error de conexion"); setSaving(false); }
+      } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setSaving(false); }
     }
   }
 

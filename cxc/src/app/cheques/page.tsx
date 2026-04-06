@@ -1,13 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import { SkeletonTable, EmptyState, Toast, StatusBadge, ConfirmModal } from "@/components/ui";
+import { SkeletonTable, EmptyState, Toast, StatusBadge, ConfirmModal, AnimatedNumber, useContextMenu, PullToRefresh, SwipeableRow } from "@/components/ui";
+import type { ContextMenuItem, SwipeAction } from "@/components/ui";
+import UndoToast from "@/components/UndoToast";
+import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import XLSX from "xlsx-js-style";
 import { fmt, fmtDate } from "@/lib/format";
+import { groupByTimePeriod } from "@/lib/group-by-time";
+import TimeGroupHeader from "@/components/TimeGroupHeader";
 
 import { EMPRESAS } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
+import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
+import SuggestionCard from "@/components/SuggestionCard";
+import { cacheSet, cacheGet, CACHE_KEYS } from "@/lib/offlineCache";
+import { useOnline } from "@/lib/OnlineContext";
+import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 
 interface Cheque {
   id: string;
@@ -29,7 +41,8 @@ const BANCOS = ["Banistmo", "BAC", "General", "Global", "Multibank", "Otro"];
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
-type Filter = "all" | "pendiente" | "depositado" | "vencido" | "rebotado" | "vencen_hoy" | "vencen_semana";
+type Filter = "all" | "pendiente" | "depositado" | "vencido" | "rebotado" | "vencen_hoy" | "vencen_manana" | "vencen_semana";
+const VALID_FILTERS: Filter[] = ["all", "pendiente", "depositado", "vencido", "rebotado", "vencen_hoy", "vencen_manana", "vencen_semana"];
 
 function ChequeMoreMenu({ cheque, ve, role, onRebotado, onWA, onDelete }: {
   cheque: Cheque; ve: string; role: string;
@@ -61,17 +74,29 @@ function ChequeMoreMenu({ cheque, ve, role, onRebotado, onWA, onDelete }: {
   );
 }
 
-export default function ChequesPage() {
+export default function ChequesPageWrapper() {
+  return <Suspense><ChequesPage /></Suspense>;
+}
+
+function ChequesPage() {
   const { authChecked, role } = useAuth({ moduleKey: "cheques", allowedRoles: ["admin","secretaria","upload","director"] });
+  const searchParams = useSearchParams();
+  const isOnline = useOnline();
   const [cheques, setCheques] = useState<Cheque[]>([]);
+  const [chequesCached, setChequesCached] = useState(false);
   const [loading, setLoading] = useState(true);
+  usePersistedScroll("cheques", !loading && cheques.length > 0);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<Filter>(() => {
+    const urlFilter = searchParams.get("filter") as Filter | null;
+    return urlFilter && VALID_FILTERS.includes(urlFilter) ? urlFilter : "all";
+  });
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingEstado, setEditingEstado] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista");
+  const [groupedView, setGroupedView] = useState(true);
   const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
   const [calPopover, setCalPopover] = useState<string | null>(null);
   const [showResumen, setShowResumen] = useState(false);
@@ -85,6 +110,9 @@ export default function ChequesPage() {
   const [depositingId, setDepositingId] = useState<string | null>(null);
   const [confirmDepositId, setConfirmDepositId] = useState<string | null>(null);
   const [kpiTooltip, setKpiTooltip] = useState<string | null>(null);
+
+  // Undo actions
+  const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
 
   // Rebotado modal
   const [rebotandoId, setRebotandoId] = useState<string | null>(null);
@@ -112,13 +140,93 @@ export default function ChequesPage() {
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
 
+  // Draft auto-save for new cheque form
+  const chequeDraftData = useMemo(() => ({
+    cliente: fCliente, empresa: fEmpresa, banco: fBanco, numero: fNumero, monto: fMonto, fecha: fFecha,
+  }), [fCliente, fEmpresa, fBanco, fNumero, fMonto, fFecha]);
+  const isChequeDraftEmpty = useCallback((d: typeof chequeDraftData) => {
+    return !d.cliente && !d.empresa && !d.banco && !d.numero && !d.monto;
+  }, []);
+  const { draft: chequeDraft, hasDraft: hasChequeDraft, clearDraft: clearChequeDraft, draftTimeAgo: chequeDraftTimeAgo } = useDraftAutoSave("cheque", chequeDraftData, isChequeDraftEmpty);
+  function restoreChequeDraft() {
+    if (!chequeDraft) return;
+    setFCliente(chequeDraft.cliente || "");
+    setFEmpresa(chequeDraft.empresa || "");
+    setFBanco(chequeDraft.banco || "");
+    setFNumero(chequeDraft.numero || "");
+    setFMonto(chequeDraft.monto || "");
+    setFFecha(chequeDraft.fecha || todayStr());
+    clearChequeDraft();
+  }
+
+  const { show: showContextMenu } = useContextMenu();
+
+  function buildChequeContextMenu(c: Cheque, ve: string): ContextMenuItem[] {
+    const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
+    return [
+      {
+        label: "Confirmar deposito",
+        shortcut: "D",
+        icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 4 12 14.01 9 11.01"/><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/></svg>,
+        onClick: () => setConfirmDepositId(c.id),
+        hidden: !isPending,
+        dividerAfter: isPending,
+      },
+      {
+        label: "WhatsApp",
+        shortcut: "W",
+        icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-emerald-600"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>,
+        onClick: () => {
+          if (!c.whatsapp) { showToast("Este cliente no tiene WhatsApp registrado"); return; }
+          let phone = (c.whatsapp || "").replace(/\D/g, "");
+          if (!phone.startsWith("507") && phone.length <= 8) { phone = "507" + phone; }
+          const msg = `Hola, le recordamos que tiene un cheque #${c.numero_cheque} por $${fmt(c.monto)} con fecha de deposito ${fmtDate(c.fecha_deposito)}.`;
+          try { window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
+        },
+      },
+      {
+        label: "Marcar como rebotado",
+        shortcut: "B",
+        icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h18M3 12l6-6M3 12l6 6" /></svg>,
+        onClick: () => setRebotandoId(c.id),
+        hidden: !isPending,
+      },
+      {
+        label: "Eliminar",
+        shortcut: "Del",
+        icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
+        onClick: () => setConfirmDeleteId(c.id),
+        destructive: true,
+        hidden: role !== "admin",
+      },
+    ];
+  }
+
   const loadingRef = useRef(false);
   const loadCheques = useCallback(async () => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     setLoading(true);
-    try { const res = await fetch("/api/cheques"); if (res.ok) { const d = await res.json(); setCheques(Array.isArray(d) ? d : []); } }
-    catch { setError("No se pudieron cargar los cheques. Recarga la página."); }
+    try {
+      const res = await fetch("/api/cheques");
+      if (res.ok) {
+        const d = await res.json();
+        const arr = Array.isArray(d) ? d : [];
+        setCheques(arr);
+        setChequesCached(false);
+        // Cache last 50 cheques
+        cacheSet(CACHE_KEYS.CHEQUES, arr.slice(0, 50));
+      }
+    } catch {
+      // Offline — try cache
+      const cached = cacheGet<Cheque[]>(CACHE_KEYS.CHEQUES);
+      if (cached) {
+        setCheques(cached);
+        setChequesCached(true);
+      } else {
+        setError("No se pudieron cargar los cheques. Recarga la página.");
+      }
+    }
     finally { setLoading(false); loadingRef.current = false; }
   }, []);
 
@@ -168,21 +276,31 @@ export default function ChequesPage() {
       const url = editingId ? `/api/cheques/${editingId}` : "/api/cheques";
       const method = editingId ? "PUT" : "POST";
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-      if (res.ok) { resetForm(); setShowForm(false); loadCheques(); showToast(editingId ? "Cheque actualizado" : "Cheque guardado"); }
+      if (res.ok) { clearChequeDraft(); resetForm(); setShowForm(false); loadCheques(); showToast(editingId ? "Listo, cheque actualizado" : "Listo, cheque guardado"); }
       else { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); }
     } catch { setError("Error de conexión."); }
     setSaving(false);
   }
 
   async function depositar(id: string) {
-    setDepositingId(id);
-    try {
-      const res = await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "depositado", fecha_depositado: todayStr() }) });
-      if (!res.ok) { showToast("No se pudo depositar. Intenta de nuevo."); return; }
-      showToast("Cheque marcado como depositado");
-      loadCheques();
-    } catch { showToast("No se pudo depositar. Intenta de nuevo."); }
-    setDepositingId(null);
+    const cheque = cheques.find(c => c.id === id);
+    if (!cheque) return;
+    const snapshot = [...cheques];
+    const hoy = todayStr();
+    setCheques(prev => prev.map(c => c.id === id ? { ...c, estado: "depositado", fecha_depositado: hoy } : c));
+    setConfirmDepositId(null);
+    scheduleAction({
+      id: `deposit-${id}`,
+      message: `Cheque N° ${cheque.numero_cheque} depositado`,
+      execute: async () => {
+        try {
+          const res = await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "depositado", fecha_depositado: hoy }) });
+          if (!res.ok) { setCheques(snapshot); showToast("No se pudo depositar. Intenta de nuevo."); }
+          else { /* deposited successfully */ }
+        } catch { setCheques(snapshot); showToast("Sin conexion. Intenta de nuevo."); }
+      },
+      onRevert: () => setCheques(snapshot),
+    });
   }
 
   async function batchDepositar(ids: Set<string>, clearFn: (v: Set<string>) => void) {
@@ -211,24 +329,34 @@ export default function ChequesPage() {
 
   async function marcarRebotado(id: string) {
     const cheque = cheques.find(c => c.id === id);
-    try {
-      const res = await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rebotado", motivo_rebote: motivoRebote || null }) });
-      if (!res.ok) { showToast("No se pudo marcar como rebotado. Intenta de nuevo."); return; }
-      if (cheque) {
-        await fetch("/api/overrides", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            nombre_normalized: cheque.cliente.toUpperCase().trim(),
-            resultado_contacto: `⚠ Cheque rebotado: N° ${cheque.numero_cheque} por $${fmt(cheque.monto)} — ${motivoRebote || "Sin motivo"}`,
-          }),
-        }).catch(() => { console.error('Override failed'); });
-      }
-      showToast("Cheque marcado como rebotado");
-    } catch { showToast("Error de conexion. Intenta de nuevo."); }
+    if (!cheque) return;
+    const snapshot = [...cheques];
+    const motivo = motivoRebote || null;
+    setCheques(prev => prev.map(c => c.id === id ? { ...c, estado: "rebotado", motivo_rebote: motivo || undefined } : c));
     setRebotandoId(null);
     setMotivoRebote("");
-    loadCheques();
+    scheduleAction({
+      id: `rebotado-${id}`,
+      message: `Cheque N° ${cheque.numero_cheque} marcado como rebotado`,
+      execute: async () => {
+        try {
+          const res = await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rebotado", motivo_rebote: motivo }) });
+          if (!res.ok) { setCheques(snapshot); showToast("No se pudo marcar como rebotado. Intenta de nuevo."); return; }
+          if (cheque) {
+            await fetch("/api/overrides", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                nombre_normalized: cheque.cliente.toUpperCase().trim(),
+                resultado_contacto: `⚠ Cheque rebotado: N° ${cheque.numero_cheque} por $${fmt(cheque.monto)} — ${motivo || "Sin motivo"}`,
+              }),
+            }).catch(() => {});
+          }
+          loadCheques();
+        } catch { setCheques(snapshot); showToast("Error de conexion. Intenta de nuevo."); }
+      },
+      onRevert: () => setCheques(snapshot),
+    });
   }
 
   async function redepositar(id: string) {
@@ -249,8 +377,8 @@ export default function ChequesPage() {
     try {
       const res = await fetch(`/api/cheques/${id}`, { method: "DELETE" });
       if (res.ok) { loadCheques(); showToast("Cheque eliminado"); }
-      else showToast("Error al eliminar cheque");
-    } catch { showToast("Error de conexión"); }
+      else showToast("No se pudo eliminar. Intenta de nuevo.");
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
   }
 
   function exportFilterLabel(): string {
@@ -260,6 +388,7 @@ export default function ChequesPage() {
       case "vencido": return "vencidos";
       case "rebotado": return "rebotados";
       case "vencen_hoy": return "vencen hoy";
+      case "vencen_manana": return "vencen mañana";
       case "vencen_semana": return "vencen esta semana";
       case "all": default: return "todos";
     }
@@ -285,6 +414,11 @@ export default function ChequesPage() {
       case "vencen_hoy":
         data = cheques.filter((c) => c.fecha_deposito === hoy && visualEstado(c) !== "depositado" && visualEstado(c) !== "rebotado");
         break;
+      case "vencen_manana": {
+        const manana = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+        data = cheques.filter((c) => c.fecha_deposito === manana && visualEstado(c) !== "depositado" && visualEstado(c) !== "rebotado");
+        break;
+      }
       case "vencen_semana":
         data = cheques.filter((c) => c.fecha_deposito >= hoy && c.fecha_deposito <= semana && visualEstado(c) !== "depositado" && visualEstado(c) !== "rebotado");
         break;
@@ -383,7 +517,7 @@ export default function ChequesPage() {
     a.download = `cheques-${label.replace(/ /g, "-")}-${todayStr()}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
-    showToast("Excel descargado");
+    showToast("Excel listo — revisa tu carpeta de descargas");
   }
 
   const today = todayStr();
@@ -404,9 +538,28 @@ export default function ChequesPage() {
   const proximo = pendientes.length > 0 ? pendientes[0].fecha_deposito : null;
 
   // Alert banners data
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   const vencenHoy = cheques.filter((c) => c.fecha_deposito === today && visualEstado(c) !== "depositado" && visualEstado(c) !== "rebotado");
+  const vencenManana = cheques.filter((c) => c.fecha_deposito === tomorrow && visualEstado(c) !== "depositado" && visualEstado(c) !== "rebotado");
   const vencenSemana = cheques.filter((c) => c.fecha_deposito >= today && c.fecha_deposito <= weekFromNow && visualEstado(c) !== "depositado" && visualEstado(c) !== "rebotado");
   const totalVencenHoy = vencenHoy.reduce((s, c) => s + (Number(c.monto) || 0), 0);
+
+  // ── Smart suggestion: undeposited cheques ──
+  const chequeSuggestions = useMemo<SmartSuggestion[]>(() => {
+    if (vencidos.length === 0) return [];
+    const totalVencido = vencidos.reduce((s, c) => s + (Number(c.monto) || 0), 0);
+    return [{
+      id: `cheques-vencidos-${vencidos.length}`,
+      message: `Tienes ${vencidos.length} cheque${vencidos.length > 1 ? "s" : ""} vencido${vencidos.length > 1 ? "s" : ""} sin depositar por $${fmt(totalVencido)}. ¿Marcarlos como depositados?`,
+      actionLabel: "Depositar todos",
+      onAction: () => {
+        const ids = new Set(vencidos.map(c => c.id));
+        setConfirmBatch({ ids, clearFn: setSelectedVencidos });
+      },
+    }];
+  }, [vencidos]);
+
+  const { suggestion: chequeSuggestion, dismiss: dismissCheque } = useSmartSuggestions(chequeSuggestions);
 
   // Search filter (by numero_cheque or cliente)
   const searchLower = search.toLowerCase().trim();
@@ -420,6 +573,7 @@ export default function ChequesPage() {
       case "vencido": return vencidos;
       case "rebotado": return rebotados;
       case "vencen_hoy": return vencenHoy;
+      case "vencen_manana": return vencenManana;
       case "vencen_semana": return vencenSemana;
       default: return cheques;
     }
@@ -433,16 +587,20 @@ export default function ChequesPage() {
     : filteredByTab;
 
   return (
+    <PullToRefresh onRefresh={loadCheques}>
     <div>
       <AppHeader module="Cheques Posfechados" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       <div className="flex items-center justify-between mb-5">
-        <h1 className="text-xl font-light tracking-tight">Cheques Posfechados</h1>
+        <div>
+          <h1 className="text-xl font-light tracking-tight">Cheques Posfechados</h1>
+          {chequesCached && <p className="text-xs text-amber-600 mt-0.5">(datos cacheados)</p>}
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={exportCheques} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-md active:bg-gray-100 transition-all">
             ↓ Exportar {exportFilterLabel()}
           </button>
-          <button onClick={() => { resetForm(); setShowForm(!showForm); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">
+          <button onClick={() => { resetForm(); setShowForm(!showForm); }} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
             {showForm ? "Cerrar" : "Nuevo Cheque"}
           </button>
         </div>
@@ -478,7 +636,7 @@ export default function ChequesPage() {
                 <div className="text-xs uppercase tracking-widest text-gray-500">Total a cobrar</div>
                 <button onClick={() => setKpiTooltip(kpiTooltip === "total" ? null : "total")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
               </div>
-              <div className="text-xl font-semibold tabular-nums">${fmt(totalPendiente)}</div>
+              <div className="text-xl font-semibold tabular-nums">$<AnimatedNumber value={totalPendiente} formatter={(n: number) => fmt(n)} /></div>
               <div className="text-xs text-gray-400 mt-0.5">{pendientes.length} cheques</div>
               {kpiTooltip === "total" && <p className="text-xs text-gray-500 mt-1">Suma de todos los cheques pendientes de cobro</p>}
             </div>
@@ -504,7 +662,7 @@ export default function ChequesPage() {
                 <div className="text-xs uppercase tracking-widest text-gray-500">Depositados</div>
                 <button onClick={() => setKpiTooltip(kpiTooltip === "depositados" ? null : "depositados")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
               </div>
-              <div className="text-xl font-semibold tabular-nums text-green-600">{depositados.length}</div>
+              <div className="text-xl font-semibold tabular-nums text-green-600"><AnimatedNumber value={depositados.length} /></div>
               <div className="text-xs text-gray-400 mt-0.5">${fmt(depositados.reduce((s, c) => s + (Number(c.monto) || 0), 0))}</div>
               {kpiTooltip === "depositados" && <p className="text-xs text-gray-500 mt-1">Cheques ya depositados en el banco</p>}
             </div>
@@ -512,10 +670,21 @@ export default function ChequesPage() {
         );
       })()}
 
+      {chequeSuggestion && <SuggestionCard suggestion={chequeSuggestion} onDismiss={dismissCheque} />}
+
       {/* Form */}
       {showForm && (
         <div className="bg-gray-50 rounded-lg p-4 mb-8 overflow-visible">
           <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">{editingId ? "Editar Cheque" : "Nuevo Cheque"}</div>
+          {hasChequeDraft && !editingId && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4 flex items-center justify-between gap-4">
+              <p className="text-sm text-amber-800">Tienes un borrador guardado de {chequeDraftTimeAgo}. ¿Restaurar?</p>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <button onClick={restoreChequeDraft} className="bg-black text-white text-sm px-4 py-1.5 rounded-md hover:bg-gray-800 transition">Restaurar</button>
+                <button onClick={clearChequeDraft} className="text-sm text-amber-700 hover:text-amber-900 transition">Descartar</button>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 overflow-visible">
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Cliente <span className="text-red-500">*</span></label>
@@ -576,16 +745,23 @@ export default function ChequesPage() {
           </div>
           {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
           <div className="flex items-center gap-4 mt-6">
-            <button onClick={saveCheque} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40">{saving ? "Guardando..." : "Guardar Cheque"}</button>
+            <button onClick={saveCheque} disabled={saving || !isOnline} title={!isOnline ? "Sin conexion" : undefined} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">{!isOnline ? "Sin conexion" : saving ? "Guardando..." : "Guardar Cheque"}</button>
             <button onClick={() => { resetForm(); setShowForm(false); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
           </div>
         </div>
       )}
 
       {/* View toggle */}
-      <div className="flex gap-1 bg-gray-100 rounded-full p-0.5 mb-6 w-fit">
+      <div className="flex items-center gap-4 mb-6">
+        <div className="flex gap-1 bg-gray-100 rounded-full p-0.5 w-fit">
         <button onClick={() => setViewMode("lista")} className={`py-1.5 px-4 text-xs rounded-full transition ${viewMode === "lista" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Lista</button>
         <button onClick={() => setViewMode("calendario")} className={`py-1.5 px-4 text-xs rounded-full transition ${viewMode === "calendario" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Calendario</button>
+        </div>
+        {viewMode === "lista" && (
+          <button onClick={() => setGroupedView(!groupedView)} className={`text-xs transition ${groupedView ? "text-black font-medium" : "text-gray-400 hover:text-black"}`}>
+            {groupedView ? "Lista plana" : "Agrupar por fecha"}
+          </button>
+        )}
       </div>
 
       {/* Filter tabs + search — CAMBIO 40 search by cliente */}
@@ -824,12 +1000,52 @@ export default function ChequesPage() {
       {viewMode === "lista" && (loading ? (
         <SkeletonTable rows={5} cols={6} />
       ) : filtered.length === 0 ? (
-        <EmptyState
-          title="No hay cheques registrados"
-          subtitle="Registra el primer cheque posfechado"
-          actionLabel="+ Nuevo Cheque"
-          onAction={() => setShowForm(true)}
-        />
+        cheques.length === 0 ? (
+          <EmptyState
+            title="No hay cheques registrados"
+            subtitle="Registra el primer cheque posfechado"
+            actionLabel="+ Nuevo Cheque"
+            onAction={() => setShowForm(true)}
+          />
+        ) : (
+          <div className="flex flex-col items-center py-16 text-center">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-gray-200 mb-3">
+              <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            <p className="text-sm text-gray-500 mb-1">
+              {search
+                ? `No encontramos cheques para "${search}"`
+                : `No hay cheques ${filter === "pendiente" ? "pendientes" : filter === "depositado" ? "depositados" : filter === "vencido" ? "vencidos" : filter === "rebotado" ? "rebotados" : filter === "vencen_hoy" ? "que vencen hoy" : filter === "vencen_semana" ? "que vencen esta semana" : ""}`
+              }
+            </p>
+            <p className="text-xs text-gray-400 mb-4">{search ? "Revisa el nombre del cliente o numero de cheque" : "Prueba con otro filtro"}</p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {(
+                [
+                  ["all", "Todos"],
+                  ["pendiente", "Pendientes"],
+                  ["depositado", "Depositados"],
+                  ["vencido", "Vencidos"],
+                  ["rebotado", "Rebotados"],
+                ] as [Filter, string][]
+              )
+                .filter(([key]) => key !== filter)
+                .map(([key, label]) => {
+                  const count = key === "all" ? cheques.length : key === "pendiente" ? pendientes.length : key === "depositado" ? depositados.length : key === "vencido" ? vencidos.length : rebotados.length;
+                  if (count === 0) return null;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => { setFilter(key); setSearch(""); }}
+                      className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black transition"
+                    >
+                      {label} <span className="text-gray-300 ml-0.5">{count}</span>
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+        )
       ) : (
         <>
         {selectedIds.size > 0 && (
@@ -850,30 +1066,59 @@ export default function ChequesPage() {
             <button onClick={() => setSelectedVencidos(new Set())} className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
           </div>
         )}
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
-          <div className="min-w-[700px] px-4 sm:px-0">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-white z-10">
-            <tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500">
-              <th className="text-left py-3 px-4 font-normal">Fecha Depósito</th>
-              <th className="text-left py-3 px-4 font-normal">Cliente</th>
-              <th className="text-left py-3 px-4 font-normal">Empresa</th>
-              <th className="text-left py-3 px-4 font-normal">Banco</th>
-              <th className="text-left py-3 px-4 font-normal">N° Cheque</th>
-              <th className="text-right py-3 px-4 font-normal">Monto</th>
-              <th className="text-left py-3 px-4 font-normal">Estado</th>
-              <th className="text-right py-3 px-4 font-normal"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((c) => {
+        {/* Mobile card list with swipe-to-deposit */}
+        <div className="sm:hidden space-y-1.5">
+          {filtered.map((c) => {
+            const ve = visualEstado(c);
+            const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
+            const depositSwipe: SwipeAction | undefined = isPending ? {
+              label: "Depositar",
+              color: "bg-emerald-500",
+              icon: <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>,
+              onAction: () => setConfirmDepositId(c.id),
+            } : undefined;
+            const card = (
+              <div className={`px-4 py-3 ${ve === "depositado" ? "opacity-60" : ""}`} onClick={() => startEdit(c)}>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium truncate">{c.cliente}</span>
+                  <span className="text-sm font-medium tabular-nums">${fmt(c.monto)}</span>
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <StatusBadge estado={ve} />
+                  <span className="text-xs text-gray-400">{c.banco} · {c.numero_cheque}</span>
+                  <span className="text-xs text-gray-400 ml-auto">{fmtDate(c.fecha_deposito)}</span>
+                </div>
+              </div>
+            );
+            return depositSwipe ? (
+              <SwipeableRow key={c.id} rightAction={depositSwipe} className="border border-gray-200 rounded-lg">
+                {card}
+              </SwipeableRow>
+            ) : (
+              <div key={c.id} className="border border-gray-200 rounded-lg">
+                {card}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden sm:block overflow-x-auto">
+          <div className="min-w-[700px]">
+        {(() => {
+          const _gm = filter === "depositado" ? "depositado" as const : "pendiente" as const;
+          const _df = filter === "depositado" ? "fecha_depositado" as keyof Cheque : "fecha_deposito" as keyof Cheque;
+          const _cg = filter === "all" || filter === "pendiente" || filter === "depositado";
+          const _tg = groupedView && _cg ? groupByTimePeriod(filtered, _df, _gm) : null;
+          const _th = (<thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500"><th className="text-left py-3 px-4 font-normal">Fecha Depósito</th><th className="text-left py-3 px-4 font-normal">Cliente</th><th className="text-left py-3 px-4 font-normal">Empresa</th><th className="text-left py-3 px-4 font-normal">Banco</th><th className="text-left py-3 px-4 font-normal">N° Cheque</th><th className="text-right py-3 px-4 font-normal">Monto</th><th className="text-left py-3 px-4 font-normal">Estado</th><th className="text-right py-3 px-4 font-normal"></th></tr></thead>);
+          const _rr = (c: Cheque) => {
               const ve = visualEstado(c);
               const isToday = c.fecha_deposito === today && ve === "pendiente";
               const isVencido = ve === "pendiente_vencido" || ve === "vencido";
               const isDep = ve === "depositado";
               const isRebotado = ve === "rebotado";
               return (
-                <tr key={c.id} className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${isToday ? "bg-yellow-50 border-l-4 border-l-yellow-400" : isVencido ? "bg-amber-50/30" : isRebotado ? "bg-red-50/20" : ""} ${isDep ? "text-gray-400" : ""}`}>
+                <tr key={c.id} className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${isToday ? "bg-yellow-50 border-l-4 border-l-yellow-400" : isVencido ? "bg-amber-50/30" : isRebotado ? "bg-red-50/20" : ""} ${isDep ? "text-gray-400" : ""}`} onContextMenu={(e) => showContextMenu(e, buildChequeContextMenu(c, ve))}>
                   {ve === "pendiente" && (
                     <td className="py-3 pl-2 pr-0 w-8">
                       <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} className="accent-emerald-600 w-3.5 h-3.5" />
@@ -896,12 +1141,12 @@ export default function ChequesPage() {
                   <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                     {(ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido") && (
-                      <button onClick={() => setConfirmDepositId(c.id)} className="text-sm text-gray-500 hover:text-black transition min-h-[44px]">Confirmar depósito</button>
+                      <button onClick={() => setConfirmDepositId(c.id)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Confirmar depósito</button>
                     )}
                     {isRebotado && (
-                      <button onClick={() => redepositar(c.id)} className="text-sm text-gray-500 hover:text-emerald-600 transition min-h-[44px]">Re-depositar</button>
+                      <button onClick={() => redepositar(c.id)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-emerald-600 transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Re-depositar</button>
                     )}
-                    <button onClick={() => startEdit(c)} className="text-sm text-gray-500 hover:text-black transition min-h-[44px]">Editar</button>
+                    <button onClick={() => startEdit(c)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Editar</button>
                     <ChequeMoreMenu
                       cheque={c}
                       ve={ve}
@@ -920,15 +1165,26 @@ export default function ChequesPage() {
                   </td>
                 </tr>
               );
-            })}
-          </tbody>
-        </table>
+          };
+          return _tg ? (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              {_tg.map((g) => (
+                <TimeGroupHeader key={g.key} label={g.label} count={g.items.length} color={g.color} bgColor={g.bgColor}>
+                  <table className="w-full text-sm">{_th}<tbody>{g.items.map(_rr)}</tbody></table>
+                </TimeGroupHeader>
+              ))}
+            </div>
+          ) : (
+            <table className="w-full text-sm">{_th}<tbody>{filtered.map(_rr)}</tbody></table>
+          );
+        })()}
           </div>
         </div>
         </>
       ))}
       <Toast message={error} type="error" />
       <Toast message={toast} />
+      {pendingUndo && <UndoToast message={pendingUndo.message} startedAt={pendingUndo.startedAt} onUndo={undoAction} />}
       {/* Confirm deposit */}
       <ConfirmModal
         open={!!confirmDepositId}
@@ -957,5 +1213,6 @@ export default function ChequesPage() {
       />
     </div>
     </div>
+    </PullToRefresh>
   );
 }

@@ -9,7 +9,7 @@ import type { ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
 import { VENDOR_MAP } from "@/lib/vendors";
 import AppHeader from "@/components/AppHeader";
-import { Toast } from "@/components/ui";
+import { Toast, PullToRefresh } from "@/components/ui";
 import UploadFreshness from "./components/UploadFreshness";
 import KpiCards from "./components/KpiCards";
 import CompanySummary from "./components/CompanySummary";
@@ -18,6 +18,9 @@ import { SkeletonRow } from "./components/Skeleton";
 import { generatePDFResumen, generatePDFDetallado } from "@/lib/pdf-cxc";
 import useAdminData from "./hooks/useAdminData";
 import { exportConsolidado } from "@/lib/excel-cxc-consolidado";
+import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
+import SuggestionCard from "@/components/SuggestionCard";
+import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -128,6 +131,7 @@ function buildVendorMsg(vendorName: string, companyName: string, brand: string, 
 export default function AdminDashboard() {
   const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "director"] });
   const { clients, uploads, contactLog, loading, loadError, loadData, setContactLog } = useAdminData();
+  usePersistedScroll("cxc", !loading && clients.length > 0);
   const [search, setSearch] = useState("");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
   const [companyFilter, setCompanyFilter] = useState<string>("all");
@@ -441,12 +445,16 @@ export default function AdminDashboard() {
   }
 
   async function handleRegisterContact(clientName: string, data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) {
-    // Save resultado + proximo_seguimiento to cxc_client_overrides (merge with existing contact fields)
     const existingClient = clients.find((c) => c.nombre_normalized === clientName);
     const now = new Date().toISOString();
 
-    // Only overwrite resultado/proximo if Angela actually provided them
-    // This way a quick "contacted via WhatsApp" won't erase a previous resultado
+    // Optimistic: update contactLog immediately so the row shows the contact date
+    const contactLogSnapshot = { ...contactLog };
+    setContactLog((prev) => ({
+      ...prev,
+      [clientName]: { date: now, method: data.metodo.toLowerCase() },
+    }));
+
     const upsertData: Record<string, unknown> = {
       nombre_normalized: clientName,
       correo: existingClient?.correo || "",
@@ -464,13 +472,18 @@ export default function AdminDashboard() {
       upsertData.proximo_seguimiento = data.proximo_seguimiento;
     }
 
-    await supabase.from("cxc_client_overrides").upsert(
-      upsertData,
-      { onConflict: "nombre_normalized" }
-    );
-    // Also log the contact in cxc_contact_log
-    await markContacted(clientName, data.metodo.toLowerCase());
-    loadData();
+    try {
+      const { error } = await supabase.from("cxc_client_overrides").upsert(
+        upsertData,
+        { onConflict: "nombre_normalized" }
+      );
+      if (error) throw error;
+      await markContacted(clientName, data.metodo.toLowerCase());
+    } catch {
+      // Revert optimistic update on failure
+      setContactLog(contactLogSnapshot);
+      showToast("No se pudo registrar el contacto. Intenta de nuevo.");
+    }
   }
 
   function buildExportSubtitle() {
@@ -485,6 +498,39 @@ export default function AdminDashboard() {
     }
     return parts.length > 0 ? parts.join(" — ") : undefined;
   }
+
+  // ── Smart suggestions ──────────────────────────────────
+  const cxcSuggestions = useMemo<SmartSuggestion[]>(() => {
+    const suggestions: SmartSuggestion[] = [];
+    const now = Date.now();
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+
+    for (const client of clients) {
+      if (client.total < 10000) continue;
+      const log = contactLog[client.nombre_normalized];
+      const lastContactMs = log?.date ? new Date(log.date).getTime() : 0;
+      const daysSinceContact = lastContactMs ? Math.floor((now - lastContactMs) / (24 * 60 * 60 * 1000)) : null;
+
+      if (!lastContactMs || (now - lastContactMs) >= SEVEN_DAYS) {
+        const daysLabel = daysSinceContact ? `${daysSinceContact} días` : "más de 7 días";
+        suggestions.push({
+          id: `cxc-contact-${client.nombre_normalized}`,
+          message: `Llevas ${daysLabel} sin contactar a ${client.nombre_normalized} y deben $${fmt(client.total)}. ¿Enviar WhatsApp?`,
+          actionLabel: "Enviar WhatsApp",
+          onAction: () => openWhatsApp(client),
+        });
+      }
+    }
+    // Sort by total desc to surface most important first
+    suggestions.sort((a, b) => {
+      const ca = clients.find(c => a.id.includes(c.nombre_normalized));
+      const cb = clients.find(c => b.id.includes(c.nombre_normalized));
+      return (cb?.total || 0) - (ca?.total || 0);
+    });
+    return suggestions;
+  }, [clients, contactLog]);
+
+  const { suggestion: cxcSuggestion, dismiss: dismissCxc } = useSmartSuggestions(cxcSuggestions);
 
   // ── Render ────────────────────────────────────────────
 
@@ -506,6 +552,7 @@ export default function AdminDashboard() {
   }
 
   return (
+    <PullToRefresh onRefresh={loadData}>
     <div>
       <AppHeader module="Panel CXC" />
       <div className="max-w-6xl mx-auto px-6 py-8">
@@ -594,7 +641,43 @@ export default function AdminDashboard() {
 
       <UploadFreshness roleCompanies={cxcCompanies} uploads={uploads} />
 
+      {/* Smart empty state: no CXC data loaded */}
+      {!loading && roleClients.length === 0 && (
+        <div className="flex flex-col items-center py-16 text-center mb-8">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-gray-200 mb-4">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M12 8v4m0 4h.01" />
+          </svg>
+          <p className="text-sm font-medium text-gray-500 mb-1">No hay datos de cartera cargados</p>
+          {(() => {
+            const uploadDates = Object.values(uploads).map(u => new Date(u.uploaded_at).getTime());
+            const lastUploadMs = uploadDates.length > 0 ? Math.max(...uploadDates) : 0;
+            const daysSinceUpload = lastUploadMs ? Math.floor((Date.now() - lastUploadMs) / (1000 * 60 * 60 * 24)) : null;
+            return (
+              <>
+                {daysSinceUpload !== null && daysSinceUpload > 14 && (
+                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-4 py-2 text-xs mb-3">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    La ultima carga fue hace {daysSinceUpload} dias. Los datos pueden estar desactualizados.
+                  </div>
+                )}
+                <p className="text-xs text-gray-400 mb-4 max-w-xs">Importa el archivo CSV de cartera desde Switch para ver el panel de cuentas por cobrar.</p>
+              </>
+            );
+          })()}
+          <button
+            onClick={() => (window.location.href = "/upload?tab=cxc")}
+            className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all min-h-[44px] flex items-center gap-2"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Importar archivo de cartera
+          </button>
+        </div>
+      )}
+
       <KpiCards roleClients={roleClients} onFilterOverdue={() => setRiskFilter("overdue")} onSortByFollowUp={() => { setSortKey("follow_up"); setSortDir("asc"); }} />
+
+      {cxcSuggestion && <SuggestionCard suggestion={cxcSuggestion} onDismiss={dismissCxc} />}
 
       <CompanySummary
         roleCompanies={cxcCompanies}
@@ -635,5 +718,6 @@ export default function AdminDashboard() {
       <Toast message={toast} />
     </div>
     </div>
+    </PullToRefresh>
   );
 }

@@ -23,12 +23,82 @@ interface SearchResults {
   caja: CajaResult[];
 }
 
+interface QuickAction {
+  label: string;
+  href: string;
+}
+
 interface FlatItem {
   module: string;
   label: string;
   sub: string;
   href: string;
   icon: string;
+}
+
+function parseQuickAction(query: string): QuickAction | null {
+  const q = query.trim();
+
+  // cheques que vencen hoy / mañana / esta semana
+  const chequeMatch = q.match(/cheques?.*(venc|hoy|ma[ñn]ana|semana)/i);
+  if (chequeMatch) {
+    const lower = q.toLowerCase();
+    if (lower.includes("mañana") || lower.includes("manana")) {
+      return { label: "Ir a cheques que vencen mañana", href: "/cheques?filter=vencen_manana" };
+    }
+    if (lower.includes("semana")) {
+      return { label: "Ir a cheques que vencen esta semana", href: "/cheques?filter=vencen_semana" };
+    }
+    // default: hoy or generic "vencen"
+    return { label: "Ir a cheques que vencen hoy", href: "/cheques?filter=vencen_hoy" };
+  }
+
+  // cuánto debe [client]
+  const debeMatch = q.match(/cu[aá]nto\s+debe\s+(.+)/i);
+  if (debeMatch) {
+    const client = debeMatch[1].trim();
+    return { label: `Buscar deuda de "${client}" en CxC`, href: `/admin?search=${encodeURIComponent(client)}` };
+  }
+
+  // reclamos de/para [empresa]
+  const reclamoMatch = q.match(/reclamos?\s+(?:de|para)\s+(.+)/i);
+  if (reclamoMatch) {
+    const empresa = reclamoMatch[1].trim();
+    return { label: `Ir a reclamos de ${empresa}`, href: `/reclamos?empresa=${encodeURIComponent(empresa)}` };
+  }
+
+  // guías pendientes
+  if (/gu[ií]as?\s+pendientes?/i.test(q)) {
+    return { label: "Ir a guías pendientes", href: "/guias?pendientes=1" };
+  }
+
+  // últimos gastos / caja
+  if (/gastos|caja|[uú]ltimos?\s+gastos/i.test(q)) {
+    return { label: "Ir a Caja", href: "/caja" };
+  }
+
+  // préstamos de [persona]
+  const prestamoMatch = q.match(/pr[eé]stamos?\s+de\s+(.+)/i);
+  if (prestamoMatch) {
+    const persona = prestamoMatch[1].trim();
+    return { label: `Buscar préstamos de "${persona}"`, href: `/prestamos?search=${encodeURIComponent(persona)}` };
+  }
+
+  // cheques pendientes / rebotados / depositados
+  if (/cheques?\s+pendientes?/i.test(q)) {
+    return { label: "Ir a cheques pendientes", href: "/cheques?filter=pendiente" };
+  }
+  if (/cheques?\s+rebotados?/i.test(q)) {
+    return { label: "Ir a cheques rebotados", href: "/cheques?filter=rebotado" };
+  }
+  if (/cheques?\s+depositados?/i.test(q)) {
+    return { label: "Ir a cheques depositados", href: "/cheques?filter=depositado" };
+  }
+  if (/cheques?\s+vencidos?/i.test(q)) {
+    return { label: "Ir a cheques vencidos", href: "/cheques?filter=vencido" };
+  }
+
+  return null;
 }
 
 function fmtMoney(n: number) {
@@ -133,6 +203,22 @@ function flatten(r: SearchResults): FlatItem[] {
   return items;
 }
 
+const SEARCH_MODULES = [
+  { label: "Cuentas por Cobrar", href: "/admin", keywords: ["cxc", "cartera", "cobrar", "deuda", "saldo", "cliente", "vencido"] },
+  { label: "Reclamos", href: "/reclamos", keywords: ["reclamo", "nota credito", "devolucion", "queja"] },
+  { label: "Cheques", href: "/cheques", keywords: ["cheque", "deposito", "posfechado", "banco"] },
+  { label: "Guias", href: "/guias", keywords: ["guia", "despacho", "envio", "transporte"] },
+  { label: "Ventas", href: "/ventas", keywords: ["venta", "factura", "ingreso", "vendedor"] },
+  { label: "Directorio", href: "/directorio", keywords: ["directorio", "contacto", "correo", "telefono", "whatsapp"] },
+  { label: "Prestamos", href: "/prestamos", keywords: ["prestamo", "empleado", "descuento", "planilla"] },
+  { label: "Caja", href: "/caja", keywords: ["caja", "gasto", "pago", "proveedor", "efectivo"] },
+];
+
+function getModuleSuggestions(q: string) {
+  const ql = q.toLowerCase();
+  return SEARCH_MODULES.filter(m => m.keywords.some(k => k.includes(ql) || ql.includes(k))).slice(0, 3);
+}
+
 export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { darkMode?: boolean; compact?: boolean; fullScreen?: boolean; onClose?: () => void }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -146,7 +232,8 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const items = results ? flatten(results) : [];
-  const hasResults = items.length > 0;
+  const quickAction = query.length >= 2 ? parseQuickAction(query) : null;
+  const hasResults = items.length > 0 || quickAction !== null;
   const searched = results !== null && query.length >= 2;
 
   const doSearch = useCallback(async (q: string) => {
@@ -165,6 +252,10 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
   }, []);
 
   useEffect(() => {
+    // Open dropdown immediately if quick action matches (before API call)
+    if (query.length >= 2 && parseQuickAction(query)) {
+      setOpen(true);
+    }
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => doSearch(query), 300);
     return () => { if (timerRef.current) clearTimeout(timerRef.current); };
@@ -203,6 +294,16 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
     router.push(item.href);
   }
 
+  function navigateQuickAction(action: QuickAction) {
+    setOpen(false);
+    setQuery("");
+    setResults(null);
+    if (compact) setExpanded(false);
+    router.push(action.href);
+  }
+
+  const totalItems = (quickAction ? 1 : 0) + items.length;
+
   function onKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Escape") {
       setOpen(false);
@@ -213,9 +314,17 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
       return;
     }
     if (!open || !hasResults) return;
-    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, items.length - 1)); }
+    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, totalItems - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, 0)); }
-    else if (e.key === "Enter" && activeIdx >= 0) { e.preventDefault(); navigate(items[activeIdx]); }
+    else if (e.key === "Enter" && activeIdx >= 0) {
+      e.preventDefault();
+      if (quickAction && activeIdx === 0) {
+        navigateQuickAction(quickAction);
+      } else {
+        const itemIdx = quickAction ? activeIdx - 1 : activeIdx;
+        if (itemIdx >= 0 && itemIdx < items.length) navigate(items[itemIdx]);
+      }
+    }
   }
 
   // Group items by module for display
@@ -243,7 +352,38 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
         </div>
         <div className="flex-1 overflow-y-auto px-4 py-2">
           {loading && <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" /></div>}
-          {!loading && searched && items.length === 0 && <p className="text-sm text-gray-400 text-center py-8">Sin resultados para &ldquo;{query}&rdquo;</p>}
+          {!loading && searched && items.length === 0 && !quickAction && (
+            <div className="text-center py-8">
+              <p className="text-sm text-gray-400">No encontramos nada para &ldquo;{query}&rdquo;</p>
+              {(() => {
+                const suggestions = getModuleSuggestions(query);
+                if (suggestions.length === 0) return null;
+                return (
+                  <div className="mt-4">
+                    <p className="text-xs text-gray-400 mb-2">Tal vez buscas en:</p>
+                    <div className="flex flex-wrap justify-center gap-2">
+                      {suggestions.map(s => (
+                        <button key={s.href} onClick={() => { router.push(s.href); onClose?.(); }} className="text-xs px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black transition">
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+          {/* Quick Action (mobile) */}
+          {!loading && quickAction && (
+            <button
+              onClick={() => { router.push(quickAction.href); onClose?.(); }}
+              className="w-full flex items-center gap-3 py-2.5 text-left bg-blue-50 hover:bg-blue-100 rounded-md px-2 mb-3 transition"
+            >
+              <span className="text-base">⚡</span>
+              <div className="flex-1 min-w-0"><div className="text-sm font-medium text-blue-700">{quickAction.label}</div></div>
+              <span className="text-blue-400 text-xs">→</span>
+            </button>
+          )}
           {!loading && items.length > 0 && Object.entries(grouped).map(([mod, gItems]) => (
             <div key={mod} className="mb-4">
               <div className="text-[10px] uppercase text-gray-400 font-medium mb-1">{mod}</div>
@@ -309,12 +449,32 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
       </div>
 
       {/* Dropdown */}
-      {open && searched && (
+      {open && (searched || quickAction) && (
         <div className={`absolute z-50 mt-1 w-full rounded-lg border shadow-lg overflow-hidden ${bg}`} style={{ minWidth: 320 }}>
           {hasResults ? (
             <div className="max-h-80 overflow-y-auto">
+              {/* Quick Action */}
+              {quickAction && (
+                <button
+                  onClick={() => navigateQuickAction(quickAction)}
+                  onMouseEnter={() => setActiveIdx(0)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition border-b ${
+                    darkMode ? "border-gray-700" : "border-blue-100"
+                  } ${activeIdx === 0
+                    ? (darkMode ? "bg-blue-900/30" : "bg-blue-50")
+                    : (darkMode ? "bg-blue-900/10" : "bg-blue-50/50")
+                  }`}
+                >
+                  <span className="text-lg flex-shrink-0">⚡</span>
+                  <div className="min-w-0 flex-1">
+                    <div className={`text-sm font-medium ${darkMode ? "text-blue-300" : "text-blue-700"}`}>{quickAction.label}</div>
+                  </div>
+                  <svg className={`w-3.5 h-3.5 flex-shrink-0 ${darkMode ? "text-blue-400" : "text-blue-400"}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6" /></svg>
+                </button>
+              )}
+              {/* Normal Results */}
               {(() => {
-                let idx = 0;
+                let idx = quickAction ? 1 : 0;
                 return Object.entries(grouped).map(([module, moduleItems]) => (
                   <div key={module}>
                     <div className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-medium ${darkMode ? "text-gray-500 bg-gray-900" : "text-gray-400 bg-gray-50"}`}>
@@ -346,7 +506,23 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
             </div>
           ) : (
             <div className="px-4 py-6 text-center">
-              <p className="text-sm text-gray-400">Sin resultados para &quot;{query}&quot;</p>
+              <p className="text-sm text-gray-400">No encontramos nada para &quot;{query}&quot;</p>
+              {(() => {
+                const suggestions = getModuleSuggestions(query);
+                if (suggestions.length === 0) return null;
+                return (
+                  <div className="mt-3">
+                    <p className="text-[10px] text-gray-400 mb-2">Tal vez buscas en:</p>
+                    <div className="flex flex-wrap justify-center gap-1.5">
+                      {suggestions.map(s => (
+                        <button key={s.href} onClick={() => navigate({ module: s.label, label: s.label, sub: "", href: s.href, icon: "" })} className="text-xs px-2.5 py-1 rounded-full border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black transition">
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>

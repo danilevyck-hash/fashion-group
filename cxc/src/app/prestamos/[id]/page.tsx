@@ -6,6 +6,7 @@ import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, ConfirmModal } from "@/components/ui";
+import UndoToast from "@/components/UndoToast";
 
 import { Empleado } from "../components/types";
 import EmpleadoHeader from "../components/EmpleadoHeader";
@@ -219,15 +220,7 @@ export default function PrestamoDetallePage() {
         onConfirm={actions.forceArchive}
       />
 
-      <ConfirmModal
-        open={!!movForm.confirmDeleteMovId}
-        onClose={() => movForm.setConfirmDeleteMovId(null)}
-        onConfirm={movForm.doDeleteMov}
-        title="Eliminar movimiento"
-        message="¿Eliminar este movimiento? Esta acción no se puede deshacer."
-        confirmLabel="Eliminar"
-        destructive
-      />
+      {movForm.pendingUndoMov && <UndoToast message={movForm.pendingUndoMov.message} startedAt={movForm.pendingUndoMov.startedAt} onUndo={movForm.undoActionMov} />}
 
       <Toast message={toast} />
     </div>

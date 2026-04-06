@@ -146,7 +146,7 @@ export default function PedidosPage() {
       {loading ? (
         <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="h-14 bg-gray-100 rounded-lg animate-pulse" />)}</div>
       ) : filtered.length === 0 ? (
-        <EmptyState title={search || dateFilter || statusFilter !== "todos" ? "Sin resultados" : "No hay pedidos"} subtitle={search || dateFilter || statusFilter !== "todos" ? "Intenta con otros filtros" : "Los pedidos aparecerán aquí"} />
+        <EmptyState title={search || dateFilter || statusFilter !== "todos" ? "No encontramos pedidos" : "No hay pedidos aun"} subtitle={search || dateFilter || statusFilter !== "todos" ? "Intenta con otros filtros o busqueda" : "Los pedidos aparecerán aquí al crearlos"} />
       ) : (
         <div className="space-y-2">
           {filtered.map(o => (

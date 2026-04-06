@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import type { Guia, GuiaItem, View } from "./types";
+import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
+import { usePersistedState } from "@/lib/hooks/usePersistedState";
 import {
   DEFAULT_TRANSPORTISTAS,
   DEFAULT_CLIENTES,
@@ -27,7 +29,7 @@ export function useGuiasState() {
   const [toast, setToast] = useState<string | null>(null);
 
   // Accordion expanded row
-  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = usePersistedState<string | null>("guias", "expanded", null);
   const [expandedGuia, setExpandedGuia] = useState<Guia | null>(null);
   const [expandedLoading, setExpandedLoading] = useState(false);
 
@@ -53,6 +55,24 @@ export function useGuiasState() {
   const [nextNumero, setNextNumero] = useState(1);
   const [formNumero, setFormNumero] = useState(1);
   const [saving, setSaving] = useState(false);
+
+  // Draft auto-save for new guia form
+  const guiaDraftData = useMemo(() => ({
+    transportista, entregadoPor, items, observaciones,
+  }), [transportista, entregadoPor, items, observaciones]);
+  const isGuiaDraftEmpty = useCallback((d: typeof guiaDraftData) => {
+    return !d.transportista && !d.entregadoPor && !d.observaciones && d.items.every(i => !i.cliente && !i.direccion && !i.facturas && (!i.bultos || i.bultos === 0));
+  }, []);
+  const { draft: guiaDraft, hasDraft: hasGuiaDraft, clearDraft: clearGuiaDraft, draftTimeAgo: guiaDraftTimeAgo } = useDraftAutoSave("guia", guiaDraftData, isGuiaDraftEmpty);
+
+  function restoreGuiaDraft() {
+    if (!guiaDraft) return;
+    setTransportista(guiaDraft.transportista || "");
+    setEntregadoPor(guiaDraft.entregadoPor || "");
+    setObservaciones(guiaDraft.observaciones || "");
+    if (guiaDraft.items?.length) setItems(guiaDraft.items);
+    clearGuiaDraft();
+  }
 
   // Month filter
   const currentMonth = new Date().toISOString().slice(0, 7);
@@ -322,6 +342,7 @@ export function useGuiasState() {
     });
     if (res.ok) {
       setError(null);
+      clearGuiaDraft();
       const guia = await res.json();
       if (!editingId) {
         const totalB = validItems.reduce(
@@ -418,6 +439,8 @@ export function useGuiasState() {
     validationErrors,
     updateItem, addRow, removeRow, resetForm,
     saveGuia,
+    // draft
+    hasGuiaDraft, guiaDraftTimeAgo, restoreGuiaDraft, clearGuiaDraft,
     // despacho
     tipoDespacho, setTipoDespacho,
     bPlaca, setBPlaca,

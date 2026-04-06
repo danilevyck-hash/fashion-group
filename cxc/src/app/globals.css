@@ -88,8 +88,33 @@ input, button, select, textarea {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+/* ── Page transitions ── */
 .fade-in { animation: fadeIn 0.3s ease-in; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Direction-aware page transitions */
+@keyframes slideFromRight {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideFromLeft {
+  from { opacity: 0; transform: translateX(-30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes crossfade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.page-slide-right {
+  animation: slideFromRight 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.page-slide-left {
+  animation: slideFromLeft 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.page-crossfade {
+  animation: crossfade 180ms ease both;
+}
 
 /* Mobile: prevent iOS zoom on input focus */
 @media (max-width: 768px) {
@@ -168,4 +193,63 @@ input, button, select, textarea {
 }
 .floating-bar-enter {
   animation: slideUp 0.3s ease-out;
+}
+
+
+/* ── State-change animations ── */
+@keyframes depositSuccess {
+  0% { background-color: rgb(220 252 231); }
+  100% { background-color: transparent; }
+}
+.deposit-flash {
+  animation: depositSuccess 1.2s ease-out forwards;
+}
+
+@keyframes newRow {
+  0% { background-color: rgb(254 249 195); }
+  100% { background-color: transparent; }
+}
+.new-row-highlight {
+  animation: newRow 1.5s ease-out forwards;
+}
+
+@keyframes saldoShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+.saldo-shake {
+  animation: saldoShake 0.4s ease-in-out;
+}
+
+@keyframes badgeIn {
+  0% { opacity: 0; transform: scale(0.8); }
+  100% { opacity: 1; transform: scale(1); }
+}
+.badge-enter {
+  animation: badgeIn 200ms ease forwards;
+}
+
+@keyframes slideDown {
+  0% { opacity: 0; transform: translateY(-100%); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-slideDown {
+  animation: slideDown 300ms ease forwards;
+}
+
+/* SwipeableRow: disable touch swipe on desktop (pointer devices) */
+@media (hover: hover) and (pointer: fine) {
+  .swipeable-row {
+    overflow: visible !important;
+  }
+  .swipeable-row > div:last-child {
+    transform: none !important;
+    transition: none !important;
+  }
+  .swipeable-row > div:not(:last-child) {
+    display: none !important;
+  }
 }

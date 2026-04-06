@@ -89,7 +89,7 @@ export default function EmpresaSelector({
                 <p className="text-sm text-gray-500">{results.length} resultados para &quot;{globalSearch}&quot;</p>
                 <button onClick={() => setGlobalSearch("")} className="text-xs text-gray-400 hover:text-black transition">× Limpiar</button>
               </div>
-              {results.length === 0 ? <EmptyState title="Sin resultados" subtitle={`No se encontraron resultados para "${globalSearch}"`} /> : (
+              {results.length === 0 ? <EmptyState title="No encontramos nada" subtitle={`Intenta con otro termino en vez de "${globalSearch}"`} /> : (
                 <table className="w-full text-sm">
                   <thead><tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
                     <th className="text-left pb-3 font-medium">N° Reclamo</th>

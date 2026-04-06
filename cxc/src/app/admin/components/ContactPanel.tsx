@@ -143,7 +143,7 @@ export default function ContactPanel({
                 value={editData.contacto} onChange={(e) => setEditData({ ...editData, contacto: e.target.value })} />
               <div className="col-span-2 flex gap-2 mt-1 items-center">
                 <button onClick={() => { if (debounceRef.current) { clearTimeout(debounceRef.current); doAutoSave(); } setEditing(false); }} className="text-xs text-gray-500 hover:text-black transition">Cerrar edicion</button>
-                {autoSaveStatus === "saved" && <span className="text-[10px] text-green-600 transition">Guardado ✓</span>}
+                {autoSaveStatus === "saved" && <span className="text-[10px] text-green-600 transition">Listo, guardado</span>}
                 {autoSaveStatus === "saving" && <span className="text-[10px] text-gray-400 transition">Guardando...</span>}
               </div>
             </div>

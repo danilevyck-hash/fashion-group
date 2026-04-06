@@ -240,7 +240,7 @@ export default function OrderDetailPage() {
     const url = URL.createObjectURL(doc.output("blob"));
     const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
-    showToast("PDF descargado");
+    showToast("PDF listo — revisa tu carpeta de descargas");
   }
 
   async function sendToClient() {
@@ -323,7 +323,7 @@ export default function OrderDetailPage() {
         <div className="flex items-center gap-3 flex-shrink-0">
           {/* Auto-save indicator */}
           {autoSaveStatus === "saving" && <span className="text-[11px] text-gray-400">Guardando...</span>}
-          {autoSaveStatus === "saved" && <span className="text-[11px] text-green-600">Guardado</span>}
+          {autoSaveStatus === "saved" && <span className="text-[11px] text-green-600">Listo, guardado</span>}
           {/* Add more products */}
           {!isConfirmed && canEdit && (
             <Link href="/catalogo/reebok/productos" className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full hover:bg-gray-200 transition">

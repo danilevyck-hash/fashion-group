@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, ReactNode } from "react";
+import { useEffect, useRef, useState, useCallback, ReactNode, createContext, useContext } from "react";
 
 // ── ESTÉTICA 5: Skeleton Loaders ──
 export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
@@ -287,7 +287,19 @@ const STATUS_LABELS: Record<string, string> = {
 export function StatusBadge({ estado }: { estado: string }) {
   const color = STATUS_COLORS[estado] || "gray";
   const label = STATUS_LABELS[estado] || estado;
-  return <Badge color={color}>{label}</Badge>;
+  const [animate, setAnimate] = useState(false);
+  const prevEstado = useRef(estado);
+
+  useEffect(() => {
+    if (prevEstado.current !== estado) {
+      setAnimate(true);
+      prevEstado.current = estado;
+      const t = setTimeout(() => setAnimate(false), 220);
+      return () => clearTimeout(t);
+    }
+  }, [estado]);
+
+  return <span className={animate ? "badge-enter inline-flex" : "inline-flex"}><Badge color={color}>{label}</Badge></span>;
 }
 
 // ── ESTÉTICA 10: Money Formatter ──
@@ -323,6 +335,55 @@ export function ScrollableTable({
   );
 }
 
+
+// ── AnimatedNumber: count-up from 0 to target ──
+export function AnimatedNumber({
+  value,
+  duration = 300,
+  formatter,
+  className = "",
+}: {
+  value: number;
+  duration?: number;
+  formatter?: (n: number) => string;
+  className?: string;
+}) {
+  const [display, setDisplay] = useState(0);
+  const prevValue = useRef(0);
+  const rafRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const start = prevValue.current;
+    const end = value;
+    if (start === end) return;
+
+    const startTime = performance.now();
+
+    function tick(now: number) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = start + (end - start) * eased;
+      setDisplay(current);
+
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(tick);
+      } else {
+        setDisplay(end);
+        prevValue.current = end;
+      }
+    }
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [value, duration]);
+
+  const text = formatter ? formatter(display) : display.toFixed(0);
+  return <span className={className}>{text}</span>;
+}
+
 // ── Animated Accordion Content ──
 // Uses CSS grid trick: grid-rows-[0fr] → grid-rows-[1fr] for smooth height animation.
 // Usage: <AccordionContent open={isExpanded}><div>...content...</div></AccordionContent>
@@ -346,6 +407,603 @@ export function AccordionContent({
       }}
     >
       <div className="overflow-hidden">{children}</div>
+    </div>
+  );
+}
+
+// ── Context Menu (right-click) ──────────────────────────────
+// Reusable right-click context menu for desktop power users.
+// Only shows on non-touch devices. Uses fixed positioning.
+
+export interface ContextMenuItem {
+  label: string;
+  icon?: ReactNode;
+  shortcut?: string;
+  onClick: () => void;
+  destructive?: boolean;
+  hidden?: boolean;
+  dividerAfter?: boolean;
+}
+
+interface ContextMenuState {
+  x: number;
+  y: number;
+  items: ContextMenuItem[];
+}
+
+const ContextMenuCtx = createContext<{
+  show: (e: React.MouseEvent, items: ContextMenuItem[]) => void;
+  hide: () => void;
+} | null>(null);
+
+export function useContextMenu() {
+  const ctx = useContext(ContextMenuCtx);
+  if (!ctx) throw new Error("useContextMenu must be used inside <ContextMenuProvider>");
+  return ctx;
+}
+
+// ── Pull to Refresh (mobile touch only) ──
+export function PullToRefresh({
+  onRefresh,
+  children,
+}: {
+  onRefresh: () => Promise<void>;
+  children: ReactNode;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const startY = useRef(0);
+  const pullDistance = useRef(0);
+  const [pull, setPull] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const pulling = useRef(false);
+  const threshold = 60;
+
+  const isAtTop = useCallback(() => {
+    return window.scrollY <= 0;
+  }, []);
+
+  useEffect(() => {
+    let isTouchDevice = false;
+    const checkTouch = () => { isTouchDevice = true; };
+    window.addEventListener("touchstart", checkTouch, { once: true, passive: true });
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (!isTouchDevice || refreshing) return;
+      if (isAtTop()) {
+        startY.current = e.touches[0].clientY;
+        pulling.current = true;
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (!pulling.current || refreshing) return;
+      if (!isAtTop()) {
+        pulling.current = false;
+        pullDistance.current = 0;
+        setPull(0);
+        return;
+      }
+      const dy = e.touches[0].clientY - startY.current;
+      if (dy > 0) {
+        const resisted = Math.min(dy * 0.4, 120);
+        pullDistance.current = resisted;
+        setPull(resisted);
+      } else {
+        pullDistance.current = 0;
+        setPull(0);
+      }
+    };
+
+    const onTouchEnd = async () => {
+      if (!pulling.current) return;
+      pulling.current = false;
+      if (pullDistance.current >= threshold && !refreshing) {
+        setPull(threshold);
+        setRefreshing(true);
+        try {
+          await onRefresh();
+        } catch {
+          // silently handle
+        }
+        setRefreshing(false);
+      }
+      pullDistance.current = 0;
+      setPull(0);
+    };
+
+    const el = containerRef.current;
+    if (el) {
+      el.addEventListener("touchstart", onTouchStart, { passive: true });
+      el.addEventListener("touchmove", onTouchMove, { passive: true });
+      el.addEventListener("touchend", onTouchEnd, { passive: true });
+    }
+
+    return () => {
+      window.removeEventListener("touchstart", checkTouch);
+      if (el) {
+        el.removeEventListener("touchstart", onTouchStart);
+        el.removeEventListener("touchmove", onTouchMove);
+        el.removeEventListener("touchend", onTouchEnd);
+      }
+    };
+  }, [onRefresh, refreshing, isAtTop]);
+
+  const showIndicator = pull > 10 || refreshing;
+  const rotation = Math.min((pull / threshold) * 360, 360);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div
+        className="flex items-center justify-center overflow-hidden transition-[height] duration-200"
+        style={{ height: showIndicator ? `${Math.max(pull, refreshing ? threshold : 0)}px` : "0px" }}
+      >
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#9ca3af"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={refreshing ? "animate-spin" : "transition-transform"}
+          style={!refreshing ? { transform: `rotate(${rotation}deg)` } : undefined}
+        >
+          <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+          {!refreshing && <polyline points="21 3 21 9 15 9" />}
+        </svg>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+export function ContextMenuProvider({ children }: { children: ReactNode }) {
+  const [menu, setMenu] = useState<ContextMenuState | null>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const isTouchDevice = useRef(false);
+
+  useEffect(() => {
+    const onTouch = () => { isTouchDevice.current = true; };
+    window.addEventListener("touchstart", onTouch, { once: true, passive: true });
+    return () => window.removeEventListener("touchstart", onTouch);
+  }, []);
+
+  const hide = useCallback(() => setMenu(null), []);
+
+  const show = useCallback((e: React.MouseEvent, items: ContextMenuItem[]) => {
+    if (isTouchDevice.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+
+    const visible = items.filter((i) => !i.hidden);
+    if (visible.length === 0) return;
+
+    const menuWidth = 220;
+    const menuHeight = visible.length * 36 + 8;
+    let x = e.clientX;
+    let y = e.clientY;
+    if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 8;
+    if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 8;
+    if (x < 4) x = 4;
+    if (y < 4) y = 4;
+
+    setMenu({ x, y, items: visible });
+  }, []);
+
+  useEffect(() => {
+    if (!menu) return;
+    const onClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) hide();
+    };
+    document.addEventListener("mousedown", onClick, true);
+    return () => document.removeEventListener("mousedown", onClick, true);
+  }, [menu, hide]);
+
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") hide(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [menu, hide]);
+
+  useEffect(() => {
+    if (!menu) return;
+    const onScroll = () => hide();
+    window.addEventListener("scroll", onScroll, true);
+    return () => window.removeEventListener("scroll", onScroll, true);
+  }, [menu, hide]);
+
+  const normal = menu ? menu.items.filter((i) => !i.destructive) : [];
+  const destructive = menu ? menu.items.filter((i) => i.destructive) : [];
+
+  return (
+    <ContextMenuCtx.Provider value={{ show, hide }}>
+      {children}
+      {menu && (
+        <div
+          ref={menuRef}
+          className="fixed z-[100] bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[200px] max-w-[280px]"
+          style={{ left: menu.x, top: menu.y }}
+        >
+          {normal.map((item, idx) => (
+            <div key={idx}>
+              <button
+                onClick={() => { item.onClick(); hide(); }}
+                className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition group/item"
+              >
+                {item.icon && <span className="w-4 h-4 shrink-0 flex items-center justify-center text-gray-400 group-hover/item:text-gray-600">{item.icon}</span>}
+                <span className="flex-1">{item.label}</span>
+                {item.shortcut && <span className="text-[11px] text-gray-300 ml-3 font-mono">{item.shortcut}</span>}
+              </button>
+              {item.dividerAfter && <div className="border-t border-gray-100 my-1" />}
+            </div>
+          ))}
+          {destructive.length > 0 && normal.length > 0 && (
+            <div className="border-t border-gray-100 my-1" />
+          )}
+          {destructive.map((item, idx) => (
+            <button
+              key={`d-${idx}`}
+              onClick={() => { item.onClick(); hide(); }}
+              className="flex items-center gap-2.5 w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition group/item"
+            >
+              {item.icon && <span className="w-4 h-4 shrink-0 flex items-center justify-center">{item.icon}</span>}
+              <span className="flex-1">{item.label}</span>
+              {item.shortcut && <span className="text-[11px] text-red-300 ml-3 font-mono">{item.shortcut}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </ContextMenuCtx.Provider>
+  );
+}
+
+// ── BottomSheet: Apple-style slide-up sheet for mobile detail views ──
+export function BottomSheet({
+  open,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const dragStartY = useRef(0);
+  const dragCurrentY = useRef(0);
+  const isDragging = useRef(false);
+  const sheetHeight = useRef(0);
+  const [translateY, setTranslateY] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  // "half" = ~50vh, "full" = ~5vh from top
+  const [mode, setMode] = useState<"half" | "full">("half");
+  const [visible, setVisible] = useState(false);
+
+  // Animate in on open
+  useEffect(() => {
+    if (open) {
+      setMode("half");
+      setTranslateY(0);
+      // Small delay so the initial render happens off-screen, then animate in
+      requestAnimationFrame(() => setVisible(true));
+    } else {
+      setVisible(false);
+    }
+  }, [open]);
+
+  // Escape key
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  // Lock body scroll when open
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+      return () => { document.body.style.overflow = ""; };
+    }
+  }, [open]);
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    // Only initiate drag from the handle area (first 40px) or if scrolled to top
+    const target = e.target as HTMLElement;
+    const handleArea = target.closest("[data-bottomsheet-handle]");
+    const scrollContainer = sheetRef.current?.querySelector("[data-bottomsheet-scroll]") as HTMLElement | null;
+    const isScrolledToTop = !scrollContainer || scrollContainer.scrollTop <= 0;
+
+    if (!handleArea && !isScrolledToTop) return;
+
+    isDragging.current = true;
+    dragStartY.current = e.touches[0].clientY;
+    dragCurrentY.current = 0;
+    sheetHeight.current = sheetRef.current?.offsetHeight || 0;
+    setDragging(true);
+  }, []);
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging.current) return;
+    const dy = e.touches[0].clientY - dragStartY.current;
+    dragCurrentY.current = dy;
+
+    // Allow downward drag freely; upward drag limited
+    if (dy > 0) {
+      setTranslateY(dy);
+    } else {
+      // Dragging up: allow expanding from half to full with resistance
+      if (mode === "half") {
+        setTranslateY(dy * 0.4); // resistance
+      } else {
+        setTranslateY(0); // already full, don't go further
+      }
+    }
+  }, [mode]);
+
+  const onTouchEnd = useCallback(() => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    setDragging(false);
+    const dy = dragCurrentY.current;
+
+    // Dismiss threshold: 100px down
+    if (dy > 100) {
+      onClose();
+      setTranslateY(0);
+      return;
+    }
+
+    // Expand to full: drag up > 60px from half mode
+    if (dy < -60 && mode === "half") {
+      setMode("full");
+      setTranslateY(0);
+      return;
+    }
+
+    // Collapse to half: drag down > 60px from full mode
+    if (dy > 60 && mode === "full") {
+      setMode("half");
+      setTranslateY(0);
+      return;
+    }
+
+    // Snap back
+    setTranslateY(0);
+  }, [mode, onClose]);
+
+  if (!open) return null;
+
+  const sheetTop = mode === "half" ? "45vh" : "5vh";
+
+  return (
+    <div className="fixed inset-0 z-50 sm:hidden">
+      {/* Backdrop */}
+      <div
+        className={`absolute inset-0 bg-black/40 transition-opacity duration-300 ${visible ? "opacity-100" : "opacity-0"}`}
+        onClick={onClose}
+      />
+      {/* Sheet */}
+      <div
+        ref={sheetRef}
+        className={`absolute left-0 right-0 bottom-0 bg-white rounded-t-2xl shadow-xl flex flex-col ${
+          dragging ? "" : "transition-all duration-300 ease-out"
+        }`}
+        style={{
+          top: sheetTop,
+          transform: visible
+            ? `translateY(${translateY}px)`
+            : "translateY(100%)",
+        }}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        {/* Drag handle */}
+        <div data-bottomsheet-handle="" className="flex justify-center pt-3 pb-2 cursor-grab">
+          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+        </div>
+        {/* Content */}
+        <div data-bottomsheet-scroll="" className="flex-1 overflow-y-auto px-5 pb-8">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SwipeableRow: iOS Mail-style swipe-to-action on mobile ──
+export interface SwipeAction {
+  label: string;
+  icon?: ReactNode;
+  color: string; // Tailwind bg class e.g. "bg-emerald-500"
+  textColor?: string; // defaults to "text-white"
+  onAction: () => void;
+}
+
+export function SwipeableRow({
+  children,
+  leftAction,
+  rightAction,
+  className = "",
+  threshold = 60,
+  executeThreshold = 150,
+}: {
+  children: ReactNode;
+  leftAction?: SwipeAction;   // revealed when swiping RIGHT
+  rightAction?: SwipeAction;  // revealed when swiping LEFT
+  className?: string;
+  threshold?: number;
+  executeThreshold?: number;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const currentX = useRef(0);
+  const isDragging = useRef(false);
+  const isHorizontal = useRef<boolean | null>(null);
+  const [offset, setOffset] = useState(0);
+  const [transitioning, setTransitioning] = useState(false);
+  const [executed, setExecuted] = useState(false);
+
+  const reset = useCallback(() => {
+    setTransitioning(true);
+    setOffset(0);
+    setExecuted(false);
+    setTimeout(() => setTransitioning(false), 300);
+  }, []);
+
+  const onTouchStart = useCallback((e: React.TouchEvent) => {
+    // Don't interfere with inputs, buttons, etc.
+    const tag = (e.target as HTMLElement).tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON") return;
+    setTransitioning(false);
+    setExecuted(false);
+    startX.current = e.touches[0].clientX;
+    startY.current = e.touches[0].clientY;
+    currentX.current = 0;
+    isDragging.current = true;
+    isHorizontal.current = null;
+  }, []);
+
+  const onTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!isDragging.current) return;
+    const dx = e.touches[0].clientX - startX.current;
+    const dy = e.touches[0].clientY - startY.current;
+
+    // Determine direction on first significant move
+    if (isHorizontal.current === null) {
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+        isHorizontal.current = Math.abs(dx) > Math.abs(dy);
+        if (!isHorizontal.current) {
+          isDragging.current = false;
+          return;
+        }
+      } else {
+        return;
+      }
+    }
+
+    // Limit swipe direction based on available actions
+    let clampedDx = dx;
+    if (!leftAction && clampedDx > 0) clampedDx = 0;
+    if (!rightAction && clampedDx < 0) clampedDx = 0;
+
+    // Apply resistance past executeThreshold
+    const max = executeThreshold + 40;
+    if (Math.abs(clampedDx) > max) {
+      clampedDx = clampedDx > 0 ? max : -max;
+    }
+
+    currentX.current = clampedDx;
+    setOffset(clampedDx);
+  }, [leftAction, rightAction, executeThreshold]);
+
+  const onTouchEnd = useCallback(() => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    const dx = currentX.current;
+    const absDx = Math.abs(dx);
+
+    // Auto-execute if past executeThreshold
+    if (absDx >= executeThreshold) {
+      setExecuted(true);
+      setTransitioning(true);
+      // Slide fully off before executing
+      setOffset(dx > 0 ? 300 : -300);
+      const action = dx > 0 ? leftAction : rightAction;
+      setTimeout(() => {
+        action?.onAction();
+        // Reset after action
+        setTimeout(() => {
+          setOffset(0);
+          setExecuted(false);
+          setTimeout(() => setTransitioning(false), 50);
+        }, 150);
+      }, 200);
+      return;
+    }
+
+    // Snap open if past threshold
+    if (absDx >= threshold) {
+      setTransitioning(true);
+      const snapTo = dx > 0 ? threshold + 20 : -(threshold + 20);
+      setOffset(snapTo);
+      setTimeout(() => setTransitioning(false), 300);
+      return;
+    }
+
+    // Spring back
+    reset();
+  }, [threshold, executeThreshold, leftAction, rightAction, reset]);
+
+  // Close on outside tap
+  useEffect(() => {
+    if (offset === 0) return;
+    const handler = (e: TouchEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        reset();
+      }
+    };
+    document.addEventListener("touchstart", handler, { passive: true });
+    return () => document.removeEventListener("touchstart", handler);
+  }, [offset, reset]);
+
+  const actionWidth = Math.max(Math.abs(offset), threshold);
+  const showRight = offset < -10;
+  const showLeft = offset > 10;
+
+  return (
+    <div ref={containerRef} className={`swipeable-row relative overflow-hidden ${className}`}>
+      {/* Right action (revealed on swipe left) */}
+      {rightAction && (
+        <div
+          className={`absolute inset-y-0 right-0 flex items-center justify-center ${rightAction.color} ${rightAction.textColor || "text-white"}`}
+          style={{
+            width: `${actionWidth}px`,
+            opacity: showRight ? 1 : 0,
+            transition: transitioning ? "opacity 0.15s" : "none",
+          }}
+        >
+          <div className="flex flex-col items-center gap-0.5 px-3">
+            {rightAction.icon}
+            <span className="text-[11px] font-medium whitespace-nowrap">{rightAction.label}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Left action (revealed on swipe right) */}
+      {leftAction && (
+        <div
+          className={`absolute inset-y-0 left-0 flex items-center justify-center ${leftAction.color} ${leftAction.textColor || "text-white"}`}
+          style={{
+            width: `${actionWidth}px`,
+            opacity: showLeft ? 1 : 0,
+            transition: transitioning ? "opacity 0.15s" : "none",
+          }}
+        >
+          <div className="flex flex-col items-center gap-0.5 px-3">
+            {leftAction.icon}
+            <span className="text-[11px] font-medium whitespace-nowrap">{leftAction.label}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Main content */}
+      <div
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+        className="relative bg-white"
+        style={{
+          transform: `translateX(${offset}px)`,
+          transition: transitioning ? "transform 0.3s cubic-bezier(0.25, 1, 0.5, 1)" : "none",
+          willChange: isDragging.current ? "transform" : "auto",
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }

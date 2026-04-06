@@ -210,7 +210,7 @@ export default function CamisetasPage() {
     else doc.text("Sujeto a disponibilidad", 14, fy);
 
     doc.save(`Camisetas-${cl.nombre.replace(/\s+/g, "-")}.pdf`);
-    showToast("PDF descargado");
+    showToast("PDF listo — revisa tu carpeta de descargas");
   }
 
   // ── Nuevo Pedido handlers ──

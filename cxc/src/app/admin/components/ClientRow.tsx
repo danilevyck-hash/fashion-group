@@ -24,9 +24,10 @@ interface Props {
   onRegisterContact?: (data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) => Promise<void>;
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
+  onRowContextMenu?: (e: React.MouseEvent) => void;
 }
 
-export default function ClientRow({ client, isExpanded, onToggle, userRole, contactLog, selectionMode, isSelected, onQuickWA, onQuickEmail, onRegisterContact, isFavorite, onToggleFavorite }: Props) {
+export default function ClientRow({ client, isExpanded, onToggle, userRole, contactLog, selectionMode, isSelected, onQuickWA, onQuickEmail, onRegisterContact, isFavorite, onToggleFavorite, onRowContextMenu }: Props) {
   const lastContact = contactLog?.[client.nombre_normalized];
   const daysSinceContact = lastContact ? Math.floor((Date.now() - new Date(lastContact.date).getTime()) / 86400000) : null;
   const risk = riskInfo(client.current, client.watch, client.overdue);
@@ -80,6 +81,7 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
         <div
           className={`hidden sm:grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-3 text-xs sm:text-sm cursor-pointer transition-colors border-b border-gray-200 ${isExpanded ? "bg-gray-50" : "hover:bg-gray-50/70"}`}
           onClick={onToggle}
+          onContextMenu={onRowContextMenu}
         >
           <>
             {selectionMode && (

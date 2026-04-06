@@ -39,7 +39,7 @@ export function useEmpleadoActions({ empleadoId, empleado, movs, onSuccess, onDe
       });
       if (res.ok) { showToast("Empleado actualizado"); setShowEditModal(false); onSuccess(); }
       else { const err = await res.json(); showToast(err.error || "Error"); }
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSavingEdit(false);
   }
 
@@ -75,7 +75,7 @@ export function useEmpleadoActions({ empleadoId, empleado, movs, onSuccess, onDe
       });
       if (res.ok) { showToast(`Pago quincenal de $${fmt(empleado.deduccion_quincenal)} registrado`); onSuccess(); }
       else { const err = await res.json(); showToast(err.error || "Error"); }
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
   }
 
   // ── Danger zone ──
@@ -108,7 +108,7 @@ export function useEmpleadoActions({ empleadoId, empleado, movs, onSuccess, onDe
         showToast(err.error || "Error al borrar historial");
       }
     } catch {
-      showToast("Error de conexión");
+      showToast("Sin conexión. Verifica tu internet e intenta de nuevo.");
     }
     setClearProgress("");
     setClearInput(""); setShowClearConfirm(false);

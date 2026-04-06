@@ -442,14 +442,48 @@ export default function VentasDashboard() {
         )}
 
         {/* Empty state — no data for selected year */}
-        {!loading && !hasData && (
-          <EmptyState
-            title={`Sin datos para ${año}`}
-            subtitle="Carga un CSV de ventas para ver el dashboard"
-            actionLabel="Cargar datos"
-            onAction={() => router.push("/upload?tab=ventas&from=ventas")}
-          />
-        )}
+        {!loading && !hasData && (() => {
+          const otherYears = años.filter(y => y !== año);
+          const lastYear = otherYears.length > 0 ? Math.max(...otherYears) : null;
+          return (
+            <div className="flex flex-col items-center py-20 text-center">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-gray-200 mb-4">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M12 8v4m0 4h.01" />
+              </svg>
+              <p className="text-sm font-medium text-gray-500 mb-1">Sin datos para {año}</p>
+              {lastYear ? (
+                <>
+                  <p className="text-xs text-gray-400 mb-4">El ultimo dato disponible es de {lastYear}</p>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setAño(lastYear)}
+                      className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all min-h-[44px]"
+                    >
+                      Ver {lastYear}
+                    </button>
+                    <button
+                      onClick={() => router.push("/upload?tab=ventas&from=ventas")}
+                      className="text-sm border border-gray-200 text-gray-600 px-5 py-2.5 rounded-md font-medium hover:bg-gray-50 transition-all min-h-[44px]"
+                    >
+                      Cargar datos de {año}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-400 mb-4">Carga un CSV de ventas para ver el dashboard</p>
+                  <button
+                    onClick={() => router.push("/upload?tab=ventas&from=ventas")}
+                    className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all min-h-[44px]"
+                  >
+                    Cargar datos
+                  </button>
+                </>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Mobile hint removed — user can freely toggle Mensual/Quarter on any device */}
 

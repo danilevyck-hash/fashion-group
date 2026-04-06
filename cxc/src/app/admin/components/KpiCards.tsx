@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
+import { AnimatedNumber } from "@/components/ui";
 
 interface Props {
   roleClients: ConsolidatedClient[];
@@ -40,7 +41,7 @@ export default function KpiCards({ roleClients, onFilterOverdue, onSortByFollowU
               <div className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Total CXC</div>
               <button onClick={() => setKpiTooltip(kpiTooltip === "total" ? null : "total")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
             </div>
-            <div className="text-xl font-semibold mt-0.5 tabular-nums">${fmt(totalCxc)}</div>
+            <div className="text-xl font-semibold mt-0.5 tabular-nums">$<AnimatedNumber value={totalCxc} formatter={(n: number) => fmt(n)} /></div>
             <div className="text-[11px] text-gray-400 mt-0.5">{roleClients.length} clientes activos</div>
             {kpiTooltip === "total" && <p className="text-xs text-gray-500 mt-1">Total de deuda pendiente de todos los clientes</p>}
           </div>
@@ -58,7 +59,7 @@ export default function KpiCards({ roleClients, onFilterOverdue, onSortByFollowU
               <div className="text-[11px] text-emerald-700 uppercase tracking-wider font-medium">Corriente 0-90d</div>
               <button onClick={() => setKpiTooltip(kpiTooltip === "current" ? null : "current")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
             </div>
-            <div className="text-xl font-semibold mt-0.5 tabular-nums text-emerald-800">${fmt(totalCurrent)}</div>
+            <div className="text-xl font-semibold mt-0.5 tabular-nums text-emerald-800">$<AnimatedNumber value={totalCurrent} formatter={(n: number) => fmt(n)} /></div>
             <div className="text-[11px] text-emerald-600 mt-0.5">{pctCurrent.toFixed(0)}% del total</div>
             {kpiTooltip === "current" && <p className="text-xs text-emerald-600 mt-1">Deuda con menos de 90 días. En buen estado.</p>}
           </div>
@@ -76,7 +77,7 @@ export default function KpiCards({ roleClients, onFilterOverdue, onSortByFollowU
               <div className="text-[11px] text-amber-700 uppercase tracking-wider font-medium">Vigilancia 91-120d</div>
               <button onClick={() => setKpiTooltip(kpiTooltip === "watch" ? null : "watch")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
             </div>
-            <div className="text-xl font-semibold mt-0.5 tabular-nums text-amber-800">${fmt(totalWatch)}</div>
+            <div className="text-xl font-semibold mt-0.5 tabular-nums text-amber-800">$<AnimatedNumber value={totalWatch} formatter={(n: number) => fmt(n)} /></div>
             <div className="text-[11px] text-amber-600 mt-0.5">{watchClients} clientes</div>
             {kpiTooltip === "watch" && <p className="text-xs text-amber-600 mt-1">Deuda de 91 a 120 días. Requiere seguimiento.</p>}
           </div>
@@ -97,7 +98,7 @@ export default function KpiCards({ roleClients, onFilterOverdue, onSortByFollowU
               <div className="text-[11px] text-red-700 uppercase tracking-wider font-medium">Vencido +121d</div>
               <button onClick={(e) => { e.stopPropagation(); setKpiTooltip(kpiTooltip === "overdue" ? null : "overdue"); }} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
             </div>
-            <div className="text-xl font-semibold mt-0.5 tabular-nums text-red-800">${fmt(totalOverdue)}</div>
+            <div className="text-xl font-semibold mt-0.5 tabular-nums text-red-800">$<AnimatedNumber value={totalOverdue} formatter={(n: number) => fmt(n)} /></div>
             <div className="flex items-center justify-between">
               <span className="text-[11px] text-red-600 mt-0.5">{criticalClients} clientes</span>
               <span className="text-[10px] text-red-400 group-hover:text-red-600 transition">Ver todos &rarr;</span>

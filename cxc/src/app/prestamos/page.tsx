@@ -6,7 +6,7 @@ import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { EMPRESAS } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast, SkeletonTable, EmptyState, ConfirmModal } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState, ConfirmModal, AnimatedNumber, BottomSheet } from "@/components/ui";
 
 // ── Types ──
 interface Movimiento {
@@ -105,6 +105,16 @@ export default function PrestamosPage() {
   const [savingMov, setSavingMov] = useState(false);
   const [movStep, setMovStep] = useState("form");
 
+  // Bottom sheet (mobile detail preview)
+  const [sheetEmp, setSheetEmp] = useState<Empleado | null>(null);
+  const [savingPagoQ, setSavingPagoQ] = useState(false);
+
+  // Batch approval state
+  const [selectedPending, setSelectedPending] = useState<Set<string>>(new Set());
+  const [confirmBatchApprove, setConfirmBatchApprove] = useState(false);
+  const [confirmBatchReject, setConfirmBatchReject] = useState(false);
+  const [batchProcessing, setBatchProcessing] = useState(false);
+
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   const loadEmpleados = useCallback(async () => {
@@ -112,7 +122,7 @@ export default function PrestamosPage() {
     try {
       const res = await fetch(`/api/prestamos/empleados?archivados=${showArchived ? "1" : "0"}`);
       if (res.ok) setEmpleados(await res.json());
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setLoading(false);
   }, [showArchived]);
 
@@ -169,7 +179,7 @@ export default function PrestamosPage() {
       } else {
         const err = await res.json(); showToast(err.error || "Error al guardar");
       }
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSaving(false);
   }
   function requestDeleteEmp(emp: Empleado) {
@@ -211,11 +221,90 @@ export default function PrestamosPage() {
       } else {
         const err = await res.json(); showToast(err.error || "Error al guardar");
       }
-    } catch { showToast("Error de conexión"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSavingMov(false);
   }
 
   const isAdmin = role === "admin";
+
+  // Mobile detection for bottom sheet vs navigation
+  function isMobileViewport() {
+    return typeof window !== "undefined" && window.innerWidth < 640;
+  }
+
+  function handleRowClick(emp: Empleado) {
+    if (isMobileViewport()) {
+      setSheetEmp(emp);
+    } else {
+      router.push(`/prestamos/${emp.id}`);
+    }
+  }
+
+  // Pago quincenal from bottom sheet
+  async function handlePagoQuincenal(emp: Empleado) {
+    if (!emp.deduccion_quincenal || emp.deduccion_quincenal <= 0) return;
+    setSavingPagoQ(true);
+    try {
+      const res = await fetch("/api/prestamos/movimientos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          empleado_id: emp.id,
+          fecha: new Date().toISOString().slice(0, 10),
+          concepto: "Pago",
+          monto: emp.deduccion_quincenal,
+          notas: "Deducción quincenal",
+        }),
+      });
+      if (res.ok) {
+        showToast("Pago quincenal registrado");
+        setSheetEmp(null);
+        loadEmpleados();
+      } else {
+        const err = await res.json();
+        showToast(err.error || "Error al registrar pago");
+      }
+    } catch { showToast("Sin conexión. Intenta de nuevo."); }
+    setSavingPagoQ(false);
+  }
+
+  // Computed data for bottom sheet employee
+  const sheetCalc = sheetEmp ? calcEmpleado(sheetEmp) : null;
+  const sheetMovs = sheetEmp
+    ? (sheetEmp.prestamos_movimientos || [])
+        .filter(m => m.estado === "aprobado")
+        .sort((a, b) => b.fecha.localeCompare(a.fecha) || b.created_at.localeCompare(a.created_at))
+        .slice(0, 5)
+    : [];
+
+  function togglePendingSelect(id: string) {
+    setSelectedPending(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function doBatchAction(estado: "aprobado" | "rechazado") {
+    const ids = Array.from(selectedPending);
+    if (ids.length === 0) return;
+    setBatchProcessing(true);
+    setConfirmBatchApprove(false);
+    setConfirmBatchReject(false);
+    let ok = 0;
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/prestamos/movimientos/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado }) });
+        if (res.ok) ok++;
+      } catch { /* continue */ }
+    }
+    const label = estado === "aprobado" ? "aprobado" : "rechazado";
+    showToast(`${ok} movimiento${ok !== 1 ? "s" : ""} ${label}${ok !== 1 ? "s" : ""}`);
+    setSelectedPending(new Set());
+    setBatchProcessing(false);
+    loadEmpleados();
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -229,7 +318,7 @@ export default function PrestamosPage() {
               <div className="text-xs text-gray-400 uppercase tracking-wide">Total Prestado</div>
               <button onClick={() => setKpiTooltip(kpiTooltip === "prestado" ? null : "prestado")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
             </div>
-            <div className="text-lg font-semibold mt-0.5 tabular-nums">${fmt(totalPrestado)}</div>
+            <div className="text-lg font-semibold mt-0.5 tabular-nums">$<AnimatedNumber value={totalPrestado} formatter={(n: number) => fmt(n)} /></div>
             {kpiTooltip === "prestado" && <p className="text-xs text-gray-500 mt-1">Suma total de préstamos otorgados a colaboradores</p>}
           </div>
           <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
@@ -237,7 +326,7 @@ export default function PrestamosPage() {
               <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo Pendiente</div>
               <button onClick={() => setKpiTooltip(kpiTooltip === "saldo" ? null : "saldo")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
             </div>
-            <div className="text-lg font-semibold mt-0.5 tabular-nums text-red-600">${fmt(totalSaldo)}</div>
+            <div className="text-lg font-semibold mt-0.5 tabular-nums text-red-600">$<AnimatedNumber value={totalSaldo} formatter={(n: number) => fmt(n)} /></div>
             {kpiTooltip === "saldo" && <p className="text-xs text-gray-500 mt-1">Lo que falta por cobrar de todos los préstamos</p>}
           </div>
           <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
@@ -279,19 +368,49 @@ export default function PrestamosPage() {
         {filterPendientes && isAdmin && (() => {
           const pendingMovs = allCalcs.flatMap(c => (c.emp.prestamos_movimientos || []).filter(m => m.estado === "pendiente_aprobacion").map(m => ({ ...m, empNombre: c.emp.nombre })));
           if (pendingMovs.length === 0) return null;
+          const allPendingIds = pendingMovs.map(m => m.id);
+          const allPendingSelected = allPendingIds.length > 0 && allPendingIds.every(id => selectedPending.has(id));
           return (
             <div className="mb-6 border border-amber-200 rounded-lg overflow-hidden">
-              <div className="text-xs uppercase tracking-wide text-amber-700 bg-amber-50 px-4 py-2 font-medium">Movimientos pendientes de aprobacion</div>
+              <div className="flex items-center justify-between bg-amber-50 px-4 py-2">
+                <div className="flex items-center gap-3">
+                  <input type="checkbox" checked={allPendingSelected} onChange={() => { if (allPendingSelected) setSelectedPending(new Set()); else setSelectedPending(new Set(allPendingIds)); }} className="accent-black" title="Seleccionar todos" />
+                  <span className="text-xs uppercase tracking-wide text-amber-700 font-medium">
+                    Movimientos pendientes de aprobacion
+                    {selectedPending.size > 0 && <span className="ml-2 normal-case">({selectedPending.size} seleccionado{selectedPending.size !== 1 ? "s" : ""})</span>}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {selectedPending.size > 0 ? (
+                    <>
+                      <button onClick={() => setConfirmBatchApprove(true)} disabled={batchProcessing} className="text-xs bg-green-600 text-white px-4 py-1.5 rounded-md hover:bg-green-700 transition disabled:opacity-50">
+                        {batchProcessing ? "Procesando..." : `Aprobar ${selectedPending.size}`}
+                      </button>
+                      <button onClick={() => setConfirmBatchReject(true)} disabled={batchProcessing} className="text-xs text-red-500 hover:text-red-700 transition px-3 py-1.5 disabled:opacity-50">
+                        Rechazar {selectedPending.size}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => { setSelectedPending(new Set(allPendingIds)); setConfirmBatchApprove(true); }} className="text-xs bg-green-600 text-white px-4 py-1.5 rounded-md hover:bg-green-700 transition">Aprobar todos</button>
+                      <button onClick={() => { setSelectedPending(new Set(allPendingIds)); setConfirmBatchReject(true); }} className="text-xs text-red-500 hover:text-red-700 transition px-3 py-1.5">Rechazar todos</button>
+                    </>
+                  )}
+                </div>
+              </div>
               {pendingMovs.map(m => (
                 <div key={m.id} className="flex items-center justify-between px-4 py-2.5 border-t border-amber-100 text-sm">
-                  <div>
-                    <span className="font-medium">{m.empNombre}</span>
-                    <span className="text-gray-400 mx-2">·</span>
-                    <span className="text-gray-500">{m.concepto}</span>
-                    <span className="text-gray-400 mx-2">·</span>
-                    <span className="tabular-nums font-medium">${fmt(m.monto)}</span>
-                    <span className="text-gray-400 mx-2">·</span>
-                    <span className="text-xs text-gray-400">{m.fecha}</span>
+                  <div className="flex items-center gap-3">
+                    <input type="checkbox" checked={selectedPending.has(m.id)} onChange={() => togglePendingSelect(m.id)} className="accent-black" />
+                    <div>
+                      <span className="font-medium">{m.empNombre}</span>
+                      <span className="text-gray-400 mx-2">·</span>
+                      <span className="text-gray-500">{m.concepto}</span>
+                      <span className="text-gray-400 mx-2">·</span>
+                      <span className="tabular-nums font-medium">${fmt(m.monto)}</span>
+                      <span className="text-gray-400 mx-2">·</span>
+                      <span className="text-xs text-gray-400">{m.fecha}</span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <button onClick={async () => { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "aprobado" }) }); if (res.ok) { showToast("Movimiento aprobado"); loadEmpleados(); } else showToast("Error al aprobar"); }} className="text-xs bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">Aprobar</button>
@@ -377,7 +496,7 @@ export default function PrestamosPage() {
               </thead>
               <tbody>
                 {filtered.map(({ emp, prestado, pagado, saldo, pct, pendientes }, i) => (
-                  <tr key={emp.id} onClick={() => router.push(`/prestamos/${emp.id}`)} className={`${i % 2 === 1 ? "bg-gray-50/50" : ""} ${!emp.activo ? "opacity-50" : ""} cursor-pointer hover:bg-gray-50 transition-colors`}>
+                  <tr key={emp.id} onClick={() => handleRowClick(emp)} className={`${i % 2 === 1 ? "bg-gray-50/50" : ""} ${!emp.activo ? "opacity-50" : ""} cursor-pointer hover:bg-gray-50 transition-colors`}>
                     <td className="py-3 px-4">
                       <span className="font-medium">{emp.nombre}</span>
                       {!emp.activo && <span className="ml-2 text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span>}
@@ -545,6 +664,106 @@ export default function PrestamosPage() {
         destructive
       />
 
+      {/* ── Bottom Sheet: Mobile Employee Preview ── */}
+      <BottomSheet open={!!sheetEmp} onClose={() => setSheetEmp(null)}>
+        {sheetEmp && sheetCalc && (
+          <div>
+            {/* Employee name */}
+            <h2 className="text-lg font-semibold mb-1">{sheetEmp.nombre}</h2>
+            <p className="text-sm text-gray-400 mb-4">{sheetEmp.empresa || "Sin empresa"}</p>
+
+            {/* Summary cards */}
+            <div className="grid grid-cols-3 gap-2 mb-5">
+              <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
+                <div className="text-[10px] text-gray-400 uppercase tracking-wide">Prestado</div>
+                <div className="text-sm font-semibold tabular-nums mt-0.5">${fmt(sheetCalc.prestado)}</div>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
+                <div className="text-[10px] text-gray-400 uppercase tracking-wide">Pagado</div>
+                <div className="text-sm font-semibold tabular-nums mt-0.5 text-green-600">${fmt(sheetCalc.pagado)}</div>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
+                <div className="text-[10px] text-gray-400 uppercase tracking-wide">Saldo</div>
+                <div className="text-sm font-semibold tabular-nums mt-0.5 text-red-600">${fmt(sheetCalc.saldo)}</div>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-gray-400">Progreso</span>
+                <span className="text-xs font-medium tabular-nums">{sheetCalc.pct.toFixed(0)}%</span>
+              </div>
+              <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className={`h-full ${progressColor(sheetCalc.pct)} rounded-full`} style={{ width: `${Math.min(sheetCalc.pct, 100)}%` }} />
+              </div>
+            </div>
+
+            {/* Recent movements */}
+            {sheetMovs.length > 0 && (
+              <div className="mb-5">
+                <div className="text-xs text-gray-400 uppercase tracking-wide mb-2">Últimos movimientos</div>
+                <div className="space-y-0 border border-gray-200 rounded-lg overflow-hidden">
+                  {sheetMovs.map((m) => (
+                    <div key={m.id} className="flex items-center justify-between px-3 py-2.5 border-b border-gray-100 last:border-b-0">
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño"
+                            ? "text-red-600" : "text-green-600"
+                        }`}>{m.concepto}</span>
+                        <span className="text-xs text-gray-400 ml-2">{m.fecha}</span>
+                      </div>
+                      <span className={`text-sm font-medium tabular-nums ${
+                        m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño"
+                          ? "text-red-600" : "text-green-600"
+                      }`}>
+                        {m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño" ? "+" : "−"}${fmt(m.monto)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="space-y-2">
+              {sheetEmp.deduccion_quincenal > 0 && sheetCalc.saldo > 0 && (
+                <button
+                  onClick={() => handlePagoQuincenal(sheetEmp)}
+                  disabled={savingPagoQ}
+                  className="w-full bg-black text-white py-3 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.98] transition-all disabled:opacity-50"
+                >
+                  {savingPagoQ ? "Registrando..." : `Pago Quincenal — $${fmt(sheetEmp.deduccion_quincenal)}`}
+                </button>
+              )}
+              <button
+                onClick={() => { setSheetEmp(null); router.push(`/prestamos/${sheetEmp.id}`); }}
+                className="w-full border border-gray-200 text-gray-600 py-3 rounded-md text-sm font-medium hover:border-gray-400 active:bg-gray-50 transition-all"
+              >
+                Ver completo
+              </button>
+            </div>
+          </div>
+        )}
+      </BottomSheet>
+
+      <ConfirmModal
+        open={confirmBatchApprove}
+        onClose={() => setConfirmBatchApprove(false)}
+        onConfirm={() => doBatchAction("aprobado")}
+        title="Aprobar movimientos"
+        message={`¿Aprobar ${selectedPending.size} movimiento${selectedPending.size !== 1 ? "s" : ""}?`}
+        confirmLabel="Aprobar"
+      />
+      <ConfirmModal
+        open={confirmBatchReject}
+        onClose={() => setConfirmBatchReject(false)}
+        onConfirm={() => doBatchAction("rechazado")}
+        title="Rechazar movimientos"
+        message={`¿Rechazar ${selectedPending.size} movimiento${selectedPending.size !== 1 ? "s" : ""}? Esta acción no se puede deshacer.`}
+        confirmLabel="Rechazar"
+        destructive
+      />
       <Toast message={toast} />
     </div>
   );

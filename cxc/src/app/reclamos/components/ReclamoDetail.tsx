@@ -1,10 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useMemo } from "react";
 import { fmt, fmtDate } from "@/lib/format";
 import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox, ScrollableTable } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
 import { ESTADOS, EMPRESAS, EC, TALLAS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, buildSingleReclamoPdfHtml, openPdfWindow, loadCustomMotivos, saveCustomMotivo, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, estadoLabel } from "./constants";
+import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
+import SuggestionCard from "@/components/SuggestionCard";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   "Borrador": ["Enviado"],
@@ -116,6 +118,19 @@ export default function ReclamoDetail({
   const sub = calcSub(items);
   const days = daysSince(current.fecha_reclamo);
 
+  // ── Smart suggestion: escalation ──
+  const reclamoSuggestions = useMemo<SmartSuggestion[]>(() => {
+    if (days <= 45 || current.estado !== "Enviado") return [];
+    return [{
+      id: `reclamo-escalate-${current.id}`,
+      message: `Este reclamo lleva ${days} días. ¿Cambiar a 'En revisión' para escalar?`,
+      actionLabel: "Escalar a En revisión",
+      onAction: () => onChangeEstado("En revisión"),
+    }];
+  }, [current.id, current.estado, days, onChangeEstado]);
+
+  const { suggestion: reclamoSuggestion, dismiss: dismissReclamo } = useSmartSuggestions(reclamoSuggestions);
+
   function getC(empresa: string) {
     return contactos.find((c) => c.empresa === empresa) || null;
   }
@@ -162,6 +177,8 @@ export default function ReclamoDetail({
         </div>
         <StatusBadge estado={current.estado} />
       </div>
+
+      {reclamoSuggestion && <SuggestionCard suggestion={reclamoSuggestion} onDismiss={dismissReclamo} />}
 
       {/* Action bar */}
       <div className="flex items-center gap-2 mb-6 flex-wrap">

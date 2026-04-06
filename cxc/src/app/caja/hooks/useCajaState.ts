@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { CajaPeriodo, CajaGasto, View, CATEGORIAS_DEFAULT } from "../components/types";
 import { GastoFormValues, GastoFormSetters } from "../components/GastoForm";
 
@@ -11,6 +12,7 @@ function normalizeStr(s: string): string {
 }
 
 export function useCajaState(urlId: string, initialView: View) {
+  const { pendingUndo: pendingUndoCaja, scheduleAction: scheduleUndoCaja, undoAction: undoActionCaja } = useUndoAction();
   const [view, _setView] = useState<View>(initialView);
 
   function setView(v: View, id?: string) {
@@ -229,35 +231,83 @@ export function useCajaState(urlId: string, initialView: View) {
     if (!current) return;
     setAddingGasto(true);
     setError(null);
+    const resolvedCategoria = normalizeStr(gCategoria === "Otro" ? gCategoriaOtro.trim() || "Otro" : gCategoria);
+    const resolvedEmpresa = gEmpresa === "Otro / General" ? gEmpresaOtro.trim() || "Otro / General" : gEmpresa;
+    const resolvedResponsable = normalizeStr(gResponsable);
+
+    // Capture request body BEFORE clearing form
+    const requestBody = {
+      periodo_id: current.id, fecha: gFecha, descripcion: gDescripcion,
+      proveedor: gProveedor, nro_factura: gNroFactura, responsable: resolvedResponsable,
+      categoria: resolvedCategoria, empresa: resolvedEmpresa,
+      subtotal: subtotalNum, itbms: itbmsNum, total: totalNum,
+    };
+
+    // Optimistic: add temporary gasto to table immediately
+    const tempId = "temp-" + Date.now();
+    const optimisticGasto: CajaGasto = {
+      id: tempId, periodo_id: current.id, fecha: gFecha,
+      descripcion: gDescripcion, proveedor: gProveedor, nro_factura: gNroFactura,
+      responsable: resolvedResponsable, categoria: resolvedCategoria, empresa: resolvedEmpresa,
+      subtotal: subtotalNum, itbms: itbmsNum, total: totalNum,
+    };
+    const snapshot = current;
+    setCurrent({
+      ...current,
+      caja_gastos: [...(current.caja_gastos || []), optimisticGasto],
+      total_gastado: current.total_gastado + totalNum,
+    });
+
+    // Clear form immediately (feels instant)
+    setGFecha(new Date().toISOString().split("T")[0]);
+    setGDescripcion(""); setGProveedor(""); setGNroFactura(""); setGSubtotal(""); setGItbmsPct("0");
+    setGCategoria("Transporte"); setGCategoriaOtro(""); setGResponsable(""); setGEmpresa(""); setGEmpresaOtro("");
+
     try {
-      const resolvedCategoria = normalizeStr(gCategoria === "Otro" ? gCategoriaOtro.trim() || "Otro" : gCategoria);
-      const resolvedEmpresa = gEmpresa === "Otro / General" ? gEmpresaOtro.trim() || "Otro / General" : gEmpresa;
-      const resolvedResponsable = normalizeStr(gResponsable);
       const res = await fetch("/api/caja/gastos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          periodo_id: current.id, fecha: gFecha, descripcion: gDescripcion,
-          proveedor: gProveedor, nro_factura: gNroFactura, responsable: resolvedResponsable,
-          categoria: resolvedCategoria, empresa: resolvedEmpresa,
-          subtotal: subtotalNum, itbms: itbmsNum, total: totalNum,
-        }),
+        body: JSON.stringify(requestBody),
       });
       if (!res.ok) throw new Error();
-      setGFecha(new Date().toISOString().split("T")[0]);
-      setGDescripcion(""); setGProveedor(""); setGNroFactura(""); setGSubtotal(""); setGItbmsPct("0");
-      setGCategoria("Transporte"); setGCategoriaOtro(""); setGResponsable(""); setGEmpresa(""); setGEmpresaOtro("");
+      // Reload to get the real server ID
       await loadDetail(current.id);
       loadPeriodos();
     } catch {
-      setError("Error al agregar gasto");
+      // Revert optimistic update
+      setCurrent(snapshot);
+      setError("Error al agregar gasto. Intenta de nuevo.");
     } finally {
       setAddingGasto(false);
     }
   }
 
   function requestDeleteGasto(gastoId: string) {
-    setConfirmDeleteGastoId(gastoId);
+    if (!current) return;
+    const gasto = (current.caja_gastos || []).find((g: CajaGasto) => g.id === gastoId);
+    const desc = gasto ? gasto.descripcion : "gasto";
+    const prevGastos = current.caja_gastos || [];
+    const periodoId = current.id;
+    setCurrent(prev => {
+      if (!prev) return prev;
+      const filtered = (prev.caja_gastos || []).filter((g: CajaGasto) => g.id !== gastoId);
+      return { ...prev, caja_gastos: filtered, total_gastado: filtered.reduce((s: number, g: CajaGasto) => s + (g.total || 0), 0) };
+    });
+    scheduleUndoCaja({
+      id: `delete-gasto-${gastoId}`,
+      message: `Gasto "${desc}" eliminado`,
+      execute: async () => {
+        await fetch(`/api/caja/gastos/${gastoId}`, { method: "DELETE" });
+        await loadDetail(periodoId);
+        loadPeriodos();
+      },
+      onRevert: () => {
+        setCurrent(prev => {
+          if (!prev) return prev;
+          return { ...prev, caja_gastos: prevGastos, total_gastado: prevGastos.reduce((s: number, g: CajaGasto) => s + (g.total || 0), 0) };
+        });
+      },
+    });
   }
 
   async function doDeleteGasto() {
@@ -324,5 +374,6 @@ export function useCajaState(urlId: string, initialView: View) {
     requestDeletePeriodo, doDeletePeriodo,
     aprobarReposicion,
     addGasto, requestDeleteGasto, doDeleteGasto, saveEditGasto, exportExcel,
+    pendingUndoCaja, undoActionCaja,
   };
 }

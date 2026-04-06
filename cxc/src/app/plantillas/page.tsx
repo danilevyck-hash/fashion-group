@@ -8,6 +8,8 @@ import ReportExport from "./components/ReportExport";
 import ActivityLog from "./components/ActivityLog";
 import SearchBar from "@/components/SearchBar";
 import { useBadges } from "@/lib/hooks/useBadges";
+import { cacheSet, cacheGet, CACHE_KEYS } from "@/lib/offlineCache";
+import { useOnline } from "@/lib/OnlineContext";
 
 const ALL_MODULES = [
   { key: "cxc", label: "Cuentas por Cobrar", subtitle: "Cartera de clientes", icon: "📊", href: "/admin", roles: ["admin", "secretaria", "director", "vendedor"] },
@@ -50,6 +52,8 @@ export default function PlantillasPage() {
   const [darkMode, setDarkMode] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
   const badges = useBadges();
+  const isOnline = useOnline();
+  const [statsCached, setStatsCached] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -110,15 +114,49 @@ export default function PlantillasPage() {
   const [stats, setStats] = useState<HomeStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
+  // Pending actions feed
+  interface PendingAction {
+    id: string; module: string; icon: string; description: string;
+    timeContext: string; href: string; urgency: number;
+  }
+  const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
+  const [pendingTotal, setPendingTotal] = useState(0);
+  const [pendingLoading, setPendingLoading] = useState(true);
+  const [showAllActions, setShowAllActions] = useState(false);
+
   const loadStats = useCallback(async () => {
     try {
       const res = await fetch("/api/home-stats");
-      if (res.ok) setStats(await res.json());
-    } catch { console.error('Failed to load home stats'); }
+      if (res.ok) {
+        const data = await res.json();
+        setStats(data);
+        setStatsCached(false);
+        cacheSet(CACHE_KEYS.HOME_STATS, data);
+      }
+    } catch {
+      // Offline or network error — try cache
+      const cached = cacheGet<HomeStats>(CACHE_KEYS.HOME_STATS);
+      if (cached) {
+        setStats(cached);
+        setStatsCached(true);
+      }
+    }
     setStatsLoading(false);
   }, []);
 
-  useEffect(() => { if (authChecked) { loadOrder(); loadStats(); } }, [authChecked, loadOrder, loadStats]);
+  const loadPendingActions = useCallback(async () => {
+    try {
+      const res = await fetch("/api/pending-actions");
+      if (res.ok) {
+        const data = await res.json();
+        setPendingActions(data.actions || []);
+        setPendingTotal(data.totalCount || 0);
+      }
+    } catch { console.error('Failed to load pending actions'); }
+    setPendingLoading(false);
+  }, []);
+
+  useEffect(() => { if (authChecked) { loadOrder(); loadStats(); loadPendingActions(); } }, [authChecked, loadOrder, loadStats, loadPendingActions]);
 
   if (!authChecked) return null;
 
@@ -133,6 +171,10 @@ export default function PlantillasPage() {
     if (stats.reclamosViejos > 0 && (role === 'admin' || role === 'secretaria')) alerts.push({ label: "Reclamos +45 días sin resolver", count: stats.reclamosViejos, href: "/reclamos?viejos=1", color: "red" });
     if (stats.cxcStale) alerts.push({ label: "Datos de cartera desactualizados", count: 0, href: "/upload", color: "yellow" });
   }
+
+  // Pending actions: show to admin, secretaria, director, contabilidad
+  const showPendingActions = alertRoles.includes(role);
+  const visibleActions = showAllActions ? pendingActions : pendingActions.slice(0, 5);
 
   // Determine visible modules
   const isAdmin = role === "admin";
@@ -204,7 +246,9 @@ export default function PlantillasPage() {
             {[1,2,3,4].map(i => <div key={i} className="h-20 rounded-lg bg-gray-50 border border-gray-200 animate-pulse" />)}
           </div>
         ) : stats ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 sm:grid-cols-4 gap-2 mb-6">
+          <div className="mb-6">
+          {statsCached && <p className="text-xs text-amber-600 mb-1">(datos cacheados)</p>}
+          <div className="grid grid-cols-2 md:grid-cols-3 sm:grid-cols-4 gap-2">
             {/* Ventas */}
             <div className={`rounded-lg p-3 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
               <p className="text-xs uppercase tracking-wider text-gray-500">Ventas del mes</p>
@@ -240,6 +284,7 @@ export default function PlantillasPage() {
                 {stats.chequesTotalPendiente > 0 ? `$${(stats.chequesTotalPendiente / 1000).toFixed(0)}K pendiente` : "—"}
               </p>
             </div>
+          </div>
           </div>
         ) : null
       )}
@@ -291,6 +336,62 @@ export default function PlantillasPage() {
           <span className="text-green-600">✓</span> Todo en orden — no hay alertas pendientes
         </p>
       ) : null)}
+
+      {/* Pending Actions Feed */}
+      {showPendingActions && (
+        pendingLoading ? (
+          <div className="mb-6">
+            <div className={`h-4 w-40 rounded mb-3 animate-pulse ${darkMode ? "bg-gray-800" : "bg-gray-100"}`} />
+            {[1,2,3].map(i => (
+              <div key={i} className={`h-12 rounded mb-1 animate-pulse ${darkMode ? "bg-gray-800" : "bg-gray-50"}`} />
+            ))}
+          </div>
+        ) : pendingActions.length > 0 ? (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                Acciones pendientes
+              </h2>
+              {pendingTotal > 5 && (
+                <button
+                  onClick={() => setShowAllActions(!showAllActions)}
+                  className={`text-xs transition ${darkMode ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-800"}`}
+                >
+                  {showAllActions ? "Ver menos" : `Ver todas (${pendingTotal})`}
+                </button>
+              )}
+            </div>
+            <div className={`rounded-lg border overflow-hidden ${darkMode ? "border-gray-800" : "border-gray-200"}`}>
+              {visibleActions.map((action, i) => (
+                <button
+                  key={action.id}
+                  onClick={() => router.push(action.href)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition ${
+                    i > 0 ? (darkMode ? "border-t border-gray-800" : "border-t border-gray-100") : ""
+                  } ${darkMode ? "hover:bg-gray-800/50" : "hover:bg-gray-50"}`}
+                >
+                  <span className="text-base shrink-0 w-6 text-center">{action.icon}</span>
+                  <span className={`flex-1 text-[13px] leading-snug truncate ${darkMode ? "text-gray-200" : "text-gray-800"}`}>
+                    {action.description}
+                  </span>
+                  <span className={`text-[11px] shrink-0 tabular-nums ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+                    {action.timeContext}
+                  </span>
+                  <svg className={`w-3.5 h-3.5 shrink-0 ${darkMode ? "text-gray-600" : "text-gray-300"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : !pendingLoading ? (
+          <div className="mb-6">
+            <p className={`text-sm ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+              <span className="text-green-500">✓</span> Todo en orden — no hay acciones pendientes
+            </p>
+          </div>
+        ) : null
+      )}
 
       {/* Edit toggle */}
       <div className="flex justify-end mb-2">

@@ -34,6 +34,10 @@ interface GuiaFormProps {
   onRemoveRow: (idx: number) => void;
   onSave: () => void;
   onCancel: () => void;
+  hasDraft?: boolean;
+  draftTimeAgo?: string;
+  onRestoreDraft?: () => void;
+  onDiscardDraft?: () => void;
 }
 
 export default function GuiaForm({
@@ -44,6 +48,7 @@ export default function GuiaForm({
   validationErrors, error, saving,
   onAddTransportista, onAddCliente, onAddDireccion, onAddEmpresa,
   onUpdateItem, onAddRow, onRemoveRow, onSave, onCancel,
+  hasDraft, draftTimeAgo, onRestoreDraft, onDiscardDraft,
 }: GuiaFormProps) {
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
 
@@ -168,7 +173,7 @@ export default function GuiaForm({
   function StatusBadge() {
     if (saveStatus === "saving") return <span className="text-sm text-gray-400">Guardando...</span>;
     if (saveStatus === "dirty") return <span className="text-sm text-orange-500">Sin guardar</span>;
-    if (saveStatus === "saved") return <span className="text-sm text-green-600 animate-save-flash">Guardado ✓ {lastSaved}</span>;
+    if (saveStatus === "saved") return <span className="text-sm text-green-600 animate-save-flash">Listo, guardado {lastSaved}</span>;
     return null;
   }
 
@@ -189,6 +194,16 @@ export default function GuiaForm({
           {editingId ? "Editar" : "Nueva"} Guía de Transporte
         </h1>
       </div>
+
+      {hasDraft && !editingId && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-6 flex items-center justify-between gap-4">
+          <p className="text-sm text-amber-800">Tienes un borrador guardado de {draftTimeAgo}. ¿Restaurar?</p>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <button onClick={onRestoreDraft} className="bg-black text-white text-sm px-4 py-1.5 rounded-md hover:bg-gray-800 transition">Restaurar</button>
+            <button onClick={onDiscardDraft} className="text-sm text-amber-700 hover:text-amber-900 transition">Descartar</button>
+          </div>
+        </div>
+      )}
 
       {/* Header fields */}
       <div className="mb-6">

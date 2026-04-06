@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { fmt } from "@/lib/format";
 import { RItem, Foto } from "./types";
-import { ConfirmDeleteModal, FotoLightbox } from "@/components/ui";
+import { AccordionContent, ConfirmDeleteModal, FotoLightbox } from "@/components/ui";
 import { EMPRESAS, EMPRESAS_MAP, TALLAS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "./constants";
 
 interface Props {
@@ -37,6 +37,11 @@ interface Props {
   onCancel: () => void;
   onViewSaved: () => void;
   onResetAndCreateAnother: () => void;
+  hasDraft?: boolean;
+  draftTimeAgo?: string;
+  onRestoreDraft?: () => void;
+  onDiscardDraft?: () => void;
+  isEditing?: boolean;
 }
 
 export default function ReclamoForm({
@@ -46,16 +51,30 @@ export default function ReclamoForm({
   uploadingFormFoto, setUploadingFormFoto, saving, error,
   customMotivos, setCustomMotivos, addingMotivo, setAddingMotivo,
   newMotivoText, setNewMotivoText, onSave, onCancel, onViewSaved, onResetAndCreateAnother,
+  hasDraft, draftTimeAgo, onRestoreDraft, onDiscardDraft,
+  isEditing,
 }: Props) {
   const formFotoRef = useRef<HTMLInputElement>(null);
   const [deleteFotoTarget, setDeleteFotoTarget] = useState<Foto | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [showAll, setShowAll] = useState(false);
   function handleBlur(field: string) { setTouched((prev) => ({ ...prev, [field]: true })); }
   function fieldError(field: string, value: string) { return touched[field] && !value.trim(); }
   const empInfo = fEmpresa ? EMPRESAS_MAP[fEmpresa] : null;
   const fSubtotal = fItems.reduce((s, i) => s + (i.subtotal || 0), 0);
   const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
+
+  // Progressive disclosure: determine which steps are revealed
+  const hasExistingData = !!isEditing || !!savedReclamoId || !!hasDraft;
+  const revealAll = hasExistingData || showAll;
+  const step2Visible = revealAll || !!fEmpresa;
+  const step3Visible = revealAll || (step2Visible && !!fFactura.trim());
+  const hasAtLeastOneItem = fItems.some((i) => i.referencia.trim() || i.descripcion.trim() || i.cantidad > 0);
+  const step4Visible = revealAll || (step3Visible && hasAtLeastOneItem);
+
+  // Current step for the progress indicator
+  const currentStep = !step2Visible ? 1 : !step3Visible ? 2 : !step4Visible ? 3 : 4;
 
   function updateItem(idx: number, field: string, val: string | number) {
     setFItems((prev) => prev.map((item, i) => {
@@ -69,11 +88,43 @@ export default function ReclamoForm({
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
       <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition mb-8 block">← Reclamos</button>
-      <h1 className="text-xl font-light tracking-tight mb-10">Nuevo Reclamo</h1>
+      <div className="flex items-center justify-between mb-10">
+        <h1 className="text-xl font-light tracking-tight">Nuevo Reclamo</h1>
+        {!revealAll && (
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              {[1, 2, 3, 4].map((s) => (
+                <div
+                  key={s}
+                  className={`w-1.5 h-1.5 rounded-full transition-colors duration-200 ${s <= currentStep ? "bg-black" : "bg-gray-200"}`}
+                />
+              ))}
+              <span className="text-[11px] text-gray-400 ml-1.5">Paso {currentStep} de 4</span>
+            </div>
+            <button
+              onClick={() => setShowAll(true)}
+              className="text-[11px] text-gray-400 hover:text-black transition underline underline-offset-2"
+            >
+              Mostrar todos los campos
+            </button>
+          </div>
+        )}
+      </div>
 
+      {hasDraft && !savedReclamoId && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-8 flex items-center justify-between gap-4">
+          <p className="text-sm text-amber-800">Tienes un borrador guardado de {draftTimeAgo}. ¿Restaurar?</p>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <button onClick={onRestoreDraft} className="bg-black text-white text-sm px-4 py-1.5 rounded-md hover:bg-gray-800 transition">Restaurar</button>
+            <button onClick={onDiscardDraft} className="text-sm text-amber-700 hover:text-amber-900 transition">Descartar</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 1: Empresa (always visible) ── */}
       <div className="mb-10">
-        <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Información General</div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-12 gap-y-5 mb-6">
+        <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Empresa</div>
+        <div className="max-w-xs">
           <div className="flex flex-col gap-1">
             <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa *</label>
             <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} onBlur={() => handleBlur("empresa")} className={`border-b ${fieldError("empresa", fEmpresa) ? "border-red-400" : "border-gray-200"} py-1.5 text-sm text-black outline-none bg-transparent`}>
@@ -83,27 +134,34 @@ export default function ReclamoForm({
             {fieldError("empresa", fEmpresa) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             {empInfo && <p className="text-xs text-gray-400 mt-1">Proveedor: {empInfo.proveedor} | Marca: {empInfo.marca}</p>}
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Factura *</label>
-            <input type="text" value={fFactura} onChange={(e) => setFFactura(e.target.value)} onBlur={() => handleBlur("factura")} placeholder="Ej. 3000012593" className={`border-b ${fieldError("factura", fFactura) ? "border-red-400" : "border-gray-200"} py-1.5 text-sm text-black outline-none`} />
-            {fieldError("factura", fFactura) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha *</label>
-            <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleBlur("fecha")} className={`border-b ${fieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-1.5 text-sm text-black outline-none`} />
-            {fieldError("fecha", fFecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Pedido</label>
-            <input type="text" value={fPedido} onChange={(e) => setFPedido(e.target.value)} placeholder="Ej. PO-2026-001" className="border-b border-gray-200 py-1.5 text-sm text-black outline-none" />
-          </div>
-          <div className="flex flex-col gap-1 col-span-2">
-            <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Notas</label>
-            <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={1} className="border-b border-gray-200 py-1.5 text-sm text-black outline-none resize-none" />
-          </div>
         </div>
       </div>
 
+      {/* ── Step 2: Factura, Fecha, Pedido (after empresa selected) ── */}
+      <AccordionContent open={step2Visible} duration={200}>
+        <div className="mb-10">
+          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Datos de Factura</div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-12 gap-y-5">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Factura *</label>
+              <input type="text" value={fFactura} onChange={(e) => setFFactura(e.target.value)} onBlur={() => handleBlur("factura")} placeholder="Ej. 3000012593" className={`border-b ${fieldError("factura", fFactura) ? "border-red-400" : "border-gray-200"} py-1.5 text-sm text-black outline-none`} />
+              {fieldError("factura", fFactura) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha *</label>
+              <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleBlur("fecha")} className={`border-b ${fieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-1.5 text-sm text-black outline-none`} />
+              {fieldError("fecha", fFecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Pedido</label>
+              <input type="text" value={fPedido} onChange={(e) => setFPedido(e.target.value)} placeholder="Ej. PO-2026-001" className="border-b border-gray-200 py-1.5 text-sm text-black outline-none" />
+            </div>
+          </div>
+        </div>
+      </AccordionContent>
+
+      {/* ── Step 3: Items table (after factura filled) ── */}
+      <AccordionContent open={step3Visible} duration={200}>
       <div className="mb-10">
         <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Ítems del Reclamo</div>
         <div className="overflow-x-auto">
@@ -171,6 +229,17 @@ export default function ReclamoForm({
           <div className="text-lg font-semibold">Total: ${fmt(fSubtotal * FACTOR_TOTAL)}</div>
         </div>
       </div>
+      </AccordionContent>
+
+      {/* ── Step 4: Notas (after at least 1 item) ── */}
+      <AccordionContent open={step4Visible} duration={200}>
+        <div className="mb-10">
+          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Notas</div>
+          <div className="max-w-2xl">
+            <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} placeholder="Notas adicionales sobre el reclamo..." className="w-full border-b border-gray-200 py-1.5 text-sm text-black outline-none resize-none" />
+          </div>
+        </div>
+      </AccordionContent>
 
       {savedReclamoId ? (
         <div className="mt-8 border-t border-gray-200 pt-6">

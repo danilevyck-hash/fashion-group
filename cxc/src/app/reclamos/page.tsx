@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { ConfirmModal } from "@/components/ui";
+import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
+import { ConfirmModal, PullToRefresh } from "@/components/ui";
+import UndoToast from "@/components/UndoToast";
+import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { Reclamo, RItem, Foto, Contacto, RView } from "./components/types";
 import { EMPRESAS_MAP, calcSub, daysSince, emptyItem, loadCustomMotivos, fetchCustomMotivos, FACTOR_TOTAL } from "./components/constants";
 import EmpresaSelector from "./components/EmpresaSelector";
@@ -28,8 +31,11 @@ function ReclamosPage() {
   const [current, setCurrent] = useState<Reclamo | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // List state
-  const [activeEmpresa, setActiveEmpresa] = useState<string | null>(null);
+  // List state — support ?empresa= from search quick actions
+  const [activeEmpresa, setActiveEmpresa] = useState<string | null>(() => {
+    const urlEmpresa = searchParams.get("empresa");
+    return urlEmpresa ? decodeURIComponent(urlEmpresa) : null;
+  });
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState(""); const [filterEstado, setFilterEstado] = useState("all");
@@ -55,9 +61,30 @@ function ReclamosPage() {
   const [editNotas, setEditNotas] = useState(""); const [editEstado, setEditEstado] = useState("");
   const [editItems, setEditItems] = useState<RItem[]>([]); const [editSaving, setEditSaving] = useState(false);
   const [contactos, setContactos] = useState<Contacto[]>([]); const [toast, setToast] = useState<string | null>(null);
+  const { pendingUndo: pendingUndoReclamo, scheduleAction: scheduleUndoReclamo, undoAction: undoActionReclamo } = useUndoAction();
   const [customMotivos, setCustomMotivos] = useState<string[]>([]);
   const [addingMotivo, setAddingMotivo] = useState<number | null>(null);
   const [addingEditMotivo, setAddingEditMotivo] = useState<number | null>(null); const [newMotivoText, setNewMotivoText] = useState("");
+
+  // Draft auto-save for new reclamo form
+  const reclamoDraftData = useMemo(() => ({
+    empresa: fEmpresa, factura: fFactura, fecha: fFecha, pedido: fPedido, notas: fNotas, items: fItems,
+  }), [fEmpresa, fFactura, fFecha, fPedido, fNotas, fItems]);
+  const isReclamoDraftEmpty = useCallback((d: typeof reclamoDraftData) => {
+    return !d.empresa && !d.factura && !d.pedido && !d.notas && d.items.every(i => !i.referencia && !i.descripcion && i.cantidad === 0 && i.precio_unitario === 0);
+  }, []);
+  const { draft: reclamoDraft, hasDraft: hasReclamoDraft, clearDraft: clearReclamoDraft, draftTimeAgo: reclamoDraftTimeAgo } = useDraftAutoSave("reclamo", reclamoDraftData, isReclamoDraftEmpty);
+
+  function restoreReclamoDraft() {
+    if (!reclamoDraft) return;
+    setFEmpresa(reclamoDraft.empresa || "");
+    setFFactura(reclamoDraft.factura || "");
+    setFFecha(reclamoDraft.fecha || new Date().toISOString().slice(0, 10));
+    setFPedido(reclamoDraft.pedido || "");
+    setFNotas(reclamoDraft.notas || "");
+    if (reclamoDraft.items?.length) setFItems(reclamoDraft.items);
+    clearReclamoDraft();
+  }
 
   function setView(v: RView, id?: string) {
     _setView(v);
@@ -71,7 +98,7 @@ function ReclamosPage() {
     try {
       const res = await fetch(`/api/reclamos/${id}`);
       if (res.ok) { const d = await res.json(); if (d?.id) { setCurrent(d); setView("detail", d.id); } }
-    } catch { setToast("Error de conexión"); setTimeout(() => setToast(null), 3000); }
+    } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -94,12 +121,12 @@ function ReclamosPage() {
       const res = await fetch("/api/reclamos");
       if (res.status === 401) { sessionStorage.clear(); router.push("/"); return; }
       if (res.ok) { const d = await res.json(); setReclamos(Array.isArray(d) ? d : []); }
-    } catch { setToast("Error de conexión"); setTimeout(() => setToast(null), 3000); }
+    } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
     setLoading(false);
   }, [router]);
 
   const loadContactos = useCallback(async () => {
-    try { const res = await fetch("/api/reclamos/contactos"); if (res.ok) setContactos(await res.json()); } catch { setToast("Error de conexión"); setTimeout(() => setToast(null), 3000); }
+    try { const res = await fetch("/api/reclamos/contactos"); if (res.ok) setContactos(await res.json()); } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
   }, []);
 
   useEffect(() => {
@@ -127,7 +154,7 @@ function ReclamosPage() {
     try {
       const empInfo = EMPRESAS_MAP[fEmpresa];
       const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: fFactura, nro_orden_compra: fPedido, fecha_reclamo: fFecha, notas: fNotas, items }) });
-      if (res.ok) { const saved = await res.json(); setSavedReclamoId(saved.id); setSavedNroReclamo(saved.nro_reclamo || ""); setFormFotos([]); loadReclamos(); }
+      if (res.ok) { clearReclamoDraft(); const saved = await res.json(); setSavedReclamoId(saved.id); setSavedNroReclamo(saved.nro_reclamo || ""); setFormFotos([]); loadReclamos(); }
       else { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); }
     } catch { setError("Error de conexión."); }
     setSaving(false);
@@ -141,12 +168,15 @@ function ReclamosPage() {
   async function changeEstado(e: string) {
     if (!current || current.estado === e) return;
     setConfirmingEstado(null);
+    // Optimistic: update estado badge immediately
+    const prevEstado = current.estado;
+    setCurrent({ ...current, estado: e });
     try {
       const res = await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: e }) });
-      if (!res.ok) { setToast("No se pudo cambiar el estado. Intenta de nuevo."); setTimeout(() => setToast(null), 3000); return; }
+      if (!res.ok) { setCurrent(prev => prev ? { ...prev, estado: prevEstado } : prev); setToast("No se pudo cambiar el estado. Intenta de nuevo."); setTimeout(() => setToast(null), 3000); return; }
       setToast(`Estado actualizado a ${e}`); setTimeout(() => setToast(null), 3000);
-      await loadDetail(current.id); loadReclamos();
-    } catch { setToast("Error de conexion. Intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
+      loadReclamos();
+    } catch { setCurrent(prev => prev ? { ...prev, estado: prevEstado } : prev); setToast("Error de conexion. Intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
   }
   function requestDeleteReclamo(id: string) {
     setShowDeleteConfirm(false);
@@ -188,7 +218,7 @@ function ReclamosPage() {
       await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: editEmpresa, proveedor: EMPRESAS_MAP[editEmpresa]?.proveedor || current.proveedor, marca: EMPRESAS_MAP[editEmpresa]?.marca || current.marca, nro_factura: editFactura, nro_orden_compra: editPedido, fecha_reclamo: editFecha, notas: editNotas, estado: editEstado }) });
       await fetch(`/api/reclamos/${current.id}/items`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: editItems }) });
       setEditMode(false); await loadDetail(current.id); loadReclamos();
-    } catch { setToast("Error de conexión"); setTimeout(() => setToast(null), 3000); }
+    } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
     setEditSaving(false);
   }
 
@@ -223,7 +253,7 @@ function ReclamosPage() {
   if (view === "list") {
     if (!activeEmpresa) {
       return (
-        <>
+        <PullToRefresh onRefresh={loadReclamos}>
           <EmpresaSelector
             role={role}
             reclamos={reclamos}
@@ -241,12 +271,12 @@ function ReclamosPage() {
             onLoadDetail={(id, empresa) => { setActiveEmpresa(empresa); loadDetail(id); }}
           />
           {deleteModal}
-        </>
+        </PullToRefresh>
       );
     }
 
     return (
-      <>
+      <PullToRefresh onRefresh={loadReclamos}>
         <EmpresaList
           role={role}
           activeEmpresa={activeEmpresa}
@@ -270,7 +300,7 @@ function ReclamosPage() {
           onDeleteReclamo={(id) => requestDeleteReclamo(id)}
         />
         {deleteModal}
-      </>
+      </PullToRefresh>
     );
   }
 
@@ -297,6 +327,10 @@ function ReclamosPage() {
         onCancel={() => { resetForm(); setView("list"); }}
         onViewSaved={() => { const id = savedReclamoId; resetForm(); loadReclamos(); if (id) loadDetail(id); }}
         onResetAndCreateAnother={resetForm}
+        hasDraft={hasReclamoDraft}
+        draftTimeAgo={reclamoDraftTimeAgo}
+        onRestoreDraft={restoreReclamoDraft}
+        onDiscardDraft={clearReclamoDraft}
       />
     );
   }
@@ -339,6 +373,7 @@ function ReclamosPage() {
         onAplicadaConfirm={handleAplicadaConfirm}
         showToast={(msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); }}
       />
+      {pendingUndoReclamo && <UndoToast message={pendingUndoReclamo.message} startedAt={pendingUndoReclamo.startedAt} onUndo={undoActionReclamo} />}
       {deleteModal}
     </>
   );

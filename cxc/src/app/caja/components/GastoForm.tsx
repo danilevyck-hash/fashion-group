@@ -378,7 +378,7 @@ export default function GastoForm({
             disabled={addingGasto || !gDescripcion || subtotalNum <= 0}
             className="bg-black text-white px-6 py-1.5 rounded-full text-sm hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
           >
-            {justSaved ? "Guardado \u2713" : "Guardar gasto"}
+            {justSaved ? "Listo, guardado \u2713" : "Guardar gasto"}
           </button>
         </div>
       </div>
