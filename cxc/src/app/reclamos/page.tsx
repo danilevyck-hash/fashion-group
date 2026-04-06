@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { ConfirmModal } from "@/components/ui";
 import { Reclamo, RItem, Foto, Contacto, RView } from "./components/types";
-import { EMPRESAS_MAP, calcSub, daysSince, emptyItem, loadCustomMotivos, FACTOR_TOTAL } from "./components/constants";
+import { EMPRESAS_MAP, calcSub, daysSince, emptyItem, loadCustomMotivos, fetchCustomMotivos, FACTOR_TOTAL } from "./components/constants";
 import EmpresaSelector from "./components/EmpresaSelector";
 import EmpresaList from "./components/EmpresaList";
 import ReclamoForm from "./components/ReclamoForm";
@@ -108,7 +108,7 @@ function ReclamosPage() {
   }, [authChecked, urlId, loadDetail]);
 
   useEffect(() => {
-    if (authChecked) { loadReclamos(); loadContactos(); setCustomMotivos(loadCustomMotivos()); }
+    if (authChecked) { loadReclamos(); loadContactos(); fetchCustomMotivos().then(setCustomMotivos); }
   }, [authChecked, loadReclamos, loadContactos]);
 
   if (!authChecked) return null;

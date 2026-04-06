@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { fmt, fmtDate } from "@/lib/format";
 import { CajaPeriodo } from "./types";
 
@@ -18,6 +19,7 @@ export default function PeriodoDetailHeader({
   pctUsed,
   onBack,
 }: Props) {
+  const [kpiTooltip, setKpiTooltip] = useState<string | null>(null);
   const isOpen = current.estado === "abierto";
 
   return (
@@ -50,30 +52,42 @@ export default function PeriodoDetailHeader({
       {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mb-10">
         <div>
-          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">
-            Fondo
+          <div className="flex items-center">
+            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">
+              Fondo
+            </div>
+            <button onClick={() => setKpiTooltip(kpiTooltip === "fondo" ? null : "fondo")} className="text-gray-300 hover:text-gray-500 text-xs ml-1 mb-1">?</button>
           </div>
           <div className="text-2xl font-semibold tabular-nums">
             ${fmt(current.fondo_inicial)}
           </div>
+          {kpiTooltip === "fondo" && <p className="text-xs text-gray-500 mt-1">Monto inicial asignado al período de caja menuda</p>}
         </div>
         <div>
-          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">
-            Gastado
+          <div className="flex items-center">
+            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">
+              Gastado
+            </div>
+            <button onClick={() => setKpiTooltip(kpiTooltip === "gastado" ? null : "gastado")} className="text-gray-300 hover:text-gray-500 text-xs ml-1 mb-1">?</button>
           </div>
           <div className="text-2xl font-semibold tabular-nums">
             ${fmt(totalGastado)}
           </div>
+          {kpiTooltip === "gastado" && <p className="text-xs text-gray-500 mt-1">Total de gastos registrados en este período</p>}
         </div>
         <div>
-          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">
-            Saldo
+          <div className="flex items-center">
+            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">
+              Saldo
+            </div>
+            <button onClick={() => setKpiTooltip(kpiTooltip === "saldo" ? null : "saldo")} className="text-gray-300 hover:text-gray-500 text-xs ml-1 mb-1">?</button>
           </div>
           <div
             className={`text-2xl font-semibold tabular-nums ${saldo < 0 ? "text-red-600" : ""}`}
           >
             ${fmt(saldo)}
           </div>
+          {kpiTooltip === "saldo" && <p className="text-xs text-gray-500 mt-1">Dinero disponible: Fondo menos lo gastado</p>}
         </div>
       </div>
 

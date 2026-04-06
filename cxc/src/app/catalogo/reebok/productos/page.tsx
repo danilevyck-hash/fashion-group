@@ -17,7 +17,7 @@ export default function ProductosPage() {
 function Productos() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [products, setProducts] = useState<(Product & { _stock: number })[]>([]);
+  const [products, setProducts] = useState<(Product & { _stock: number; _sizes: string[] })[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
@@ -25,6 +25,9 @@ function Productos() {
   const [category, setCategory] = useState("");
   const [onlyOferta, setOnlyOferta] = useState(false);
   const [priceFilter, setPriceFilter] = useState("");
+  const [colorFilter, setColorFilter] = useState("");
+  const [sizeFilter, setSizeFilter] = useState("");
+  const [sortBy, setSortBy] = useState("relevancia");
   const [toast, setToast] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [page, setPage] = useState(1);
@@ -168,6 +171,7 @@ function Productos() {
           body: JSON.stringify({
             client_name: draftClient,
             vendor_name: sessionStorage.getItem("fg_user_name") || null,
+            client_email: sessionStorage.getItem("reebok_draft_client_email") || null,
             items: cart,
           }),
         });
@@ -175,6 +179,7 @@ function Productos() {
           const order = await res.json();
           // Switch sessionStorage from "new" mode to "existing" mode
           sessionStorage.removeItem("reebok_draft_client");
+          sessionStorage.removeItem("reebok_draft_client_email");
           sessionStorage.removeItem("reebok_cart");
           sessionStorage.setItem("reebok_draft_id", order.id);
           router.push(`/catalogo/reebok/pedido/${order.id}`);
@@ -199,7 +204,7 @@ function Productos() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  useEffect(() => { setPage(1); }, [gender, category, onlyOferta, priceFilter]);
+  useEffect(() => { setPage(1); }, [gender, category, onlyOferta, priceFilter, colorFilter, sizeFilter, sortBy]);
 
   useEffect(() => {
     async function load() {
@@ -210,10 +215,17 @@ function Productos() {
           fetch("/api/catalogo/reebok/inventory"),
         ]);
         const prods: Product[] = pRes.ok ? await pRes.json() : [];
-        const inv: { product_id: string; quantity: number }[] = iRes.ok ? await iRes.json() : [];
+        const inv: { product_id: string; size: string; quantity: number }[] = iRes.ok ? await iRes.json() : [];
         const stockMap: Record<string, number> = {};
-        inv.forEach(i => { stockMap[i.product_id] = (stockMap[i.product_id] || 0) + i.quantity });
-        setProducts(prods.map(p => ({ ...p, _stock: stockMap[p.id] || 0 })));
+        const sizesMap: Record<string, Set<string>> = {};
+        inv.forEach(i => {
+          stockMap[i.product_id] = (stockMap[i.product_id] || 0) + i.quantity;
+          if (i.quantity > 0 && i.size) {
+            if (!sizesMap[i.product_id]) sizesMap[i.product_id] = new Set();
+            sizesMap[i.product_id].add(i.size);
+          }
+        });
+        setProducts(prods.map(p => ({ ...p, _stock: stockMap[p.id] || 0, _sizes: [...(sizesMap[p.id] || [])] })));
       } catch { setProducts([]); }
       setLoading(false);
     }
@@ -226,7 +238,7 @@ function Productos() {
   const catLabel: Record<string, string> = { footwear: 'Calzado', apparel: 'Ropa', accessories: 'Accesorios' };
   const genLabel: Record<string, string> = { male: 'Hombre', female: 'Mujer', kids: 'Niños', unisex: 'Unisex' };
 
-  // Pre-price filtered set (all filters EXCEPT price) — used for price dropdown options
+  // Pre-price filtered set (all filters EXCEPT price/color/size) — used for dropdown options
   const filteredBeforePrice = products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => !gender || p.gender === gender)
@@ -237,15 +249,33 @@ function Productos() {
     ? [...new Set(filteredBeforePrice.filter(p => p.price).map(p => p.price!))].sort((a, b) => a - b)
     : [];
 
+  // Unique colors from currently filtered products (before color/size filter)
+  const uniqueColors = [...new Set(filteredBeforePrice.filter(p => p.color).map(p => p.color!))].sort((a, b) => a.localeCompare(b));
+
+  // Unique sizes from currently filtered products (before color/size filter), with stock > 0
+  const uniqueSizes = [...new Set(filteredBeforePrice.flatMap(p => p._sizes))].sort((a, b) => {
+    const na = parseFloat(a), nb = parseFloat(b);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return a.localeCompare(b);
+  });
+
   const filtered = filteredBeforePrice
     .filter(p => !priceFilter || p.price === Number(priceFilter))
+    .filter(p => !colorFilter || p.color === colorFilter)
+    .filter(p => !sizeFilter || p._sizes.includes(sizeFilter))
     .sort((a, b) => {
+      if (sortBy === "precio-asc") return (a.price || 0) - (b.price || 0);
+      if (sortBy === "precio-desc") return (b.price || 0) - (a.price || 0);
+      if (sortBy === "nombre-az") return a.name.localeCompare(b.name);
+      // Default: relevancia — grouped by category then gender then name
       const ca = catOrder[a.category] ?? 9, cb = catOrder[b.category] ?? 9;
       if (ca !== cb) return ca - cb;
       const ga = genOrder[a.gender || 'unisex'] ?? 9, gb = genOrder[b.gender || 'unisex'] ?? 9;
       if (ga !== gb) return ga - gb;
       return a.name.localeCompare(b.name);
     });
+
+  const isGrouped = sortBy === "relevancia";
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -268,6 +298,9 @@ function Productos() {
 
   // ── Download catalog as PDF ──
   const [downloading, setDownloading] = useState(false);
+
+  // ── Mini cart expand/collapse ──
+  const [miniCartOpen, setMiniCartOpen] = useState(false);
 
   async function handleDownloadCatalog() {
     const items = filtered;
@@ -348,6 +381,8 @@ function Productos() {
       if (category) filterDesc.push(catLabel[category] || category);
       if (onlyOferta) filterDesc.push("Oferta");
       if (priceFilter) filterDesc.push(`$${Number(priceFilter).toFixed(0)}`);
+      if (colorFilter) filterDesc.push(colorFilter);
+      if (sizeFilter) filterDesc.push(`Talla ${sizeFilter}`);
       if (search) filterDesc.push(`"${search}"`);
       const subtitle = filterDesc.length > 0 ? filterDesc.join(" · ") : "Todos los productos";
       doc.setFontSize(8);
@@ -530,6 +565,26 @@ function Productos() {
             <option value="">Todas</option><option value="footwear">Calzado</option><option value="apparel">Ropa</option><option value="accessories">Accesorios</option>
           </select>
         </div>
+        {uniqueColors.length > 1 && (
+          <div>
+            <label className="text-[10px] text-gray-400 uppercase tracking-wider">Color</label>
+            <select value={colorFilter} onChange={e => setColorFilter(e.target.value)}
+              className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
+              <option value="">Todos</option>
+              {uniqueColors.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        )}
+        {uniqueSizes.length > 1 && (
+          <div>
+            <label className="text-[10px] text-gray-400 uppercase tracking-wider">Talla</label>
+            <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)}
+              className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
+              <option value="">Todas</option>
+              {uniqueSizes.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        )}
         <button onClick={() => { setOnlyOferta(!onlyOferta); setPriceFilter(""); }}
           className={`text-sm px-4 py-2 rounded-full transition font-medium mb-0.5 ${onlyOferta ? "bg-orange-500 text-white" : "border border-gray-200 text-gray-500 hover:border-gray-400"}`}>
           Oferta
@@ -544,10 +599,17 @@ function Productos() {
             </select>
           </div>
         )}
-        {(searchInput || gender || category || onlyOferta) && (
-          <button onClick={() => { setSearchInput(""); setSearch(""); setGender(""); setCategory(""); setOnlyOferta(false); setPriceFilter(""); }} className="text-sm text-gray-400 hover:text-black transition py-2 mb-0.5">Limpiar</button>
+        {(searchInput || gender || category || onlyOferta || colorFilter || sizeFilter) && (
+          <button onClick={() => { setSearchInput(""); setSearch(""); setGender(""); setCategory(""); setOnlyOferta(false); setPriceFilter(""); setColorFilter(""); setSizeFilter(""); setSortBy("relevancia"); }} className="text-sm text-gray-400 hover:text-black transition py-2 mb-0.5">Limpiar</button>
         )}
         <div className="flex items-center gap-2 ml-auto mb-1">
+          <select value={sortBy} onChange={e => setSortBy(e.target.value)}
+            className="text-xs border border-gray-200 rounded-md px-2 py-1.5 outline-none focus:border-gray-400 transition bg-transparent text-gray-500">
+            <option value="relevancia">Relevancia</option>
+            <option value="precio-asc">Precio: menor a mayor</option>
+            <option value="precio-desc">Precio: mayor a menor</option>
+            <option value="nombre-az">Nombre A-Z</option>
+          </select>
           <span className="text-xs text-gray-400">{filtered.length}</span>
           {filtered.length > 0 && (
             <button onClick={handleDownloadCatalog} disabled={downloading}
@@ -561,7 +623,7 @@ function Productos() {
 
       {/* ── Grid ── */}
       {loading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {[...Array(12)].map((_, i) => (
             <div key={i} className="bg-white overflow-hidden">
               <div className="aspect-square shimmer" />
@@ -577,21 +639,31 @@ function Productos() {
       ) : filtered.length === 0 ? (
         <p className="text-center py-20 text-gray-400 text-sm">No se encontraron productos</p>
       ) : (
-        <div className={`space-y-8 fade-in ${cartCount > 0 ? "pb-24" : ""}`}>
-          {groups.map(g => (
-            <div key={g.label}>
-              <div className="flex items-center gap-3 mb-3">
-                <h2 className="text-sm font-medium text-gray-800">{g.label}</h2>
-                <div className="flex-1 border-t border-gray-100" />
-                <span className="text-xs text-gray-300">{g.items.length}</span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                {g.items.map(p => (
-                  <ProductCard key={p.id} product={p} stock={p._stock} qty={cartMap.get(p.id) || 0} onQtyChange={handleQtyChange} disabled={!hasContext} />
-                ))}
-              </div>
+        <div className={`fade-in ${cartCount > 0 ? "pb-24" : ""}`}>
+          {isGrouped ? (
+            <div className="space-y-8">
+              {groups.map(g => (
+                <div key={g.label}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <h2 className="text-sm font-medium text-gray-800">{g.label}</h2>
+                    <div className="flex-1 border-t border-gray-100" />
+                    <span className="text-xs text-gray-300">{g.items.length}</span>
+                  </div>
+                  <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {g.items.map(p => (
+                      <ProductCard key={p.id} product={p} stock={p._stock} qty={cartMap.get(p.id) || 0} onQtyChange={handleQtyChange} disabled={!hasContext} />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          ) : (
+            <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              {paginated.map(p => (
+                <ProductCard key={p.id} product={p} stock={p._stock} qty={cartMap.get(p.id) || 0} onQtyChange={handleQtyChange} disabled={!hasContext} />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -618,20 +690,76 @@ function Productos() {
         <NewOrderModal onClose={() => setShowNameModal(false)} />
       )}
 
-      {/* ── Floating bar ── */}
+      {/* ── Floating bar + Mini cart ── */}
       {cartCount > 0 && hasContext && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 p-3 bg-white border-t border-gray-100 shadow-lg">
-          <button onClick={handleFloatingBarClick} disabled={saving}
-            className={`w-full py-3.5 rounded-lg text-sm font-medium flex items-center justify-between px-4 transition disabled:opacity-50 ${
-              draftId ? "bg-black text-white hover:bg-gray-800" : "bg-emerald-600 text-white hover:bg-emerald-700"
-            }`}>
-            <span>{saving ? "Guardando..." : draftId ? `Actualizar pedido ${draftNumber}` : draftClient ? `Crear pedido para ${draftClient}` : "Crear pedido"}</span>
-            <span className="flex items-center gap-2">
-              <span className="tabular-nums">{cartCount} bulto{cartCount !== 1 ? "s" : ""}</span>
-              {cartTotal > 0 && <><span className="text-white/40">·</span><span className="tabular-nums font-semibold">${fmt(cartTotal)}</span></>}
-              <span>→</span>
-            </span>
-          </button>
+        <div className="fixed bottom-0 left-0 right-0 z-40">
+          {/* Backdrop when mini cart is open */}
+          {miniCartOpen && (
+            <div className="fixed inset-0 bg-black/20 z-[-1]" onClick={() => setMiniCartOpen(false)} />
+          )}
+
+          {/* Mini cart summary panel */}
+          <div
+            className="bg-white border-t border-gray-200 overflow-hidden"
+            style={{ maxHeight: miniCartOpen ? "250px" : "0px", transition: "max-height 200ms ease-out" }}
+          >
+            <div className="overflow-y-auto" style={{ maxHeight: "200px" }}>
+              <div className="px-4 pt-3 pb-1">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Resumen del pedido</span>
+                  <button onClick={() => setMiniCartOpen(false)} className="text-gray-400 hover:text-black transition p-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                </div>
+                {cart.map(item => (
+                  <div key={item.product_id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                    <span className="text-sm text-gray-700 truncate mr-3">{item.name}</span>
+                    <span className="text-sm tabular-nums text-gray-500 shrink-0">{"×"}{item.quantity}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="px-4 py-2 border-t border-gray-100">
+              {draftId ? (
+                <Link href={`/catalogo/reebok/pedido/${draftId}`} className="text-xs text-black font-medium hover:underline">
+                  Ver pedido completo {"→"}
+                </Link>
+              ) : (
+                <button onClick={handleFloatingBarClick} className="text-xs text-black font-medium hover:underline">
+                  Ver pedido completo {"→"}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Floating bar */}
+          <div className="p-3 bg-white border-t border-gray-100 shadow-lg flex items-center gap-2">
+            {/* Expandable touch zone: bultos + total */}
+            <button
+              onClick={() => setMiniCartOpen(prev => !prev)}
+              className="flex items-center gap-1.5 px-3 py-3.5 rounded-lg bg-gray-100 text-gray-700 text-sm tabular-nums shrink-0 hover:bg-gray-200 transition"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                className="transition-transform duration-200"
+                style={{ transform: miniCartOpen ? "rotate(180deg)" : "rotate(0deg)" }}
+              >
+                <polyline points="18 15 12 9 6 15"/>
+              </svg>
+              <span>{cartCount} bulto{cartCount !== 1 ? "s" : ""}</span>
+              {cartTotal > 0 && <><span className="text-gray-400">{"·"}</span><span className="font-semibold">${fmt(cartTotal)}</span></>}
+            </button>
+
+            {/* Main action button */}
+            <button onClick={handleFloatingBarClick} disabled={saving}
+              className={`flex-1 py-3.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition disabled:opacity-50 ${
+                draftId ? "bg-black text-white hover:bg-gray-800" : "bg-emerald-600 text-white hover:bg-emerald-700"
+              }`}>
+              <span className="truncate">{saving ? "Guardando..." : draftId ? `Actualizar ${draftNumber}` : draftClient ? "Crear pedido" : "Crear pedido"}</span>
+              <span>{"→"}</span>
+            </button>
+          </div>
         </div>
       )}
     </div>

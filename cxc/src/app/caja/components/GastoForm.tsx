@@ -212,9 +212,11 @@ export default function GastoForm({
           />
           <button
             onClick={() => setShowManageCat(!showManageCat)}
-            className="text-[10px] text-gray-300 hover:text-gray-500 mt-1 block"
+            className="text-[10px] text-gray-500 hover:text-black mt-1.5 inline-flex items-center gap-1 border border-gray-200 rounded px-1.5 py-0.5 hover:border-gray-400 transition"
+            title="Gestionar categorias"
           >
-            Gestionar categorías
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Categorias
           </button>
           {showManageCat && (
             <div className="mt-2 p-2 bg-gray-50 rounded text-xs space-y-1">
@@ -264,9 +266,8 @@ export default function GastoForm({
 
       {/* Mobile-only collapsible for optional fields */}
       <div className="lg:hidden mb-3">
-        <button onClick={() => setShowMoreDetails(!showMoreDetails)} className="text-xs text-gray-400 hover:text-black transition flex items-center gap-1">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${showMoreDetails ? "rotate-90" : ""}`}><polyline points="9 18 15 12 9 6"/></svg>
-          {showMoreDetails ? "Ocultar detalles opcionales" : "Mas detalles (Proveedor, Factura, Responsable)"}
+        <button onClick={() => setShowMoreDetails(!showMoreDetails)} className="text-xs text-gray-500 hover:text-black transition flex items-center gap-1 border border-gray-200 rounded px-2 py-1 hover:border-gray-400">
+          {showMoreDetails ? "\uFF0D Ocultar campos opcionales" : "\uFF0B Proveedor, Factura y Responsable"}
         </button>
         {showMoreDetails && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end mt-2">
@@ -375,9 +376,9 @@ export default function GastoForm({
           <button
             onClick={() => { onAddGasto(); setJustSaved(true); setTimeout(() => setJustSaved(false), 2000); }}
             disabled={addingGasto || !gDescripcion || subtotalNum <= 0}
-            className="bg-black text-white px-6 py-1.5 rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50"
+            className="bg-black text-white px-6 py-1.5 rounded-full text-sm hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
           >
-            {justSaved ? "Guardado \u2713" : "Agregar"}
+            {justSaved ? "Guardado \u2713" : "Guardar gasto"}
           </button>
         </div>
       </div>

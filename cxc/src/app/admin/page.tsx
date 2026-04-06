@@ -141,12 +141,36 @@ export default function AdminDashboard() {
     try { return new Set(JSON.parse(localStorage.getItem("cxc_favorites") || "[]")); } catch { return new Set(); }
   });
 
+  // Load favorites from DB (overrides localStorage on success)
+  useEffect(() => {
+    if (!authChecked) return;
+    fetch("/api/cxc/favorites")
+      .then((r) => r.ok ? r.json() : Promise.reject(r))
+      .then((data: { favorites: string[] }) => {
+        const dbSet = new Set(data.favorites);
+        setFavorites(dbSet);
+        localStorage.setItem("cxc_favorites", JSON.stringify(data.favorites));
+      })
+      .catch(() => {
+        // Fallback: keep localStorage value (already loaded in useState)
+      });
+  }, [authChecked]);
+
   function toggleFavorite(name: string) {
+    // Optimistic update
     setFavorites(prev => {
       const next = new Set(prev);
       if (next.has(name)) next.delete(name); else next.add(name);
       localStorage.setItem("cxc_favorites", JSON.stringify([...next]));
       return next;
+    });
+    // Persist to DB
+    fetch("/api/cxc/favorites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientName: name }),
+    }).catch(() => {
+      // Silently fail — localStorage already updated as fallback
     });
   }
 
@@ -302,12 +326,20 @@ export default function AdminDashboard() {
 
   // ── Actions ──────────────────────────────────────────
 
+  function normalizePhone(raw: string): string {
+    const digits = raw.replace(/[^0-9]/g, "");
+    if (!digits) return "";
+    // Already has Panama country code (507 + 8-digit number = 11 digits)
+    if (digits.startsWith("507") && digits.length >= 11) return digits;
+    // 8-digit Panamanian mobile → prepend country code
+    if (digits.length === 8) return "507" + digits;
+    // Other format (international, etc.) → use as-is
+    return digits;
+  }
+
   function openWhatsApp(client: ConsolidatedClient) {
-    let phone = (client.celular || client.telefono).replace(/[^0-9]/g, "");
+    const phone = normalizePhone(client.celular || client.telefono);
     if (!phone) { showToast("No hay WhatsApp registrado para este cliente"); return; }
-    if (!phone.startsWith("507") && phone.length <= 8) {
-      phone = "507" + phone;
-    }
     const msg = encodeURIComponent(buildWhatsAppMsg(client));
     try { window.open(`https://wa.me/${phone}?text=${msg}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
   }
@@ -412,19 +444,28 @@ export default function AdminDashboard() {
     // Save resultado + proximo_seguimiento to cxc_client_overrides (merge with existing contact fields)
     const existingClient = clients.find((c) => c.nombre_normalized === clientName);
     const now = new Date().toISOString();
+
+    // Only overwrite resultado/proximo if Angela actually provided them
+    // This way a quick "contacted via WhatsApp" won't erase a previous resultado
+    const upsertData: Record<string, unknown> = {
+      nombre_normalized: clientName,
+      correo: existingClient?.correo || "",
+      telefono: existingClient?.telefono || "",
+      celular: existingClient?.celular || "",
+      contacto: existingClient?.contacto || "",
+      ultimo_contacto_fecha: now,
+      ultimo_contacto_metodo: data.metodo.toLowerCase(),
+      updated_at: now,
+    };
+    if (data.resultado_contacto) {
+      upsertData.resultado_contacto = data.resultado_contacto;
+    }
+    if (data.proximo_seguimiento) {
+      upsertData.proximo_seguimiento = data.proximo_seguimiento;
+    }
+
     await supabase.from("cxc_client_overrides").upsert(
-      {
-        nombre_normalized: clientName,
-        correo: existingClient?.correo || "",
-        telefono: existingClient?.telefono || "",
-        celular: existingClient?.celular || "",
-        contacto: existingClient?.contacto || "",
-        resultado_contacto: data.resultado_contacto,
-        proximo_seguimiento: data.proximo_seguimiento || null,
-        ultimo_contacto_fecha: now,
-        ultimo_contacto_metodo: data.metodo.toLowerCase(),
-        updated_at: now,
-      },
+      upsertData,
       { onConflict: "nombre_normalized" }
     );
     // Also log the contact in cxc_contact_log
@@ -451,7 +492,7 @@ export default function AdminDashboard() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4">
         <p className="text-red-500 text-sm">{loadError}</p>
-        <button onClick={loadData} className="text-sm bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800">Reintentar</button>
+        <button onClick={loadData} className="text-sm bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 active:scale-[0.97] transition-all">Reintentar</button>
       </div>
     );
   }
@@ -472,14 +513,14 @@ export default function AdminDashboard() {
       <div className="flex justify-end items-center gap-3 mb-6">
           <button
             onClick={() => (window.location.href = "/upload?tab=cxc")}
-            className="text-sm border border-gray-200 text-gray-700 px-5 py-2 rounded-md font-medium hover:bg-gray-50 transition flex items-center gap-2"
+            className="text-sm border border-gray-200 text-gray-700 px-5 py-2 rounded-md font-medium hover:bg-gray-50 active:bg-gray-100 transition-all flex items-center gap-2"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             Cargar archivo
           </button>
           <button
             onClick={() => exportConsolidado(roleClients, cxcCompanies)}
-            className="text-sm border border-gray-200 text-gray-700 px-5 py-2 rounded-md font-medium hover:bg-gray-50 transition flex items-center gap-2"
+            className="text-sm border border-gray-200 text-gray-700 px-5 py-2 rounded-md font-medium hover:bg-gray-50 active:bg-gray-100 transition-all flex items-center gap-2"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
             Consolidado
@@ -487,7 +528,7 @@ export default function AdminDashboard() {
           <div className="relative">
             <button
               onClick={() => setShowExport(!showExport)}
-              className="text-sm bg-black text-white px-5 py-2 rounded-md font-medium hover:bg-gray-800 transition flex items-center gap-2"
+              className="text-sm bg-black text-white px-5 py-2 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Exportar
@@ -553,7 +594,7 @@ export default function AdminDashboard() {
 
       <UploadFreshness roleCompanies={cxcCompanies} uploads={uploads} />
 
-      <KpiCards roleClients={roleClients} onFilterOverdue={() => setRiskFilter("overdue")} />
+      <KpiCards roleClients={roleClients} onFilterOverdue={() => setRiskFilter("overdue")} onSortByFollowUp={() => { setSortKey("follow_up"); setSortDir("asc"); }} />
 
       <CompanySummary
         roleCompanies={cxcCompanies}

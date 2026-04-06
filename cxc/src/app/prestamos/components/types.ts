@@ -80,12 +80,12 @@ export function getLast12Quincenas(): { label: string; start: Date; end: Date }[
 }
 
 export const MOV_TYPES = [
-  { key: "pago_quincenal", label: "Pago Quincenal", concepto: "Pago", icon: "💳", color: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:border-emerald-400", sign: "−" },
-  { key: "prestamo", label: "Préstamo", concepto: "Préstamo", icon: "➕", color: "bg-red-50 border-red-200 text-red-700 hover:border-red-400", sign: "+" },
-  { key: "pago_extra", label: "Pago Extra", concepto: "Pago", icon: "💰", color: "bg-green-50 border-green-200 text-green-700 hover:border-green-400", sign: "−" },
-  { key: "responsabilidad", label: "Responsabilidad por daño", concepto: "Responsabilidad por daño", icon: "⚠️", color: "bg-amber-50 border-amber-200 text-amber-700 hover:border-amber-400", sign: "+" },
-  { key: "abono_extra", label: "Abono Extra", concepto: "Abono extra", icon: "🔄", color: "bg-blue-50 border-blue-200 text-blue-700 hover:border-blue-400", sign: "−" },
-  { key: "pago_resp", label: "Pago de responsabilidad", concepto: "Pago de responsabilidad", icon: "✅", color: "bg-purple-50 border-purple-200 text-purple-700 hover:border-purple-400", sign: "−" },
+  { key: "pago_quincenal", label: "Pago Quincenal", concepto: "Pago", icon: "💳", color: "bg-emerald-50 border-emerald-200 text-emerald-700 hover:border-emerald-400", sign: "−", effect: "Reduce la deuda", effectColor: "text-green-600" },
+  { key: "prestamo", label: "Préstamo", concepto: "Préstamo", icon: "➕", color: "bg-red-50 border-red-200 text-red-700 hover:border-red-400", sign: "+", effect: "Aumenta la deuda", effectColor: "text-red-600" },
+  { key: "pago_extra", label: "Pago Extra", concepto: "Pago", icon: "💰", color: "bg-green-50 border-green-200 text-green-700 hover:border-green-400", sign: "−", effect: "Reduce la deuda", effectColor: "text-green-600" },
+  { key: "responsabilidad", label: "Responsabilidad por daño", concepto: "Responsabilidad por daño", icon: "⚠️", color: "bg-amber-50 border-amber-200 text-amber-700 hover:border-amber-400", sign: "+", effect: "Aumenta la deuda", effectColor: "text-red-600" },
+  { key: "abono_extra", label: "Abono Extra", concepto: "Abono extra", icon: "🔄", color: "bg-blue-50 border-blue-200 text-blue-700 hover:border-blue-400", sign: "−", effect: "Reduce la deuda", effectColor: "text-green-600" },
+  { key: "pago_resp", label: "Pago de responsabilidad", concepto: "Pago de responsabilidad", icon: "✅", color: "bg-purple-50 border-purple-200 text-purple-700 hover:border-purple-400", sign: "−", effect: "Reduce la deuda", effectColor: "text-green-600" },
 ] as const;
 
 export const CONCEPTO_COLORS: Record<string, string> = {

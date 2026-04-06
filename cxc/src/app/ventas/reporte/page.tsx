@@ -96,12 +96,12 @@ function ReportePage() {
           </p>
         </div>
         <div className="text-xs text-gray-500 text-right">
-          Generado: {new Date().toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" })}<br />
+          Generado: {new Date().toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")}<br />
           Vista: {vista === "mensual" ? "Mensual" : "Trimestral"}
         </div>
       </div>
 
-      {/* KPIs — order: Ventas Netas | vs Año Ant. | Utilidad Total | Margen Bruto | vs Meta */}
+      {/* KPIs — order: Ventas Netas | vs Año Anterior | Utilidad Total | Margen Bruto | vs Meta */}
       <div className="grid grid-cols-5 gap-3 mb-6 text-center">
         {/* 1. Ventas Netas */}
         <div className="border border-gray-200 rounded-lg p-3">
@@ -109,9 +109,9 @@ function ReportePage() {
           <div className="text-base font-semibold">${fmt(ventasNetas)}</div>
         </div>
 
-        {/* 2. vs Año Ant. */}
+        {/* 2. vs {año - 1} */}
         <div className="border border-gray-200 rounded-lg p-3">
-          <div className="text-xs uppercase text-gray-500">vs Año Ant.</div>
+          <div className="text-xs uppercase text-gray-500">vs {año - 1}</div>
           <div className={`text-base font-semibold ${vsAnterior !== null && vsAnterior < -20 ? "text-red-600" : vsAnterior !== null && vsAnterior >= 0 ? "text-green-600" : ""}`}>
             {vsAnterior === null ? "—" : `${vsAnterior > 0 ? "+" : ""}${vsAnterior.toFixed(1)}%`}
           </div>
@@ -136,7 +136,7 @@ function ReportePage() {
           </div>
           {margenDelta !== null && (
             <div className={`text-xs mt-0.5 ${margenDelta >= 0 ? "text-green-600" : "text-red-500"}`}>
-              {margenDelta > 0 ? "▲" : "▼"} {Math.abs(margenDelta).toFixed(1)} pp vs ant.
+              {margenDelta > 0 ? "▲" : "▼"} {Math.abs(margenDelta).toFixed(1)} puntos vs ant.
             </div>
           )}
         </div>

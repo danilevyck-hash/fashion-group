@@ -98,7 +98,7 @@ export default function ReportePage() {
       .total-row { font-weight: 700; border-top: 2px solid #1b3a5c; }
       .footer { color: #999; font-size: 9px; margin-top: 24px; padding-top: 8px; border-top: 1px solid #eee; }
     </style></head><body>
-    <div class="header"><h1>FASHION GROUP</h1><p>Reporte de Deducciones Quincenales</p></div>
+    <div class="header" style="display:flex;align-items:center;gap:12px;justify-content:center;"><img src="/logo.jpeg" style="width:36px;height:36px;border-radius:4px;" /><div><h1>FASHION GROUP</h1><p>Reporte de Deducciones Quincenales</p></div></div>
     <div class="period">${periodoLabel}</div>
     <table><thead><tr><th>Empleado</th><th>Empresa</th><th class="right">Deducción Quincenal</th></tr></thead>
     <tbody>${rows}

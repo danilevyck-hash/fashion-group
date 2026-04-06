@@ -4,6 +4,7 @@ import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
 import ClientRow from "./ClientRow";
 import ContactPanel from "./ContactPanel";
+import { AccordionContent } from "@/components/ui";
 
 type RiskFilter = "all" | "current" | "watch" | "overdue";
 type SortKey = "name" | "current" | "watch" | "overdue" | "total" | "follow_up";
@@ -284,19 +285,20 @@ export default function ClientTable({
                   isFavorite={favorites?.has(client.nombre_normalized)}
                   onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(client.nombre_normalized) : undefined}
                 />
-                {isExpanded && !selectionMode && (
-                  <ContactPanel
-                    client={client}
-                    contactLog={contactLog}
-                    onOpenWhatsApp={onOpenWhatsApp}
-                    onCopyCollectionMsg={onCopyCollectionMsg}
-                    onOpenEmail={onOpenEmail}
-                    onMarkContacted={onMarkContacted}
-                    onSaveEdit={onSaveEdit}
-                    onRegisterContact={(data) => onRegisterContact(client.nombre_normalized, data)}
-                    companyFilter={companyFilter}
-                    roleCompanies={roleCompanies}
-                  />
+                {!selectionMode && (
+                  <AccordionContent open={isExpanded}>
+                    <ContactPanel
+                      client={client}
+                      contactLog={contactLog}
+                      onOpenWhatsApp={onOpenWhatsApp}
+                      onCopyCollectionMsg={onCopyCollectionMsg}
+                      onOpenEmail={onOpenEmail}
+                      onSaveEdit={onSaveEdit}
+                      onRegisterContact={(data) => onRegisterContact(client.nombre_normalized, data)}
+                      companyFilter={companyFilter}
+                      roleCompanies={roleCompanies}
+                    />
+                  </AccordionContent>
                 )}
               </div>
             );

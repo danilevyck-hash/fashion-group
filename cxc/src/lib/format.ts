@@ -6,10 +6,15 @@ export function fmtDate(d: string): string {
   if (!d) return "";
   try {
     const date = new Date(d + "T12:00:00");
-    return date.toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" });
+    return date
+      .toLocaleDateString("es-PA", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+      .replace(".", "");
   } catch {
-    const [y, m, day] = d.split("-");
-    return `${day}/${m}/${y}`;
+    return d;
   }
 }
 

@@ -28,7 +28,7 @@ export default function UploadFreshness({ roleCompanies, uploads }: Props) {
             {up ? (
               <div className="flex items-center gap-1 mt-1">
                 <span className={`w-1.5 h-1.5 rounded-full ${ageDot[age]}`} />
-                <span className="text-gray-500">{new Date(up.uploaded_at).toLocaleDateString("es-PA")}</span>
+                <span className="text-gray-500">{new Date(up.uploaded_at).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")}</span>
               </div>
             ) : (
               <div className="text-gray-400 mt-1">Sin datos</div>

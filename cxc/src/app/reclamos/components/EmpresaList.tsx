@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
-import { ESTADOS, daysSince, calcSub, buildReclamosPdfHtml, openPdfWindow, FACTOR_TOTAL } from "./constants";
+import { ESTADOS, daysSince, calcSub, buildReclamosPdfHtml, openPdfWindow, FACTOR_TOTAL, estadoLabel } from "./constants";
 import { EmptyState, StatusBadge, Toast } from "@/components/ui";
 
 interface Props {
@@ -145,24 +145,21 @@ export default function EmpresaList({
           {selectionMode ? (
             <>
               <span className="text-sm text-gray-400">{selectedIds.length} seleccionados</span>
-              <button onClick={() => allSelected ? setSelectedIds([]) : setSelectedIds(allSelectableIds)} className="text-sm text-gray-400 hover:text-black transition">
-                {allSelected ? "Deseleccionar todo" : "Seleccionar todo"}
-              </button>
               {selectedIds.length > 0 && <>
-                <button onClick={() => sendBulkEmail(selectedIds)} disabled={!!emailProgress} className="text-sm bg-black text-white px-5 py-2 rounded-md hover:bg-gray-800 transition disabled:opacity-50 flex items-center gap-1">
+                <button onClick={() => sendBulkEmail(selectedIds)} disabled={!!emailProgress} className="text-sm bg-black text-white px-5 py-2 rounded-md hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 flex items-center gap-1">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
                   {emailProgress || "Enviar por Email"}
                 </button>
-                <button onClick={downloadSelectedPdf} className="text-sm text-gray-400 hover:text-black transition border border-gray-200 px-4 py-2 rounded-md">↓ PDF</button>
-                <button onClick={downloadSelectedExcel} className="text-sm text-gray-400 hover:text-black transition border border-gray-200 px-4 py-2 rounded-md">↓ Excel</button>
-                <button onClick={() => sendBulkWA(selectedIds)} className="text-sm text-gray-400 hover:text-black transition border border-gray-200 px-4 py-2 rounded-md">WhatsApp</button>
+                <button onClick={downloadSelectedPdf} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md active:bg-gray-100 transition-all">↓ PDF</button>
+                <button onClick={downloadSelectedExcel} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md active:bg-gray-100 transition-all">↓ Excel</button>
+                <button onClick={() => sendBulkWA(selectedIds)} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md active:bg-gray-100 transition-all">WhatsApp</button>
               </>}
               <button onClick={() => { setSelectionMode(false); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
             </>
           ) : (
             <>
-              <button onClick={() => { setSelectionMode(true); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition">Seleccionar</button>
-              <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition">Nuevo Reclamo</button>
+              <button onClick={() => { setSelectionMode(true); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md transition">Seleccionar</button>
+              <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
             </>
           )}
         </div>
@@ -176,7 +173,7 @@ export default function EmpresaList({
           const count = allEmpresaRecs.filter((r) => r.estado === e).length;
           return (
             <button key={e} onClick={() => setFilterEstado(e)} className={`text-xs px-3 py-1 rounded-full transition ${filterEstado === e ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
-              {e} <span className="ml-1 opacity-60">{count}</span>
+              {estadoLabel(e)} <span className="ml-1 opacity-60">{count}</span>
             </button>
           );
         })}
@@ -192,7 +189,9 @@ export default function EmpresaList({
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-white z-10">
             <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
-              {selectionMode && <th className="pb-3 w-8"></th>}
+              {selectionMode && <th className="pb-3 w-8">
+                <input type="checkbox" checked={allSelected} onChange={() => allSelected ? setSelectedIds([]) : setSelectedIds(allSelectableIds)} className="accent-black" title="Seleccionar todos" />
+              </th>}
               <th className="text-left pb-3 font-medium">N° Reclamo</th>
               <th className="text-left pb-3 font-medium">Factura</th>
               <th onClick={() => toggleSort("fecha")} className="text-left pb-3 font-medium cursor-pointer hover:text-black select-none">Fecha {sortCol === "fecha" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>

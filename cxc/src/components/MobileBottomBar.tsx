@@ -41,7 +41,7 @@ export default function MobileBottomBar() {
           <div className="absolute bottom-16 right-2 left-2 bg-white border border-gray-200 rounded-lg shadow-xl p-2 max-h-[60vh] overflow-y-auto">
             {MORE_ITEMS.map(m => (
               <button key={m.href} onClick={() => { router.push(m.href); setShowMore(false); }}
-                className={`w-full text-left px-4 py-3 text-sm rounded-lg transition ${pathname.startsWith(m.href) ? "bg-gray-50 font-medium text-black" : "text-gray-600 hover:bg-gray-50"}`}>
+                className={`w-full text-left px-4 py-3 text-sm rounded-lg transition-all ${pathname.startsWith(m.href) ? "bg-gray-50 font-medium text-black" : "text-gray-600 hover:bg-gray-50 active:bg-gray-100"}`}>
                 {m.label}
               </button>
             ))}
@@ -56,14 +56,14 @@ export default function MobileBottomBar() {
             const active = t.key === "inicio" ? pathname === "/plantillas" : pathname.startsWith(t.href);
             return (
               <button key={t.key} onClick={() => router.push(t.href)}
-                className={`flex-1 flex flex-col items-center justify-center py-2 min-h-[52px] transition ${active ? "text-black" : "text-gray-400"}`}>
+                className={`flex-1 flex flex-col items-center justify-center py-2 min-h-[52px] transition-all ${active ? "text-black" : "text-gray-400"} active:scale-[0.92] active:bg-gray-50`}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.5" : "1.5"} strokeLinecap="round" strokeLinejoin="round"><path d={t.icon}/></svg>
                 <span className="text-[10px] mt-0.5">{t.label}</span>
               </button>
             );
           })}
           <button onClick={() => setShowMore(!showMore)}
-            className={`flex-1 flex flex-col items-center justify-center py-2 min-h-[52px] transition ${showMore ? "text-black" : "text-gray-400"}`}>
+            className={`flex-1 flex flex-col items-center justify-center py-2 min-h-[52px] transition-all ${showMore ? "text-black" : "text-gray-400"} active:scale-[0.92] active:bg-gray-50`}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
             <span className="text-[10px] mt-0.5">Más</span>
           </button>

@@ -55,7 +55,7 @@ export function EmptyState({
       <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
       {subtitle && <p className="text-xs text-gray-400 mb-4 max-w-xs">{subtitle}</p>}
       {actionLabel && onAction && (
-        <button onClick={onAction} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition min-h-[44px]">
+        <button onClick={onAction} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all min-h-[44px]">
           {actionLabel}
         </button>
       )}
@@ -152,15 +152,15 @@ export function ConfirmModal({
           <button
             onClick={onConfirm}
             disabled={loading}
-            className={`flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition disabled:opacity-50 min-h-[44px] ${
+            className={`flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition-all disabled:opacity-50 min-h-[44px] ${
               destructive
-                ? "bg-red-600 text-white hover:bg-red-700"
-                : "bg-black text-white hover:bg-gray-800"
+                ? "bg-red-600 text-white hover:bg-red-700 active:scale-[0.97]"
+                : "bg-black text-white hover:bg-gray-800 active:scale-[0.97]"
             }`}
           >
             {loading ? "Procesando..." : confirmLabel}
           </button>
-          <button onClick={onClose} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
+          <button onClick={onClose} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 active:bg-gray-100 transition-all disabled:opacity-50 min-h-[44px]">
             {cancelLabel}
           </button>
         </div>
@@ -214,11 +214,11 @@ export function ConfirmDeleteModal({
           <button
             onClick={onConfirm}
             disabled={!enabled || loading}
-            className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 min-h-[44px]"
+            className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition-all bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] disabled:opacity-40 min-h-[44px]"
           >
             {loading ? "Eliminando..." : !enabled ? "Eliminar..." : "Eliminar"}
           </button>
-          <button onClick={onCancel} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition disabled:opacity-50 min-h-[44px]">
+          <button onClick={onCancel} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 active:bg-gray-100 transition-all disabled:opacity-50 min-h-[44px]">
             Cancelar
           </button>
         </div>
@@ -300,4 +300,52 @@ export function MoneyCell({ value, className = "" }: { value: number; className?
   const v = Number(value) || 0;
   const color = v < 0 ? "text-red-500" : v === 0 ? "text-gray-400" : "";
   return <span className={`tabular-nums ${color} ${className}`}>{fmtMoney(v)}</span>;
+}
+
+// ── Scrollable Table Wrapper ──
+// Provides mobile-friendly horizontal scrolling for wide tables.
+// Uses negative margins on mobile to let the table go edge-to-edge, with inner padding to restore alignment.
+export function ScrollableTable({
+  children,
+  minWidth = 700,
+  className = "",
+}: {
+  children: ReactNode;
+  minWidth?: number;
+  className?: string;
+}) {
+  return (
+    <div className={`overflow-x-auto -mx-4 sm:mx-0 ${className}`}>
+      <div className={`px-4 sm:px-0`} style={{ minWidth: `${minWidth}px` }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// ── Animated Accordion Content ──
+// Uses CSS grid trick: grid-rows-[0fr] → grid-rows-[1fr] for smooth height animation.
+// Usage: <AccordionContent open={isExpanded}><div>...content...</div></AccordionContent>
+export function AccordionContent({
+  open,
+  children,
+  className = "",
+  duration = 250,
+}: {
+  open: boolean;
+  children: ReactNode;
+  className?: string;
+  duration?: number;
+}) {
+  return (
+    <div
+      className={`grid transition-[grid-template-rows] ease-out ${className}`}
+      style={{
+        gridTemplateRows: open ? "1fr" : "0fr",
+        transitionDuration: `${duration}ms`,
+      }}
+    >
+      <div className="overflow-hidden">{children}</div>
+    </div>
+  );
 }

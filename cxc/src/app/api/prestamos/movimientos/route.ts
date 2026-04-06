@@ -77,3 +77,22 @@ export async function POST(req: NextRequest) {
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json(data);
 }
+
+export async function DELETE(req: NextRequest) {
+  const s = getSession(req);
+  if (!s || !["admin"].includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
+  const body = await req.json();
+  const { empleado_id } = body;
+
+  if (!empleado_id) {
+    return NextResponse.json({ error: "empleado_id requerido" }, { status: 400 });
+  }
+
+  const { error } = await supabaseServer
+    .from("prestamos_movimientos")
+    .delete()
+    .eq("empleado_id", empleado_id);
+
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
+  return NextResponse.json({ ok: true });
+}

@@ -2,6 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import type { ConsolidatedClient } from "@/lib/types";
 import type { Company } from "@/lib/companies";
+import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 
 function fmt(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -18,23 +19,30 @@ function isoDate() {
 
 function addHeader(doc: jsPDF, subtitle?: string) {
   const w = doc.internal.pageSize.getWidth();
+
+  // Logo
+  try {
+    doc.addImage(FG_LOGO_BASE64, "JPEG", 19, 10, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
+  } catch { /* skip if logo fails */ }
+
+  const textX = 19 + FG_LOGO_WIDTH + 3;
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.setTextColor(17, 24, 39);
-  doc.text("FG  FASHION GROUP", 19, 19);
+  doc.text("FASHION GROUP", textX, 18);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(107, 114, 128);
-  doc.text(`Reporte CXC — ${fmtDate()}`, w - 19, 19, { align: "right" });
+  doc.text(`Reporte CXC — ${fmtDate()}`, w - 19, 18, { align: "right" });
 
   if (subtitle) {
     doc.setFontSize(9);
-    doc.text(subtitle, 19, 26);
+    doc.text(subtitle, textX, 24);
   }
 
   // Line under header
-  const y = subtitle ? 30 : 24;
+  const y = subtitle ? 28 : 24;
   doc.setDrawColor(229, 231, 235);
   doc.setLineWidth(0.5);
   doc.line(19, y, w - 19, y);

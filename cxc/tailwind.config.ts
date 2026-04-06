@@ -11,6 +11,15 @@ const config: Config = {
         grey: '#f5f5f5',
       },
     },
+    keyframes: {
+      'save-flash': {
+        '0%': { backgroundColor: 'rgb(220 252 231)', borderRadius: '4px', padding: '0 4px' },
+        '100%': { backgroundColor: 'transparent', borderRadius: '4px', padding: '0 4px' },
+      },
+    },
+    animation: {
+      'save-flash': 'save-flash 1.5s ease-out',
+    },
   } },
   plugins: [],
 };

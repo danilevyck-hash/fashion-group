@@ -22,10 +22,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: "Sin permiso para editar" }, { status: 403 });
   }
 
-  const { client_name, vendor_name, comment, items, status } = await req.json();
+  const { client_name, vendor_name, client_email, comment, items, status } = await req.json();
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (client_name !== undefined) update.client_name = client_name;
   if (vendor_name !== undefined) update.vendor_name = vendor_name;
+  if (client_email !== undefined) update.client_email = client_email;
   if (comment !== undefined) update.comment = comment;
   if (status !== undefined) update.status = status;
 

@@ -4,8 +4,9 @@ import { useState } from "react";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import type { Guia, GuiaItem } from "./types";
 import { clientesSummary } from "./constants";
-import { SkeletonTable, EmptyState, StatusBadge } from "@/components/ui";
+import { SkeletonTable, EmptyState, StatusBadge, AccordionContent, ScrollableTable } from "@/components/ui";
 import DespachoForm from "./DespachoForm";
+import { exportGuiasExcel } from "./excel-guias";
 
 interface GuiasListProps {
   guias: Guia[];
@@ -77,14 +78,45 @@ export default function GuiasList({
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-light tracking-tight">Guias de Transporte</h1>
-          {canCreate && (
-            <button
-              onClick={onNewGuia}
-              className="text-sm bg-black text-white px-6 py-3 rounded-md font-medium hover:bg-gray-800 transition"
-            >
-              Nueva Guia
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {guias.length > 0 && (
+              <button
+                onClick={() => {
+                  const filtered = guias
+                    .filter((g) => {
+                      if (!search) return true;
+                      const q = search.toLowerCase();
+                      return (
+                        g.transportista.toLowerCase().includes(q) ||
+                        (g.guia_items || []).some(
+                          (item: GuiaItem) =>
+                            (item.facturas || "").toLowerCase().includes(q) ||
+                            (item.cliente || "").toLowerCase().includes(q),
+                        )
+                      );
+                    })
+                    .filter((g) => !showPending || g.estado === "Pendiente Bodega");
+                  const subtitle = search
+                    ? `Filtrado: "${search}"`
+                    : showPending
+                      ? "Pendientes de bodega"
+                      : "Todas las gu\u00edas";
+                  exportGuiasExcel(filtered, subtitle);
+                }}
+                className="text-sm border border-gray-200 text-gray-600 px-4 py-3 rounded-md font-medium hover:border-gray-400 hover:text-black transition"
+              >
+                &darr; Excel
+              </button>
+            )}
+            {canCreate && (
+              <button
+                onClick={onNewGuia}
+                className="text-sm bg-black text-white px-6 py-3 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all"
+              >
+                Nueva Guia
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Bodega pending banner */}
@@ -175,6 +207,11 @@ export default function GuiasList({
                               {clientesSummary(g.guia_items || [])}
                             </span>
                             <span className="tabular-nums w-14 text-right shrink-0">{g.total_bultos}</span>
+                            {!isDispatched && g.estado === "Pendiente Bodega" && (
+                              <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap">
+                                ⚠ Pendiente despacho
+                              </span>
+                            )}
                             <span className="w-24 shrink-0">
                               <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : isDispatched ? "despachada" : "pendiente"} />
                             </span>
@@ -187,14 +224,14 @@ export default function GuiasList({
                           </button>
 
                           {/* Expanded content */}
-                          {isExpanded && (
+                          <AccordionContent open={isExpanded}>
                             <div className="px-4 pb-5 border-t border-gray-200">
                               {expandedLoading ? (
                                 <div className="py-6 flex justify-center"><svg className="animate-spin h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
                               ) : expandedGuia ? (
                                 <>
                                   {/* Items table */}
-                                  <div className="overflow-x-auto mt-4">
+                                  <ScrollableTable minWidth={600} className="mt-4">
                                     <table className="w-full text-xs">
                                       <thead className="sticky top-0 bg-white z-10">
                                         <tr className="text-[10px] uppercase tracking-wider text-gray-400 border-b border-gray-200">
@@ -219,7 +256,7 @@ export default function GuiasList({
                                         ))}
                                       </tbody>
                                     </table>
-                                  </div>
+                                  </ScrollableTable>
 
                                   {/* Observaciones */}
                                   {expandedGuia.observaciones && (
@@ -311,7 +348,7 @@ export default function GuiasList({
                                       </button>
                                     )}
                                     <button
-                                      onClick={() => onPrint(expandedGuia.id)}
+                                      onClick={() => window.open(`/guias?id=${expandedGuia.id}`, '_blank')}
                                       className="text-xs text-gray-500 hover:text-black transition min-h-[44px] inline-flex items-center"
                                     >
                                       Imprimir
@@ -339,7 +376,7 @@ export default function GuiasList({
                                 </>
                               ) : null}
                             </div>
-                          )}
+                          </AccordionContent>
                         </div>
                       );
                     })}
@@ -347,8 +384,11 @@ export default function GuiasList({
                     {/* Ver más */}
                     {hasMore && (
                       <button onClick={() => setVisibleCount(c => c + 15)}
-                        className="w-full py-3 text-sm text-gray-600 hover:text-black transition border border-gray-200 rounded-lg mt-2">
-                        Ver más ({filtered.length - visibleCount} restantes)
+                        className="w-full py-4 text-base font-medium text-gray-700 hover:text-black hover:bg-gray-50 transition border-2 border-gray-300 rounded-lg mt-3 flex items-center justify-center gap-2">
+                        <span>Ver más ({filtered.length - visibleCount} restantes)</span>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
                       </button>
                     )}
 

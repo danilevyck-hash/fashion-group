@@ -130,3 +130,42 @@ input, button, select, textarea {
 .table-scroll-hint.show-hint::after {
   opacity: 1;
 }
+
+/* ── Reebok catalog micro-interactions ── */
+
+/* Card bounce on add to cart */
+@keyframes cardBounce {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.03); }
+  60% { transform: scale(0.99); }
+  100% { transform: scale(1); }
+}
+
+/* Checkmark overlay fade */
+@keyframes checkFade {
+  0% { opacity: 0; transform: scale(0.5); }
+  30% { opacity: 1; transform: scale(1.1); }
+  50% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+/* Order confirmed celebration */
+@keyframes confirmPulse {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes confirmBannerPulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.3); }
+  50% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+
+/* Floating bar slide up */
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.floating-bar-enter {
+  animation: slideUp 0.3s ease-out;
+}

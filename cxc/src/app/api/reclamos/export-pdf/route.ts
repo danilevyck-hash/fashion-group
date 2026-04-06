@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
+import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 
 /** Tasa de importación — 10% */
 const TASA_IMPORTACION = 0.10;
@@ -45,12 +46,16 @@ async function buildPdf(reclamos: Record<string, unknown>[]) {
   // Header
   doc.setFillColor(27, 58, 92);
   doc.rect(0, 0, 220, 22, "F");
+  try {
+    doc.addImage(FG_LOGO_BASE64, "JPEG", 8, 3, FG_LOGO_WIDTH + 2, FG_LOGO_HEIGHT + 2);
+  } catch { /* skip if logo fails */ }
+  const logoEnd = 8 + FG_LOGO_WIDTH + 2 + 4;
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
-  doc.text("FASHION GROUP", 108, 10, { align: "center" });
+  doc.text("FASHION GROUP", logoEnd, 10, { align: "left" });
   doc.setFontSize(10);
-  doc.text(`Reclamos — ${empresa}`, 108, 17, { align: "center" });
+  doc.text(`Reclamos — ${empresa}`, logoEnd, 17, { align: "left" });
 
   // Subtitle with date
   doc.setTextColor(100, 100, 100);

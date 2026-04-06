@@ -26,7 +26,7 @@ export default function PrintView({ current, onBack }: Props) {
         </button>
         <button
           onClick={() => window.print()}
-          className="text-sm bg-black text-white px-6 py-2 rounded-md hover:bg-gray-800 transition"
+          className="text-sm bg-black text-white px-6 py-2 rounded-md hover:bg-gray-800 active:scale-[0.97] transition-all"
         >
           Imprimir
         </button>
@@ -37,9 +37,13 @@ export default function PrintView({ current, onBack }: Props) {
         className="border border-gray-200 rounded-lg p-8"
         style={{ fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif" }}
       >
-        <h1 className="text-center text-lg font-bold mb-2 uppercase tracking-wide">
-          Reporte de Caja Menuda
-        </h1>
+        <div className="flex items-center justify-center gap-3 mb-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.jpeg" alt="FG" className="w-9 h-9 rounded" />
+          <h1 className="text-lg font-bold uppercase tracking-wide">
+            Reporte de Caja Menuda
+          </h1>
+        </div>
         <p className="text-center text-sm text-gray-600 mb-1">
           Período N° {current.numero} | Apertura:{" "}
           {fmtDate(current.fecha_apertura)}

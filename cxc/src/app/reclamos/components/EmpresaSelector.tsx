@@ -59,10 +59,10 @@ export default function EmpresaSelector({
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex items-center justify-between mb-5">
           <h1 className="text-xl font-light tracking-tight">Reclamos</h1>
-          <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition">Nuevo Reclamo</button>
+          <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
         </div>
 
-        {role === "admin" && (
+        {(role === "admin" || role === "secretaria") && (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-5">
             <div className="border border-gray-200 rounded-lg p-4"><div className="text-xs text-gray-400 uppercase tracking-widest">Total Pendiente</div><div className="text-xl font-semibold mt-1 tabular-nums">${fmt(totalPendiente)}</div></div>
             <div className="border border-gray-200 rounded-lg p-4"><div className="text-xs text-gray-400 uppercase tracking-widest">Reclamos Abiertos</div><div className="text-xl font-semibold mt-1">{pendientes.length}</div></div>

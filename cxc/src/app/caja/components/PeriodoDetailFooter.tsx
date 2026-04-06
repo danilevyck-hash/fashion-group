@@ -34,17 +34,21 @@ export default function PeriodoDetailFooter({
             </p>
           </div>
           {!current.repuesto ? (
-            <button
-              onClick={() => onAprobarReposicion(current.id)}
-              className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition"
-            >
-              Aprobar reposición
-            </button>
+            <div>
+              <button
+                onClick={() => onAprobarReposicion(current.id)}
+                title="Reponer = devolver el dinero gastado al fondo de caja"
+                className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all"
+              >
+                Aprobar reposicion
+              </button>
+              <p className="text-[10px] text-gray-400 mt-1 text-right">Reponer = devolver el dinero gastado al fondo de caja</p>
+            </div>
           ) : (
             <span className="text-sm text-green-600 font-medium">
               ✓ Repuesto el{" "}
               {current.repuesto_at
-                ? new Date(current.repuesto_at).toLocaleDateString("es-PA")
+                ? new Date(current.repuesto_at).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")
                 : ""}
             </span>
           )}
@@ -55,7 +59,7 @@ export default function PeriodoDetailFooter({
       <div className="flex flex-wrap items-center gap-6 mt-8">
         <button
           onClick={onPrint}
-          className="text-sm bg-black text-white px-6 py-2 rounded-md hover:bg-gray-800 transition"
+          className="text-sm bg-black text-white px-6 py-2 rounded-md hover:bg-gray-800 active:scale-[0.97] transition-all"
         >
           Imprimir
         </button>

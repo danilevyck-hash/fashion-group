@@ -52,7 +52,7 @@ function calcKPIs(rows: VentaRow[], prevRows: VentaRow[], metaRows: MetaRow[], v
     const diff = margenBruto - prevMargen;
     const arrow = diff >= 0 ? "↑" : "↓";
     const sign = diff >= 0 ? "+" : "";
-    margenDisplay = `${margenBruto.toFixed(1)}% ${arrow}${sign}${diff.toFixed(1)}pp`;
+    margenDisplay = `${margenBruto.toFixed(1)}% ${arrow}${sign}${diff.toFixed(1)} puntos`;
     margenFlag = diff < 0;
   } else {
     margenDisplay = `${margenBruto.toFixed(1)}%`;
@@ -109,7 +109,7 @@ export default function VentasDashboard() {
   }, [authChecked, role, router]);
 
   const [año, setAño] = useState(new Date().getFullYear());
-  const [vista, setVista] = useState<"mensual" | "quarter">(() => typeof window !== "undefined" && window.innerWidth < 640 ? "quarter" : "mensual");
+  const [vista, setVista] = useState<"mensual" | "quarter">("mensual");
   const [empresaFilter, setEmpresaFilter] = useState<string[]>([]); // empty = all
   const [filterMes, setFilterMes] = useState<number | null>(null); // null = all months
   const [loading, setLoading] = useState(true);
@@ -282,17 +282,40 @@ export default function VentasDashboard() {
     ];
     for (const row of table.tableRows) {
       if (row.total === 0 && empresaFilter.length === 0) continue;
-      rows.push([row.empresa, ...row.values, row.total, Number(row.margen.toFixed(1))]);
+      rows.push([row.empresa, ...row.values, row.total, row.margen / 100]);
     }
-    rows.push(["TOTAL", ...table.totalValues, table.grandTotal, Number(table.grandMargen.toFixed(1))]);
+    rows.push(["TOTAL", ...table.totalValues, table.grandTotal, table.grandMargen / 100]);
     const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [{ wch: 24 }, ...table.periods.map(() => ({ wch: 12 })), { wch: 14 }, { wch: 10 }];
+    ws["!cols"] = [{ wch: 24 }, ...table.periods.map(() => ({ wch: 14 })), { wch: 16 }, { wch: 10 }];
     ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: table.periods.length + 2 } }];
     const titleCell = ws[XLSX.utils.encode_cell({ r: 0, c: 0 })];
     if (titleCell) titleCell.s = { font: { bold: true, sz: 14 } };
     for (let c = 0; c < table.periods.length + 3; c++) {
       const cell = ws[XLSX.utils.encode_cell({ r: 2, c })];
       if (cell) cell.s = { font: { bold: true } };
+    }
+    // Apply number formats to data rows (currency + percentage)
+    const dataStartRow = 3; // row 0=title, 1=blank, 2=headers
+    const lastDataRow = rows.length - 1;
+    const numPeriods = table.periods.length;
+    const currFmt = { numFmt: '$#,##0.00' };
+    const pctFmt = { numFmt: '0.0%' };
+    for (let r = dataStartRow; r <= lastDataRow; r++) {
+      const isTotal = r === lastDataRow;
+      const base = isTotal ? { font: { bold: true } } : {};
+      // Currency columns: period values + total (cols 1 .. numPeriods+1)
+      for (let c = 1; c <= numPeriods + 1; c++) {
+        const cell = ws[XLSX.utils.encode_cell({ r, c })];
+        if (cell) cell.s = { ...base, ...currFmt };
+      }
+      // Margin % column (last col)
+      const mCell = ws[XLSX.utils.encode_cell({ r, c: numPeriods + 2 })];
+      if (mCell) mCell.s = { ...base, ...pctFmt };
+      // Bold empresa name in total row
+      if (isTotal) {
+        const nCell = ws[XLSX.utils.encode_cell({ r, c: 0 })];
+        if (nCell) nCell.s = { font: { bold: true } };
+      }
     }
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Ventas");
@@ -309,11 +332,11 @@ export default function VentasDashboard() {
   if (!authChecked) return null;
 
   const kpiCards = [
-    { key: "ventas", label: "Ventas netas", value: fmtK(kpi.ventasNetas), flag: false, tooltip: "Total de ventas sin ITBMS. Facturas menos Notas de Crédito más Notas de Débito.", valueExtra: undefined as string | null | undefined },
-    { key: "vsAnterior", label: "vs. Año Ant.", value: kpi.vsAnterior === null ? "—" : `${kpi.vsAnterior >= 0 ? "+" : ""}${kpi.vsAnterior.toFixed(1)}%`, flag: kpi.vsAnterior !== null && kpi.vsAnterior < -20, tooltip: "Compara los mismos meses con datos vs el año pasado.", valueExtra: undefined as string | null | undefined },
-    { key: "utilidad", label: "Utilidad total", value: fmtK(kpi.totalUtil), valueExtra: kpi.utilVsAnt, flag: false, tooltip: "Utilidad bruta total del período en B/. absolutos." },
-    { key: "margen", label: "Margen bruto", value: kpi.margenDisplay, flag: kpi.margenFlag, tooltip: "Utilidad / ventas netas. Fusionado con tendencia vs año anterior.", valueExtra: undefined as string | null | undefined },
-    { key: "vsMeta", label: "vs. Meta", value: kpi.metaTotal ? `${kpi.vsMeta.toFixed(0)}%` : "N/A", flag: kpi.metaTotal > 0 && kpi.vsMeta < 80, tooltip: "Cumplimiento de la meta definida. N/A si no hay metas.", valueExtra: undefined as string | null | undefined },
+    { key: "ventas", label: "Ventas netas", value: fmtK(kpi.ventasNetas), flag: false, tooltip: "Total vendido en el período (sin impuestos).", valueExtra: undefined as string | null | undefined },
+    { key: "vsAnterior", label: `vs. ${año - 1}`, value: kpi.vsAnterior === null ? "—" : `${kpi.vsAnterior >= 0 ? "+" : ""}${kpi.vsAnterior.toFixed(1)}%`, flag: kpi.vsAnterior !== null && kpi.vsAnterior < -20, tooltip: "Comparado con el mismo período del año pasado.", valueExtra: undefined as string | null | undefined },
+    { key: "utilidad", label: "Utilidad total", value: fmtK(kpi.totalUtil), valueExtra: kpi.utilVsAnt, flag: false, tooltip: "Ganancia bruta del período." },
+    { key: "margen", label: "Margen bruto", value: kpi.margenDisplay, flag: kpi.margenFlag, tooltip: "Porcentaje de ganancia sobre las ventas.", valueExtra: undefined as string | null | undefined },
+    { key: "vsMeta", label: "vs. Meta", value: kpi.metaTotal ? `${kpi.vsMeta.toFixed(0)}%` : "N/A", flag: kpi.metaTotal > 0 && kpi.vsMeta < 80, tooltip: "Qué tanto se alcanzó la meta de ventas.", valueExtra: undefined as string | null | undefined },
   ];
 
   return (
@@ -325,15 +348,15 @@ export default function VentasDashboard() {
           <h1 className="text-xl font-semibold">Dashboard de Ventas</h1>
           <div className="flex items-center gap-2">
             <button onClick={() => router.push("/upload?tab=ventas&from=ventas")}
-              className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 transition print:hidden">
+              className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all print:hidden">
               Cargar datos
             </button>
             <button onClick={exportExcel}
-              className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 transition print:hidden">
+              className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all print:hidden">
               ↓ Excel
             </button>
             <button onClick={() => window.open(`/ventas/reporte?anio=${año}&empresa=${empresaFilter.join(",") || "all"}&vista=${vista}`, "_blank")}
-              className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 transition print:hidden">
+              className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all print:hidden">
               Imprimir
             </button>
           </div>
@@ -378,7 +401,7 @@ export default function VentasDashboard() {
             {MES_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
           </select>
           {role === "admin" && (
-            <button onClick={openMetas} className="ml-auto text-xs bg-black text-white rounded-md px-4 py-1.5 hover:bg-gray-800 transition">
+            <button onClick={openMetas} className="ml-auto text-xs bg-black text-white rounded-md px-4 py-1.5 hover:bg-gray-800 active:scale-[0.97] transition-all">
               Editar metas
             </button>
           )}
@@ -428,8 +451,7 @@ export default function VentasDashboard() {
           />
         )}
 
-        {/* Mobile hint */}
-        {vista === "quarter" && <p className="text-xs text-gray-500 mb-2 sm:hidden">Vista trimestral activa en mobile</p>}
+        {/* Mobile hint removed — user can freely toggle Mensual/Quarter on any device */}
 
         {/* Period indicator */}
         {!loading && kpi.monthsWithData.length > 0 && (
@@ -545,7 +567,7 @@ export default function VentasDashboard() {
                   {displayClients.map(c => {
                     const margen = c.subtotal ? (c.utilidad / c.subtotal * 100) : 0;
                     const pct = totalVentas ? (c.subtotal / totalVentas * 100) : 0;
-                    const lastCompra = c.lastFecha ? new Date(c.lastFecha).toLocaleDateString("es-PA", { month: "long", year: "numeric" }) : "—";
+                    const lastCompra = c.lastFecha ? new Date(c.lastFecha).toLocaleDateString("es-PA", { month: "short", year: "numeric" }).replace(".", "") : "—";
                     const expanded = expandedClient === c.cliente;
                     return [
                       <tr key={c.cliente} className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer" onClick={() => setExpandedClient(expanded ? null : c.cliente)}>
@@ -566,7 +588,7 @@ export default function VentasDashboard() {
                           <td className="text-right px-3 py-1.5 tabular-nums text-gray-500 text-xs">{fmtK(e.utilidad)}</td>
                           <td className="text-right px-3 py-1.5 tabular-nums text-gray-500 text-xs">{e.subtotal ? ((e.utilidad / e.subtotal) * 100).toFixed(1) : 0}%</td>
                           <td></td>
-                          <td className="text-right px-3 py-1.5 text-gray-500 text-xs">{e.lastFecha ? new Date(e.lastFecha).toLocaleDateString("es-PA", { month: "long", year: "numeric" }) : "—"}</td>
+                          <td className="text-right px-3 py-1.5 text-gray-500 text-xs">{e.lastFecha ? new Date(e.lastFecha).toLocaleDateString("es-PA", { month: "short", year: "numeric" }).replace(".", "") : "—"}</td>
                         </tr>
                       )),
                     ];
@@ -607,9 +629,9 @@ export default function VentasDashboard() {
           </table>
         </div>
         <div className="flex justify-end gap-2 mt-4">
-          <button onClick={() => setShowMetas(false)} className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50">Cancelar</button>
+          <button onClick={() => setShowMetas(false)} className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all">Cancelar</button>
           <button onClick={saveMetas} disabled={savingMetas}
-            className="text-xs bg-black text-white rounded-md px-4 py-2 hover:bg-gray-800 disabled:opacity-50">
+            className="text-xs bg-black text-white rounded-md px-4 py-2 hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50">
             {savingMetas ? "Guardando..." : "Guardar metas"}
           </button>
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { Product } from "@/components/reebok/supabase";
 
 interface Props {
@@ -15,6 +16,19 @@ export default function ProductCard({ product, stock = 0, qty, onQtyChange, disa
   const [showLightbox, setShowLightbox] = useState(false);
   const [showQtyInput, setShowQtyInput] = useState(false);
   const [qtyInputVal, setQtyInputVal] = useState("");
+  const [imageStatus, setImageStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const [justAdded, setJustAdded] = useState(false);
+  const prevQtyRef = useRef(qty);
+
+  // Detect when qty goes from 0 to 1 (first add) and trigger flash
+  useEffect(() => {
+    if (prevQtyRef.current === 0 && qty === 1) {
+      setJustAdded(true);
+      const t = setTimeout(() => setJustAdded(false), 600);
+      return () => clearTimeout(t);
+    }
+    prevQtyRef.current = qty;
+  }, [qty]);
 
   function setQty(n: number) {
     onQtyChange(product.id, Math.max(0, n), product);
@@ -31,10 +45,46 @@ export default function ProductCard({ product, stock = 0, qty, onQtyChange, disa
 
   return (
     <>
-      <div className="bg-white overflow-hidden rounded-lg">
+      <div className={`bg-white overflow-hidden rounded-lg relative transition-all duration-300 ${justAdded ? "ring-2 ring-emerald-400 scale-[1.02]" : ""}`}
+        style={justAdded ? { animation: "cardBounce 0.4s ease-out" } : undefined}>
+        {/* Checkmark overlay on add */}
+        {justAdded && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none" style={{ animation: "checkFade 0.6s ease-out forwards" }}>
+            <div className="w-10 h-10 rounded-full bg-emerald-500 flex items-center justify-center shadow-lg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+          </div>
+        )}
         <div className="aspect-square bg-gray-50 relative overflow-hidden cursor-pointer" onClick={() => { if (product.image_url) setShowLightbox(true); }}>
           {product.image_url ? (
-            <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-2" loading="lazy" />
+            <>
+              {imageStatus === "loading" && (
+                <div className="absolute inset-0 shimmer" />
+              )}
+              {imageStatus === "error" ? (
+                <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 gap-2">
+                  <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setImageStatus("loading"); }}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              ) : (
+                <Image
+                  key={imageStatus}
+                  src={product.image_url}
+                  alt={product.name}
+                  width={300}
+                  height={300}
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+                  className="object-contain p-2"
+                  onLoad={() => setImageStatus("loaded")}
+                  onError={() => setImageStatus("error")}
+                />
+              )}
+            </>
           ) : (
             <div className="w-full h-full flex items-center justify-center text-gray-300">
               <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>

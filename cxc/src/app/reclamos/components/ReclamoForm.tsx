@@ -50,6 +50,9 @@ export default function ReclamoForm({
   const formFotoRef = useRef<HTMLInputElement>(null);
   const [deleteFotoTarget, setDeleteFotoTarget] = useState<Foto | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  function handleBlur(field: string) { setTouched((prev) => ({ ...prev, [field]: true })); }
+  function fieldError(field: string, value: string) { return touched[field] && !value.trim(); }
   const empInfo = fEmpresa ? EMPRESAS_MAP[fEmpresa] : null;
   const fSubtotal = fItems.reduce((s, i) => s + (i.subtotal || 0), 0);
   const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
@@ -73,19 +76,22 @@ export default function ReclamoForm({
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-12 gap-y-5 mb-6">
           <div className="flex flex-col gap-1">
             <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa *</label>
-            <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm text-black outline-none bg-transparent">
+            <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} onBlur={() => handleBlur("empresa")} className={`border-b ${fieldError("empresa", fEmpresa) ? "border-red-400" : "border-gray-200"} py-1.5 text-sm text-black outline-none bg-transparent`}>
               <option value="">Seleccionar...</option>
               {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
             </select>
+            {fieldError("empresa", fEmpresa) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             {empInfo && <p className="text-xs text-gray-400 mt-1">Proveedor: {empInfo.proveedor} | Marca: {empInfo.marca}</p>}
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Factura *</label>
-            <input type="text" value={fFactura} onChange={(e) => setFFactura(e.target.value)} placeholder="Ej. 3000012593" className="border-b border-gray-200 py-1.5 text-sm text-black outline-none" />
+            <input type="text" value={fFactura} onChange={(e) => setFFactura(e.target.value)} onBlur={() => handleBlur("factura")} placeholder="Ej. 3000012593" className={`border-b ${fieldError("factura", fFactura) ? "border-red-400" : "border-gray-200"} py-1.5 text-sm text-black outline-none`} />
+            {fieldError("factura", fFactura) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha *</label>
-            <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm text-black outline-none" />
+            <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleBlur("fecha")} className={`border-b ${fieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-1.5 text-sm text-black outline-none`} />
+            {fieldError("fecha", fFecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Pedido</label>
@@ -189,7 +195,7 @@ export default function ReclamoForm({
                 ))}
               </div>
             )}
-            {formFotos.length < 3 && (
+            {formFotos.length < 5 && (
               <>
                 <input ref={formFotoRef} type="file" accept="image/*" className="hidden" onChange={async (e) => {
                   const file = e.target.files?.[0];
@@ -215,7 +221,7 @@ export default function ReclamoForm({
         <div className="mt-8">
           {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
           <div className="flex items-center gap-6">
-            <button onClick={onSave} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50">
+            <button onClick={onSave} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50">
               {saving ? "Guardando..." : "Guardar Reclamo"}
             </button>
             <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>

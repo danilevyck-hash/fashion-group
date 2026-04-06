@@ -20,6 +20,7 @@ export default function NewOrderModal({ onClose }: Props) {
     } catch { /* */ }
     return "";
   });
+  const [email, setEmail] = useState("");
   const [confirmed, setConfirmed] = useState(false);
   const [suggestions, setSuggestions] = useState<DirClient[]>([]);
   const [showSugg, setShowSugg] = useState(false);
@@ -54,9 +55,14 @@ export default function NewOrderModal({ onClose }: Props) {
         body: JSON.stringify({ nombre: name.trim() }),
       }).catch(() => { /* best-effort */ });
     }
-    // Clear any existing draft and set new client name
+    // Clear any existing draft and set new client name + email
     sessionStorage.removeItem("reebok_draft_id");
     sessionStorage.setItem("reebok_draft_client", name.trim());
+    if (email.trim()) {
+      sessionStorage.setItem("reebok_draft_client_email", email.trim());
+    } else {
+      sessionStorage.removeItem("reebok_draft_client_email");
+    }
     onClose();
     router.push("/catalogo/reebok/productos");
   }
@@ -96,6 +102,13 @@ export default function NewOrderModal({ onClose }: Props) {
               )}
             </>
           )}
+        </div>
+        <div className="mt-3">
+          <label className="text-xs text-gray-400">Correo del cliente (opcional)</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && canProceed) proceed(); }}
+            placeholder="cliente@ejemplo.com"
+            className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
         </div>
         <button onClick={proceed} disabled={!canProceed}
           className="w-full mt-4 bg-black text-white py-2.5 rounded text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">

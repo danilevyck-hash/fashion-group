@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
 
-  const { client_name, vendor_name, items } = await req.json();
+  const { client_name, vendor_name, client_email, items } = await req.json();
   if (!client_name) return NextResponse.json({ error: "client_name required" }, { status: 400 });
   if (!items || !Array.isArray(items) || items.length === 0) return NextResponse.json({ error: "El pedido debe tener al menos un producto" }, { status: 400 });
 
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   const { data: order, error } = await reebokServer
     .from("reebok_orders")
-    .insert({ order_number, client_name, vendor_name: vendor_name || session.userName || null, total, status: "borrador" })
+    .insert({ order_number, client_name, vendor_name: vendor_name || session.userName || null, client_email: client_email || null, total, status: "borrador" })
     .select().single();
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
 

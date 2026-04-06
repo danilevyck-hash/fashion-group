@@ -4,6 +4,18 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 
+function ForgotPassword() {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="text-center">
+      <button type="button" onClick={() => setShow(!show)} className="text-xs text-gray-400 hover:text-gray-600 transition">
+        ¿Olvidaste tu contraseña?
+      </button>
+      {show && <p className="text-xs text-gray-500 mt-2">Contacta al administrador para restablecer tu contraseña.</p>}
+    </div>
+  );
+}
+
 function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -88,6 +100,8 @@ function LoginForm() {
         >
           {loading ? "Verificando..." : "Ingresar"}
         </button>
+
+        <ForgotPassword />
       </form>
     </div>
   );

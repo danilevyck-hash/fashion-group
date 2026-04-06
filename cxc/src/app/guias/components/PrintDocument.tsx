@@ -40,9 +40,13 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
         className="border border-gray-200 rounded-lg p-8"
         style={{ fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif" }}
       >
-        <h1 className="text-center text-lg font-bold mb-6 uppercase tracking-wide">
-          Guia de Transporte Interior
-        </h1>
+        <div className="flex items-center justify-center gap-3 mb-6">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.jpeg" alt="FG" className="w-9 h-9 rounded" />
+          <h1 className="text-lg font-bold uppercase tracking-wide">
+            Guia de Transporte Interior
+          </h1>
+        </div>
 
         <div className="print-header grid grid-cols-2 gap-4 mb-4 text-sm">
           <div className="flex gap-2">
@@ -64,7 +68,7 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
             </span>
           </div>
           <div className="flex gap-2">
-            <span className="font-medium">ENTREGADO POR:</span>
+            <span className="font-medium">DESPACHADO POR:</span>
             <span className="border-b border-gray-300 flex-1 text-center">
               {g.entregado_por || "\u00A0"}
             </span>
@@ -140,7 +144,7 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
           {/* Left column */}
           <div>
             <div className="font-medium uppercase mb-6">
-              {isDirect ? "Chofer" : "Entregado por"}
+              {isDirect ? "Chofer" : "Despachado por"}
             </div>
             <div className="mb-4">
               NOMBRE:{" "}

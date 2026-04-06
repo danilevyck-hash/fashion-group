@@ -94,12 +94,23 @@ export function useEmpleadoActions({ empleadoId, empleado, movs, onSuccess, onDe
   }
 
   async function clearHistory() {
-    for (let i = 0; i < movs.length; i++) {
-      setClearProgress(`Eliminando movimiento ${i + 1} de ${movs.length}...`);
-      await fetch(`/api/prestamos/movimientos/${movs[i].id}`, { method: "DELETE" });
+    setClearProgress("Borrando historial...");
+    try {
+      const res = await fetch("/api/prestamos/movimientos", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ empleado_id: empleadoId }),
+      });
+      if (res.ok) {
+        showToast("Historial borrado");
+      } else {
+        const err = await res.json();
+        showToast(err.error || "Error al borrar historial");
+      }
+    } catch {
+      showToast("Error de conexión");
     }
     setClearProgress("");
-    showToast("Historial eliminado");
     setClearInput(""); setShowClearConfirm(false);
     onSuccess();
   }

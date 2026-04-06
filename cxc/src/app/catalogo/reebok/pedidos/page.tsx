@@ -162,7 +162,7 @@ export default function PedidosPage() {
                 <div className="flex items-center gap-2 mt-0.5">
                   <span className="text-xs text-gray-400 font-mono">{o.order_number}</span>
                   <span className="text-xs text-gray-300">·</span>
-                  <span className="text-xs text-gray-400">{new Date(o.created_at).toLocaleDateString("es-PA")}</span>
+                  <span className="text-xs text-gray-400">{new Date(o.created_at).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")}</span>
                   <span className="text-xs text-gray-300">·</span>
                   <span className="text-xs text-gray-400">{o.item_count} items</span>
                 </div>

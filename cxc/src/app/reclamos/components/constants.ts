@@ -31,6 +31,16 @@ export const TALLAS = ["XS", "S", "M", "L", "XL", "XXL", "OS", "Otros"];
 
 export const ESTADOS = ["Borrador", "Enviado", "En revisión", "Resuelto con NC", "Rechazado"];
 
+/** Display-friendly names for estados (use in buttons/labels) */
+export const ESTADO_DISPLAY: Record<string, string> = {
+  "Resuelto con NC": "Resuelto con Nota de Crédito",
+};
+
+/** Get display name for an estado, falls back to the estado itself */
+export function estadoLabel(estado: string): string {
+  return ESTADO_DISPLAY[estado] || estado;
+}
+
 export const EC: Record<string, string> = {
   "Borrador": "bg-gray-100 text-gray-600",
   "Enviado": "bg-blue-50 text-blue-700",
@@ -39,13 +49,41 @@ export const EC: Record<string, string> = {
   "Rechazado": "bg-red-50 text-red-600",
 };
 
+/** Load custom motivos — tries API first, falls back to localStorage */
 export function loadCustomMotivos(): string[] {
   try { return JSON.parse(localStorage.getItem("fg_custom_motivos") || "[]"); } catch { return []; }
 }
 
-export function saveCustomMotivo(m: string) {
+/** Fetch custom motivos from Supabase. Falls back to localStorage if API fails. */
+export async function fetchCustomMotivos(): Promise<string[]> {
+  try {
+    const res = await fetch("/api/reclamos/motivos");
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data) && data.length > 0) {
+        // Sync to localStorage as cache
+        localStorage.setItem("fg_custom_motivos", JSON.stringify(data));
+        return data;
+      }
+    }
+  } catch { /* fall through */ }
+  // Fallback: load from localStorage
+  return loadCustomMotivos();
+}
+
+/** Save a custom motivo — persists to Supabase and localStorage */
+export async function saveCustomMotivo(m: string) {
+  // Save to localStorage immediately for instant feedback
   const cur = loadCustomMotivos();
   if (!cur.includes(m)) { cur.push(m); localStorage.setItem("fg_custom_motivos", JSON.stringify(cur)); }
+  // Persist to Supabase in background
+  try {
+    await fetch("/api/reclamos/motivos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ motivo: m }),
+    });
+  } catch { /* localStorage already has it as fallback */ }
 }
 
 export function emptyItem(): RItem {

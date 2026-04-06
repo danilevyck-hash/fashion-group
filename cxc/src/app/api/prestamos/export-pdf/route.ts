@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
+import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "contabilidad"]);
@@ -37,13 +38,17 @@ export async function GET(req: NextRequest) {
 
   // Header
   doc.setFillColor(27, 58, 92);
-  doc.rect(0, 0, 220, 20, "F");
+  doc.rect(0, 0, 220, 22, "F");
+  try {
+    doc.addImage(FG_LOGO_BASE64, "JPEG", 8, 3, FG_LOGO_WIDTH + 2, FG_LOGO_HEIGHT + 2);
+  } catch { /* skip if logo fails */ }
+  const logoEnd = 8 + FG_LOGO_WIDTH + 2 + 4;
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
-  doc.text("FASHION GROUP", 108, 10, { align: "center" });
+  doc.text("FASHION GROUP", logoEnd, 10, { align: "left" });
   doc.setFontSize(10);
-  doc.text(`Reporte de Deducciones Quincenales — ${periodoLabel}`, 108, 17, { align: "center" });
+  doc.text(`Reporte de Deducciones Quincenales — ${periodoLabel}`, logoEnd, 17, { align: "left" });
 
   // Table
   let total = 0;

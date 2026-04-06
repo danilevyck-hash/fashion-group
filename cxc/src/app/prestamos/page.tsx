@@ -75,6 +75,7 @@ export default function PrestamosPage() {
   const [empleados, setEmpleados] = useState<Empleado[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const [kpiTooltip, setKpiTooltip] = useState<string | null>(null);
 
   // Filters
   const [filterEmpresa, setFilterEmpresa] = useState("all");
@@ -224,23 +225,40 @@ export default function PrestamosPage() {
         {/* KPI Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
           <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-            <div className="text-xs text-gray-400 uppercase tracking-wide">Total Prestado</div>
+            <div className="flex items-center">
+              <div className="text-xs text-gray-400 uppercase tracking-wide">Total Prestado</div>
+              <button onClick={() => setKpiTooltip(kpiTooltip === "prestado" ? null : "prestado")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
+            </div>
             <div className="text-lg font-semibold mt-0.5 tabular-nums">${fmt(totalPrestado)}</div>
+            {kpiTooltip === "prestado" && <p className="text-xs text-gray-500 mt-1">Suma total de préstamos otorgados a colaboradores</p>}
           </div>
           <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-            <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo Pendiente</div>
+            <div className="flex items-center">
+              <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo Pendiente</div>
+              <button onClick={() => setKpiTooltip(kpiTooltip === "saldo" ? null : "saldo")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
+            </div>
             <div className="text-lg font-semibold mt-0.5 tabular-nums text-red-600">${fmt(totalSaldo)}</div>
+            {kpiTooltip === "saldo" && <p className="text-xs text-gray-500 mt-1">Lo que falta por cobrar de todos los préstamos</p>}
           </div>
           <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-            <div className="text-xs text-gray-400 uppercase tracking-wide">Empleados Activos</div>
+            <div className="flex items-center">
+              <div className="text-xs text-gray-400 uppercase tracking-wide">Empleados Activos</div>
+              <button onClick={() => setKpiTooltip(kpiTooltip === "empleados" ? null : "empleados")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
+            </div>
             <div className="text-lg font-semibold mt-0.5 tabular-nums">{empleadosActivos}</div>
+            {kpiTooltip === "empleados" && <p className="text-xs text-gray-500 mt-1">Colaboradores con préstamos en curso</p>}
           </div>
           <div className={`rounded-lg p-3 ${deduccionesCompletas ? "bg-green-50" : "bg-amber-50"}`}>
-            <div className="text-xs text-gray-400 uppercase tracking-wide">Deducciones Quincena</div>
+            <div className="flex items-center">
+              <div className="text-xs text-gray-400 uppercase tracking-wide">Deducciones Quincena</div>
+              <button onClick={() => setKpiTooltip(kpiTooltip === "deducciones" ? null : "deducciones")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
+            </div>
             <div className={`text-lg font-semibold mt-0.5 tabular-nums ${deduccionesCompletas ? "text-green-600" : "text-amber-600"}`}>
               {deduccionesAplicadas} / {deduccionesTotal}
             </div>
+            <div className="text-[11px] text-gray-500 mt-0.5">{deduccionesAplicadas} deducidos de {deduccionesTotal} empleados</div>
             <div className="text-xs text-gray-400">{quincena.label}</div>
+            {kpiTooltip === "deducciones" && <p className="text-xs text-gray-500 mt-1">Cantidad de empleados a los que ya se les aplicó la deducción quincenal vs. el total que tienen deducción configurada</p>}
           </div>
         </div>
 
@@ -346,8 +364,8 @@ export default function PrestamosPage() {
               <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Empleado</th>
-                  <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Empresa</th>
-                  <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Ded. Quincenal</th>
+                  <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Empresa</th>
+                  <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Ded. Quinc.</th>
                   <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Total Prestado</th>
                   <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Pagado</th>
                   <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Saldo</th>
@@ -365,8 +383,8 @@ export default function PrestamosPage() {
                       {!emp.activo && <span className="ml-2 text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span>}
                       {pendientes > 0 && <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md">{pendientes} pendiente{pendientes > 1 ? "s" : ""}</span>}
                     </td>
-                    <td className="py-3 px-4 text-gray-500">{emp.empresa || "—"}</td>
-                    <td className="py-3 px-4 text-right tabular-nums hidden sm:table-cell">${fmt(emp.deduccion_quincenal)}</td>
+                    <td className="py-3 px-4 text-gray-500 hidden sm:table-cell">{emp.empresa || "—"}</td>
+                    <td className="py-3 px-4 text-right tabular-nums">${fmt(emp.deduccion_quincenal)}</td>
                     <td className="py-3 px-4 text-right tabular-nums hidden sm:table-cell">${fmt(prestado)}</td>
                     <td className="py-3 px-4 text-right tabular-nums hidden sm:table-cell">${fmt(pagado)}</td>
                     <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(saldo)}</td>

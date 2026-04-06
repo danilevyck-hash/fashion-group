@@ -2,9 +2,9 @@
 
 import { useRef, useState } from "react";
 import { fmt, fmtDate } from "@/lib/format";
-import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox } from "@/components/ui";
+import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox, ScrollableTable } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
-import { ESTADOS, EMPRESAS, EC, TALLAS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, buildSingleReclamoPdfHtml, openPdfWindow, loadCustomMotivos, saveCustomMotivo, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "./constants";
+import { ESTADOS, EMPRESAS, EC, TALLAS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, buildSingleReclamoPdfHtml, openPdfWindow, loadCustomMotivos, saveCustomMotivo, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, estadoLabel } from "./constants";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   "Borrador": ["Enviado"],
@@ -165,12 +165,12 @@ export default function ReclamoDetail({
 
       {/* Action bar */}
       <div className="flex items-center gap-2 mb-6 flex-wrap">
-        <button onClick={startEdit} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
+        <button onClick={startEdit} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 active:bg-gray-100 transition-all flex items-center gap-1">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
           Editar
         </button>
         <div className="relative">
-          <button onClick={() => setShowEmailConfirm(!showEmailConfirm)} disabled={sendingEmail} className="text-xs bg-black text-white px-4 py-2.5 sm:py-1.5 rounded-full hover:bg-gray-800 transition flex items-center gap-1 disabled:opacity-50">
+          <button onClick={() => setShowEmailConfirm(!showEmailConfirm)} disabled={sendingEmail} className="text-xs bg-black text-white px-4 py-2.5 sm:py-1.5 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-1 disabled:opacity-50">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
             {sendingEmail ? "Enviando..." : "Enviar por Email"}
           </button>
@@ -179,7 +179,7 @@ export default function ReclamoDetail({
               {c?.correo ? (<>
                 <p className="text-xs text-gray-500 mb-2">Enviar a <strong>{c.correo}</strong>?</p>
                 <div className="flex gap-1">
-                  <button onClick={sendEmail} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 transition">Enviar</button>
+                  <button onClick={sendEmail} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all">Enviar</button>
                   <button onClick={() => setShowEmailConfirm(false)} className="text-[11px] text-gray-400 px-2 py-1 hover:text-black transition">Cancelar</button>
                 </div>
               </>) : (<>
@@ -189,7 +189,7 @@ export default function ReclamoDetail({
             </div>
           ); })()}
         </div>
-        <button onClick={sendWA} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
+        <button onClick={sendWA} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 active:bg-gray-100 transition-all flex items-center gap-1">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
           WhatsApp
         </button>
@@ -208,7 +208,7 @@ export default function ReclamoDetail({
 
       {/* Enviar button for Borrador */}
       {current.estado === "Borrador" && (
-        <button onClick={() => onChangeEstado("Enviado")} className="mb-6 bg-black text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-gray-800 transition flex items-center gap-2">
+        <button onClick={() => onChangeEstado("Enviado")} className="mb-6 bg-black text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
           Enviar Reclamo
         </button>
@@ -226,13 +226,13 @@ export default function ReclamoDetail({
                 onClick={() => { if (!isCurrent && canTransition) setConfirmingEstado(confirmingEstado === e ? null : e); }}
                 disabled={!isCurrent && !canTransition}
                 className={`h-11 sm:h-8 text-xs text-center transition px-4 py-2 rounded-md ${isCurrent ? `${EC[e] || "bg-gray-100 text-gray-500"} ring-1 ring-current font-medium` : canTransition ? "bg-gray-100 text-gray-400 hover:bg-gray-200" : "bg-gray-50 text-gray-300 cursor-not-allowed"}`}>
-                {e}
+                {estadoLabel(e)}
               </button>
               {confirmingEstado === e && !isCurrent && canTransition && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-10 text-center" style={{ minWidth: 140 }}>
-                  <p className="text-[11px] text-gray-500 mb-1.5">Cambiar a {e}?</p>
+                  <p className="text-[11px] text-gray-500 mb-1.5">Cambiar a {estadoLabel(e)}?</p>
                   <div className="flex gap-1 justify-center">
-                    <button onClick={() => { if (e === "Resuelto con NC") { setShowAplicadaModal(true); setConfirmingEstado(null); } else onChangeEstado(e); }} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 transition">Si</button>
+                    <button onClick={() => { if (e === "Resuelto con NC") { setShowAplicadaModal(true); setConfirmingEstado(null); } else onChangeEstado(e); }} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all">Si</button>
                     <button onClick={() => setConfirmingEstado(null)} className="text-[11px] text-gray-400 px-2 py-1 hover:text-black transition">No</button>
                   </div>
                 </div>
@@ -261,8 +261,7 @@ export default function ReclamoDetail({
       {items.length > 0 && (
         <div className="mb-8">
           <div className="text-xs uppercase tracking-widest text-gray-400 mb-3">Ítems</div>
-          <div className="overflow-x-auto -mx-4 sm:mx-0">
-            <div className="min-w-[700px] px-4 sm:px-0">
+          <ScrollableTable minWidth={700}>
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
@@ -293,8 +292,7 @@ export default function ReclamoDetail({
                 ))}
               </tbody>
             </table>
-            </div>
-          </div>
+          </ScrollableTable>
         </div>
       )}
 
@@ -314,7 +312,7 @@ export default function ReclamoDetail({
             })}
           </div>
         )}
-        {fotos.length < 3 && (
+        {fotos.length < 5 && (
           <>
             <input ref={fotoRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadFoto(f); if (fotoRef.current) fotoRef.current.value = ""; }} />
             <button onClick={() => fotoRef.current?.click()} className="text-sm text-gray-400 hover:text-black transition mt-2">+ Agregar foto</button>
@@ -329,7 +327,7 @@ export default function ReclamoDetail({
         <div className="text-xs uppercase tracking-widest text-gray-400 mb-3">Seguimiento</div>
         <div className="flex gap-2 mb-3">
           <input type="text" value={nota} onChange={(e) => setNota(e.target.value)} onBlur={() => { if (nota.trim()) onAddNota(); }} placeholder="Agregar nota..." className="flex-1 border-b border-gray-200 py-1.5 text-sm outline-none" />
-          <button onClick={onAddNota} disabled={!nota.trim()} className="text-sm bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 transition disabled:opacity-50">Agregar</button>
+          <button onClick={onAddNota} disabled={!nota.trim()} className="text-sm bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50">Agregar</button>
         </div>
         {seg.map((s) => (
           <div key={s.id} className="border-b border-gray-50 py-2">
@@ -392,8 +390,7 @@ export default function ReclamoDetail({
             </div>
           </div>
           <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Ítems</div>
-          <div className="overflow-x-auto -mx-4 sm:mx-0 mb-4">
-            <div className="min-w-[700px] px-4 sm:px-0">
+          <ScrollableTable minWidth={700} className="mb-4">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
@@ -437,11 +434,10 @@ export default function ReclamoDetail({
                 ))}
               </tbody>
             </table>
-            </div>
-          </div>
+          </ScrollableTable>
           <button onClick={() => setEditItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition mb-6">+ Agregar fila</button>
           <div className="flex items-center gap-6">
-            <button onClick={onSaveEdit} disabled={editSaving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50">
+            <button onClick={onSaveEdit} disabled={editSaving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50">
               {editSaving ? "Guardando..." : "Guardar Cambios"}
             </button>
             <button onClick={() => setEditMode(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
@@ -468,7 +464,7 @@ export default function ReclamoDetail({
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={onAplicadaConfirm} disabled={!aplicadaNc.trim() || !aplicadaMonto} className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50">Confirmar</button>
+              <button onClick={onAplicadaConfirm} disabled={!aplicadaNc.trim() || !aplicadaMonto} className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50">Confirmar</button>
               <button onClick={() => { setShowAplicadaModal(false); setConfirmingEstado(null); }} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition">Cancelar</button>
             </div>
           </div>

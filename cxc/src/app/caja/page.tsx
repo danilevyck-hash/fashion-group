@@ -94,14 +94,14 @@ function CajaPage() {
             <div className="flex gap-2 pt-2">
               <button
                 onClick={() => setShowNewPeriodoModal(false)}
-                className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition"
+                className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 active:bg-gray-100 transition-all"
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmCreatePeriodo}
                 disabled={!fondoInput || parseFloat(fondoInput) <= 0}
-                className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50"
+                className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
               >
                 Crear período
               </button>

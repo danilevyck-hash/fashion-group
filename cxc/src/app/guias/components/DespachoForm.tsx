@@ -148,7 +148,7 @@ export default function DespachoForm({
 
       {/* Confirm */}
       <button onClick={handleConfirmar} disabled={bSaving}
-        className="bg-black text-white px-8 py-3 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40 w-full sm:w-auto">
+        className="bg-black text-white px-8 py-3 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 w-full sm:w-auto">
         {bSaving ? "Guardando..." : "Confirmar despacho"}
       </button>
     </div>

@@ -276,7 +276,7 @@ export default function ChatPanel() {
                 return (
                   <button key={i} onClick={() => restoreHistory(i)}
                     className="w-full text-left text-xs text-gray-600 dark:text-gray-400 hover:text-black dark:hover:text-white transition truncate py-1 border-b border-gray-50 dark:border-gray-800 last:border-0">
-                    <span className="text-gray-300 mr-1">{new Date(h.date).toLocaleDateString("es-PA")}</span>
+                    <span className="text-gray-300 mr-1">{new Date(h.date).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")}</span>
                     {preview.slice(0, 60)}
                   </button>
                 );

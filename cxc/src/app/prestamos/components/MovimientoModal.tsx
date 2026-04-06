@@ -47,7 +47,7 @@ export default function MovimientoModal({
                     <span className="text-lg">{t.icon}</span>
                     <span className="text-xs font-medium">{t.label}</span>
                   </div>
-                  <span className="text-[10px] opacity-60">Signo: {t.sign}</span>
+                  <span className={`text-[10px] font-medium ${t.effectColor}`}>{t.effect}</span>
                 </button>
               ))}
             </div>

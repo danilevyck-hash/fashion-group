@@ -47,7 +47,12 @@ export default function GuiaForm({
 }: GuiaFormProps) {
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
 
-  // Dynamic "Entregado por" list (persisted in localStorage)
+  // Real-time onBlur validation
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  function handleBlur(field: string) { setTouched((prev) => ({ ...prev, [field]: true })); }
+  function fieldError(field: string, value: string) { return touched[field] && !value.trim(); }
+
+  // Dynamic "Despachado por" list (persisted in localStorage)
   const DEFAULT_ENTREGADORES = ["Julio", "Rodrigo"];
   const [entregadores, setEntregadores] = useState(DEFAULT_ENTREGADORES);
   const [entregadoPorOtro, setEntregadoPorOtro] = useState("");
@@ -140,8 +145,10 @@ export default function GuiaForm({
     setLastSaved(new Date().toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" }));
   }
 
-  function inputClass(key: string, base: string) {
-    return `${base} ${validationErrors.has(key) || validationErrors.has(key + "-format") || validationErrors.has(key + "-separator") ? "border-red-400" : ""}`;
+  function inputClass(key: string, base: string, touchedKey?: string, touchedValue?: string) {
+    const hasSubmitError = validationErrors.has(key) || validationErrors.has(key + "-format") || validationErrors.has(key + "-separator");
+    const hasTouchedError = touchedKey !== undefined && touchedValue !== undefined && touched[touchedKey] && !touchedValue.trim();
+    return `${base} ${hasSubmitError || hasTouchedError ? "border-red-400" : ""}`;
   }
 
   // Save status indicator
@@ -149,8 +156,8 @@ export default function GuiaForm({
 
   function SaveButton({ size = "normal" }: { size?: "normal" | "small" }) {
     const cls = size === "small"
-      ? "bg-black text-white px-4 py-2 rounded-md text-xs font-medium hover:bg-gray-800 transition disabled:opacity-40"
-      : "bg-black text-white px-6 py-3 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40";
+      ? "bg-black text-white px-4 py-2 rounded-md text-xs font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40"
+      : "bg-black text-white px-6 py-3 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40";
     return (
       <button onClick={handleSave} disabled={saving || !items.some(i => i.cliente)} className={cls}>
         {saving ? "Guardando..." : editingId ? "Guardar Cambios" : "Guardar Guía"}
@@ -159,9 +166,9 @@ export default function GuiaForm({
   }
 
   function StatusBadge() {
-    if (saveStatus === "saving") return <span className="text-xs text-gray-400">Guardando...</span>;
-    if (saveStatus === "dirty") return <span className="text-xs text-orange-500">Sin guardar</span>;
-    if (saveStatus === "saved") return <span className="text-xs text-green-600">Guardado ✓ {lastSaved}</span>;
+    if (saveStatus === "saving") return <span className="text-sm text-gray-400">Guardando...</span>;
+    if (saveStatus === "dirty") return <span className="text-sm text-orange-500">Sin guardar</span>;
+    if (saveStatus === "saved") return <span className="text-sm text-green-600 animate-save-flash">Guardado ✓ {lastSaved}</span>;
     return null;
   }
 
@@ -189,20 +196,22 @@ export default function GuiaForm({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-6">
           <div>
             <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">Fecha <span className="text-red-500">*</span></label>
-            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)}
-              className={inputClass("fecha", "w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition")} />
+            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} onBlur={() => handleBlur("fecha")}
+              className={inputClass("fecha", "w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition", "fecha", fecha)} />
+            {fieldError("fecha", fecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
           </div>
           <div>
             <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">
               Transportista <span className="text-red-500">*</span>
               <AddNewInline placeholder="Nombre" onAdd={onAddTransportista} />
             </label>
-            <select value={transportista} onChange={e => setTransportista(e.target.value)}
-              className={inputClass("transportista", "w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none")}>
+            <select value={transportista} onChange={e => setTransportista(e.target.value)} onBlur={() => handleBlur("transportista")}
+              className={inputClass("transportista", "w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none", "transportista", transportista)}>
               <option value="">Seleccionar...</option>
               {transportistas.map(t => <option key={t} value={t}>{t}</option>)}
               <option value="__other__">Otro...</option>
             </select>
+            {fieldError("transportista", transportista) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             {transportista === "__other__" && (
               <input type="text" placeholder="Nombre del transportista" value={transportistaOtro} onChange={e => setTransportistaOtro(e.target.value)}
                 className={inputClass("transportista", "w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition mt-3")} />
@@ -210,7 +219,7 @@ export default function GuiaForm({
           </div>
           <div>
             <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">
-              Entregado por <span className="text-red-500">*</span>
+              Despachado por <span className="text-red-500">*</span>
               <AddNewInline placeholder="Nombre" onAdd={addEntregador} />
             </label>
             <select value={entregadoPor} onChange={e => setEntregadoPor(e.target.value)}
@@ -262,29 +271,34 @@ export default function GuiaForm({
               <tr key={idx} className="border-b border-gray-200">
                 <td className="py-2 text-gray-300">{idx + 1}</td>
                 <td className="py-2 pr-2">
-                  <input list="clientes-list" type="text" value={item.cliente} onChange={e => onUpdateItem(idx, "cliente", e.target.value)}
-                    className={inputClass(`item-${idx}-cliente`, "w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition")} />
+                  <input list="clientes-list" type="text" value={item.cliente} onChange={e => onUpdateItem(idx, "cliente", e.target.value)} onBlur={() => handleBlur(`item-${idx}-cliente`)}
+                    className={inputClass(`item-${idx}-cliente`, "w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition", `item-${idx}-cliente`, item.cliente)} />
+                  {fieldError(`item-${idx}-cliente`, item.cliente) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
                 </td>
                 <td className="py-2 pr-2">
-                  <input list="direcciones-list" type="text" value={item.direccion} onChange={e => onUpdateItem(idx, "direccion", e.target.value)}
-                    className={inputClass(`item-${idx}-direccion`, "w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition")} />
+                  <input list="direcciones-list" type="text" value={item.direccion} onChange={e => onUpdateItem(idx, "direccion", e.target.value)} onBlur={() => handleBlur(`item-${idx}-direccion`)}
+                    className={inputClass(`item-${idx}-direccion`, "w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition", `item-${idx}-direccion`, item.direccion)} />
+                  {fieldError(`item-${idx}-direccion`, item.direccion) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
                 </td>
                 <td className="py-2 pr-2">
-                  <select value={item.empresa} onChange={e => onUpdateItem(idx, "empresa", e.target.value)}
-                    className={inputClass(`item-${idx}-empresa`, "w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent focus:border-black transition appearance-none")}>
+                  <select value={item.empresa} onChange={e => onUpdateItem(idx, "empresa", e.target.value)} onBlur={() => handleBlur(`item-${idx}-empresa`)}
+                    className={inputClass(`item-${idx}-empresa`, "w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent focus:border-black transition appearance-none", `item-${idx}-empresa`, item.empresa)}>
                     <option value="">Seleccionar...</option>
                     {empresas.map(e => <option key={e} value={e}>{e}</option>)}
                   </select>
+                  {fieldError(`item-${idx}-empresa`, item.empresa) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
                 </td>
                 <td className="py-2 pr-2">
-                  <input type="text" value={item.facturas} onChange={e => onUpdateItem(idx, "facturas", e.target.value)}
-                    className={inputClass(`item-${idx}-facturas`, "w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition")} />
+                  <input type="text" value={item.facturas} onChange={e => onUpdateItem(idx, "facturas", e.target.value)} onBlur={() => handleBlur(`item-${idx}-facturas`)}
+                    className={inputClass(`item-${idx}-facturas`, "w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition", `item-${idx}-facturas`, item.facturas)} />
+                  {fieldError(`item-${idx}-facturas`, item.facturas) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
                   {validationErrors.has(`item-${idx}-facturas-separator`) && <p className="text-[9px] text-red-500 mt-0.5">Separar con coma y espacio (ej: FA-001, FA-002)</p>}
                   {validationErrors.has(`item-${idx}-facturas-format`) && !validationErrors.has(`item-${idx}-facturas-separator`) && <p className="text-[9px] text-red-500 mt-0.5">Mín. 4 dígitos por factura</p>}
                 </td>
                 <td className="py-2 pr-2">
-                  <input type="number" min={0} value={item.bultos || ""} placeholder="0" onChange={e => onUpdateItem(idx, "bultos", parseInt(e.target.value) || 0)}
-                    className={inputClass(`item-${idx}-bultos`, "w-full border-b border-gray-200 py-1 text-sm outline-none text-center focus:border-black transition")} />
+                  <input type="number" min={0} value={item.bultos || ""} placeholder="0" onChange={e => onUpdateItem(idx, "bultos", parseInt(e.target.value) || 0)} onBlur={() => handleBlur(`item-${idx}-bultos`)}
+                    className={inputClass(`item-${idx}-bultos`, "w-full border-b border-gray-200 py-1 text-sm outline-none text-center focus:border-black transition", `item-${idx}-bultos`, String(item.bultos || ""))} />
+                  {touched[`item-${idx}-bultos`] && !item.bultos && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
                 </td>
                 <td className="py-2 text-center">
                   {items.length > 1 && <button onClick={() => handleRemoveRow(idx)} className="text-gray-400 hover:text-red-500 transition text-sm">×</button>}

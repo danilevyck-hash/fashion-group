@@ -3,15 +3,15 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]); if (auth instanceof NextResponse) return auth;
+  const auth = requireRole(req, ["admin", "secretaria", "director", "vendedor", "bodega", "contabilidad"]); if (auth instanceof NextResponse) return auth;
   const q = req.nextUrl.searchParams.get("q")?.trim();
   if (!q || q.length < 2) {
-    return NextResponse.json({ cxc: [], reclamos: [], guias: [], directorio: [], cheques: [] });
+    return NextResponse.json({ cxc: [], reclamos: [], guias: [], directorio: [], cheques: [], ventas: [], prestamos: [], caja: [] });
   }
 
   const pattern = `%${q}%`;
 
-  const [cxcRes, reclamosRes, guiasRes, dirRes, chequesRes] = await Promise.all([
+  const [cxcRes, reclamosRes, guiasRes, dirRes, chequesRes, ventasRes, prestamosRes, cajaRes] = await Promise.all([
     // CxC: buscar por nombre (deduplicated by nombre_normalized)
     supabaseServer
       .from("cxc_rows")
@@ -52,6 +52,31 @@ export async function GET(req: NextRequest) {
       .ilike("cliente", pattern)
       .order("fecha_deposito", { ascending: false })
       .limit(5),
+
+    // Ventas: buscar por cliente en ventas_raw
+    supabaseServer
+      .from("ventas_raw")
+      .select("cliente, mes, empresa, subtotal, fecha")
+      .ilike("cliente", pattern)
+      .order("fecha", { ascending: false })
+      .limit(50),
+
+    // Préstamos: buscar por nombre en prestamos_empleados
+    supabaseServer
+      .from("prestamos_empleados")
+      .select("id, nombre, empresa, activo, prestamos_movimientos(monto, concepto, estado)")
+      .ilike("nombre", pattern)
+      .eq("activo", true)
+      .order("nombre")
+      .limit(5),
+
+    // Caja: buscar por descripcion o proveedor en caja_gastos
+    supabaseServer
+      .from("caja_gastos")
+      .select("id, descripcion, proveedor, total, fecha, periodo_id")
+      .or(`descripcion.ilike.${pattern},proveedor.ilike.${pattern}`)
+      .order("fecha", { ascending: false })
+      .limit(5),
   ]);
 
   // Also search guias by numero if q is numeric
@@ -87,11 +112,115 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => b.total - a.total)
     .slice(0, 5);
 
-  return NextResponse.json({
+  // Aggregate ventas by client: latest date and total amount
+  const ventasRaw = ventasRes.data || [];
+  const ventasMap = new Map<string, { cliente: string; total: number; last_fecha: string; empresa: string }>();
+  for (const row of ventasRaw) {
+    const key = (row.cliente || "").toUpperCase().trim();
+    if (!key) continue;
+    const existing = ventasMap.get(key);
+    if (existing) {
+      existing.total += Number(row.subtotal) || 0;
+      if (row.fecha > existing.last_fecha) {
+        existing.last_fecha = row.fecha;
+        existing.empresa = row.empresa;
+      }
+    } else {
+      ventasMap.set(key, {
+        cliente: row.cliente,
+        total: Number(row.subtotal) || 0,
+        last_fecha: row.fecha || "",
+        empresa: row.empresa || "",
+      });
+    }
+  }
+  const ventasDeduped = Array.from(ventasMap.values())
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5);
+
+  // Calculate saldo for each prestamo employee
+  interface PrestamoResult {
+    id: string;
+    nombre: string;
+    empresa: string | null;
+    saldo: number;
+  }
+  const prestamosRaw = prestamosRes.data || [];
+  const prestamosData: PrestamoResult[] = prestamosRaw.map((emp: { id: string; nombre: string; empresa: string | null; prestamos_movimientos: { monto: number; concepto: string; estado: string }[] }) => {
+    const movs = emp.prestamos_movimientos || [];
+    const prestado = movs
+      .filter((m) => (m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño") && m.estado === "aprobado")
+      .reduce((s, m) => s + Number(m.monto), 0);
+    const pagado = movs
+      .filter((m) => (m.concepto === "Pago" || m.concepto === "Abono extra" || m.concepto === "Pago de responsabilidad") && m.estado === "aprobado")
+      .reduce((s, m) => s + Number(m.monto), 0);
+    return {
+      id: emp.id,
+      nombre: emp.nombre,
+      empresa: emp.empresa,
+      saldo: prestado - pagado,
+    };
+  });
+
+  // Module-level permissions per role
+  const role = auth.role;
+  const empty = { cxc: [], reclamos: [], guias: [], directorio: [], cheques: [], ventas: [], prestamos: [], caja: [] };
+  const allResults = {
     cxc: cxcDeduped,
     reclamos: reclamosRes.data || [],
     guias: guiasData,
     directorio: dirRes.data || [],
     cheques: chequesRes.data || [],
-  });
+    ventas: ventasDeduped,
+    prestamos: prestamosData,
+    caja: cajaRes.data || [],
+  };
+
+  // Vendedor: only CXC and Directorio
+  if (role === "vendedor") {
+    return NextResponse.json({
+      ...empty,
+      cxc: allResults.cxc,
+      directorio: allResults.directorio,
+    });
+  }
+
+  // Bodega: only Guías and Directorio
+  if (role === "bodega") {
+    return NextResponse.json({
+      ...empty,
+      guias: allResults.guias,
+      directorio: allResults.directorio,
+    });
+  }
+
+  // Contabilidad: prestamos and ventas
+  if (role === "contabilidad") {
+    return NextResponse.json({
+      ...empty,
+      ventas: allResults.ventas,
+      prestamos: allResults.prestamos,
+    });
+  }
+
+  // Secretaria: everything except ventas and prestamos
+  if (role === "secretaria") {
+    return NextResponse.json({
+      ...allResults,
+      ventas: [],
+      prestamos: [],
+    });
+  }
+
+  // Director: everything except prestamos and caja
+  if (role === "director") {
+    return NextResponse.json({
+      ...allResults,
+      prestamos: [],
+      caja: [],
+    });
+  }
+
+  // Admin: everything
+  return NextResponse.json(allResults);
 }

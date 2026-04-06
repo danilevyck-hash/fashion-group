@@ -3,6 +3,7 @@ import { reebokServer } from "@/lib/reebok-supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { REEBOK_LOGO_BASE64, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT } from "@/lib/reebok-logo";
 
 const P = 12;
 
@@ -74,9 +75,8 @@ export async function POST(req: NextRequest) {
 
   doc.setFillColor(26, 26, 26);
   doc.rect(0, 0, 210, 18, "F");
-  doc.setFontSize(12); doc.setTextColor(255); doc.setFont("helvetica", "bold");
-  doc.text("REEBOK", 14, 12);
-  doc.setFontSize(8); doc.setFont("helvetica", "normal");
+  try { doc.addImage(REEBOK_LOGO_BASE64, "PNG", 14, 5, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT); } catch { /* skip logo */ }
+  doc.setFontSize(8); doc.setTextColor(255); doc.setFont("helvetica", "normal");
   doc.text("Fashion Group · Panama", 196, 12, { align: "right" });
 
   doc.setTextColor(100); doc.setFontSize(9);
@@ -88,13 +88,16 @@ export async function POST(req: NextRequest) {
     startY: 32,
     head: [["", "Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
     body: items.map(i => ["", i.name, i.sku, String(i.quantity), String(i.quantity * P), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * P * Number(i.unit_price))}`]),
-    styles: { fontSize: 8, cellPadding: 2, minCellHeight: 14 },
+    styles: { fontSize: 8, cellPadding: 2, minCellHeight: 12 },
     headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
     alternateRowStyles: { fillColor: [249, 249, 249] },
-    columnStyles: { 0: { cellWidth: 16 }, 3: { halign: "center" }, 4: { halign: "center" }, 5: { halign: "right" }, 6: { halign: "right" } },
-    didDrawCell: (data: { row: { index: number; section: string }; column: { index: number }; cell: { x: number; y: number } }) => {
+    columnStyles: { 0: { cellWidth: 12, minCellHeight: 12 }, 3: { halign: "center" }, 4: { halign: "center" }, 5: { halign: "right" }, 6: { halign: "right" } },
+    didDrawCell: (data: { row: { index: number; section: string }; column: { index: number }; cell: { x: number; y: number; height: number; width: number } }) => {
       if (data.column.index === 0 && data.row.section === "body" && imgs[data.row.index]) {
-        try { doc.addImage(imgs[data.row.index], "JPEG", data.cell.x + 1, data.cell.y + 1, 12, 12); } catch { /* skip */ }
+        const imgSize = 10;
+        const xOffset = data.cell.x + (data.cell.width - imgSize) / 2;
+        const yOffset = data.cell.y + (data.cell.height - imgSize) / 2;
+        try { doc.addImage(imgs[data.row.index], "JPEG", xOffset, yOffset, imgSize, imgSize); } catch { /* skip */ }
       }
     },
   });
@@ -107,11 +110,13 @@ export async function POST(req: NextRequest) {
   doc.text("Fashion Group Panama · Reebok Authorized Distributor", 14, fy + 10);
 
   const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
-  const pdfFilename = `${orderNumber}-${clientName.replace(/\s+/g, "-")}.pdf`;
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const pdfFilename = `Pedido-${orderNumber}-${dateStr}.pdf`;
 
   // ── Build HTML email ──
   const rows = items.map((item) =>
     `<tr style="border-bottom:1px solid #eee">
+      <td style="padding:8px;vertical-align:middle;width:48px">${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" width="40" height="40" style="display:block;width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #eee">` : `<div style="display:block;width:40px;height:40px;background:#e5e7eb;border-radius:4px"></div>`}</td>
       <td style="padding:8px;vertical-align:middle"><strong>${item.name}</strong><br><span style="font-size:11px;color:#888">${item.sku}</span></td>
       <td style="padding:8px;text-align:center;vertical-align:middle">${item.quantity}</td>
       <td style="padding:8px;text-align:center;vertical-align:middle">${item.quantity * P}</td>
@@ -123,8 +128,9 @@ export async function POST(req: NextRequest) {
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:650px;margin:0 auto">
       <div style="background:#1a1a1a;color:white;padding:16px 20px;border-radius:8px 8px 0 0">
+        <img src="https://fashiongr.com/reebok/reebok-logo.png" alt="Reebok" width="60" height="17" style="display:block;margin-bottom:8px" />
         <h2 style="margin:0;font-size:18px">Pedido ${orderNumber} — ${clientName}</h2>
-        <p style="margin:4px 0 0;font-size:12px;opacity:0.7">${fechaLabel}</p>
+        <p style="margin:4px 0 0;font-size:12px;opacity:0.7">Fashion Group · Panama — ${fechaLabel}</p>
       </div>
       <div style="padding:20px;border:1px solid #eee;border-top:none;border-radius:0 0 8px 8px">
         <p style="color:#333;font-size:14px;line-height:1.5;margin:0 0 16px">
@@ -134,6 +140,7 @@ export async function POST(req: NextRequest) {
         ${comment ? `<p style="color:#666;font-size:13px;margin:0 0 12px"><strong>Nota:</strong> ${comment}</p>` : ""}
         <table style="width:100%;border-collapse:collapse;margin:16px 0">
           <thead><tr style="background:#1a1a1a;color:white">
+            <th style="padding:8px;width:48px"></th>
             <th style="padding:8px;text-align:left">Producto</th>
             <th style="padding:8px;text-align:center">Bultos</th><th style="padding:8px;text-align:center">Piezas</th>
             <th style="padding:8px;text-align:right">Precio/u</th><th style="padding:8px;text-align:right">Subtotal</th>

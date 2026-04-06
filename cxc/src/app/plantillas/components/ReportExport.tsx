@@ -103,10 +103,15 @@ export default function ReportExport({ stats, darkMode }: { stats: Stats; darkMo
       const dateStr = now.toLocaleDateString("es-PA", { year: "numeric", month: "long", day: "numeric" });
 
       // Header
+      const { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } = await import("@/lib/pdf-logo");
       doc.setFillColor(26, 26, 26);
       doc.rect(0, 0, 210, 22, "F");
+      try {
+        doc.addImage(FG_LOGO_BASE64, "JPEG", 8, 3, FG_LOGO_WIDTH + 2, FG_LOGO_HEIGHT + 2);
+      } catch { /* skip if logo fails */ }
+      const _logoEnd = 8 + FG_LOGO_WIDTH + 2 + 4;
       doc.setFontSize(14); doc.setTextColor(255); doc.setFont("helvetica", "bold");
-      doc.text("FASHION GROUP", 14, 14);
+      doc.text("FASHION GROUP", _logoEnd, 14);
       doc.setFontSize(8); doc.setFont("helvetica", "normal");
       doc.text("Reporte Ejecutivo", 196, 10, { align: "right" });
       doc.text(dateStr, 196, 16, { align: "right" });

@@ -6,11 +6,6 @@ import { SkeletonTable, EmptyState, Toast, StatusBadge, ConfirmModal } from "@/c
 import XLSX from "xlsx-js-style";
 import { fmt, fmtDate } from "@/lib/format";
 
-function fmtShort(d: string): string {
-  if (!d) return "";
-  try { return new Date(d + "T12:00:00").toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }); }
-  catch { return d; }
-}
 import { EMPRESAS } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
 
@@ -51,9 +46,12 @@ function ChequeMoreMenu({ cheque, ve, role, onRebotado, onWA, onDelete }: {
         <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
         <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg z-20 py-1 min-w-[160px]">
           {isPending && (
-            <button onClick={() => { onRebotado(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Rebotado</button>
+            <button onClick={() => { onRebotado(); setOpen(false); }} title="Cheque devuelto por el banco" className="block w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Marcar como rebotado (devuelto)</button>
           )}
-          <button onClick={() => { onWA(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">WhatsApp</button>
+          <button onClick={() => { onWA(); setOpen(false); }} className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-gray-50 transition" title="Enviar recordatorio por WhatsApp">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            Enviar WhatsApp
+          </button>
           {role === "admin" && (
             <button onClick={() => { onDelete(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-gray-50 transition">Eliminar Cheque</button>
           )}
@@ -86,6 +84,7 @@ export default function ChequesPage() {
   const [confirmBatch, setConfirmBatch] = useState<{ ids: Set<string>; clearFn: (v: Set<string>) => void } | null>(null);
   const [depositingId, setDepositingId] = useState<string | null>(null);
   const [confirmDepositId, setConfirmDepositId] = useState<string | null>(null);
+  const [kpiTooltip, setKpiTooltip] = useState<string | null>(null);
 
   // Rebotado modal
   const [rebotandoId, setRebotandoId] = useState<string | null>(null);
@@ -106,6 +105,10 @@ export default function ChequesPage() {
   const [fWhatsapp, setFWhatsapp] = useState("");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
+  const [touchedCheque, setTouchedCheque] = useState<Record<string, boolean>>({});
+  function handleChequeBlur(field: string) { setTouchedCheque((prev) => ({ ...prev, [field]: true })); }
+  function chequeFieldError(field: string, value: string) { return touchedCheque[field] && !value.trim(); }
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
 
@@ -148,7 +151,7 @@ export default function ChequesPage() {
   if (!authChecked) return null;
 
   function resetForm() {
-    setFCliente(""); setFEmpresa(""); setFBanco(""); setFNumero(""); setFMonto(""); setFFecha(todayStr()); setFNotas(""); setFWhatsapp(""); setEditingId(null); setEditingEstado(null); setError(null);
+    setFCliente(""); setFEmpresa(""); setFBanco(""); setFNumero(""); setFMonto(""); setFFecha(todayStr()); setFNotas(""); setFWhatsapp(""); setEditingId(null); setEditingEstado(null); setError(null); setTouchedCheque({});
   }
 
   function startEdit(c: Cheque) {
@@ -250,36 +253,134 @@ export default function ChequesPage() {
     } catch { showToast("Error de conexión"); }
   }
 
-  function exportPendientes() {
-    const pend = cheques.filter((c) => c.estado === "pendiente" || c.estado === "vencido" || visualEstado(c) === "pendiente_vencido");
-    if (pend.length === 0) return;
-    const rows: (string | number)[][] = [
-      ["FASHION GROUP — Cheques Pendientes"],
-      [],
-      ["Cliente", "Banco", "Nº Cheque", "Monto", "Fecha Depósito", "WhatsApp"],
-    ];
-    for (const c of pend) {
-      rows.push([c.cliente, c.banco, c.numero_cheque, c.monto, fmtDate(c.fecha_deposito), c.whatsapp || ""]);
+  function exportFilterLabel(): string {
+    switch (filter) {
+      case "pendiente": return "pendientes";
+      case "depositado": return "depositados";
+      case "vencido": return "vencidos";
+      case "rebotado": return "rebotados";
+      case "vencen_hoy": return "vencen hoy";
+      case "vencen_semana": return "vencen esta semana";
+      case "all": default: return "todos";
     }
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 18 }];
+  }
+
+  function exportCheques() {
+    const hoy = todayStr();
+    const semana = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    let data: Cheque[];
+    switch (filter) {
+      case "pendiente":
+        data = cheques.filter((c) => visualEstado(c) === "pendiente");
+        break;
+      case "depositado":
+        data = cheques.filter((c) => visualEstado(c) === "depositado");
+        break;
+      case "vencido":
+        data = cheques.filter((c) => visualEstado(c) === "pendiente_vencido" || visualEstado(c) === "vencido");
+        break;
+      case "rebotado":
+        data = cheques.filter((c) => visualEstado(c) === "rebotado");
+        break;
+      case "vencen_hoy":
+        data = cheques.filter((c) => c.fecha_deposito === hoy && visualEstado(c) !== "depositado" && visualEstado(c) !== "rebotado");
+        break;
+      case "vencen_semana":
+        data = cheques.filter((c) => c.fecha_deposito >= hoy && c.fecha_deposito <= semana && visualEstado(c) !== "depositado" && visualEstado(c) !== "rebotado");
+        break;
+      case "all": default:
+        data = cheques;
+        break;
+    }
+    if (data.length === 0) { showToast("No hay cheques para exportar"); return; }
+    const label = exportFilterLabel();
+    const sheetName = label.charAt(0).toUpperCase() + label.slice(1);
+
+    // Style helpers — matches Caja/Préstamos exports
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const B: any = { top: { style: "thin", color: { rgb: "D5DBDB" } }, bottom: { style: "thin", color: { rgb: "D5DBDB" } }, left: { style: "thin", color: { rgb: "D5DBDB" } }, right: { style: "thin", color: { rgb: "D5DBDB" } } };
+    const ec = XLSX.utils.encode_cell;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ws: any = {};
+    const heights: number[] = [];
+    let r = 0;
+
+    // Title row — merged, bold, 14pt, navy bg
+    for (let ci = 0; ci < 6; ci++) {
+      ws[ec({ r, c: ci })] = {
+        v: ci === 0 ? `FASHION GROUP — Cheques ${sheetName}` : "",
+        t: "s",
+        s: { font: { bold: true, sz: 14, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: "1B3A5C" } }, alignment: { horizontal: "left", vertical: "center" } },
+      };
+    }
+    heights[r] = 30;
+    r++;
+
+    // Spacer
+    heights[r] = 6;
+    r++;
+
+    // Header row — navy bg, white bold
+    const hdrs = ["Cliente", "Banco", "Nº Cheque", "Monto", "Fecha Depósito", "WhatsApp"];
+    hdrs.forEach((h, ci) => {
+      ws[ec({ r, c: ci })] = {
+        v: h, t: "s",
+        s: { font: { bold: true, sz: 10, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: "1B3A5C" } }, alignment: { horizontal: ci === 3 ? "right" : "left", vertical: "center" }, border: B },
+      };
+    });
+    heights[r] = 22;
+    r++;
+
+    // Data rows — alternating white / light gray
+    let totalMonto = 0;
+    for (let i = 0; i < data.length; i++) {
+      const ch = data[i];
+      const alt = i % 2 === 1;
+      const bg = alt ? "F8F9F9" : "FFFFFF";
+      const cellS = (fg = "333333", sz = 10) => ({ font: { sz, color: { rgb: fg }, name: "Calibri" }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: "left" as const }, border: B });
+
+      ws[ec({ r, c: 0 })] = { v: ch.cliente, t: "s", s: cellS("111111") };
+      ws[ec({ r, c: 1 })] = { v: ch.banco, t: "s", s: cellS("333333", 9) };
+      ws[ec({ r, c: 2 })] = { v: ch.numero_cheque, t: "s", s: cellS("333333", 9) };
+      ws[ec({ r, c: 3 })] = { v: ch.monto, t: "n", z: '"$"#,##0.00', s: { font: { sz: 10, color: { rgb: "333333" }, name: "Calibri" }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: "right" }, border: B } };
+      ws[ec({ r, c: 4 })] = { v: fmtDate(ch.fecha_deposito), t: "s", s: cellS("555555", 9) };
+      ws[ec({ r, c: 5 })] = { v: ch.whatsapp || "", t: "s", s: cellS("555555", 9) };
+      totalMonto += Number(ch.monto) || 0;
+      heights[r] = 18;
+      r++;
+    }
+
+    // Spacer
+    heights[r] = 6;
+    r++;
+
+    // Totals row
+    for (let ci = 0; ci < 6; ci++) {
+      const topB = { ...B, top: { style: "medium", color: { rgb: "1B3A5C" } } };
+      if (ci === 2) {
+        ws[ec({ r, c: ci })] = { v: "TOTAL", t: "s", s: { font: { bold: true, sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "EBF0F0" } }, alignment: { horizontal: "right" }, border: topB } };
+      } else if (ci === 3) {
+        ws[ec({ r, c: ci })] = { v: totalMonto, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "EBF0F0" } }, alignment: { horizontal: "right" }, border: topB } };
+      } else {
+        ws[ec({ r, c: ci })] = { v: "", t: "s", s: { font: { sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "EBF0F0" } }, border: topB } };
+      }
+    }
+    heights[r] = 22;
+    r++;
+
+    ws["!ref"] = `A1:F${r}`;
     ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }];
-    // Bold header row
-    for (let c = 0; c < 6; c++) {
-      const cell = ws[XLSX.utils.encode_cell({ r: 2, c })];
-      if (cell) cell.s = { font: { bold: true } };
-    }
-    // Title style
-    const titleCell = ws[XLSX.utils.encode_cell({ r: 0, c: 0 })];
-    if (titleCell) titleCell.s = { font: { bold: true, sz: 14 } };
+    ws["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 18 }];
+    ws["!rows"] = heights.map((h: number) => ({ hpt: h || 16 }));
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Pendientes");
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
     const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
     const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `cheques-pendientes-${todayStr()}.xlsx`;
+    a.download = `cheques-${label.replace(/ /g, "-")}-${todayStr()}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
     showToast("Excel descargado");
@@ -338,10 +439,10 @@ export default function ChequesPage() {
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-light tracking-tight">Cheques Posfechados</h1>
         <div className="flex flex-wrap items-center gap-3">
-          <button onClick={exportPendientes} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-md transition">
-            ↓ Exportar pendientes
+          <button onClick={exportCheques} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-md active:bg-gray-100 transition-all">
+            ↓ Exportar {exportFilterLabel()}
           </button>
-          <button onClick={() => { resetForm(); setShowForm(!showForm); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition">
+          <button onClick={() => { resetForm(); setShowForm(!showForm); }} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">
             {showForm ? "Cerrar" : "Nuevo Cheque"}
           </button>
         </div>
@@ -373,23 +474,39 @@ export default function ChequesPage() {
         return (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
             <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-              <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Total a cobrar</div>
+              <div className="flex items-center mb-1">
+                <div className="text-xs uppercase tracking-widest text-gray-500">Total a cobrar</div>
+                <button onClick={() => setKpiTooltip(kpiTooltip === "total" ? null : "total")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
+              </div>
               <div className="text-xl font-semibold tabular-nums">${fmt(totalPendiente)}</div>
               <div className="text-xs text-gray-400 mt-0.5">{pendientes.length} cheques</div>
+              {kpiTooltip === "total" && <p className="text-xs text-gray-500 mt-1">Suma de todos los cheques pendientes de cobro</p>}
             </div>
             <div className={`rounded-lg p-3 border border-gray-200 ${vencenSemanaKPI.length > 0 ? "bg-amber-50" : "bg-gray-50"}`}>
-              <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Vencen esta semana</div>
+              <div className="flex items-center mb-1">
+                <div className="text-xs uppercase tracking-widest text-gray-500">Vencen esta semana</div>
+                <button onClick={() => setKpiTooltip(kpiTooltip === "semana" ? null : "semana")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
+              </div>
               <div className={`text-xl font-semibold tabular-nums ${vencenSemanaKPI.length > 0 ? "text-amber-600" : ""}`}>{vencenSemanaKPI.length}</div>
               <div className="text-xs text-gray-400 mt-0.5">${fmt(vencenSemanaKPI.reduce((s, c) => s + (Number(c.monto) || 0), 0))}</div>
+              {kpiTooltip === "semana" && <p className="text-xs text-gray-500 mt-1">Cheques que se pueden depositar esta semana</p>}
             </div>
             <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-              <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Próximo depósito</div>
+              <div className="flex items-center mb-1">
+                <div className="text-xs uppercase tracking-widest text-gray-500">Próximo depósito</div>
+                <button onClick={() => setKpiTooltip(kpiTooltip === "proximo" ? null : "proximo")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
+              </div>
               <div className="text-xl font-semibold">{proximo ? fmtDate(proximo) : "—"}</div>
+              {kpiTooltip === "proximo" && <p className="text-xs text-gray-500 mt-1">Fecha del próximo cheque que vence</p>}
             </div>
             <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-              <div className="text-xs uppercase tracking-widest text-gray-500 mb-1">Depositados</div>
+              <div className="flex items-center mb-1">
+                <div className="text-xs uppercase tracking-widest text-gray-500">Depositados</div>
+                <button onClick={() => setKpiTooltip(kpiTooltip === "depositados" ? null : "depositados")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
+              </div>
               <div className="text-xl font-semibold tabular-nums text-green-600">{depositados.length}</div>
               <div className="text-xs text-gray-400 mt-0.5">${fmt(depositados.reduce((s, c) => s + (Number(c.monto) || 0), 0))}</div>
+              {kpiTooltip === "depositados" && <p className="text-xs text-gray-500 mt-1">Cheques ya depositados en el banco</p>}
             </div>
           </div>
         );
@@ -403,7 +520,7 @@ export default function ChequesPage() {
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Cliente <span className="text-red-500">*</span></label>
               <div className="relative">
-                <input type="text" value={fCliente} onChange={(e) => { setFCliente(e.target.value); setShowSuggestions(true); }} onFocus={() => setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition" />
+                <input type="text" value={fCliente} onChange={(e) => { setFCliente(e.target.value); setShowSuggestions(true); }} onFocus={() => setShowSuggestions(true)} onBlur={() => { setTimeout(() => setShowSuggestions(false), 200); handleChequeBlur("cliente"); }} className={`w-full border-b ${chequeFieldError("cliente", fCliente) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`} />
                 {showSuggestions && fCliente.length >= 2 && (() => {
                   const matches = dirClientes.filter(n => n.toLowerCase().includes(fCliente.toLowerCase())).slice(0, 5);
                   return matches.length > 0 ? (
@@ -415,32 +532,38 @@ export default function ChequesPage() {
                   ) : null;
                 })()}
               </div>
+              {chequeFieldError("cliente", fCliente) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa <span className="text-red-500">*</span></label>
-              <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition">
+              <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} onBlur={() => handleChequeBlur("empresa")} className={`border-b ${chequeFieldError("empresa", fEmpresa) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`}>
                 <option value="">Seleccionar...</option>
                 {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
               </select>
+              {chequeFieldError("empresa", fEmpresa) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Banco <span className="text-red-500">*</span></label>
-              <select value={fBanco} onChange={(e) => setFBanco(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition">
+              <select value={fBanco} onChange={(e) => setFBanco(e.target.value)} onBlur={() => handleChequeBlur("banco")} className={`border-b ${chequeFieldError("banco", fBanco) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`}>
                 <option value="">Seleccionar...</option>
                 {BANCOS.map((b) => <option key={b} value={b}>{b}</option>)}
               </select>
+              {chequeFieldError("banco", fBanco) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Cheque <span className="text-red-500">*</span></label>
-              <input type="text" value={fNumero} onChange={(e) => setFNumero(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition" />
+              <input type="text" value={fNumero} onChange={(e) => setFNumero(e.target.value)} onBlur={() => handleChequeBlur("numero")} className={`border-b ${chequeFieldError("numero", fNumero) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`} />
+              {chequeFieldError("numero", fNumero) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Monto <span className="text-red-500">*</span></label>
-              <input type="number" step="0.01" value={fMonto} onChange={(e) => setFMonto(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition" />
+              <input type="number" step="0.01" value={fMonto} onChange={(e) => setFMonto(e.target.value)} onBlur={() => handleChequeBlur("monto")} className={`border-b ${chequeFieldError("monto", fMonto) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`} />
+              {chequeFieldError("monto", fMonto) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha Depósito <span className="text-red-500">*</span></label>
-              <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition" />
+              <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleChequeBlur("fecha")} className={`border-b ${chequeFieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`} />
+              {chequeFieldError("fecha", fFecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">WhatsApp</label>
@@ -453,7 +576,7 @@ export default function ChequesPage() {
           </div>
           {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
           <div className="flex items-center gap-4 mt-6">
-            <button onClick={saveCheque} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-40">{saving ? "Guardando..." : "Guardar Cheque"}</button>
+            <button onClick={saveCheque} disabled={saving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40">{saving ? "Guardando..." : "Guardar Cheque"}</button>
             <button onClick={() => { resetForm(); setShowForm(false); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
           </div>
         </div>
@@ -523,7 +646,7 @@ export default function ChequesPage() {
                       <td className="py-3 px-4 font-medium">{r.cliente}</td>
                       <td className="py-3 px-4 text-right tabular-nums">{r.count}</td>
                       <td className="py-3 px-4 text-right tabular-nums">${fmt(r.total)}</td>
-                      <td className="py-3 px-4 text-right text-gray-500">{fmtShort(r.ultimo)}</td>
+                      <td className="py-3 px-4 text-right text-gray-500">{fmtDate(r.ultimo)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -635,8 +758,8 @@ export default function ChequesPage() {
                                 <StatusBadge estado={ve} />
                                 {(ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido") && (
                                   <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
-                                    <button onClick={() => { setConfirmDepositId(c.id); setCalPopover(null); }} className="text-[11px] text-emerald-600 hover:underline">Depositar</button>
-                                    <button onClick={() => { setRebotandoId(c.id); setCalPopover(null); }} className="text-[11px] text-red-500 hover:underline">Rebotado</button>
+                                    <button onClick={() => { setConfirmDepositId(c.id); setCalPopover(null); }} className="text-[11px] text-emerald-600 hover:underline">Confirmar depósito</button>
+                                    <button onClick={() => { setRebotandoId(c.id); setCalPopover(null); }} title="Cheque devuelto por el banco" className="text-[11px] text-red-500 hover:underline">Rebotado</button>
                                   </div>
                                 )}
                               </div>
@@ -674,8 +797,8 @@ export default function ChequesPage() {
                           </div>
                           {(ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido") && (
                             <div className="flex gap-3 mt-1 ml-1">
-                              <button onClick={() => setConfirmDepositId(c.id)} className="text-xs text-emerald-600 hover:underline py-1">Depositar</button>
-                              <button onClick={() => setRebotandoId(c.id)} className="text-xs text-red-500 hover:underline py-1">Rebotado</button>
+                              <button onClick={() => setConfirmDepositId(c.id)} className="text-xs text-emerald-600 hover:underline py-1">Confirmar depósito</button>
+                              <button onClick={() => setRebotandoId(c.id)} title="Cheque devuelto por el banco" className="text-xs text-red-500 hover:underline py-1">Rebotado</button>
                             </div>
                           )}
                         </div>
@@ -761,7 +884,7 @@ export default function ChequesPage() {
                       <input type="checkbox" checked={selectedVencidos.has(c.id)} onChange={() => toggleSelectVencido(c.id)} className="accent-amber-600 w-3.5 h-3.5" />
                     </td>
                   )}
-                  <td className={`py-3 px-4 ${ve !== "pendiente" ? "" : ""}`}>{fmtShort(c.fecha_deposito)}</td>
+                  <td className={`py-3 px-4 ${ve !== "pendiente" ? "" : ""}`}>{fmtDate(c.fecha_deposito)}</td>
                   <td className="py-3 px-4 font-medium">{c.cliente}</td>
                   <td className="py-3 px-4 text-gray-500">{c.empresa}</td>
                   <td className="py-3 px-4 text-gray-500">{c.banco}</td>
@@ -773,7 +896,7 @@ export default function ChequesPage() {
                   <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end gap-2">
                     {(ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido") && (
-                      <button onClick={() => setConfirmDepositId(c.id)} className="text-sm text-gray-500 hover:text-black transition min-h-[44px]">Depositar</button>
+                      <button onClick={() => setConfirmDepositId(c.id)} className="text-sm text-gray-500 hover:text-black transition min-h-[44px]">Confirmar depósito</button>
                     )}
                     {isRebotado && (
                       <button onClick={() => redepositar(c.id)} className="text-sm text-gray-500 hover:text-emerald-600 transition min-h-[44px]">Re-depositar</button>
@@ -785,9 +908,11 @@ export default function ChequesPage() {
                       role={role}
                       onRebotado={() => setRebotandoId(c.id)}
                       onWA={() => {
-                        if (!c.whatsapp) { showToast("Este cheque no tiene WhatsApp"); return; }
-                        const msg = `Hola, le escribo de Fashion Group respecto al cheque N° ${c.numero_cheque} por $${fmt(c.monto)} con fecha de depósito ${fmtDate(c.fecha_deposito)}. ${ve === "pendiente" ? "Queda pendiente de depósito." : ve === "rebotado" ? "El cheque fue rebotado." : ""} Gracias.`;
-                        try { window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
+                        if (!c.whatsapp) { showToast("Este cliente no tiene WhatsApp registrado"); return; }
+                        let phone = (c.whatsapp || "").replace(/\D/g, "");
+                        if (!phone.startsWith("507") && phone.length <= 8) { phone = "507" + phone; }
+                        const msg = `Hola, le recordamos que tiene un cheque #${c.numero_cheque} por $${fmt(c.monto)} con fecha de depósito ${fmtDate(c.fecha_deposito)}.`;
+                        try { window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
                       }}
                       onDelete={() => setConfirmDeleteId(c.id)}
                     />

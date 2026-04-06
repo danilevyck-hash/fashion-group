@@ -270,7 +270,7 @@ export default function PlantillasPage() {
       )}
 
       {/* Alerts */}
-      {statsLoading ? (
+      {showAlerts && (statsLoading ? (
         <div className="mb-4 h-10 bg-gray-50 rounded-lg animate-pulse" />
       ) : alerts.length > 0 ? (
         <div className="mb-4 flex flex-wrap gap-2">
@@ -287,10 +287,10 @@ export default function PlantillasPage() {
           ))}
         </div>
       ) : stats ? (
-        <div className="mb-4 flex items-center gap-2 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs text-emerald-700">
-          <span>✓</span> Todo al dia
-        </div>
-      ) : null}
+        <p className="mb-4 text-sm text-gray-500">
+          <span className="text-green-600">✓</span> Todo en orden — no hay alertas pendientes
+        </p>
+      ) : null)}
 
       {/* Edit toggle */}
       <div className="flex justify-end mb-2">

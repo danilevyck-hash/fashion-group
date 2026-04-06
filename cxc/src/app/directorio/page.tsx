@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast, SkeletonTable, EmptyState, ConfirmDeleteModal } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState, ConfirmDeleteModal, AccordionContent, Modal, ScrollableTable } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import XLSX from "xlsx-js-style";
 
@@ -276,12 +276,23 @@ export default function DirectorioPage() {
             }}
           />
           {(role === "admin" || role === "secretaria") && (
+          <>
           <button onClick={() => importRef.current?.click()} title="Formato: CSV separado por ; (punto y coma). Columnas: Nombre, Empresa, Teléfono, Celular, Correo, Contacto, Notas" className="text-sm text-gray-400 hover:text-black transition">
             Importar CSV
           </button>
-          )}
-          {(role === "admin" || role === "secretaria") && !showNew && (
-            <span className="text-[10px] text-gray-300 hidden lg:inline">Formato: ; separado</span>
+          <button onClick={() => {
+            const headers = "Nombre;Empresa;Teléfono;Celular;Correo;Contacto;Notas";
+            const blob = new Blob([headers + "\n"], { type: "text/csv;charset=utf-8;" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "plantilla-directorio.csv";
+            a.click();
+            URL.revokeObjectURL(url);
+          }} className="text-sm text-gray-400 hover:text-black transition">
+            Descargar plantilla
+          </button>
+          </>
           )}
           <button onClick={() => window.open("/api/directorio?format=csv")} className="text-sm text-gray-400 hover:text-black transition">
             Exportar CSV
@@ -311,52 +322,49 @@ export default function DirectorioPage() {
         </div>
       </div>
 
-      {/* New contact form */}
-      {showNew && ( /* data-print-hide applied via parent */
-        <div className="border border-gray-200 rounded-lg p-6 mb-8">
-          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Nuevo Contacto</div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Nombre *</label>
-              <input type="text" value={newData.nombre} onChange={(e) => setNewData({ ...newData, nombre: e.target.value })}
-                className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Empresa</label>
-              <input type="text" value={newData.empresa} onChange={(e) => setNewData({ ...newData, empresa: e.target.value })}
-                className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">WhatsApp</label>
-              <input type="text" value={newData.whatsapp} onChange={(e) => setNewData({ ...newData, whatsapp: e.target.value })}
-                placeholder="+507 6000-0000"
-                className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Correo</label>
-              <input type="text" value={newData.correo} onChange={(e) => setNewData({ ...newData, correo: e.target.value })}
-                className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
-            </div>
-            <div>
-              <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Contacto</label>
-              <input type="text" value={newData.contacto} onChange={(e) => setNewData({ ...newData, contacto: e.target.value })}
-                className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
-            </div>
-            <div className="col-span-2">
-              <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Notas</label>
-              <input type="text" value={newData.notas} onChange={(e) => setNewData({ ...newData, notas: e.target.value })}
-                className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
-            </div>
+      {/* New contact modal */}
+      <Modal open={showNew} onClose={() => setShowNew(false)} title="Nuevo Contacto" maxWidth="max-w-lg">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Nombre *</label>
+            <input type="text" value={newData.nombre} onChange={(e) => setNewData({ ...newData, nombre: e.target.value })}
+              className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
           </div>
-          <div className="flex items-center gap-4 mt-6">
-            <button onClick={handleCreate} disabled={savingNew}
-              className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition disabled:opacity-50">
-              {savingNew ? "Guardando..." : "Guardar Cliente"}
-            </button>
-            <button onClick={() => setShowNew(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+          <div>
+            <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Empresa</label>
+            <input type="text" value={newData.empresa} onChange={(e) => setNewData({ ...newData, empresa: e.target.value })}
+              className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">WhatsApp</label>
+            <input type="text" value={newData.whatsapp} onChange={(e) => setNewData({ ...newData, whatsapp: e.target.value })}
+              placeholder="+507 6000-0000"
+              className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Correo</label>
+            <input type="text" value={newData.correo} onChange={(e) => setNewData({ ...newData, correo: e.target.value })}
+              className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
+          </div>
+          <div>
+            <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Contacto</label>
+            <input type="text" value={newData.contacto} onChange={(e) => setNewData({ ...newData, contacto: e.target.value })}
+              className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
+          </div>
+          <div className="col-span-2">
+            <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">Notas</label>
+            <input type="text" value={newData.notas} onChange={(e) => setNewData({ ...newData, notas: e.target.value })}
+              className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
           </div>
         </div>
-      )}
+        <div className="flex items-center gap-4 mt-6">
+          <button onClick={handleCreate} disabled={savingNew}
+            className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 transition disabled:opacity-50">
+            {savingNew ? "Guardando..." : "Guardar Cliente"}
+          </button>
+          <button onClick={() => setShowNew(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+        </div>
+      </Modal>
 
       {/* Search */}
       <div className="flex items-end gap-4 mb-6" data-print-hide>
@@ -392,8 +400,7 @@ export default function DirectorioPage() {
         />
       ) : (
         <>
-          <div className="overflow-x-auto -mx-4 sm:mx-0">
-          <div className="min-w-[600px] px-4 sm:px-0">
+          <ScrollableTable minWidth={600}>
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b border-gray-200">
@@ -423,6 +430,17 @@ export default function DirectorioPage() {
                           }
                           setExpanded(isExpanded ? null : c.id);
                         }}
+                        onDoubleClick={(e) => {
+                          e.preventDefault();
+                          if (role !== "admin" && role !== "secretaria") return;
+                          if (isDirty && editing && editing !== c.id) {
+                            if (!confirm("Tienes cambios sin guardar. ¿Salir sin guardar?")) return;
+                          }
+                          setExpanded(c.id);
+                          setEditing(c.id);
+                          setEditData(c);
+                          setIsDirty(false);
+                        }}
                       >
                         <div className="font-medium">{c.nombre}{cxcClients.has(c.nombre.toUpperCase().trim().replace(/\s+/g, " ")) && (
                           <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full ml-1" title="Este contacto también aparece en Cuentas por Cobrar">En CxC</span>
@@ -441,72 +459,72 @@ export default function DirectorioPage() {
                         <div className="text-right text-gray-300 text-xs">{isExpanded ? "▼" : "▶"}</div>
                       </div>
 
-                      {/* Expanded detail */}
-                      {isExpanded && !isEditing && (
-                        <div className="bg-gray-50 px-4 py-3 mb-1 rounded-lg text-sm">
-                          <div className="text-gray-500 mb-1">Teléfono: {c.telefono || <span className="text-gray-300">—</span>}</div>
-                          <div className="text-gray-500 mb-1">Notas: {c.notas || <span className="text-gray-300">—</span>}</div>
-                          <div className="text-gray-400 text-xs mb-3">Creado: {fmtDate(c.created_at.slice(0, 10))}</div>
-                          <div className="flex gap-3">
-                            {(role === "admin" || role === "secretaria") && (
-                            <button onClick={(e) => { e.stopPropagation(); setEditing(c.id); setEditData(c); setIsDirty(false); }}
-                              className="text-sm text-gray-400 hover:text-black transition py-2.5 sm:py-1.5 min-h-[44px]">Editar</button>
-                            )}
-                            <button onClick={(e) => { e.stopPropagation(); router.push(`/admin?search=${encodeURIComponent(c.nombre)}`); }}
-                              title="Ver deuda de este cliente en Cuentas por Cobrar" className="text-xs text-gray-400 hover:text-black transition py-2.5 sm:py-1.5 min-h-[44px]">Ver en CXC →</button>
-                            {role === "admin" && (
-                              <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
-                                className="text-sm text-gray-400 hover:text-red-500 transition py-2.5 sm:py-1.5 min-h-[44px]">Eliminar Contacto</button>
-                            )}
+                      {/* Expanded detail / Edit form */}
+                      <AccordionContent open={isExpanded}>
+                        {isExpanded && !isEditing && (
+                          <div className="bg-gray-50 px-4 py-3 mb-1 rounded-lg text-sm">
+                            <div className="text-gray-500 mb-1">Teléfono: {c.telefono || <span className="text-gray-300">—</span>}</div>
+                            <div className="text-gray-500 mb-1">Notas: {c.notas || <span className="text-gray-300">—</span>}</div>
+                            <div className="text-gray-400 text-xs mb-3">Creado: {fmtDate(c.created_at.slice(0, 10))}</div>
+                            <div className="flex gap-3">
+                              {(role === "admin" || role === "secretaria") && (
+                              <button onClick={(e) => { e.stopPropagation(); setEditing(c.id); setEditData(c); setIsDirty(false); }}
+                                className="text-sm text-gray-400 hover:text-black transition py-2.5 sm:py-1.5 min-h-[44px]">Editar</button>
+                              )}
+                              <button onClick={(e) => { e.stopPropagation(); router.push(`/admin?search=${encodeURIComponent(c.nombre)}`); }}
+                                title="Ver deuda de este cliente en Cuentas por Cobrar" className="text-xs text-gray-400 hover:text-black transition py-2.5 sm:py-1.5 min-h-[44px]">Ver en CXC →</button>
+                              {role === "admin" && (
+                                <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(c); }}
+                                  className="text-sm text-gray-400 hover:text-red-500 transition py-2.5 sm:py-1.5 min-h-[44px]">Eliminar Contacto</button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {/* Edit form */}
-                      {isExpanded && isEditing && (role === "admin" || role === "secretaria") && (
-                        <div className="bg-gray-50 px-4 py-3 mb-1 rounded-lg" onClick={(e) => e.stopPropagation()}>
-                          <div className="grid grid-cols-2 gap-3">
-                            {(["nombre", "empresa", "whatsapp", "correo", "contacto", "notas"] as const).map((field) => (
-                              <div key={field}>
-                                <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">{field}</label>
-                                <input type="text" value={(editData as Record<string, string>)[field] || ""}
-                                  onChange={(e) => {
-                                    const next = { ...editData, [field]: e.target.value };
-                                    setEditData(next);
-                                    setIsDirty(true);
-                                    if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
-                                    autoSaveRef.current = setTimeout(async () => {
-                                      setAutoSaveStatus("saving");
-                                      const res = await fetch(`/api/directorio/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) });
-                                      if (res.ok) {
-                                        setIsDirty(false);
-                                        setAutoSaveStatus("saved");
-                                        setTimeout(() => setAutoSaveStatus(""), 2000);
-                                        loadClientes(debouncedSearch, page);
-                                      } else { setAutoSaveStatus(""); }
-                                    }, 2000);
-                                  }}
-                                  className="w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition bg-transparent" />
-                              </div>
-                            ))}
+                        {isExpanded && isEditing && (role === "admin" || role === "secretaria") && (
+                          <div className="bg-gray-50 px-4 py-3 mb-1 rounded-lg" onClick={(e) => e.stopPropagation()}>
+                            <div className="grid grid-cols-2 gap-3">
+                              {(["nombre", "empresa", "whatsapp", "correo", "contacto", "notas"] as const).map((field) => (
+                                <div key={field}>
+                                  <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">{field}</label>
+                                  <input type="text" value={(editData as Record<string, string>)[field] || ""}
+                                    onChange={(e) => {
+                                      const next = { ...editData, [field]: e.target.value };
+                                      setEditData(next);
+                                      setIsDirty(true);
+                                      if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
+                                      autoSaveRef.current = setTimeout(async () => {
+                                        setAutoSaveStatus("saving");
+                                        const res = await fetch(`/api/directorio/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) });
+                                        if (res.ok) {
+                                          setIsDirty(false);
+                                          setAutoSaveStatus("saved");
+                                          setTimeout(() => setAutoSaveStatus(""), 2000);
+                                          loadClientes(debouncedSearch, page);
+                                        } else { setAutoSaveStatus(""); }
+                                      }, 2000);
+                                    }}
+                                    className="w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition bg-transparent" />
+                                </div>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-3 mt-4">
+                              <button onClick={() => handleUpdate(c.id)}
+                                className="text-sm bg-black text-white px-5 py-1.5 rounded-full hover:bg-gray-800 transition">Guardar Cliente</button>
+                              <button onClick={() => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current); if (isDirty && !confirm("Tienes cambios sin guardar. ¿Salir sin guardar?")) return; setEditing(null); setIsDirty(false); setAutoSaveStatus(""); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+                              {autoSaveStatus === "saving" && <span className="text-xs text-gray-400">Guardando...</span>}
+                              {autoSaveStatus === "saved" && <span className="text-xs text-green-600">Guardado ✓</span>}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-3 mt-4">
-                            <button onClick={() => handleUpdate(c.id)}
-                              className="text-sm bg-black text-white px-5 py-1.5 rounded-full hover:bg-gray-800 transition">Guardar Cliente</button>
-                            <button onClick={() => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current); if (isDirty && !confirm("Tienes cambios sin guardar. ¿Salir sin guardar?")) return; setEditing(null); setIsDirty(false); setAutoSaveStatus(""); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
-                            {autoSaveStatus === "saving" && <span className="text-xs text-gray-400">Guardando...</span>}
-                            {autoSaveStatus === "saved" && <span className="text-xs text-green-600">Guardado ✓</span>}
-                          </div>
-                        </div>
-                      )}
+                        )}
+                      </AccordionContent>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
-          </div>
-          </div>
+          </ScrollableTable>
           {clientes.length === 0 && search && (
             <p className="text-center text-gray-300 text-sm py-12">Sin resultados para &quot;{search}&quot;</p>
           )}

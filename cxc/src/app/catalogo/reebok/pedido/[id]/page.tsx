@@ -7,7 +7,7 @@ import { fmt } from "@/lib/format";
 import { ConfirmDeleteModal, Toast } from "@/components/ui";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
-interface Order { id: string; order_number: string; client_name: string; comment: string; status: string; total: number; reebok_order_items: OrderItem[]; created_at: string; }
+interface Order { id: string; order_number: string; client_name: string; client_email?: string | null; comment: string; status: string; total: number; reebok_order_items: OrderItem[]; created_at: string; }
 interface DirClient { nombre: string; empresa: string; }
 
 const P = 12;
@@ -50,6 +50,7 @@ export default function OrderDetailPage() {
           }
         }
         setOrder(d); setItems(d.reebok_order_items || []); setClientName(d.client_name || "");
+        if (d.client_email) setClientEmail(d.client_email);
         // Track active draft so catalog can add to it
         if (d.status === "borrador") sessionStorage.setItem("reebok_draft_id", id);
       } else router.push("/catalogo/reebok/pedidos");
@@ -139,6 +140,7 @@ export default function OrderDetailPage() {
 
     showToast("Pedido confirmado. Se envio por email a Fashion Group.");
     setConfirming(false);
+    setJustConfirmed(true);
     load();
   }
 
@@ -173,6 +175,7 @@ export default function OrderDetailPage() {
   const [clientEmail, setClientEmail] = useState("");
   const [sendingToClient, setSendingToClient] = useState(false);
   const [showEmailInput, setShowEmailInput] = useState(false);
+  const [justConfirmed, setJustConfirmed] = useState(false);
 
   async function fetchImageB64(url: string): Promise<string | null> {
     try { const r = await fetch(url); const b = await r.blob(); return new Promise(res => { const rd = new FileReader(); rd.onload = () => res(rd.result as string); rd.readAsDataURL(b); }); } catch { return null; }
@@ -183,6 +186,7 @@ export default function OrderDetailPage() {
     showToast("Generando PDF...");
     const { jsPDF } = await import("jspdf");
     const { default: autoTable } = await import("jspdf-autotable");
+    const { REEBOK_LOGO_BASE64, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT } = await import("@/lib/reebok-logo");
     const doc = new jsPDF("portrait");
 
     // Pre-fetch product images
@@ -196,9 +200,8 @@ export default function OrderDetailPage() {
 
     doc.setFillColor(26, 26, 26);
     doc.rect(0, 0, 210, 18, "F");
-    doc.setFontSize(12); doc.setTextColor(255); doc.setFont("helvetica", "bold");
-    doc.text("REEBOK", 14, 12);
-    doc.setFontSize(8); doc.setFont("helvetica", "normal");
+    try { doc.addImage(REEBOK_LOGO_BASE64, "PNG", 14, 5, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT); } catch { /* skip logo */ }
+    doc.setFontSize(8); doc.setTextColor(255); doc.setFont("helvetica", "normal");
     doc.text("Fashion Group · Panama", 196, 12, { align: "right" });
 
     doc.setTextColor(100); doc.setFontSize(9);
@@ -210,13 +213,16 @@ export default function OrderDetailPage() {
       startY: 32,
       head: [["", "Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
       body: items.map(i => ["", i.name, i.sku || "", String(i.quantity), String(i.quantity * P), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * P * Number(i.unit_price))}`]),
-      styles: { fontSize: 8, cellPadding: 2, minCellHeight: 14 },
+      styles: { fontSize: 8, cellPadding: 2, minCellHeight: 12 },
       headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: [249, 249, 249] },
-      columnStyles: { 0: { cellWidth: 16 }, 3: { halign: "center" }, 4: { halign: "center" }, 5: { halign: "right" }, 6: { halign: "right" } },
-      didDrawCell: (data: { row: { index: number; section: string }; column: { index: number }; cell: { x: number; y: number } }) => {
+      columnStyles: { 0: { cellWidth: 12, minCellHeight: 12 }, 3: { halign: "center" }, 4: { halign: "center" }, 5: { halign: "right" }, 6: { halign: "right" } },
+      didDrawCell: (data: { row: { index: number; section: string }; column: { index: number }; cell: { x: number; y: number; height: number; width: number } }) => {
         if (data.column.index === 0 && data.row.section === "body" && imgs[data.row.index]) {
-          try { doc.addImage(imgs[data.row.index], "JPEG", data.cell.x + 1, data.cell.y + 1, 12, 12); } catch { /* skip */ }
+          const imgSize = 10;
+          const xOffset = data.cell.x + (data.cell.width - imgSize) / 2;
+          const yOffset = data.cell.y + (data.cell.height - imgSize) / 2;
+          try { doc.addImage(imgs[data.row.index], "JPEG", xOffset, yOffset, imgSize, imgSize); } catch { /* skip */ }
         }
       },
     });
@@ -228,7 +234,9 @@ export default function OrderDetailPage() {
     doc.setFontSize(7); doc.setTextColor(160); doc.setFont("helvetica", "normal");
     doc.text("Fashion Group Panama · Reebok Authorized Distributor", 14, fy + 10);
 
-    const filename = `${order.order_number}-${clientName.replace(/\s+/g, "-")}.pdf`;
+    const prefix = order.status === "confirmado" ? "Pedido" : "Cotizacion";
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const filename = `${prefix}-${order.order_number}-${dateStr}.pdf`;
     const url = URL.createObjectURL(doc.output("blob"));
     const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
     URL.revokeObjectURL(url);
@@ -325,7 +333,7 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      <p className="text-xs text-gray-400 mb-4">{new Date(order.created_at).toLocaleDateString("es-PA")}</p>
+      <p className="text-xs text-gray-400 mb-4">{new Date(order.created_at).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")}</p>
 
       {/* Items table */}
       {items.length > 0 ? (
@@ -399,8 +407,15 @@ export default function OrderDetailPage() {
       {/* Actions — ONE primary button */}
       {isConfirmed ? (
         <div className="space-y-3">
-          <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-center">
-            <span className="text-emerald-700 font-medium text-sm">&#10003; Pedido confirmado</span>
+          <div className={`bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 text-center ${justConfirmed ? "" : ""}`}
+            style={justConfirmed ? { animation: "confirmBannerPulse 0.8s ease-out" } : undefined}>
+            <div className="flex items-center justify-center gap-2">
+              <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500 flex-shrink-0"
+                style={justConfirmed ? { animation: "confirmPulse 0.5s ease-out" } : undefined}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              </span>
+              <span className="text-emerald-700 font-medium text-sm">Pedido confirmado</span>
+            </div>
             <span className="text-emerald-600 text-xs block mt-0.5">Enviado por email a Fashion Group</span>
           </div>
 

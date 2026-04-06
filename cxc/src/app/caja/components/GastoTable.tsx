@@ -3,7 +3,7 @@
 import { fmt, fmtDate } from "@/lib/format";
 import { CajaGasto } from "./types";
 import { CAJA_EMPRESAS, AutocompleteInput } from "./GastoForm";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, ScrollableTable } from "@/components/ui";
 
 interface Props {
   gastos: CajaGasto[];
@@ -39,8 +39,7 @@ export default function GastoTable({
       <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">
         Gastos
       </div>
-      <div className="overflow-x-auto -mx-4 sm:mx-0">
-        <div className="min-w-[700px] px-4 sm:px-0">
+      <ScrollableTable minWidth={700}>
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-white z-10">
             <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
@@ -294,8 +293,12 @@ export default function GastoTable({
             )}
           </tbody>
         </table>
-        </div>
-      </div>
+      </ScrollableTable>
+      {gastos.length > 0 && (
+        <p className="sm:hidden text-[10px] text-gray-400 mt-2 text-center">
+          Desliza &rarr; para ver mas columnas
+        </p>
+      )}
     </div>
   );
 }

@@ -47,7 +47,7 @@ function formatDate(iso: string) {
   if (diff < 60_000) return "Hace un momento";
   if (diff < 3_600_000) return `Hace ${Math.floor(diff / 60_000)} min`;
   if (diff < 86_400_000) return `Hace ${Math.floor(diff / 3_600_000)}h`;
-  return d.toLocaleDateString("es-PA", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleDateString("es-PA", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).replace(".", "");
 }
 
 export default function ActivityLog({ darkMode }: { darkMode: boolean }) {

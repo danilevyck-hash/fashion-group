@@ -477,9 +477,9 @@ function UploadPageInner() {
 
   function formatPeriod(dateStr: string, count?: number) {
     const d = new Date(dateStr);
-    const mes = d.toLocaleDateString("es-PA", { month: "short", timeZone: "America/Panama" });
+    const mes = d.toLocaleDateString("es-PA", { month: "short", timeZone: "America/Panama" }).replace(".", "");
     const ano = d.getFullYear();
-    const dia = d.toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "America/Panama" });
+    const dia = d.toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "America/Panama" }).replace(".", "");
     const hora = d.toLocaleTimeString("es-PA", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Panama" }).toLowerCase();
     const parts = [`${mes} ${ano}`];
     if (count) parts.push(`${count.toLocaleString()} reg.`);

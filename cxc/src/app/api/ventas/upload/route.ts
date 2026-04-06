@@ -57,11 +57,22 @@ const VALID_TIPOS = new Set(["Factura", "Nota de Crédito", "Nota de Débito"]);
 
 function parseCSV(text: string, empresa: string): RawRow[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length < 2) return [];
+  if (lines.length < 2) {
+    throw new Error("No se encontraron filas válidas. Verifica que el archivo tenga datos.");
+  }
 
-  // Find the header line
+  // Check if any line contains FECHA at all (regardless of delimiter)
+  const hasFechaAnywhere = lines.some((l) => l.toUpperCase().includes("FECHA"));
+
+  // Find the header line (must have FECHA and semicolon delimiter)
   const headerIdx = lines.findIndex((l) => l.toUpperCase().includes("FECHA") && l.includes(";"));
-  if (headerIdx === -1) return [];
+  if (headerIdx === -1) {
+    if (hasFechaAnywhere) {
+      // Has FECHA but no semicolons → wrong delimiter
+      throw new Error("El archivo no tiene el formato esperado. Usa punto y coma (;) como separador.");
+    }
+    throw new Error("No se encontró la columna FECHA en el archivo. Verifica que el formato sea correcto.");
+  }
 
   const headers = lines[headerIdx].split(";").map((h) => h.trim().toUpperCase());
   const rows: RawRow[] = [];
@@ -119,13 +130,17 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): RawRow[] {
   // Use raw: false so numbers are formatted strings; header:1 gives array-of-arrays
   const raw: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: "" });
 
-  if (raw.length < 2) return [];
+  if (raw.length < 2) {
+    throw new Error("No se encontraron filas válidas. Verifica que el archivo tenga datos.");
+  }
 
   // Find header row
   const headerIdx = raw.findIndex(
     (row) => Array.isArray(row) && row.some((c) => String(c).toUpperCase() === "FECHA")
   );
-  if (headerIdx === -1) return [];
+  if (headerIdx === -1) {
+    throw new Error("No se encontró la columna FECHA en el archivo. Verifica que el formato sea correcto.");
+  }
 
   const headers = (raw[headerIdx] as string[]).map((h) => String(h).trim().toUpperCase());
   const rows: RawRow[] = [];
@@ -216,14 +231,20 @@ export async function POST(req: NextRequest) {
       // Decode CSV: try UTF-8 first, fall back to latin-1 if replacement chars found
       const buffer = await file.arrayBuffer();
       let text = new TextDecoder("utf-8").decode(buffer);
-      if (text.includes("\uFFFD")) {
+      const hadEncodingIssue = text.includes("\uFFFD");
+      if (hadEncodingIssue) {
         text = new TextDecoder("latin1").decode(buffer);
+      }
+      // If latin-1 fallback still has replacement chars, encoding is broken
+      if (hadEncodingIssue && text.includes("\uFFFD")) {
+        throw new Error("El archivo tiene caracteres especiales. Guárdalo como UTF-8 e intenta de nuevo.");
       }
       rows = parseCSV(text, empresa);
     }
   } catch (err) {
     console.error("[ventas/upload] parse error", err);
-    return NextResponse.json({ error: "Error al parsear el archivo" }, { status: 400 });
+    const message = err instanceof Error ? err.message : "Error al parsear el archivo. Verifica que el formato sea correcto.";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 
   if (rows.length === 0) {
