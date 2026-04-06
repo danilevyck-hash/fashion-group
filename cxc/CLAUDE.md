@@ -16,30 +16,37 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 | Rol | DB value | Acceso |
 |-----|----------|--------|
 | Admin | `admin` | Todo |
-| Secretaria | `secretaria` | upload, guias, caja, reclamos, cheques, directorio |
-| Bodega | `bodega` | guias (despacho) |
+| Secretaria | `secretaria` | upload, guias, caja, reclamos, cheques, directorio, KPIs dashboard |
+| Bodega | `bodega` | guias (despacho), directorio, búsqueda global (guías+directorio) |
 | Director | `director` | Todo (lectura), ventas, CXC |
-| Contabilidad | `contabilidad` | prestamos, ventas |
-| Vendedor | `vendedor` | reebok, CXC, directorio |
+| Contabilidad | `contabilidad` | prestamos, ventas, búsqueda global (ventas+prestamos) |
+| Vendedor | `vendedor` | reebok, CXC, directorio, búsqueda global (CXC+directorio) |
 | Cliente | `cliente` | catalogo reebok (solo propio) |
 
 ## Auth
 - Passwords: bcrypt hashed (migración de plaintext completada parcialmente)
 - Session: httpOnly cookie `cxc_session`, base64url-encoded JSON `{role, userId, userName, sessionToken}`
 - Middleware: `src/middleware.ts` valida sesión contra `user_sessions` table
+- Session health check: `/api/auth/check` — pinged cada 2 min, warning banner antes de expirar
 - API auth: `src/lib/requireRole.ts` — admin siempre pasa, verifica rol contra array
 - Rate limiting: 5 intentos/min/IP en login (in-memory)
+- User indicator: nombre + rol visible en header desktop y drawer mobile
+- Forgot password: link en login → "Contacta al administrador"
 
 ## Base de datos
 - **Tablas grandes:** cxc_rows (~50K), ventas_raw (~100K)
 - **Soft delete:** `deleted` boolean en: reclamos, cheques, guias, prestamos, caja, directorio
-- **Indexes necesarios:** ver commit `4ac238b` para SQL completo
+- **Tablas UX audit (abril 2026):**
+  - `cxc_favorites` — favoritos ⭐ por usuario (antes localStorage)
+  - `reclamo_custom_motivos` — motivos personalizados de reclamos (antes localStorage)
+  - `reebok_orders.client_email` — email del cliente capturado al crear pedido
 
 ## Switch Soft (ERP externo)
 - CSVs semicolon-delimited (`;`)
 - Encoding: **latin-1** para inventario Reebok, **UTF-8** para CXC y Ventas
 - Upload: 100% manual (drag-drop), no hay API/SFTP
 - Auto-detect delimiter en CXC upload (`;` o `,`)
+- Upload de ventas muestra resumen de filas excluidas con razón
 
 ## Email (Resend)
 - `noreply@fashiongr.com` — cheques reminders
@@ -57,20 +64,96 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 | /api/cron/backup | 06:00 UTC diario | Backup |
 
 ## Design System
-- **Direction:** Precision & Density
-- **Buttons:** `rounded-md`, `bg-black text-white`
+- **Direction:** Precision & Density + Apple-grade fluidity
+- **Buttons:** `rounded-md`, `bg-black text-white`, `active:scale-[0.97]` tap feedback
 - **Cards:** `rounded-lg`, `border border-gray-200`, no shadows
-- **Tables:** sticky headers (`sticky top-0 bg-white z-10`), `tabular-nums` en montos
+- **Tables:** sticky headers, `tabular-nums`, ScrollableTable con gradient indicators, SwipeableRow en mobile
+- **Modals:** ConfirmModal (normal), ConfirmDeleteModal (destructivo, 1s delay), BottomSheet (mobile)
 - **Spacing:** 4px base, py-6 containers, mb-4 sections, p-3 cards
 - **Depth:** borders-only (no shadows en cards/modules)
+- **Module colors:** CXC=blue, Guías=emerald, Cheques=amber, Reclamos=orange, Caja=violet, Directorio=cyan, Préstamos=rose, Ventas=indigo, Reebok=red (2px accent en header)
+- **Animations:** AccordionContent (CSS grid 250ms), page transitions (slide-right/left/crossfade 180ms), KPI count-up, deposit flash, saldo shake, new row highlight
 
 ## UX Principles
 - Usuarios: secretarias, bodegueros, vendedores en Panamá. NO tech-savvy.
 - Labels en español simple. Cero jerga (CXC → "Cuentas por Cobrar")
-- Botones descriptivos ("Guardar Contacto", no "Guardar")
-- Errores accionables ("No se pudo guardar. Intenta de nuevo.")
+- Botones descriptivos ("Guardar gasto", no "Guardar")
+- Errores accionables y humanos ("No se pudo guardar. Intenta de nuevo en unos segundos.")
+- Micro-copy con personalidad ("Listo, guardado", "Excel listo — revisa tu carpeta de descargas")
 - Font size mínimo text-sm para datos. text-gray-600 mínimo para montos.
 - Confirmación solo para acciones destructivas (eliminar), NO para guardar.
+- Undo universal: 5 segundos para deshacer acciones destructivas (depositar, eliminar, cambiar estado)
+- Optimistic UI: actualizar UI antes de respuesta del server, revertir si falla
+- 1 acción principal por vista + OverflowMenu "···" para secundarias
+- Toasts: errores 8s, éxitos 3s, con botón X para cerrar
+
+## Keyboard Shortcuts (Desktop)
+- `/` o `⌘K` — buscar
+- `?` — mostrar ayuda de atajos
+- `G+H` — ir a inicio, `G+C` — CXC, `G+G` — guías, `G+Q` — cheques, `G+R` — reclamos
+- `J/K` — navegar filas, `Enter/Space` — expandir, `E` — editar, `Escape` — cerrar
+- Right-click en filas de CXC y Cheques → context menu con acciones
+
+## Smart Features
+- **Búsqueda global:** 8 módulos (CXC, Reclamos, Guías, Directorio, Cheques, Ventas, Préstamos, Caja)
+- **Spotlight:** "cheques que vencen mañana" → ⚡ quick action con deep link
+- **Búsquedas recientes:** últimas 5 + "Ir a..." shortcuts de módulos
+- **Smart defaults:** recuerda última categoría, empresa, banco, transportista (localStorage `fg_last_*`)
+- **Smart suggestions:** 💡 proactivas inline (contactar cliente $10K+, depositar vencidos, escalar reclamo +45d, cerrar período +30d)
+- **Dashboard feed:** "Acciones pendientes" con 8 fuentes de datos ordenadas por urgencia
+- **Daily summary:** resumen matutino 1x/día con bullets accionables
+- **Draft auto-save:** formularios de reclamos, guías, cheques se guardan cada 5s en localStorage
+- **Time grouping:** cheques y guías agrupados por "Hoy/Esta semana/Vencidos"
+- **Relative time:** SmartDate muestra "hace 2 horas", "ayer" con hover para fecha completa
+- **Contextual color:** tinte rojo/ámbar ambient cuando hay datos urgentes
+- **Inline previews:** último contacto, días para depósito, próxima deducción visibles sin expandir
+- **Hover preview:** cards ricas en CXC al hover 500ms sobre nombre de cliente
+- **URL state:** filtros persisten en URL (?risk=vencido&empresa=fashion_wear) — deep links y back/forward funcionan
+- **UI persistence:** filas expandidas y scroll position sobreviven navegación (sessionStorage)
+- **Offline:** banner "Sin conexión", cache 30min en dashboard/cheques, botones deshabilitados
+
+## Exports
+- Todos los PDFs tienen logo Fashion Group (src/lib/pdf-logo.ts, base64)
+- Reebok PDFs/emails tienen logo Reebok (src/lib/reebok-logo.ts, base64)
+- Fechas display: "5 abr 2026" (fmtDate en src/lib/format.ts)
+- Moneda: `$#,##0.00` en Excel (números reales, no texto)
+- Nombres de archivo con fecha: `Pedido-RBK001-2026-04-05.pdf`
+
+## Shared Components (src/components/)
+- **AppHeader** — sticky header con module color accent, user info, search, notifications, shortcuts
+- **SearchBar** — ⌘K + mobile full-screen + recientes + spotlight NLP
+- **MobileBottomBar** — tabs adaptables por rol
+- **NotificationCenter** — 🔔 bell con historial de toasts
+- **SessionWarning** — banner/modal antes de expirar sesión
+- **OfflineBanner** — amber offline, green reconexión
+- **KeyboardShortcutsProvider** — global shortcuts + table navigation
+- **ContextMenuWrapper** — right-click menus en desktop
+- **UndoToast** — countdown bar 5s con "Deshacer"
+- **SuggestionCard** — 💡 sugerencias proactivas inline
+- **TimeGroupHeader** — headers colapsables por período de tiempo
+- **HoverPreview** — cards ricas en hover 500ms (desktop)
+- **OverflowMenu** — "···" dropdown para acciones secundarias
+- **ScrollableTable** — gradient indicators para scroll horizontal
+- **SwipeableRow** — swipe-to-action en mobile
+- **PullToRefresh** — pull down para refrescar en mobile
+- **BottomSheet** — half/full screen draggable (mobile)
+- **AccordionContent** — CSS grid expand/collapse animado
+- **AnimatedNumber** — count-up con easing
+- **SmartDate** — tiempo relativo con auto-update cada 60s
+
+## Hooks (src/lib/hooks/)
+- **useAuth** — check role, user info
+- **useBadges** — notification badge counts
+- **useSessionCheck** — ping /api/auth/check cada 2 min
+- **useKeyboardShortcuts** — global + table shortcuts
+- **useUrlState** — sync state ↔ URL params
+- **useLastUsed** — remember last form values
+- **useDraftAutoSave** — auto-save formularios cada 5s
+- **usePersistedState** — sessionStorage-backed state
+- **useUndoAction** — delayed execution con 5s undo window
+- **useSmartSuggestions** — proactive inline suggestions
+- **useOnlineStatus** — offline/online detection
+- **useTableShortcuts** — J/K row navigation context
 
 ## Testing
 ```bash
