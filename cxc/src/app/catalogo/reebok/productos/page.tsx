@@ -311,13 +311,29 @@ function Productos() {
 
     try {
       const { jsPDF } = await import("jspdf");
+      const { REEBOK_LOGO_BASE64 } = await import("@/lib/reebok-logo");
 
-      // Layout constants (letter portrait in mm)
-      const PW = 215.9, PH = 279.4, M = 14;
-      const COLS = 3, GAP = 5;
-      const CW = (PW - 2 * M - (COLS - 1) * GAP) / COLS;
-      const IH = 52, TH = 18, CH = IH + TH, RGAP = 5;
-      const GENDER_H = 10;
+      // ── Reebok brand palette ──
+      const NAVY: [number, number, number] = [26, 38, 86];     // #1A2656
+      const RED: [number, number, number] = [228, 0, 43];      // #E4002B
+      const CREAM: [number, number, number] = [245, 240, 232];  // #F5F0E8
+      const GRAY_LIGHT: [number, number, number] = [160, 160, 165];
+      const GRAY_MID: [number, number, number] = [120, 120, 125];
+      const WHITE: [number, number, number] = [255, 255, 255];
+
+      // ── Layout constants (letter portrait in mm) ──
+      const PW = 215.9, PH = 279.4;
+      const M = 18;                           // generous margin
+      const CONTENT_W = PW - 2 * M;
+      const COLS = 3, GAP = 8;
+      const CW = (CONTENT_W - (COLS - 1) * GAP) / COLS;
+      const IH = 54;                          // image box height
+      const TH = 22;                          // text area below image
+      const CH = IH + TH;                     // total card height
+      const RGAP = 10;                        // row gap (breathing room)
+      const GENDER_H = 14;                    // gender divider height
+      const HEADER_H = 12;                    // page header height
+      const FOOTER_H = 10;                    // footer reserved space
 
       // Load an image as base64 via canvas
       function loadImg(url: string): Promise<{ data: string; w: number; h: number }> {
@@ -328,7 +344,7 @@ function Productos() {
             const c = document.createElement("canvas");
             c.width = img.naturalWidth; c.height = img.naturalHeight;
             c.getContext("2d")!.drawImage(img, 0, 0);
-            try { resolve({ data: c.toDataURL("image/jpeg", 0.75), w: img.naturalWidth, h: img.naturalHeight }); }
+            try { resolve({ data: c.toDataURL("image/jpeg", 0.82), w: img.naturalWidth, h: img.naturalHeight }); }
             catch { resolve({ data: "", w: 0, h: 0 }); }
           };
           img.onerror = () => resolve({ data: "", w: 0, h: 0 });
@@ -336,46 +352,91 @@ function Productos() {
         });
       }
 
-      // Load all product images + logo in parallel
+      // Load all product images in parallel
       const urls = [...new Set(items.filter(p => p.image_url).map(p => p.image_url!))];
       const imgCache: Record<string, { data: string; w: number; h: number }> = {};
-      const [logoResult, ...imgResults] = await Promise.all([
-        loadImg("/reebok/reebok-logo.png"),
-        ...urls.map(u => loadImg(u).then(r => { imgCache[u] = r; })),
-      ]);
-      void imgResults;
+      await Promise.all(urls.map(u => loadImg(u).then(r => { imgCache[u] = r; })));
 
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
       let y = M;
+      let pageNum = 1;
 
-      function needPage(h: number) {
-        if (y + h > PH - M) { doc.addPage(); y = M; return true; }
+      // ── Reusable: draw page footer ──
+      function drawFooter() {
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...GRAY_LIGHT);
+        doc.text(`${pageNum}`, PW / 2, PH - 8, { align: "center" });
+        doc.setFontSize(6);
+        doc.setTextColor(...GRAY_MID);
+        doc.text("Fashion Group \u2014 Panam\u00e1", PW / 2, PH - 4.5, { align: "center" });
+      }
+
+      // ── Reusable: draw page header (pages 2+) ──
+      function drawPageHeader() {
+        // Small logo top-left
+        if (REEBOK_LOGO_BASE64) {
+          doc.addImage(REEBOK_LOGO_BASE64, "PNG", M, 8, 18, 5);
+        }
+        // Thin red accent line
+        doc.setDrawColor(...RED);
+        doc.setLineWidth(0.4);
+        doc.line(M, 15, PW - M, 15);
+        y = 20;
+      }
+
+      function needPage(h: number): boolean {
+        if (y + h > PH - M - FOOTER_H) {
+          drawFooter();
+          doc.addPage();
+          pageNum++;
+          drawPageHeader();
+          return true;
+        }
         return false;
       }
 
-      // ── Header (page 1) ──
-      if (logoResult.data) {
-        const logoH = 10;
-        const logoW = (logoResult.w / logoResult.h) * logoH;
-        doc.addImage(logoResult.data, "PNG", M, y, logoW, logoH);
+      // ══════════════════════════════════════
+      // ── COVER / FIRST PAGE HEADER ──
+      // ══════════════════════════════════════
+
+      // Logo top-left (tasteful size)
+      if (REEBOK_LOGO_BASE64) {
+        doc.addImage(REEBOK_LOGO_BASE64, "PNG", M, y, 24, 6.7);
       }
-      // Right side info
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(150);
-      const dateStr = new Date().toLocaleDateString("es-PA", { day: "numeric", month: "long", year: "numeric" });
-      doc.text(dateStr, PW - M, y + 4, { align: "right" });
-      doc.setFontSize(12);
-      doc.setTextColor(30);
+
+      // "CATALOGO" right-aligned, navy uppercase tracking-wider
+      doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
-      doc.text(`${items.length} productos`, PW - M, y + 9, { align: "right" });
-      y += 14;
-      // Red line
-      doc.setDrawColor(204, 0, 0);
-      doc.setLineWidth(0.6);
+      doc.setTextColor(...NAVY);
+      doc.text("CAT\u00c1LOGO", PW - M, y + 5.5, { align: "right" });
+
+      y += 11;
+
+      // Thin red separator line
+      doc.setDrawColor(...RED);
+      doc.setLineWidth(0.5);
       doc.line(M, y, PW - M, y);
-      y += 2;
-      // Subtitle (filters)
+      y += 6;
+
+      // Date + product count + filter description
+      const dateStr = new Date().toLocaleDateString("es-PA", {
+        day: "numeric", month: "long", year: "numeric",
+      });
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(...GRAY_MID);
+      doc.text(dateStr, M, y);
+
+      doc.setFontSize(9);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...NAVY);
+      doc.text(`${items.length} productos`, PW - M, y, { align: "right" });
+
+      y += 5;
+
+      // Filter description
       const filterDesc: string[] = [];
       if (gender) filterDesc.push(genLabel[gender] || gender);
       if (category) filterDesc.push(catLabel[category] || category);
@@ -384,43 +445,50 @@ function Productos() {
       if (priceFilter) filterDesc.push(`$${Number(priceFilter).toFixed(0)}`);
       if (colorFilter) filterDesc.push(colorFilter);
       if (sizeFilter) filterDesc.push(`Talla ${sizeFilter}`);
-      if (search) filterDesc.push(`"${search}"`);
-      const subtitle = filterDesc.length > 0 ? filterDesc.join(" · ") : "Todos los productos";
+      if (search) filterDesc.push(`\u201c${search}\u201d`);
+      const subtitle = filterDesc.length > 0 ? filterDesc.join("  \u00b7  ") : "Todos los productos";
       doc.setFontSize(8);
       doc.setFont("helvetica", "normal");
-      doc.setTextColor(140);
-      doc.text(subtitle, M, y + 3);
-      y += 7;
+      doc.setTextColor(...GRAY_LIGHT);
+      doc.text(subtitle.toUpperCase(), M, y);
 
-      // ── Group by gender ──
+      y += 8;
+
+      // ══════════════════════════════════════
+      // ── PRODUCT GRID BY GENDER ──
+      // ══════════════════════════════════════
+
       const genders = [
-        { key: "male", label: "Hombre" },
-        { key: "female", label: "Mujer" },
-        { key: "kids", label: "Niños" },
-        { key: "unisex", label: "Unisex" },
+        { key: "male", label: "HOMBRE" },
+        { key: "female", label: "MUJER" },
+        { key: "kids", label: "NI\u00d1OS" },
+        { key: "unisex", label: "UNISEX" },
       ];
 
       for (const g of genders) {
         const gItems = items.filter(p => (p.gender || "unisex") === g.key);
         if (!gItems.length) continue;
 
-        // Gender section header
+        // ── Gender section divider ──
         needPage(GENDER_H + CH);
-        doc.setFontSize(12);
+
+        // Navy bar with white text
+        doc.setFillColor(...NAVY);
+        doc.roundedRect(M, y, CONTENT_W, 8, 1, 1, "F");
+        doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(30);
-        doc.text(g.label, M, y + 6);
-        const tw = doc.getTextWidth(g.label);
-        doc.setDrawColor(210);
-        doc.setLineWidth(0.2);
-        doc.line(M + tw + 4, y + 4, PW - M, y + 4);
+        doc.setTextColor(...WHITE);
+        doc.text(g.label, M + 5, y + 5.8);
+
+        // Product count right side
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
-        doc.setTextColor(170);
-        doc.text(`${gItems.length}`, PW - M, y + 6, { align: "right" });
+        doc.setTextColor(200, 200, 210);
+        doc.text(`${gItems.length} productos`, PW - M - 5, y + 5.8, { align: "right" });
+
         y += GENDER_H;
 
-        // Render products in rows
+        // ── Render products in 3-column rows ──
         for (let i = 0; i < gItems.length; i += COLS) {
           needPage(CH);
           const row = gItems.slice(i, i + COLS);
@@ -429,16 +497,14 @@ function Productos() {
             const p = row[j];
             const x = M + j * (CW + GAP);
 
-            // Image background
-            doc.setFillColor(248, 248, 248);
-            doc.setDrawColor(230);
-            doc.setLineWidth(0.2);
-            doc.roundedRect(x, y, CW, IH, 1.5, 1.5, "FD");
+            // Cream background for image area
+            doc.setFillColor(...CREAM);
+            doc.roundedRect(x, y, CW, IH, 2, 2, "F");
 
-            // Product image (fit inside keeping aspect ratio)
+            // Product image (fit inside with padding, centered)
             const cached = p.image_url ? imgCache[p.image_url] : null;
             if (cached?.data) {
-              const pad = 3;
+              const pad = 4;
               const boxW = CW - pad * 2, boxH = IH - pad * 2;
               const scale = Math.min(boxW / cached.w, boxH / cached.h);
               const dw = cached.w * scale, dh = cached.h * scale;
@@ -447,45 +513,62 @@ function Productos() {
               doc.addImage(cached.data, "JPEG", dx, dy, dw, dh);
             }
 
-            // OFERTA badge
+            // Badge: OFERTA (red) or NUEVO (navy)
             if (p.on_sale) {
-              doc.setFillColor(204, 0, 0);
-              doc.roundedRect(x + CW - 16, y + 2, 14, 4.5, 1, 1, "F");
-              doc.setFontSize(6.5);
-              doc.setTextColor(255, 255, 255);
+              doc.setFillColor(...RED);
+              doc.roundedRect(x + 2, y + 2, 14, 4.5, 1, 1, "F");
+              doc.setFontSize(6);
+              doc.setTextColor(...WHITE);
               doc.setFont("helvetica", "bold");
-              doc.text("OFERTA", x + CW - 15, y + 5.2);
+              doc.text("OFERTA", x + 3.2, y + 5.2);
+            } else {
+              doc.setFillColor(...NAVY);
+              doc.roundedRect(x + 2, y + 2, 13, 4.5, 1, 1, "F");
+              doc.setFontSize(6);
+              doc.setTextColor(...WHITE);
+              doc.setFont("helvetica", "bold");
+              doc.text("NUEVO", x + 3.2, y + 5.2);
             }
 
-            // Product info below image
-            let ty = y + IH + 4;
-            doc.setTextColor(30);
-            doc.setFontSize(9);
-            doc.setFont("helvetica", "bold");
-            const name = p.name.length > 32 ? p.name.substring(0, 30) + "…" : p.name;
-            doc.text(name, x + 2, ty);
+            // ── Text area below image ──
+            let ty = y + IH + 5;
 
-            ty += 3.8;
-            doc.setFontSize(7);
+            // Product name — navy bold
+            doc.setTextColor(...NAVY);
+            doc.setFontSize(8);
+            doc.setFont("helvetica", "bold");
+            const maxNameLen = Math.floor(CW / 1.8);
+            const name = p.name.length > maxNameLen
+              ? p.name.substring(0, maxNameLen - 1) + "\u2026"
+              : p.name;
+            doc.text(name.toUpperCase(), x + 1, ty);
+
+            // SKU — small gray
+            ty += 4;
+            doc.setFontSize(6.5);
             doc.setFont("helvetica", "normal");
-            doc.setTextColor(150);
-            doc.text(p.sku || "", x + 2, ty);
+            doc.setTextColor(...GRAY_LIGHT);
+            const skuText = p.sku || "";
+            const colorText = p.color ? `  \u00b7  ${p.color}` : "";
+            doc.text(skuText + colorText, x + 1, ty);
 
-            if (p.color) {
-              const skuW = doc.getTextWidth(p.sku || "");
-              doc.setTextColor(180);
-              doc.text(" · " + p.color, x + 2 + skuW, ty);
-            }
-
-            ty = y + IH + TH - 1;
-            doc.setFontSize(11);
+            // Price — bold, bottom of text area
+            ty += 5.5;
+            doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
-            doc.setTextColor(30);
-            doc.text(p.price ? `$${p.price.toFixed(0)}` : "—", x + 2, ty);
+            if (p.on_sale) {
+              doc.setTextColor(...RED);
+            } else {
+              doc.setTextColor(...NAVY);
+            }
+            doc.text(p.price ? `$${p.price.toFixed(0)}` : "\u2014", x + 1, ty);
           }
           y += CH + RGAP;
         }
       }
+
+      // Draw footer on last page
+      drawFooter();
 
       doc.save(`catalogo-reebok-${new Date().toISOString().slice(0, 10)}.pdf`);
       setToast("Catálogo descargado");
