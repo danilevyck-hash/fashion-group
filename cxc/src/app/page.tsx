@@ -80,6 +80,8 @@ function LoginForm() {
               onChange={(e) => { setPassword(e.target.value); setError(""); }}
               placeholder="Contraseña"
               className="w-full border border-gray-300 rounded px-4 py-3 text-sm focus:outline-none focus:border-black pr-14"
+              autoCapitalize="none"
+              autoCorrect="off"
               autoFocus
               disabled={loading}
             />

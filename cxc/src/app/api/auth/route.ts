@@ -57,8 +57,8 @@ export async function POST(req: NextRequest) {
     if (users) {
       for (const user of users) {
         const match = isHash(user.password)
-          ? await bcrypt.compare(password, user.password)
-          : password === user.password;
+          ? (await bcrypt.compare(password, user.password) || await bcrypt.compare(password.toLowerCase(), user.password))
+          : password.toLowerCase() === user.password.toLowerCase();
 
         if (match) {
           // Modules come from the role, not the individual user
@@ -126,8 +126,8 @@ export async function POST(req: NextRequest) {
     if (rows) {
       for (const row of rows) {
         const match = isHash(row.password)
-          ? await bcrypt.compare(password, row.password)
-          : password === row.password;
+          ? (await bcrypt.compare(password, row.password) || await bcrypt.compare(password.toLowerCase(), row.password))
+          : password.toLowerCase() === row.password.toLowerCase();
 
         if (match) {
           role = row.role;
