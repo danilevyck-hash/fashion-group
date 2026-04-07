@@ -132,7 +132,7 @@ export function useKeyboardShortcuts(options: UseKeyboardShortcutsOptions = {}) 
       // ── G-chord navigation ──────────────────────────────────────
       if (gPressedRef.current) {
         const routes: Record<string, string> = {
-          h: "/plantillas",
+          h: "/home",
           c: "/admin",
           g: "/guias",
           q: "/cheques",

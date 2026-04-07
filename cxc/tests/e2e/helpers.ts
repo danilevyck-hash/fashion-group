@@ -4,7 +4,7 @@ import { Page, expect } from "@playwright/test";
  * Login with a role password via the login page.
  * Waits for redirect to dashboard (or reebok for cliente).
  */
-export async function login(page: Page, password: string, expectPath = "/plantillas") {
+export async function login(page: Page, password: string, expectPath = "/home") {
   await page.goto("/");
   await page.waitForSelector('input[type="password"]', { timeout: 10_000 });
   await page.fill('input[type="password"]', password);

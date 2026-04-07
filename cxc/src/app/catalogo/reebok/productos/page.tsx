@@ -498,10 +498,11 @@ function Productos() {
   }
 
   return (
+    <div className="min-h-screen bg-[#F5F0E8]">
     <div className="max-w-7xl mx-auto px-4 py-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-light">Catálogo Reebok</h1>
-        <p className="text-sm text-gray-400">Panamá</p>
+        <h1 className="text-xl font-bold uppercase tracking-wider text-[#1A2656]">Catálogo</h1>
+        <p className="text-xs text-[#1A2656]/50 uppercase tracking-widest mt-0.5">Panamá</p>
       </div>
 
       {/* ── Banner: recovered draft from localStorage ── */}
@@ -548,19 +549,19 @@ function Productos() {
       {/* ── Filters ── */}
       <div className="flex flex-wrap items-end gap-3 mb-6">
         <div>
-          <label className="text-[10px] text-gray-400 uppercase tracking-wider">Buscar</label>
+          <label className="text-[10px] text-[#1A2656]/60 uppercase tracking-wider font-medium">Buscar</label>
           <input value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Nombre o SKU"
             className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition w-44" />
         </div>
         <div>
-          <label className="text-[10px] text-gray-400 uppercase tracking-wider">Género</label>
+          <label className="text-[10px] text-[#1A2656]/60 uppercase tracking-wider font-medium">Género</label>
           <select value={gender} onChange={e => setGender(e.target.value)}
             className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
             <option value="">Todos</option><option value="male">Hombre</option><option value="female">Mujer</option><option value="kids">Niños</option>
           </select>
         </div>
         <div>
-          <label className="text-[10px] text-gray-400 uppercase tracking-wider">Categoría</label>
+          <label className="text-[10px] text-[#1A2656]/60 uppercase tracking-wider font-medium">Categoría</label>
           <select value={category} onChange={e => setCategory(e.target.value)}
             className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
             <option value="">Todas</option><option value="footwear">Calzado</option><option value="apparel">Ropa</option><option value="accessories">Accesorios</option>
@@ -568,7 +569,7 @@ function Productos() {
         </div>
         {uniqueColors.length > 1 && (
           <div>
-            <label className="text-[10px] text-gray-400 uppercase tracking-wider">Color</label>
+            <label className="text-[10px] text-[#1A2656]/60 uppercase tracking-wider font-medium">Color</label>
             <select value={colorFilter} onChange={e => setColorFilter(e.target.value)}
               className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
               <option value="">Todos</option>
@@ -578,7 +579,7 @@ function Productos() {
         )}
         {uniqueSizes.length > 1 && (
           <div>
-            <label className="text-[10px] text-gray-400 uppercase tracking-wider">Talla</label>
+            <label className="text-[10px] text-[#1A2656]/60 uppercase tracking-wider font-medium">Talla</label>
             <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)}
               className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
               <option value="">Todas</option>
@@ -587,11 +588,11 @@ function Productos() {
           </div>
         )}
         <button onClick={() => { setSaleFilter(saleFilter === "oferta" ? "" : "oferta"); setPriceFilter(""); }}
-          className={`text-sm px-4 py-2 rounded-full transition font-medium mb-0.5 ${saleFilter === "oferta" ? "bg-orange-500 text-white" : "border border-gray-200 text-gray-500 hover:border-gray-400"}`}>
+          className={`text-xs px-4 py-2 rounded-sm transition font-medium uppercase tracking-wider mb-0.5 ${saleFilter === "oferta" ? "bg-[#E4002B] text-white" : "border border-[#1A2656]/20 text-[#1A2656]/60 hover:border-[#E4002B] hover:text-[#E4002B]"}`}>
           Oferta
         </button>
         <button onClick={() => { setSaleFilter(saleFilter === "nuevo" ? "" : "nuevo"); setPriceFilter(""); }}
-          className={`text-sm px-4 py-2 rounded-full transition font-medium mb-0.5 ${saleFilter === "nuevo" ? "bg-emerald-600 text-white" : "border border-gray-200 text-gray-500 hover:border-gray-400"}`}>
+          className={`text-xs px-4 py-2 rounded-sm transition font-medium uppercase tracking-wider mb-0.5 ${saleFilter === "nuevo" ? "bg-[#1A2656] text-white" : "border border-[#1A2656]/20 text-[#1A2656]/60 hover:border-[#1A2656] hover:text-[#1A2656]"}`}>
           Nuevo
         </button>
         {saleFilter === "oferta" && ofertaPrices.length > 1 && (
@@ -642,7 +643,7 @@ function Productos() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <p className="text-center py-20 text-gray-400 text-sm">No se encontraron productos</p>
+        <p className="text-center py-20 text-[#1A2656]/40 text-sm">No se encontraron productos</p>
       ) : (
         <div className={`fade-in ${cartCount > 0 ? "pb-24" : ""}`}>
           {isGrouped ? (
@@ -650,9 +651,9 @@ function Productos() {
               {groups.map(g => (
                 <div key={g.label}>
                   <div className="flex items-center gap-3 mb-3">
-                    <h2 className="text-sm font-medium text-gray-800">{g.label}</h2>
-                    <div className="flex-1 border-t border-gray-100" />
-                    <span className="text-xs text-gray-300">{g.items.length}</span>
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-[#1A2656]">{g.label}</h2>
+                    <div className="flex-1 border-t border-[#1A2656]/10" />
+                    <span className="text-xs text-[#1A2656]/30">{g.items.length}</span>
                   </div>
                   <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                     {g.items.map(p => (
@@ -676,10 +677,10 @@ function Productos() {
       {!loading && totalPages > 1 && (
         <div className="flex items-center justify-center gap-4 mt-8 mb-4">
           <button onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} disabled={page === 1}
-            className="text-sm border border-gray-200 px-4 py-2 rounded-full hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">← Anterior</button>
-          <span className="text-xs text-gray-400">Página {page} de {totalPages}</span>
+            className="text-xs font-medium uppercase tracking-wider border border-[#1A2656]/20 text-[#1A2656] px-4 py-2 rounded-sm hover:border-[#1A2656] transition disabled:opacity-30 disabled:cursor-not-allowed">← Anterior</button>
+          <span className="text-xs text-[#1A2656]/40">{page} / {totalPages}</span>
           <button onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} disabled={page === totalPages}
-            className="text-sm border border-gray-200 px-4 py-2 rounded-full hover:border-gray-400 transition disabled:opacity-30 disabled:cursor-not-allowed">Siguiente →</button>
+            className="text-xs font-medium uppercase tracking-wider border border-[#1A2656]/20 text-[#1A2656] px-4 py-2 rounded-sm hover:border-[#1A2656] transition disabled:opacity-30 disabled:cursor-not-allowed">Siguiente →</button>
         </div>
       )}
 
@@ -758,8 +759,8 @@ function Productos() {
 
             {/* Main action button */}
             <button onClick={handleFloatingBarClick} disabled={saving}
-              className={`flex-1 py-3.5 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition disabled:opacity-50 ${
-                draftId ? "bg-black text-white hover:bg-gray-800" : "bg-emerald-600 text-white hover:bg-emerald-700"
+              className={`flex-1 py-3.5 rounded-sm text-xs font-medium uppercase tracking-wider flex items-center justify-center gap-2 transition disabled:opacity-50 ${
+                draftId ? "bg-[#1A2656] text-white hover:bg-[#0f1a3d]" : "bg-[#E4002B] text-white hover:bg-[#c90025]"
               }`}>
               <span className="truncate">{saving ? "Guardando..." : draftId ? `Actualizar ${draftNumber}` : draftClient ? "Crear pedido" : "Crear pedido"}</span>
               <span>{"→"}</span>
@@ -767,6 +768,7 @@ function Productos() {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

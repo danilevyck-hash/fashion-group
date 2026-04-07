@@ -55,10 +55,10 @@ export default function ProductCard({ product, stock = 0, qty, onQtyChange, disa
             </div>
           </div>
         )}
-        <div className="aspect-square bg-gray-50 relative overflow-hidden cursor-pointer" onClick={() => { if (product.image_url) setShowLightbox(true); }}>
+        <div className="aspect-square bg-[#F5F0E8] relative overflow-hidden cursor-pointer" onClick={() => { if (product.image_url) setShowLightbox(true); }}>
           {!product.on_sale && (
-            <div className="absolute top-2 left-2 z-[5]">
-              <span className="inline-block bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-sm shadow-sm">
+            <div className="absolute top-2.5 left-0 z-[5]">
+              <span className="inline-block bg-[#1A2656] text-white text-[9px] font-bold uppercase tracking-[0.15em] pl-2.5 pr-2 py-[3px]">
                 Nuevo
               </span>
             </div>
@@ -110,7 +110,7 @@ export default function ProductCard({ product, stock = 0, qty, onQtyChange, disa
             <p className="text-base font-semibold text-black">
               {product.price ? `$${product.price.toFixed(0)}` : "Consultar"}
             </p>
-            {product.on_sale && <span className="text-[11px] font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded">OFERTA</span>}
+            {product.on_sale && <span className="text-[10px] font-bold text-[#E4002B] bg-red-50 px-2 py-0.5 uppercase tracking-wider">OFERTA</span>}
           </div>
 
           {inOrder ? (
@@ -135,7 +135,7 @@ export default function ProductCard({ product, stock = 0, qty, onQtyChange, disa
             </div>
           ) : (
             <button onClick={() => { if (!disabled) setQty(1); }} disabled={disabled}
-              className={`w-full mt-2 py-3 rounded text-xs font-medium uppercase tracking-wider transition min-h-[48px] ${disabled ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-black text-white hover:bg-gray-800"}`}>
+              className={`w-full mt-2 py-3 rounded-sm text-xs font-medium uppercase tracking-[0.12em] transition min-h-[48px] ${disabled ? "bg-gray-200 text-gray-400 cursor-not-allowed" : "bg-[#E4002B] text-white hover:bg-[#c90025]"}`}>
               Agregar
             </button>
           )}

@@ -21,7 +21,7 @@ test("10. Reebok order page → buttons are clear", async ({ page }) => {
   await page.waitForSelector('input[type="password"]', { timeout: 10_000 });
   await page.fill('input[type="password"]', process.env.E2E_ADMIN_PW || "admin");
   await page.click('button[type="submit"]');
-  await page.waitForURL("**/plantillas**", { timeout: 15_000 });
+  await page.waitForURL("**/home**", { timeout: 15_000 });
 
   // Navigate to pedidos
   await page.goto("/catalogo/reebok/pedidos");

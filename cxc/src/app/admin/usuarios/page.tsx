@@ -298,7 +298,7 @@ export default function UsuariosPage() {
             <h1 className="text-xl font-semibold">Usuarios y Permisos</h1>
             <p className="text-sm text-gray-400 mt-1">Control de acceso por rol — cada rol usa una contraseña compartida</p>
           </div>
-          <button onClick={() => router.push("/plantillas")} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Volver</button>
+          <button onClick={() => router.push("/home")} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Volver</button>
         </div>
 
         {/* ══ NEW: fg_users section ══ */}

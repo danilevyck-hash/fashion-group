@@ -11,19 +11,35 @@ import { useBadges } from "@/lib/hooks/useBadges";
 import { cacheSet, cacheGet, CACHE_KEYS } from "@/lib/offlineCache";
 import { useOnline } from "@/lib/OnlineContext";
 
+// SVG icon components for a premium internal-tool feel
+const MODULE_ICONS: Record<string, React.ReactNode> = {
+  cxc: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20"/><path d="M10 9v12"/></svg>,
+  upload: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
+  guias: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5a2 2 0 01-2 2h-1"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/><path d="M8 16H16"/></svg>,
+  caja: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>,
+  directorio: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>,
+  cheques: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 12h4"/><path d="M14 12h4"/><path d="M6 16h12"/></svg>,
+  prestamos: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><path d="M12 9v4l2 2"/></svg>,
+  reclamos: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
+  ventas: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,
+  reebok: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20.38 3.46L16 2 7.56 14.55a8 8 0 00-1.27 2.7L5 22l3.75-1.29a8 8 0 002.7-1.27L24 11z"/></svg>,
+  camisetas: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 7l-4-3H8L4 7l3 2v12h10V9z"/><path d="M8 4l2 3h4l2-3"/></svg>,
+  usuarios: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
+};
+
 const ALL_MODULES = [
-  { key: "cxc", label: "Cuentas por Cobrar", subtitle: "Cartera de clientes", icon: "📊", href: "/admin", roles: ["admin", "secretaria", "director", "vendedor"] },
-  { key: "upload", label: "Cargar CSV", subtitle: "Antigüedad de deuda", icon: "📤", href: "/upload", roles: ["admin", "secretaria"] },
-  { key: "guias", label: "Guías", subtitle: "Transporte y despacho", icon: "🚚", href: "/guias", roles: ["admin", "secretaria", "bodega", "director"] },
-  { key: "caja", label: "Caja Menuda", subtitle: "Control de gastos", icon: "💵", href: "/caja", roles: ["admin", "secretaria"] },
-  { key: "directorio", label: "Directorio", subtitle: "Clientes y contactos", icon: "📋", href: "/directorio", roles: ["admin", "secretaria", "director", "contabilidad", "vendedor"] },
-  { key: "cheques", label: "Cheques", subtitle: "Posfechados", icon: "🏦", href: "/cheques", roles: ["admin", "secretaria", "director"] },
-  { key: "prestamos", label: "Préstamos", subtitle: "Colaboradores", icon: "🤝", href: "/prestamos", roles: ["admin", "contabilidad"] },
-  { key: "reclamos", label: "Reclamos", subtitle: "Seguimiento", icon: "📝", href: "/reclamos", roles: ["admin", "secretaria", "director"] },
-  { key: "ventas", label: "Ventas", subtitle: "Mensuales", icon: "📈", href: "/ventas", roles: ["admin", "director", "contabilidad"] },
-  { key: "reebok", label: "Catálogo Reebok", subtitle: "Productos y pedidos", icon: "👟", href: "/catalogo/reebok", roles: ["admin", "vendedor", "cliente", "secretaria"] },
-  { key: "camisetas", label: "Camisetas Selección", subtitle: "Pedidos y stock", icon: "👕", href: "/camisetas", roles: ["admin", "vendedor"] },
-  { key: "usuarios", label: "Usuarios", subtitle: "Permisos y accesos", icon: "👥", href: "/admin/usuarios", roles: ["admin"] },
+  { key: "cxc", label: "Cuentas por Cobrar", subtitle: "Cartera de clientes", href: "/admin", roles: ["admin", "secretaria", "director", "vendedor"] },
+  { key: "upload", label: "Cargar CSV", subtitle: "Antigüedad de deuda", href: "/upload", roles: ["admin", "secretaria"] },
+  { key: "guias", label: "Guías", subtitle: "Transporte y despacho", href: "/guias", roles: ["admin", "secretaria", "bodega", "director"] },
+  { key: "caja", label: "Caja Menuda", subtitle: "Control de gastos", href: "/caja", roles: ["admin", "secretaria"] },
+  { key: "directorio", label: "Directorio", subtitle: "Clientes y contactos", href: "/directorio", roles: ["admin", "secretaria", "director", "contabilidad", "vendedor"] },
+  { key: "cheques", label: "Cheques", subtitle: "Posfechados", href: "/cheques", roles: ["admin", "secretaria", "director"] },
+  { key: "prestamos", label: "Préstamos", subtitle: "Colaboradores", href: "/prestamos", roles: ["admin", "contabilidad"] },
+  { key: "reclamos", label: "Reclamos", subtitle: "Seguimiento", href: "/reclamos", roles: ["admin", "secretaria", "director"] },
+  { key: "ventas", label: "Ventas", subtitle: "Mensuales", href: "/ventas", roles: ["admin", "director", "contabilidad"] },
+  { key: "reebok", label: "Catálogo Reebok", subtitle: "Productos y pedidos", href: "/catalogo/reebok", roles: ["admin", "vendedor", "cliente", "secretaria"] },
+  { key: "camisetas", label: "Camisetas Selección", subtitle: "Pedidos y stock", href: "/camisetas", roles: ["admin", "vendedor"] },
+  { key: "usuarios", label: "Usuarios", subtitle: "Permisos y accesos", href: "/admin/usuarios", roles: ["admin"] },
 ];
 
 function getGreeting() {
@@ -54,6 +70,7 @@ export default function PlantillasPage() {
   const badges = useBadges();
   const isOnline = useOnline();
   const [statsCached, setStatsCached] = useState(false);
+  const [showCxc, setShowCxc] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -242,22 +259,13 @@ export default function PlantillasPage() {
       {/* KPI Cards — admin and director only */}
       {(role === "admin" || role === "director") && (
         statsLoading ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 sm:grid-cols-4 gap-2 mb-6">
-            {[1,2,3,4].map(i => <div key={i} className="h-20 rounded-lg bg-gray-50 border border-gray-200 animate-pulse" />)}
+          <div className="grid grid-cols-2 gap-2 mb-6">
+            {[1,2].map(i => <div key={i} className="h-20 rounded-lg bg-gray-50 border border-gray-200 animate-pulse" />)}
           </div>
         ) : stats ? (
           <div className="mb-6">
           {statsCached && <p className="text-xs text-amber-600 mb-1">(datos cacheados)</p>}
-          <div className="grid grid-cols-2 md:grid-cols-3 sm:grid-cols-4 gap-2">
-            {/* Ventas */}
-            <div className={`rounded-lg p-3 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
-              <p className="text-xs uppercase tracking-wider text-gray-500">Ventas del mes</p>
-              <p className="text-lg font-semibold tabular-nums mt-0.5">${stats.ventasMes > 0 ? (stats.ventasMes / 1000).toFixed(0) + "K" : "—"}</p>
-              {stats.ventasPrev > 0 && stats.ventasMes > 0 ? (() => {
-                const pct = ((stats.ventasMes - stats.ventasPrev) / stats.ventasPrev * 100);
-                return <p className={`text-xs mt-1 ${pct >= 0 ? "text-green-600" : "text-red-500"}`}>{pct >= 0 ? "+" : ""}{pct.toFixed(0)}% vs mes anterior</p>;
-              })() : <p className="text-xs text-gray-300 mt-1">—</p>}
-            </div>
+          <div className="grid grid-cols-2 gap-2">
             {/* Reclamos */}
             <div className={`rounded-lg p-3 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
               <p className="text-xs uppercase tracking-wider text-gray-500">Reclamos</p>
@@ -268,21 +276,31 @@ export default function PlantillasPage() {
                 {stats.reclamosViejos === 0 && stats.reclamosResueltosEsteMes === 0 && <span className="text-xs text-gray-300">—</span>}
               </div>
             </div>
-            {/* CxC */}
+            {/* CxC with eye toggle */}
             <div className={`rounded-lg p-3 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
-              <p className="text-xs uppercase tracking-wider text-gray-500">Cuentas por Cobrar</p>
-              <p className="text-lg font-semibold tabular-nums mt-0.5">${stats.cxcTotal > 0 ? (stats.cxcTotal / 1000).toFixed(0) + "K" : "—"}</p>
-              {stats.cxcVencida > 0
-                ? <p className="text-xs text-red-500 mt-1">${(stats.cxcVencida / 1000).toFixed(0)}K vencida</p>
-                : <p className="text-xs text-green-600 mt-1">Sin vencidos</p>}
-            </div>
-            {/* Cheques */}
-            <div className={`rounded-lg p-3 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
-              <p className="text-xs uppercase tracking-wider text-gray-500">Cheques</p>
-              <p className="text-lg font-semibold tabular-nums mt-0.5">{stats.vencenEstaSemana}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {stats.chequesTotalPendiente > 0 ? `$${(stats.chequesTotalPendiente / 1000).toFixed(0)}K pendiente` : "—"}
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs uppercase tracking-wider text-gray-500">Cuentas por Cobrar</p>
+                <button onClick={() => setShowCxc(!showCxc)} className="text-gray-400 hover:text-gray-600 transition p-0.5 -mr-1">
+                  {showCxc ? (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                  ) : (
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                  )}
+                </button>
+              </div>
+              {showCxc ? (
+                <>
+                  <p className="text-lg font-semibold tabular-nums mt-0.5">${stats.cxcTotal > 0 ? (stats.cxcTotal / 1000).toFixed(0) + "K" : "—"}</p>
+                  {stats.cxcVencida > 0
+                    ? <p className="text-xs text-red-500 mt-1">${(stats.cxcVencida / 1000).toFixed(0)}K vencida</p>
+                    : <p className="text-xs text-green-600 mt-1">Sin vencidos</p>}
+                </>
+              ) : (
+                <>
+                  <p className="text-lg font-semibold tabular-nums mt-0.5 text-gray-300">••••</p>
+                  <p className="text-xs text-gray-300 mt-1">Toca el ojo para ver</p>
+                </>
+              )}
             </div>
           </div>
           </div>
@@ -422,8 +440,8 @@ export default function PlantillasPage() {
                       {editMode && (
                         <span className="absolute top-2 right-2 text-gray-300 text-xs">⠿</span>
                       )}
-                      <div className="text-xl mb-1.5 relative inline-block">
-                        {mod.icon}
+                      <div className="mb-1.5 relative inline-block text-gray-700 dark:text-gray-300">
+                        {MODULE_ICONS[mod.key] || <span className="w-5 h-5 block" />}
                         {(() => {
                           const badgeMap: Record<string, number> = {
                             cheques: badges.cheques,

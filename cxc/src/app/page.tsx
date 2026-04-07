@@ -57,7 +57,7 @@ function LoginForm() {
       if (data.userId) sessionStorage.setItem("fg_user_id", data.userId);
       if (data.userName) sessionStorage.setItem("fg_user_name", data.userName);
       if (data.modules) sessionStorage.setItem("fg_modules", JSON.stringify(data.modules));
-      router.push(data.role === "cliente" ? "/catalogo/reebok" : "/plantillas");
+      router.push(data.role === "cliente" ? "/catalogo/reebok" : "/home");
     } catch {
       setError("Sin conexión. Verifica tu internet e intenta de nuevo.");
     } finally {

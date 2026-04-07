@@ -2,7 +2,7 @@
   "name": "Fashion Group",
   "short_name": "FG",
   "description": "Sistema interno Fashion Group",
-  "start_url": "/plantillas",
+  "start_url": "/home",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#000000",

@@ -23,7 +23,7 @@ export function useAuth({ moduleKey, allowedRoles }: UseAuthOptions) {
         div.className = "fixed bottom-6 left-1/2 -translate-x-1/2 bg-red-600 text-white text-sm px-5 py-2.5 rounded-full shadow-lg z-[9999]";
         div.textContent = "No tienes acceso a este modulo";
         document.body.appendChild(div);
-        setTimeout(() => { div.remove(); router.push("/plantillas"); }, 2000);
+        setTimeout(() => { div.remove(); router.push("/home"); }, 2000);
       } else {
         router.push("/");
       }

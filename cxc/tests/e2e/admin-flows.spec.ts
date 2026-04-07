@@ -170,7 +170,7 @@ test("8. Secretaria login → access guias, caja, directorio", async ({ page }) 
 
   // Back to dashboard
   await page.click("text=Inicio");
-  await page.waitForURL("**/plantillas**", { timeout: 10_000 });
+  await page.waitForURL("**/home**", { timeout: 10_000 });
 
   // Navigate to Caja
   await page.click("text=Caja Menuda");
@@ -178,7 +178,7 @@ test("8. Secretaria login → access guias, caja, directorio", async ({ page }) 
 
   // Back to dashboard
   await page.click("text=Inicio");
-  await page.waitForURL("**/plantillas**", { timeout: 10_000 });
+  await page.waitForURL("**/home**", { timeout: 10_000 });
 
   // Navigate to Directorio
   await page.click("text=Directorio");
@@ -187,7 +187,7 @@ test("8. Secretaria login → access guias, caja, directorio", async ({ page }) 
 
   // Navigate to CXC (newly granted to secretaria)
   await page.click("text=Inicio");
-  await page.waitForURL("**/plantillas**", { timeout: 10_000 });
+  await page.waitForURL("**/home**", { timeout: 10_000 });
   await page.click("text=Cuentas por Cobrar");
   await page.waitForURL("**/admin**", { timeout: 10_000 });
 });

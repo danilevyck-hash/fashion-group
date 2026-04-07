@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { getModuleColor, getModuleKeyFromPath } from "@/lib/moduleColors";
 
 const TABS = [
-  { key: "inicio", label: "Inicio", href: "/plantillas", icon: "M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z M9 22V12h6v10" },
+  { key: "inicio", label: "Inicio", href: "/home", icon: "M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z M9 22V12h6v10" },
   { key: "cxc", label: "CXC", href: "/admin", icon: "M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" },
   { key: "guias", label: "Guías", href: "/guias", icon: "M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z M13 2v7h7" },
   { key: "cheques", label: "Cheques", href: "/cheques", icon: "M2 17l10 5 10-5M2 12l10 5 10-5M12 2L2 7l10 5 10-5-10-5z" },
@@ -58,7 +58,7 @@ export default function MobileBottomBar() {
       <div className="fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-gray-200 md:hidden safe-bottom">
         <div className="flex items-stretch">
           {TABS.map(t => {
-            const active = t.key === "inicio" ? pathname === "/plantillas" : pathname.startsWith(t.href);
+            const active = t.key === "inicio" ? pathname === "/home" : pathname.startsWith(t.href);
             const moduleColor = getModuleColor(t.href);
             const activeColor = active && moduleColor ? moduleColor.text : active ? "text-black" : "text-gray-400";
             return (
