@@ -310,6 +310,38 @@ export default function AdminDashboard() {
     if (q) setSearch(q);
   }, [authChecked, loadData]);
 
+  // ── Smart suggestions (must be before conditional returns to respect hook rules) ──
+  const cxcSuggestions = useMemo<SmartSuggestion[]>(() => {
+    const suggestions: SmartSuggestion[] = [];
+    const now = Date.now();
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+
+    for (const client of clients) {
+      if (client.total < 10000) continue;
+      const log = contactLog[client.nombre_normalized];
+      const lastContactMs = log?.date ? new Date(log.date).getTime() : 0;
+      const daysSinceContact = lastContactMs ? Math.floor((now - lastContactMs) / (24 * 60 * 60 * 1000)) : null;
+
+      if (!lastContactMs || (now - lastContactMs) >= SEVEN_DAYS) {
+        const daysLabel = daysSinceContact ? `${daysSinceContact} días` : "más de 7 días";
+        suggestions.push({
+          id: `cxc-contact-${client.nombre_normalized}`,
+          message: `Llevas ${daysLabel} sin contactar a ${client.nombre_normalized} y deben $${fmt(client.total)}. ¿Enviar WhatsApp?`,
+          actionLabel: "Enviar WhatsApp",
+          onAction: () => openWhatsApp(client),
+        });
+      }
+    }
+    suggestions.sort((a, b) => {
+      const ca = clients.find(c => a.id.includes(c.nombre_normalized));
+      const cb = clients.find(c => b.id.includes(c.nombre_normalized));
+      return (cb?.total || 0) - (ca?.total || 0);
+    });
+    return suggestions;
+  }, [clients, contactLog]);
+
+  const { suggestion: cxcSuggestion, dismiss: dismissCxc } = useSmartSuggestions(cxcSuggestions);
+
   if (!authChecked) return null;
 
   // ── Sorting ──────────────────────────────────────────
@@ -498,39 +530,6 @@ export default function AdminDashboard() {
     }
     return parts.length > 0 ? parts.join(" — ") : undefined;
   }
-
-  // ── Smart suggestions ──────────────────────────────────
-  const cxcSuggestions = useMemo<SmartSuggestion[]>(() => {
-    const suggestions: SmartSuggestion[] = [];
-    const now = Date.now();
-    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-
-    for (const client of clients) {
-      if (client.total < 10000) continue;
-      const log = contactLog[client.nombre_normalized];
-      const lastContactMs = log?.date ? new Date(log.date).getTime() : 0;
-      const daysSinceContact = lastContactMs ? Math.floor((now - lastContactMs) / (24 * 60 * 60 * 1000)) : null;
-
-      if (!lastContactMs || (now - lastContactMs) >= SEVEN_DAYS) {
-        const daysLabel = daysSinceContact ? `${daysSinceContact} días` : "más de 7 días";
-        suggestions.push({
-          id: `cxc-contact-${client.nombre_normalized}`,
-          message: `Llevas ${daysLabel} sin contactar a ${client.nombre_normalized} y deben $${fmt(client.total)}. ¿Enviar WhatsApp?`,
-          actionLabel: "Enviar WhatsApp",
-          onAction: () => openWhatsApp(client),
-        });
-      }
-    }
-    // Sort by total desc to surface most important first
-    suggestions.sort((a, b) => {
-      const ca = clients.find(c => a.id.includes(c.nombre_normalized));
-      const cb = clients.find(c => b.id.includes(c.nombre_normalized));
-      return (cb?.total || 0) - (ca?.total || 0);
-    });
-    return suggestions;
-  }, [clients, contactLog]);
-
-  const { suggestion: cxcSuggestion, dismiss: dismissCxc } = useSmartSuggestions(cxcSuggestions);
 
   // ── Render ────────────────────────────────────────────
 
