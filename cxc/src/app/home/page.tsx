@@ -150,6 +150,25 @@ export default function PlantillasPage() {
     setStatsLoading(false);
   }, []);
 
+  // Auto-redirect if user has only 1 module (e.g., Bodega → Guías)
+  useEffect(() => {
+    if (!authChecked || !role) return;
+    const isAdm = role === "admin" || role === "director";
+    if (isAdm) return;
+
+    let keys: string[] = [];
+    if (fgModules && fgModules.length > 0) {
+      keys = fgModules;
+    } else {
+      keys = ALL_MODULES.filter(m => m.roles.includes(role)).map(m => m.key);
+    }
+
+    if (keys.length === 1) {
+      const mod = ALL_MODULES.find(m => m.key === keys[0]);
+      if (mod) { router.push(mod.href); return; }
+    }
+  }, [authChecked, role, fgModules, router]);
+
   useEffect(() => { if (authChecked) { loadOrder(); loadStats(); } }, [authChecked, loadOrder, loadStats]);
 
   // Determine visible modules

@@ -80,6 +80,7 @@ export async function POST(req: NextRequest) {
               contabilidad: ["prestamos","ventas"],
               secretaria: ["upload","guias","caja","reclamos","cheques","directorio"],
               vendedor: ["reebok","cxc","directorio"],
+              bodega: ["guias"],
               cliente: ["reebok"],
             };
             modules = DEFAULTS[user.role] || [];
