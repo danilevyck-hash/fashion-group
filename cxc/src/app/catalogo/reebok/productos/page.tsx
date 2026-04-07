@@ -23,7 +23,7 @@ function Productos() {
   const [search, setSearch] = useState("");
   const [gender, setGender] = useState(searchParams.get("gender") || "");
   const [category, setCategory] = useState("");
-  const [onlyOferta, setOnlyOferta] = useState(false);
+  const [saleFilter, setSaleFilter] = useState<"" | "oferta" | "nuevo">("");
   const [priceFilter, setPriceFilter] = useState("");
   const [colorFilter, setColorFilter] = useState("");
   const [sizeFilter, setSizeFilter] = useState("");
@@ -204,7 +204,7 @@ function Productos() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  useEffect(() => { setPage(1); }, [gender, category, onlyOferta, priceFilter, colorFilter, sizeFilter, sortBy]);
+  useEffect(() => { setPage(1); }, [gender, category, saleFilter, priceFilter, colorFilter, sizeFilter, sortBy]);
 
   useEffect(() => {
     async function load() {
@@ -243,9 +243,9 @@ function Productos() {
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => !gender || p.gender === gender)
     .filter(p => !category || p.category === category)
-    .filter(p => !onlyOferta || p.on_sale);
+    .filter(p => !saleFilter || (saleFilter === "oferta" ? p.on_sale : !p.on_sale));
 
-  const ofertaPrices = onlyOferta
+  const ofertaPrices = saleFilter === "oferta"
     ? [...new Set(filteredBeforePrice.filter(p => p.price).map(p => p.price!))].sort((a, b) => a - b)
     : [];
 
@@ -379,7 +379,8 @@ function Productos() {
       const filterDesc: string[] = [];
       if (gender) filterDesc.push(genLabel[gender] || gender);
       if (category) filterDesc.push(catLabel[category] || category);
-      if (onlyOferta) filterDesc.push("Oferta");
+      if (saleFilter === "oferta") filterDesc.push("Oferta");
+      if (saleFilter === "nuevo") filterDesc.push("Nuevo");
       if (priceFilter) filterDesc.push(`$${Number(priceFilter).toFixed(0)}`);
       if (colorFilter) filterDesc.push(colorFilter);
       if (sizeFilter) filterDesc.push(`Talla ${sizeFilter}`);
@@ -585,11 +586,15 @@ function Productos() {
             </select>
           </div>
         )}
-        <button onClick={() => { setOnlyOferta(!onlyOferta); setPriceFilter(""); }}
-          className={`text-sm px-4 py-2 rounded-full transition font-medium mb-0.5 ${onlyOferta ? "bg-orange-500 text-white" : "border border-gray-200 text-gray-500 hover:border-gray-400"}`}>
+        <button onClick={() => { setSaleFilter(saleFilter === "oferta" ? "" : "oferta"); setPriceFilter(""); }}
+          className={`text-sm px-4 py-2 rounded-full transition font-medium mb-0.5 ${saleFilter === "oferta" ? "bg-orange-500 text-white" : "border border-gray-200 text-gray-500 hover:border-gray-400"}`}>
           Oferta
         </button>
-        {onlyOferta && ofertaPrices.length > 1 && (
+        <button onClick={() => { setSaleFilter(saleFilter === "nuevo" ? "" : "nuevo"); setPriceFilter(""); }}
+          className={`text-sm px-4 py-2 rounded-full transition font-medium mb-0.5 ${saleFilter === "nuevo" ? "bg-emerald-600 text-white" : "border border-gray-200 text-gray-500 hover:border-gray-400"}`}>
+          Nuevo
+        </button>
+        {saleFilter === "oferta" && ofertaPrices.length > 1 && (
           <div>
             <label className="text-[10px] text-orange-400 uppercase tracking-wider">Precio</label>
             <select value={priceFilter} onChange={e => setPriceFilter(e.target.value)}
@@ -599,8 +604,8 @@ function Productos() {
             </select>
           </div>
         )}
-        {(searchInput || gender || category || onlyOferta || colorFilter || sizeFilter) && (
-          <button onClick={() => { setSearchInput(""); setSearch(""); setGender(""); setCategory(""); setOnlyOferta(false); setPriceFilter(""); setColorFilter(""); setSizeFilter(""); setSortBy("relevancia"); }} className="text-sm text-gray-400 hover:text-black transition py-2 mb-0.5">Limpiar</button>
+        {(searchInput || gender || category || saleFilter || colorFilter || sizeFilter) && (
+          <button onClick={() => { setSearchInput(""); setSearch(""); setGender(""); setCategory(""); setSaleFilter(""); setPriceFilter(""); setColorFilter(""); setSizeFilter(""); setSortBy("relevancia"); }} className="text-sm text-gray-400 hover:text-black transition py-2 mb-0.5">Limpiar</button>
         )}
         <div className="flex items-center gap-2 ml-auto mb-1">
           <select value={sortBy} onChange={e => setSortBy(e.target.value)}

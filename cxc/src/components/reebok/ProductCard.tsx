@@ -56,6 +56,13 @@ export default function ProductCard({ product, stock = 0, qty, onQtyChange, disa
           </div>
         )}
         <div className="aspect-square bg-gray-50 relative overflow-hidden cursor-pointer" onClick={() => { if (product.image_url) setShowLightbox(true); }}>
+          {!product.on_sale && (
+            <div className="absolute top-2 left-2 z-[5]">
+              <span className="inline-block bg-emerald-600 text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-sm shadow-sm">
+                Nuevo
+              </span>
+            </div>
+          )}
           {product.image_url ? (
             <>
               {imageStatus === "loading" && (
