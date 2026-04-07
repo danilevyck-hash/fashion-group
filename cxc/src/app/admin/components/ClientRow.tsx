@@ -51,30 +51,65 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
   return (
     <>
       <div className={`border-l-4 ${risk.border} group`} data-tooltip={risk.tooltip}>
-        {/* Mobile card layout */}
+        {/* Mobile card layout — name + total + status badge, age buckets on expand */}
         <div
           className={`sm:hidden px-3 py-3 cursor-pointer transition-colors border-b border-gray-200 ${isExpanded ? "bg-gray-50" : "hover:bg-gray-50/70"}`}
           onClick={onToggle}
         >
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
               {!selectionMode && onToggleFavorite && (
                 <button onClick={(e) => { e.stopPropagation(); onToggleFavorite(); }} className="flex-shrink-0 text-sm leading-none">
                   {isFavorite ? <span className="text-amber-400">★</span> : <span className="text-gray-300">☆</span>}
                 </button>
               )}
               {selectionMode && (
-                <input type="checkbox" checked={!!isSelected} readOnly className="accent-emerald-600 w-3.5 h-3.5 flex-shrink-0" />
+                <input type="checkbox" checked={!!isSelected} readOnly className="accent-emerald-600 w-4 h-4 flex-shrink-0" />
               )}
-              <span className="text-xs font-medium truncate">{client.nombre_normalized}</span>
-              {followUpBadge && (
-                <span className={`inline-flex items-center text-[9px] px-1 py-0.5 rounded-full ${followUpBadge.bg} ${followUpBadge.text} flex-shrink-0 font-medium`}>
-                  {followUpBadge.label}
-                </span>
-              )}
+              <span className="text-sm font-medium truncate">{client.nombre_normalized}</span>
             </div>
-            <span className="text-sm font-semibold tabular-nums flex-shrink-0 ml-2">{fmt(client.total)}</span>
+            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+              {/* Status badge */}
+              {client.overdue > 0 ? (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">Vencido</span>
+              ) : client.watch > 0 ? (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Vigilancia</span>
+              ) : (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">Corriente</span>
+              )}
+              <span className="text-sm font-semibold tabular-nums">${fmt(client.total)}</span>
+              {/* Expand chevron */}
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}>
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </div>
           </div>
+          {/* Follow-up badge below name on mobile */}
+          {followUpBadge && (
+            <div className="mt-1 ml-6">
+              <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${followUpBadge.bg} ${followUpBadge.text} font-medium`}>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                {followUpBadge.label}
+              </span>
+            </div>
+          )}
+          {/* Age buckets — revealed on expand (mobile only) */}
+          {isExpanded && (
+            <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+              <div className="bg-emerald-50 rounded-md px-2 py-1.5 text-center">
+                <div className="text-[10px] text-emerald-600 font-medium">0-90d</div>
+                <div className="tabular-nums text-emerald-800 font-semibold">${fmt(client.current)}</div>
+              </div>
+              <div className="bg-amber-50 rounded-md px-2 py-1.5 text-center">
+                <div className="text-[10px] text-amber-600 font-medium">91-120d</div>
+                <div className="tabular-nums text-amber-800 font-semibold">${fmt(client.watch)}</div>
+              </div>
+              <div className="bg-red-50 rounded-md px-2 py-1.5 text-center">
+                <div className="text-[10px] text-red-600 font-medium">121d+</div>
+                <div className="tabular-nums text-red-800 font-semibold">${fmt(client.overdue)}</div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Desktop grid layout */}

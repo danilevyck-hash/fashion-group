@@ -557,17 +557,18 @@ export default function AdminDashboard() {
       <AppHeader module="Panel CXC" />
       <div className="max-w-6xl mx-auto px-6 py-8">
       {/* Export */}
-      <div className="flex justify-end items-center gap-3 mb-6">
+      <div className="flex justify-end items-center gap-2 sm:gap-3 mb-6 flex-wrap">
           <button
             onClick={() => (window.location.href = "/upload?tab=cxc")}
-            className="text-sm border border-gray-200 text-gray-700 px-5 py-2 rounded-md font-medium hover:bg-gray-50 active:bg-gray-100 transition-all flex items-center gap-2"
+            className="text-sm border border-gray-200 text-gray-700 px-4 sm:px-5 rounded-lg font-medium hover:bg-gray-50 active:bg-gray-100 transition-all flex items-center gap-2 min-h-[44px]"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Cargar archivo
+            <span className="hidden sm:inline">Cargar archivo</span>
+            <span className="sm:hidden">Cargar</span>
           </button>
           <button
             onClick={() => exportConsolidado(roleClients, cxcCompanies)}
-            className="text-sm border border-gray-200 text-gray-700 px-5 py-2 rounded-md font-medium hover:bg-gray-50 active:bg-gray-100 transition-all flex items-center gap-2"
+            className="text-sm border border-gray-200 text-gray-700 px-4 sm:px-5 rounded-lg font-medium hover:bg-gray-50 active:bg-gray-100 transition-all flex items-center gap-2 min-h-[44px]"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
             Consolidado
@@ -575,7 +576,7 @@ export default function AdminDashboard() {
           <div className="relative">
             <button
               onClick={() => setShowExport(!showExport)}
-              className="text-sm bg-black text-white px-5 py-2 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2"
+              className="text-sm bg-black text-white px-4 sm:px-5 rounded-lg font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2 min-h-[44px]"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Exportar

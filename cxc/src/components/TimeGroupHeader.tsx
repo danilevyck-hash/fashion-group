@@ -29,7 +29,7 @@ export default function TimeGroupHeader({
     <div>
       <button
         onClick={() => setOpen(!open)}
-        className={`sticky top-0 z-[5] w-full flex items-center gap-3 px-4 py-2 text-left transition-colors ${bgColor} border-b border-gray-200`}
+        className={`sticky top-14 z-[5] w-full flex items-center gap-3 px-4 py-2 text-left transition-colors bg-gray-50/90 backdrop-blur-sm border-b border-gray-200`}
       >
         <svg
           className={`w-3 h-3 ${color} transition-transform shrink-0 ${open ? "rotate-90" : ""}`}
@@ -38,11 +38,11 @@ export default function TimeGroupHeader({
         >
           <path d="M6 4l8 6-8 6V4z" />
         </svg>
-        <span className={`text-xs font-semibold uppercase tracking-wider ${color}`}>
+        <span className={`text-sm font-semibold ${color}`}>
           {label}
         </span>
         <span className="text-[11px] text-gray-400 tabular-nums">
-          {count}
+          ({count} {count === 1 ? "guía" : "guías"})
         </span>
       </button>
       {open && children}

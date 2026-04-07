@@ -46,12 +46,14 @@ export function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center py-20 text-center">
-      {icon || (
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-gray-200 mb-4">
-          <rect x="3" y="3" width="18" height="18" rx="2" />
-          <path d="M12 8v4m0 4h.01" />
-        </svg>
-      )}
+      <div className="min-w-[48px] min-h-[48px] flex items-center justify-center mb-4">
+        {icon || (
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="text-gray-200">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M12 8v4m0 4h.01" />
+          </svg>
+        )}
+      </div>
       <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
       {subtitle && <p className="text-xs text-gray-400 mb-4 max-w-xs">{subtitle}</p>}
       {actionLabel && onAction && (
@@ -64,7 +66,7 @@ export function EmptyState({
 }
 
 // ── ESTÉTICA 6: Toast Component ──
-export function Toast({ message, type = "success" }: { message: string | null; type?: "success" | "error" }) {
+export function Toast({ message, type = "success", onDismiss }: { message: string | null; type?: "success" | "error"; onDismiss?: () => void }) {
   if (!message) return null;
   return (
     <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-md text-sm border border-gray-200 z-50 flex items-center gap-2 ${
@@ -75,7 +77,12 @@ export function Toast({ message, type = "success" }: { message: string | null; t
       ) : (
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
       )}
-      {message}
+      <span className="flex-1">{message}</span>
+      {onDismiss && (
+        <button onClick={onDismiss} className="ml-2 p-1 rounded hover:bg-white/20 transition flex-shrink-0" aria-label="Cerrar">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
 import ClientRow from "./ClientRow";
 import ContactPanel from "./ContactPanel";
-import { AccordionContent, useContextMenu } from "@/components/ui";
+import { AccordionContent, useContextMenu, BottomSheet } from "@/components/ui";
 import type { ContextMenuItem } from "@/components/ui";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
 
@@ -178,18 +178,86 @@ export default function ClientTable({
   }
 
   const allVisibleSelected = filtered.length > 0 && filtered.every((c) => selectedNames.has(c.nombre_normalized));
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
+
+  const activeFilterCount = (riskFilter !== "all" ? 1 : 0) + (companyFilter !== "all" ? 1 : 0);
 
   const filterBtn = (key: RiskFilter, label: string, count: number, activeClasses: string, inactiveClasses: string) => (
     <button onClick={() => setRiskFilter(key)}
-      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${riskFilter === key ? activeClasses : inactiveClasses}`}>
+      className={`px-3 min-h-[44px] rounded-lg text-xs font-medium transition ${riskFilter === key ? activeClasses : inactiveClasses}`}>
       {label} <span className="opacity-60 ml-0.5">{count}</span>
     </button>
   );
 
   return (
     <>
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+      {/* Filters — Desktop inline, Mobile: search + "Filtros" button */}
+      {/* Mobile: search bar + filtros button */}
+      <div className="flex sm:hidden gap-2 mb-4">
+        <div className="flex-1 relative">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar cliente..."
+            className="w-full border border-gray-200 rounded-lg pl-9 pr-8 min-h-[44px] text-sm focus:outline-none focus:ring-1 focus:ring-gray-300"
+            onKeyDown={(e) => { if (e.key === "Escape") setSearch(""); }}
+          />
+          {search && (
+            <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          )}
+        </div>
+        <button
+          onClick={() => setMobileFiltersOpen(true)}
+          className={`flex items-center gap-1.5 px-4 min-h-[44px] rounded-lg border text-sm font-medium transition flex-shrink-0 ${activeFilterCount > 0 ? "border-blue-300 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+        </button>
+      </div>
+
+      {/* Mobile filters bottom sheet */}
+      <BottomSheet open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)}>
+        <div className="px-4 pb-6 space-y-5">
+          <div className="text-base font-semibold text-gray-900 pb-2 border-b border-gray-100">Filtros</div>
+          <div>
+            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Estado</div>
+            <div className="grid grid-cols-2 gap-2">
+              {filterBtn("all", "Todos", clients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600")}
+              {filterBtn("current", "Corriente", countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700")}
+              {filterBtn("watch", "Vigilancia", countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700")}
+              {filterBtn("overdue", "Vencido", countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700")}
+            </div>
+          </div>
+          {roleCompanies.length > 1 && (
+            <div>
+              <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Empresa</div>
+              <select
+                value={companyFilter}
+                onChange={(e) => setCompanyFilter(e.target.value)}
+                className="w-full border border-gray-200 rounded-lg px-3 min-h-[44px] text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white"
+              >
+                <option value="all">Todas las empresas</option>
+                {roleCompanies.map((co) => <option key={co.key} value={co.key}>{co.name}</option>)}
+              </select>
+            </div>
+          )}
+          <button
+            onClick={() => setMobileFiltersOpen(false)}
+            className="w-full bg-black text-white rounded-lg min-h-[44px] text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all"
+          >
+            Aplicar filtros
+          </button>
+        </div>
+      </BottomSheet>
+
+      {/* Desktop filters — hidden on mobile */}
+      <div className="hidden sm:flex flex-row gap-3 mb-4">
         <div className="flex gap-1.5 flex-wrap">
           {filterBtn("all", "Todos", clients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
           {filterBtn("current", "Corriente", countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700 hover:bg-emerald-100")}
@@ -200,7 +268,7 @@ export default function ClientTable({
           <select
             value={companyFilter}
             onChange={(e) => setCompanyFilter(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white"
+            className="border border-gray-200 rounded-lg px-3 min-h-[44px] text-xs focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white"
           >
             <option value="all">Todas las empresas</option>
             {roleCompanies.map((co) => <option key={co.key} value={co.key}>{co.name}</option>)}
@@ -216,7 +284,7 @@ export default function ClientTable({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nombre, telefono, email..."
-            className="w-full border border-gray-200 rounded-lg pl-9 pr-8 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300"
+            className="w-full border border-gray-200 rounded-lg pl-9 pr-8 min-h-[44px] text-xs focus:outline-none focus:ring-1 focus:ring-gray-300"
             onKeyDown={(e) => { if (e.key === "Escape") setSearch(""); }}
           />
           {search && (
@@ -275,21 +343,22 @@ export default function ClientTable({
       {/* Client table */}
       <div className="border border-gray-200 rounded-lg overflow-hidden">
         {/* Sticky sortable header */}
-        <div className="grid grid-cols-12 gap-1 sm:gap-2 px-3 sm:px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[10px] sm:text-[11px] font-medium text-gray-500 uppercase tracking-wider select-none sticky top-11 z-[5]">
+        {/* Desktop header — hidden on mobile since mobile uses card layout */}
+        <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[11px] font-medium text-gray-500 uppercase tracking-wider select-none sticky top-11 z-[5]">
           {selectionMode && <div className="col-span-1" />}
-          <div className={`${selectionMode ? "col-span-4 sm:col-span-3" : "col-span-5 sm:col-span-4"} cursor-pointer hover:text-gray-900 transition`} onClick={() => toggleSort("name")}>
+          <div className={`${selectionMode ? "col-span-3" : "col-span-4"} cursor-pointer hover:text-gray-900 transition`} onClick={() => toggleSort("name")}>
             Cliente{sortArrow("name")}
           </div>
-          <div className="hidden sm:block col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Corriente: deuda con 0 a 90 dias" onClick={() => toggleSort("current")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Corriente: deuda con 0 a 90 dias" onClick={() => toggleSort("current")}>
             0-90d{sortArrow("current")}
           </div>
-          <div className="hidden sm:block col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Vigilancia: deuda con 91 a 120 dias" onClick={() => toggleSort("watch")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Vigilancia: deuda con 91 a 120 dias" onClick={() => toggleSort("watch")}>
             91-120d{sortArrow("watch")}
           </div>
-          <div className="col-span-3 sm:col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Vencido: deuda con mas de 121 dias" onClick={() => toggleSort("overdue")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Vencido: deuda con mas de 121 dias" onClick={() => toggleSort("overdue")}>
             121d+{sortArrow("overdue")}
           </div>
-          <div className="col-span-4 sm:col-span-2 text-right cursor-pointer hover:text-gray-900 transition" onClick={() => toggleSort("total")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" onClick={() => toggleSort("total")}>
             Total{sortArrow("total")}
           </div>
         </div>

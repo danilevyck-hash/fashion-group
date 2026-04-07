@@ -55,6 +55,9 @@ export default function DirectorioPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchDeleting, setBatchDeleting] = useState(false);
   const [confirmBatchDelete, setConfirmBatchDelete] = useState(false);
+  const [empresaSearch, setEmpresaSearch] = useState("");
+  const [empresaDropdownOpen, setEmpresaDropdownOpen] = useState(false);
+  const [mobileContactId, setMobileContactId] = useState<string | null>(null);
 
   const loadClientes = useCallback(async (searchTerm: string, pg: number, empFilter?: string) => {
     setLoading(true);
@@ -320,6 +323,13 @@ export default function DirectorioPage() {
           th { font-weight: 600; border-bottom: 2px solid #000; }
           .max-w-6xl { max-width: 100% !important; padding: 0 !important; }
         }
+        @keyframes slide-up {
+          from { transform: translateY(100%); }
+          to { transform: translateY(0); }
+        }
+        .animate-slide-up {
+          animation: slide-up 250ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
       `}</style>
       <AppHeader module="Directorio de Clientes" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
@@ -356,8 +366,9 @@ export default function DirectorioPage() {
             <>
               {(role === "admin" || role === "secretaria") && (
               <>
-              <button onClick={() => importRef.current?.click()} title="Formato: CSV separado por ; (punto y coma). Columnas: Nombre, Empresa, Teléfono, Celular, Correo, Contacto, Notas" className="text-sm text-gray-400 hover:text-black transition">
-                Importar CSV
+              <button onClick={() => importRef.current?.click()} title="Formato: CSV separado por ; (punto y coma). Columnas: Nombre, Empresa, Teléfono, Celular, Correo, Contacto, Notas" className="text-sm text-gray-600 hover:text-black border border-gray-300 hover:border-gray-400 px-4 py-2.5 sm:py-2 rounded-md transition inline-flex items-center gap-1.5 min-h-[44px]">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                Importar
               </button>
               <button onClick={() => {
                 const headers = "Nombre;Empresa;Teléfono;Celular;Correo;Contacto;Notas";
@@ -457,16 +468,55 @@ export default function DirectorioPage() {
           placeholder="Buscar por nombre o empresa..."
           className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black w-full max-w-sm"
         />
-        <select
-          value={empresaFilter}
-          onChange={(e) => { setEmpresaFilter(e.target.value); setPage(1); }}
-          className="border-b border-gray-200 py-2 text-sm outline-none focus:border-black bg-transparent"
-        >
-          <option value="">Todas las empresas</option>
-          {empresas.map((emp) => (
-            <option key={emp} value={emp}>{emp}</option>
-          ))}
-        </select>
+        <div className="relative">
+          <div className="flex items-center">
+            <svg className="absolute left-0 text-gray-300 pointer-events-none" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input
+              type="text"
+              value={empresaFilter ? empresaFilter : empresaSearch}
+              onChange={(e) => {
+                setEmpresaSearch(e.target.value);
+                setEmpresaDropdownOpen(true);
+                if (!e.target.value) { setEmpresaFilter(""); setPage(1); }
+              }}
+              onFocus={() => setEmpresaDropdownOpen(true)}
+              onBlur={() => setTimeout(() => setEmpresaDropdownOpen(false), 200)}
+              placeholder="Filtrar empresa..."
+              className="border-b border-gray-200 py-2 pl-6 text-sm outline-none focus:border-black bg-transparent w-44"
+            />
+            {empresaFilter && (
+              <button
+                onClick={() => { setEmpresaFilter(""); setEmpresaSearch(""); setPage(1); }}
+                className="text-gray-400 hover:text-black ml-1 text-xs min-h-[44px] min-w-[44px] flex items-center justify-center"
+              >
+                &times;
+              </button>
+            )}
+          </div>
+          {empresaDropdownOpen && (
+            <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-50 mt-1 max-h-48 overflow-y-auto">
+              <button
+                type="button"
+                onMouseDown={() => { setEmpresaFilter(""); setEmpresaSearch(""); setEmpresaDropdownOpen(false); setPage(1); }}
+                className="block w-full text-left px-3 py-2.5 text-sm text-gray-400 hover:bg-gray-50 transition min-h-[44px]"
+              >
+                Todas las empresas
+              </button>
+              {empresas
+                .filter((emp) => !empresaSearch || emp.toLowerCase().includes(empresaSearch.toLowerCase()))
+                .map((emp) => (
+                  <button
+                    key={emp}
+                    type="button"
+                    onMouseDown={() => { setEmpresaFilter(emp); setEmpresaSearch(""); setEmpresaDropdownOpen(false); setPage(1); }}
+                    className="block w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition min-h-[44px]"
+                  >
+                    {emp}
+                  </button>
+                ))}
+            </div>
+          )}
+        </div>
         <span className="text-xs text-gray-400 pb-2">{total} contacto{total !== 1 ? "s" : ""}</span>
       </div>
 
@@ -516,7 +566,13 @@ export default function DirectorioPage() {
                             setEditing(null);
                             setIsDirty(false);
                           }
-                          setExpanded(isExpanded ? null : c.id);
+                          // On mobile, open bottom sheet; on tablet/desktop, expand inline
+                          if (window.innerWidth < 768) {
+                            setMobileContactId(isExpanded ? null : c.id);
+                            setExpanded(null);
+                          } else {
+                            setExpanded(isExpanded ? null : c.id);
+                          }
                         }}
                         onDoubleClick={(e) => {
                           e.preventDefault();
@@ -633,6 +689,159 @@ export default function DirectorioPage() {
           )}
         </>
       )}
+
+      {/* Mobile contact detail modal (iPhone) */}
+      {mobileContactId && (() => {
+        const mc = clientes.find(c => c.id === mobileContactId);
+        if (!mc) return null;
+        return (
+          <div className="md:hidden fixed inset-0 z-50 bg-black/40" onClick={() => setMobileContactId(null)}>
+            <div
+              className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl max-h-[90vh] overflow-y-auto animate-slide-up"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Drag handle */}
+              <div className="flex justify-center pt-3 pb-2">
+                <div className="w-10 h-1 rounded-full bg-gray-300" />
+              </div>
+
+              <div className="px-5 pb-8">
+                {/* Header */}
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h2 className="text-lg font-semibold">{mc.nombre}</h2>
+                    {mc.empresa && <p className="text-sm text-gray-500">{mc.empresa}</p>}
+                  </div>
+                  <button
+                    onClick={() => setMobileContactId(null)}
+                    className="text-gray-400 hover:text-black min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+
+                {/* Quick action buttons */}
+                <div className="grid grid-cols-3 gap-3 mb-6">
+                  {mc.whatsapp ? (
+                    <a
+                      href={`https://wa.me/${mc.whatsapp.replace(/[^0-9]/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex flex-col items-center gap-1.5 bg-emerald-50 border border-emerald-200 rounded-xl py-4 min-h-[76px] text-emerald-700 hover:bg-emerald-100 active:scale-[0.97] transition-all"
+                    >
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a3.04 3.04 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
+                      <span className="text-xs font-medium">WhatsApp</span>
+                    </a>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl py-4 min-h-[76px] text-gray-300">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a3.04 3.04 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
+                      <span className="text-xs">WhatsApp</span>
+                    </div>
+                  )}
+                  {(mc.telefono || mc.celular) ? (
+                    <a
+                      href={`tel:${(mc.celular || mc.telefono).replace(/[^0-9+]/g, "")}`}
+                      className="flex flex-col items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-xl py-4 min-h-[76px] text-blue-700 hover:bg-blue-100 active:scale-[0.97] transition-all"
+                    >
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                      <span className="text-xs font-medium">Llamar</span>
+                    </a>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl py-4 min-h-[76px] text-gray-300">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                      <span className="text-xs">Llamar</span>
+                    </div>
+                  )}
+                  {mc.correo ? (
+                    <a
+                      href={`mailto:${mc.correo}`}
+                      className="flex flex-col items-center gap-1.5 bg-violet-50 border border-violet-200 rounded-xl py-4 min-h-[76px] text-violet-700 hover:bg-violet-100 active:scale-[0.97] transition-all"
+                    >
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                      <span className="text-xs font-medium">Email</span>
+                    </a>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-xl py-4 min-h-[76px] text-gray-300">
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                      <span className="text-xs">Email</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Contact details */}
+                <div className="space-y-3">
+                  {mc.whatsapp && (
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">WhatsApp</p>
+                      <p className="text-sm">{mc.whatsapp}</p>
+                    </div>
+                  )}
+                  {mc.telefono && (
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">Teléfono</p>
+                      <p className="text-sm">{mc.telefono}</p>
+                    </div>
+                  )}
+                  {mc.celular && (
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">Celular</p>
+                      <p className="text-sm">{mc.celular}</p>
+                    </div>
+                  )}
+                  {mc.correo && (
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">Correo</p>
+                      <p className="text-sm">{mc.correo}</p>
+                    </div>
+                  )}
+                  {mc.contacto && (
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">Contacto</p>
+                      <p className="text-sm">{mc.contacto}</p>
+                    </div>
+                  )}
+                  {mc.notas && (
+                    <div>
+                      <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">Notas</p>
+                      <p className="text-sm text-gray-600">{mc.notas}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-0.5">Creado</p>
+                    <p className="text-sm text-gray-500">{fmtDate(mc.created_at.slice(0, 10))}</p>
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex flex-wrap gap-3 mt-6 pt-4 border-t border-gray-100">
+                  {(role === "admin" || role === "secretaria") && (
+                    <button
+                      onClick={() => { setMobileContactId(null); setExpanded(mc.id); setEditing(mc.id); setEditData(mc); setIsDirty(false); }}
+                      className="text-sm text-gray-500 hover:text-black transition min-h-[44px] px-4"
+                    >
+                      Editar
+                    </button>
+                  )}
+                  <button
+                    onClick={() => { setMobileContactId(null); router.push(`/admin?search=${encodeURIComponent(mc.nombre)}`); }}
+                    className="text-sm text-gray-500 hover:text-black transition min-h-[44px] px-4"
+                  >
+                    Ver en CXC
+                  </button>
+                  {role === "admin" && (
+                    <button
+                      onClick={() => { setMobileContactId(null); handleDelete(mc.id); }}
+                      className="text-sm text-gray-400 hover:text-red-500 transition min-h-[44px] px-4"
+                    >
+                      Eliminar
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       <ConfirmDeleteModal
         open={confirmBatchDelete}

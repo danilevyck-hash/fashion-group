@@ -113,15 +113,15 @@ export default function AppHeader({ module, breadcrumbs }: AppHeaderProps) {
           </button>
           {/* Mobile: search + notification + hamburger */}
           <div className="sm:hidden"><NotificationCenter /></div>
-          <button onClick={() => setMobileSearchOpen(true)} className="sm:hidden w-9 h-9 flex items-center justify-center">
+          <button onClick={() => setMobileSearchOpen(true)} className="sm:hidden w-10 h-10 flex items-center justify-center">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </button>
-          <button onClick={() => setDrawerOpen(true)} className="sm:hidden w-9 h-9 flex items-center justify-center -mr-1">
+          <button onClick={() => setDrawerOpen(true)} className="sm:hidden w-10 h-10 flex items-center justify-center -mr-1">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
         </div>
         {/* Breadcrumb bar — hidden on mobile */}
-        <div className="hidden sm:flex px-6 py-1 text-[11px] text-gray-400 items-center gap-1">
+        <div className="hidden sm:flex flex-wrap px-6 py-1 text-[11px] text-gray-400 items-center gap-1">
           <button onClick={() => router.push("/home")} className="hover:text-gray-700 transition">Inicio</button>
           <span>›</span>
           <span className="text-gray-500">{module}</span>
@@ -152,7 +152,7 @@ export default function AppHeader({ module, breadcrumbs }: AppHeaderProps) {
           <div className="absolute right-0 top-0 bottom-0 w-72 bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
             <div className="flex items-center justify-between px-5 h-14 border-b border-gray-200">
               <span className="text-sm font-medium">Módulos</span>
-              <button onClick={() => setDrawerOpen(false)} className="w-9 h-9 flex items-center justify-center active:bg-gray-100 rounded-md transition-all">
+              <button onClick={() => setDrawerOpen(false)} className="w-10 h-10 flex items-center justify-center active:bg-gray-100 rounded-md transition-all">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
             </div>

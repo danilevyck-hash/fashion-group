@@ -108,6 +108,8 @@ interface Props {
   setNewResponsable: (v: string) => void;
   setResponsables: (v: string[]) => void;
   onAddGasto: () => void;
+  fondoInicial?: number;
+  totalGastado?: number;
 }
 
 export default function GastoForm({
@@ -131,6 +133,8 @@ export default function GastoForm({
   setNewResponsable,
   setResponsables,
   onAddGasto,
+  fondoInicial = 0,
+  totalGastado = 0,
 }: Props) {
   const {
     gFecha, gDescripcion, gProveedor, gNroFactura,
@@ -146,10 +150,25 @@ export default function GastoForm({
   const [showMoreDetails, setShowMoreDetails] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
 
+  const restante = fondoInicial - totalGastado;
+  const restantePct = fondoInicial > 0 ? (restante / fondoInicial) * 100 : 100;
+  const isLowBalance = restantePct < 10;
+
   return (
     <div className="mb-10">
-      <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">
-        Agregar Gasto
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+        <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400">
+          Agregar Gasto
+        </div>
+        {fondoInicial > 0 && (
+          <div className={`flex items-center gap-1 text-xs tabular-nums px-3 py-1.5 rounded-full border ${isLowBalance ? "bg-red-50 border-red-200 text-red-700" : "bg-gray-50 border-gray-200 text-gray-600"}`}>
+            <span>Fondo: <b>${fmt(fondoInicial)}</b></span>
+            <span className="text-gray-300 mx-0.5">|</span>
+            <span>Gastado: <b>${fmt(totalGastado)}</b></span>
+            <span className="text-gray-300 mx-0.5">|</span>
+            <span>Restante: <b className={isLowBalance ? "text-red-600" : ""}>${fmt(restante)}</b></span>
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 items-end mb-3">
         <div>

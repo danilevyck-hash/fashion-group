@@ -11,6 +11,7 @@ interface Props {
   saldo: number;
   pctUsed: number;
   onBack: () => void;
+  onClosePeriodo?: () => void;
 }
 
 export default function PeriodoDetailHeader({
@@ -19,6 +20,7 @@ export default function PeriodoDetailHeader({
   saldo,
   pctUsed,
   onBack,
+  onClosePeriodo,
 }: Props) {
   const [kpiTooltip, setKpiTooltip] = useState<string | null>(null);
   const [shaking, setShaking] = useState(false);
@@ -34,14 +36,47 @@ export default function PeriodoDetailHeader({
     prevPctUsed.current = pctUsed;
   }, [pctUsed]);
 
+  const daysSinceOpen = isOpen
+    ? Math.floor((Date.now() - new Date(current.fecha_apertura).getTime()) / (24 * 60 * 60 * 1000))
+    : 0;
+
   return (
     <>
       <button
         onClick={onBack}
-        className="text-sm text-gray-400 hover:text-black transition mb-8 block"
+        className="text-sm text-gray-400 hover:text-black transition mb-6 block"
       >
         ← Períodos
       </button>
+
+      {/* Period status banner */}
+      {isOpen ? (
+        <div className={`rounded-lg px-4 py-3 mb-6 flex flex-wrap items-center justify-between gap-3 ${daysSinceOpen > 30 ? "bg-amber-50 border border-amber-200" : "bg-emerald-50 border border-emerald-200"}`}>
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${daysSinceOpen > 30 ? "bg-amber-500" : "bg-emerald-500"}`} />
+            <p className={`text-sm ${daysSinceOpen > 30 ? "text-amber-800" : "text-emerald-800"}`}>
+              {daysSinceOpen > 30
+                ? `Este período lleva ${daysSinceOpen} días abierto — abierto desde ${fmtDate(current.fecha_apertura)}`
+                : `Período abierto desde ${fmtDate(current.fecha_apertura)}`}
+            </p>
+          </div>
+          {onClosePeriodo && (
+            <button
+              onClick={onClosePeriodo}
+              className={`text-sm px-4 py-1.5 rounded-md font-medium transition active:scale-[0.97] ${daysSinceOpen > 30 ? "bg-amber-600 text-white hover:bg-amber-700" : "border border-emerald-300 text-emerald-700 hover:bg-emerald-100"}`}
+            >
+              Cerrar período
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="bg-gray-100 border border-gray-200 rounded-lg px-4 py-3 mb-6 flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-gray-400" />
+          <p className="text-sm text-gray-600">
+            Período cerrado — {fmtDate(current.fecha_cierre || "")}
+          </p>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-4 mb-8">
         <h1 className="text-xl font-light tracking-tight">

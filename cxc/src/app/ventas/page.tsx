@@ -332,17 +332,17 @@ export default function VentasDashboard() {
   if (!authChecked) return null;
 
   const kpiCards = [
-    { key: "ventas", label: "Ventas netas", value: fmtK(kpi.ventasNetas), flag: false, tooltip: "Total vendido en el período (sin impuestos).", valueExtra: undefined as string | null | undefined },
-    { key: "vsAnterior", label: `vs. ${año - 1}`, value: kpi.vsAnterior === null ? "—" : `${kpi.vsAnterior >= 0 ? "+" : ""}${kpi.vsAnterior.toFixed(1)}%`, flag: kpi.vsAnterior !== null && kpi.vsAnterior < -20, tooltip: "Comparado con el mismo período del año pasado.", valueExtra: undefined as string | null | undefined },
-    { key: "utilidad", label: "Utilidad total", value: fmtK(kpi.totalUtil), valueExtra: kpi.utilVsAnt, flag: false, tooltip: "Ganancia bruta del período." },
-    { key: "margen", label: "Margen bruto", value: kpi.margenDisplay, flag: kpi.margenFlag, tooltip: "Porcentaje de ganancia sobre las ventas.", valueExtra: undefined as string | null | undefined },
-    { key: "vsMeta", label: "vs. Meta", value: kpi.metaTotal ? `${kpi.vsMeta.toFixed(0)}%` : "N/A", flag: kpi.metaTotal > 0 && kpi.vsMeta < 80, tooltip: "Qué tanto se alcanzó la meta de ventas.", valueExtra: undefined as string | null | undefined },
+    { key: "ventas", label: "Ventas netas", value: fmtK(kpi.ventasNetas), flag: false, tooltip: "Total vendido en el período (sin impuestos).", valueExtra: undefined as string | null | undefined, trend: null as "up" | "down" | null },
+    { key: "vsAnterior", label: `vs. ${año - 1}`, value: kpi.vsAnterior === null ? "—" : `${kpi.vsAnterior >= 0 ? "+" : ""}${kpi.vsAnterior.toFixed(1)}%`, flag: kpi.vsAnterior !== null && kpi.vsAnterior < -20, tooltip: "Comparado con el mismo período del año pasado.", valueExtra: undefined as string | null | undefined, trend: kpi.vsAnterior === null ? null : kpi.vsAnterior >= 0 ? "up" as const : "down" as const },
+    { key: "utilidad", label: "Utilidad total", value: fmtK(kpi.totalUtil), valueExtra: kpi.utilVsAnt, flag: false, tooltip: "Ganancia bruta del período.", trend: null as "up" | "down" | null },
+    { key: "margen", label: "Margen bruto", value: kpi.margenDisplay, flag: kpi.margenFlag, tooltip: "Porcentaje de ganancia sobre las ventas.", valueExtra: undefined as string | null | undefined, trend: null as "up" | "down" | null },
+    { key: "vsMeta", label: "vs. Meta", value: kpi.metaTotal ? `${kpi.vsMeta.toFixed(0)}%` : "N/A", flag: kpi.metaTotal > 0 && kpi.vsMeta < 80, tooltip: "Qué tanto se alcanzó la meta de ventas.", valueExtra: undefined as string | null | undefined, trend: kpi.metaTotal > 0 ? (kpi.vsMeta >= 100 ? "up" as const : kpi.vsMeta < 80 ? "down" as const : null) : null },
   ];
 
   return (
     <>
       <AppHeader module="Ventas" />
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 md:px-6 py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-xl font-semibold">Dashboard de Ventas</h1>
@@ -367,7 +367,7 @@ export default function VentasDashboard() {
           <div className="flex gap-1 bg-gray-100 rounded-md p-1">
             {(años.length ? años : [año]).map(y => (
               <button key={y} onClick={() => setAño(y)}
-                className={`px-3 py-1 text-xs rounded-md transition ${y === año ? "bg-white shadow font-medium" : "text-gray-500 hover:text-gray-700"}`}>
+                className={`px-3 py-1.5 min-h-[44px] text-xs rounded-md transition ${y === año ? "bg-white shadow font-medium" : "text-gray-500 hover:text-gray-700"}`}>
                 {y}
               </button>
             ))}
@@ -375,28 +375,28 @@ export default function VentasDashboard() {
           <div className="flex gap-1 bg-gray-100 rounded-md p-1">
             {(["mensual", "quarter"] as const).map(v => (
               <button key={v} onClick={() => setVista(v)}
-                className={`px-3 py-1 text-xs rounded-md transition capitalize ${v === vista ? "bg-white shadow font-medium" : "text-gray-500 hover:text-gray-700"}`}>
+                className={`px-3 py-1.5 min-h-[44px] text-xs rounded-md transition capitalize ${v === vista ? "bg-white shadow font-medium" : "text-gray-500 hover:text-gray-700"}`}>
                 {v === "mensual" ? "Mensual" : "Quarter"}
               </button>
             ))}
           </div>
           <div className="flex flex-wrap gap-1.5">
             <button onClick={() => setEmpresaFilter([])}
-              className={`px-3 py-1 text-xs rounded-md transition ${empresaFilter.length === 0 ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+              className={`px-3 py-1.5 min-h-[44px] text-xs rounded-md transition ${empresaFilter.length === 0 ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
               Todas
             </button>
             {EMPRESAS.map(e => {
               const active = empresaFilter.includes(e);
               return (
                 <button key={e} onClick={() => setEmpresaFilter(prev => active ? prev.filter(x => x !== e) : [...prev, e])}
-                  className={`px-3 py-1 text-xs rounded-md transition ${active ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                  className={`px-3 py-1.5 min-h-[44px] text-xs rounded-md transition ${active ? "bg-black text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
                   {e.replace("International", "Intl.").replace("Confecciones ", "")}
                 </button>
               );
             })}
           </div>
           <select value={filterMes ?? ""} onChange={e => setFilterMes(e.target.value ? Number(e.target.value) : null)}
-            className="text-xs border border-gray-200 rounded-md px-3 py-1.5 bg-white">
+            className="text-xs border border-gray-200 rounded-md px-3 py-1.5 min-h-[44px] bg-white">
             <option value="">Todos los meses</option>
             {MES_NAMES.map((m, i) => <option key={m} value={i + 1}>{m}</option>)}
           </select>
@@ -409,15 +409,22 @@ export default function VentasDashboard() {
 
         {/* KPI Cards */}
         {loading ? <SkeletonKPI count={5} /> : (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6 tabular-nums">
             {kpiCards.map(k => (
               <div key={k.key} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                 <div className="flex items-center mb-1">
                   <p className="text-xs uppercase tracking-wide text-gray-500">{k.label}</p>
                   <button onClick={() => setKpiTooltip(kpiTooltip === k.key ? null : k.key)} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
                 </div>
-                <p className={`text-xl font-semibold ${k.flag ? "text-red-600" : ""}`}>{k.value}</p>
-                {k.valueExtra && <p className="text-xs text-gray-500">{k.valueExtra}</p>}
+                <div className="flex items-center gap-1.5">
+                  {k.trend && (
+                    <span className={`text-lg font-semibold leading-none ${k.trend === "up" ? "text-green-600" : "text-red-500"}`}>
+                      {k.trend === "up" ? "▲" : "▼"}
+                    </span>
+                  )}
+                  <p className={`text-xl font-semibold tabular-nums ${k.flag ? "text-red-600" : ""} ${k.trend === "up" ? "text-green-600" : ""} ${k.trend === "down" && !k.flag ? "text-red-500" : ""}`}>{k.value}</p>
+                </div>
+                {k.valueExtra && <p className={`text-xs font-semibold mt-0.5 ${k.valueExtra.startsWith("+") ? "text-green-600" : k.valueExtra.startsWith("-") ? "text-red-500" : "text-gray-500"}`}>{k.valueExtra}</p>}
                 {kpiTooltip === k.key && <p className="text-xs text-gray-500 mt-1">{k.tooltip}</p>}
               </div>
             ))}
@@ -426,12 +433,12 @@ export default function VentasDashboard() {
 
         {/* Monthly Bar Chart */}
         {!loading && hasData && filterMes === null && (
-          <div className="mb-6 border border-gray-200 rounded-lg p-4 print:hidden">
+          <div className="mb-6 border border-gray-200 rounded-lg p-3 sm:p-4 print:hidden">
             <p className="text-xs uppercase tracking-wide text-gray-500 mb-3">Ventas mensuales {año}</p>
-            <ResponsiveContainer width="100%" height={180}>
+            <ResponsiveContainer width="100%" height={typeof window !== "undefined" && window.innerWidth < 640 ? 160 : 220}>
               <BarChart data={chartData} barCategoryGap="20%">
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} />
+                <XAxis dataKey="name" tick={{ fontSize: typeof window !== "undefined" && window.innerWidth < 640 ? 11 : 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: typeof window !== "undefined" && window.innerWidth < 640 ? 11 : 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v: number) => v >= 1000 ? `${(v/1000).toFixed(0)}k` : String(v)} width={typeof window !== "undefined" && window.innerWidth < 640 ? 35 : 40} />
                 <RTooltip formatter={(v) => [`$${fmt(Number(v))}`, ""]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                 <Bar dataKey="ventas" fill="#1a1a1a" radius={[3, 3, 0, 0]} />
                 <Bar dataKey="prev" fill="#e5e7eb" radius={[3, 3, 0, 0]} />
@@ -505,8 +512,8 @@ export default function VentasDashboard() {
 
         {/* Tab Bar */}
         <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 mb-6 max-w-xs print:hidden">
-          <button onClick={() => setActiveTab("resumen")} className={`flex-1 py-2 px-4 text-sm rounded-md transition ${activeTab === "resumen" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Resumen</button>
-          <button onClick={() => setActiveTab("clientes")} className={`flex-1 py-2 px-4 text-sm rounded-md transition ${activeTab === "clientes" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Clientes</button>
+          <button onClick={() => setActiveTab("resumen")} className={`flex-1 py-2.5 px-4 min-h-[44px] text-sm rounded-md transition ${activeTab === "resumen" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Resumen</button>
+          <button onClick={() => setActiveTab("clientes")} className={`flex-1 py-2.5 px-4 min-h-[44px] text-sm rounded-md transition ${activeTab === "clientes" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Clientes</button>
         </div>
 
         {/* Resumen Tab */}
@@ -587,15 +594,17 @@ export default function VentasDashboard() {
             </div>
 
             {/* Client Table */}
-            <div className="overflow-x-auto border border-gray-200 rounded-lg mb-6">
-              <table className="w-full text-xs">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Top clientes por ventas</p>
+            <div className="relative overflow-x-auto border border-gray-200 rounded-lg mb-6 -mx-3 sm:mx-0">
+              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent z-20 sm:hidden" />
+              <table className="w-full text-xs min-w-[600px]">
                 <thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 bg-white">
-                  <th className="text-left px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("ventas")}>Cliente {clientSort === "ventas" ? (clientSortDir === "desc" ? "↓" : "↑") : ""}</th>
-                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("ventas")}>Ventas {clientSort === "ventas" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
-                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("utilidad")}>Utilidad {clientSort === "utilidad" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
-                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("margen")}>Margen% {clientSort === "margen" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
-                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("pct")}>% Total {clientSort === "pct" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
-                  <th className="text-right px-3 py-2 cursor-pointer" onClick={() => toggleClientSort("fecha")}>Última Compra {clientSort === "fecha" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
+                  <th className="text-left px-3 py-2 min-h-[44px] cursor-pointer" onClick={() => toggleClientSort("ventas")}>Cliente {clientSort === "ventas" ? (clientSortDir === "desc" ? "↓" : "↑") : ""}</th>
+                  <th className="text-right px-3 py-2 min-h-[44px] cursor-pointer whitespace-nowrap" onClick={() => toggleClientSort("ventas")}>Ventas {clientSort === "ventas" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
+                  <th className="text-right px-3 py-2 min-h-[44px] cursor-pointer whitespace-nowrap" onClick={() => toggleClientSort("utilidad")}>Utilidad {clientSort === "utilidad" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
+                  <th className="text-right px-3 py-2 min-h-[44px] cursor-pointer whitespace-nowrap" onClick={() => toggleClientSort("margen")}>Margen% {clientSort === "margen" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
+                  <th className="text-right px-3 py-2 min-h-[44px] cursor-pointer whitespace-nowrap" onClick={() => toggleClientSort("pct")}>% Total {clientSort === "pct" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
+                  <th className="text-right px-3 py-2 min-h-[44px] cursor-pointer whitespace-nowrap" onClick={() => toggleClientSort("fecha")}>Última Compra {clientSort === "fecha" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
                 </tr></thead>
                 <tbody>
                   {displayClients.map(c => {
@@ -603,17 +612,19 @@ export default function VentasDashboard() {
                     const pct = totalVentas ? (c.subtotal / totalVentas * 100) : 0;
                     const lastCompra = c.lastFecha ? new Date(c.lastFecha).toLocaleDateString("es-PA", { month: "short", year: "numeric" }).replace(".", "") : "—";
                     const expanded = expandedClient === c.cliente;
+                    const isInactive = c.lastFecha && c.lastFecha < sixtyDaysAgo;
                     return [
-                      <tr key={c.cliente} className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer" onClick={() => setExpandedClient(expanded ? null : c.cliente)}>
-                        <td className="px-3 py-2 text-gray-700 flex items-center gap-1">
+                      <tr key={c.cliente} className="border-b border-gray-50 hover:bg-gray-50/50 cursor-pointer min-h-[44px]" onClick={() => setExpandedClient(expanded ? null : c.cliente)}>
+                        <td className="px-3 py-2.5 text-gray-700 flex items-center gap-1 min-h-[44px]">
                           <span className={`text-gray-300 text-xs transition ${expanded ? "rotate-90" : ""}`}>▶</span>
                           {c.cliente}
+                          {isInactive && <span className="text-red-400 text-[10px] ml-1" title="Sin compra 60+ días">▼</span>}
                         </td>
-                        <td className="text-right px-3 py-2 tabular-nums">{fmtK(c.subtotal)}</td>
-                        <td className="text-right px-3 py-2 tabular-nums">{fmtK(c.utilidad)}</td>
-                        <td className={`text-right px-3 py-2 tabular-nums ${margen < 15 ? "text-red-600" : ""}`}>{margen.toFixed(1)}%</td>
-                        <td className="text-right px-3 py-2 tabular-nums text-gray-500">{pct.toFixed(1)}%</td>
-                        <td className="text-right px-3 py-2 text-gray-500">{lastCompra}</td>
+                        <td className="text-right px-3 py-2.5 tabular-nums min-h-[44px]">{fmtK(c.subtotal)}</td>
+                        <td className="text-right px-3 py-2.5 tabular-nums min-h-[44px]">{fmtK(c.utilidad)}</td>
+                        <td className={`text-right px-3 py-2.5 tabular-nums min-h-[44px] ${margen < 15 ? "text-red-600" : ""}`}>{margen.toFixed(1)}%</td>
+                        <td className="text-right px-3 py-2.5 tabular-nums text-gray-500 min-h-[44px]">{pct.toFixed(1)}%</td>
+                        <td className={`text-right px-3 py-2.5 min-h-[44px] ${isInactive ? "text-red-500" : "text-gray-500"}`}>{lastCompra}</td>
                       </tr>,
                       expanded && c.empresas.map(e => (
                         <tr key={`${c.cliente}-${e.empresa}`} className="bg-gray-50/30">

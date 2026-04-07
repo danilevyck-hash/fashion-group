@@ -28,9 +28,10 @@ export default function KpiCards({ roleClients, onFilterOverdue, onSortByFollowU
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 mb-6">
-        {/* Total CXC */}
-        <div className="border border-gray-200 rounded-lg px-4 py-4 flex items-start gap-3">
+      {/* Top 3 prominent KPIs */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+        {/* Total Pendiente — hero KPI */}
+        <div className="border border-gray-200 rounded-lg px-4 py-4 sm:py-5 flex items-start gap-3">
           <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#374151" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
@@ -38,17 +39,41 @@ export default function KpiCards({ roleClients, onFilterOverdue, onSortByFollowU
           </div>
           <div className="min-w-0">
             <div className="flex items-center">
-              <div className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Total CXC</div>
+              <div className="text-[11px] text-gray-500 uppercase tracking-wider font-medium">Total Pendiente</div>
               <button onClick={() => setKpiTooltip(kpiTooltip === "total" ? null : "total")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
             </div>
-            <div className="text-xl font-semibold mt-0.5 tabular-nums">$<AnimatedNumber value={totalCxc} formatter={(n: number) => fmt(n)} /></div>
+            <div className="text-2xl font-bold mt-0.5 tabular-nums">$<AnimatedNumber value={totalCxc} formatter={(n: number) => fmt(n)} /></div>
             <div className="text-[11px] text-gray-400 mt-0.5">{roleClients.length} clientes activos</div>
             {kpiTooltip === "total" && <p className="text-xs text-gray-500 mt-1">Total de deuda pendiente de todos los clientes</p>}
           </div>
         </div>
 
-        {/* Corriente */}
-        <div className="border border-emerald-200 rounded-lg px-4 py-4 flex items-start gap-3 bg-emerald-50/50">
+        {/* Vencida 121d+ — prominent with red left border when > 0 */}
+        <div
+          className={`border border-red-200 rounded-lg px-4 py-4 sm:py-5 flex items-start gap-3 bg-red-50/50 cursor-pointer hover:bg-red-50 transition group ${totalOverdue > 0 ? "border-l-4 border-l-red-400" : ""}`}
+          onClick={onFilterOverdue}
+        >
+          <div className="w-9 h-9 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center">
+              <div className="text-[11px] text-red-700 uppercase tracking-wider font-medium">Vencida +121d</div>
+              <button onClick={(e) => { e.stopPropagation(); setKpiTooltip(kpiTooltip === "overdue" ? null : "overdue"); }} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
+            </div>
+            <div className="text-2xl font-bold mt-0.5 tabular-nums text-red-800">$<AnimatedNumber value={totalOverdue} formatter={(n: number) => fmt(n)} /></div>
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] text-red-600 mt-0.5">{criticalClients} clientes</span>
+              <span className="text-[10px] text-red-400 group-hover:text-red-600 transition">Ver todos &rarr;</span>
+            </div>
+            {kpiTooltip === "overdue" && <p className="text-xs text-red-600 mt-1">Deuda con mas de 120 dias. Accion urgente.</p>}
+          </div>
+        </div>
+
+        {/* Corriente — prominent */}
+        <div className="border border-emerald-200 rounded-lg px-4 py-4 sm:py-5 flex items-start gap-3 bg-emerald-50/50">
           <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="20 6 9 17 4 12"/>
@@ -59,14 +84,16 @@ export default function KpiCards({ roleClients, onFilterOverdue, onSortByFollowU
               <div className="text-[11px] text-emerald-700 uppercase tracking-wider font-medium">Corriente 0-90d</div>
               <button onClick={() => setKpiTooltip(kpiTooltip === "current" ? null : "current")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
             </div>
-            <div className="text-xl font-semibold mt-0.5 tabular-nums text-emerald-800">$<AnimatedNumber value={totalCurrent} formatter={(n: number) => fmt(n)} /></div>
+            <div className="text-2xl font-bold mt-0.5 tabular-nums text-emerald-800">$<AnimatedNumber value={totalCurrent} formatter={(n: number) => fmt(n)} /></div>
             <div className="text-[11px] text-emerald-600 mt-0.5">{pctCurrent.toFixed(0)}% del total</div>
-            {kpiTooltip === "current" && <p className="text-xs text-emerald-600 mt-1">Deuda con menos de 90 días. En buen estado.</p>}
+            {kpiTooltip === "current" && <p className="text-xs text-emerald-600 mt-1">Deuda con menos de 90 dias. En buen estado.</p>}
           </div>
         </div>
+      </div>
 
-        {/* Vigilancia */}
-        <div className="border border-amber-200 rounded-lg px-4 py-4 flex items-start gap-3 bg-amber-50/50">
+      {/* Secondary KPI: Vigilancia — smaller, inline */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <div className="border border-amber-200 rounded-lg px-4 py-3 flex items-start gap-3 bg-amber-50/50">
           <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
@@ -77,33 +104,9 @@ export default function KpiCards({ roleClients, onFilterOverdue, onSortByFollowU
               <div className="text-[11px] text-amber-700 uppercase tracking-wider font-medium">Vigilancia 91-120d</div>
               <button onClick={() => setKpiTooltip(kpiTooltip === "watch" ? null : "watch")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
             </div>
-            <div className="text-xl font-semibold mt-0.5 tabular-nums text-amber-800">$<AnimatedNumber value={totalWatch} formatter={(n: number) => fmt(n)} /></div>
-            <div className="text-[11px] text-amber-600 mt-0.5">{watchClients} clientes</div>
-            {kpiTooltip === "watch" && <p className="text-xs text-amber-600 mt-1">Deuda de 91 a 120 días. Requiere seguimiento.</p>}
-          </div>
-        </div>
-
-        {/* Vencido */}
-        <div
-          className="border border-red-200 rounded-lg px-4 py-4 flex items-start gap-3 bg-red-50/50 cursor-pointer hover:bg-red-50 transition group"
-          onClick={onFilterOverdue}
-        >
-          <div className="w-9 h-9 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center">
-              <div className="text-[11px] text-red-700 uppercase tracking-wider font-medium">Vencido +121d</div>
-              <button onClick={(e) => { e.stopPropagation(); setKpiTooltip(kpiTooltip === "overdue" ? null : "overdue"); }} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
-            </div>
-            <div className="text-xl font-semibold mt-0.5 tabular-nums text-red-800">$<AnimatedNumber value={totalOverdue} formatter={(n: number) => fmt(n)} /></div>
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] text-red-600 mt-0.5">{criticalClients} clientes</span>
-              <span className="text-[10px] text-red-400 group-hover:text-red-600 transition">Ver todos &rarr;</span>
-            </div>
-            {kpiTooltip === "overdue" && <p className="text-xs text-red-600 mt-1">Deuda con más de 120 días. Acción urgente.</p>}
+            <div className="text-lg font-semibold mt-0.5 tabular-nums text-amber-800">$<AnimatedNumber value={totalWatch} formatter={(n: number) => fmt(n)} /></div>
+            <div className="text-[11px] text-amber-600 mt-0.5">{watchClients} clientes &middot; {pctWatch.toFixed(0)}% del total</div>
+            {kpiTooltip === "watch" && <p className="text-xs text-amber-600 mt-1">Deuda de 91 a 120 dias. Requiere seguimiento.</p>}
           </div>
         </div>
       </div>

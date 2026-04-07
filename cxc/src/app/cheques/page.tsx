@@ -44,13 +44,16 @@ function todayStr() { return new Date().toISOString().slice(0, 10); }
 type Filter = "all" | "pendiente" | "depositado" | "vencido" | "rebotado" | "vencen_hoy" | "vencen_manana" | "vencen_semana";
 const VALID_FILTERS: Filter[] = ["all", "pendiente", "depositado", "vencido", "rebotado", "vencen_hoy", "vencen_manana", "vencen_semana"];
 
-function ChequeMoreMenu({ cheque, ve, role, onRebotado, onWA, onDelete }: {
+function ChequeMoreMenu({ cheque, ve, role, onRebotado, onWA, onDelete, onRedepositar }: {
   cheque: Cheque; ve: string; role: string;
-  onRebotado: () => void; onWA: () => void; onDelete: () => void;
+  onRebotado: () => void; onWA: () => void; onDelete: () => void; onRedepositar?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
-  const hasActions = isPending || cheque.whatsapp || role === "admin";
+  const isRebotado = ve === "rebotado";
+  const isDep = ve === "depositado";
+  // State machine: only show valid actions
+  const hasActions = isPending || (isRebotado && onRedepositar) || (isDep && role === "admin") || role === "admin";
   if (!hasActions) return null;
   return (
     <div className="relative">
@@ -59,14 +62,19 @@ function ChequeMoreMenu({ cheque, ve, role, onRebotado, onWA, onDelete }: {
         <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
         <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg z-20 py-1 min-w-[160px]">
           {isPending && (
-            <button onClick={() => { onRebotado(); setOpen(false); }} title="Cheque devuelto por el banco" className="block w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition">Marcar como rebotado (devuelto)</button>
+            <button onClick={() => { onRebotado(); setOpen(false); }} title="Cheque devuelto por el banco" className="block w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition min-h-[44px]">Marcar como rebotado (devuelto)</button>
           )}
-          <button onClick={() => { onWA(); setOpen(false); }} className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-gray-50 transition" title="Enviar recordatorio por WhatsApp">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-            Enviar WhatsApp
-          </button>
+          {isPending && cheque.whatsapp && (
+            <button onClick={() => { onWA(); setOpen(false); }} className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-gray-50 transition min-h-[44px]" title="Enviar recordatorio por WhatsApp">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+              Enviar WhatsApp
+            </button>
+          )}
+          {isRebotado && onRedepositar && (
+            <button onClick={() => { onRedepositar(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-gray-50 transition min-h-[44px]">Re-depositar</button>
+          )}
           {role === "admin" && (
-            <button onClick={() => { onDelete(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-gray-50 transition">Eliminar Cheque</button>
+            <button onClick={() => { onDelete(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-gray-50 transition min-h-[44px]">Eliminar Cheque</button>
           )}
         </div>
       </>)}
@@ -163,7 +171,10 @@ function ChequesPage() {
 
   function buildChequeContextMenu(c: Cheque, ve: string): ContextMenuItem[] {
     const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
+    const isRebotado = ve === "rebotado";
+    const isDep = ve === "depositado";
     return [
+      // Pendiente/Vencido: can deposit
       {
         label: "Confirmar deposito",
         shortcut: "D",
@@ -172,18 +183,15 @@ function ChequesPage() {
         hidden: !isPending,
         dividerAfter: isPending,
       },
+      // Pendiente/Vencido: can send WhatsApp (only if has phone)
       {
         label: "WhatsApp",
         shortcut: "W",
         icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-emerald-600"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>,
-        onClick: () => {
-          if (!c.whatsapp) { showToast("Este cliente no tiene WhatsApp registrado"); return; }
-          let phone = (c.whatsapp || "").replace(/\D/g, "");
-          if (!phone.startsWith("507") && phone.length <= 8) { phone = "507" + phone; }
-          const msg = `Hola, le recordamos que tiene un cheque #${c.numero_cheque} por $${fmt(c.monto)} con fecha de deposito ${fmtDate(c.fecha_deposito)}.`;
-          try { window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
-        },
+        onClick: () => sendWhatsApp(c),
+        hidden: !isPending || !c.whatsapp,
       },
+      // Pendiente/Vencido: can mark rebotado
       {
         label: "Marcar como rebotado",
         shortcut: "B",
@@ -191,13 +199,23 @@ function ChequesPage() {
         onClick: () => setRebotandoId(c.id),
         hidden: !isPending,
       },
+      // Rebotado: can re-deposit
+      {
+        label: "Re-depositar",
+        shortcut: "R",
+        icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>,
+        onClick: () => redepositar(c.id),
+        hidden: !isRebotado,
+      },
+      // Depositado: admin can delete (only valid action)
+      // All states: admin can delete
       {
         label: "Eliminar",
         shortcut: "Del",
         icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
         onClick: () => setConfirmDeleteId(c.id),
         destructive: true,
-        hidden: role !== "admin",
+        hidden: role !== "admin" || (!isDep && !isPending && !isRebotado),
       },
     ];
   }
@@ -528,6 +546,25 @@ function ChequesPage() {
   function visualEstado(c: Cheque): string {
     if (c.estado === "pendiente" && c.fecha_deposito < today) return "pendiente_vencido";
     return c.estado;
+  }
+
+  // Urgency border class for color-coded left borders
+  function urgencyBorder(c: Cheque, ve: string): string {
+    if (ve === "depositado") return "border-l-4 border-l-emerald-400";
+    if (ve === "pendiente_vencido" || ve === "vencido") return "border-l-4 border-l-red-700";
+    if (ve === "pendiente" && c.fecha_deposito === today) return "border-l-4 border-l-red-500";
+    if (ve === "pendiente" && c.fecha_deposito <= weekFromNow) return "border-l-4 border-l-amber-400";
+    if (ve === "rebotado") return "border-l-4 border-l-red-700";
+    return "";
+  }
+
+  // WhatsApp send handler (reusable)
+  function sendWhatsApp(c: Cheque) {
+    if (!c.whatsapp) { showToast("Este cliente no tiene WhatsApp registrado"); return; }
+    let phone = (c.whatsapp || "").replace(/\D/g, "");
+    if (!phone.startsWith("507") && phone.length <= 8) { phone = "507" + phone; }
+    const msg = `Hola, le recordamos que tiene un cheque #${c.numero_cheque} por $${fmt(c.monto)} con fecha de deposito ${fmtDate(c.fecha_deposito)}.`;
+    try { window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
   }
 
   const pendientes = cheques.filter((c) => visualEstado(c) === "pendiente");
@@ -1071,6 +1108,7 @@ function ChequesPage() {
           {filtered.map((c) => {
             const ve = visualEstado(c);
             const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
+            const isRebotado = ve === "rebotado";
             const depositSwipe: SwipeAction | undefined = isPending ? {
               label: "Depositar",
               color: "bg-emerald-500",
@@ -1079,23 +1117,49 @@ function ChequesPage() {
             } : undefined;
             const card = (
               <div className={`px-4 py-3 ${ve === "depositado" ? "opacity-60" : ""}`} onClick={() => startEdit(c)}>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium truncate">{c.cliente}</span>
-                  <span className="text-sm font-medium tabular-nums">${fmt(c.monto)}</span>
+                {/* Row 1: Banco + Monto + WhatsApp */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-medium truncate">{c.cliente}</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {isPending && c.whatsapp && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); sendWhatsApp(c); }}
+                        className="w-[36px] h-[36px] min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full bg-emerald-500 text-white active:scale-[0.95] transition-transform"
+                        title="Enviar WhatsApp"
+                      >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                      </button>
+                    )}
+                    <span className="text-sm font-semibold tabular-nums">${fmt(c.monto)}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 mt-1">
+                {/* Row 2: Banco, fecha, status */}
+                <div className="flex items-center gap-2 mt-1.5">
                   <StatusBadge estado={ve} />
-                  <span className="text-xs text-gray-400">{c.banco} · {c.numero_cheque}</span>
+                  <span className="text-xs text-gray-500 font-medium">{c.banco}</span>
                   <span className="text-xs text-gray-400 ml-auto">{fmtDate(c.fecha_deposito)}</span>
                 </div>
+                {/* Row 3: Secondary info */}
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[11px] text-gray-400">N° {c.numero_cheque}</span>
+                  <span className="text-[11px] text-gray-400">· {c.empresa}</span>
+                </div>
+                {/* State-valid actions */}
+                {isRebotado && (
+                  <div className="mt-2 pt-2 border-t border-gray-100">
+                    <button onClick={(e) => { e.stopPropagation(); redepositar(c.id); }} className="text-xs text-emerald-600 font-medium py-1 min-h-[44px] flex items-center">Re-depositar</button>
+                  </div>
+                )}
               </div>
             );
             return depositSwipe ? (
-              <SwipeableRow key={c.id} rightAction={depositSwipe} className="border border-gray-200 rounded-lg">
+              <SwipeableRow key={c.id} rightAction={depositSwipe} className={`border border-gray-200 rounded-lg ${urgencyBorder(c, ve)}`}>
                 {card}
               </SwipeableRow>
             ) : (
-              <div key={c.id} className="border border-gray-200 rounded-lg">
+              <div key={c.id} className={`border border-gray-200 rounded-lg ${urgencyBorder(c, ve)}`}>
                 {card}
               </div>
             );
@@ -1110,15 +1174,14 @@ function ChequesPage() {
           const _df = filter === "depositado" ? "fecha_depositado" as keyof Cheque : "fecha_deposito" as keyof Cheque;
           const _cg = filter === "all" || filter === "pendiente" || filter === "depositado";
           const _tg = groupedView && _cg ? groupByTimePeriod(filtered, _df, _gm) : null;
-          const _th = (<thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500"><th className="text-left py-3 px-4 font-normal">Fecha Depósito</th><th className="text-left py-3 px-4 font-normal">Cliente</th><th className="text-left py-3 px-4 font-normal">Empresa</th><th className="text-left py-3 px-4 font-normal">Banco</th><th className="text-left py-3 px-4 font-normal">N° Cheque</th><th className="text-right py-3 px-4 font-normal">Monto</th><th className="text-left py-3 px-4 font-normal">Estado</th><th className="text-right py-3 px-4 font-normal"></th></tr></thead>);
+          const _th = (<thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500"><th className="text-left py-3 px-4 font-normal">Fecha Depósito</th><th className="text-left py-3 px-4 font-normal">Cliente</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell">Empresa</th><th className="text-left py-3 px-4 font-normal">Banco</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell">N° Cheque</th><th className="text-right py-3 px-4 font-normal">Monto</th><th className="text-left py-3 px-4 font-normal">Estado</th><th className="text-right py-3 px-4 font-normal"></th></tr></thead>);
           const _rr = (c: Cheque) => {
               const ve = visualEstado(c);
-              const isToday = c.fecha_deposito === today && ve === "pendiente";
-              const isVencido = ve === "pendiente_vencido" || ve === "vencido";
+              const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
               const isDep = ve === "depositado";
               const isRebotado = ve === "rebotado";
               return (
-                <tr key={c.id} className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${isToday ? "bg-yellow-50 border-l-4 border-l-yellow-400" : isVencido ? "bg-amber-50/30" : isRebotado ? "bg-red-50/20" : ""} ${isDep ? "text-gray-400" : ""}`} onContextMenu={(e) => showContextMenu(e, buildChequeContextMenu(c, ve))}>
+                <tr key={c.id} className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${urgencyBorder(c, ve)} ${isDep ? "text-gray-400" : isRebotado ? "bg-red-50/20" : ""}`} onContextMenu={(e) => showContextMenu(e, buildChequeContextMenu(c, ve))}>
                   {ve === "pendiente" && (
                     <td className="py-3 pl-2 pr-0 w-8">
                       <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} className="accent-emerald-600 w-3.5 h-3.5" />
@@ -1129,18 +1192,29 @@ function ChequesPage() {
                       <input type="checkbox" checked={selectedVencidos.has(c.id)} onChange={() => toggleSelectVencido(c.id)} className="accent-amber-600 w-3.5 h-3.5" />
                     </td>
                   )}
-                  <td className={`py-3 px-4 ${ve !== "pendiente" ? "" : ""}`}>{fmtDate(c.fecha_deposito)}</td>
+                  <td className="py-3 px-4">{fmtDate(c.fecha_deposito)}</td>
                   <td className="py-3 px-4 font-medium">{c.cliente}</td>
-                  <td className="py-3 px-4 text-gray-500">{c.empresa}</td>
+                  <td className="py-3 px-4 text-gray-500 hidden lg:table-cell">{c.empresa}</td>
                   <td className="py-3 px-4 text-gray-500">{c.banco}</td>
-                  <td className="py-3 px-4 text-gray-500">{c.numero_cheque}</td>
+                  <td className="py-3 px-4 text-gray-500 hidden lg:table-cell">{c.numero_cheque}</td>
                   <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(c.monto)}</td>
                   <td className="py-3 px-4">
                     <StatusBadge estado={ve} />
                   </td>
                   <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                    {(ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido") && (
+                    {/* Inline WhatsApp button for pending cheques with phone */}
+                    {isPending && c.whatsapp && (
+                      <button
+                        onClick={() => sendWhatsApp(c)}
+                        className="w-8 h-8 min-w-[34px] min-h-[34px] flex items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600 active:scale-[0.95] transition-all"
+                        title="Enviar WhatsApp"
+                      >
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                      </button>
+                    )}
+                    {/* State machine: only show valid primary actions */}
+                    {isPending && (
                       <button onClick={() => setConfirmDepositId(c.id)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Confirmar depósito</button>
                     )}
                     {isRebotado && (
@@ -1152,14 +1226,9 @@ function ChequesPage() {
                       ve={ve}
                       role={role}
                       onRebotado={() => setRebotandoId(c.id)}
-                      onWA={() => {
-                        if (!c.whatsapp) { showToast("Este cliente no tiene WhatsApp registrado"); return; }
-                        let phone = (c.whatsapp || "").replace(/\D/g, "");
-                        if (!phone.startsWith("507") && phone.length <= 8) { phone = "507" + phone; }
-                        const msg = `Hola, le recordamos que tiene un cheque #${c.numero_cheque} por $${fmt(c.monto)} con fecha de depósito ${fmtDate(c.fecha_deposito)}.`;
-                        try { window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
-                      }}
+                      onWA={() => sendWhatsApp(c)}
                       onDelete={() => setConfirmDeleteId(c.id)}
+                      onRedepositar={isRebotado ? () => redepositar(c.id) : undefined}
                     />
                     </div>
                   </td>

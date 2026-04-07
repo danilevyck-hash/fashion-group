@@ -342,15 +342,15 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
   if (fullScreen) {
     return (
       <div className="flex flex-col h-full">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200">
+        <div className="flex items-center gap-3 px-4 sm:px-6 py-3 border-b border-gray-200">
           <svg className="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
           <input ref={inputRef} type="text" value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={onKeyDown}
             placeholder="Busca clientes, reclamos, guías, cheques..."
-            className="flex-1 text-sm outline-none bg-transparent" autoFocus />
-          {query && <button onClick={() => setQuery("")} className="text-gray-400"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg></button>}
-          <button onClick={onClose} className="text-sm text-gray-500 ml-2">Cerrar</button>
+            className="flex-1 text-base py-1 outline-none bg-transparent" autoFocus />
+          {query && <button onClick={() => setQuery("")} className="text-gray-400 w-10 h-10 flex items-center justify-center"><svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12" /></svg></button>}
+          <button onClick={onClose} className="text-sm text-gray-500 ml-1 min-h-[44px] px-2">Cerrar</button>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-2">
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-3">
           {loading && <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin" /></div>}
           {!loading && searched && items.length === 0 && !quickAction && (
             <div className="text-center py-8">

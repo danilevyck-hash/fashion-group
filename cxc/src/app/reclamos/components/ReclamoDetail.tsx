@@ -165,8 +165,15 @@ export default function ReclamoDetail({
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
-      <button onClick={onBack} className="text-sm text-gray-400 hover:text-black transition mb-8 block">← Reclamos</button>
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
+      {/* Breadcrumbs */}
+      <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
+        <button onClick={onBack} className="hover:text-black transition">Reclamos</button>
+        <span className="text-gray-300">/</span>
+        <span className="hover:text-black transition cursor-default">{current.empresa}</span>
+        <span className="text-gray-300">/</span>
+        <span className="text-gray-600 font-medium">{current.nro_reclamo}</span>
+      </nav>
 
       <div className="flex items-start justify-between mb-4">
         <div>
@@ -181,7 +188,7 @@ export default function ReclamoDetail({
       {reclamoSuggestion && <SuggestionCard suggestion={reclamoSuggestion} onDismiss={dismissReclamo} />}
 
       {/* Action bar */}
-      <div className="flex items-center gap-2 mb-6 flex-wrap">
+      <div className="flex items-center gap-2 mb-6 flex-wrap overflow-x-auto pb-1">
         <button onClick={startEdit} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 active:bg-gray-100 transition-all flex items-center gap-1">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
           Editar
@@ -267,7 +274,7 @@ export default function ReclamoDetail({
       </p>
 
       {/* Totals */}
-      <div className="grid grid-cols-4 gap-4 mb-8 mt-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8 mt-6">
         <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Subtotal</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub)}</div></div>
         <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Import. 10%</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * TASA_IMPORTACION)}</div></div>
         <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * TASA_ITBMS)}</div></div>
@@ -313,27 +320,42 @@ export default function ReclamoDetail({
         </div>
       )}
 
-      {/* Fotos */}
+      {/* Evidencia fotográfica */}
       <div className="mb-8">
-        <div className="text-xs uppercase tracking-widest text-gray-400 mb-3">Fotos de Evidencia</div>
-        {fotos.length === 0 ? <p className="text-[12px] text-gray-400 italic">Sin fotos adjuntas</p> : (
-          <div className="flex gap-3 flex-wrap">
+        <div className="text-xs uppercase tracking-widest text-gray-400 mb-1">Evidencia fotográfica</div>
+        <p className="text-xs text-gray-400 mb-3">Adjunta fotos para agilizar la resolución</p>
+
+        {/* Thumbnail row — horizontal scroll on mobile */}
+        {fotos.length > 0 && (
+          <div className="flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 mb-3" style={{ scrollSnapType: "x mandatory" }}>
             {fotos.map((f) => {
               const src = f.url || `${SUPA_URL}/storage/v1/object/public/reclamo-fotos/${f.storage_path}`;
               return (
-                <div key={f.id} className="relative cursor-pointer" onClick={() => setLightboxSrc(src)}>
-                  <img src={src} alt="" className="w-24 h-24 object-cover rounded-lg border border-gray-200" />
-                  <button onClick={(e) => { e.stopPropagation(); setDeleteFotoTarget({ id: f.id, path: f.storage_path }); }} className="absolute -top-1.5 -right-1.5 w-10 h-10 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
+                <div key={f.id} className="relative flex-shrink-0 cursor-pointer" style={{ scrollSnapAlign: "start" }} onClick={() => setLightboxSrc(src)}>
+                  <img src={src} alt="" className="w-24 h-24 sm:w-28 sm:h-28 object-cover rounded-lg border border-gray-200" />
+                  <button onClick={(e) => { e.stopPropagation(); setDeleteFotoTarget({ id: f.id, path: f.storage_path }); }} className="absolute -top-1.5 -right-1.5 w-7 h-7 bg-black text-white rounded-full text-xs flex items-center justify-center">×</button>
                 </div>
               );
             })}
           </div>
         )}
+
+        {/* Upload area */}
         {fotos.length < 5 && (
           <>
-            <input ref={fotoRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadFoto(f); if (fotoRef.current) fotoRef.current.value = ""; }} />
-            <button onClick={() => fotoRef.current?.click()} className="text-sm text-gray-400 hover:text-black transition mt-2">+ Agregar foto</button>
+            <input ref={fotoRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onUploadFoto(f); if (fotoRef.current) fotoRef.current.value = ""; }} />
+            <button
+              onClick={() => fotoRef.current?.click()}
+              className="w-full sm:w-auto border-2 border-dashed border-gray-300 hover:border-gray-400 rounded-lg px-6 py-4 sm:py-3 flex items-center justify-center gap-2 text-gray-400 hover:text-gray-600 transition active:bg-gray-50 min-h-[44px]"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              <span className="text-sm font-medium">Adjuntar fotos</span>
+              <span className="text-xs text-gray-300 hidden sm:inline">({fotos.length}/5)</span>
+            </button>
           </>
+        )}
+        {fotos.length === 0 && (
+          <p className="text-[11px] text-gray-300 mt-2 italic">Sin fotos adjuntas</p>
         )}
       </div>
 
@@ -343,7 +365,7 @@ export default function ReclamoDetail({
       <div className="mb-8">
         <div className="text-xs uppercase tracking-widest text-gray-400 mb-3">Seguimiento</div>
         <div className="flex gap-2 mb-3">
-          <input type="text" value={nota} onChange={(e) => setNota(e.target.value)} onBlur={() => { if (nota.trim()) onAddNota(); }} placeholder="Agregar nota..." className="flex-1 border-b border-gray-200 py-1.5 text-sm outline-none" />
+          <input type="text" value={nota} onChange={(e) => setNota(e.target.value)} onBlur={() => { if (nota.trim()) onAddNota(); }} placeholder="Agregar nota..." className="flex-1 border-b border-gray-200 py-3 sm:py-1.5 text-base sm:text-sm outline-none" />
           <button onClick={onAddNota} disabled={!nota.trim()} className="text-sm bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50">Agregar</button>
         </div>
         {seg.map((s) => (

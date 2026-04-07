@@ -41,6 +41,76 @@ export default function GastoTable({
       <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">
         Gastos
       </div>
+
+      {/* Mobile card layout (iPhone) */}
+      <div className="md:hidden space-y-3">
+        {gastos.length === 0 ? (
+          <EmptyState
+            title="Sin gastos registrados"
+            subtitle="Agrega el primer gasto de este período"
+          />
+        ) : (
+          <>
+            {gastos.map((g) => (
+              <div
+                key={g.id}
+                className={`border border-gray-200 rounded-lg p-4 ${recentlyAddedIds.has(g.id) ? "new-row-highlight" : ""}`}
+              >
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{g.descripcion || g.nombre}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{g.categoria || "Varios"}</p>
+                  </div>
+                  <p className="text-sm font-semibold tabular-nums whitespace-nowrap">${fmt(g.total)}</p>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-gray-400">
+                  <span>{fmtDate(g.fecha)}</span>
+                  {g.responsable && <span>{g.responsable}</span>}
+                  {g.empresa && <span>{g.empresa}</span>}
+                </div>
+                {isOpen && (
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
+                    <button
+                      onClick={() => {
+                        setEditingGastoId(g.id);
+                        setEditGasto({
+                          fecha: g.fecha,
+                          descripcion: g.descripcion || g.nombre,
+                          proveedor: g.proveedor || "",
+                          nro_factura: g.nro_factura || "",
+                          responsable: g.responsable || "",
+                          categoria: g.categoria || "Varios",
+                          empresa: g.empresa || "",
+                          subtotal: g.subtotal,
+                          itbms: g.itbms,
+                        });
+                      }}
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-black transition min-h-[44px] px-3"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => onDeleteGasto(g.id)}
+                      className="flex items-center gap-1 text-xs text-gray-300 hover:text-red-500 transition min-h-[44px] px-3"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      Eliminar
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+            <div className="border-t border-gray-300 pt-3 flex items-center justify-between">
+              <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Total</span>
+              <span className="text-sm font-semibold tabular-nums">${fmt(totalGastado)}</span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Desktop/iPad table layout */}
+      <div className="hidden md:block">
       <ScrollableTable minWidth={700}>
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-white z-10">
@@ -301,6 +371,7 @@ export default function GastoTable({
           Desliza &rarr; para ver mas columnas
         </p>
       )}
+      </div>
     </div>
   );
 }

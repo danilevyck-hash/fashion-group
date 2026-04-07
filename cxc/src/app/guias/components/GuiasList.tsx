@@ -197,7 +197,7 @@ export default function GuiasList({
           />
         ) : (
           <>
-            <div className="mb-4 flex items-center gap-4">
+            <div className="mb-4 flex items-center gap-4 flex-wrap">
               {selectionMode && (
                 <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer shrink-0">
                   <input type="checkbox" checked={(() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return g.transportista.toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).filter(g => !showPending || g.estado === "Pendiente Bodega").map(g => g.id); return ids.length > 0 && ids.every(id => selectedIds.has(id)); })()} onChange={() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return g.transportista.toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).filter(g => !showPending || g.estado === "Pendiente Bodega").map(g => g.id); const allSel = ids.length > 0 && ids.every(id => selectedIds.has(id)); if (allSel) { setSelectedIds(new Set()); } else { setSelectedIds(new Set(ids)); } }} className="accent-black" />
@@ -209,7 +209,7 @@ export default function GuiasList({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por transportista, cliente o factura..."
-                className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:border-black w-full max-w-sm transition"
+                className="border border-gray-200 rounded-lg px-3 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black w-full max-w-sm transition"
               />
               <button onClick={() => setGroupedView(!groupedView)} className={`text-xs transition whitespace-nowrap ${groupedView ? "text-black font-medium" : "text-gray-400 hover:text-black"}`}>
                 {groupedView ? "Lista plana" : "Agrupar por fecha"}
@@ -258,39 +258,86 @@ export default function GuiasList({
                         onAction: () => onToggleExpand(g.id),
                       } : undefined;
 
+                      // Status-based left border color
+                      const statusBorderClass = g.estado === "Completada"
+                        ? "border-l-4 border-l-emerald-400"
+                        : g.estado === "Rechazada"
+                          ? "border-l-4 border-l-red-400"
+                          : (g.estado === "Confirmada" || g.estado === "Despachada")
+                            ? "border-l-4 border-l-blue-400"
+                            : "border-l-4 border-l-amber-400";
+
                       const cardContent = (
-                        <div className={`border rounded-lg transition-all ${isExpanded ? "border-gray-300" : "border-gray-200 hover:border-gray-200"}`}>
-                          {/* Row header */}
+                        <div className={`border rounded-lg transition-all ${statusBorderClass} ${isExpanded ? "border-gray-300" : "border-gray-200 hover:border-gray-200"}`}>
+                          {/* Row header — desktop: inline row, mobile: stacked card */}
                           <button
                             onClick={() => selectionMode ? toggleSelect(g.id) : onToggleExpand(g.id)}
-                            className="w-full flex items-center gap-4 px-4 py-3 text-left text-sm"
+                            className="w-full text-left text-sm min-h-[44px]"
                           >
-                            {selectionMode && (
-                              <span onClick={(e) => { e.stopPropagation(); toggleSelect(g.id); }} className="shrink-0">
-                                <input type="checkbox" checked={selectedIds.has(g.id)} onChange={() => toggleSelect(g.id)} className="accent-black" />
+                            {/* Desktop layout (md+) */}
+                            <div className="hidden md:flex items-center gap-4 px-4 py-3">
+                              {selectionMode && (
+                                <span onClick={(e) => { e.stopPropagation(); toggleSelect(g.id); }} className="shrink-0">
+                                  <input type="checkbox" checked={selectedIds.has(g.id)} onChange={() => toggleSelect(g.id)} className="accent-black" />
+                                </span>
+                              )}
+                              <span className="font-medium w-16 shrink-0 font-mono text-xs">{fmtGuia(g.numero)}</span>
+                              <span className="text-gray-500 w-36 shrink-0 text-xs">{fmtDate(g.fecha)}</span>
+                              <span className="flex-1 truncate">{g.transportista}</span>
+                              <span className="text-gray-400 text-xs w-40 truncate">
+                                {clientesSummary(g.guia_items || [])}
                               </span>
-                            )}
-                            <span className="font-medium w-16 shrink-0 font-mono text-xs">{fmtGuia(g.numero)}</span>
-                            <span className="text-gray-500 w-36 shrink-0 text-xs">{fmtDate(g.fecha)}</span>
-                            <span className="flex-1 truncate">{g.transportista}</span>
-                            <span className="text-gray-400 text-xs hidden sm:block w-40 truncate">
-                              {clientesSummary(g.guia_items || [])}
-                            </span>
-                            <span className="tabular-nums w-14 text-right shrink-0">{g.total_bultos}</span>
-                            {!isDispatched && g.estado === "Pendiente Bodega" && (
-                              <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap">
-                                ⚠ Pendiente despacho
+                              <span className="tabular-nums w-14 text-right shrink-0">{g.total_bultos}</span>
+                              {!isDispatched && g.estado === "Pendiente Bodega" && (
+                                <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap">
+                                  Pendiente despacho
+                                </span>
+                              )}
+                              <span className="w-24 shrink-0">
+                                <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : isDispatched ? "despachada" : "pendiente"} />
                               </span>
-                            )}
-                            <span className="w-24 shrink-0">
-                              <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : isDispatched ? "despachada" : "pendiente"} />
-                            </span>
-                            <svg
-                              className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`}
-                              fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
+                              <svg
+                                className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`}
+                                fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
+
+                            {/* Mobile layout (< md): stacked card with key info visible */}
+                            <div className="md:hidden px-4 py-3">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  {selectionMode && (
+                                    <span onClick={(e) => { e.stopPropagation(); toggleSelect(g.id); }} className="shrink-0">
+                                      <input type="checkbox" checked={selectedIds.has(g.id)} onChange={() => toggleSelect(g.id)} className="accent-black" />
+                                    </span>
+                                  )}
+                                  <span className="font-medium font-mono text-xs shrink-0">{fmtGuia(g.numero)}</span>
+                                  <span className="font-medium truncate">{g.transportista}</span>
+                                </div>
+                                <svg
+                                  className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`}
+                                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </div>
+                              <div className="flex items-center gap-3 mt-1.5">
+                                <span className="text-gray-500 text-xs">{fmtDate(g.fecha)}</span>
+                                <span className="tabular-nums text-xs text-gray-500">{g.total_bultos} bultos</span>
+                                <span className="ml-auto">
+                                  <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : isDispatched ? "despachada" : "pendiente"} />
+                                </span>
+                              </div>
+                              {!isDispatched && g.estado === "Pendiente Bodega" && (
+                                <div className="mt-1.5">
+                                  <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 whitespace-nowrap">
+                                    Pendiente despacho
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </button>
 
                           {/* Expanded content */}

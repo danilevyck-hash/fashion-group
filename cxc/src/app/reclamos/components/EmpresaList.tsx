@@ -134,10 +134,16 @@ export default function EmpresaList({
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
-      <div className="flex items-end justify-between mb-8 flex-wrap gap-4">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
+      {/* Breadcrumbs */}
+      <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
+        <button onClick={onBack} className="hover:text-black transition">Reclamos</button>
+        <span className="text-gray-300">/</span>
+        <span className="text-gray-600 font-medium">{activeEmpresa}</span>
+      </nav>
+
+      <div className="flex items-end justify-between mb-6 sm:mb-8 flex-wrap gap-4">
         <div>
-          <button onClick={onBack} className="text-sm text-gray-400 hover:text-black transition mb-2 block">← Empresas</button>
           <h1 className="text-xl font-light tracking-tight">{activeEmpresa}</h1>
           {c && <p className="text-xs text-gray-400 mt-1">Contacto: {(c.nombre_contacto || c.nombre || "equipo")} | {c.correo}</p>}
         </div>
@@ -180,8 +186,46 @@ export default function EmpresaList({
       </div>
 
       <div className="mb-6">
-        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="border-b border-gray-200 py-2 text-sm outline-none w-full max-w-xs" />
+        <input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar..." className="border-b border-gray-200 py-3 sm:py-2 text-base sm:text-sm outline-none w-full max-w-xs" />
       </div>
+
+      {/* Mobile card list — visible on small screens only */}
+      {sortedRecs.length > 0 && (
+        <div className="sm:hidden space-y-2 mb-4">
+          {sortedRecs.map((r) => {
+            const days = daysSince(r.fecha_reclamo);
+            const total = calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL;
+            const isOpen = r.estado !== "Resuelto con NC" && r.estado !== "Rechazado";
+            return (
+              <div
+                key={r.id}
+                onClick={() => selectionMode ? (isOpen && toggleSelect(r.id)) : onLoadDetail(r.id)}
+                className="border border-gray-200 rounded-lg p-4 active:bg-gray-50 transition cursor-pointer"
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    {selectionMode && (
+                      <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!isOpen} className="accent-black disabled:opacity-50" />
+                    )}
+                    <div>
+                      <p className="text-sm font-medium">{r.nro_reclamo}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{r.nro_factura}</p>
+                    </div>
+                  </div>
+                  <StatusBadge estado={r.estado} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3 text-xs text-gray-400">
+                    <span>{fmtDate(r.fecha_reclamo)}</span>
+                    <span className={`tabular-nums ${days > 60 && isOpen ? "text-red-600 font-medium" : days > 30 && isOpen ? "text-amber-600" : ""}`}>{days}d</span>
+                  </div>
+                  <span className="text-sm font-semibold tabular-nums">${fmt(total)}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {sortedRecs.length === 0 ? (() => {
         const openCount = allEmpresaRecs.filter(r => r.estado !== "Resuelto con NC" && r.estado !== "Rechazado").length;
@@ -210,7 +254,7 @@ export default function EmpresaList({
         }
         return <EmptyState title="Sin reclamos" subtitle="No hay reclamos registrados para esta empresa" />;
       })() : (
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="overflow-x-auto -mx-4 sm:mx-0 hidden sm:block">
           <div className="min-w-[600px] px-4 sm:px-0">
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-white z-10">

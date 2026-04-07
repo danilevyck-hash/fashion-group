@@ -159,6 +159,7 @@ function CajaPage() {
           saldo={saldo}
           pctUsed={pctUsed}
           onBack={() => { setView("list", undefined); setCurrent(null); }}
+          onClosePeriodo={isOpen ? () => requestClosePeriodo(current.id) : undefined}
         />
 
         {cajaSuggestion && <SuggestionCard suggestion={cajaSuggestion} onDismiss={dismissCaja} />}
@@ -189,6 +190,8 @@ function CajaPage() {
             setNewResponsable={setNewResponsable}
             setResponsables={setResponsables}
             onAddGasto={addGasto}
+            fondoInicial={current.fondo_inicial}
+            totalGastado={totalGastado}
           />
         )}
 

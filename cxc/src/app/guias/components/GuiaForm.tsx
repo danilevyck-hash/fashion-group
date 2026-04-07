@@ -153,7 +153,10 @@ export default function GuiaForm({
   function inputClass(key: string, base: string, touchedKey?: string, touchedValue?: string) {
     const hasSubmitError = validationErrors.has(key) || validationErrors.has(key + "-format") || validationErrors.has(key + "-separator");
     const hasTouchedError = touchedKey !== undefined && touchedValue !== undefined && touched[touchedKey] && !touchedValue.trim();
-    return `${base} ${hasSubmitError || hasTouchedError ? "border-red-400" : ""}`;
+    // text-base on mobile prevents iOS zoom, md:text-sm for desktop density
+    const mobileSize = base.includes("text-sm") ? base.replace("text-sm", "text-base md:text-sm") : base;
+    const mobilePadding = mobileSize.includes("py-2") ? mobileSize.replace("py-2", "py-3 md:py-2") : mobileSize.includes("py-1") ? mobileSize.replace("py-1", "py-2 md:py-1") : mobileSize;
+    return `${mobilePadding} ${hasSubmitError || hasTouchedError ? "border-red-400" : ""}`;
   }
 
   // Save status indicator
@@ -347,7 +350,7 @@ export default function GuiaForm({
 
       {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
       <div className="flex flex-wrap items-center gap-6">
-        <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+        <button onClick={onCancel} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] px-2">Cancelar</button>
         <StatusBadge />
       </div>
 
