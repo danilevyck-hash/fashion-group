@@ -71,7 +71,6 @@ export default function PlantillasPage() {
   const isOnline = useOnline();
   const [statsCached, setStatsCached] = useState(false);
   const [showFinancials, setShowFinancials] = useState(false);
-  const [showPendingSection, setShowPendingSection] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -132,16 +131,6 @@ export default function PlantillasPage() {
   const [stats, setStats] = useState<HomeStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
 
-  // Pending actions feed
-  interface PendingAction {
-    id: string; module: string; icon: string; description: string;
-    timeContext: string; href: string; urgency: number;
-  }
-  const [pendingActions, setPendingActions] = useState<PendingAction[]>([]);
-  const [pendingTotal, setPendingTotal] = useState(0);
-  const [pendingLoading, setPendingLoading] = useState(true);
-  const [showAllActions, setShowAllActions] = useState(true);
-
   const loadStats = useCallback(async () => {
     try {
       const res = await fetch("/api/home-stats");
@@ -152,7 +141,6 @@ export default function PlantillasPage() {
         cacheSet(CACHE_KEYS.HOME_STATS, data);
       }
     } catch {
-      // Offline or network error — try cache
       const cached = cacheGet<HomeStats>(CACHE_KEYS.HOME_STATS);
       if (cached) {
         setStats(cached);
@@ -162,37 +150,7 @@ export default function PlantillasPage() {
     setStatsLoading(false);
   }, []);
 
-  const loadPendingActions = useCallback(async () => {
-    try {
-      const res = await fetch("/api/pending-actions");
-      if (res.ok) {
-        const data = await res.json();
-        setPendingActions(data.actions || []);
-        setPendingTotal(data.totalCount || 0);
-      }
-    } catch { console.error('Failed to load pending actions'); }
-    setPendingLoading(false);
-  }, []);
-
-  useEffect(() => { if (authChecked) { loadOrder(); loadStats(); loadPendingActions(); } }, [authChecked, loadOrder, loadStats, loadPendingActions]);
-
-  if (!authChecked) return null;
-
-  // Build alerts — only show alerts relevant to the user's role
-  const alertRoles = ['admin', 'secretaria', 'director', 'contabilidad'];
-  const showAlerts = alertRoles.includes(role);
-  const alerts: { label: string; count: number; href: string; color: "red" | "yellow" | "blue" }[] = [];
-  if (stats && showAlerts) {
-    if (stats.vencenHoy > 0) alerts.push({ label: "Cheques vencen hoy", count: stats.vencenHoy, href: "/cheques?filtro=vencen_hoy", color: "red" });
-    if (stats.vencenEstaSemana > 0) alerts.push({ label: "Cheques vencen esta semana", count: stats.vencenEstaSemana, href: "/cheques?filtro=vencen_semana", color: "yellow" });
-    if (stats.prestamosPendientes > 0) alerts.push({ label: "Aprobaciones pendientes", count: stats.prestamosPendientes, href: "/prestamos?pendientes=1", color: "blue" });
-    if (stats.reclamosViejos > 0 && (role === 'admin' || role === 'secretaria')) alerts.push({ label: "Reclamos +45 días sin resolver", count: stats.reclamosViejos, href: "/reclamos?viejos=1", color: "red" });
-    if (stats.cxcStale) alerts.push({ label: "Datos de cartera desactualizados", count: 0, href: "/upload", color: "yellow" });
-  }
-
-  // Pending actions: show to admin, secretaria, director, contabilidad
-  const showPendingActions = alertRoles.includes(role);
-  const visibleActions = showAllActions ? pendingActions : pendingActions.slice(0, 5);
+  useEffect(() => { if (authChecked) { loadOrder(); loadStats(); } }, [authChecked, loadOrder, loadStats]);
 
   // Determine visible modules
   const isAdmin = role === "admin";
@@ -347,69 +305,7 @@ export default function PlantillasPage() {
         </div>
       )}
 
-      {/* Alerts */}
-      {showAlerts && (statsLoading ? (
-        <div className="mb-4 h-10 bg-gray-50 rounded-lg animate-pulse" />
-      ) : alerts.length > 0 ? (
-        <div className="mb-4 flex flex-wrap gap-2">
-          {alerts.map((a, i) => (
-            <button key={i} onClick={() => router.push(a.href)}
-              className={`flex items-center gap-2 px-3 py-1 rounded-lg border text-xs font-medium transition ${
-                a.color === "red" ? "border-red-200 bg-red-50 text-red-700 hover:border-red-300" :
-                a.color === "yellow" ? "border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300" :
-                "border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300"
-              }`}>
-              {a.count > 0 && <span className="font-bold tabular-nums">{a.count}</span>}
-              <span>{a.label}</span>
-            </button>
-          ))}
-        </div>
-      ) : stats ? (
-        <p className="mb-4 text-sm text-gray-500">
-          <span className="text-green-600">✓</span> Todo en orden — no hay alertas pendientes
-        </p>
-      ) : null)}
-
-      {/* Pending Actions Feed — collapsible, collapsed by default */}
-      {showPendingActions && !pendingLoading && pendingActions.length > 0 && (
-        <div className="mb-4">
-          <button
-            onClick={() => setShowPendingSection(!showPendingSection)}
-            className={`flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-md border transition ${
-              darkMode ? "border-gray-700 text-gray-400 hover:text-gray-200" : "border-gray-200 text-gray-500 hover:text-gray-800"
-            }`}
-          >
-            <svg className={`w-3 h-3 transition-transform ${showPendingSection ? "rotate-90" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-            </svg>
-            Acciones pendientes ({pendingTotal})
-          </button>
-          {showPendingSection && (
-            <div className={`mt-2 rounded-lg border overflow-hidden ${darkMode ? "border-gray-800" : "border-gray-200"}`}>
-              {visibleActions.map((action, i) => (
-                <button
-                  key={action.id}
-                  onClick={() => router.push(action.href)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 text-left transition ${
-                    i > 0 ? (darkMode ? "border-t border-gray-800" : "border-t border-gray-100") : ""
-                  } ${darkMode ? "hover:bg-gray-800/50" : "hover:bg-gray-50"}`}
-                >
-                  <span className="text-base shrink-0 w-6 text-center">{action.icon}</span>
-                  <span className={`flex-1 text-[13px] leading-snug truncate ${darkMode ? "text-gray-200" : "text-gray-800"}`}>
-                    {action.description}
-                  </span>
-                  <span className={`text-[11px] shrink-0 tabular-nums ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
-                    {action.timeContext}
-                  </span>
-                  <svg className={`w-3.5 h-3.5 shrink-0 ${darkMode ? "text-gray-600" : "text-gray-300"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Alerts and Pending Actions removed — info shown as module badges instead */}
 
       {/* Edit toggle */}
       <div className="flex justify-end mb-2">
@@ -440,23 +336,23 @@ export default function PlantillasPage() {
                       {editMode && (
                         <span className="absolute top-2 right-2 text-gray-300 text-xs">⠿</span>
                       )}
-                      {/* Badge — absolute top-right of card */}
+                      {/* Badge — only CSV stale + reclamos pending */}
                       {(() => {
-                        const badgeMap: Record<string, number> = {
-                          cheques: badges.cheques,
-                          reclamos: badges.reclamos,
-                          prestamos: badges.prestamos,
-                          guias: badges.guias,
-                          cxc: badges.cxc,
-                          upload: badges.cxc,
-                        };
-                        const count = badgeMap[mod.key] || 0;
-                        if (count === 0) return null;
-                        return (
-                          <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center leading-none">
-                            {count > 99 ? "99+" : count}
-                          </span>
-                        );
+                        if (mod.key === "upload" && stats?.cxcStale) {
+                          return (
+                            <span className="absolute top-2 right-2 bg-amber-500 text-white text-[8px] font-bold px-1.5 h-[18px] rounded-full flex items-center justify-center leading-none">
+                              CSV
+                            </span>
+                          );
+                        }
+                        if (mod.key === "reclamos" && stats && stats.reclamosPendientes > 0) {
+                          return (
+                            <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center leading-none">
+                              {stats.reclamosPendientes}
+                            </span>
+                          );
+                        }
+                        return null;
                       })()}
                       <div className="flex items-center justify-center w-10 h-10 mx-auto text-gray-700 dark:text-gray-300">
                         {MODULE_ICONS[mod.key] || <span className="w-5 h-5 block" />}
