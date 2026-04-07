@@ -101,8 +101,7 @@ export default function ProductCard({ product, stock = 0, qty, onQtyChange, disa
         <div className="p-3">
           <h3 className="text-sm font-medium text-gray-900 line-clamp-2 leading-tight">{product.name}</h3>
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-            {product.sku && <span className="text-[10px] text-gray-400 font-mono">{product.sku}</span>}
-            {product.sku && product.sub_category && <span className="text-[10px] text-gray-300">·</span>}
+            {false && product.sku && <span className="text-[10px] text-gray-400 font-mono">{product.sku}</span>}
             {product.sub_category && <span className="text-[10px] text-gray-500 capitalize">{product.sub_category}</span>}
             {product.color && <><span className="text-[10px] text-gray-300">·</span><span className="text-[10px] text-gray-400">{product.color}</span></>}
           </div>

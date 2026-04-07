@@ -84,7 +84,7 @@ export default function ReebokAdmin() {
 
       {/* ── SECTION 1: Products ── */}
       <SectionDivider title="Productos" />
-      <ProductsListSection
+      <ProductsSectionWrapper
         products={products}
         inventory={inventory}
         loading={loading}
@@ -98,11 +98,11 @@ export default function ReebokAdmin() {
 
       {/* ── SECTION 2: Inventory Update ── */}
       <SectionDivider title="Actualizar Inventario" />
-      <InventoryUpdateSection />
+      <InventoryUpdateSection products={products} />
 
       {/* ── SECTION 3: Import & Export ── */}
       <SectionDivider title="Importar y Exportar" />
-      <ImportExportSection products={products} inventory={inventory} onDataChange={loadData} />
+      <ImportExportSection onDataChange={loadData} />
     </div>
   )
 }
@@ -110,6 +110,36 @@ export default function ReebokAdmin() {
 // ══════════════════════════════════════════════════════════════════════════════
 //  SECTION 1 — PRODUCTS LIST WITH ACCORDION
 // ══════════════════════════════════════════════════════════════════════════════
+
+function ProductsSectionWrapper(props: {
+  products: Product[]
+  inventory: InventoryItem[]
+  loading: boolean
+  setProducts: React.Dispatch<React.SetStateAction<Product[]>>
+  setInventory: React.Dispatch<React.SetStateAction<InventoryItem[]>>
+  reloadInventory: () => Promise<void>
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div>
+      <button onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between py-3 px-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+        <span className="text-sm font-medium text-gray-700">Gestión de productos</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400">{props.products.length} productos</span>
+          <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </div>
+      </button>
+      {open && (
+        <div className="mt-3">
+          <ProductsListSection {...props} />
+        </div>
+      )}
+    </div>
+  )
+}
 
 function ProductsListSection({
   products, inventory, loading, setProducts, setInventory, reloadInventory,
@@ -319,7 +349,7 @@ function AddSizeForm({ onAdd }: { onAdd: (size: string, qty: number) => void }) 
 //  SECTION 2 — INVENTORY UPDATE (Active Shoes / Active Wear)
 // ══════════════════════════════════════════════════════════════════════════════
 
-function InventoryUpdateSection() {
+function InventoryUpdateSection({ products }: { products: Product[] }) {
   const { toast } = useToast()
   const [shoesResult, setShoesResult] = useState<InventoryResult | null>(null)
   const [wearResult, setWearResult] = useState<InventoryResult | null>(null)
@@ -331,16 +361,16 @@ function InventoryUpdateSection() {
         Switch Soft &rarr; Stock Articulos &rarr; Listado de Articulos &rarr; Descargar (primera opcion). Sube cada empresa por separado.
       </p>
       <div className="space-y-5">
-        <InventoryZone label="Active Shoes" empresa="shoes" notInCSVLabel="en footwear del website pero no en este CSV" result={shoesResult} onResult={setShoesResult} onError={onError} />
-        <InventoryZone label="Active Wear" empresa="wear" notInCSVLabel="en apparel/accesorios del website pero no en este CSV" result={wearResult} onResult={setWearResult} onError={onError} />
+        <InventoryZone label="Active Shoes" empresa="shoes" notInCSVLabel="en footwear del website pero no en este CSV" result={shoesResult} onResult={setShoesResult} onError={onError} products={products} />
+        <InventoryZone label="Active Wear" empresa="wear" notInCSVLabel="en apparel/accesorios del website pero no en este CSV" result={wearResult} onResult={setWearResult} onError={onError} products={products} />
       </div>
     </div>
   )
 }
 
-function InventoryZone({ label, empresa, notInCSVLabel, result, onResult, onError }: {
+function InventoryZone({ label, empresa, notInCSVLabel, result, onResult, onError, products }: {
   label: string; empresa: 'shoes' | 'wear'; notInCSVLabel: string
-  result: InventoryResult | null; onResult: (r: InventoryResult | null) => void; onError: (msg: string) => void
+  result: InventoryResult | null; onResult: (r: InventoryResult | null) => void; onError: (msg: string) => void; products: Product[]
 }) {
   const [processing, setProcessing] = useState(false)
   const [dragging, setDragging] = useState(false)
@@ -395,7 +425,7 @@ function InventoryZone({ label, empresa, notInCSVLabel, result, onResult, onErro
       )}
       {result && (
         <>
-          <InventoryResultBlock result={result} notInCSVLabel={notInCSVLabel} />
+          <InventoryResultBlock result={result} notInCSVLabel={notInCSVLabel} products={products} />
           <button onClick={() => onResult(null)} className="text-xs text-gray-400 hover:text-gray-600 underline mt-2">Limpiar</button>
         </>
       )}
@@ -403,8 +433,33 @@ function InventoryZone({ label, empresa, notInCSVLabel, result, onResult, onErro
   )
 }
 
-function InventoryResultBlock({ result, notInCSVLabel }: { result: InventoryResult; notInCSVLabel: string }) {
+function InventoryResultBlock({ result, notInCSVLabel, products }: { result: InventoryResult; notInCSVLabel: string; products: Product[] }) {
   const [showUpdated, setShowUpdated] = useState(false)
+  const [showMissingPhotos, setShowMissingPhotos] = useState(false)
+
+  // Products updated with stock > 0 that have no photo
+  const missingPhotos = result.updated
+    .filter(u => u.nueva > 0)
+    .map(u => {
+      const prod = products.find(p => p.sku === u.sku)
+      if (prod && !prod.image_url) return { sku: u.sku, name: u.name, stock: u.nueva }
+      return null
+    })
+    .filter((x): x is { sku: string; name: string; stock: number } => x !== null)
+
+  const downloadMissingPhotosExcel = async () => {
+    const XLSX = (await import('xlsx-js-style')).default
+    const hs = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: 'D97706' }, patternType: 'solid' as const } }
+    const cols = ['SKU', 'Nombre', 'Stock']
+    const hr = cols.map(h => ({ v: h, s: hs }))
+    const rows = missingPhotos.map(p => [p.sku, p.name, p.stock])
+    const ws = XLSX.utils.aoa_to_sheet([hr, ...rows])
+    ws['!cols'] = [{ wch: 15 }, { wch: 40 }, { wch: 10 }]
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sin foto')
+    const blob = new Blob([XLSX.write(wb, { type: 'array', bookType: 'xlsx' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `sin-foto-${new Date().toISOString().slice(0, 10)}.xlsx`; a.click()
+  }
+
   return (
     <div className="mt-3 space-y-2">
       {result.updated.length > 0 && (
@@ -420,6 +475,28 @@ function InventoryResultBlock({ result, notInCSVLabel }: { result: InventoryResu
                   <tr key={i} className="border-t border-green-100"><td className="py-1 pr-2 font-mono">{item.sku}</td><td className="py-1 pr-2 truncate max-w-[180px]">{item.name}</td><td className="py-1 text-right text-gray-500">{item.anterior}</td><td className="py-1 text-right pl-2 font-medium">{item.nueva}</td></tr>
                 ))}</tbody>
               </table>
+            </div>
+          )}
+        </div>
+      )}
+      {missingPhotos.length > 0 && (
+        <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+          <button onClick={() => setShowMissingPhotos(v => !v)} className="w-full flex items-center justify-between text-left">
+            <span className="text-sm font-medium text-orange-800">{missingPhotos.length} productos sin foto</span>
+            <svg className={`w-4 h-4 text-orange-600 transition-transform ${showMissingPhotos ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </button>
+          {showMissingPhotos && (
+            <div className="mt-2">
+              <div className="max-h-48 overflow-y-auto">
+                <table className="w-full text-xs"><thead className="sticky top-0 bg-orange-50"><tr className="text-left text-orange-700"><th className="py-1 pr-2">SKU</th><th className="py-1 pr-2">Nombre</th><th className="py-1 text-right">Stock</th></tr></thead>
+                  <tbody>{missingPhotos.map((item, i) => (
+                    <tr key={i} className="border-t border-orange-100"><td className="py-1 pr-2 font-mono">{item.sku}</td><td className="py-1 pr-2 truncate max-w-[200px]">{item.name}</td><td className="py-1 text-right font-medium">{item.stock}</td></tr>
+                  ))}</tbody>
+                </table>
+              </div>
+              <button onClick={downloadMissingPhotosExcel} className="mt-2 text-xs bg-orange-600 text-white px-3 py-1.5 rounded hover:bg-orange-700 transition-colors">
+                Descargar Excel
+              </button>
             </div>
           )}
         </div>
@@ -454,15 +531,15 @@ function InventoryResultBlock({ result, notInCSVLabel }: { result: InventoryResu
 //  SECTION 3 — IMPORT, PHOTOS, EXPORT
 // ══════════════════════════════════════════════════════════════════════════════
 
-function ImportExportSection({ products, inventory, onDataChange }: {
-  products: Product[]; inventory: InventoryItem[]; onDataChange: () => void
+function ImportExportSection({ onDataChange }: {
+  onDataChange: () => void
 }) {
-  const [active, setActive] = useState<'import' | 'photos' | 'export' | null>(null)
+  const [active, setActive] = useState<'import' | 'photos' | null>(null)
   return (
     <div>
-      <div className="grid grid-cols-3 gap-2 mb-4">
-        {(['import', 'photos', 'export'] as const).map(key => {
-          const labels = { import: 'Agregar productos', photos: 'Subir fotos', export: 'Exportar catálogo' }
+      <div className="grid grid-cols-2 gap-2 mb-4">
+        {(['import', 'photos'] as const).map(key => {
+          const labels = { import: 'Agregar productos', photos: 'Subir fotos' }
           return (
             <button key={key} onClick={() => setActive(active === key ? null : key)}
               className={`py-3 rounded-lg text-sm font-medium transition-colors ${active === key ? 'bg-black text-white' : 'border border-gray-200 text-gray-700 hover:border-gray-400'}`}>
@@ -473,7 +550,6 @@ function ImportExportSection({ products, inventory, onDataChange }: {
       </div>
       {active === 'import' && <ImportPanel onDone={onDataChange} />}
       {active === 'photos' && <PhotosPanel />}
-      {active === 'export' && <ExportPanel products={products} inventory={inventory} />}
     </div>
   )
 }
@@ -653,57 +729,3 @@ function PhotosPanel() {
   )
 }
 
-// ── Export Panel ──
-
-function ExportPanel({ products, inventory }: { products: Product[]; inventory: InventoryItem[] }) {
-  const { toast } = useToast()
-  const [exporting, setExporting] = useState('')
-  const getSizes = (pid: string) => inventory.filter(i => i.product_id === pid && i.quantity > 0).map(i => i.size).join(', ')
-
-  const exportExcel = async () => {
-    setExporting('excel')
-    try {
-      const XLSX = (await import('xlsx-js-style')).default
-      const hs = { font: { bold: true, color: { rgb: 'FFFFFF' } }, fill: { fgColor: { rgb: 'CC0000' }, patternType: 'solid' as const } }
-      const cols = ['SKU', 'Nombre', 'Color', 'Precio', 'Categoría', 'Género', 'Tallas']
-      const hr = cols.map(h => ({ v: h, s: hs }))
-      const rows = products.filter(p => p.active).map(p => [p.sku || '-', p.name, p.color || '-', p.price ? `$${p.price}` : '-', p.category, p.gender || '-', getSizes(p.id) || '-'])
-      const ws = XLSX.utils.aoa_to_sheet([hr, ...rows])
-      ws['!cols'] = [{ wch: 15 }, { wch: 30 }, { wch: 20 }, { wch: 12 }, { wch: 15 }, { wch: 12 }, { wch: 30 }]
-      const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Catalogo')
-      const blob = new Blob([XLSX.write(wb, { type: 'array', bookType: 'xlsx' })], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'catalogo-reebok.xlsx'; a.click()
-    } catch { toast('Error al exportar', 'error') }
-    setExporting('')
-  }
-
-  const exportPDF = async () => {
-    setExporting('pdf')
-    try {
-      const { jsPDF } = await import('jspdf')
-      const { default: autoTable } = await import('jspdf-autotable')
-      const doc = new jsPDF('landscape')
-      doc.setFontSize(18); doc.text('Catálogo Reebok Panamá', 14, 20)
-      doc.setFontSize(10); doc.text(`Generado: ${new Date().toLocaleDateString('es-PA', { year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 28)
-      const active = products.filter(p => p.active)
-      const rows = active.slice(0, 100).map(p => [p.sku || '-', p.name, p.color || '-', p.price ? `$${p.price}` : '-', p.category, getSizes(p.id) || '-'])
-      autoTable(doc, { startY: 35, head: [['SKU', 'Nombre', 'Color', 'Precio', 'Categoría', 'Tallas']], body: rows, styles: { cellPadding: 3, fontSize: 8 } })
-      doc.save('catalogo-reebok.pdf')
-    } catch { toast('Error al exportar', 'error') }
-    setExporting('')
-  }
-
-  return (
-    <div className="border border-gray-200 rounded-lg p-4">
-      <div className="grid grid-cols-2 gap-3">
-        <button onClick={exportExcel} disabled={!!exporting} className="bg-green-600 text-white py-3 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50">
-          {exporting === 'excel' ? 'Generando...' : 'Exportar Excel'}
-        </button>
-        <button onClick={exportPDF} disabled={!!exporting} className="bg-black text-white py-3 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors disabled:opacity-50">
-          {exporting === 'pdf' ? 'Generando...' : 'Exportar PDF'}
-        </button>
-      </div>
-      <p className="text-xs text-gray-400 mt-2">{products.filter(p => p.active).length} productos activos</p>
-    </div>
-  )
-}

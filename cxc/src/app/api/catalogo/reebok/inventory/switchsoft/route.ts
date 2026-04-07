@@ -95,17 +95,29 @@ export async function POST(req: NextRequest) {
     }
 
     // Find active products in DB that were NOT in this CSV, filtered by empresa
-    const notInCSV: { sku: string; name: string }[] = []
+    const notInCSV: { sku: string; name: string; id: string }[] = []
     for (const p of products || []) {
       if (!p.sku || !p.active || csvSkus.has(p.sku)) continue
 
       if (empresa === 'shoes' && p.category !== 'footwear') continue
       if (empresa === 'wear' && p.category !== 'apparel' && p.category !== 'accessories') continue
 
-      notInCSV.push({ sku: p.sku, name: p.name })
+      notInCSV.push({ sku: p.sku, name: p.name, id: p.id })
     }
 
-    return NextResponse.json({ updated, wentToZero, notFound, notInCSV })
+    // Zero out inventory for products NOT in the CSV (same category)
+    let zeroedNotInCSV = 0
+    for (const p of notInCSV) {
+      const { error } = await reebokServer
+        .from('inventory')
+        .upsert(
+          { product_id: p.id, size: 'UNICA', quantity: 0 },
+          { onConflict: 'product_id,size' }
+        )
+      if (!error) zeroedNotInCSV++
+    }
+
+    return NextResponse.json({ updated, wentToZero, notFound, notInCSV, zeroedNotInCSV })
   } catch {
     return NextResponse.json({ error: 'Error processing Switch Soft CSV' }, { status: 500 })
   }

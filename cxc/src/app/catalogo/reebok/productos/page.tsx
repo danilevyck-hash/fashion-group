@@ -225,7 +225,7 @@ function Productos() {
             sizesMap[i.product_id].add(i.size);
           }
         });
-        setProducts(prods.map(p => ({ ...p, _stock: stockMap[p.id] || 0, _sizes: [...(sizesMap[p.id] || [])] })));
+        setProducts(prods.map(p => ({ ...p, _stock: stockMap[p.id] || 0, _sizes: [...(sizesMap[p.id] || [])] })).filter(p => p._stock > 0));
       } catch { setProducts([]); }
       setLoading(false);
     }
