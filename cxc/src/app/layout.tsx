@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import ChatPanel from "@/components/ChatPanel";
-import MobileBottomBar from "@/components/MobileBottomBar";
 import { ContextMenuProviderWrapper } from "@/components/ContextMenuWrapper";
 import { OnlineProvider } from "@/lib/OnlineContext";
 import OfflineBanner from "@/components/OfflineBanner";
@@ -48,7 +47,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ContextMenuProviderWrapper>
             {children}
           </ContextMenuProviderWrapper>
-          <MobileBottomBar />
         <ChatPanel />
         </OnlineProvider>
         <script
