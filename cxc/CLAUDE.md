@@ -17,7 +17,7 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 |-----|----------|--------|
 | Admin | `admin` | Todo |
 | Secretaria | `secretaria` | upload, guias, caja, reclamos, cheques, directorio, KPIs dashboard |
-| Bodega | `bodega` | guias (despacho), directorio, búsqueda global (guías+directorio) |
+| Bodega | `bodega` | guias (despacho), directorio, búsqueda global (guías+directorio). Auto-redirect a Guías desde home (único módulo) |
 | Director | `director` | Todo (lectura), ventas, CXC |
 | Contabilidad | `contabilidad` | prestamos, ventas, búsqueda global (ventas+prestamos) |
 | Vendedor | `vendedor` | reebok, CXC, directorio, búsqueda global (CXC+directorio) |
@@ -30,6 +30,8 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 - Session health check: `/api/auth/check` — pinged cada 2 min, warning banner antes de expirar
 - API auth: `src/lib/requireRole.ts` — admin siempre pasa, verifica rol contra array
 - Rate limiting: 5 intentos/min/IP en login (in-memory)
+- Login case-insensitive: contraseñas no distinguen mayúsculas/minúsculas (autocapitalizar iPhone)
+- Input login: autoCapitalize=none, autoCorrect=off
 - User indicator: nombre + rol visible en header desktop y drawer mobile
 - Forgot password: link en login → "Contacta al administrador"
 
@@ -62,6 +64,14 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 | /api/cron/weekly-report | 14:00 UTC lunes | Resumen semanal a daniel@ |
 | /api/cron/monthly-report | 14:00 UTC día 1 | Resumen mensual a daniel@ |
 | /api/cron/backup | 06:00 UTC diario | Backup |
+
+## PWA (iOS)
+- `viewport-fit: cover` + `env(safe-area-inset-top/bottom)` para notch/Dynamic Island
+- `apple-mobile-web-app-status-bar-style: black`
+- Standalone mode, start_url: `/home`
+- Sin service worker (desregistrado en layout)
+- Roles con 1 solo módulo auto-redirigen desde home (ej: Bodega → Guías)
+- Sin bottom tab bar — navegación por módulos del home + drawer del header
 
 ## Design System
 - **Direction:** Precision & Density + Apple-grade fluidity
@@ -122,7 +132,7 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 ## Shared Components (src/components/)
 - **AppHeader** — sticky header con module color accent, user info, search, notifications, shortcuts
 - **SearchBar** — ⌘K + mobile full-screen + recientes + spotlight NLP
-- **MobileBottomBar** — tabs adaptables por rol
+- **MobileBottomBar** — ELIMINADO (abril 2026). Navegación es solo por módulos del home + drawer del header
 - **NotificationCenter** — 🔔 bell con historial de toasts
 - **SessionWarning** — banner/modal antes de expirar sesión
 - **OfflineBanner** — amber offline, green reconexión
