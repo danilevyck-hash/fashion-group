@@ -22,7 +22,7 @@ export default function GuiasPage() {
   useEffect(() => {
     if (authChecked) {
       s.loadGuias();
-      if (role === "bodega") s.setShowPending(true);
+      if (role === "bodega") s.setShowPending(false);
       // Support ?pendientes=1 from search quick actions
       const pendientesParam = new URLSearchParams(window.location.search).get("pendientes");
       if (pendientesParam === "1") s.setShowPending(true);
