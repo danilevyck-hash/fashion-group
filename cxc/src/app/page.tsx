@@ -91,7 +91,9 @@ function LoginForm() {
       const data = await verifyRes.json();
       storeSession(data);
       router.push(data.role === "cliente" ? "/catalogo/reebok" : "/home");
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error desconocido";
+      console.error("Face ID auth error:", msg);
       setError("No se pudo verificar. Usa tu contraseña.");
       setWebauthnAvailable(false);
     } finally {
@@ -103,13 +105,16 @@ function LoginForm() {
     setWebauthnLoading(true);
     try {
       const regRes = await fetch("/api/auth/webauthn/register");
-      if (!regRes.ok) throw new Error("No se pudo iniciar registro");
+      if (!regRes.ok) {
+        const errData = await regRes.json().catch(() => ({}));
+        throw new Error(errData.error || "No se pudo iniciar registro");
+      }
       const options = await regRes.json();
 
       const { base64urlDecode, base64urlEncode } = await import("@/lib/webauthn");
       const toBuf = (u: Uint8Array): ArrayBuffer => { const ab = new ArrayBuffer(u.byteLength); new Uint8Array(ab).set(u); return ab; };
 
-      const credential = await navigator.credentials.create({
+      const pubKeyCredential = await navigator.credentials.create({
         publicKey: {
           challenge: toBuf(base64urlDecode(options.challenge)),
           rp: options.rp,
@@ -125,23 +130,31 @@ function LoginForm() {
         },
       }) as PublicKeyCredential | null;
 
-      if (!credential) throw new Error("Cancelado");
+      if (!pubKeyCredential) throw new Error("Cancelado");
 
-      const attResp = credential.response as AuthenticatorAttestationResponse;
+      const attResp = pubKeyCredential.response as AuthenticatorAttestationResponse;
 
       const saveRes = await fetch("/api/auth/webauthn/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: base64urlEncode(new Uint8Array(credential.rawId)),
-          response: {
-            attestationObject: base64urlEncode(new Uint8Array(attResp.attestationObject)),
-            clientDataJSON: base64urlEncode(new Uint8Array(attResp.clientDataJSON)),
+          credential: {
+            id: base64urlEncode(new Uint8Array(pubKeyCredential.rawId)),
+            rawId: base64urlEncode(new Uint8Array(pubKeyCredential.rawId)),
+            type: pubKeyCredential.type,
+            response: {
+              attestationObject: base64urlEncode(new Uint8Array(attResp.attestationObject)),
+              clientDataJSON: base64urlEncode(new Uint8Array(attResp.clientDataJSON)),
+            },
           },
+          challenge: options.challenge,
         }),
       });
 
-      if (!saveRes.ok) throw new Error("No se pudo guardar");
+      if (!saveRes.ok) {
+        const errData = await saveRes.json().catch(() => ({}));
+        throw new Error(errData.error || "No se pudo guardar");
+      }
 
       const savedCred = await saveRes.json();
       const existing = JSON.parse(localStorage.getItem("fg_webauthn_cred_ids") || "[]");
@@ -150,8 +163,10 @@ function LoginForm() {
       localStorage.setItem("fg_webauthn_available", "1");
       setShowWebauthnSetup(false);
       router.push("/home");
-    } catch {
-      setError("No se pudo configurar Face ID");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error desconocido";
+      console.error("Face ID setup error:", msg);
+      setError(`No se pudo configurar Face ID: ${msg}`);
     } finally {
       setWebauthnLoading(false);
     }

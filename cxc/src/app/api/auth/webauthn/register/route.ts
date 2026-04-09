@@ -70,11 +70,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No autenticado" }, { status: 401 });
   }
 
-  const body = await req.json();
+  let body;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Body JSON inválido" }, { status: 400 });
+  }
   const { credential, challenge, deviceName } = body;
 
-  if (!credential || !challenge) {
-    return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
+  if (!credential) {
+    return NextResponse.json(
+      { error: "Datos incompletos: falta 'credential'", receivedKeys: Object.keys(body) },
+      { status: 400 }
+    );
+  }
+  if (!challenge) {
+    return NextResponse.json(
+      { error: "Datos incompletos: falta 'challenge'", receivedKeys: Object.keys(body) },
+      { status: 400 }
+    );
   }
 
   // Verify challenge was issued by us
@@ -100,7 +114,10 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error("Error storing webauthn credential:", error);
-      return NextResponse.json({ error: "Error guardando credencial" }, { status: 500 });
+      return NextResponse.json(
+        { error: `Error guardando credencial: ${error.message}` },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({
@@ -108,9 +125,10 @@ export async function POST(req: NextRequest) {
       credentialId: result.credentialId,
     });
   } catch (err) {
-    console.error("WebAuthn registration verification failed:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("WebAuthn registration verification failed:", msg);
     return NextResponse.json(
-      { error: "Error verificando credencial" },
+      { error: `Error verificando credencial: ${msg}` },
       { status: 400 }
     );
   }
