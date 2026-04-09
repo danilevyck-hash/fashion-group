@@ -344,12 +344,12 @@ export default function PlantillasPage() {
         )}
       </div>
 
-      {/* Module grid — grouped when default order, flat when custom/edit */}
-      {!editMode && moduleOrder.length === 0 ? (
+      {/* Module grid — grouped when not editing, flat when editing */}
+      {!editMode ? (
         // Grouped view
         <div className="space-y-6">
           {GROUP_ORDER.map(groupKey => {
-            const groupMods = visibleModules.filter(m => m.group === groupKey);
+            const groupMods = visibleModules.filter(m => (m as typeof m & { group: string }).group === groupKey);
             if (groupMods.length === 0) return null;
             const gl = GROUP_LABELS[groupKey];
             return (
