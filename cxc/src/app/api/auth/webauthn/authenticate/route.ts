@@ -5,7 +5,6 @@ import { randomUUID } from "crypto";
 import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
-  consumeChallenge,
 } from "@/lib/webauthn";
 
 const COOKIE_NAME = "cxc_session";
@@ -78,12 +77,6 @@ export async function POST(req: NextRequest) {
 
   if (!credential || !challenge) {
     return NextResponse.json({ error: "Datos incompletos" }, { status: 400 });
-  }
-
-  // Verify challenge
-  const challengeData = consumeChallenge(challenge);
-  if (!challengeData) {
-    return NextResponse.json({ error: "Challenge expirado o inválido" }, { status: 400 });
   }
 
   // Look up credential by ID

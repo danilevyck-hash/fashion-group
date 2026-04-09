@@ -3,7 +3,6 @@ import { supabaseServer } from "@/lib/supabase-server";
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
-  consumeChallenge,
 } from "@/lib/webauthn";
 
 const COOKIE_NAME = "cxc_session";
@@ -89,12 +88,6 @@ export async function POST(req: NextRequest) {
       { error: "Datos incompletos: falta 'challenge'", receivedKeys: Object.keys(body) },
       { status: 400 }
     );
-  }
-
-  // Verify challenge was issued by us
-  const challengeData = consumeChallenge(challenge);
-  if (!challengeData) {
-    return NextResponse.json({ error: "Challenge expirado o inválido" }, { status: 400 });
   }
 
   const rpId = getRpId(req);
