@@ -174,7 +174,14 @@ export default function AdminDashboard() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientName: name }),
     }).catch(() => {
-      // Silently fail — localStorage already updated as fallback
+      // Revert optimistic update
+      setFavorites(prev => {
+        const reverted = new Set(prev);
+        if (reverted.has(name)) reverted.delete(name); else reverted.add(name);
+        localStorage.setItem("cxc_favorites", JSON.stringify([...reverted]));
+        return reverted;
+      });
+      showToast("Error al guardar favorito");
     });
   }
 
@@ -391,7 +398,7 @@ export default function AdminDashboard() {
 
   function sendVendorWhatsApp(companyKey: string) {
     const co = cxcCompanies.find((c) => c.key === companyKey);
-    if (!co?.vendedorPhone || !co?.vendedor) { alert("Esta empresa no tiene vendedor asignado."); return; }
+    if (!co?.vendedorPhone || !co?.vendedor) { showToast("Esta empresa no tiene vendedor asignado."); return; }
 
     const vendorClients = VENDOR_MAP[companyKey] || {};
     const vendorClientNames = new Set(
@@ -421,7 +428,7 @@ export default function AdminDashboard() {
       .sort((a, b) => b.total - a.total);
 
     if (critical.length === 0) {
-      alert("No hay clientes criticos de " + co.vendedor + " en " + co.name);
+      showToast("No hay clientes criticos de " + co.vendedor + " en " + co.name);
       return;
     }
 
@@ -430,7 +437,7 @@ export default function AdminDashboard() {
   }
 
   function openEmail(client: ConsolidatedClient) {
-    if (!client.correo) { alert("Este cliente no tiene correo registrado. Edite el contacto primero."); return; }
+    if (!client.correo) { showToast("Este cliente no tiene correo registrado. Edite el contacto primero."); return; }
     const subject = encodeURIComponent(buildEmailSubject(client));
     const body = encodeURIComponent(buildEmailBody(client));
     window.open(`mailto:${client.correo}?subject=${subject}&body=${body}`, "_blank");
@@ -464,7 +471,12 @@ export default function AdminDashboard() {
       { nombre_normalized: nombre, ...data, updated_at: new Date().toISOString() },
       { onConflict: "nombre_normalized" }
     );
-    if (!error) loadData();
+    if (error) {
+      showToast("Error al guardar contacto");
+      return;
+    }
+    showToast("Contacto actualizado");
+    loadData();
 
     // Sync to directorio
     try {
@@ -684,7 +696,6 @@ export default function AdminDashboard() {
         roleClients={roleClients}
         companyFilter={companyFilter}
         clients={clients}
-        vendorMap={VENDOR_MAP}
         onSendVendorWhatsApp={sendVendorWhatsApp}
       />
 

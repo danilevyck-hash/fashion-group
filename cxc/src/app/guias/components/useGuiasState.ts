@@ -74,10 +74,6 @@ export function useGuiasState() {
     clearGuiaDraft();
   }
 
-  // Month filter
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  const [monthFilter, setMonthFilter] = useState(currentMonth);
-
   // Confirm delete state
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
@@ -149,7 +145,7 @@ export function useGuiasState() {
       setGuias(data);
       setNextNumero(data.length > 0 ? data[0].numero + 1 : 1);
     } catch {
-      setError("Error al cargar guias");
+      setError("Error al cargar guías");
     } finally {
       setLoading(false);
     }
@@ -207,7 +203,16 @@ export function useGuiasState() {
 
   async function confirmDeleteGuia() {
     if (!confirmDeleteId) return;
-    await fetch(`/api/guias/${confirmDeleteId}`, { method: "DELETE" });
+    try {
+      const res = await fetch(`/api/guias/${confirmDeleteId}`, { method: "DELETE" });
+      if (res.ok) {
+        showToast("Guía eliminada");
+      } else {
+        showToast("Error al eliminar guía");
+      }
+    } catch {
+      showToast("Error al eliminar guía");
+    }
     setConfirmDeleteId(null);
     setExpandedId(null);
     setExpandedGuia(null);
@@ -217,43 +222,53 @@ export function useGuiasState() {
   // ── Print ──
 
   async function openPrint(id: string) {
-    const res = await fetch(`/api/guias/${id}`);
-    if (res.ok) {
-      const g = await res.json();
-      setPrintGuia(g);
-      _setView("print");
-      window.history.pushState({ guiaId: id }, "", `/guias?id=${id}`);
+    try {
+      const res = await fetch(`/api/guias/${id}`);
+      if (res.ok) {
+        const g = await res.json();
+        setPrintGuia(g);
+        _setView("print");
+        window.history.pushState({ guiaId: id }, "", `/guias?id=${id}`);
+      } else {
+        showToast("Error al cargar guía");
+      }
+    } catch {
+      showToast("Error al cargar guía");
     }
   }
 
   // ── Edit ──
 
   async function startEdit(id: string) {
-    const res = await fetch(`/api/guias/${id}`);
-    if (!res.ok) return;
-    const g = await res.json();
-    setEditingId(g.id);
-    setEditingEstado(g.estado || null);
-    setFormNumero(g.numero);
-    setFecha(g.fecha);
-    if (transportistas.includes(g.transportista)) {
-      setTransportista(g.transportista);
-      setTransportistaOtro("");
-    } else {
-      setTransportista("__other__");
-      setTransportistaOtro(g.transportista);
+    try {
+      const res = await fetch(`/api/guias/${id}`);
+      if (!res.ok) { showToast("Error al cargar guía"); return; }
+      const g = await res.json();
+      setEditingId(g.id);
+      setEditingEstado(g.estado || null);
+      setFormNumero(g.numero);
+      setFecha(g.fecha);
+      if (transportistas.includes(g.transportista)) {
+        setTransportista(g.transportista);
+        setTransportistaOtro("");
+      } else {
+        setTransportista("__other__");
+        setTransportistaOtro(g.transportista);
+      }
+      setEntregadoPor(g.entregado_por || "");
+      setObservaciones(g.observaciones || "");
+      const guiaItems = (g.guia_items || []) as GuiaItem[];
+      setItems(
+        guiaItems.length > 0
+          ? guiaItems.map((item: GuiaItem, i: number) => ({ ...item, orden: i + 1 }))
+          : [emptyItem(1)],
+      );
+      setError(null);
+      setValidationErrors(new Set());
+      setView("form");
+    } catch {
+      showToast("Error al cargar guía");
     }
-    setEntregadoPor(g.entregado_por || "");
-    setObservaciones(g.observaciones || "");
-    const guiaItems = (g.guia_items || []) as GuiaItem[];
-    setItems(
-      guiaItems.length > 0
-        ? guiaItems.map((item: GuiaItem, i: number) => ({ ...item, orden: i + 1 }))
-        : [emptyItem(1)],
-    );
-    setError(null);
-    setValidationErrors(new Set());
-    setView("form");
   }
 
   function resetForm() {
@@ -353,8 +368,8 @@ export function useGuiasState() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            subject: `Nueva Guia GT-${String(guia.numero).padStart(3, "0")} — Pendiente Bodega`,
-            body: `<h2>Guia GT-${String(guia.numero).padStart(3, "0")}</h2><p><strong>Transportista:</strong> ${transp}</p><p><strong>Total bultos:</strong> ${totalB}</p><p>Pendiente de completar en bodega.</p>`,
+            subject: `Nueva Guía GT-${String(guia.numero).padStart(3, "0")} — Pendiente Bodega`,
+            body: `<h2>Guía GT-${String(guia.numero).padStart(3, "0")}</h2><p><strong>Transportista:</strong> ${transp}</p><p><strong>Total bultos:</strong> ${totalB}</p><p>Pendiente de completar en bodega.</p>`,
           }),
         }).catch(() => {});
       }
@@ -395,7 +410,7 @@ export function useGuiasState() {
     });
 
     if (res.ok) {
-      showToast(`Guia GT-${String(expandedGuia.numero).padStart(3, "0")} despachada`);
+      showToast(`Guía GT-${String(expandedGuia.numero).padStart(3, "0")} despachada`);
       // Clear saved signatures from localStorage
       try { localStorage.removeItem(`guia_firma_${expandedGuia.id}_transportista`); localStorage.removeItem(`guia_firma_${expandedGuia.id}_entregador`); } catch { /* */ }
 
@@ -413,13 +428,30 @@ export function useGuiasState() {
     setBSaving(false);
   }
 
+  async function rejectGuia(id: string, motivo: string) {
+    const res = await fetch(`/api/guias/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ estado: "Rechazada", observaciones: motivo }),
+    });
+    if (res.ok) {
+      showToast("Guía rechazada");
+      if (expandedId === id) {
+        const fullRes = await fetch(`/api/guias/${id}`);
+        if (fullRes.ok) setExpandedGuia(await fullRes.json());
+      }
+      loadGuias();
+    } else {
+      showToast("Error al rechazar");
+    }
+  }
+
   return {
     // view
     view, setView, _setView,
     // list
     guias, loading, error,
     search, setSearch,
-    monthFilter, setMonthFilter,
     showPending, setShowPending,
     // accordion
     expandedId, expandedGuia, expandedLoading, toggleExpand,
@@ -462,22 +494,4 @@ export function useGuiasState() {
     confirmarDespacho,
     rejectGuia,
   };
-
-  async function rejectGuia(id: string, motivo: string) {
-    const res = await fetch(`/api/guias/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ estado: "Rechazada", observaciones: motivo }),
-    });
-    if (res.ok) {
-      showToast("Guia rechazada");
-      if (expandedId === id) {
-        const fullRes = await fetch(`/api/guias/${id}`);
-        if (fullRes.ok) setExpandedGuia(await fullRes.json());
-      }
-      loadGuias();
-    } else {
-      showToast("Error al rechazar");
-    }
-  }
 }

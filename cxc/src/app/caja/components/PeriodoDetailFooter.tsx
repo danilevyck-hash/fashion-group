@@ -70,14 +70,6 @@ export default function PeriodoDetailFooter({
         >
           ↓ Excel
         </button>
-        {isOpen && (
-          <button
-            onClick={onClose}
-            className="text-sm text-gray-400 hover:text-black transition"
-          >
-            Cerrar Período
-          </button>
-        )}
       </div>
     </>
   );

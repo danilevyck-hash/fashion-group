@@ -1,19 +1,20 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase, Product, InventoryItem } from '@/components/reebok/supabase'
-import { useCart } from '@/components/reebok/CartProvider'
+
+interface CartItem { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
 
 export default function ProductoDetalle() {
   const { id } = useParams()
-  const { addToCart } = useCart()
   const [product, setProduct] = useState<Product | null>(null)
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [selectedSize, setSelectedSize] = useState('')
   const [quantity, setQuantity] = useState(1)
   const [added, setAdded] = useState(false)
+  const cartInitialized = useRef(false)
 
   useEffect(() => {
     supabase.from('products').select('*').eq('id', id).single()
@@ -25,17 +26,40 @@ export default function ProductoDetalle() {
 
   const availableSizes = inventory.filter(i => i.quantity > 0)
 
+  // Read cart from sessionStorage (same key as productos/page.tsx)
+  function getCart(): CartItem[] {
+    try {
+      const saved = sessionStorage.getItem('reebok_cart')
+      if (saved) return JSON.parse(saved)
+    } catch { /* */ }
+    return []
+  }
+
+  // Write cart to sessionStorage + localStorage (same as productos/page.tsx)
+  function saveCart(cart: CartItem[]) {
+    sessionStorage.setItem('reebok_cart', JSON.stringify(cart))
+    try {
+      localStorage.setItem('reebok_cart', JSON.stringify(cart))
+    } catch { /* */ }
+  }
+
   const handleAdd = () => {
     if (!product || !selectedSize) return
-    addToCart({
-      productId: product.id,
-      productName: product.name,
-      color: product.color || '',
-      size: selectedSize,
-      quantity,
-      imageUrl: product.image_url || '',
-      price: product.price,
-    })
+    const cart = getCart()
+    const existing = cart.find(i => i.product_id === product.id)
+    if (existing) {
+      existing.quantity += quantity
+    } else {
+      cart.push({
+        product_id: product.id,
+        sku: product.sku || '',
+        name: product.name,
+        image_url: product.image_url || '',
+        quantity,
+        unit_price: product.price || 0,
+      })
+    }
+    saveCart(cart)
     setAdded(true)
     setTimeout(() => setAdded(false), 2000)
   }

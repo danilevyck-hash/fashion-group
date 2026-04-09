@@ -28,18 +28,18 @@ const MODULE_ICONS: Record<string, React.ReactNode> = {
 };
 
 const ALL_MODULES = [
-  { key: "cxc", label: "Cuentas por Cobrar", subtitle: "Cartera de clientes", href: "/admin", roles: ["admin", "secretaria", "director", "vendedor"] },
-  { key: "upload", label: "Cargar CSV", subtitle: "Antigüedad de deuda", href: "/upload", roles: ["admin", "secretaria"] },
-  { key: "guias", label: "Guías", subtitle: "Transporte y despacho", href: "/guias", roles: ["admin", "secretaria", "bodega", "director"] },
-  { key: "caja", label: "Caja Menuda", subtitle: "Control de gastos", href: "/caja", roles: ["admin", "secretaria"] },
-  { key: "directorio", label: "Directorio", subtitle: "Clientes y contactos", href: "/directorio", roles: ["admin", "secretaria", "director", "contabilidad", "vendedor"] },
-  { key: "cheques", label: "Cheques", subtitle: "Posfechados", href: "/cheques", roles: ["admin", "secretaria", "director"] },
-  { key: "prestamos", label: "Préstamos", subtitle: "Colaboradores", href: "/prestamos", roles: ["admin", "contabilidad"] },
-  { key: "reclamos", label: "Reclamos", subtitle: "Seguimiento", href: "/reclamos", roles: ["admin", "secretaria", "director"] },
-  { key: "ventas", label: "Ventas", subtitle: "Mensuales", href: "/ventas", roles: ["admin", "director", "contabilidad"] },
-  { key: "reebok", label: "Catálogo Reebok", subtitle: "Productos y pedidos", href: "/catalogo/reebok", roles: ["admin", "vendedor", "cliente", "secretaria"] },
-  { key: "camisetas", label: "Camisetas Selección", subtitle: "Pedidos y stock", href: "/camisetas", roles: ["admin", "vendedor"] },
-  { key: "usuarios", label: "Usuarios", subtitle: "Permisos y accesos", href: "/admin/usuarios", roles: ["admin"] },
+  { key: "cxc", label: "Cuentas por Cobrar", subtitle: "Quién debe, cuánto y desde cuándo", href: "/admin", roles: ["admin", "secretaria", "director", "vendedor"], group: "dia" as const },
+  { key: "upload", label: "Actualizar Datos", subtitle: "Subir archivos de Switch Soft", href: "/upload", roles: ["admin", "secretaria"], group: "dia" as const },
+  { key: "guias", label: "Guías de Despacho", subtitle: "Crear y rastrear envíos", href: "/guias", roles: ["admin", "secretaria", "bodega", "director"], group: "dia" as const },
+  { key: "caja", label: "Caja Menuda", subtitle: "Registrar gastos del día a día", href: "/caja", roles: ["admin", "secretaria"], group: "consulta" as const },
+  { key: "directorio", label: "Directorio", subtitle: "Clientes y contactos", href: "/directorio", roles: ["admin", "secretaria", "director", "contabilidad", "vendedor"], group: "consulta" as const },
+  { key: "cheques", label: "Cheques", subtitle: "Control de cheques por cobrar", href: "/cheques", roles: ["admin", "secretaria", "director"], group: "dia" as const },
+  { key: "prestamos", label: "Préstamos", subtitle: "Adelantos y deducciones de empleados", href: "/prestamos", roles: ["admin", "contabilidad"], group: "consulta" as const },
+  { key: "reclamos", label: "Reclamos", subtitle: "Reportar y dar seguimiento", href: "/reclamos", roles: ["admin", "secretaria", "director"], group: "dia" as const },
+  { key: "ventas", label: "Ventas", subtitle: "Ver por mes y comparar períodos", href: "/ventas", roles: ["admin", "director", "contabilidad"], group: "consulta" as const },
+  { key: "reebok", label: "Catálogo Reebok", subtitle: "Productos, pedidos e inventario", href: "/catalogo/reebok", roles: ["admin", "vendedor", "cliente", "secretaria"], group: "catalogo" as const },
+  { key: "camisetas", label: "Camisetas Selección", subtitle: "Pedidos y stock", href: "/camisetas", roles: ["admin", "vendedor"], group: "catalogo" as const },
+  { key: "usuarios", label: "Usuarios", subtitle: "Crear usuarios y asignar permisos", href: "/admin/usuarios", roles: ["admin"], group: "admin" as const },
 ];
 
 function getGreeting() {
@@ -55,6 +55,15 @@ function getDateLabel() {
   const meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
   return `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`;
 }
+
+type ModuleGroup = "dia" | "consulta" | "catalogo" | "admin";
+const GROUP_LABELS: Record<ModuleGroup, { title: string; description: string }> = {
+  dia: { title: "Día a día", description: "Lo que usas todos los días" },
+  consulta: { title: "Consultas y reportes", description: "Información cuando la necesites" },
+  catalogo: { title: "Catálogos", description: "Productos y pedidos" },
+  admin: { title: "Administración", description: "Configuración del sistema" },
+};
+const GROUP_ORDER: ModuleGroup[] = ["dia", "consulta", "catalogo", "admin"];
 
 export default function PlantillasPage() {
   const router = useRouter();
@@ -335,32 +344,32 @@ export default function PlantillasPage() {
         )}
       </div>
 
-      {/* Module grid — Apple iOS style */}
-      <DragDropContext onDragEnd={onDragEnd}>
-        <Droppable droppableId="modules" direction="vertical">
-          {(provided) => (
-            <div ref={provided.innerRef} {...provided.droppableProps} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-              {visibleModules.map((mod, index) => (
-                <Draggable key={mod.key} draggableId={mod.key} index={index} isDragDisabled={!editMode}>
-                  {(prov, snapshot) => (
+      {/* Module grid — grouped when default order, flat when custom/edit */}
+      {!editMode && moduleOrder.length === 0 ? (
+        // Grouped view
+        <div className="space-y-6">
+          {GROUP_ORDER.map(groupKey => {
+            const groupMods = visibleModules.filter(m => m.group === groupKey);
+            if (groupMods.length === 0) return null;
+            const gl = GROUP_LABELS[groupKey];
+            return (
+              <div key={groupKey}>
+                <div className="mb-2">
+                  <h2 className="text-sm font-semibold">{gl.title}</h2>
+                  <p className="text-[11px] text-gray-400">{gl.description}</p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {groupMods.map((mod) => (
                     <div
-                      ref={prov.innerRef}
-                      {...prov.draggableProps}
-                      {...(editMode ? prov.dragHandleProps : {})}
-                      onClick={() => { if (!editMode) router.push(mod.href); }}
-                      className={`relative border rounded-xl p-4 text-center transition-all duration-150 cursor-pointer select-none hover:shadow-md hover:scale-[1.02] ${
-                        snapshot.isDragging ? "border-gray-300 bg-white z-50 shadow-lg" : `${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 hover:border-gray-300 bg-white"}`
-                      } ${editMode ? "cursor-grab active:cursor-grabbing" : ""}`}
+                      key={mod.key}
+                      onClick={() => router.push(mod.href)}
+                      className={`relative border rounded-xl p-4 text-center transition-all duration-150 cursor-pointer select-none hover:shadow-md hover:scale-[1.02] ${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 hover:border-gray-300 bg-white"}`}
                     >
-                      {editMode && (
-                        <span className="absolute top-2 right-2 text-gray-300 text-xs">⠿</span>
-                      )}
-                      {/* Badge — only CSV stale + reclamos pending */}
                       {(() => {
                         if (mod.key === "upload" && stats?.cxcStale) {
                           return (
                             <span className="absolute top-2 right-2 bg-amber-500 text-white text-[8px] font-bold px-1.5 h-[18px] rounded-full flex items-center justify-center leading-none">
-                              CSV
+                              Nuevo
                             </span>
                           );
                         }
@@ -379,14 +388,65 @@ export default function PlantillasPage() {
                       <div className="text-[13px] font-semibold leading-tight mt-2">{mod.label}</div>
                       <div className={`text-[11px] mt-0.5 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>{mod.subtitle}</div>
                     </div>
-                  )}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        // Flat grid with drag-drop
+        <DragDropContext onDragEnd={onDragEnd}>
+          <Droppable droppableId="modules" direction="vertical">
+            {(provided) => (
+              <div ref={provided.innerRef} {...provided.droppableProps} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {visibleModules.map((mod, index) => (
+                  <Draggable key={mod.key} draggableId={mod.key} index={index} isDragDisabled={!editMode}>
+                    {(prov, snapshot) => (
+                      <div
+                        ref={prov.innerRef}
+                        {...prov.draggableProps}
+                        {...(editMode ? prov.dragHandleProps : {})}
+                        onClick={() => { if (!editMode) router.push(mod.href); }}
+                        className={`relative border rounded-xl p-4 text-center transition-all duration-150 cursor-pointer select-none hover:shadow-md hover:scale-[1.02] ${
+                          snapshot.isDragging ? "border-gray-300 bg-white z-50 shadow-lg" : `${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 hover:border-gray-300 bg-white"}`
+                        } ${editMode ? "cursor-grab active:cursor-grabbing" : ""}`}
+                      >
+                        {editMode && (
+                          <span className="absolute top-2 right-2 text-gray-300 text-xs">⠿</span>
+                        )}
+                        {(() => {
+                          if (mod.key === "upload" && stats?.cxcStale) {
+                            return (
+                              <span className="absolute top-2 right-2 bg-amber-500 text-white text-[8px] font-bold px-1.5 h-[18px] rounded-full flex items-center justify-center leading-none">
+                                Nuevo
+                              </span>
+                            );
+                          }
+                          if (mod.key === "reclamos" && stats && stats.reclamosPendientes > 0) {
+                            return (
+                              <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center leading-none">
+                                {stats.reclamosPendientes}
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
+                        <div className="flex items-center justify-center w-10 h-10 mx-auto text-gray-700 dark:text-gray-300">
+                          {MODULE_ICONS[mod.key] || <span className="w-5 h-5 block" />}
+                        </div>
+                        <div className="text-[13px] font-semibold leading-tight mt-2">{mod.label}</div>
+                        <div className={`text-[11px] mt-0.5 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>{mod.subtitle}</div>
+                      </div>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
+      )}
     </div>
     </div>
   );

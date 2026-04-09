@@ -55,7 +55,7 @@ export default function GuiasPage() {
     return (
       <PullToRefresh onRefresh={s.loadGuias}>
       <div>
-        <AppHeader module="Guias de Transporte" />
+        <AppHeader module="Guías de Transporte" />
         <GuiasList
           guias={s.guias}
           loading={s.loading}
@@ -96,8 +96,8 @@ export default function GuiasPage() {
           open={!!s.confirmDeleteId}
           onClose={() => s.setConfirmDeleteId(null)}
           onConfirm={s.confirmDeleteGuia}
-          title="Eliminar guia"
-          message="Esta accion no se puede deshacer."
+          title="Eliminar guía"
+          message="Esta acción no se puede deshacer."
           confirmLabel="Eliminar"
           destructive
         />

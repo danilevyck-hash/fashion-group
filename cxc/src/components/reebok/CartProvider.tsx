@@ -1,3 +1,8 @@
+/**
+ * @deprecated No usar. El carrito unificado usa sessionStorage('reebok_cart') directamente.
+ * Ver productos/page.tsx y producto/[id]/page.tsx para la implementación actual.
+ * Este archivo se mantiene temporalmente para evitar romper imports existentes.
+ */
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'

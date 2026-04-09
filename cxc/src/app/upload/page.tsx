@@ -729,7 +729,7 @@ function UploadPageInner() {
                 <span className="text-green-700 bg-green-50 px-2.5 py-1 rounded-full">{cxcPreview.validCount} validos</span>
                 {cxcPreview.errorCount > 0 && <span className="text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">{cxcPreview.errorCount} con advertencias</span>}
                 {cxcPreview.duplicateNames.size > 0 && <span className="text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full">{cxcPreview.duplicateNames.size} nombres duplicados</span>}
-                {cxcPreview.bucketExceedsTotal > 0 && <span className="text-orange-700 bg-orange-50 px-2.5 py-1 rounded-full">{cxcPreview.bucketExceedsTotal} filas donde suma de buckets excede el total</span>}
+                {cxcPreview.bucketExceedsTotal > 0 && <span className="text-orange-700 bg-orange-50 px-2.5 py-1 rounded-full">{cxcPreview.bucketExceedsTotal} filas donde la suma de rangos excede el total</span>}
               </div>
             }
             headerRow={cxcPreview.headers}

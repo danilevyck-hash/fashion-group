@@ -267,7 +267,9 @@ export default function ReclamoDetail({
       </div>
       <p className="text-[11px] text-gray-400 mt-1">
         Último cambio: {(() => {
-          const d = current.created_at ? new Date(current.created_at) : null;
+          const latestSeg = seg.length > 0 ? seg[0]?.created_at : null;
+          const raw = current.updated_at || latestSeg || current.created_at;
+          const d = raw ? new Date(raw) : null;
           if (!d) return "—";
           return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
         })()}
@@ -276,8 +278,8 @@ export default function ReclamoDetail({
       {/* Totals */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8 mt-6">
         <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Subtotal</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub)}</div></div>
-        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Import. 10%</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * TASA_IMPORTACION)}</div></div>
-        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * TASA_ITBMS)}</div></div>
+        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Imp. importación (10%)</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * TASA_IMPORTACION)}</div></div>
+        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS (7%)</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * TASA_ITBMS)}</div></div>
         <div className="bg-gray-900 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Total</div><div className="text-xl font-semibold tabular-nums mt-1 text-white">${fmt(sub * FACTOR_TOTAL)}</div></div>
       </div>
 
@@ -365,7 +367,7 @@ export default function ReclamoDetail({
       <div className="mb-8">
         <div className="text-xs uppercase tracking-widest text-gray-400 mb-3">Seguimiento</div>
         <div className="flex gap-2 mb-3">
-          <input type="text" value={nota} onChange={(e) => setNota(e.target.value)} onBlur={() => { if (nota.trim()) onAddNota(); }} placeholder="Agregar nota..." className="flex-1 border-b border-gray-200 py-3 sm:py-1.5 text-base sm:text-sm outline-none" />
+          <input type="text" value={nota} onChange={(e) => setNota(e.target.value)} placeholder="Agregar nota..." className="flex-1 border-b border-gray-200 py-3 sm:py-1.5 text-base sm:text-sm outline-none" />
           <button onClick={onAddNota} disabled={!nota.trim()} className="text-sm bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50">Agregar</button>
         </div>
         {seg.map((s) => (

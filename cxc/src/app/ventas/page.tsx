@@ -155,7 +155,7 @@ export default function VentasDashboard() {
       setVentasPrev(Array.isArray(v2?.prevYear) ? v2.prevYear.map(r => ({ ...r, costo: 0 })) : []);
       setMetas(Array.isArray(metasRes) ? metasRes : []);
       setClientesData(Array.isArray(v2?.clientesDetalle) ? v2.clientesDetalle : []);
-    } catch { /* ignore */ }
+    } catch { showToast("Error al cargar datos de ventas"); }
     setLoading(false);
   }, [año, desdeStr]);
 
@@ -330,6 +330,7 @@ export default function VentasDashboard() {
   }
 
   if (!authChecked) return null;
+  if (role === "secretaria") return null;
 
   const kpiCards = [
     { key: "ventas", label: "Ventas netas", value: fmtK(kpi.ventasNetas), flag: false, tooltip: "Total vendido en el período (sin impuestos).", valueExtra: undefined as string | null | undefined, trend: null as "up" | "down" | null },
@@ -376,7 +377,7 @@ export default function VentasDashboard() {
             {(["mensual", "quarter"] as const).map(v => (
               <button key={v} onClick={() => setVista(v)}
                 className={`px-3 py-1.5 min-h-[44px] text-xs rounded-md transition capitalize ${v === vista ? "bg-white shadow font-medium" : "text-gray-500 hover:text-gray-700"}`}>
-                {v === "mensual" ? "Mensual" : "Quarter"}
+                {v === "mensual" ? "Mensual" : "Trimestral"}
               </button>
             ))}
           </div>

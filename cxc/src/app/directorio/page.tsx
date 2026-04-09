@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast, SkeletonTable, EmptyState, ConfirmDeleteModal, AccordionContent, Modal, ScrollableTable } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState, ConfirmDeleteModal, ConfirmModal, AccordionContent, Modal, ScrollableTable } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { fmtDate } from "@/lib/format";
@@ -58,6 +58,8 @@ export default function DirectorioPage() {
   const [empresaSearch, setEmpresaSearch] = useState("");
   const [empresaDropdownOpen, setEmpresaDropdownOpen] = useState(false);
   const [mobileContactId, setMobileContactId] = useState<string | null>(null);
+  const [confirmDupCreate, setConfirmDupCreate] = useState<{ match: Cliente } | null>(null);
+  const [confirmUnsavedTarget, setConfirmUnsavedTarget] = useState<{ action: () => void } | null>(null);
 
   const loadClientes = useCallback(async (searchTerm: string, pg: number, empFilter?: string) => {
     setLoading(true);
@@ -133,28 +135,9 @@ export default function DirectorioPage() {
     return semicolons >= commas ? ";" : ",";
   }
 
-  async function handleCreate() {
-    if (!newData.nombre.trim()) return;
+  async function doCreateContact() {
     setSavingNew(true);
     try {
-      // Duplicate detection
-      try {
-        const dupRes = await fetch(`/api/directorio?search=${encodeURIComponent(newData.nombre.trim())}&page=1&limit=50`);
-        if (dupRes.ok) {
-          const dupResult = await dupRes.json();
-          const matches = (dupResult.data || []).filter((c: Cliente) =>
-            c.nombre.toLowerCase().trim() === newData.nombre.toLowerCase().trim() &&
-            c.empresa.toLowerCase().trim() === (newData.empresa || "").toLowerCase().trim()
-          );
-          if (matches.length > 0) {
-            const match = matches[0];
-            if (!confirm(`Ya existe un contacto similar: ${match.nombre} en ${match.empresa || "(sin empresa)"}. ¿Crear de todos modos?`)) {
-              setSavingNew(false);
-              return;
-            }
-          }
-        }
-      } catch { /* proceed if dedup check fails */ }
       const res = await fetch("/api/directorio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -170,13 +153,39 @@ export default function DirectorioPage() {
     setSavingNew(false);
   }
 
+  async function handleCreate() {
+    if (!newData.nombre.trim()) return;
+    setSavingNew(true);
+    try {
+      // Duplicate detection
+      try {
+        const dupRes = await fetch(`/api/directorio?search=${encodeURIComponent(newData.nombre.trim())}&page=1&limit=50`);
+        if (dupRes.ok) {
+          const dupResult = await dupRes.json();
+          const matches = (dupResult.data || []).filter((c: Cliente) =>
+            c.nombre.toLowerCase().trim() === newData.nombre.toLowerCase().trim() &&
+            c.empresa.toLowerCase().trim() === (newData.empresa || "").toLowerCase().trim()
+          );
+          if (matches.length > 0) {
+            const match = matches[0];
+            setConfirmDupCreate({ match });
+            setSavingNew(false);
+            return;
+          }
+        }
+      } catch { /* proceed if dedup check fails */ }
+      await doCreateContact();
+    } catch { setToast("Error de conexión. Intenta de nuevo."); setSavingNew(false); }
+  }
+
   async function handleUpdate(id: string) {
-    const res = await fetch(`/api/directorio/${id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editData),
-    });
-    if (res.ok) {
+    try {
+      const res = await fetch(`/api/directorio/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editData),
+      });
+      if (!res.ok) { showToast("Error al actualizar contacto"); return; }
       setEditing(null);
       setIsDirty(false);
       showToast("Contacto actualizado");
@@ -197,7 +206,7 @@ export default function DirectorioPage() {
           }),
         }).catch(() => {}); // Don't fail if CXC override doesn't exist
       }
-    }
+    } catch { showToast("Error al actualizar contacto"); }
   }
 
   function handleDelete(id: string) {
@@ -562,9 +571,8 @@ export default function DirectorioPage() {
                         onClick={() => {
                           if (selectionMode) { toggleSelect(c.id); return; }
                           if (isDirty && editing && editing !== c.id) {
-                            if (!confirm("Tienes cambios sin guardar. ¿Salir sin guardar?")) return;
-                            setEditing(null);
-                            setIsDirty(false);
+                            setConfirmUnsavedTarget({ action: () => { setEditing(null); setIsDirty(false); if (window.innerWidth < 768) { setMobileContactId(c.id); setExpanded(null); } else { setExpanded(expanded === c.id ? null : c.id); } } });
+                            return;
                           }
                           // On mobile, open bottom sheet; on tablet/desktop, expand inline
                           if (window.innerWidth < 768) {
@@ -578,7 +586,8 @@ export default function DirectorioPage() {
                           e.preventDefault();
                           if (role !== "admin" && role !== "secretaria") return;
                           if (isDirty && editing && editing !== c.id) {
-                            if (!confirm("Tienes cambios sin guardar. ¿Salir sin guardar?")) return;
+                            setConfirmUnsavedTarget({ action: () => { setEditing(c.id); setEditData(c); setIsDirty(false); setExpanded(c.id); } });
+                            return;
                           }
                           setExpanded(c.id);
                           setEditing(c.id);
@@ -644,13 +653,31 @@ export default function DirectorioPage() {
                                       if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
                                       autoSaveRef.current = setTimeout(async () => {
                                         setAutoSaveStatus("saving");
-                                        const res = await fetch(`/api/directorio/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) });
-                                        if (res.ok) {
-                                          setIsDirty(false);
-                                          setAutoSaveStatus("saved");
-                                          setTimeout(() => setAutoSaveStatus(""), 2000);
-                                          loadClientes(debouncedSearch, page);
-                                        } else { setAutoSaveStatus(""); }
+                                        try {
+                                          const res = await fetch(`/api/directorio/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) });
+                                          if (res.ok) {
+                                            setIsDirty(false);
+                                            setAutoSaveStatus("saved");
+                                            setTimeout(() => setAutoSaveStatus(""), 2000);
+                                            loadClientes(debouncedSearch, page);
+                                            // Sync to CXC overrides
+                                            const nombre = (next as Partial<Cliente>).nombre;
+                                            if (nombre) {
+                                              const normalized = nombre.toUpperCase().trim().replace(/\s+/g, " ");
+                                              fetch("/api/overrides", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({
+                                                  nombre_normalized: normalized,
+                                                  correo: (next as Partial<Cliente>).correo || "",
+                                                  telefono: (next as Partial<Cliente>).telefono || "",
+                                                  celular: (next as Partial<Cliente>).celular || "",
+                                                  contacto: (next as Partial<Cliente>).contacto || "",
+                                                }),
+                                              }).catch(() => {});
+                                            }
+                                          } else { setAutoSaveStatus(""); }
+                                        } catch { setAutoSaveStatus(""); }
                                       }, 2000);
                                     }}
                                     className="w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition bg-transparent" />
@@ -658,11 +685,10 @@ export default function DirectorioPage() {
                               ))}
                             </div>
                             <div className="flex items-center gap-3 mt-4">
-                              <button onClick={() => handleUpdate(c.id)}
-                                className="text-sm bg-black text-white px-5 py-1.5 rounded-full hover:bg-gray-800 transition">Guardar Cliente</button>
-                              <button onClick={() => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current); if (isDirty && !confirm("Tienes cambios sin guardar. ¿Salir sin guardar?")) return; setEditing(null); setIsDirty(false); setAutoSaveStatus(""); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+                              <button onClick={() => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current); if (isDirty) { setConfirmUnsavedTarget({ action: () => { setEditing(null); setIsDirty(false); setAutoSaveStatus(""); } }); return; } setEditing(null); setIsDirty(false); setAutoSaveStatus(""); }} className="text-sm text-gray-400 hover:text-black transition">Cerrar edición</button>
                               {autoSaveStatus === "saving" && <span className="text-xs text-gray-400">Guardando...</span>}
                               {autoSaveStatus === "saved" && <span className="text-xs text-green-600">Listo, guardado</span>}
+                              {autoSaveStatus === "" && !isDirty && <span className="text-xs text-gray-400">Guardado automáticamente</span>}
                             </div>
                           </div>
                         )}
@@ -849,6 +875,22 @@ export default function DirectorioPage() {
         onConfirm={doBatchDelete}
         title="Eliminar contactos"
         description={`¿Seguro que deseas eliminar ${selectedIds.size} contacto${selectedIds.size !== 1 ? "s" : ""}? Esta acción no se puede deshacer.`}
+      />
+      <ConfirmModal
+        open={!!confirmDupCreate}
+        onClose={() => setConfirmDupCreate(null)}
+        onConfirm={() => { setConfirmDupCreate(null); doCreateContact(); }}
+        title="Contacto similar encontrado"
+        message={confirmDupCreate ? `Ya existe un contacto similar: ${confirmDupCreate.match.nombre} en ${confirmDupCreate.match.empresa || "(sin empresa)"}. ¿Crear de todos modos?` : ""}
+        confirmLabel="Crear de todos modos"
+      />
+      <ConfirmModal
+        open={!!confirmUnsavedTarget}
+        onClose={() => setConfirmUnsavedTarget(null)}
+        onConfirm={() => { const action = confirmUnsavedTarget?.action; setConfirmUnsavedTarget(null); if (action) action(); }}
+        title="Cambios sin guardar"
+        message="Tienes cambios sin guardar. ¿Salir sin guardar?"
+        confirmLabel="Salir sin guardar"
       />
       <Toast message={toast} />
       {pendingUndoDir && <UndoToast message={pendingUndoDir.message} startedAt={pendingUndoDir.startedAt} onUndo={undoActionDir} />}

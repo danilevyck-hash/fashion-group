@@ -157,7 +157,7 @@ export default function GuiasList({
                     onClick={onNewGuia}
                     className="text-sm bg-black text-white px-6 py-3 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all"
                   >
-                    Nueva Guia
+                    Nueva Guía
                   </button>
                 )}
               </>
@@ -190,9 +190,9 @@ export default function GuiasList({
           <SkeletonTable rows={5} cols={5} />
         ) : guias.length === 0 ? (
           <EmptyState
-            title="No hay guias registradas"
-            subtitle="Crea tu primera guia para registrar un despacho"
-            actionLabel={canCreate ? "+ Nueva Guia" : undefined}
+            title="No hay guías registradas"
+            subtitle="Crea tu primera guía para registrar un despacho"
+            actionLabel={canCreate ? "+ Nueva Guía" : undefined}
             onAction={canCreate ? onNewGuia : undefined}
           />
         ) : (

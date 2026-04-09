@@ -44,6 +44,7 @@ export interface Reclamo {
   estado: string;
   notas: string;
   created_at: string;
+  updated_at?: string;
   reclamo_items?: RItem[];
   reclamo_seguimiento?: Seguimiento[];
   reclamo_fotos?: Foto[];

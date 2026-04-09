@@ -28,7 +28,6 @@ export default function PedidosPage() {
   const [deleting, setDeleting] = useState(false);
 
   const [role, setRole] = useState("");
-  const [clientFilter, setClientFilter] = useState("");
 
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role") || "";
@@ -81,17 +80,16 @@ export default function PedidosPage() {
   const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(now.getDate() - 30);
 
   const canDelete = role === "admin" || role === "secretaria";
-  const visibleOrders = orders;
 
   // Status counts for tabs
   const countByStatus = {
-    todos: visibleOrders.length,
-    borrador: visibleOrders.filter(o => o.status === "borrador").length,
-    enviado: visibleOrders.filter(o => o.status === "enviado").length,
-    confirmado: visibleOrders.filter(o => o.status === "confirmado").length,
+    todos: orders.length,
+    borrador: orders.filter(o => o.status === "borrador").length,
+    enviado: orders.filter(o => o.status === "enviado").length,
+    confirmado: orders.filter(o => o.status === "confirmado").length,
   };
 
-  const filtered = visibleOrders
+  const filtered = orders
     .filter(o => {
       if (!search) return true;
       const s = search.toLowerCase();

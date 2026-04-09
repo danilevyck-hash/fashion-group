@@ -107,7 +107,7 @@ interface Props {
   setNewCatName: (v: string) => void;
   setNewResponsable: (v: string) => void;
   setResponsables: (v: string[]) => void;
-  onAddGasto: () => void;
+  onAddGasto: () => void | Promise<void>;
   fondoInicial?: number;
   totalGastado?: number;
 }
@@ -393,7 +393,7 @@ export default function GastoForm({
         </div>
         <div>
           <button
-            onClick={() => { onAddGasto(); setJustSaved(true); setTimeout(() => setJustSaved(false), 2000); }}
+            onClick={async () => { try { await onAddGasto(); setJustSaved(true); setTimeout(() => setJustSaved(false), 2000); } catch { /* error handled by parent */ } }}
             disabled={addingGasto || !gDescripcion || subtotalNum <= 0}
             className="bg-black text-white px-6 py-1.5 rounded-full text-sm hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
           >

@@ -48,6 +48,7 @@ export default function CamisetasPage() {
   const [stockEdits, setStockEdits] = useState<Record<string, number>>({});
   const [savingStock, setSavingStock] = useState(false);
   const [stockWarningDismissed, setStockWarningDismissed] = useState(false);
+  const [addingClient, setAddingClient] = useState(false);
 
   // Nuevo Pedido modal
   const [showNuevo, setShowNuevo] = useState(false);
@@ -121,20 +122,25 @@ export default function CamisetasPage() {
     if (diff > 0) checkStockWarning(pId, diff);
     const res = await fetch("/api/camisetas/pedido", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: cId, producto_id: pId, paquetes: paq }) });
     if (res.ok) {
-      if (diff <= 0 || prodTotalPaq(pId) + diff <= Math.floor((productos.find(x => x.id === pId)?.stock_comprado || 0) / PPQ)) showToast("Guardado");
+      showToast("Guardado");
     } else {
       showToast("No se pudo guardar. Intenta de nuevo.");
       load();
     }
   }
   async function addClient() {
-    if (!newClientName.trim()) return;
-    const res = await fetch("/api/camisetas/clientes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre: newClientName.trim() }) });
-    if (res.ok) {
-      const created = await res.json();
-      setNewClientName(""); setShowNewClient(false); showToast("Cliente creado");
-      await load();
-      setSelectedClient(created.id);
+    if (!newClientName.trim() || addingClient) return;
+    setAddingClient(true);
+    try {
+      const res = await fetch("/api/camisetas/clientes", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre: newClientName.trim() }) });
+      if (res.ok) {
+        const created = await res.json();
+        setNewClientName(""); setShowNewClient(false); showToast("Cliente creado");
+        await load();
+        setSelectedClient(created.id);
+      }
+    } finally {
+      setAddingClient(false);
     }
   }
   async function deleteClient(id: string) {
@@ -530,7 +536,7 @@ export default function CamisetasPage() {
                     <div className="flex gap-2 mb-4">
                       <input value={newClientName} onChange={e => setNewClientName(e.target.value)} placeholder="Nombre del cliente" onKeyDown={e => { if (e.key === "Enter") addClient(); }}
                         className="flex-1 border-b border-gray-200 py-2 text-sm outline-none focus:border-black min-h-[44px]" autoFocus />
-                      <button onClick={addClient} className="text-sm text-gray-500 hover:text-black px-3 min-h-[44px] min-w-[44px]">OK</button>
+                      <button onClick={addClient} disabled={addingClient} className="text-sm text-gray-500 hover:text-black px-3 min-h-[44px] min-w-[44px] disabled:opacity-50">{addingClient ? "..." : "OK"}</button>
                     </div>
                   )}
 
@@ -589,7 +595,7 @@ export default function CamisetasPage() {
                         {isEntregado ? "Marcar como Pendiente" : "Marcar como Entregado"}
                       </button>
                       <button onClick={() => setDeleteTarget(cl)} className="border border-red-200 text-red-600 px-4 py-2.5 rounded-md text-sm hover:border-red-400 transition min-h-[44px]">
-                        Cancelar Pedido
+                        Eliminar Cliente y Pedidos
                       </button>
                     </div>
 
@@ -681,7 +687,7 @@ export default function CamisetasPage() {
                     )}
                     <div className="text-right w-24 flex-shrink-0">
                       <span className={`text-sm font-medium tabular-nums ${disp < 0 ? "text-red-600" : "text-black"}`}>{disp}</span>
-                      <span className="text-xs text-gray-400 ml-1">disp.</span>
+                      <span className="text-xs text-gray-400 ml-1">disponibles</span>
                       {disp < 0 && <span className="text-[10px] text-red-500 block">⚠ −{Math.abs(disp)} paq</span>}
                     </div>
                   </div>
@@ -835,7 +841,7 @@ export default function CamisetasPage() {
                 <th className="text-left pb-2 font-medium">Item</th>
                 <th className="text-left pb-2 font-medium">Género</th>
                 <th className="text-right pb-2 font-medium">Precio Panamá</th>
-                <th className="text-right pb-2 font-medium">RRP</th>
+                <th className="text-right pb-2 font-medium">Precio Sugerido</th>
               </tr></thead>
               <tbody>
                 {GENERO_ORDER.flatMap(gen =>

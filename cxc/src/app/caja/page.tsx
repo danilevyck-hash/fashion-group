@@ -47,12 +47,11 @@ function CajaPage() {
     formValues, formSetters,
     confirmClosePeriodo, setConfirmClosePeriodo,
     confirmDeletePeriodoId, setConfirmDeletePeriodoId,
-    confirmDeleteGastoId, setConfirmDeleteGastoId,
     loadDetail, createPeriodo, confirmCreatePeriodo,
     requestClosePeriodo, doClosePeriodo,
     requestDeletePeriodo, doDeletePeriodo,
     aprobarReposicion,
-    addGasto, requestDeleteGasto, doDeleteGasto, saveEditGasto, exportExcel,
+    addGasto, requestDeleteGasto, saveEditGasto, exportExcel,
     pendingUndoCaja, undoActionCaja,
   } = useCajaState(urlId, initialView);
 

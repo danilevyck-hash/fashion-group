@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import { fmt } from "@/lib/format";
+import { fmt, fmtDate } from "@/lib/format";
 import { EMPRESAS } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, AnimatedNumber, BottomSheet } from "@/components/ui";
@@ -114,6 +114,8 @@ export default function PrestamosPage() {
   const [confirmBatchApprove, setConfirmBatchApprove] = useState(false);
   const [confirmBatchReject, setConfirmBatchReject] = useState(false);
   const [batchProcessing, setBatchProcessing] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
@@ -409,12 +411,12 @@ export default function PrestamosPage() {
                       <span className="text-gray-400 mx-2">·</span>
                       <span className="tabular-nums font-medium">${fmt(m.monto)}</span>
                       <span className="text-gray-400 mx-2">·</span>
-                      <span className="text-xs text-gray-400">{m.fecha}</span>
+                      <span className="text-xs text-gray-400">{fmtDate(m.fecha)}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={async () => { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "aprobado" }) }); if (res.ok) { showToast("Movimiento aprobado"); loadEmpleados(); } else showToast("Error al aprobar"); }} className="text-xs bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">Aprobar</button>
-                    <button onClick={async () => { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rechazado" }) }); if (res.ok) { showToast("Movimiento rechazado"); loadEmpleados(); } else showToast("Error al rechazar"); }} className="text-xs text-red-500 hover:text-red-700 transition px-4 py-2">Rechazar</button>
+                    <button disabled={processingId === m.id} onClick={async () => { setProcessingId(m.id); try { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "aprobado" }) }); if (res.ok) { showToast("Movimiento aprobado"); loadEmpleados(); } else showToast("Error al aprobar"); } finally { setProcessingId(null); } }} className="text-xs bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition disabled:opacity-50">{processingId === m.id ? "Procesando..." : "Aprobar"}</button>
+                    <button disabled={processingId === m.id} onClick={async () => { setProcessingId(m.id); try { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rechazado" }) }); if (res.ok) { showToast("Movimiento rechazado"); loadEmpleados(); } else showToast("Error al rechazar"); } finally { setProcessingId(null); } }} className="text-xs text-red-500 hover:text-red-700 transition px-4 py-2 disabled:opacity-50">{processingId === m.id ? "..." : "Rechazar"}</button>
                   </div>
                 </div>
               ))}
@@ -428,7 +430,9 @@ export default function PrestamosPage() {
           <button onClick={openNewMov} className="bg-black text-white px-5 py-2.5 sm:py-2 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo Préstamo</button>
           <button onClick={() => router.push("/prestamos/reporte")} className="border border-gray-200 px-5 py-2.5 sm:py-2 rounded-md text-sm hover:border-gray-400 transition">Reporte Deducciones</button>
           <button
+            disabled={exportingExcel}
             onClick={async () => {
+              setExportingExcel(true);
               const now = new Date();
               const q = now.getDate() <= 15 ? "1" : "2";
               const m = String(now.getMonth() + 1);
@@ -445,9 +449,10 @@ export default function PrestamosPage() {
                   URL.revokeObjectURL(url);
                 } else { showToast("Error al exportar"); }
               } catch { showToast("Error al exportar"); }
+              setExportingExcel(false);
             }}
-            className="border border-gray-200 px-5 py-2.5 sm:py-2 rounded-md text-sm hover:border-gray-400 transition"
-          >Exportar Excel</button>
+            className="border border-gray-200 px-5 py-2.5 sm:py-2 rounded-md text-sm hover:border-gray-400 transition disabled:opacity-50"
+          >{exportingExcel ? "Exportando..." : "Exportar Excel"}</button>
 
           <div className="flex-1" />
 
@@ -484,7 +489,7 @@ export default function PrestamosPage() {
                 <tr className="border-b border-gray-200">
                   <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Empleado</th>
                   <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Empresa</th>
-                  <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Ded. Quinc.</th>
+                  <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Ded. Quincenal</th>
                   <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Total Prestado</th>
                   <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Pagado</th>
                   <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Saldo</th>

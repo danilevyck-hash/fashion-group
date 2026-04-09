@@ -125,7 +125,9 @@ export default function GuiaForm({
     if (!editingId || !dirty || saving || autoSaveInFlight.current) return;
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(async () => {
-      if (items.some(i => i.cliente) && !autoSaveInFlight.current) {
+      const hasItems = items.some(i => i.cliente && i.direccion && i.empresa && i.facturas && i.bultos > 0);
+      const hasHeader = fecha.trim() && (transportista.trim() && transportista !== "__other__" || transportistaOtro.trim()) && entregadoPor.trim();
+      if (hasItems && hasHeader && !autoSaveInFlight.current) {
         autoSaveInFlight.current = true;
         try { handleSave(); } finally { autoSaveInFlight.current = false; }
       }

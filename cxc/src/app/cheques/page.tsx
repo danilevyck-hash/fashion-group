@@ -115,12 +115,14 @@ function ChequesPage() {
   const [selectedVencidos, setSelectedVencidos] = useState<Set<string>>(new Set());
   const [batchProcessing, setBatchProcessing] = useState(false);
   const [confirmBatch, setConfirmBatch] = useState<{ ids: Set<string>; clearFn: (v: Set<string>) => void } | null>(null);
-  const [depositingId, setDepositingId] = useState<string | null>(null);
   const [confirmDepositId, setConfirmDepositId] = useState<string | null>(null);
   const [kpiTooltip, setKpiTooltip] = useState<string | null>(null);
 
   // Undo actions
   const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
+
+  // Re-depositar loading
+  const [redepositandoId, setRedepositandoId] = useState<string | null>(null);
 
   // Rebotado modal
   const [rebotandoId, setRebotandoId] = useState<string | null>(null);
@@ -241,6 +243,7 @@ function ChequesPage() {
       if (cached) {
         setCheques(cached);
         setChequesCached(true);
+        showToast("Mostrando datos guardados. No se pudo actualizar.");
       } else {
         setError("No se pudieron cargar los cheques. Recarga la página.");
       }
@@ -380,6 +383,7 @@ function ChequesPage() {
   async function redepositar(id: string) {
     const cheque = cheques.find(c => c.id === id);
     if (!cheque) return;
+    setRedepositandoId(id);
     const hoy = todayStr();
     const notaExtra = `Re-depósito desde rebote (${hoy})`;
     const notas = cheque.notas ? `${cheque.notas}\n${notaExtra}` : notaExtra;
@@ -388,15 +392,26 @@ function ChequesPage() {
       if (!res.ok) { showToast("No se pudo re-depositar. Intenta de nuevo."); return; }
       showToast("Cheque marcado para re-depósito");
     } catch { showToast("Error de conexión. Intenta de nuevo."); }
+    finally { setRedepositandoId(null); }
     loadCheques();
   }
 
-  async function deleteCheque(id: string) {
-    try {
-      const res = await fetch(`/api/cheques/${id}`, { method: "DELETE" });
-      if (res.ok) { loadCheques(); showToast("Cheque eliminado"); }
-      else showToast("No se pudo eliminar. Intenta de nuevo.");
-    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
+  function deleteCheque(id: string) {
+    const cheque = cheques.find(c => c.id === id);
+    if (!cheque) return;
+    const snapshot = [...cheques];
+    setCheques(prev => prev.filter(c => c.id !== id));
+    scheduleAction({
+      id: `delete-${id}`,
+      message: `Cheque N° ${cheque.numero_cheque} eliminado`,
+      execute: async () => {
+        try {
+          const res = await fetch(`/api/cheques/${id}`, { method: "DELETE" });
+          if (!res.ok) { setCheques(snapshot); showToast("No se pudo eliminar. Intenta de nuevo."); }
+        } catch { setCheques(snapshot); showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
+      },
+      onRevert: () => setCheques(snapshot),
+    });
   }
 
   function exportFilterLabel(): string {
@@ -1149,7 +1164,7 @@ function ChequesPage() {
                 {/* State-valid actions */}
                 {isRebotado && (
                   <div className="mt-2 pt-2 border-t border-gray-100">
-                    <button onClick={(e) => { e.stopPropagation(); redepositar(c.id); }} className="text-xs text-emerald-600 font-medium py-1 min-h-[44px] flex items-center">Re-depositar</button>
+                    <button onClick={(e) => { e.stopPropagation(); redepositar(c.id); }} disabled={redepositandoId === c.id} className="text-xs text-emerald-600 font-medium py-1 min-h-[44px] flex items-center disabled:opacity-40">{redepositandoId === c.id ? "Re-depositando..." : "Re-depositar"}</button>
                   </div>
                 )}
               </div>
@@ -1218,7 +1233,7 @@ function ChequesPage() {
                       <button onClick={() => setConfirmDepositId(c.id)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Confirmar depósito</button>
                     )}
                     {isRebotado && (
-                      <button onClick={() => redepositar(c.id)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-emerald-600 transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Re-depositar</button>
+                      <button onClick={() => redepositar(c.id)} disabled={!isOnline || redepositandoId === c.id} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-emerald-600 transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">{redepositandoId === c.id ? "Re-depositando..." : "Re-depositar"}</button>
                     )}
                     <button onClick={() => startEdit(c)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Editar</button>
                     <ChequeMoreMenu

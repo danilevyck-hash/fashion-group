@@ -162,8 +162,12 @@ function ReclamosPage() {
 
   async function addNota() {
     if (!current || !nota.trim()) return;
-    await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seguimiento_nota: nota, autor: role }) });
-    setNota(""); await loadDetail(current.id);
+    try {
+      const res = await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seguimiento_nota: nota, autor: role }) });
+      if (!res.ok) { setToast("Error al agregar nota"); setTimeout(() => setToast(null), 3000); return; }
+      setNota(""); await loadDetail(current.id);
+      setToast("Nota agregada"); setTimeout(() => setToast(null), 3000);
+    } catch { setToast("Error al agregar nota"); setTimeout(() => setToast(null), 3000); }
   }
   async function changeEstado(e: string) {
     if (!current || current.estado === e) return;
@@ -218,6 +222,7 @@ function ReclamosPage() {
       await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: editEmpresa, proveedor: EMPRESAS_MAP[editEmpresa]?.proveedor || current.proveedor, marca: EMPRESAS_MAP[editEmpresa]?.marca || current.marca, nro_factura: editFactura, nro_orden_compra: editPedido, fecha_reclamo: editFecha, notas: editNotas, estado: editEstado }) });
       await fetch(`/api/reclamos/${current.id}/items`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: editItems }) });
       setEditMode(false); await loadDetail(current.id); loadReclamos();
+      setToast("Cambios guardados"); setTimeout(() => setToast(null), 3000);
     } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
     setEditSaving(false);
   }

@@ -6,7 +6,7 @@ import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
 import ClientRow from "./ClientRow";
 import ContactPanel from "./ContactPanel";
-import { AccordionContent, useContextMenu, BottomSheet } from "@/components/ui";
+import { AccordionContent, useContextMenu, BottomSheet, Toast, ConfirmModal } from "@/components/ui";
 import type { ContextMenuItem } from "@/components/ui";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
 
@@ -74,6 +74,9 @@ export default function ClientTable({
   const cancelledRef = useRef(false);
   const [batchProgress, setBatchProgress] = useState<{ sent: number; total: number } | null>(null);
   const { show: showContextMenu } = useContextMenu();
+  const [toast, setToast] = useState<string | null>(null);
+  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
+  const [confirmWA, setConfirmWA] = useState<{ count: number; callback: () => void } | null>(null);
 
   // Build context menu items for a CXC client row
   const buildClientContextMenu = useCallback((client: ConsolidatedClient): ContextMenuItem[] => {
@@ -148,35 +151,39 @@ export default function ClientTable({
     const selected = filtered.filter((c) => selectedNames.has(c.nombre_normalized));
     const withPhone = selected.filter((c) => c.celular || c.telefono);
     if (withPhone.length === 0) {
-      alert(`${selected.length > 0 ? "Ninguno de los clientes seleccionados tiene telefono registrado." : "No hay clientes seleccionados."}`);
+      showToast(selected.length > 0 ? "Ninguno de los clientes seleccionados tiene telefono registrado." : "No hay clientes seleccionados.");
       return;
     }
-    if (!confirm(`Se abriran ${withPhone.length} ventanas de WhatsApp. ¿Continuar?`)) return;
 
-    cancelledRef.current = false;
-    setBatchProgress({ sent: 0, total: withPhone.length });
+    setConfirmWA({
+      count: withPhone.length,
+      callback: () => {
+        cancelledRef.current = false;
+        setBatchProgress({ sent: 0, total: withPhone.length });
 
-    function sendNext(index: number) {
-      if (cancelledRef.current) {
-        alert(`Envio cancelado. Se enviaron ${index} de ${withPhone.length} mensajes.`);
-        setBatchProgress(null);
-        exitSelectionMode();
-        return;
-      }
-      if (index >= withPhone.length) {
-        alert(`Envio completado. Se enviaron ${withPhone.length} mensajes.`);
-        setBatchProgress(null);
-        exitSelectionMode();
-        return;
-      }
-      const client = withPhone[index];
-      onOpenWhatsApp(client);
-      onMarkContacted(client.nombre_normalized, "whatsapp");
-      setBatchProgress({ sent: index + 1, total: withPhone.length });
-      setTimeout(() => sendNext(index + 1), 1500);
-    }
+        function sendNext(index: number) {
+          if (cancelledRef.current) {
+            showToast(`Envio cancelado. Se enviaron ${index} de ${withPhone.length} mensajes.`);
+            setBatchProgress(null);
+            exitSelectionMode();
+            return;
+          }
+          if (index >= withPhone.length) {
+            showToast(`Envio completado. Se enviaron ${withPhone.length} mensajes.`);
+            setBatchProgress(null);
+            exitSelectionMode();
+            return;
+          }
+          const client = withPhone[index];
+          onOpenWhatsApp(client);
+          onMarkContacted(client.nombre_normalized, "whatsapp");
+          setBatchProgress({ sent: index + 1, total: withPhone.length });
+          setTimeout(() => sendNext(index + 1), 1500);
+        }
 
-    sendNext(0);
+        sendNext(0);
+      },
+    });
   }
 
   const allVisibleSelected = filtered.length > 0 && filtered.every((c) => selectedNames.has(c.nombre_normalized));
@@ -465,6 +472,16 @@ export default function ClientTable({
       <div className="mt-3 text-[11px] text-gray-400 text-center">
         {filtered.length} clientes &middot; Politica: 0-90d corriente &middot; 91-120d vigilancia &middot; 121d+ vencido
       </div>
+
+      <Toast message={toast} />
+      <ConfirmModal
+        open={!!confirmWA}
+        onClose={() => setConfirmWA(null)}
+        onConfirm={() => { confirmWA?.callback(); setConfirmWA(null); }}
+        title="Envio masivo de WhatsApp"
+        message={`Se abriran ${confirmWA?.count ?? 0} ventanas de WhatsApp. ¿Continuar?`}
+        confirmLabel="Enviar"
+      />
     </>
   );
 }

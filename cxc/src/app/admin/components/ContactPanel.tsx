@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Company } from "@/lib/companies";
+import { COMPANIES } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
 import ContactInline from "./ContactInline";
@@ -70,8 +71,6 @@ export default function ContactPanel({
     });
     setAutoSaveStatus("idle");
   }
-
-  const [noteSaved, setNoteSaved] = useState(false);
 
   // FIX 10: Auto-save with debounce
   const doAutoSave = useCallback(() => {
@@ -284,7 +283,7 @@ export default function ContactPanel({
                     const totalColor = overdue > 0 ? "text-red-600" : watch > 0 ? "text-amber-600" : "text-emerald-600";
                     return (
                       <tr key={i} className="border-t border-gray-200 hover:bg-white transition">
-                        <td className="py-1.5 font-medium">{inv.company_key}</td>
+                        <td className="py-1.5 font-medium">{COMPANIES.find(c => c.key === inv.company_key)?.name ?? inv.company_key}</td>
                         <td className="py-1.5 text-gray-400">{inv.codigo}</td>
                         <td className="text-right py-1.5 tabular-nums">{fmt(current)}</td>
                         <td className="text-right py-1.5 tabular-nums text-amber-600">{fmt(watch)}</td>

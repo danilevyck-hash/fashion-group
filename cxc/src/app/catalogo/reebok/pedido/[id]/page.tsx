@@ -107,38 +107,46 @@ export default function OrderDetailPage() {
     saveInFlight.current = false;
   }
 
-  // ── CONFIRM ORDER (send email first, then mark confirmado) ──
+  // ── CONFIRM ORDER (mark confirmed first, then send email) ──
   async function confirmOrder() {
     setConfirming(true);
-    showToast("Enviando email...");
+    showToast("Confirmando pedido...");
 
-    // 1. Try to send email first
+    // 1. Mark as confirmado FIRST
+    try {
+      const confirmRes = await fetch(`/api/catalogo/reebok/orders/${id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_name: clientName, items, status: "confirmado" }),
+      });
+      if (!confirmRes.ok) {
+        showToast("No se pudo confirmar el pedido. Intenta de nuevo.");
+        setConfirming(false);
+        return;
+      }
+    } catch {
+      showToast("No se pudo confirmar el pedido. Intenta de nuevo.");
+      setConfirming(false);
+      return;
+    }
+
+    // 2. Clear active draft so catalog starts fresh
+    sessionStorage.removeItem("reebok_draft_id");
+
+    // 3. Try to send email (non-blocking — order is already confirmed)
     try {
       const emailRes = await fetch("/api/catalogo/reebok/send-order", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId: id }),
       });
       if (!emailRes.ok) {
-        showToast("No se pudo enviar el email. El pedido NO fue confirmado.");
-        setConfirming(false);
-        return;
+        showToast("Pedido confirmado pero no se pudo enviar email");
+      } else {
+        showToast("Pedido confirmado. Se envio por email a Fashion Group.");
       }
     } catch {
-      showToast("No se pudo enviar el email. El pedido NO fue confirmado.");
-      setConfirming(false);
-      return;
+      showToast("Pedido confirmado pero no se pudo enviar email");
     }
 
-    // 2. Email succeeded — now mark as confirmado
-    await fetch(`/api/catalogo/reebok/orders/${id}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ client_name: clientName, items, status: "confirmado" }),
-    });
-
-    // 3. Clear active draft so catalog starts fresh
-    sessionStorage.removeItem("reebok_draft_id");
-
-    showToast("Pedido confirmado. Se envio por email a Fashion Group.");
     setConfirming(false);
     setJustConfirmed(true);
     load();

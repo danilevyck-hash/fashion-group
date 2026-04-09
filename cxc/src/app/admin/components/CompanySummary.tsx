@@ -9,7 +9,6 @@ interface Props {
   roleClients: ConsolidatedClient[];
   companyFilter: string;
   clients: ConsolidatedClient[];
-  vendorMap: Record<string, Record<string, string>>;
   onSendVendorWhatsApp: (companyKey: string) => void;
 }
 

@@ -33,7 +33,6 @@ export function useCajaState(urlId: string, initialView: View) {
   const [newCatName, setNewCatName] = useState("");
   const [confirmClosePeriodo, setConfirmClosePeriodo] = useState<string | null>(null);
   const [confirmDeletePeriodoId, setConfirmDeletePeriodoId] = useState<string | null>(null);
-  const [confirmDeleteGastoId, setConfirmDeleteGastoId] = useState<string | null>(null);
   const [showNewPeriodoModal, setShowNewPeriodoModal] = useState(false);
   const [fondoInput, setFondoInput] = useState("200");
   const [responsables, setResponsables] = useState<string[]>([]);
@@ -273,10 +272,11 @@ export function useCajaState(urlId: string, initialView: View) {
       // Reload to get the real server ID
       await loadDetail(current.id);
       loadPeriodos();
-    } catch {
+    } catch (err) {
       // Revert optimistic update
       setCurrent(snapshot);
       setError("Error al agregar gasto. Intenta de nuevo.");
+      throw err;
     } finally {
       setAddingGasto(false);
     }
@@ -310,15 +310,6 @@ export function useCajaState(urlId: string, initialView: View) {
     });
   }
 
-  async function doDeleteGasto() {
-    if (!current || !confirmDeleteGastoId) return;
-    const gastoId = confirmDeleteGastoId;
-    setConfirmDeleteGastoId(null);
-    await fetch(`/api/caja/gastos/${gastoId}`, { method: "DELETE" });
-    await loadDetail(current.id);
-    loadPeriodos();
-  }
-
   async function saveEditGasto() {
     if (!current || !editingGastoId) return;
     const sub = parseFloat(String(editGasto.subtotal)) || 0;
@@ -330,13 +321,18 @@ export function useCajaState(urlId: string, initialView: View) {
       categoria: normalizeStr(editGasto.categoria || ""),
       responsable: normalizeStr(editGasto.responsable || ""),
     };
-    await fetch(`/api/caja/gastos/${editingGastoId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(normalizedEdit),
-    });
-    setEditingGastoId(null); setEditGasto({});
-    await loadDetail(current.id); loadPeriodos();
+    try {
+      const res = await fetch(`/api/caja/gastos/${editingGastoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(normalizedEdit),
+      });
+      if (!res.ok) { setError("Error al guardar cambios"); return; }
+      setEditingGastoId(null); setEditGasto({});
+      await loadDetail(current.id); loadPeriodos();
+    } catch {
+      setError("Error al guardar cambios");
+    }
   }
 
   async function exportExcel() {
@@ -368,12 +364,11 @@ export function useCajaState(urlId: string, initialView: View) {
     formValues, formSetters,
     confirmClosePeriodo, setConfirmClosePeriodo,
     confirmDeletePeriodoId, setConfirmDeletePeriodoId,
-    confirmDeleteGastoId, setConfirmDeleteGastoId,
     loadDetail, createPeriodo, confirmCreatePeriodo,
     requestClosePeriodo, doClosePeriodo,
     requestDeletePeriodo, doDeletePeriodo,
     aprobarReposicion,
-    addGasto, requestDeleteGasto, doDeleteGasto, saveEditGasto, exportExcel,
+    addGasto, requestDeleteGasto, saveEditGasto, exportExcel,
     pendingUndoCaja, undoActionCaja,
   };
 }
