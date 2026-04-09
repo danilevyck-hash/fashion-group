@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import React, { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 
@@ -29,11 +29,20 @@ function LoginForm() {
   const searchParams = useSearchParams();
   const expired = searchParams.get("expired") === "1";
 
+  const autoTriggered = useRef(false);
+
   useEffect(() => {
     if (expired) setExpiredMsg(true);
     if (typeof window !== "undefined" && localStorage.getItem("fg_webauthn_available") === "1") {
       setWebauthnAvailable(true);
+      // Auto-trigger Face ID on app open (like a bank app)
+      if (!expired && !autoTriggered.current) {
+        autoTriggered.current = true;
+        // Small delay to let the page render first
+        setTimeout(() => handleFaceId(), 300);
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expired]);
 
   function storeSession(data: { role: string; userId?: string; userName?: string; modules?: string[] }) {
