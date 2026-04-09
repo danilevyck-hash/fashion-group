@@ -49,8 +49,8 @@ function LoginForm() {
     try {
       const credIds = JSON.parse(localStorage.getItem("fg_webauthn_cred_ids") || "[]");
       const optRes = await fetch(`/api/auth/webauthn/authenticate?credentialIds=${credIds.join(",")}`);
-      if (!optRes.ok) throw new Error("No se pudo iniciar Face ID");
       const options = await optRes.json();
+      if (!optRes.ok) throw new Error(options.error || "No se pudo iniciar Face ID");
 
       const { base64urlDecode } = await import("@/lib/webauthn");
 
@@ -92,14 +92,14 @@ function LoginForm() {
         }),
       });
 
-      if (!verifyRes.ok) throw new Error("Verificación fallida");
-      const data = await verifyRes.json();
-      storeSession(data);
-      router.push(data.role === "cliente" ? "/catalogo/reebok" : "/home");
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok) throw new Error(verifyData.error || "Verificación fallida");
+      storeSession(verifyData);
+      router.push(verifyData.role === "cliente" ? "/catalogo/reebok" : "/home");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error desconocido";
       console.error("Face ID auth error:", msg);
-      setError("No se pudo verificar. Usa tu contraseña.");
+      setError(msg || "No se pudo verificar. Usa tu contraseña.");
       setWebauthnAvailable(false);
     } finally {
       setWebauthnLoading(false);

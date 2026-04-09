@@ -87,7 +87,10 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (lookupErr || !storedCred) {
-    return NextResponse.json({ error: "Credencial no encontrada" }, { status: 401 });
+    return NextResponse.json(
+      { error: `Credencial no encontrada (id: ${credential.id?.substring(0, 12)}..., dbError: ${lookupErr?.message || "none"})` },
+      { status: 401 }
+    );
   }
 
   const rpId = getRpId(req);
@@ -118,8 +121,17 @@ export async function POST(req: NextRequest) {
       .eq("id", storedCred.user_id)
       .single();
 
-    if (userErr || !user || !user.active) {
-      return NextResponse.json({ error: "Usuario no encontrado o inactivo" }, { status: 401 });
+    if (userErr || !user) {
+      return NextResponse.json(
+        { error: `Usuario no encontrado (user_id: ${storedCred.user_id}, dbError: ${userErr?.message || "none"})` },
+        { status: 401 }
+      );
+    }
+    if (!user.active) {
+      return NextResponse.json(
+        { error: `Usuario "${user.name}" está inactivo` },
+        { status: 401 }
+      );
     }
 
     // Get modules (same logic as password auth)
@@ -185,9 +197,10 @@ export async function POST(req: NextRequest) {
 
     return res;
   } catch (err) {
-    console.error("WebAuthn authentication verification failed:", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("WebAuthn authentication verification failed:", msg);
     return NextResponse.json(
-      { error: "Error verificando credencial" },
+      { error: `Error verificando credencial: ${msg}` },
       { status: 401 }
     );
   }
