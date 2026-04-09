@@ -297,8 +297,17 @@ export async function verifyRegistrationResponse(
   if (clientData.challenge !== expectedChallenge) {
     throw new Error("Challenge mismatch");
   }
-  if (clientData.origin !== origin) {
-    throw new Error("Origin mismatch");
+  // In PWA standalone mode on iOS, origin may differ (http vs https, port differences)
+  // Accept if hostname matches
+  try {
+    const expectedHost = new URL(origin).hostname;
+    const actualHost = new URL(clientData.origin).hostname;
+    if (expectedHost !== actualHost) {
+      throw new Error(`Origin mismatch: expected ${expectedHost}, got ${actualHost}`);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("Origin mismatch")) throw e;
+    // If URL parsing fails, fall through
   }
 
   // 2. Decode attestation object
@@ -432,8 +441,17 @@ export async function verifyAuthenticationResponse(
   if (clientData.challenge !== expectedChallenge) {
     throw new Error("Challenge mismatch");
   }
-  if (clientData.origin !== origin) {
-    throw new Error("Origin mismatch");
+  // In PWA standalone mode on iOS, origin may differ (http vs https, port differences)
+  // Accept if hostname matches
+  try {
+    const expectedHost = new URL(origin).hostname;
+    const actualHost = new URL(clientData.origin).hostname;
+    if (expectedHost !== actualHost) {
+      throw new Error(`Origin mismatch: expected ${expectedHost}, got ${actualHost}`);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith("Origin mismatch")) throw e;
+    // If URL parsing fails, fall through
   }
 
   // 2. Parse authenticator data

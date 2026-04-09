@@ -48,7 +48,7 @@ function LoginForm() {
     setError("");
     try {
       const credIds = JSON.parse(localStorage.getItem("fg_webauthn_cred_ids") || "[]");
-      const optRes = await fetch(`/api/auth/webauthn/authenticate?credIds=${encodeURIComponent(JSON.stringify(credIds))}`);
+      const optRes = await fetch(`/api/auth/webauthn/authenticate?credentialIds=${credIds.join(",")}`);
       if (!optRes.ok) throw new Error("No se pudo iniciar Face ID");
       const options = await optRes.json();
 
@@ -78,12 +78,17 @@ function LoginForm() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: base64urlEncode(new Uint8Array(credential.rawId)),
-          response: {
-            authenticatorData: base64urlEncode(new Uint8Array(authResp.authenticatorData)),
-            clientDataJSON: base64urlEncode(new Uint8Array(authResp.clientDataJSON)),
-            signature: base64urlEncode(new Uint8Array(authResp.signature)),
+          credential: {
+            id: base64urlEncode(new Uint8Array(credential.rawId)),
+            rawId: base64urlEncode(new Uint8Array(credential.rawId)),
+            type: credential.type,
+            response: {
+              authenticatorData: base64urlEncode(new Uint8Array(authResp.authenticatorData)),
+              clientDataJSON: base64urlEncode(new Uint8Array(authResp.clientDataJSON)),
+              signature: base64urlEncode(new Uint8Array(authResp.signature)),
+            },
           },
+          challenge: options.challenge,
         }),
       });
 
