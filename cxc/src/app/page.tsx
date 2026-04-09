@@ -110,6 +110,8 @@ function LoginForm() {
       console.error("Face ID auth error:", msg);
       setError(msg || "No se pudo verificar. Usa tu contraseña.");
       setWebauthnAvailable(false);
+      localStorage.removeItem("fg_webauthn_available");
+      localStorage.removeItem("fg_webauthn_cred_ids");
     } finally {
       setWebauthnLoading(false);
     }
