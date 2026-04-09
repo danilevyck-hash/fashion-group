@@ -287,8 +287,8 @@ export function generateRegistrationOptions(
     pubKeyCredParams: [{ type: "public-key", alg: -7 }], // ES256
     authenticatorSelection: {
       authenticatorAttachment: "platform",
-      residentKey: "preferred",
-      userVerification: "preferred",
+      residentKey: "discouraged",
+      userVerification: "required",
     },
     attestation: "none",
     timeout: 60000,
