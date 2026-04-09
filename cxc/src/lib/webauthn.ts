@@ -15,6 +15,40 @@ function toAB(u: Uint8Array): ArrayBuffer {
 }
 
 // ---------------------------------------------------------------------------
+// DER → IEEE P1363 signature conversion (for ECDSA P-256)
+// ---------------------------------------------------------------------------
+
+/** Convert DER-encoded ECDSA signature to raw r||s (each 32 bytes for P-256) */
+function derToRaw(der: Uint8Array): Uint8Array {
+  // DER: 30 <totalLen> 02 <rLen> <rBytes> 02 <sLen> <sBytes>
+  const raw = new Uint8Array(64); // 32 + 32 for P-256
+  let offset = 2; // skip 30 <len>
+
+  // Read r
+  if (der[offset] !== 0x02) throw new Error("Invalid DER: expected 0x02 for r");
+  offset++;
+  const rLen = der[offset++];
+  let rStart = offset;
+  let rActualLen = rLen;
+  // Skip leading zero padding (DER adds 0x00 if high bit set)
+  if (rLen === 33 && der[rStart] === 0x00) { rStart++; rActualLen = 32; }
+  // Copy r, right-aligned in 32 bytes
+  raw.set(der.slice(rStart, rStart + Math.min(rActualLen, 32)), 32 - Math.min(rActualLen, 32));
+  offset += rLen;
+
+  // Read s
+  if (der[offset] !== 0x02) throw new Error("Invalid DER: expected 0x02 for s");
+  offset++;
+  const sLen = der[offset++];
+  let sStart = offset;
+  let sActualLen = sLen;
+  if (sLen === 33 && der[sStart] === 0x00) { sStart++; sActualLen = 32; }
+  raw.set(der.slice(sStart, sStart + Math.min(sActualLen, 32)), 32 + 32 - Math.min(sActualLen, 32));
+
+  return raw;
+}
+
+// ---------------------------------------------------------------------------
 // Base64url helpers
 // ---------------------------------------------------------------------------
 
@@ -502,18 +536,20 @@ export async function verifyAuthenticationResponse(
     throw new Error(`Failed to import public key (${publicKeyBytes.length}B): ${keyErr instanceof Error ? keyErr.message : String(keyErr)}`);
   }
 
-  // WebAuthn uses DER-encoded signature, Web Crypto expects it too for ECDSA
-  const signatureBytes = base64urlDecode(response.response.signature);
+  // WebAuthn gives DER-encoded signature, but Web Crypto ECDSA expects
+  // IEEE P1363 format (raw r||s, each 32 bytes for P-256). Convert.
+  const derSig = base64urlDecode(response.response.signature);
+  const rawSig = derToRaw(derSig);
 
   const valid = await crypto.subtle.verify(
     { name: "ECDSA", hash: "SHA-256" },
     cryptoKey,
-    toAB(signatureBytes),
+    toAB(rawSig),
     toAB(signedData)
   );
 
   if (!valid) {
-    throw new Error(`Signature verification failed (signedData: ${signedData.length}B, sig: ${signatureBytes.length}B, pubKey: ${publicKeyBytes.length}B)`);
+    throw new Error(`Signature verification failed (signedData: ${signedData.length}B, sig: ${rawSig.length}B, pubKey: ${publicKeyBytes.length}B)`);
   }
 
   return { newCounter: authData.signCount };
