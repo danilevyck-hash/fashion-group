@@ -131,19 +131,23 @@ export default function CamisetasPage() {
 
   async function saveAllChanges() {
     const entries = Object.entries(pendingChanges);
-    if (entries.length === 0) return;
+    if (entries.length === 0) { showToast("No hay cambios para guardar"); return; }
     setSavingAll(true);
-    let ok = true;
+    let failures = 0;
+    let lastError = "";
     for (const [key, paq] of entries) {
       const [cId, pId] = key.split("::");
-      const res = await fetch("/api/camisetas/pedido", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: cId, producto_id: pId, paquetes: paq }) });
-      if (!res.ok) ok = false;
+      try {
+        const res = await fetch("/api/camisetas/pedido", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: cId, producto_id: pId, paquetes: paq }) });
+        if (!res.ok) { failures++; const errData = await res.json().catch(() => ({})); lastError = errData.error || `HTTP ${res.status}`; }
+      } catch (e) { failures++; lastError = e instanceof Error ? e.message : "Sin conexión"; }
     }
-    if (ok) {
+    if (failures === 0) {
       showToast(`${entries.length} cambio${entries.length > 1 ? "s" : ""} guardado${entries.length > 1 ? "s" : ""}`);
       setPendingChanges({});
+      load();
     } else {
-      showToast("Error al guardar algunos cambios. Intenta de nuevo.");
+      showToast(`Error: ${lastError}. ${failures} de ${entries.length} fallaron.`);
       load();
     }
     setSavingAll(false);
