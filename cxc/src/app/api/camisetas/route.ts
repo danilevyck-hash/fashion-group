@@ -3,6 +3,8 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "vendedor"]);
@@ -21,10 +23,12 @@ export async function GET(req: NextRequest) {
     .from("camisetas_pedidos").select("*").eq("deleted", false);
   if (e3) { console.error("camisetas_pedidos error:", e3.message); errors.push(`pedidos: ${e3.message}`); }
 
-  return NextResponse.json({
+  const res = NextResponse.json({
     productos: productos || [],
     clientes: clientes || [],
     pedidos: pedidos || [],
     errors: errors.length > 0 ? errors : undefined,
   });
+  res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+  return res;
 }
