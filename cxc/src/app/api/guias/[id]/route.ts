@@ -5,7 +5,7 @@ import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const GUIAS_ROLES = ["admin", "secretaria", "bodega", "director"];
+const GUIAS_ROLES = ["admin", "secretaria", "bodega", "director", "vendedor"];
 
 // ── Shared: generate PDF + send email ──
 

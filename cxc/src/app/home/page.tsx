@@ -30,7 +30,7 @@ const MODULE_ICONS: Record<string, React.ReactNode> = {
 const ALL_MODULES = [
   { key: "cxc", label: "Cuentas por Cobrar", subtitle: "Quién debe, cuánto y desde cuándo", href: "/admin", roles: ["admin", "secretaria", "director", "vendedor"], group: "dia" as const },
   { key: "upload", label: "Actualizar Datos", subtitle: "Subir archivos de Switch Soft", href: "/upload", roles: ["admin", "secretaria"], group: "dia" as const },
-  { key: "guias", label: "Guías de Despacho", subtitle: "Crear y rastrear envíos", href: "/guias", roles: ["admin", "secretaria", "bodega", "director"], group: "dia" as const },
+  { key: "guias", label: "Guías de Despacho", subtitle: "Crear y rastrear envíos", href: "/guias", roles: ["admin", "secretaria", "bodega", "director", "vendedor"], group: "dia" as const },
   { key: "caja", label: "Caja Menuda", subtitle: "Registrar gastos del día a día", href: "/caja", roles: ["admin", "secretaria"], group: "consulta" as const },
   { key: "directorio", label: "Directorio", subtitle: "Clientes y contactos", href: "/directorio", roles: ["admin", "secretaria", "director", "contabilidad", "vendedor"], group: "consulta" as const },
   { key: "cheques", label: "Cheques", subtitle: "Control de cheques por cobrar", href: "/cheques", roles: ["admin", "secretaria", "director"], group: "dia" as const },
