@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -36,8 +36,9 @@ export default function CamisetasPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [editCell, setEditCell] = useState<{ cId: string; pId: string } | null>(null);
-  const [editVal, setEditVal] = useState(0);
-  const editValRef = useRef(0);
+  const [editVal, setEditVal] = useState("");
+  const [pendingChanges, setPendingChanges] = useState<Record<string, number>>({});
+  const [savingAll, setSavingAll] = useState(false);
   const [newClientName, setNewClientName] = useState("");
   const [showNewClient, setShowNewClient] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
@@ -108,26 +109,44 @@ export default function CamisetasPage() {
     }
   }
 
-  async function savePedido(cId: string, pId: string, paq: number) {
+  function commitCell(cId: string, pId: string, val: string) {
+    const paq = parseInt(val) || 0;
+    const key = `${cId}::${pId}`;
     const prevPaq = getPaq(cId, pId);
-    const diff = paq - prevPaq;
+    if (paq === prevPaq) {
+      // No change, remove from pending if was there
+      setPendingChanges(prev => { const n = { ...prev }; delete n[key]; return n; });
+    } else {
+      setPendingChanges(prev => ({ ...prev, [key]: paq }));
+    }
+    // Update local state optimistically for immediate visual feedback
     setPedidos(prev => {
       const idx = prev.findIndex(p => p.cliente_id === cId && p.producto_id === pId);
-      if (paq <= 0) {
-        return idx >= 0 ? prev.filter((_, i) => i !== idx) : prev;
-      }
+      if (paq <= 0) return idx >= 0 ? prev.filter((_, i) => i !== idx) : prev;
       if (idx >= 0) return prev.map((p, i) => i === idx ? { ...p, paquetes: paq } : p);
       return [...prev, { id: "", cliente_id: cId, producto_id: pId, paquetes: paq }];
     });
     setEditCell(null);
-    if (diff > 0) checkStockWarning(pId, diff);
-    const res = await fetch("/api/camisetas/pedido", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: cId, producto_id: pId, paquetes: paq }) });
-    if (res.ok) {
-      showToast("Guardado");
+  }
+
+  async function saveAllChanges() {
+    const entries = Object.entries(pendingChanges);
+    if (entries.length === 0) return;
+    setSavingAll(true);
+    let ok = true;
+    for (const [key, paq] of entries) {
+      const [cId, pId] = key.split("::");
+      const res = await fetch("/api/camisetas/pedido", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cliente_id: cId, producto_id: pId, paquetes: paq }) });
+      if (!res.ok) ok = false;
+    }
+    if (ok) {
+      showToast(`${entries.length} cambio${entries.length > 1 ? "s" : ""} guardado${entries.length > 1 ? "s" : ""}`);
+      setPendingChanges({});
     } else {
-      showToast("No se pudo guardar. Intenta de nuevo.");
+      showToast("Error al guardar algunos cambios. Intenta de nuevo.");
       load();
     }
+    setSavingAll(false);
   }
   async function addClient() {
     if (!newClientName.trim() || addingClient) return;
@@ -484,23 +503,20 @@ export default function CamisetasPage() {
                                     return (
                                       <td key={c.id} className="py-1 px-0.5 text-center border-b border-gray-200 hover:bg-gray-50 transition">
                                         {editing ? (
-                                          <div className="flex items-center justify-center gap-0.5">
-                                            <input type="text" inputMode="numeric" value={editVal === 0 ? "" : editVal}
-                                              onChange={e => { const raw = e.target.value.replace(/\D/g, ""); const v = raw ? parseInt(raw) : 0; setEditVal(v); editValRef.current = v; }}
-                                              onKeyDown={e => { if (e.key === "Enter") savePedido(c.id, prod.id, editValRef.current); if (e.key === "Escape") setEditCell(null); }}
-                                              placeholder="#"
-                                              className="w-8 text-center border-b border-black text-xs py-0.5 outline-none bg-transparent" autoFocus />
-                                            <button onClick={() => savePedido(c.id, prod.id, editValRef.current)}
-                                              className="text-[9px] bg-black text-white rounded px-1 py-0.5 hover:bg-gray-700 active:scale-95 transition">✓</button>
-                                          </div>
+                                          <input type="text" inputMode="numeric" value={editVal}
+                                            onChange={e => setEditVal(e.target.value.replace(/\D/g, ""))}
+                                            onBlur={() => commitCell(c.id, prod.id, editVal)}
+                                            onKeyDown={e => { if (e.key === "Enter") { commitCell(c.id, prod.id, editVal); } if (e.key === "Escape") setEditCell(null); }}
+                                            placeholder="#"
+                                            className="w-10 text-center border border-black rounded text-xs py-0.5 outline-none bg-white" autoFocus />
                                         ) : paq > 0 ? (
-                                          <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(paq); editValRef.current = paq; }}
+                                          <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(String(paq)); }}
                                             title="Click para editar"
-                                            className="inline-block bg-gray-800 text-white rounded px-1.5 py-0.5 text-[10px] tabular-nums font-medium hover:bg-red-600 transition min-w-[22px]">{paq}</button>
+                                            className={`inline-block rounded px-1.5 py-0.5 text-[10px] tabular-nums font-medium transition min-w-[22px] ${pendingChanges[`${c.id}::${prod.id}`] !== undefined ? "bg-amber-500 text-white" : "bg-gray-800 text-white hover:bg-gray-600"}`}>{paq}</button>
                                         ) : (
-                                          <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(0); editValRef.current = 0; }}
+                                          <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(""); }}
                                             title="Click para editar"
-                                            className="text-gray-200 hover:text-gray-400 cursor-pointer hover:bg-gray-100 transition text-[10px]">—</button>
+                                            className={`text-[10px] cursor-pointer hover:bg-gray-100 transition ${pendingChanges[`${c.id}::${prod.id}`] !== undefined ? "text-amber-500 font-bold" : "text-gray-200 hover:text-gray-400"}`}>—</button>
                                         )}
                                       </td>
                                     );
@@ -627,7 +643,7 @@ export default function CamisetasPage() {
                                     inputMode="numeric"
                                     onBlur={e => {
                                       const v = parseInt(e.target.value) || 0;
-                                      if (v !== paq) savePedido(selectedClient, prod.id, v);
+                                      if (v !== paq && selectedClient) commitCell(selectedClient, prod.id, String(v));
                                     }}
                                     onKeyDown={e => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
                                     className="w-14 text-center border border-gray-200 rounded-lg text-sm py-2 outline-none focus:border-black tabular-nums min-h-[44px]" />
@@ -885,6 +901,20 @@ export default function CamisetasPage() {
         )}
         <button onClick={() => setShowInfo(false)} className="mt-4 w-full py-2.5 border rounded-md text-sm hover:bg-gray-50 transition">Cerrar</button>
       </Modal>
+
+      {/* Sticky save bar when there are pending changes */}
+      {Object.keys(pendingChanges).length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between z-40 safe-bottom">
+          <span className="text-sm text-gray-500">{Object.keys(pendingChanges).length} cambio{Object.keys(pendingChanges).length > 1 ? "s" : ""} sin guardar</span>
+          <div className="flex gap-2">
+            <button onClick={() => { setPendingChanges({}); load(); }} className="text-sm text-gray-400 hover:text-gray-600 px-3 py-2 transition">Descartar</button>
+            <button onClick={saveAllChanges} disabled={savingAll}
+              className="bg-black text-white text-sm font-medium px-6 py-2 rounded-md hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[44px]">
+              {savingAll ? "Guardando..." : "Guardar cambios"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <Toast message={toast} />
       <ConfirmDeleteModal
