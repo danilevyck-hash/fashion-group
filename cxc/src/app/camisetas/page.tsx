@@ -484,11 +484,15 @@ export default function CamisetasPage() {
                                     return (
                                       <td key={c.id} className="py-1 px-0.5 text-center border-b border-gray-200 hover:bg-gray-50 transition">
                                         {editing ? (
-                                          <input type="number" min={0} value={editVal} inputMode="numeric"
-                                            onChange={e => { const v = parseInt(e.target.value) || 0; setEditVal(v); editValRef.current = v; }}
-                                            onBlur={() => { if (editCell) savePedido(c.id, prod.id, editValRef.current); }}
-                                            onKeyDown={e => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") setEditCell(null); }}
-                                            className="w-10 text-center border-b border-black text-xs py-0.5 outline-none bg-transparent" autoFocus />
+                                          <div className="flex items-center justify-center gap-0.5">
+                                            <input type="text" inputMode="numeric" value={editVal === 0 ? "" : editVal}
+                                              onChange={e => { const raw = e.target.value.replace(/\D/g, ""); const v = raw ? parseInt(raw) : 0; setEditVal(v); editValRef.current = v; }}
+                                              onKeyDown={e => { if (e.key === "Enter") savePedido(c.id, prod.id, editValRef.current); if (e.key === "Escape") setEditCell(null); }}
+                                              placeholder="#"
+                                              className="w-8 text-center border-b border-black text-xs py-0.5 outline-none bg-transparent" autoFocus />
+                                            <button onClick={() => savePedido(c.id, prod.id, editValRef.current)}
+                                              className="text-[9px] bg-black text-white rounded px-1 py-0.5 hover:bg-gray-700 active:scale-95 transition">✓</button>
+                                          </div>
                                         ) : paq > 0 ? (
                                           <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(paq); editValRef.current = paq; }}
                                             title="Click para editar"
