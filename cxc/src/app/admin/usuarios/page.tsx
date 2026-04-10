@@ -216,14 +216,16 @@ export default function UsuariosPage() {
     setShowUserModal(true);
   }
   function openEditUser(u: FgUser) {
-    setEditUserId(u.id); setUName(u.name); setUPassword(u.password); setURole(u.role); setUCompany(u.associated_company || "");
+    setEditUserId(u.id); setUName(u.name); setUPassword(""); setURole(u.role); setUCompany(u.associated_company || "");
     setShowUserModal(true);
   }
   async function saveUser() {
-    if (!uName.trim() || !uPassword.trim()) { showToast("Nombre y contraseña requeridos"); return; }
+    if (!uName.trim()) { showToast("Nombre requerido"); return; }
+    if (!editUserId && !uPassword.trim()) { showToast("Contraseña requerida para nuevo usuario"); return; }
     setSavingUser(true);
     try {
-      const body = { id: editUserId, name: uName.trim(), password: uPassword.trim(), role: uRole, associated_company: uCompany || null };
+      const body: Record<string, unknown> = { id: editUserId, name: uName.trim(), role: uRole, associated_company: uCompany || null };
+      if (uPassword.trim()) body.password = uPassword.trim();
       const method = editUserId ? "PUT" : "POST";
       const res = await fetch("/api/admin/users", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
       if (res.ok) { showToast(editUserId ? "Usuario actualizado" : "Usuario creado"); setShowUserModal(false); loadFgUsers(); }
@@ -367,8 +369,8 @@ export default function UsuariosPage() {
                   <input value={uName} onChange={e => setUName(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
                 </div>
                 <div>
-                  <label className="text-[11px] text-gray-400 uppercase block mb-1">Contraseña *</label>
-                  <input value={uPassword} onChange={e => setUPassword(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition font-mono" />
+                  <label className="text-[11px] text-gray-400 uppercase block mb-1">{editUserId ? "Nueva contraseña (dejar vacío para no cambiar)" : "Contraseña *"}</label>
+                  <input value={uPassword} onChange={e => setUPassword(e.target.value)} placeholder={editUserId ? "Sin cambios" : ""} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition font-mono" />
                 </div>
                 <div>
                   <label className="text-[11px] text-gray-400 uppercase block mb-1">Rol</label>
