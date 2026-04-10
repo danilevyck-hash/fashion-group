@@ -55,6 +55,23 @@ function CajaPage() {
     pendingUndoCaja, undoActionCaja,
   } = useCajaState(urlId, initialView);
 
+  // ── Smart suggestion: period close (hooks must be before any conditional return) ──
+  const cajaSuggestions = useMemo<SmartSuggestion[]>(() => {
+    if (!current || current.estado !== "abierto") return [];
+    const apertura = new Date(current.fecha_apertura).getTime();
+    const now = Date.now();
+    const daysSinceOpen = Math.floor((now - apertura) / (24 * 60 * 60 * 1000));
+    if (daysSinceOpen <= 30) return [];
+    return [{
+      id: `caja-close-${current.id}`,
+      message: `Este período lleva ${daysSinceOpen} días abierto. ¿Cerrarlo y crear uno nuevo?`,
+      actionLabel: "Cerrar período",
+      onAction: () => requestClosePeriodo(current.id),
+    }];
+  }, [current, requestClosePeriodo]);
+
+  const { suggestion: cajaSuggestion, dismiss: dismissCaja } = useSmartSuggestions(cajaSuggestions);
+
   if (!authChecked) return null;
 
   const hasOpenPeriod = periodos.some((p) => p.estado === "abierto");
@@ -124,23 +141,6 @@ function CajaPage() {
       />
     );
   }
-
-  // ── Smart suggestion: period close ──
-  const cajaSuggestions = useMemo<SmartSuggestion[]>(() => {
-    if (!current || current.estado !== "abierto") return [];
-    const apertura = new Date(current.fecha_apertura).getTime();
-    const now = Date.now();
-    const daysSinceOpen = Math.floor((now - apertura) / (24 * 60 * 60 * 1000));
-    if (daysSinceOpen <= 30) return [];
-    return [{
-      id: `caja-close-${current.id}`,
-      message: `Este período lleva ${daysSinceOpen} días abierto. ¿Cerrarlo y crear uno nuevo?`,
-      actionLabel: "Cerrar período",
-      onAction: () => requestClosePeriodo(current.id),
-    }];
-  }, [current, requestClosePeriodo]);
-
-  const { suggestion: cajaSuggestion, dismiss: dismissCaja } = useSmartSuggestions(cajaSuggestions);
 
   // ── DETAIL VIEW ──
   if (view === "detail" && current) {
