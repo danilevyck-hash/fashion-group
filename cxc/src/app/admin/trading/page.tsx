@@ -77,14 +77,26 @@ function SkeletonTable() {
 
 // ── Helpers ──────────────────────────────────────────────
 
-function pnlColor(value: number): string {
+function pnlColor(value: number | undefined | null): string {
+  if (!value && value !== 0) return "text-gray-600";
   if (value > 0) return "text-emerald-600";
   if (value < 0) return "text-red-600";
   return "text-gray-600";
 }
 
-function fmtPct(value: number): string {
+function fmtPct(value: number | undefined | null): string {
+  if (value == null) return "—";
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
+function safe(value: number | undefined | null, decimals = 2): string {
+  if (value == null) return "—";
+  return value.toFixed(decimals);
+}
+
+function safeFmt(value: number | undefined | null): string {
+  if (value == null) return "—";
+  return fmt(value);
 }
 
 // ── Page ─────────────────────────────────────────────────
@@ -170,8 +182,12 @@ export default function TradingPage() {
 
   if (!data) return null;
 
-  const { portfolio, metrics, equity_curve, recent_trades, memory } = data;
-  const lastEquity = equity_curve.length > 0 ? equity_curve[equity_curve.length - 1].equity : portfolio.total_value;
+  const portfolio = data.portfolio || { total_value: 0, cash: 0, positions: [] };
+  const metrics = data.metrics || {} as BotData["metrics"];
+  const equity_curve = data.equity_curve || [];
+  const recent_trades = data.recent_trades || [];
+  const memory = data.memory || { notes: [] };
+  const lastEquity = equity_curve.length > 0 ? equity_curve[equity_curve.length - 1]?.equity : portfolio.total_value;
 
   return (
     <>
@@ -209,13 +225,13 @@ export default function TradingPage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="border border-gray-200 rounded-lg p-3">
             <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Portfolio</p>
-            <p className="text-lg font-semibold tabular-nums text-gray-900">${fmt(portfolio.total_value)}</p>
-            <p className="text-[11px] text-gray-400 tabular-nums">Cash: ${fmt(portfolio.cash)}</p>
+            <p className="text-lg font-semibold tabular-nums text-gray-900">${safeFmt(portfolio.total_value)}</p>
+            <p className="text-[11px] text-gray-400 tabular-nums">Cash: ${safeFmt(portfolio.cash)}</p>
           </div>
           <div className="border border-gray-200 rounded-lg p-3">
             <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">P&L Total</p>
             <p className={`text-lg font-semibold tabular-nums ${pnlColor(metrics.total_pnl)}`}>
-              ${fmt(metrics.total_pnl)}
+              ${safeFmt(metrics.total_pnl)}
             </p>
             <p className={`text-[11px] tabular-nums ${pnlColor(metrics.total_pnl_pct)}`}>
               {fmtPct(metrics.total_pnl_pct)}
@@ -223,15 +239,15 @@ export default function TradingPage() {
           </div>
           <div className="border border-gray-200 rounded-lg p-3">
             <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Win Rate</p>
-            <p className="text-lg font-semibold tabular-nums text-gray-900">{metrics.win_rate.toFixed(1)}%</p>
+            <p className="text-lg font-semibold tabular-nums text-gray-900">{safe(metrics.win_rate, 1)}%</p>
             <p className="text-[11px] text-gray-400 tabular-nums">
-              {metrics.winning_trades}W / {metrics.losing_trades}L
+              {metrics.winning_trades ?? 0}W / {metrics.losing_trades ?? 0}L
             </p>
           </div>
           <div className="border border-gray-200 rounded-lg p-3">
             <p className="text-[11px] text-gray-400 uppercase tracking-wide mb-1">Profit Factor</p>
-            <p className="text-lg font-semibold tabular-nums text-gray-900">{metrics.profit_factor.toFixed(2)}</p>
-            <p className="text-[11px] text-gray-400 tabular-nums">Sharpe: {metrics.sharpe_ratio.toFixed(2)}</p>
+            <p className="text-lg font-semibold tabular-nums text-gray-900">{safe(metrics.profit_factor)}</p>
+            <p className="text-[11px] text-gray-400 tabular-nums">Sharpe: {safe(metrics.sharpe_ratio)}</p>
           </div>
         </div>
 
@@ -241,10 +257,10 @@ export default function TradingPage() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
             </svg>
-            <span>Equity: <span className="font-medium tabular-nums text-gray-900">${fmt(lastEquity)}</span></span>
+            <span>Equity: <span className="font-medium tabular-nums text-gray-900">${safeFmt(lastEquity)}</span></span>
           </div>
           <span className={`text-xs tabular-nums ${pnlColor(-metrics.max_drawdown)}`}>
-            Max drawdown: {metrics.max_drawdown.toFixed(2)}%
+            Max drawdown: {safe(metrics.max_drawdown)}%
           </span>
         </div>
 
@@ -273,12 +289,12 @@ export default function TradingPage() {
                     <tr key={pos.symbol} className="border-b border-gray-50 last:border-0">
                       <td className="px-3 py-2 font-medium text-gray-900">{pos.symbol}</td>
                       <td className="px-3 py-2 text-right tabular-nums text-gray-600">{pos.quantity}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-gray-600">${fmt(pos.avg_cost)}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-gray-600">${fmt(pos.current_price)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-gray-600">${safeFmt(pos.avg_cost)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-gray-600">${safeFmt(pos.current_price)}</td>
                       <td className={`px-3 py-2 text-right tabular-nums ${pnlColor(pos.unrealized_pnl)}`}>
-                        ${fmt(pos.unrealized_pnl)}
+                        ${safeFmt(pos.unrealized_pnl)}
                       </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-gray-600">${fmt(pos.market_value)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-gray-600">${safeFmt(pos.market_value)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -325,9 +341,9 @@ export default function TradingPage() {
                         </span>
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-gray-600">{trade.quantity}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-gray-600">${fmt(trade.price)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-gray-600">${safeFmt(trade.price)}</td>
                       <td className={`px-3 py-2 text-right tabular-nums ${pnlColor(trade.pnl)}`}>
-                        ${fmt(trade.pnl)}
+                        ${safeFmt(trade.pnl)}
                       </td>
                     </tr>
                   ))}
@@ -338,7 +354,7 @@ export default function TradingPage() {
         </div>
 
         {/* ── Claude's Notes ── */}
-        {memory.notes.length > 0 && (
+        {memory.notes && memory.notes.length > 0 && (
           <div className="border border-gray-200 rounded-lg">
             <div className="px-3 py-2.5 border-b border-gray-100">
               <h3 className="text-sm font-medium text-gray-800">Notas de Claude</h3>
