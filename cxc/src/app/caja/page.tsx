@@ -145,10 +145,11 @@ function CajaPage() {
   // ── DETAIL VIEW ──
   if (view === "detail" && current) {
     const gastos = current.caja_gastos || [];
-    const totalGastado = gastos.reduce((s, g) => s + (g.total || 0), 0);
-    const saldo = current.fondo_inicial - totalGastado;
+    const totalGastado = gastos.reduce((s, g) => s + (Number(g.total) || 0), 0);
+    const fondoInicial = Number(current.fondo_inicial) || 0;
+    const saldo = fondoInicial - totalGastado;
     const isOpen = current.estado === "abierto";
-    const pctUsed = current.fondo_inicial > 0 ? (saldo / current.fondo_inicial) * 100 : 100;
+    const pctUsed = fondoInicial > 0 ? (saldo / fondoInicial) * 100 : 100;
 
     return (
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
