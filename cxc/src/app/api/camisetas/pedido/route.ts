@@ -28,9 +28,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  const { error } = await supabaseServer
+  // Try update first, then insert if not found (works without unique constraint)
+  const { data: existingRow } = await supabaseServer
     .from("camisetas_pedidos")
-    .upsert({ cliente_id, producto_id, paquetes }, { onConflict: "cliente_id,producto_id" });
+    .select("id")
+    .eq("cliente_id", cliente_id)
+    .eq("producto_id", producto_id)
+    .limit(1)
+    .single();
+
+  let error;
+  if (existingRow) {
+    ({ error } = await supabaseServer
+      .from("camisetas_pedidos")
+      .update({ paquetes, deleted: false })
+      .eq("id", existingRow.id));
+  } else {
+    ({ error } = await supabaseServer
+      .from("camisetas_pedidos")
+      .insert({ cliente_id, producto_id, paquetes, deleted: false }));
+  }
 
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   const action = previous_paquetes > 0 && previous_paquetes !== paquetes ? "pedido_update" : "pedido_create";
