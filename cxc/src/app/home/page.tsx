@@ -25,6 +25,7 @@ const MODULE_ICONS: Record<string, React.ReactNode> = {
   reebok: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/></svg>,
   camisetas: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 00-1.18 5.53L8 10l-3.46-1A10 10 0 002.06 13h4.19L8 16.54 6.54 20.5a10 10 0 003.22 1.36L12 18l2.24 3.86a10 10 0 003.22-1.36L16 16.54 17.75 13h4.19a10 10 0 00-2.48-4L16 10l-2.82-2.47A10 10 0 0012 2z"/></svg>,
   usuarios: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
+  trading: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
 };
 
 const ALL_MODULES = [
@@ -39,6 +40,7 @@ const ALL_MODULES = [
   { key: "ventas", label: "Ventas", subtitle: "Ver por mes y comparar períodos", href: "/ventas", roles: ["admin", "director", "contabilidad"], group: "consulta" as const },
   { key: "reebok", label: "Catálogo Reebok", subtitle: "Productos, pedidos e inventario", href: "/catalogo/reebok", roles: ["admin", "vendedor", "cliente", "secretaria"], group: "catalogo" as const },
   { key: "camisetas", label: "Camisetas Selección", subtitle: "Pedidos y stock", href: "/camisetas", roles: ["admin", "vendedor"], group: "catalogo" as const },
+  { key: "trading", label: "Trading Bot", subtitle: "Portfolio, trades y métricas", href: "/admin/trading", roles: ["admin"], group: "admin" as const },
   { key: "usuarios", label: "Usuarios", subtitle: "Crear usuarios y asignar permisos", href: "/admin/usuarios", roles: ["admin"], group: "admin" as const },
 ];
 
