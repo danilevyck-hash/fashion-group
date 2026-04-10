@@ -127,8 +127,7 @@ async function sendDispatchEmail(guia: GuiaEmail, dispatchedBy: string) {
       to: ["daniel@fashiongr.com", "info@fashiongr.com"],
       subject: `Guia #${guia.numero} despachada — ${guia.transportista}`,
       html: `<h2 style="color:#1a1a1a">Guia #${guia.numero} despachada</h2>
-        <p><strong>Tipo:</strong> ${tipoLabel} | <strong>Transportista:</strong> ${guia.transportista} | <strong>Placa:</strong> ${guia.placa || "N/A"} | <strong>Receptor:</strong> ${guia.receptor_nombre || "—"} | <strong>Total:</strong> ${totalB} bultos</p>
-        ${guia.nombre_chofer ? `<p><strong>Chofer:</strong> ${guia.nombre_chofer}</p>` : ""}
+        <p><strong>Tipo:</strong> ${tipoLabel} | <strong>Transportista:</strong> ${guia.transportista}${guia.tipo_despacho === "directo" ? ` | <strong>Chofer:</strong> ${guia.nombre_chofer || "—"}` : ` | <strong>Placa:</strong> ${guia.placa || "—"}`} | <strong>Receptor:</strong> ${guia.receptor_nombre || "—"} | <strong>Total:</strong> ${totalB} bultos</p>
         <p><strong>Items:</strong></p><p>${itemsHtml || "Sin items"}</p>
         <p style="color:#888;font-size:12px;margin-top:16px">Fashion Group Panama — Despachado por ${dispatchedBy}</p>`,
     };
@@ -175,6 +174,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       : (currentItems || []).reduce((s: number, i: { bultos: number }) => s + (i.bultos || 0), 0);
     if (itemCount === 0) return NextResponse.json({ error: "No se puede despachar una guía sin items" }, { status: 400 });
     if (totalBultos === 0) return NextResponse.json({ error: "No se puede despachar una guía con 0 bultos" }, { status: 400 });
+    if (!receptor_nombre) return NextResponse.json({ error: "Nombre del receptor requerido" }, { status: 400 });
+    if (!cedula) return NextResponse.json({ error: "Cédula del receptor requerida" }, { status: 400 });
+    if (tipo_despacho === "externo" && !placa) return NextResponse.json({ error: "Placa del vehículo requerida para transporte externo" }, { status: 400 });
+    if (tipo_despacho === "directo" && !nombre_chofer) return NextResponse.json({ error: "Nombre del chofer requerido para entrega directa" }, { status: 400 });
   }
 
   const { data: previous } = await supabaseServer.from("guia_transporte").select("estado, placa, transportista").eq("id", id).single();
