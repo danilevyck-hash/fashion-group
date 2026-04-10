@@ -27,6 +27,8 @@ const DEFAULT_MODULES: Record<string, string[]> = {
   cliente: ["reebok"],
 };
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req, ["admin"]);
   if (authError) return authError;

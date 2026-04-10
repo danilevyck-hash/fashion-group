@@ -6,6 +6,8 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 function fmt(n: number): string { return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("authorization")?.replace("Bearer ", "") || req.nextUrl.searchParams.get("secret");
   let authorized = secret === process.env.CRON_SECRET;

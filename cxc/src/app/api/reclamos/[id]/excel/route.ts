@@ -7,6 +7,8 @@ import { buildReclamoSheet } from "@/lib/excel-reclamo";
 const RECLAMOS_ROLES = ["admin", "secretaria", "director"];
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, RECLAMOS_ROLES);
   if (auth instanceof NextResponse) return auth;

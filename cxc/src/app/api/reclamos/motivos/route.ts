@@ -15,6 +15,8 @@ import { requireRole } from "@/lib/requireRole";
  */
 
 // GET — list all custom motivos
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const auth = await requireRole(req, ["admin", "secretaria", "director"]);
   if (auth instanceof NextResponse) return auth;

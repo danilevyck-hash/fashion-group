@@ -5,6 +5,8 @@ import { requireRole } from "@/lib/requireRole";
 
 const DIRECTORIO_ROLES = ["admin", "secretaria", "director", "contabilidad", "vendedor"];
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const session = getSession(req);
   if (!session || !DIRECTORIO_ROLES.includes(session.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });

@@ -4,6 +4,8 @@ import { getSession } from "@/lib/require-auth";
 
 const PRESTAMOS_ROLES = ["admin", "contabilidad"];
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const session = getSession(req);
   if (!session || !PRESTAMOS_ROLES.includes(session.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });

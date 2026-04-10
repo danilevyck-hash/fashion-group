@@ -13,6 +13,8 @@ function getPanamaDate(offset = 0) {
   return panama.toISOString().slice(0, 10);
 }
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const secret = req.headers.get("authorization")?.replace("Bearer ", "") || req.nextUrl.searchParams.get("secret");
   let authorized = secret === process.env.CRON_SECRET;

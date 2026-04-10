@@ -38,6 +38,8 @@ const S = {
   tdBoldR: 'style="padding:8px 10px;border-top:2px solid #1B3A5C;font-weight:bold;text-align:right;font-variant-numeric:tabular-nums"',
 };
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   // Auth: cron secret or admin session
   const secret = req.headers.get("authorization")?.replace("Bearer ", "") || req.nextUrl.searchParams.get("secret");

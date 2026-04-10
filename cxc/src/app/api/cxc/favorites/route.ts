@@ -6,6 +6,8 @@ import { supabaseServer } from "@/lib/supabase-server";
  * GET /api/cxc/favorites
  * Returns the list of favorited client names for the current user.
  */
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria", "director"]);
   if (auth instanceof NextResponse) return auth;

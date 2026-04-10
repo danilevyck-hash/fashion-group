@@ -140,6 +140,8 @@ async function sendDispatchEmail(guia: GuiaEmail, dispatchedBy: string) {
 
 // ── GET ──
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, GUIAS_ROLES);
   if (auth instanceof NextResponse) return auth;

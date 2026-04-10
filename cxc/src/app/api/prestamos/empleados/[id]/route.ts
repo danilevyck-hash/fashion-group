@@ -6,6 +6,8 @@ import { requireRole } from "@/lib/requireRole";
 
 const PRESTAMOS_ROLES = ["admin", "contabilidad"];
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, PRESTAMOS_ROLES);
   if (auth instanceof NextResponse) return auth;

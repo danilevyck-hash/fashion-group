@@ -5,6 +5,8 @@ import { requireAdmin } from '@/lib/api-auth'
 import { logActivity } from '@/lib/log-activity'
 import { getSession } from '@/lib/require-auth'
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   let query = supabase.from('products').select('*').order('created_at', { ascending: false })

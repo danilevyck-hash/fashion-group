@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { reebokServer } from "@/lib/reebok-supabase-server";
 import { requireRole } from "@/lib/requireRole";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria", "vendedor", "director"]);
   if (auth instanceof NextResponse) return auth;

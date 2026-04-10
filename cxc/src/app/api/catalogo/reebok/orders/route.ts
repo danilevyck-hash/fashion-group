@@ -6,6 +6,8 @@ const PIEZAS = 12;
 const VIEW_ROLES = ["admin", "secretaria", "vendedor", "director"];
 const CREATE_ROLES = ["admin", "secretaria", "vendedor", "cliente"];
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const session = getSession(req);
   if (!session || !VIEW_ROLES.includes(session.role)) {

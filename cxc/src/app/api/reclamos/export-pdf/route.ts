@@ -171,6 +171,8 @@ async function buildPdf(reclamos: Record<string, unknown>[]) {
   return { doc, empresa };
 }
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria", "director"]);
   if (auth instanceof NextResponse) return auth;

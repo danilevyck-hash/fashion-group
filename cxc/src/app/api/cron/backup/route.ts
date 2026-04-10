@@ -6,6 +6,8 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 const BACKUP_EMAIL = "daniel@fashionfitnessgroup.com";
 const MAX_ATTACHMENT_BYTES = 24 * 1024 * 1024; // 24MB safe limit
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   // Auth: cron secret or admin session
   const secret = req.headers.get("authorization")?.replace("Bearer ", "") || req.headers.get("x-cron-secret") || req.nextUrl.searchParams.get("secret");

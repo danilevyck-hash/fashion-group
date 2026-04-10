@@ -4,6 +4,8 @@ import { logActivity } from "@/lib/log-activity";
 import { getRole, requireAdmin } from "@/lib/api-auth";
 import { getSession } from "@/lib/require-auth";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const role = getRole(req);
   if (!role || !['admin', 'secretaria', 'upload', 'director'].includes(role)) {

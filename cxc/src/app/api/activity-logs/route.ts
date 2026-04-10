@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req, ["admin"]);
   if (authError) return authError;

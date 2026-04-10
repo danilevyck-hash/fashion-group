@@ -5,6 +5,8 @@ import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "contabilidad"]);
   if (auth instanceof NextResponse) return auth;

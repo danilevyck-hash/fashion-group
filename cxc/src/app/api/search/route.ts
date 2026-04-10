@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria", "director", "vendedor", "bodega", "contabilidad"]); if (auth instanceof NextResponse) return auth;
   const q = req.nextUrl.searchParams.get("q")?.trim();

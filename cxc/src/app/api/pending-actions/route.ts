@@ -22,6 +22,8 @@ function formatMonto(monto: number): string {
   return monto.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria", "director", "contabilidad"]);
   if (auth instanceof NextResponse) return auth;

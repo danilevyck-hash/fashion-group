@@ -15,6 +15,8 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
   "Rechazado": [],
 };
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, ["admin", "secretaria", "director"]);
   if (auth instanceof NextResponse) return auth;

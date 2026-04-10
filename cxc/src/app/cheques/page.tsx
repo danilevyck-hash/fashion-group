@@ -277,6 +277,66 @@ function ChequesPage() {
     return arr;
   }, [cheques, resumenSort]);
 
+  const today = todayStr();
+  const now = new Date();
+  const weekFromNow = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+
+  // Derive visual estado: pendiente + fecha < hoy → show as pendiente_vencido (NOT "vencido" — only the cron sets that in DB)
+  function visualEstado(c: Cheque): string {
+    if (c.estado === "pendiente" && c.fecha_deposito < today) return "pendiente_vencido";
+    return c.estado;
+  }
+
+  // Urgency border class for color-coded left borders
+  function urgencyBorder(c: Cheque, ve: string): string {
+    if (ve === "depositado") return "border-l-4 border-l-emerald-400";
+    if (ve === "pendiente_vencido" || ve === "vencido") return "border-l-4 border-l-red-700";
+    if (ve === "pendiente" && c.fecha_deposito === today) return "border-l-4 border-l-red-500";
+    if (ve === "pendiente" && c.fecha_deposito <= weekFromNow) return "border-l-4 border-l-amber-400";
+    if (ve === "rebotado") return "border-l-4 border-l-red-700";
+    return "";
+  }
+
+  // WhatsApp send handler (reusable)
+  function sendWhatsApp(c: Cheque) {
+    if (!c.whatsapp) { showToast("Este cliente no tiene WhatsApp registrado"); return; }
+    let phone = (c.whatsapp || "").replace(/\D/g, "");
+    if (!phone.startsWith("507") && phone.length <= 8) { phone = "507" + phone; }
+    const msg = `Hola, le recordamos que tiene un cheque #${c.numero_cheque} por $${fmt(c.monto)} con fecha de deposito ${fmtDate(c.fecha_deposito)}.`;
+    try { window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
+  }
+
+  const pendientes = cheques.filter((c) => visualEstado(c) === "pendiente");
+  const depositados = cheques.filter((c) => visualEstado(c) === "depositado");
+  const vencidos = cheques.filter((c) => visualEstado(c) === "pendiente_vencido" || visualEstado(c) === "vencido");
+  const rebotados = cheques.filter((c) => visualEstado(c) === "rebotado");
+  const totalPendiente = pendientes.reduce((s, c) => s + (Number(c.monto) || 0), 0);
+  const proximo = pendientes.length > 0 ? pendientes[0].fecha_deposito : null;
+
+  // Alert banners data
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const vencenHoy = cheques.filter((c) => c.fecha_deposito === today && visualEstado(c) !== "depositado" && visualEstado(c) !== "rebotado");
+  const vencenManana = cheques.filter((c) => c.fecha_deposito === tomorrow && visualEstado(c) !== "depositado" && visualEstado(c) !== "rebotado");
+  const vencenSemana = cheques.filter((c) => c.fecha_deposito >= today && c.fecha_deposito <= weekFromNow && visualEstado(c) !== "depositado" && visualEstado(c) !== "rebotado");
+  const totalVencenHoy = vencenHoy.reduce((s, c) => s + (Number(c.monto) || 0), 0);
+
+  // ── Smart suggestion: undeposited cheques ──
+  const chequeSuggestions = useMemo<SmartSuggestion[]>(() => {
+    if (vencidos.length === 0) return [];
+    const totalVencido = vencidos.reduce((s, c) => s + (Number(c.monto) || 0), 0);
+    return [{
+      id: `cheques-vencidos-${vencidos.length}`,
+      message: `Tienes ${vencidos.length} cheque${vencidos.length > 1 ? "s" : ""} vencido${vencidos.length > 1 ? "s" : ""} sin depositar por $${fmt(totalVencido)}. ¿Marcarlos como depositados?`,
+      actionLabel: "Depositar todos",
+      onAction: () => {
+        const ids = new Set(vencidos.map(c => c.id));
+        setConfirmBatch({ ids, clearFn: setSelectedVencidos });
+      },
+    }];
+  }, [vencidos]);
+
+  const { suggestion: chequeSuggestion, dismiss: dismissCheque } = useSmartSuggestions(chequeSuggestions);
+
   if (!authChecked) return null;
 
   function resetForm() {
@@ -552,66 +612,6 @@ function ChequesPage() {
     URL.revokeObjectURL(url);
     showToast("Excel listo — revisa tu carpeta de descargas");
   }
-
-  const today = todayStr();
-  const now = new Date();
-  const weekFromNow = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10);
-
-  // Derive visual estado: pendiente + fecha < hoy → show as pendiente_vencido (NOT "vencido" — only the cron sets that in DB)
-  function visualEstado(c: Cheque): string {
-    if (c.estado === "pendiente" && c.fecha_deposito < today) return "pendiente_vencido";
-    return c.estado;
-  }
-
-  // Urgency border class for color-coded left borders
-  function urgencyBorder(c: Cheque, ve: string): string {
-    if (ve === "depositado") return "border-l-4 border-l-emerald-400";
-    if (ve === "pendiente_vencido" || ve === "vencido") return "border-l-4 border-l-red-700";
-    if (ve === "pendiente" && c.fecha_deposito === today) return "border-l-4 border-l-red-500";
-    if (ve === "pendiente" && c.fecha_deposito <= weekFromNow) return "border-l-4 border-l-amber-400";
-    if (ve === "rebotado") return "border-l-4 border-l-red-700";
-    return "";
-  }
-
-  // WhatsApp send handler (reusable)
-  function sendWhatsApp(c: Cheque) {
-    if (!c.whatsapp) { showToast("Este cliente no tiene WhatsApp registrado"); return; }
-    let phone = (c.whatsapp || "").replace(/\D/g, "");
-    if (!phone.startsWith("507") && phone.length <= 8) { phone = "507" + phone; }
-    const msg = `Hola, le recordamos que tiene un cheque #${c.numero_cheque} por $${fmt(c.monto)} con fecha de deposito ${fmtDate(c.fecha_deposito)}.`;
-    try { window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
-  }
-
-  const pendientes = cheques.filter((c) => visualEstado(c) === "pendiente");
-  const depositados = cheques.filter((c) => visualEstado(c) === "depositado");
-  const vencidos = cheques.filter((c) => visualEstado(c) === "pendiente_vencido" || visualEstado(c) === "vencido");
-  const rebotados = cheques.filter((c) => visualEstado(c) === "rebotado");
-  const totalPendiente = pendientes.reduce((s, c) => s + (Number(c.monto) || 0), 0);
-  const proximo = pendientes.length > 0 ? pendientes[0].fecha_deposito : null;
-
-  // Alert banners data
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
-  const vencenHoy = cheques.filter((c) => c.fecha_deposito === today && visualEstado(c) !== "depositado" && visualEstado(c) !== "rebotado");
-  const vencenManana = cheques.filter((c) => c.fecha_deposito === tomorrow && visualEstado(c) !== "depositado" && visualEstado(c) !== "rebotado");
-  const vencenSemana = cheques.filter((c) => c.fecha_deposito >= today && c.fecha_deposito <= weekFromNow && visualEstado(c) !== "depositado" && visualEstado(c) !== "rebotado");
-  const totalVencenHoy = vencenHoy.reduce((s, c) => s + (Number(c.monto) || 0), 0);
-
-  // ── Smart suggestion: undeposited cheques ──
-  const chequeSuggestions = useMemo<SmartSuggestion[]>(() => {
-    if (vencidos.length === 0) return [];
-    const totalVencido = vencidos.reduce((s, c) => s + (Number(c.monto) || 0), 0);
-    return [{
-      id: `cheques-vencidos-${vencidos.length}`,
-      message: `Tienes ${vencidos.length} cheque${vencidos.length > 1 ? "s" : ""} vencido${vencidos.length > 1 ? "s" : ""} sin depositar por $${fmt(totalVencido)}. ¿Marcarlos como depositados?`,
-      actionLabel: "Depositar todos",
-      onAction: () => {
-        const ids = new Set(vencidos.map(c => c.id));
-        setConfirmBatch({ ids, clearFn: setSelectedVencidos });
-      },
-    }];
-  }, [vencidos]);
-
-  const { suggestion: chequeSuggestion, dismiss: dismissCheque } = useSmartSuggestions(chequeSuggestions);
 
   // Search filter (by numero_cheque or cliente)
   const searchLower = search.toLowerCase().trim();

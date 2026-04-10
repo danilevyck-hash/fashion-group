@@ -15,6 +15,8 @@ const B = {
   right: { style: "thin", color: { rgb: BRD } },
 };
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "contabilidad"]);
   if (auth instanceof NextResponse) return auth;

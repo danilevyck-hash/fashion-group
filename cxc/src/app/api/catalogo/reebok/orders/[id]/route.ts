@@ -6,6 +6,8 @@ const PIEZAS = 12;
 const EDIT_ROLES = ["admin", "secretaria", "vendedor"];
 const DELETE_ROLES = ["admin", "secretaria"];
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = getSession(req);
   if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });

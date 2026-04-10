@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from "next/server";
  * Returns 200 if session is valid (middleware already validates the cookie),
  * so if this handler runs, the user is authenticated.
  */
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   // Middleware validates the session cookie before this runs.
   // If we reach here, the session is valid.

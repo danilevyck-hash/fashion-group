@@ -150,6 +150,8 @@ function aggregatePrevYear(rows: VentasRawRow[]): PrevYearAgg[] {
 
 // ─── Route ────────────────────────────────────────────────────────────────────
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req, ["admin", "director", "contabilidad"]);
   if (authError) return authError;

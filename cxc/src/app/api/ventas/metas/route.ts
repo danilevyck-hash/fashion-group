@@ -4,6 +4,8 @@ import { requireAuth } from "@/lib/require-auth";
 
 // ventas_metas table has column "año" (with ñ) — never renamed
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req, ["admin", "director", "contabilidad"]);
   if (authError) return authError;
