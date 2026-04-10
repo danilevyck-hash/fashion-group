@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -37,6 +37,7 @@ export default function CamisetasPage() {
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
   const [editCell, setEditCell] = useState<{ cId: string; pId: string } | null>(null);
   const [editVal, setEditVal] = useState(0);
+  const editValRef = useRef(0);
   const [newClientName, setNewClientName] = useState("");
   const [showNewClient, setShowNewClient] = useState(false);
   const [clientSearch, setClientSearch] = useState("");
@@ -483,16 +484,17 @@ export default function CamisetasPage() {
                                     return (
                                       <td key={c.id} className="py-1 px-0.5 text-center border-b border-gray-200 hover:bg-gray-50 transition">
                                         {editing ? (
-                                          <input type="number" min={0} value={editVal} inputMode="numeric" onChange={e => setEditVal(parseInt(e.target.value) || 0)}
-                                            onBlur={() => savePedido(c.id, prod.id, editVal)}
-                                            onKeyDown={e => { if (e.key === "Enter") savePedido(c.id, prod.id, editVal); if (e.key === "Escape") setEditCell(null); }}
+                                          <input type="number" min={0} value={editVal} inputMode="numeric"
+                                            onChange={e => { const v = parseInt(e.target.value) || 0; setEditVal(v); editValRef.current = v; }}
+                                            onBlur={() => { if (editCell) savePedido(c.id, prod.id, editValRef.current); }}
+                                            onKeyDown={e => { if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); } if (e.key === "Escape") setEditCell(null); }}
                                             className="w-10 text-center border-b border-black text-xs py-0.5 outline-none bg-transparent" autoFocus />
                                         ) : paq > 0 ? (
-                                          <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(paq); }}
+                                          <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(paq); editValRef.current = paq; }}
                                             title="Click para editar"
                                             className="inline-block bg-gray-800 text-white rounded px-1.5 py-0.5 text-[10px] tabular-nums font-medium hover:bg-red-600 transition min-w-[22px]">{paq}</button>
                                         ) : (
-                                          <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(0); }}
+                                          <button onClick={() => { setEditCell({ cId: c.id, pId: prod.id }); setEditVal(0); editValRef.current = 0; }}
                                             title="Click para editar"
                                             className="text-gray-200 hover:text-gray-400 cursor-pointer hover:bg-gray-100 transition text-[10px]">—</button>
                                         )}
