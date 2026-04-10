@@ -35,12 +35,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     if (error || !rec) return NextResponse.json({ error: "Reclamo not found" }, { status: 404 });
 
-    const { data: contacto } = await supabaseServer
+    const { data: contactos } = await supabaseServer
       .from("reclamo_contactos")
       .select("*")
       .eq("empresa", rec.empresa)
-      .single();
+      .limit(1);
 
+    const contacto = contactos?.[0];
     if (!contacto?.correo) return NextResponse.json({ error: "No hay correo configurado para esta empresa." }, { status: 400 });
 
     // Generate Excel

@@ -155,10 +155,13 @@ export default function OrderDetailPage() {
   // ── EDIT (revert to borrador) ──
   async function editOrder() {
     setSaving(true);
-    await fetch(`/api/catalogo/reebok/orders/${id}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "borrador" }),
-    });
+    try {
+      const res = await fetch(`/api/catalogo/reebok/orders/${id}`, {
+        method: "PUT", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "borrador" }),
+      });
+      if (!res.ok) { showToast("Error al editar pedido"); setSaving(false); return; }
+    } catch { showToast("Error de conexion"); setSaving(false); return; }
     setSaving(false);
     showToast("Pedido en modo edicion");
     load();
@@ -166,7 +169,10 @@ export default function OrderDetailPage() {
 
   async function deleteOrder() {
     setDeletingOrder(true);
-    await fetch(`/api/catalogo/reebok/orders/${id}`, { method: "DELETE" });
+    try {
+      const res = await fetch(`/api/catalogo/reebok/orders/${id}`, { method: "DELETE" });
+      if (!res.ok) { showToast("Error al eliminar pedido"); setDeletingOrder(false); return; }
+    } catch { showToast("Error de conexion"); setDeletingOrder(false); return; }
     setDeletingOrder(false);
     setShowDeleteModal(false);
     router.push("/catalogo/reebok/pedidos");

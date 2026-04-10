@@ -66,8 +66,8 @@ export default function ReebokAdmin() {
 
   const loadData = async () => {
     const [p, i] = await Promise.all([
-      fetch('/api/catalogo/reebok/products').then(r => r.json()),
-      fetch('/api/catalogo/reebok/inventory').then(r => r.json()),
+      fetch('/api/catalogo/reebok/products').then(r => { if (!r.ok) throw new Error('Failed to load products'); return r.json() }),
+      fetch('/api/catalogo/reebok/inventory').then(r => { if (!r.ok) throw new Error('Failed to load inventory'); return r.json() }),
     ])
     setProducts(Array.isArray(p) ? p : [])
     setInventory(Array.isArray(i) ? i : [])
@@ -91,7 +91,7 @@ export default function ReebokAdmin() {
         setProducts={setProducts}
         setInventory={setInventory}
         reloadInventory={async () => {
-          const inv = await fetch('/api/catalogo/reebok/inventory').then(r => r.json())
+          const inv = await fetch('/api/catalogo/reebok/inventory').then(r => { if (!r.ok) throw new Error('Failed to reload inventory'); return r.json() })
           setInventory(Array.isArray(inv) ? inv : [])
         }}
       />
@@ -195,24 +195,27 @@ function ProductsListSection({
   }
 
   const addSize = async (productId: string, size: string, quantity: number) => {
-    await fetch('/api/catalogo/reebok/inventory', {
+    const res = await fetch('/api/catalogo/reebok/inventory', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ product_id: productId, size, quantity }),
     })
+    if (!res.ok) { toast('Error al agregar talla', 'error'); return }
     await reloadInventory()
   }
 
   const updateQty = async (invId: string, quantity: number) => {
-    await fetch('/api/catalogo/reebok/inventory', {
+    const res = await fetch('/api/catalogo/reebok/inventory', {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: invId, quantity }),
     })
+    if (!res.ok) { toast('Error al actualizar cantidad', 'error'); return }
     setInventory(prev => prev.map(i => i.id === invId ? { ...i, quantity } : i))
   }
 
   const deleteSize = async () => {
     if (!deleteSizeTarget) return
-    await fetch(`/api/catalogo/reebok/inventory?id=${deleteSizeTarget.invId}`, { method: 'DELETE' })
+    const res = await fetch(`/api/catalogo/reebok/inventory?id=${deleteSizeTarget.invId}`, { method: 'DELETE' })
+    if (!res.ok) { toast('Error al eliminar talla', 'error'); setDeleteSizeTarget(null); return }
     setInventory(prev => prev.filter(i => i.id !== deleteSizeTarget.invId))
     setDeleteSizeTarget(null)
   }
@@ -402,6 +405,7 @@ function InventoryZone({ label, empresa, notInCSVLabel, result, onResult, onErro
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ items, empresa }),
       })
+      if (!res.ok) { onError('Error del servidor al actualizar inventario'); setProcessing(false); return }
       onResult(await res.json())
     } catch { onError('Error al procesar') }
     setProcessing(false)
@@ -645,6 +649,7 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
       const prods = isExcel ? await parseExcel(file) : await parseCSV(file)
       if (prods.length === 0) { toast('Sin productos válidos', 'warning'); setProcessing(false); return }
       const res = await fetch('/api/catalogo/reebok/products/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ products: prods }) })
+      if (!res.ok) { toast('Error del servidor al importar', 'error'); setProcessing(false); return }
       setResult(await res.json()); onDone()
     } catch { toast('Error al procesar', 'error') }
     setProcessing(false); if (ref.current) ref.current.value = ''
@@ -682,7 +687,7 @@ function PhotosPanel() {
   const processFiles = async (files: FileList | File[]) => {
     const imgs = Array.from(files).filter(f => f.type.startsWith('image/')); if (!imgs.length) return
     setProcessing(true); setProgress({ current: 0, total: imgs.length }); setResults([])
-    const prods = await fetch('/api/catalogo/reebok/products').then(r => r.json())
+    const prods = await fetch('/api/catalogo/reebok/products').then(r => { if (!r.ok) throw new Error('Failed to load products'); return r.json() })
     const out: PhotoResult[] = []
     for (let i = 0; i < imgs.length; i++) {
       const file = imgs[i], sku = file.name.replace(/\.[^.]+$/, '')
@@ -691,9 +696,12 @@ function PhotosPanel() {
       if (!match) { out.push({ filename: file.name, sku, status: 'no_match', message: 'SKU no encontrado' }); continue }
       try {
         const fd = new FormData(); fd.append('file', file)
-        const u = await fetch('/api/catalogo/reebok/upload', { method: 'POST', body: fd }).then(r => r.json())
+        const uploadRes = await fetch('/api/catalogo/reebok/upload', { method: 'POST', body: fd })
+        if (!uploadRes.ok) throw new Error('Upload failed')
+        const u = await uploadRes.json()
         if (!u.url) throw new Error(u.error || 'Upload failed')
-        await fetch('/api/catalogo/reebok/products', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: match.id, image_url: u.url }) })
+        const putRes = await fetch('/api/catalogo/reebok/products', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: match.id, image_url: u.url }) })
+        if (!putRes.ok) throw new Error('Failed to update product image')
         out.push({ filename: file.name, sku, status: 'success', message: match.name })
       } catch (err) { out.push({ filename: file.name, sku, status: 'error', message: String(err) }) }
     }

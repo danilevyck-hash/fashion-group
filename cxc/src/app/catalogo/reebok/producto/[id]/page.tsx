@@ -20,8 +20,9 @@ export default function ProductoDetalle() {
     supabase.from('products').select('*').eq('id', id).single()
       .then(({ data }) => { if (data) setProduct(data) })
     fetch(`/api/catalogo/reebok/inventory?product_id=${id}`)
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error('Failed to load inventory'); return r.json() })
       .then(data => setInventory(data))
+      .catch(() => { /* inventory load failed, keep empty */ })
   }, [id])
 
   const availableSizes = inventory.filter(i => i.quantity > 0)

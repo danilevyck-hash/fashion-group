@@ -173,6 +173,8 @@ export default function AdminDashboard() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ clientName: name }),
+    }).then(res => {
+      if (!res.ok) throw new Error("Server error");
     }).catch(() => {
       // Revert optimistic update
       setFavorites(prev => {
