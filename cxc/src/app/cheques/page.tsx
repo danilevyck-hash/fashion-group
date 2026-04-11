@@ -1162,10 +1162,23 @@ function ChequesPage() {
                   <span className="text-[11px] text-gray-400">N° {c.numero_cheque}</span>
                   <span className="text-[11px] text-gray-400">· {c.empresa}</span>
                 </div>
-                {/* State-valid actions */}
+                {/* State-valid actions with inline guide */}
+                {ve === "depositado" && (
+                  <div className="mt-2 pt-2 border-t border-gray-100 flex items-center gap-2">
+                    <button onClick={(e) => { e.stopPropagation(); setRebotandoId(c.id); }} className="text-xs text-gray-500 hover:text-red-600 font-medium py-1 min-h-[44px] flex items-center gap-1.5 transition">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h18M3 12l6-6M3 12l6 6" /></svg>
+                      Marcar como rebotado
+                    </button>
+                    <span className="text-[10px] text-gray-300">Si el banco lo devolvio</span>
+                  </div>
+                )}
                 {isRebotado && (
-                  <div className="mt-2 pt-2 border-t border-gray-100">
-                    <button onClick={(e) => { e.stopPropagation(); redepositar(c.id); }} disabled={redepositandoId === c.id} className="text-xs text-emerald-600 font-medium py-1 min-h-[44px] flex items-center disabled:opacity-40">{redepositandoId === c.id ? "Re-depositando..." : "Re-depositar"}</button>
+                  <div className="mt-2 pt-2 border-t border-red-100 bg-red-50/40 -mx-4 px-4 pb-1 rounded-b-lg">
+                    <div className="text-[10px] text-red-400 mb-1">Este cheque reboto{c.motivo_rebote ? ` — ${c.motivo_rebote}` : ""}</div>
+                    <button onClick={(e) => { e.stopPropagation(); redepositar(c.id); }} disabled={redepositandoId === c.id} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-md font-medium min-h-[44px] flex items-center gap-1.5 hover:bg-emerald-700 transition disabled:opacity-40">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                      {redepositandoId === c.id ? "Re-depositando..." : "Re-depositar cheque"}
+                    </button>
                   </div>
                 )}
               </div>
@@ -1233,8 +1246,17 @@ function ChequesPage() {
                     {isPending && (
                       <button onClick={() => setConfirmDepositId(c.id)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Confirmar depósito</button>
                     )}
+                    {isDep && (
+                      <button onClick={() => setRebotandoId(c.id)} disabled={!isOnline} title="Si el banco devolvio este cheque, marcalo como rebotado" className="text-xs text-gray-400 hover:text-red-500 transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h18M3 12l6-6M3 12l6 6" /></svg>
+                        Rebotado
+                      </button>
+                    )}
                     {isRebotado && (
-                      <button onClick={() => redepositar(c.id)} disabled={!isOnline || redepositandoId === c.id} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-emerald-600 transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">{redepositandoId === c.id ? "Re-depositando..." : "Re-depositar"}</button>
+                      <button onClick={() => redepositar(c.id)} disabled={!isOnline || redepositandoId === c.id} title="Este cheque reboto. Click para re-depositarlo." className="text-sm bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-3 py-1 rounded-md transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 font-medium">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                        {redepositandoId === c.id ? "Re-depositando..." : "Re-depositar"}
+                      </button>
                     )}
                     <button onClick={() => startEdit(c)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Editar</button>
                     <ChequeMoreMenu

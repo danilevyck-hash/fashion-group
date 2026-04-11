@@ -84,6 +84,7 @@ export default function PrestamosPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
   const [filterPendientes, setFilterPendientes] = useState(false);
+  const [filterEstadoMov, setFilterEstadoMov] = useState<string>("todos");
 
   // Confirm delete employee
   const [confirmDeleteEmp, setConfirmDeleteEmp] = useState<Empleado | null>(null);
@@ -141,6 +142,11 @@ export default function PrestamosPage() {
   const totalSaldo = allCalcs.filter(c => c.emp.activo).reduce((s, c) => s + c.saldo, 0);
   const empleadosActivos = empleados.filter(e => e.activo).length;
   const totalPendientes = allCalcs.reduce((s, c) => s + c.pendientes, 0);
+
+  // Movement status counts for filter tabs
+  const allMovimientos = allCalcs.flatMap(c => (c.emp.prestamos_movimientos || []));
+  const countAprobados = allMovimientos.filter(m => m.estado === "aprobado").length;
+  const countRechazados = allMovimientos.filter(m => m.estado === "rechazado").length;
 
   const quincena = getQuincenaRange();
   const empleadosConDeduccion = allCalcs.filter(c => c.emp.activo && c.emp.deduccion_quincenal > 0);
@@ -418,28 +424,54 @@ export default function PrestamosPage() {
                 </div>
               </div>
               {pendingMovs.map(m => (
-                <div key={m.id} className="flex items-center justify-between px-4 py-2.5 border-t border-amber-100 text-sm">
+                <div key={m.id} className="flex items-center justify-between px-4 py-3 border-t border-amber-100 text-sm border-l-4 border-l-amber-400 bg-amber-50/20">
                   <div className="flex items-center gap-3">
                     <input type="checkbox" checked={selectedPending.has(m.id)} onChange={() => togglePendingSelect(m.id)} className="accent-black" />
+                    <span className="text-amber-500 flex-shrink-0">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    </span>
                     <div>
                       <span className="font-medium">{m.empNombre}</span>
                       <span className="text-gray-400 mx-2">·</span>
                       <span className="text-gray-500">{m.concepto}</span>
                       <span className="text-gray-400 mx-2">·</span>
-                      <span className="tabular-nums font-medium">${fmt(m.monto)}</span>
+                      <span className="tabular-nums font-semibold">${fmt(m.monto)}</span>
                       <span className="text-gray-400 mx-2">·</span>
                       <span className="text-xs text-gray-400">{fmtDate(m.fecha)}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button disabled={processingId === m.id} onClick={async () => { setProcessingId(m.id); try { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "aprobado" }) }); if (res.ok) { showToast("Movimiento aprobado"); loadEmpleados(); } else showToast("Error al aprobar"); } finally { setProcessingId(null); } }} className="text-xs bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition disabled:opacity-50">{processingId === m.id ? "Procesando..." : "Aprobar"}</button>
-                    <button disabled={processingId === m.id} onClick={async () => { setProcessingId(m.id); try { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rechazado" }) }); if (res.ok) { showToast("Movimiento rechazado"); loadEmpleados(); } else showToast("Error al rechazar"); } finally { setProcessingId(null); } }} className="text-xs text-red-500 hover:text-red-700 transition px-4 py-2 disabled:opacity-50">{processingId === m.id ? "..." : "Rechazar"}</button>
+                    <button disabled={processingId === m.id} onClick={async () => { setProcessingId(m.id); try { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "aprobado" }) }); if (res.ok) { showToast("Movimiento aprobado"); loadEmpleados(); } else showToast("Error al aprobar"); } finally { setProcessingId(null); } }} className="text-xs bg-green-600 text-white px-5 py-2.5 rounded-md hover:bg-green-700 transition disabled:opacity-50 font-medium">{processingId === m.id ? "Procesando..." : "Aprobar"}</button>
+                    <button disabled={processingId === m.id} onClick={async () => { setProcessingId(m.id); try { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rechazado" }) }); if (res.ok) { showToast("Movimiento rechazado"); loadEmpleados(); } else showToast("Error al rechazar"); } finally { setProcessingId(null); } }} className="text-xs text-red-600 border border-red-200 hover:bg-red-50 transition px-5 py-2.5 rounded-md disabled:opacity-50 font-medium">{processingId === m.id ? "..." : "Rechazar"}</button>
                   </div>
                 </div>
               ))}
             </div>
           );
         })()}
+
+        {/* Movement status filter tabs */}
+        {(role === "admin" || role === "director") && (
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 mb-4 max-w-lg overflow-x-auto">
+            {[
+              { key: "todos", label: "Todos", count: 0, color: "" },
+              { key: "pendiente_aprobacion", label: "Pendientes", count: totalPendientes, color: "text-amber-600" },
+              { key: "aprobado", label: "Aprobados", count: countAprobados, color: "text-green-600" },
+              { key: "rechazado", label: "Rechazados", count: countRechazados, color: "text-red-600" },
+            ].map(tab => (
+              <button
+                key={tab.key}
+                onClick={() => { setFilterEstadoMov(tab.key); if (tab.key === "pendiente_aprobacion") setFilterPendientes(true); else if (filterPendientes && tab.key !== "pendiente_aprobacion") setFilterPendientes(false); }}
+                className={`flex items-center gap-1.5 py-2 px-3 text-sm rounded-md transition whitespace-nowrap ${filterEstadoMov === tab.key ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}
+              >
+                {tab.label}
+                {"count" in tab && tab.count !== undefined && tab.count > 0 && (
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${filterEstadoMov === tab.key ? `${tab.color} bg-white` : "text-gray-400 bg-gray-200"}`}>{tab.count}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Actions + Filters */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
@@ -517,12 +549,25 @@ export default function PrestamosPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(({ emp, prestado, pagado, saldo, pct, pendientes }, i) => (
-                  <tr key={emp.id} onClick={() => handleRowClick(emp)} className={`${i % 2 === 1 ? "bg-gray-50/50" : ""} ${!emp.activo ? "opacity-50" : ""} cursor-pointer hover:bg-gray-50 transition-colors`}>
+                {filtered.map(({ emp, prestado, pagado, saldo, pct, pendientes }, i) => {
+                  const hasRejected = (emp.prestamos_movimientos || []).some(m => m.estado === "rechazado");
+                  return (
+                  <tr key={emp.id} onClick={() => handleRowClick(emp)} className={`${pendientes > 0 ? "border-l-4 border-l-amber-400 bg-amber-50/30" : hasRejected ? "border-l-4 border-l-red-300" : i % 2 === 1 ? "bg-gray-50/50" : ""} ${!emp.activo ? "opacity-50" : ""} cursor-pointer hover:bg-gray-50 transition-colors`}>
                     <td className="py-3 px-4">
-                      <span className="font-medium">{emp.nombre}</span>
-                      {!emp.activo && <span className="ml-2 text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span>}
-                      {pendientes > 0 && <span className="ml-2 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md">{pendientes} pendiente{pendientes > 1 ? "s" : ""}</span>}
+                      <div className="flex items-center gap-1.5">
+                        {pendientes > 0 ? (
+                          <span className="text-amber-500 flex-shrink-0" title="Tiene movimientos pendientes de aprobacion">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" opacity="0.2"/><path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                          </span>
+                        ) : saldo <= 0 && prestado > 0 ? (
+                          <span className="text-green-500 flex-shrink-0" title="Prestamo completado">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+                          </span>
+                        ) : null}
+                        <span className="font-medium">{emp.nombre}</span>
+                      </div>
+                      {!emp.activo && <span className="ml-5 text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span>}
+                      {pendientes > 0 && <span className="ml-5 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-medium">{pendientes} pendiente{pendientes > 1 ? "s" : ""}</span>}
                     </td>
                     <td className="py-3 px-4 text-gray-500 hidden sm:table-cell">{emp.empresa || "—"}</td>
                     <td className="py-3 px-4 text-right tabular-nums">${fmt(emp.deduccion_quincenal)}</td>
@@ -558,7 +603,8 @@ export default function PrestamosPage() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
             </div>

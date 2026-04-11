@@ -197,11 +197,18 @@ export default function ClientTable({
     overdue: "Vencido — deuda con más de 121 días sin pagar",
   };
 
+  const riskSubtitles: Record<string, string> = {
+    current: "Al dia (0-90 dias)",
+    watch: "Atencion (91-120 dias)",
+    overdue: "Vencido (121+ dias)",
+  };
+
   const filterBtn = (key: RiskFilter, label: string, count: number, activeClasses: string, inactiveClasses: string) => (
     <button onClick={() => setRiskFilter(key)}
       title={riskTooltips[key] || ""}
-      className={`px-3 min-h-[44px] rounded-lg text-xs font-medium transition ${riskFilter === key ? activeClasses : inactiveClasses}`}>
-      {label} <span className="opacity-60 ml-0.5">{count}</span>
+      className={`px-3 min-h-[44px] rounded-lg text-xs font-medium transition flex flex-col items-center justify-center ${riskFilter === key ? activeClasses : inactiveClasses}`}>
+      <span>{label} <span className="opacity-60 ml-0.5">{count}</span></span>
+      {riskSubtitles[key] && <span className={`text-[10px] font-normal mt-0.5 ${riskFilter === key ? "opacity-70" : "opacity-50"}`}>{riskSubtitles[key]}</span>}
     </button>
   );
 

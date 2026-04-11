@@ -701,6 +701,14 @@ export default function AdminDashboard() {
         onSendVendorWhatsApp={sendVendorWhatsApp}
       />
 
+      {/* Company selection hint for multi-company users */}
+      {cxcCompanies.length > 1 && companyFilter === "all" && roleClients.length > 0 && (
+        <div className="flex items-center gap-2 mb-4 bg-blue-50 border border-blue-100 rounded-lg px-4 py-2.5">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <p className="text-xs text-blue-700">Estas viendo todas las empresas. Selecciona una empresa en los filtros para ver cuentas especificas.</p>
+        </div>
+      )}
+
       <ClientTable
         filtered={filtered}
         roleCompanies={cxcCompanies}

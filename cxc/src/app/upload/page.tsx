@@ -528,6 +528,16 @@ function UploadPageInner() {
         <div className="bg-white rounded-lg w-full max-w-[950px] max-h-[85vh] flex flex-col">
           {/* Header */}
           <div className="px-6 pt-5 pb-4 border-b border-gray-200 flex-shrink-0">
+            <div className="flex items-center gap-2 mb-3 text-xs text-gray-400">
+              <span className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-[10px] font-medium"><svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></span>
+              <span>Archivo seleccionado</span>
+              <div className="w-4 h-px bg-gray-300" />
+              <span className="w-5 h-5 rounded-full bg-black text-white flex items-center justify-center text-[10px] font-bold">2</span>
+              <span className="text-black font-medium">Revisa los datos</span>
+              <div className="w-4 h-px bg-gray-200" />
+              <span className="w-5 h-5 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center text-[10px] font-medium">3</span>
+              <span>Confirmar</span>
+            </div>
             <div className="flex justify-between items-start">
               <div>
                 <p className="font-semibold text-[15px]">{title}</p>
@@ -579,15 +589,17 @@ function UploadPageInner() {
           {/* Actions */}
           <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0">
             {warning && <div className="mb-3">{warning}</div>}
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-center">
             <button onClick={onConfirm} disabled={confirmDisabled}
-              className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed">
+              className="bg-black text-white px-8 py-3 rounded-md text-sm font-semibold hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+              <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
               {confirmLabel}
             </button>
             <button onClick={onCancel}
-              className="border border-gray-300 px-5 py-2.5 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition">
+              className="border border-gray-300 px-5 py-3 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition">
               Cancelar
             </button>
+            {!confirmDisabled && <span className="text-xs text-gray-400 ml-2">Paso 3: Confirma para completar la carga</span>}
             </div>
           </div>
         </div>
@@ -612,8 +624,28 @@ function UploadPageInner() {
           <button onClick={() => setActiveTab("ventas")} className={`flex-1 py-2.5 sm:py-2 px-4 text-sm rounded-md transition ${activeTab === "ventas" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Ventas</button>
         </div>
 
+        {/* Step indicator */}
+        <div className="flex items-center gap-0 mb-6">
+          {[
+            { num: 1, label: "Selecciona el archivo", active: !cxcPreview && !ventasPreview && !message, done: !!cxcPreview || !!ventasPreview || !!message },
+            { num: 2, label: "Revisa los datos", active: !!cxcPreview || !!ventasPreview, done: !!message },
+            { num: 3, label: "Confirmar carga", active: false, done: message?.type === "ok" },
+          ].map((step, i) => (
+            <div key={step.num} className="flex items-center">
+              {i > 0 && <div className={`w-8 sm:w-12 h-px ${step.done || step.active ? "bg-black" : "bg-gray-200"} mx-1`} />}
+              <div className="flex items-center gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 ${step.done ? "bg-black text-white" : step.active ? "bg-black text-white" : "bg-gray-100 text-gray-400"}`}>
+                  {step.done ? <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg> : step.num}
+                </div>
+                <span className={`text-xs whitespace-nowrap ${step.done || step.active ? "text-black font-medium" : "text-gray-400"}`}>{step.label}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+
         {message && (
           <div className={`mb-6 px-4 py-3 rounded-lg text-sm ${message.type === "ok" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+            {message.type === "ok" && <span className="font-medium block mb-0.5">Carga completada</span>}
             {message.text}
           </div>
         )}
