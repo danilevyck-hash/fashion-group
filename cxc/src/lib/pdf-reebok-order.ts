@@ -64,12 +64,12 @@ export async function generateReebokOrderPdf(cart: OrderItem[]): Promise<void> {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
   doc.setTextColor(...NAVY_RGB);
-  doc.text("FASHION GROUP", textX, y + 2);
+  doc.text("REEBOK", textX, y + 2);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...GRAY_TEXT);
-  doc.text("fashiongr.com", textX, y + 7);
+  doc.text("Panamá", textX, y + 7);
 
   // Right side: title + date
   doc.setFont("helvetica", "bold");
