@@ -165,6 +165,40 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 - **useOnlineStatus** — offline/online detection
 - **useTableShortcuts** — J/K row navigation context
 
+## Changes — April 2026 Session
+
+### Home & Navigation
+- Home reorganized with grouped modules: Día a día, Consultas, Catálogos, Admin
+- Claude chat removed from layout
+
+### Roles
+- Bodega now sees all guías by default (not just pending)
+- Vendedor can now view guías (read-only)
+
+### UX Audit (45+ fixes)
+- alert() replaced with toast notifications across all modules
+- Error handling improved (try/catch, user-friendly messages)
+- Copies and microcopy refined
+- Dead code removed across modules
+
+### Camisetas
+- Batch edit with "Guardar cambios" button
+- force-dynamic on API route
+
+### API & Cache
+- All 58 API routes now have `export const dynamic = 'force-dynamic'` (no more stale cache on Vercel)
+
+### Hooks
+- Hooks fixed in cheques and caja (moved before conditional returns per React rules)
+
+### Auth
+- Password minimum length changed to 3 characters
+- Password field clears on edit (prevents double-hash bug)
+
+### Attempted & Reverted
+- Face ID (WebAuthn): implemented and removed — too unstable on serverless (DER/P1363 format issues, challenge storage in memory)
+- Trading bot dashboard: added and removed — localhost IBKR gateway not accessible from Vercel
+
 ## Testing
 ```bash
 npx next build    # Build check — must pass before push
