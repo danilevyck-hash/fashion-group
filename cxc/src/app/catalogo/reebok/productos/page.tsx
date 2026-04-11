@@ -4,9 +4,12 @@ import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Product } from "@/components/reebok/supabase";
-import ProductCard from "@/components/reebok/ProductCard";
 import NewOrderModal from "@/components/reebok/NewOrderModal";
 import { Toast } from "@/components/ui";
+import CatalogHeader from "@/components/reebok/CatalogHeader";
+import CatalogFilters from "@/components/reebok/CatalogFilters";
+import CatalogProductCard from "@/components/reebok/CatalogProductCard";
+import StickyCartBar from "@/components/reebok/StickyCartBar";
 
 interface CartItem { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
 
@@ -37,9 +40,7 @@ function Productos() {
 
   // ── State: cart + draft context ──
   const [cart, setCart] = useState<CartItem[]>([]);
-  // Mode A: new order (client name in sessionStorage, no DB order yet)
   const [draftClient, setDraftClient] = useState("");
-  // Mode B: existing order (draft ID in sessionStorage, order in DB)
   const [draftId, setDraftId] = useState<string | null>(null);
   const [draftNumber, setDraftNumber] = useState("");
   const [draftOriginalIds, setDraftOriginalIds] = useState<Set<string>>(new Set());
@@ -55,7 +56,6 @@ function Productos() {
     const newClient = sessionStorage.getItem("reebok_draft_client");
 
     if (existingDraftId) {
-      // Mode B: returning from an existing draft order — load its items
       fetch(`/api/catalogo/reebok/orders/${existingDraftId}`).then(r => r.ok ? r.json() : null).then(order => {
         if (order && order.status === "borrador") {
           setDraftId(order.id);
@@ -72,14 +72,12 @@ function Productos() {
         }
       }).catch(() => { sessionStorage.removeItem("reebok_draft_id"); });
     } else if (newClient) {
-      // Mode A: client set, restore cart from sessionStorage
       setDraftClient(newClient);
       try {
         const saved = sessionStorage.getItem("reebok_cart");
         if (saved) setCart(JSON.parse(saved));
       } catch { /* corrupt data — ignore */ }
     } else {
-      // No sessionStorage context — check localStorage for recovered draft
       try {
         const lsClient = localStorage.getItem("reebok_draft_client");
         const lsCart = localStorage.getItem("reebok_cart");
@@ -87,7 +85,7 @@ function Productos() {
           const parsed = JSON.parse(lsCart);
           if (Array.isArray(parsed) && parsed.length > 0) {
             setRestoredDraftBanner(lsClient);
-            return; // Don't clean — wait for user decision
+            return;
           }
         }
       } catch { /* */ }
@@ -113,12 +111,10 @@ function Productos() {
     setRestoredDraftBanner(null);
   }
 
-  // Persist cart to sessionStorage + localStorage on every change (skip initial empty)
   const cartInitialized = useRef(false);
   useEffect(() => {
     if (!cartInitialized.current) { cartInitialized.current = true; return; }
     sessionStorage.setItem("reebok_cart", JSON.stringify(cart));
-    // Also persist to localStorage for recovery
     try {
       localStorage.setItem("reebok_cart", JSON.stringify(cart));
       if (draftClient) localStorage.setItem("reebok_draft_client", draftClient);
@@ -137,12 +133,10 @@ function Productos() {
   // ── Floating bar action: create or update ──
   async function handleFloatingBarClick() {
     if (cart.length === 0) return;
-    // No context yet — ask for client name first
     if (!draftId && !draftClient) { setShowNameModal(true); return; }
     setSaving(true);
 
     if (draftId) {
-      // Mode B: update existing order
       setToast("Actualizando pedido...");
       try {
         for (const item of cart) {
@@ -151,7 +145,6 @@ function Productos() {
             body: JSON.stringify(item),
           });
         }
-        // Delete removed items
         for (const pid of draftOriginalIds) {
           if (!cart.find(i => i.product_id === pid)) {
             await fetch(`/api/catalogo/reebok/orders/${draftId}/item`, {
@@ -163,7 +156,6 @@ function Productos() {
         router.push(`/catalogo/reebok/pedido/${draftId}`);
       } catch { setToast("Error al actualizar pedido"); setSaving(false); }
     } else {
-      // Mode A: create new order
       setToast("Creando pedido...");
       try {
         const res = await fetch("/api/catalogo/reebok/orders", {
@@ -177,7 +169,6 @@ function Productos() {
         });
         if (res.ok) {
           const order = await res.json();
-          // Switch sessionStorage from "new" mode to "existing" mode
           sessionStorage.removeItem("reebok_draft_client");
           sessionStorage.removeItem("reebok_draft_client_email");
           sessionStorage.removeItem("reebok_cart");
@@ -188,7 +179,7 @@ function Productos() {
           setToast(err.error || "Error al crear pedido");
           setSaving(false);
         }
-      } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setSaving(false); }
+      } catch { setToast("Sin conexion. Verifica tu internet e intenta de nuevo."); setSaving(false); }
     }
   }
 
@@ -235,12 +226,11 @@ function Productos() {
   // ── Derived state ──
   const catOrder: Record<string, number> = { footwear: 0, apparel: 1, accessories: 2 };
   const genOrder: Record<string, number> = { male: 0, female: 1, kids: 2, unisex: 3 };
-  const catLabel: Record<string, string> = { footwear: 'Calzado', apparel: 'Ropa', accessories: 'Accesorios' };
-  const genLabel: Record<string, string> = { male: 'Hombre', female: 'Mujer', kids: 'Niños', unisex: 'Unisex' };
+  const catLabel: Record<string, string> = { footwear: "Calzado", apparel: "Ropa", accessories: "Accesorios" };
+  const genLabel: Record<string, string> = { male: "Hombre", female: "Mujer", kids: "Ninos", unisex: "Unisex" };
 
-  // Pre-price filtered set (all filters EXCEPT price/color/size) — used for dropdown options
   const filteredBeforePrice = products
-    .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()))
+    .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => !gender || p.gender === gender)
     .filter(p => !category || p.category === category)
     .filter(p => !saleFilter || (saleFilter === "oferta" ? p.on_sale : !p.on_sale));
@@ -249,10 +239,7 @@ function Productos() {
     ? [...new Set(filteredBeforePrice.filter(p => p.price).map(p => p.price!))].sort((a, b) => a - b)
     : [];
 
-  // Unique colors from currently filtered products (before color/size filter)
   const uniqueColors = [...new Set(filteredBeforePrice.filter(p => p.color).map(p => p.color!))].sort((a, b) => a.localeCompare(b));
-
-  // Unique sizes from currently filtered products (before color/size filter), with stock > 0
   const uniqueSizes = [...new Set(filteredBeforePrice.flatMap(p => p._sizes))].sort((a, b) => {
     const na = parseFloat(a), nb = parseFloat(b);
     if (!isNaN(na) && !isNaN(nb)) return na - nb;
@@ -267,40 +254,36 @@ function Productos() {
       if (sortBy === "precio-asc") return (a.price || 0) - (b.price || 0);
       if (sortBy === "precio-desc") return (b.price || 0) - (a.price || 0);
       if (sortBy === "nombre-az") return a.name.localeCompare(b.name);
-      // Default: relevancia — grouped by category then gender then name
       const ca = catOrder[a.category] ?? 9, cb = catOrder[b.category] ?? 9;
       if (ca !== cb) return ca - cb;
-      const ga = genOrder[a.gender || 'unisex'] ?? 9, gb = genOrder[b.gender || 'unisex'] ?? 9;
+      const ga = genOrder[a.gender || "unisex"] ?? 9, gb = genOrder[b.gender || "unisex"] ?? 9;
       if (ga !== gb) return ga - gb;
       return a.name.localeCompare(b.name);
     });
 
   const isGrouped = sortBy === "relevancia";
-
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const cartMap = new Map(cart.map(i => [i.product_id, i.quantity]));
 
   type Group = { label: string; items: typeof filtered };
   const groups: Group[] = [];
-  let lastKey = '';
+  let lastKey = "";
   for (const p of paginated) {
-    const key = `${p.category}|${p.gender || 'unisex'}`;
+    const key = `${p.category}|${p.gender || "unisex"}`;
     if (key !== lastKey) {
-      groups.push({ label: `${catLabel[p.category] || p.category} — ${genLabel[p.gender || 'unisex'] || p.gender}`, items: [] });
+      groups.push({ label: `${catLabel[p.category] || p.category} — ${genLabel[p.gender || "unisex"] || p.gender}`, items: [] });
       lastKey = key;
     }
     groups[groups.length - 1].items.push(p);
   }
 
   const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  const hasContext = draftClient || draftId; // user is in an order flow
+  const hasContext = draftClient || draftId;
 
   // ── Download catalog as PDF ──
   const [downloading, setDownloading] = useState(false);
 
-  // ── Mini cart expand/collapse ──
-  const [miniCartOpen, setMiniCartOpen] = useState(false);
   // ── Share dropdown ──
   const [showShareMenu, setShowShareMenu] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
@@ -331,35 +314,31 @@ function Productos() {
     if (!items.length || downloading) return;
 
     setDownloading(true);
-    setToast("Generando catálogo PDF...");
+    setToast("Generando catalogo PDF...");
 
     try {
       const { jsPDF } = await import("jspdf");
       const { REEBOK_LOGO_BASE64 } = await import("@/lib/reebok-logo");
 
-      // ── Reebok brand palette ──
-      const NAVY: [number, number, number] = [26, 38, 86];     // #1A2656
-      const RED: [number, number, number] = [228, 0, 43];      // #E4002B
-      const CREAM: [number, number, number] = [245, 240, 232];  // #F5F0E8
+      const NAVY: [number, number, number] = [26, 38, 86];
+      const RED: [number, number, number] = [228, 0, 43];
+      const CREAM: [number, number, number] = [245, 240, 232];
       const GRAY_LIGHT: [number, number, number] = [160, 160, 165];
       const GRAY_MID: [number, number, number] = [120, 120, 125];
       const WHITE: [number, number, number] = [255, 255, 255];
 
-      // ── Layout constants (letter portrait in mm) ──
       const PW = 215.9, PH = 279.4;
-      const M = 18;                           // generous margin
+      const M = 18;
       const CONTENT_W = PW - 2 * M;
       const COLS = 3, GAP = 8;
       const CW = (CONTENT_W - (COLS - 1) * GAP) / COLS;
-      const IH = 54;                          // image box height
-      const TH = 22;                          // text area below image
-      const CH = IH + TH;                     // total card height
-      const RGAP = 10;                        // row gap (breathing room)
-      const GENDER_H = 14;                    // gender divider height
-      const HEADER_H = 12;                    // page header height
-      const FOOTER_H = 10;                    // footer reserved space
+      const IH = 54;
+      const TH = 22;
+      const CH = IH + TH;
+      const RGAP = 10;
+      const GENDER_H = 14;
+      const FOOTER_H = 10;
 
-      // Load an image as base64 via canvas
       function loadImg(url: string): Promise<{ data: string; w: number; h: number }> {
         return new Promise(resolve => {
           const img = new Image();
@@ -376,7 +355,6 @@ function Productos() {
         });
       }
 
-      // Load all product images in parallel
       const urls = [...new Set(items.filter(p => p.image_url).map(p => p.image_url!))];
       const imgCache: Record<string, { data: string; w: number; h: number }> = {};
       await Promise.all(urls.map(u => loadImg(u).then(r => { imgCache[u] = r; })));
@@ -385,7 +363,6 @@ function Productos() {
       let y = M;
       let pageNum = 1;
 
-      // ── Reusable: draw page footer ──
       function drawFooter() {
         doc.setFontSize(7);
         doc.setFont("helvetica", "normal");
@@ -396,13 +373,10 @@ function Productos() {
         doc.text("Fashion Group \u2014 Panam\u00e1", PW / 2, PH - 4.5, { align: "center" });
       }
 
-      // ── Reusable: draw page header (pages 2+) ──
       function drawPageHeader() {
-        // Small logo top-left
         if (REEBOK_LOGO_BASE64) {
           doc.addImage(REEBOK_LOGO_BASE64, "PNG", M, 8, 18, 5);
         }
-        // Thin red accent line
         doc.setDrawColor(...RED);
         doc.setLineWidth(0.4);
         doc.line(M, 15, PW - M, 15);
@@ -420,30 +394,19 @@ function Productos() {
         return false;
       }
 
-      // ══════════════════════════════════════
-      // ── COVER / FIRST PAGE HEADER ──
-      // ══════════════════════════════════════
-
-      // Logo top-left (tasteful size)
       if (REEBOK_LOGO_BASE64) {
         doc.addImage(REEBOK_LOGO_BASE64, "PNG", M, y, 24, 6.7);
       }
-
-      // "CATALOGO" right-aligned, navy uppercase tracking-wider
       doc.setFontSize(14);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(...NAVY);
       doc.text("CAT\u00c1LOGO", PW - M, y + 5.5, { align: "right" });
-
       y += 11;
-
-      // Thin red separator line
       doc.setDrawColor(...RED);
       doc.setLineWidth(0.5);
       doc.line(M, y, PW - M, y);
       y += 6;
 
-      // Date + product count + filter description
       const dateStr = new Date().toLocaleDateString("es-PA", {
         day: "numeric", month: "long", year: "numeric",
       });
@@ -460,7 +423,6 @@ function Productos() {
 
       y += 5;
 
-      // Filter description
       const filterDesc: string[] = [];
       if (gender) filterDesc.push(genLabel[gender] || gender);
       if (category) filterDesc.push(catLabel[category] || category);
@@ -475,12 +437,7 @@ function Productos() {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(...GRAY_LIGHT);
       doc.text(subtitle.toUpperCase(), M, y);
-
       y += 8;
-
-      // ══════════════════════════════════════
-      // ── PRODUCT GRID BY GENDER ──
-      // ══════════════════════════════════════
 
       const genders = [
         { key: "male", label: "HOMBRE" },
@@ -492,40 +449,27 @@ function Productos() {
       for (const g of genders) {
         const gItems = items.filter(p => (p.gender || "unisex") === g.key);
         if (!gItems.length) continue;
-
-        // ── Gender section divider ──
         needPage(GENDER_H + CH);
-
-        // Navy bar with white text
         doc.setFillColor(...NAVY);
         doc.roundedRect(M, y, CONTENT_W, 8, 1, 1, "F");
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(...WHITE);
         doc.text(g.label, M + 5, y + 5.8);
-
-        // Product count right side
         doc.setFontSize(8);
         doc.setFont("helvetica", "normal");
         doc.setTextColor(200, 200, 210);
         doc.text(`${gItems.length} productos`, PW - M - 5, y + 5.8, { align: "right" });
-
         y += GENDER_H;
 
-        // ── Render products in 3-column rows ──
         for (let i = 0; i < gItems.length; i += COLS) {
           needPage(CH);
           const row = gItems.slice(i, i + COLS);
-
           for (let j = 0; j < row.length; j++) {
             const p = row[j];
             const x = M + j * (CW + GAP);
-
-            // Cream background for image area
             doc.setFillColor(...CREAM);
             doc.roundedRect(x, y, CW, IH, 2, 2, "F");
-
-            // Product image (fit inside with padding, centered)
             const cached = p.image_url ? imgCache[p.image_url] : null;
             if (cached?.data) {
               const pad = 4;
@@ -536,8 +480,6 @@ function Productos() {
               const dy = y + pad + (boxH - dh) / 2;
               doc.addImage(cached.data, "JPEG", dx, dy, dw, dh);
             }
-
-            // Badge: OFERTA (red) or NUEVO (navy)
             if (p.on_sale) {
               doc.setFillColor(...RED);
               doc.roundedRect(x + 2, y + 2, 14, 4.5, 1, 1, "F");
@@ -553,11 +495,7 @@ function Productos() {
               doc.setFont("helvetica", "bold");
               doc.text("NUEVO", x + 3.2, y + 5.2);
             }
-
-            // ── Text area below image ──
             let ty = y + IH + 5;
-
-            // Product name — navy bold
             doc.setTextColor(...NAVY);
             doc.setFontSize(8);
             doc.setFont("helvetica", "bold");
@@ -566,8 +504,6 @@ function Productos() {
               ? p.name.substring(0, maxNameLen - 1) + "\u2026"
               : p.name;
             doc.text(name.toUpperCase(), x + 1, ty);
-
-            // SKU — small gray
             ty += 4;
             doc.setFontSize(6.5);
             doc.setFont("helvetica", "normal");
@@ -575,8 +511,6 @@ function Productos() {
             const skuText = p.sku || "";
             const colorText = p.color ? `  \u00b7  ${p.color}` : "";
             doc.text(skuText + colorText, x + 1, ty);
-
-            // Price — bold, bottom of text area
             ty += 5.5;
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
@@ -591,11 +525,9 @@ function Productos() {
         }
       }
 
-      // Draw footer on last page
       drawFooter();
-
       doc.save(`catalogo-reebok-${new Date().toISOString().slice(0, 10)}.pdf`);
-      setToast("Catálogo descargado");
+      setToast("Catalogo descargado");
     } catch (e) {
       console.error(e);
       setToast("Error al generar PDF");
@@ -604,213 +536,216 @@ function Productos() {
     }
   }
 
+  function handleClearAll() {
+    setSearchInput(""); setSearch(""); setGender(""); setCategory("");
+    setSaleFilter(""); setPriceFilter(""); setColorFilter(""); setSizeFilter("");
+    setSortBy("relevancia");
+  }
+
+  function handleClearCart() {
+    setCart([]);
+    sessionStorage.removeItem("reebok_cart");
+    try { localStorage.removeItem("reebok_cart"); } catch { /* */ }
+  }
+
+  // Skeleton
+  const skeletonGrid = (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+      {[...Array(12)].map((_, i) => (
+        <div key={i} className="bg-white overflow-hidden rounded-xl">
+          <div className="aspect-square shimmer" />
+          <div className="p-3 space-y-2.5">
+            <div className="h-4 shimmer rounded" style={{ width: "75%" }} />
+            <div className="h-3 shimmer rounded" style={{ width: "40%" }} />
+            <div className="h-3 shimmer rounded" style={{ width: "55%" }} />
+            <div className="h-6 shimmer w-20 mt-1.5 rounded" />
+            <div className="h-11 shimmer w-full mt-2 rounded-lg" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Empty
+  const emptyState = (
+    <div className="text-center py-20">
+      <div className="w-16 h-16 rounded-full bg-[#1A2656]/5 flex items-center justify-center mx-auto mb-4">
+        <svg className="w-8 h-8 text-[#1A2656]/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
+      <p className="text-[#1A2656]/40 text-sm font-medium">No encontramos productos con estos filtros</p>
+      <button
+        onClick={handleClearAll}
+        className="mt-3 text-sm text-[#E4002B] hover:text-[#c90025] font-medium transition"
+      >
+        Limpiar filtros
+      </button>
+    </div>
+  );
+
+  // Grid
+  const productGrid = (
+    <div className={`${cartCount > 0 && hasContext ? "pb-28" : ""}`}>
+      {isGrouped ? (
+        <div className="space-y-8">
+          {groups.map(g => (
+            <div key={g.label}>
+              <div className="flex items-center gap-3 mb-4">
+                <h2 className="text-xs font-bold uppercase tracking-wider text-[#1A2656]">
+                  {g.label}
+                </h2>
+                <div className="flex-1 h-px bg-[#1A2656]/10" />
+                <span className="text-[11px] text-[#1A2656]/25 tabular-nums">{g.items.length}</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+                {g.items.map(p => (
+                  <CatalogProductCard
+                    key={p.id}
+                    product={p}
+                    qty={cartMap.get(p.id) || 0}
+                    onQtyChange={handleQtyChange}
+                    disabled={!hasContext}
+                    showBultos
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
+          {paginated.map(p => (
+            <CatalogProductCard
+              key={p.id}
+              product={p}
+              qty={cartMap.get(p.id) || 0}
+              onQtyChange={handleQtyChange}
+              disabled={!hasContext}
+              showBultos
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-[#F5F0E8]">
     <div className="max-w-7xl mx-auto px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-xl font-bold uppercase tracking-wider text-[#1A2656]">Catálogo</h1>
-        <p className="text-xs text-[#1A2656]/50 uppercase tracking-widest mt-0.5">Panamá</p>
-      </div>
+      <CatalogHeader variant="vendor" />
 
       {/* ── Banner: recovered draft from localStorage ── */}
       {restoredDraftBanner && (
-        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
           <span className="text-sm text-amber-700">Tienes un pedido sin terminar para <strong>{restoredDraftBanner}</strong>.</span>
           <div className="flex gap-2">
-            <button onClick={restoreDraft} className="text-xs bg-black text-white px-4 py-1.5 rounded-full hover:bg-gray-800 transition">Continuar</button>
-            <button onClick={discardDraft} className="text-xs text-gray-500 hover:text-black transition px-2">Descartar</button>
+            <button onClick={restoreDraft} className="text-xs bg-[#1A2656] text-white px-4 py-1.5 rounded-lg hover:bg-[#0f1a3d] transition font-medium">Continuar</button>
+            <button onClick={discardDraft} className="text-xs text-gray-500 hover:text-[#1A2656] transition px-2">Descartar</button>
           </div>
         </div>
       )}
 
       {/* ── Banner: order context ── */}
       {hasContext ? (
-        <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 mb-4">
+        <div className="flex items-center justify-between bg-white border border-[#1A2656]/10 rounded-xl px-4 py-3 mb-4 shadow-sm">
           <div className="flex items-center gap-2 text-sm">
             {!draftId && (
               <div className="flex items-center gap-1.5 mr-2">
-                <span className="w-5 h-5 rounded-full bg-gray-300 text-white text-[10px] flex items-center justify-center font-medium">&#10003;</span>
-                <span className="w-5 h-5 rounded-full bg-black text-white text-[10px] flex items-center justify-center font-medium">2</span>
-                <span className="text-[10px] text-gray-400">Paso 2 de 2</span>
+                <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] flex items-center justify-center font-medium">&#10003;</span>
+                <span className="w-5 h-5 rounded-full bg-[#1A2656] text-white text-[10px] flex items-center justify-center font-bold">2</span>
+                <span className="text-[10px] text-[#1A2656]/30 font-medium">Paso 2 de 2</span>
               </div>
             )}
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             {draftId ? (
               <>
-                <span className="text-gray-600">Editando</span>
-                <span className="font-medium">{draftNumber}</span>
-                <span className="text-gray-400">— {draftClient}</span>
+                <span className="text-[#1A2656]/50">Editando</span>
+                <span className="font-semibold text-[#1A2656]">{draftNumber}</span>
+                <span className="text-[#1A2656]/30">— {draftClient}</span>
               </>
             ) : (
               <>
-                <span className="text-gray-600">Elige productos para</span>
-                <span className="font-medium">{draftClient}</span>
+                <span className="text-[#1A2656]/50">Elige productos para</span>
+                <span className="font-semibold text-[#1A2656]">{draftClient}</span>
               </>
             )}
           </div>
           <div className="flex items-center gap-3">
-            {!draftId && <button onClick={() => setShowNameModal(true)} className="text-xs text-gray-400 hover:text-black transition">Cambiar</button>}
-            {draftId && <Link href={`/catalogo/reebok/pedido/${draftId}`} className="text-xs text-black hover:underline transition">Ver pedido →</Link>}
+            {!draftId && <button onClick={() => setShowNameModal(true)} className="text-xs text-[#1A2656]/40 hover:text-[#1A2656] transition font-medium">Cambiar</button>}
+            {draftId && <Link href={`/catalogo/reebok/pedido/${draftId}`} className="text-xs text-[#1A2656] font-semibold hover:underline transition">Ver pedido &rarr;</Link>}
           </div>
         </div>
       ) : (
-        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
+        <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
           <span className="text-sm text-amber-800">Para hacer un pedido, primero selecciona el cliente</span>
-          <button onClick={() => setShowNameModal(true)} className="text-sm bg-black text-white px-4 py-1.5 rounded-md hover:bg-gray-800 transition">Seleccionar cliente</button>
+          <button onClick={() => setShowNameModal(true)} className="text-sm bg-[#1A2656] text-white px-4 py-1.5 rounded-lg hover:bg-[#0f1a3d] transition font-medium">Seleccionar cliente</button>
         </div>
       )}
 
       {/* ── Filters ── */}
-      <div className="flex flex-wrap items-end gap-3 mb-6">
-        <div>
-          <label className="text-[10px] text-[#1A2656]/60 uppercase tracking-wider font-medium">Buscar</label>
-          <input value={searchInput} onChange={e => setSearchInput(e.target.value)} placeholder="Nombre o SKU"
-            className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition w-44" />
-        </div>
-        <div>
-          <label className="text-[10px] text-[#1A2656]/60 uppercase tracking-wider font-medium">Género</label>
-          <select value={gender} onChange={e => setGender(e.target.value)}
-            className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
-            <option value="">Todos</option><option value="male">Hombre</option><option value="female">Mujer</option><option value="kids">Niños</option>
-          </select>
-        </div>
-        <div>
-          <label className="text-[10px] text-[#1A2656]/60 uppercase tracking-wider font-medium">Categoría</label>
-          <select value={category} onChange={e => setCategory(e.target.value)}
-            className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
-            <option value="">Todas</option><option value="footwear">Calzado</option><option value="apparel">Ropa</option><option value="accessories">Accesorios</option>
-          </select>
-        </div>
-        {uniqueColors.length > 1 && (
-          <div>
-            <label className="text-[10px] text-[#1A2656]/60 uppercase tracking-wider font-medium">Color</label>
-            <select value={colorFilter} onChange={e => setColorFilter(e.target.value)}
-              className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
-              <option value="">Todos</option>
-              {uniqueColors.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
-        )}
-        {uniqueSizes.length > 1 && (
-          <div>
-            <label className="text-[10px] text-[#1A2656]/60 uppercase tracking-wider font-medium">Talla</label>
-            <select value={sizeFilter} onChange={e => setSizeFilter(e.target.value)}
-              className="block border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
-              <option value="">Todas</option>
-              {uniqueSizes.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-        )}
-        <button onClick={() => { setSaleFilter(saleFilter === "oferta" ? "" : "oferta"); setPriceFilter(""); }}
-          className={`text-xs px-4 py-2 rounded-sm transition font-medium uppercase tracking-wider mb-0.5 ${saleFilter === "oferta" ? "bg-[#E4002B] text-white" : "border border-[#1A2656]/20 text-[#1A2656]/60 hover:border-[#E4002B] hover:text-[#E4002B]"}`}>
-          Oferta
-        </button>
-        <button onClick={() => { setSaleFilter(saleFilter === "nuevo" ? "" : "nuevo"); setPriceFilter(""); }}
-          className={`text-xs px-4 py-2 rounded-sm transition font-medium uppercase tracking-wider mb-0.5 ${saleFilter === "nuevo" ? "bg-[#1A2656] text-white" : "border border-[#1A2656]/20 text-[#1A2656]/60 hover:border-[#1A2656] hover:text-[#1A2656]"}`}>
-          Nuevo
-        </button>
-        {saleFilter === "oferta" && ofertaPrices.length > 1 && (
-          <div>
-            <label className="text-[10px] text-orange-400 uppercase tracking-wider">Precio</label>
-            <select value={priceFilter} onChange={e => setPriceFilter(e.target.value)}
-              className="block border-b border-orange-300 py-2 text-sm outline-none focus:border-orange-500 transition bg-transparent text-orange-700">
-              <option value="">Todos</option>
-              {ofertaPrices.map(p => <option key={p} value={p}>${p.toFixed(0)}</option>)}
-            </select>
-          </div>
-        )}
-        {(searchInput || gender || category || saleFilter || colorFilter || sizeFilter) && (
-          <button onClick={() => { setSearchInput(""); setSearch(""); setGender(""); setCategory(""); setSaleFilter(""); setPriceFilter(""); setColorFilter(""); setSizeFilter(""); setSortBy("relevancia"); }} className="text-sm text-gray-400 hover:text-black transition py-2 mb-0.5">Limpiar</button>
-        )}
-        <div className="flex items-center gap-2 ml-auto mb-1">
-          <select value={sortBy} onChange={e => setSortBy(e.target.value)}
-            className="text-xs border border-gray-200 rounded-md px-2 py-1.5 outline-none focus:border-gray-400 transition bg-transparent text-gray-500">
-            <option value="relevancia">Relevancia</option>
-            <option value="precio-asc">Precio: menor a mayor</option>
-            <option value="precio-desc">Precio: mayor a menor</option>
-            <option value="nombre-az">Nombre A-Z</option>
-          </select>
-          <span className="text-xs text-gray-400">{filtered.length}</span>
-          {filtered.length > 0 && (
-            <div className="relative" ref={shareRef}>
-              <button onClick={() => setShowShareMenu(prev => !prev)}
-                className="text-xs border border-gray-200 text-gray-500 px-3 py-1.5 rounded-full hover:border-gray-400 hover:text-black transition flex items-center gap-1">
-                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-                Compartir
-              </button>
-              {showShareMenu && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 w-48 z-50">
-                  <button onClick={handleCopyLink}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    Copiar link
-                  </button>
-                  <button onClick={() => { setShowShareMenu(false); handleDownloadCatalog(); }} disabled={downloading}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    {downloading ? "Generando..." : "Descargar PDF"}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
+      <CatalogFilters
+        searchInput={searchInput}
+        onSearchChange={setSearchInput}
+        gender={gender}
+        onGenderChange={setGender}
+        category={category}
+        onCategoryChange={setCategory}
+        saleFilter={saleFilter}
+        onSaleFilterChange={(v) => { setSaleFilter(v); setPriceFilter(""); }}
+        colorFilter={colorFilter}
+        onColorFilterChange={setColorFilter}
+        sizeFilter={sizeFilter}
+        onSizeFilterChange={setSizeFilter}
+        priceFilter={priceFilter}
+        onPriceFilterChange={setPriceFilter}
+        sortBy={sortBy}
+        onSortByChange={setSortBy}
+        uniqueColors={uniqueColors}
+        uniqueSizes={uniqueSizes}
+        ofertaPrices={ofertaPrices}
+        filteredCount={filtered.length}
+        onClearAll={handleClearAll}
+      />
 
-      {/* ── Grid ── */}
-      {loading ? (
-        <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {[...Array(12)].map((_, i) => (
-            <div key={i} className="bg-white overflow-hidden">
-              <div className="aspect-square shimmer" />
-              <div className="p-3 space-y-2.5">
-                <div className="h-3.5 shimmer" style={{ width: "70%" }} />
-                <div className="h-3 shimmer" style={{ width: "45%" }} />
-                <div className="h-5 shimmer w-16 mt-1.5" />
-                <div className="h-10 shimmer w-full mt-2 rounded-md" />
+      {/* ── Share/Download row ── */}
+      {filtered.length > 0 && (
+        <div className="flex items-center justify-end gap-2 mb-4">
+          <div className="relative" ref={shareRef}>
+            <button onClick={() => setShowShareMenu(prev => !prev)}
+              className="text-xs border border-[#1A2656]/10 text-[#1A2656]/40 px-3 py-1.5 rounded-lg hover:border-[#1A2656]/25 hover:text-[#1A2656]/60 transition flex items-center gap-1.5 min-h-[32px]">
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+              Compartir
+            </button>
+            {showShareMenu && (
+              <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 w-48 z-50">
+                <button onClick={handleCopyLink}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  Copiar link
+                </button>
+                <button onClick={() => { setShowShareMenu(false); handleDownloadCatalog(); }} disabled={downloading}
+                  className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 transition flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  {downloading ? "Generando..." : "Descargar PDF"}
+                </button>
               </div>
-            </div>
-          ))}
-        </div>
-      ) : filtered.length === 0 ? (
-        <p className="text-center py-20 text-[#1A2656]/40 text-sm">No se encontraron productos</p>
-      ) : (
-        <div className={`fade-in ${cartCount > 0 ? "pb-24" : ""}`}>
-          {isGrouped ? (
-            <div className="space-y-8">
-              {groups.map(g => (
-                <div key={g.label}>
-                  <div className="flex items-center gap-3 mb-3">
-                    <h2 className="text-xs font-bold uppercase tracking-wider text-[#1A2656]">{g.label}</h2>
-                    <div className="flex-1 border-t border-[#1A2656]/10" />
-                    <span className="text-xs text-[#1A2656]/30">{g.items.length}</span>
-                  </div>
-                  <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {g.items.map(p => (
-                      <ProductCard key={p.id} product={p} stock={p._stock} qty={cartMap.get(p.id) || 0} onQtyChange={handleQtyChange} disabled={!hasContext} />
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 min-[360px]:grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-              {paginated.map(p => (
-                <ProductCard key={p.id} product={p} stock={p._stock} qty={cartMap.get(p.id) || 0} onQtyChange={handleQtyChange} disabled={!hasContext} />
-              ))}
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
+      {/* ── Grid ── */}
+      {loading ? skeletonGrid : filtered.length === 0 ? emptyState : productGrid}
+
       {/* Pagination */}
       {!loading && totalPages > 1 && (
-        <div className="flex items-center justify-center gap-4 mt-8 mb-4">
+        <div className="flex items-center justify-center gap-3 mt-8 mb-4">
           <button onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} disabled={page === 1}
-            className="text-xs font-medium uppercase tracking-wider border border-[#1A2656]/20 text-[#1A2656] px-4 py-2 rounded-sm hover:border-[#1A2656] transition disabled:opacity-30 disabled:cursor-not-allowed">← Anterior</button>
-          <span className="text-xs text-[#1A2656]/40">{page} / {totalPages}</span>
+            className="text-xs font-semibold uppercase tracking-wider text-[#1A2656] px-4 py-2.5 rounded-lg border border-[#1A2656]/15 hover:border-[#1A2656]/30 transition disabled:opacity-25 disabled:cursor-not-allowed min-h-[44px]">&larr; Anterior</button>
+          <span className="text-xs text-[#1A2656]/35 tabular-nums font-medium">{page} / {totalPages}</span>
           <button onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }} disabled={page === totalPages}
-            className="text-xs font-medium uppercase tracking-wider border border-[#1A2656]/20 text-[#1A2656] px-4 py-2 rounded-sm hover:border-[#1A2656] transition disabled:opacity-30 disabled:cursor-not-allowed">Siguiente →</button>
+            className="text-xs font-semibold uppercase tracking-wider text-[#1A2656] px-4 py-2.5 rounded-lg border border-[#1A2656]/15 hover:border-[#1A2656]/30 transition disabled:opacity-25 disabled:cursor-not-allowed min-h-[44px]">Siguiente &rarr;</button>
         </div>
       )}
 
@@ -818,7 +753,7 @@ function Productos() {
 
       {showScrollTop && (
         <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          className="fixed bottom-20 right-4 z-30 w-10 h-10 bg-white border border-gray-200 rounded-full shadow-md flex items-center justify-center text-gray-400 hover:text-black transition">↑</button>
+          className="fixed bottom-24 right-4 z-30 w-10 h-10 bg-white border border-[#1A2656]/10 rounded-full shadow-md flex items-center justify-center text-[#1A2656]/40 hover:text-[#1A2656] transition min-w-[44px] min-h-[44px]">&uarr;</button>
       )}
 
       {/* ── Name modal (when no context) ── */}
@@ -826,77 +761,28 @@ function Productos() {
         <NewOrderModal onClose={() => setShowNameModal(false)} />
       )}
 
-      {/* ── Floating bar + Mini cart ── */}
+      {/* ── Sticky cart bar ── */}
       {cartCount > 0 && hasContext && (
-        <div className="fixed bottom-0 left-0 right-0 z-40">
-          {/* Backdrop when mini cart is open */}
-          {miniCartOpen && (
-            <div className="fixed inset-0 bg-black/20 z-[-1]" onClick={() => setMiniCartOpen(false)} />
-          )}
-
-          {/* Mini cart summary panel */}
-          <div
-            className="bg-white border-t border-gray-200 overflow-hidden"
-            style={{ maxHeight: miniCartOpen ? "250px" : "0px", transition: "max-height 200ms ease-out" }}
-          >
-            <div className="overflow-y-auto" style={{ maxHeight: "200px" }}>
-              <div className="px-4 pt-3 pb-1">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">Resumen del pedido</span>
-                  <button onClick={() => setMiniCartOpen(false)} className="text-gray-400 hover:text-black transition p-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-                  </button>
-                </div>
-                {cart.map(item => (
-                  <div key={item.product_id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
-                    <span className="text-sm text-gray-700 truncate mr-3">{item.name}</span>
-                    <span className="text-sm tabular-nums text-gray-500 shrink-0">{"×"}{item.quantity}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="px-4 py-2 border-t border-gray-100">
-              {draftId ? (
-                <Link href={`/catalogo/reebok/pedido/${draftId}`} className="text-xs text-black font-medium hover:underline">
-                  Ver pedido completo {"→"}
-                </Link>
-              ) : (
-                <button onClick={handleFloatingBarClick} className="text-xs text-black font-medium hover:underline">
-                  Ver pedido completo {"→"}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Floating bar */}
-          <div className="p-3 bg-white border-t border-gray-100 shadow-lg flex items-center gap-2">
-            {/* Expandable touch zone: bultos + total */}
-            <button
-              onClick={() => setMiniCartOpen(prev => !prev)}
-              className="flex items-center gap-1.5 px-3 py-3.5 rounded-lg bg-gray-100 text-gray-700 text-sm tabular-nums shrink-0 hover:bg-gray-200 transition"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                className="transition-transform duration-200"
-                style={{ transform: miniCartOpen ? "rotate(180deg)" : "rotate(0deg)" }}
-              >
-                <polyline points="18 15 12 9 6 15"/>
-              </svg>
-              <span>{cartCount} bulto{cartCount !== 1 ? "s" : ""}</span>
-              {cartTotal > 0 && <><span className="text-gray-400">{"·"}</span><span className="font-semibold">${fmt(cartTotal)}</span></>}
-            </button>
-
-            {/* Main action button */}
-            <button onClick={handleFloatingBarClick} disabled={saving}
-              className={`flex-1 py-3.5 rounded-sm text-xs font-medium uppercase tracking-wider flex items-center justify-center gap-2 transition disabled:opacity-50 ${
-                draftId ? "bg-[#1A2656] text-white hover:bg-[#0f1a3d]" : "bg-[#E4002B] text-white hover:bg-[#c90025]"
-              }`}>
-              <span className="truncate">{saving ? "Guardando..." : draftId ? `Actualizar ${draftNumber}` : draftClient ? "Crear pedido" : "Crear pedido"}</span>
-              <span>{"→"}</span>
-            </button>
-          </div>
-        </div>
+        <StickyCartBar
+          cart={cart}
+          cartCount={cartCount}
+          cartTotal={cartTotal}
+          onQtyChange={handleQtyChange}
+          onClearCart={handleClearCart}
+          variant="vendor"
+          onCreateOrder={handleFloatingBarClick}
+          saving={saving}
+          actionLabel={saving ? "Guardando..." : draftId ? `Actualizar ${draftNumber}` : "Crear pedido"}
+          actionColor={draftId ? "bg-[#1A2656] hover:bg-[#0f1a3d]" : "bg-[#E4002B] hover:bg-[#c90025]"}
+          miniCartLink={
+            draftId ? (
+              <Link href={`/catalogo/reebok/pedido/${draftId}`} className="text-xs text-[#1A2656] font-semibold hover:underline">
+                Ver pedido &rarr;
+              </Link>
+            ) : undefined
+          }
+          formatTotal={fmt}
+        />
       )}
     </div>
     </div>
