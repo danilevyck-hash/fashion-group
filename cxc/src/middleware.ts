@@ -7,6 +7,7 @@ const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 const PUBLIC_PATHS = [
   "/",              // login page
   "/api/auth",      // login endpoint
+  "/catalogo/reebok/ver", // public catalog (no auth)
 ];
 
 // Paths that start with these prefixes are public
@@ -14,6 +15,7 @@ const PUBLIC_PREFIXES = [
   "/api/cron/",     // cron jobs use CRON_SECRET
   "/api/catalogo/reebok/products", // public catalog reads
   "/api/catalogo/reebok/inventory", // public catalog stock
+  "/api/catalogo/reebok/public",    // public catalog endpoint (no auth)
   "/_next/",
   "/icon-",
   "/manifest",
