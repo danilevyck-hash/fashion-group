@@ -183,19 +183,33 @@ function PublicCatalog() {
     setSortBy("relevancia");
   }
 
-  // WhatsApp send
-  function handleSendWhatsApp() {
-    if (cart.length === 0) return;
-    const lines = cart.map(item =>
-      `- ${item.name} x${item.quantity} — $${(item.unit_price * item.quantity).toFixed(2)}`
-    );
-    const total = cart.reduce((s, i) => s + i.quantity * i.unit_price, 0);
-    const msg = `Hola, quiero hacer un pedido:\n\n${lines.join("\n")}\n\nTotal: $${total.toFixed(2)}`;
-    const url = `https://wa.me/50766745522?text=${encodeURIComponent(msg)}`;
-    window.open(url, "_blank");
-    setCart([]);
-    try { localStorage.removeItem("reebok_public_cart"); } catch { /* */ }
-    setToast("Pedido enviado por WhatsApp");
+  const [sendingOrder, setSendingOrder] = useState(false);
+
+  // WhatsApp send with PDF
+  async function handleSendWhatsApp() {
+    if (cart.length === 0 || sendingOrder) return;
+    setSendingOrder(true);
+    try {
+      // Generate and download PDF
+      const { generateReebokOrderPdf } = await import("@/lib/pdf-reebok-order");
+      await generateReebokOrderPdf(cart);
+      setToast("PDF descargado — envíalo por WhatsApp");
+
+      // Open WhatsApp after a brief delay so the user sees the toast
+      const total = cart.reduce((s, i) => s + i.quantity * i.unit_price, 0);
+      const msg = `Hola, te envío mi pedido de Reebok (ver PDF adjunto). Total: $${total.toFixed(2)}`;
+      const url = `https://wa.me/50766745522?text=${encodeURIComponent(msg)}`;
+      setTimeout(() => {
+        window.open(url, "_blank");
+      }, 600);
+
+      setCart([]);
+      try { localStorage.removeItem("reebok_public_cart"); } catch { /* */ }
+    } catch {
+      setToast("Error al generar el PDF. Intenta de nuevo.");
+    } finally {
+      setSendingOrder(false);
+    }
   }
 
   function handleClearCart() {
@@ -352,6 +366,8 @@ function PublicCatalog() {
           onClearCart={handleClearCart}
           variant="public"
           onSendWhatsApp={handleSendWhatsApp}
+          saving={sendingOrder}
+          actionLabel={sendingOrder ? "Generando PDF..." : undefined}
           formatTotal={fmt}
         />
       </div>
