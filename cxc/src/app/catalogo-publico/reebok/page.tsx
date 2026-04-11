@@ -29,9 +29,7 @@ function PublicCatalog() {
   const [gender, setGender] = useState("");
   const [category, setCategory] = useState("");
   const [saleFilter, setSaleFilter] = useState<"" | "oferta" | "nuevo">("");
-  const [priceFilter, setPriceFilter] = useState("");
-  const [colorFilter, setColorFilter] = useState("");
-  const [sizeFilter, setSizeFilter] = useState("");
+  // color/size/price filters removed — kept simple
   const [sortBy, setSortBy] = useState("relevancia");
   const [toast, setToast] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -86,7 +84,7 @@ function PublicCatalog() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  useEffect(() => { setPage(1); }, [gender, category, saleFilter, priceFilter, colorFilter, sizeFilter, sortBy]);
+  useEffect(() => { setPage(1); }, [gender, category, saleFilter, sortBy]);
 
   // Load products
   useEffect(() => {
@@ -126,27 +124,11 @@ function PublicCatalog() {
   const catLabel: Record<string, string> = { footwear: "Calzado", apparel: "Ropa", accessories: "Accesorios" };
   const genLabel: Record<string, string> = { male: "Hombre", female: "Mujer", kids: "Ninos", unisex: "Unisex" };
 
-  const filteredBeforePrice = products
+  const filtered = products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => !gender || p.gender === gender)
     .filter(p => !category || p.category === category)
-    .filter(p => !saleFilter || (saleFilter === "oferta" ? p.on_sale : !p.on_sale));
-
-  const ofertaPrices = saleFilter === "oferta"
-    ? [...new Set(filteredBeforePrice.filter(p => p.price).map(p => p.price!))].sort((a, b) => a - b)
-    : [];
-
-  const uniqueColors = [...new Set(filteredBeforePrice.filter(p => p.color).map(p => p.color!))].sort((a, b) => a.localeCompare(b));
-  const uniqueSizes = [...new Set(filteredBeforePrice.flatMap(p => p._sizes))].sort((a, b) => {
-    const na = parseFloat(a), nb = parseFloat(b);
-    if (!isNaN(na) && !isNaN(nb)) return na - nb;
-    return a.localeCompare(b);
-  });
-
-  const filtered = filteredBeforePrice
-    .filter(p => !priceFilter || p.price === Number(priceFilter))
-    .filter(p => !colorFilter || p.color === colorFilter)
-    .filter(p => !sizeFilter || p._sizes.includes(sizeFilter))
+    .filter(p => !saleFilter || (saleFilter === "oferta" ? p.on_sale : !p.on_sale))
     .sort((a, b) => {
       if (sortBy === "precio-asc") return (a.price || 0) - (b.price || 0);
       if (sortBy === "precio-desc") return (b.price || 0) - (a.price || 0);
@@ -179,8 +161,7 @@ function PublicCatalog() {
 
   function handleClearAll() {
     setSearchInput(""); setSearch(""); setGender(""); setCategory("");
-    setSaleFilter(""); setPriceFilter(""); setColorFilter(""); setSizeFilter("");
-    setSortBy("relevancia");
+    setSaleFilter(""); setSortBy("relevancia");
   }
 
   const [sendingOrder, setSendingOrder] = useState(false);
@@ -205,7 +186,8 @@ function PublicCatalog() {
 
       setCart([]);
       try { localStorage.removeItem("reebok_public_cart"); } catch { /* */ }
-    } catch {
+    } catch (err) {
+      console.error("PDF generation failed:", err);
       setToast("Error al generar el PDF. Intenta de nuevo.");
     } finally {
       setSendingOrder(false);
@@ -308,18 +290,9 @@ function PublicCatalog() {
           category={category}
           onCategoryChange={setCategory}
           saleFilter={saleFilter}
-          onSaleFilterChange={(v) => { setSaleFilter(v); setPriceFilter(""); }}
-          colorFilter={colorFilter}
-          onColorFilterChange={setColorFilter}
-          sizeFilter={sizeFilter}
-          onSizeFilterChange={setSizeFilter}
-          priceFilter={priceFilter}
-          onPriceFilterChange={setPriceFilter}
+          onSaleFilterChange={setSaleFilter}
           sortBy={sortBy}
           onSortByChange={setSortBy}
-          uniqueColors={uniqueColors}
-          uniqueSizes={uniqueSizes}
-          ofertaPrices={ofertaPrices}
           filteredCount={filtered.length}
           onClearAll={handleClearAll}
         />
