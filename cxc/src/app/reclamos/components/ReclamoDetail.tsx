@@ -231,40 +231,92 @@ export default function ReclamoDetail({
         )}
       </div>
 
-      {/* Enviar button for Borrador */}
+      {/* Next state action button — prominent */}
       {current.estado === "Borrador" && (
-        <button onClick={() => onChangeEstado("Enviado")} className="mb-6 bg-black text-white px-5 py-2 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
-          Enviar Reclamo
-        </button>
+        <div className="relative inline-block mb-6">
+          <button onClick={() => setConfirmingEstado(confirmingEstado === "Enviado" ? null : "Enviado")} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+            → Enviar al proveedor
+          </button>
+          {confirmingEstado === "Enviado" && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-10 text-center" style={{ minWidth: 180 }}>
+              <p className="text-[11px] text-gray-500 mb-1.5">Cambiar estado a Enviado?</p>
+              <div className="flex gap-1 justify-center">
+                <button onClick={() => onChangeEstado("Enviado")} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all">Si</button>
+                <button onClick={() => setConfirmingEstado(null)} className="text-[11px] text-gray-400 px-2 py-1 hover:text-black transition">No</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {current.estado === "Enviado" && (
+        <div className="relative inline-block mb-6">
+          <button onClick={() => setConfirmingEstado(confirmingEstado === "Confirmado" ? null : "Confirmado")} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+            → Marcar como Confirmado
+          </button>
+          {confirmingEstado === "Confirmado" && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-10 text-center" style={{ minWidth: 180 }}>
+              <p className="text-[11px] text-gray-500 mb-1.5">Cambiar estado a Confirmado?</p>
+              <div className="flex gap-1 justify-center">
+                <button onClick={() => onChangeEstado("Confirmado")} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all">Si</button>
+                <button onClick={() => setConfirmingEstado(null)} className="text-[11px] text-gray-400 px-2 py-1 hover:text-black transition">No</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {current.estado === "Confirmado" && (
+        <div className="relative inline-block mb-6">
+          <button onClick={() => { setShowAplicadaModal(true); }} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            → Aplicar Nota de Credito
+          </button>
+        </div>
+      )}
+      {current.estado === "Aplicado" && (
+        <div className="mb-6">
+          <span className="inline-flex items-center gap-2 bg-green-50 text-green-700 border border-green-200 px-4 py-2.5 rounded-md text-sm font-medium">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            Ciclo completado
+          </span>
+        </div>
+      )}
+      {current.estado === "Rechazado" && (
+        <div className="relative inline-block mb-6">
+          <button onClick={() => setConfirmingEstado(confirmingEstado === "Borrador" ? null : "Borrador")} className="bg-gray-100 text-gray-700 px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-200 active:scale-[0.97] transition-all flex items-center gap-2">
+            → Volver a Borrador
+          </button>
+          {confirmingEstado === "Borrador" && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-10 text-center" style={{ minWidth: 180 }}>
+              <p className="text-[11px] text-gray-500 mb-1.5">Volver a Borrador?</p>
+              <div className="flex gap-1 justify-center">
+                <button onClick={() => onChangeEstado("Borrador")} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all">Si</button>
+                <button onClick={() => setConfirmingEstado(null)} className="text-[11px] text-gray-400 px-2 py-1 hover:text-black transition">No</button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
-      {/* Estado buttons */}
+      {/* Estado progress indicator */}
       <div className="flex items-center gap-1 mb-2 flex-wrap gap-y-2">
-        {ESTADOS.map((e) => {
+        {ESTADOS.filter(e => e !== "Rechazado").map((e, i, arr) => {
           const isCurrent = current.estado === e;
-          const allowedNext = VALID_TRANSITIONS[current.estado] || [];
-          const canTransition = allowedNext.includes(e);
+          const isPast = (() => {
+            const order = ["Borrador", "Enviado", "Confirmado", "Aplicado"];
+            return order.indexOf(e) < order.indexOf(current.estado);
+          })();
           return (
-            <div key={e} className="relative">
-              <button
-                onClick={() => { if (!isCurrent && canTransition) setConfirmingEstado(confirmingEstado === e ? null : e); }}
-                disabled={!isCurrent && !canTransition}
-                className={`h-11 sm:h-8 text-xs text-center transition px-4 py-2 rounded-md ${isCurrent ? `${EC[e] || "bg-gray-100 text-gray-500"} ring-1 ring-current font-medium` : canTransition ? "bg-gray-100 text-gray-400 hover:bg-gray-200" : "bg-gray-50 text-gray-300 cursor-not-allowed"}`}>
-                {estadoLabel(e)}
-              </button>
-              {confirmingEstado === e && !isCurrent && canTransition && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-10 text-center" style={{ minWidth: 140 }}>
-                  <p className="text-[11px] text-gray-500 mb-1.5">Cambiar a {estadoLabel(e)}?</p>
-                  <div className="flex gap-1 justify-center">
-                    <button onClick={() => { if (e === "Aplicado") { setShowAplicadaModal(true); setConfirmingEstado(null); } else onChangeEstado(e); }} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all">Si</button>
-                    <button onClick={() => setConfirmingEstado(null)} className="text-[11px] text-gray-400 px-2 py-1 hover:text-black transition">No</button>
-                  </div>
-                </div>
-              )}
+            <div key={e} className="flex items-center gap-1">
+              <span className={`text-xs px-3 py-1.5 rounded-md ${isCurrent ? `${EC[e] || "bg-gray-100 text-gray-500"} ring-1 ring-current font-medium` : isPast ? "bg-gray-100 text-gray-500" : "bg-gray-50 text-gray-300"}`}>
+                {isPast ? "\u2713 " : ""}{estadoLabel(e)}
+              </span>
+              {i < arr.length - 1 && <span className={`text-xs ${isPast ? "text-gray-400" : "text-gray-200"}`}>→</span>}
             </div>
           );
         })}
+        {current.estado === "Rechazado" && <span className="text-xs px-3 py-1.5 rounded-md bg-red-100 text-red-600 ring-1 ring-current font-medium">Rechazado</span>}
         {/* Info icon — estado help */}
         <div className="relative">
           <button onClick={() => setShowEstadoHelp(!showEstadoHelp)} className="w-7 h-7 sm:w-6 sm:h-6 rounded-full border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-400 flex items-center justify-center text-xs transition ml-1" title="Significado de cada estado">?</button>

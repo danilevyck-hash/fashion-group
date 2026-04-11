@@ -627,6 +627,13 @@ function Productos() {
       {hasContext ? (
         <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 mb-4">
           <div className="flex items-center gap-2 text-sm">
+            {!draftId && (
+              <div className="flex items-center gap-1.5 mr-2">
+                <span className="w-5 h-5 rounded-full bg-gray-300 text-white text-[10px] flex items-center justify-center font-medium">&#10003;</span>
+                <span className="w-5 h-5 rounded-full bg-black text-white text-[10px] flex items-center justify-center font-medium">2</span>
+                <span className="text-[10px] text-gray-400">Paso 2 de 2</span>
+              </div>
+            )}
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
             {draftId ? (
               <>
@@ -636,7 +643,7 @@ function Productos() {
               </>
             ) : (
               <>
-                <span className="text-gray-600">Pedido para</span>
+                <span className="text-gray-600">Elige productos para</span>
                 <span className="font-medium">{draftClient}</span>
               </>
             )}

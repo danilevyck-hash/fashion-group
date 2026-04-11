@@ -7,6 +7,8 @@ import { fmt, fmtDate } from "@/lib/format";
 import { EMPRESAS } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, AnimatedNumber, BottomSheet } from "@/components/ui";
+import UndoToast from "@/components/UndoToast";
+import { useUndoAction } from "@/lib/hooks/useUndoAction";
 
 // ── Types ──
 interface Movimiento {
@@ -116,6 +118,7 @@ export default function PrestamosPage() {
   const [batchProcessing, setBatchProcessing] = useState(false);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [exportingExcel, setExportingExcel] = useState(false);
+  const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
@@ -288,24 +291,38 @@ export default function PrestamosPage() {
     });
   }
 
-  async function doBatchAction(estado: "aprobado" | "rechazado") {
+  function doBatchAction(estado: "aprobado" | "rechazado") {
     const ids = Array.from(selectedPending);
     if (ids.length === 0) return;
-    setBatchProcessing(true);
     setConfirmBatchApprove(false);
     setConfirmBatchReject(false);
-    let ok = 0;
-    for (const id of ids) {
-      try {
-        const res = await fetch(`/api/prestamos/movimientos/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado }) });
-        if (res.ok) ok++;
-      } catch { /* continue */ }
-    }
+    const count = ids.length;
     const label = estado === "aprobado" ? "aprobado" : "rechazado";
-    showToast(`${ok} movimiento${ok !== 1 ? "s" : ""} ${label}${ok !== 1 ? "s" : ""}`);
-    setSelectedPending(new Set());
-    setBatchProcessing(false);
-    loadEmpleados();
+    const savedSelected = new Set(selectedPending);
+
+    scheduleAction({
+      id: `batch-${estado}-${Date.now()}`,
+      message: `${count} movimiento${count !== 1 ? "s" : ""} ${label}${count !== 1 ? "s" : ""}`,
+      onOptimistic: () => {
+        setSelectedPending(new Set());
+      },
+      onRevert: () => {
+        setSelectedPending(savedSelected);
+      },
+      execute: async () => {
+        setBatchProcessing(true);
+        let ok = 0;
+        for (const id of ids) {
+          try {
+            const res = await fetch(`/api/prestamos/movimientos/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado }) });
+            if (res.ok) ok++;
+          } catch { /* continue */ }
+        }
+        showToast(`${ok} movimiento${ok !== 1 ? "s" : ""} ${label}${ok !== 1 ? "s" : ""}`);
+        setBatchProcessing(false);
+        loadEmpleados();
+      },
+    });
   }
 
   return (
@@ -769,6 +786,7 @@ export default function PrestamosPage() {
         confirmLabel="Rechazar"
         destructive
       />
+      {pendingUndo && <UndoToast message={pendingUndo.message} startedAt={pendingUndo.startedAt} onUndo={undoAction} />}
       <Toast message={toast} />
     </div>
   );
