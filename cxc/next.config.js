@@ -1,3 +1,5 @@
+const { withSentryConfig } = require("@sentry/nextjs");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -12,4 +14,11 @@ const nextConfig = {
   compress: true,
   poweredByHeader: false,
 };
-module.exports = nextConfig;
+
+module.exports = withSentryConfig(nextConfig, {
+  silent: true,
+  org: "fashion-group",
+  project: "fashion-group",
+  widenClientFileUpload: true,
+  disableLogger: true,
+});
