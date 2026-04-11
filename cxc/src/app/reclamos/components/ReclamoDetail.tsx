@@ -10,9 +10,9 @@ import SuggestionCard from "@/components/SuggestionCard";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   "Borrador": ["Enviado"],
-  "Enviado": ["En revisión"],
-  "En revisión": ["Resuelto con NC", "Rechazado"],
-  "Resuelto con NC": [],
+  "Enviado": ["Confirmado"],
+  "Confirmado": ["Aplicado", "Rechazado"],
+  "Aplicado": [],
   "Rechazado": ["Borrador"],
 };
 
@@ -87,6 +87,7 @@ export default function ReclamoDetail({
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [showEmailConfirm, setShowEmailConfirm] = useState(false);
+  const [showEstadoHelp, setShowEstadoHelp] = useState(false);
 
   async function sendEmail() {
     const c = getC(current.empresa);
@@ -123,9 +124,9 @@ export default function ReclamoDetail({
     if (days <= 45 || current.estado !== "Enviado") return [];
     return [{
       id: `reclamo-escalate-${current.id}`,
-      message: `Este reclamo lleva ${days} días. ¿Cambiar a 'En revisión' para escalar?`,
-      actionLabel: "Escalar a En revisión",
-      onAction: () => onChangeEstado("En revisión"),
+      message: `Este reclamo lleva ${days} días. ¿Cambiar a 'Confirmado' para avanzar?`,
+      actionLabel: "Marcar como Confirmado",
+      onAction: () => onChangeEstado("Confirmado"),
     }];
   }, [current.id, current.estado, days, onChangeEstado]);
 
@@ -239,7 +240,7 @@ export default function ReclamoDetail({
       )}
 
       {/* Estado buttons */}
-      <div className="flex items-center gap-1 mb-8 flex-wrap gap-y-2">
+      <div className="flex items-center gap-1 mb-2 flex-wrap gap-y-2">
         {ESTADOS.map((e) => {
           const isCurrent = current.estado === e;
           const allowedNext = VALID_TRANSITIONS[current.estado] || [];
@@ -256,7 +257,7 @@ export default function ReclamoDetail({
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-2 z-10 text-center" style={{ minWidth: 140 }}>
                   <p className="text-[11px] text-gray-500 mb-1.5">Cambiar a {estadoLabel(e)}?</p>
                   <div className="flex gap-1 justify-center">
-                    <button onClick={() => { if (e === "Resuelto con NC") { setShowAplicadaModal(true); setConfirmingEstado(null); } else onChangeEstado(e); }} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all">Si</button>
+                    <button onClick={() => { if (e === "Aplicado") { setShowAplicadaModal(true); setConfirmingEstado(null); } else onChangeEstado(e); }} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all">Si</button>
                     <button onClick={() => setConfirmingEstado(null)} className="text-[11px] text-gray-400 px-2 py-1 hover:text-black transition">No</button>
                   </div>
                 </div>
@@ -264,6 +265,24 @@ export default function ReclamoDetail({
             </div>
           );
         })}
+        {/* Info icon — estado help */}
+        <div className="relative">
+          <button onClick={() => setShowEstadoHelp(!showEstadoHelp)} className="w-7 h-7 sm:w-6 sm:h-6 rounded-full border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-400 flex items-center justify-center text-xs transition ml-1" title="Significado de cada estado">?</button>
+          {showEstadoHelp && (
+            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-20" style={{ minWidth: 280 }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-600">Estados del reclamo</span>
+                <button onClick={() => setShowEstadoHelp(false)} className="text-gray-300 hover:text-black text-sm leading-none">x</button>
+              </div>
+              <div className="space-y-1.5 text-[11px] text-gray-500">
+                <div><span className="font-medium text-gray-700">Borrador</span> — Reclamo creado en la oficina</div>
+                <div><span className="font-medium text-gray-700">Enviado</span> — Enviado al encargado/proveedor</div>
+                <div><span className="font-medium text-gray-700">Confirmado</span> — Proveedor firmo/acepto el reclamo</div>
+                <div><span className="font-medium text-gray-700">Aplicado</span> — Nota de credito aplicada al estado de cuenta</div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
       <p className="text-[11px] text-gray-400 mt-1">
         Último cambio: {(() => {
@@ -492,7 +511,7 @@ export default function ReclamoDetail({
       {showAplicadaModal && (
         <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setShowAplicadaModal(false)}>
           <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-semibold mb-1">Resuelto con Nota de Crédito</h3>
+            <h3 className="text-base font-semibold mb-1">Aplicar Nota de Crédito</h3>
             <p className="text-sm text-gray-400 mb-6">Registra los datos de la nota de crédito recibida.</p>
             <div className="space-y-4 mb-6">
               <div>

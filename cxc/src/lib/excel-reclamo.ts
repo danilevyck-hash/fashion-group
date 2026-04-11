@@ -11,7 +11,7 @@ interface ReclamoFoto {
 // Blue corporate palette
 const PRI = "1B3A5C"; const MID = "2E5E8E"; const SEP = "D4E6F1"; const LBL_BG = "EBF5FB"; const VAL_BG = "FDFEFE"; const DATA_BG = "F8F9F9"; const BRD = "D5DBDB";
 const B = { top: { style: "thin", color: { rgb: BRD } }, bottom: { style: "thin", color: { rgb: BRD } }, left: { style: "thin", color: { rgb: BRD } }, right: { style: "thin", color: { rgb: BRD } } };
-const ESTADO_FG: Record<string, string> = { "Enviado": "1D4ED8", "En Revisión": "C2410C", "N/C Aprobada": "15803D", "Aplicada": "374151" };
+const ESTADO_FG: Record<string, string> = { "Enviado": "1D4ED8", "Confirmado": "C2410C", "Aplicado": "15803D", "Rechazado": "991B1B" };
 
 function fill(c: number, r: number, ws: XLSX.WorkSheet, bg: string) { for (let i = 0; i <= c; i++) if (!ws[addr(r, i)]) ws[addr(r, i)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: bg } } } }; }
 
@@ -51,7 +51,7 @@ export function buildReclamoSheet(rec: Record<string, unknown>, items: Record<st
     ws[addr(r, 4)] = mLbl(eLbl);
     if (eLbl === "Estado") {
       const fg = ESTADO_FG[eVal as string] || "374151";
-      const ebg = ({ "Enviado": "EBF5FB", "En Revisión": "FFF7ED", "N/C Aprobada": "F0FDF4", "Aplicada": "F9FAFB" } as Record<string, string>)[eVal as string] || VAL_BG;
+      const ebg = ({ "Enviado": "EBF5FB", "Confirmado": "FFF7ED", "Aplicado": "F0FDF4", "Rechazado": "FEE2E2" } as Record<string, string>)[eVal as string] || VAL_BG;
       ws[addr(r, 5)] = { v: eVal, t: "s", s: { font: { bold: true, sz: 10, color: { rgb: fg }, name: "Calibri" }, fill: { fgColor: { rgb: ebg } }, alignment: { horizontal: "left" }, border: B } };
     } else {
       ws[addr(r, 5)] = mVal(eVal as string);

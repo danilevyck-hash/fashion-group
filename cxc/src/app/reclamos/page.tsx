@@ -230,15 +230,15 @@ function ReclamosPage() {
   async function handleAplicadaConfirm() {
     if (!current || !aplicadaNc.trim() || !aplicadaMonto) return;
     try {
-      const r1 = await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "Resuelto con NC" }) });
+      const r1 = await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "Aplicado" }) });
       if (!r1.ok) { setToast("Error al aplicar NC."); setTimeout(() => setToast(null), 3000); return; }
-      await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seguimiento_nota: `Resuelto con NC — N/C ${aplicadaNc} por $${parseFloat(aplicadaMonto).toFixed(2)}`, autor: role }) });
+      await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seguimiento_nota: `Aplicado — N/C ${aplicadaNc} por $${parseFloat(aplicadaMonto).toFixed(2)}`, autor: role }) });
       setShowAplicadaModal(false); setAplicadaNc(""); setAplicadaMonto("");
       await loadDetail(current.id); loadReclamos();
     } catch { setToast("Error de conexion."); setTimeout(() => setToast(null), 3000); }
   }
 
-  const pendientes = reclamos.filter((r) => r.estado !== "Resuelto con NC" && r.estado !== "Rechazado");
+  const pendientes = reclamos.filter((r) => r.estado !== "Aplicado" && r.estado !== "Rechazado");
   const totalPendiente = pendientes.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
   const alertas = pendientes.filter((r) => daysSince(r.fecha_reclamo) > 45).length;
   // ── Confirm modal — always rendered (used by list + detail views) ──

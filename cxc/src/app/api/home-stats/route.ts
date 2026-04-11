@@ -25,14 +25,14 @@ export async function GET(req: NextRequest) {
   ] = await Promise.all([
     supabaseServer.from("reclamos").select("*", { count: "exact", head: true })
       .eq("deleted", false)
-      .not("estado", "in", '("Resuelto con NC","Rechazado","Aplicada")'),
+      .not("estado", "in", '("Aplicado","Rechazado","Aplicada")'),
     supabaseServer.from("reclamos").select("*", { count: "exact", head: true })
       .eq("deleted", false)
-      .not("estado", "in", '("Resuelto con NC","Rechazado","Aplicada")')
+      .not("estado", "in", '("Aplicado","Rechazado","Aplicada")')
       .lt("fecha_reclamo", dias45),
     supabaseServer.from("reclamos").select("*", { count: "exact", head: true })
       .eq("deleted", false)
-      .in("estado", ["Resuelto con NC", "Aplicada"])
+      .in("estado", ["Aplicado", "Aplicada"])
       .gte("updated_at", monthStart),
     supabaseServer.from("cheques").select("fecha_deposito, monto").eq("estado", "pendiente").eq("deleted", false),
     supabaseServer.from("caja_periodos").select("fondo_inicial, id").eq("estado", "abierto").order("created_at", { ascending: false }).limit(1).maybeSingle(),

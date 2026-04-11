@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
       .from("reclamos")
       .select("id, nro_reclamo, proveedor, fecha_reclamo, estado")
       .eq("deleted", false)
-      .not("estado", "in", '("Resuelto con NC","Rechazado","Aplicada")')
+      .not("estado", "in", '("Aplicado","Rechazado","Aplicada")')
       .lt("fecha_reclamo", dias45)
       .order("fecha_reclamo", { ascending: true })
       .limit(3),

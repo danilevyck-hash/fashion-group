@@ -29,11 +29,11 @@ export const DEFAULT_MOTIVOS = [
 
 export const TALLAS = ["XS", "S", "M", "L", "XL", "XXL", "OS", "Otros"];
 
-export const ESTADOS = ["Borrador", "Enviado", "En revisión", "Resuelto con NC", "Rechazado"];
+export const ESTADOS = ["Borrador", "Enviado", "Confirmado", "Aplicado", "Rechazado"];
 
 /** Display-friendly names for estados (use in buttons/labels) */
 export const ESTADO_DISPLAY: Record<string, string> = {
-  "Resuelto con NC": "Resuelto con Nota de Crédito",
+  "Aplicado": "Aplicado (N/C)",
 };
 
 /** Get display name for an estado, falls back to the estado itself */
@@ -44,8 +44,8 @@ export function estadoLabel(estado: string): string {
 export const EC: Record<string, string> = {
   "Borrador": "bg-gray-100 text-gray-600",
   "Enviado": "bg-blue-50 text-blue-700",
-  "En revisión": "bg-yellow-50 text-yellow-700",
-  "Resuelto con NC": "bg-green-50 text-green-700",
+  "Confirmado": "bg-yellow-50 text-yellow-700",
+  "Aplicado": "bg-green-50 text-green-700",
   "Rechazado": "bg-red-50 text-red-600",
 };
 
@@ -105,7 +105,7 @@ export function buildReclamosPdfHtml(reclamosArr: Reclamo[], titulo: string) {
     const sub = calcSub(items);
     const total = sub * FACTOR_TOTAL;
     const itemsDesc = items.map((i) => `${i.descripcion || "Item"} x ${Number(i.cantidad) || 0}`).join(", ");
-    return `<tr><td>${r.nro_reclamo}</td><td>${fmtDate(r.fecha_reclamo)}</td><td>${r.nro_factura || ""}</td><td><span class="badge ${r.estado === "Resuelto con NC" ? "badge-green" : r.estado === "Rechazado" ? "badge-red" : "badge-blue"}">${r.estado}</span></td><td>${itemsDesc}</td><td class="right">$${fmt(total)}</td></tr>`;
+    return `<tr><td>${r.nro_reclamo}</td><td>${fmtDate(r.fecha_reclamo)}</td><td>${r.nro_factura || ""}</td><td><span class="badge ${r.estado === "Aplicado" ? "badge-green" : r.estado === "Rechazado" ? "badge-red" : "badge-blue"}">${r.estado}</span></td><td>${itemsDesc}</td><td class="right">$${fmt(total)}</td></tr>`;
   }).join("");
   const grandTotal = reclamosArr.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${titulo}</title><style>

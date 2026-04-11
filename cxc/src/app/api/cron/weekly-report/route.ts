@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
   const cxcVencida = (cxc || []).reduce((s, r) => s + (Number(r.d121_180) || 0) + (Number(r.d181_270) || 0) + (Number(r.d271_365) || 0) + (Number(r.mas_365) || 0), 0);
 
   // Reclamos abiertos
-  const { count: reclamosCount } = await supabaseServer.from("reclamos").select("*", { count: "exact", head: true }).not("estado", "in", '("Resuelto con NC","Rechazado","Aplicada")').eq("deleted", false);
+  const { count: reclamosCount } = await supabaseServer.from("reclamos").select("*", { count: "exact", head: true }).not("estado", "in", '("Aplicado","Rechazado","Aplicada")').eq("deleted", false);
 
   // Cheques por vencer
   const { data: cheques } = await supabaseServer.from("cheques").select("monto").eq("estado", "pendiente").eq("deleted", false).gte("fecha_deposito", today).lte("fecha_deposito", weekFromNow);

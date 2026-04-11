@@ -276,13 +276,13 @@ const STATUS_COLORS: Record<string, string> = {
   // Blue: active/open/sent
   activo: "blue", abierto: "blue", "Enviado": "blue",
   // Green: completed/resolved/deposited
-  depositado: "green", aprobado: "green", "Resuelto con NC": "green", cerrado: "green", "Aplicada": "green", "Entregado": "green", despachada: "green",
+  depositado: "green", aprobado: "green", "Aplicado": "green", cerrado: "green", "Aplicada": "green", "Entregado": "green", despachada: "green",
   // Orange/amber: pending but overdue
   pendiente_vencido: "orange",
   // Red: rejected/expired/bounced
   rechazado: "red", "Rechazado": "red", vencido: "red", rebotado: "red", archivado: "red",
-  // Purple: in review
-  "En revisión": "purple",
+  // Purple: in review / confirmed
+  "Confirmado": "purple", "En revisión": "purple",
   // Orange: in progress
   "Preparando": "orange", "En camino": "orange", "Pendiente Bodega": "orange",
 };

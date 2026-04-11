@@ -168,7 +168,7 @@ export async function GET(req: NextRequest) {
     .from("reclamos")
     .select("empresa, estado, created_at, reclamo_items(cantidad, precio_unitario)")
     .eq("deleted", false)
-    .in("estado", ["Borrador", "Enviado", "En revisión"]);
+    .in("estado", ["Borrador", "Enviado", "Confirmado"]);
 
   type ReclamoAgg = { count: number; monto: number; totalDays: number };
   const recByEmpresa: Record<string, ReclamoAgg> = {};

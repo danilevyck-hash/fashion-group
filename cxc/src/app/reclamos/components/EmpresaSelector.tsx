@@ -121,7 +121,7 @@ export default function EmpresaSelector({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {EMPRESAS.map((empresa) => {
               const ers = reclamos.filter((r) => r.empresa === empresa);
-              const open = ers.filter((r) => r.estado !== "Resuelto con NC" && r.estado !== "Rechazado");
+              const open = ers.filter((r) => r.estado !== "Aplicado" && r.estado !== "Rechazado");
               const tot = open.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
               const hasAlert = open.some((r) => daysSince(r.fecha_reclamo) > 45);
               const c = getC(empresa);
