@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { Product } from "@/components/reebok/supabase";
+import { getBultoSize } from "@/lib/reebok-bulto";
 
 const COLOR_DOT_MAP: Record<string, string> = {
   black: "#000", negro: "#000", white: "#fff", blanco: "#fff",
@@ -60,7 +61,9 @@ export default function CatalogProductCard({
   }
 
   const inOrder = qty > 0;
+  const bultoSize = getBultoSize(product.category);
   const qtyLabel = showBultos ? "bultos" : "";
+  const bultoTotal = (product.price || 0) * bultoSize;
 
   return (
     <>
@@ -173,14 +176,24 @@ export default function CatalogProductCard({
           )}
 
           {/* Price */}
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className={`text-xl font-bold tabular-nums ${product.on_sale ? "text-[#E4002B]" : "text-[#1A2656]"}`}>
-              {product.price ? `$${product.price.toFixed(2)}` : "Consultar"}
-            </span>
-            {product.on_sale && (
-              <span className="text-[10px] font-bold text-[#E4002B] bg-red-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                Oferta
+          <div className="mt-2">
+            <div className="flex items-baseline gap-2">
+              <span className={`text-xl font-bold tabular-nums ${product.on_sale ? "text-[#E4002B]" : "text-[#1A2656]"}`}>
+                {product.price ? `$${product.price.toFixed(2)}` : "Consultar"}
               </span>
+              {product.price && <span className="text-[10px] text-[#1A2656]/40">/unidad</span>}
+              {product.on_sale && (
+                <span className="text-[10px] font-bold text-[#E4002B] bg-red-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                  Oferta
+                </span>
+              )}
+            </div>
+            {product.price != null && (
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-[11px] text-[#1A2656]/50 font-medium">Bulto de {bultoSize}</span>
+                <span className="text-[11px] text-[#1A2656]/30">&middot;</span>
+                <span className="text-[11px] text-[#1A2656]/50 font-semibold tabular-nums">${bultoTotal.toFixed(2)}/bulto</span>
+              </div>
             )}
           </div>
 
@@ -208,7 +221,7 @@ export default function CatalogProductCard({
                 </button>
                 <button onClick={showBultos ? openQtyInput : undefined} className="text-center min-w-[48px] py-1">
                   <span className="text-base font-bold text-emerald-700 tabular-nums">{qty}</span>
-                  {qtyLabel && <span className="text-[10px] text-emerald-600 ml-1">{qtyLabel}</span>}
+                  <span className="text-[10px] text-emerald-600 ml-1">{qty === 1 ? "bulto" : "bultos"}</span>
                 </button>
                 <button
                   onClick={() => setQty(qty + 1)}

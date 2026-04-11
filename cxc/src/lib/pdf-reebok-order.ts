@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
+import { getBultoSize } from "@/lib/reebok-bulto";
 
 interface OrderItem {
   product_id: string;
@@ -9,6 +10,7 @@ interface OrderItem {
   image_url: string;
   quantity: number;
   unit_price: number;
+  category?: string;
 }
 
 function fmtMoney(n: number) {
@@ -98,16 +100,21 @@ export async function generateReebokOrderPdf(cart: OrderItem[]): Promise<void> {
   await Promise.all(imagePromises);
 
   // --- Table ---
-  const total = cart.reduce((s, i) => s + i.quantity * i.unit_price, 0);
+  const total = cart.reduce((s, i) => {
+    const bs = getBultoSize(i.category || "footwear");
+    return s + i.quantity * bs * i.unit_price;
+  }, 0);
   const imgCellSize = 10; // mm
 
   const tableBody = cart.map((item) => {
-    const lineTotal = item.quantity * item.unit_price;
+    const bs = getBultoSize(item.category || "footwear");
+    const lineTotal = item.quantity * bs * item.unit_price;
+    const qtyLabel = `${item.quantity} bulto${item.quantity !== 1 ? "s" : ""} (${item.quantity * bs} pzas)`;
     return [
       { content: "", styles: { minCellWidth: 14, cellPadding: 2 } }, // photo placeholder
       item.sku || "-",
       item.name,
-      String(item.quantity),
+      qtyLabel,
       `$${fmtMoney(item.unit_price)}`,
       `$${fmtMoney(lineTotal)}`,
     ];
@@ -116,7 +123,7 @@ export async function generateReebokOrderPdf(cart: OrderItem[]): Promise<void> {
   autoTable(doc, {
     startY: y,
     margin: { left: margin, right: margin },
-    head: [["", "SKU", "Producto", "Cant.", "Precio Unit.", "Total"]],
+    head: [["", "SKU", "Producto", "Cantidad", "Precio Unit.", "Total"]],
     body: tableBody,
     headStyles: {
       fillColor: NAVY_RGB,
@@ -137,7 +144,7 @@ export async function generateReebokOrderPdf(cart: OrderItem[]): Promise<void> {
       0: { cellWidth: 14, halign: "center" },
       1: { cellWidth: 28 },
       2: { cellWidth: "auto" },
-      3: { cellWidth: 14, halign: "center" },
+      3: { cellWidth: 32, halign: "center" },
       4: { cellWidth: 24, halign: "right" },
       5: { cellWidth: 24, halign: "right" },
     },

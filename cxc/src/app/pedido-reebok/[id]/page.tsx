@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
+import { getBultoSize } from "@/lib/reebok-bulto";
 
 interface CartItem {
   product_id: string;
@@ -11,6 +12,7 @@ interface CartItem {
   image_url: string;
   quantity: number;
   unit_price: number;
+  category?: string;
 }
 
 interface Order {
@@ -141,12 +143,20 @@ export default function PedidoReebokPage() {
 
                 {/* Qty + Price */}
                 <div className="text-right flex-shrink-0">
-                  <p className="text-sm font-semibold text-[#1A2656] tabular-nums">
-                    ${fmtMoney(item.quantity * item.unit_price)}
-                  </p>
-                  <p className="text-xs text-[#1A2656]/40 tabular-nums">
-                    {item.quantity} x ${fmtMoney(item.unit_price)}
-                  </p>
+                  {(() => {
+                    const bs = getBultoSize(item.category || "footwear");
+                    const lineTotal = item.quantity * bs * item.unit_price;
+                    return (
+                      <>
+                        <p className="text-sm font-semibold text-[#1A2656] tabular-nums">
+                          ${fmtMoney(lineTotal)}
+                        </p>
+                        <p className="text-xs text-[#1A2656]/40 tabular-nums">
+                          {item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * bs} pzas) x ${fmtMoney(item.unit_price)}
+                        </p>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
@@ -156,7 +166,9 @@ export default function PedidoReebokPage() {
         {/* Total */}
         <div className="bg-[#1A2656] rounded-b-xl px-6 py-4 flex items-center justify-between">
           <span className="text-white/70 text-sm font-medium">Total</span>
-          <span className="text-white font-bold text-xl tabular-nums">${fmtMoney(order.total)}</span>
+          <span className="text-white font-bold text-xl tabular-nums">
+            ${fmtMoney(order.items.reduce((s, i) => s + i.quantity * getBultoSize(i.category || "footwear") * i.unit_price, 0))}
+          </span>
         </div>
 
         {/* Download PDF button */}

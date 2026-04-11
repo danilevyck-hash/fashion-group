@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Product } from "@/components/reebok/supabase";
+import { getBultoSize } from "@/lib/reebok-bulto";
 
 interface CartItem {
   product_id: string;
@@ -10,6 +11,7 @@ interface CartItem {
   image_url: string;
   quantity: number;
   unit_price: number;
+  category?: string;
 }
 
 interface StickyCartBarProps {
@@ -87,9 +89,15 @@ export default function StickyCartBar({
                 </svg>
               </button>
             </div>
-            {cart.map(item => (
+            {cart.map(item => {
+              const bs = getBultoSize(item.category || "footwear");
+              const lineTotal = item.quantity * bs * item.unit_price;
+              return (
               <div key={item.product_id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-                <span className="text-sm text-[#1A2656] truncate mr-3 flex-1 font-medium">{item.name}</span>
+                <div className="flex-1 min-w-0 mr-3">
+                  <span className="text-sm text-[#1A2656] truncate block font-medium">{item.name}</span>
+                  <span className="text-[10px] text-[#1A2656]/40">x{item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * bs} pzas)</span>
+                </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <div className="flex items-center gap-0.5">
                     <button
@@ -108,12 +116,13 @@ export default function StickyCartBar({
                       +
                     </button>
                   </div>
-                  <span className="text-sm tabular-nums text-[#1A2656]/60 w-16 text-right font-medium">
-                    ${(item.unit_price * item.quantity).toFixed(2)}
+                  <span className="text-sm tabular-nums text-[#1A2656]/60 w-20 text-right font-medium">
+                    ${lineTotal.toFixed(2)}
                   </span>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
         <div className="px-4 py-2.5 border-t border-gray-100 flex items-center justify-between">
@@ -150,7 +159,7 @@ export default function StickyCartBar({
             </span>
           </div>
           <div className="flex flex-col items-start leading-tight">
-            <span className="text-xs text-[#1A2656]/50">{cartCount} producto{cartCount !== 1 ? "s" : ""}</span>
+            <span className="text-xs text-[#1A2656]/50">{cartCount} bulto{cartCount !== 1 ? "s" : ""}</span>
             <span className="font-bold text-sm">${formatTotal(cartTotal)}</span>
           </div>
           <svg

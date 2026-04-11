@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Product } from "@/components/reebok/supabase";
+import { getBultoSize } from "@/lib/reebok-bulto";
 import NewOrderModal from "@/components/reebok/NewOrderModal";
 import { Toast } from "@/components/ui";
 import CatalogHeader from "@/components/reebok/CatalogHeader";
@@ -11,7 +12,7 @@ import CatalogFilters from "@/components/reebok/CatalogFilters";
 import CatalogProductCard from "@/components/reebok/CatalogProductCard";
 import StickyCartBar from "@/components/reebok/StickyCartBar";
 
-interface CartItem { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
+interface CartItem { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category: string; }
 
 export default function ProductosPage() {
   return <Suspense><Productos /></Suspense>;
@@ -44,7 +45,7 @@ function Productos() {
   const [draftOriginalIds, setDraftOriginalIds] = useState<Set<string>>(new Set());
 
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
-  const cartTotal = cart.reduce((s, i) => s + i.quantity * 12 * Number(i.unit_price || 0), 0);
+  const cartTotal = cart.reduce((s, i) => s + i.quantity * getBultoSize(i.category) * Number(i.unit_price || 0), 0);
 
   const [restoredDraftBanner, setRestoredDraftBanner] = useState<string | null>(null);
 
@@ -124,7 +125,7 @@ function Productos() {
       if (qty <= 0) return prev.filter(i => i.product_id !== productId);
       const idx = prev.findIndex(i => i.product_id === productId);
       if (idx >= 0) return prev.map((item, i) => i === idx ? { ...item, quantity: qty } : item);
-      return [...prev, { product_id: productId, sku: product.sku || "", name: product.name, image_url: product.image_url || "", quantity: qty, unit_price: product.price || 0 }];
+      return [...prev, { product_id: productId, sku: product.sku || "", name: product.name, image_url: product.image_url || "", quantity: qty, unit_price: product.price || 0, category: product.category }];
     });
   }, []);
 

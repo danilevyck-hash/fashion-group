@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { Product } from "@/components/reebok/supabase";
+import { getBultoSize } from "@/lib/reebok-bulto";
 import { Toast } from "@/components/ui";
 import CatalogHeader from "@/components/reebok/CatalogHeader";
 import CatalogFilters from "@/components/reebok/CatalogFilters";
@@ -15,6 +16,7 @@ interface CartItem {
   image_url: string;
   quantity: number;
   unit_price: number;
+  category: string;
 }
 
 export default function PublicCatalogPage() {
@@ -39,7 +41,7 @@ function PublicCatalog() {
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
-  const cartTotal = cart.reduce((s, i) => s + i.quantity * Number(i.unit_price || 0), 0);
+  const cartTotal = cart.reduce((s, i) => s + i.quantity * getBultoSize(i.category) * Number(i.unit_price || 0), 0);
 
   // Persist cart to localStorage
   const cartInitialized = useRef(false);
@@ -67,6 +69,7 @@ function PublicCatalog() {
         image_url: product.image_url || "",
         quantity: qty,
         unit_price: product.price || 0,
+        category: product.category,
       }];
     });
   }, []);
@@ -179,9 +182,13 @@ function PublicCatalog() {
       if (!res.ok) throw new Error("save failed");
       const { short_id } = await res.json();
 
-      const total = cart.reduce((s, i) => s + i.quantity * i.unit_price, 0);
+      const total = cart.reduce((s, i) => s + i.quantity * getBultoSize(i.category) * i.unit_price, 0);
+      const itemLines = cart.map(i => {
+        const bs = getBultoSize(i.category);
+        return `${i.name} x${i.quantity} bulto${i.quantity !== 1 ? "s" : ""} (${i.quantity * bs} pzas) — $${(i.quantity * bs * i.unit_price).toFixed(2)}`;
+      }).join("\n");
       const link = `https://www.fashiongr.com/pedido-reebok/${short_id}`;
-      const msg = `Hola, quiero hacer un pedido de Reebok:\n\n${link}\n\nTotal: $${total.toFixed(2)}`;
+      const msg = `Hola, quiero hacer un pedido de Reebok:\n\n${itemLines}\n\nTotal: $${total.toFixed(2)}\n\n${link}`;
       const url = `https://wa.me/50766745522?text=${encodeURIComponent(msg)}`;
       window.open(url, "_blank");
 
