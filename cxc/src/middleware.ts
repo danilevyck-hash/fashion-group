@@ -16,6 +16,8 @@ const PUBLIC_PREFIXES = [
   "/api/catalogo/reebok/inventory", // public catalog stock
   "/api/catalogo/reebok/public",    // public catalog endpoint (no auth)
   "/catalogo-publico/",             // public catalog page (no auth)
+  "/pedido-reebok/",                // public order view page (no auth)
+  "/api/catalogo/reebok/pedido-publico", // public order API (no auth)
   "/_next/",
   "/icon-",
   "/manifest",

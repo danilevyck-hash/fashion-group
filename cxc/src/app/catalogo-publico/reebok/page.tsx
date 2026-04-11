@@ -166,29 +166,30 @@ function PublicCatalog() {
 
   const [sendingOrder, setSendingOrder] = useState(false);
 
-  // WhatsApp send with PDF
+  // WhatsApp send with shareable link
   async function handleSendWhatsApp() {
     if (cart.length === 0 || sendingOrder) return;
     setSendingOrder(true);
     try {
-      // Generate and download PDF
-      const { generateReebokOrderPdf } = await import("@/lib/pdf-reebok-order");
-      await generateReebokOrderPdf(cart);
-      setToast("PDF descargado — envíalo por WhatsApp");
+      const res = await fetch("/api/catalogo/reebok/pedido-publico", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items: cart }),
+      });
+      if (!res.ok) throw new Error("save failed");
+      const { short_id } = await res.json();
 
-      // Open WhatsApp after a brief delay so the user sees the toast
       const total = cart.reduce((s, i) => s + i.quantity * i.unit_price, 0);
-      const msg = `Hola, te envío mi pedido de Reebok (ver PDF adjunto). Total: $${total.toFixed(2)}`;
+      const link = `https://www.fashiongr.com/pedido-reebok/${short_id}`;
+      const msg = `Hola, quiero hacer un pedido de Reebok:\n\n${link}\n\nTotal: $${total.toFixed(2)}`;
       const url = `https://wa.me/50766745522?text=${encodeURIComponent(msg)}`;
-      setTimeout(() => {
-        window.open(url, "_blank");
-      }, 600);
+      window.open(url, "_blank");
 
       setCart([]);
       try { localStorage.removeItem("reebok_public_cart"); } catch { /* */ }
-    } catch (err) {
-      console.error("PDF generation failed:", err);
-      setToast("Error al generar el PDF. Intenta de nuevo.");
+      setToast("Pedido enviado");
+    } catch {
+      setToast("Error al enviar el pedido. Intenta de nuevo.");
     } finally {
       setSendingOrder(false);
     }
@@ -340,7 +341,7 @@ function PublicCatalog() {
           variant="public"
           onSendWhatsApp={handleSendWhatsApp}
           saving={sendingOrder}
-          actionLabel={sendingOrder ? "Generando PDF..." : undefined}
+          actionLabel={sendingOrder ? "Enviando..." : undefined}
           formatTotal={fmt}
         />
       </div>
