@@ -18,8 +18,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    console.log(`Foto upload: ${file.name}, size: ${buffer.length} bytes`);
-
     const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
     const fileName = `${crypto.randomUUID()}.${ext}`;
     const storagePath = `${id}/${fileName}`;

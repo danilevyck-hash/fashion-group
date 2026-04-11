@@ -30,7 +30,7 @@ function esc(s: unknown): string {
 
 async function sendEmail(to: string, subject: string, html: string) {
   const key = process.env.RESEND_API_KEY;
-  if (!key) { console.log("RESEND_API_KEY not configured"); return false; }
+  if (!key) { console.error("RESEND_API_KEY not configured"); return false; }
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",

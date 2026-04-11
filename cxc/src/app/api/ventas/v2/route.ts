@@ -188,11 +188,6 @@ export async function GET(req: NextRequest) {
     offset += PAGE;
   }
   const currentRows = allCurrentRows;
-  console.log(`[ventas/v2] año=${año} filterEmpresa=${filterEmpresa} desde=${desdeParam} currentRows=${currentRows.length} pages=${Math.ceil(offset/PAGE)+1}`);
-  if (currentRows.length > 0) {
-    const empresas = [...new Set(currentRows.map(r => r.empresa))];
-    console.log(`[ventas/v2] empresas found: ${empresas.join(", ")}`);
-  }
   if (currentErr) {
     console.error("[ventas/v2] current year query error", currentErr.code, currentErr.message);
     if (currentErr.code === "42P01") return NextResponse.json({ byEmpresaMes: [], topClientes: [], prevYear: [], clientesDetalle: [] });
@@ -219,12 +214,9 @@ export async function GET(req: NextRequest) {
     prevOffset += PAGE;
   }
 
-  console.log(`[ventas/v2] prevRows=${allPrevRows.length}`);
-
   // ── Fetch historical last-fecha per client via RPC (aggregated, efficient) ──
   const { data: lastDates, error: lastDatesErr } = await supabaseServer.rpc("get_ultima_compra");
   if (lastDatesErr) console.error("[ventas/v2] get_ultima_compra error:", lastDatesErr.code, lastDatesErr.message);
-  console.log(`[ventas/v2] lastDates=${(lastDates ?? []).length}`);
 
   // ── Aggregate ────────────────────────────────────────────────────────────
   const rows = currentRows;
@@ -236,14 +228,11 @@ export async function GET(req: NextRequest) {
     ? rows.filter(r => (r.fecha ?? "") >= desdeParam)
     : rows
   ).filter(r => !EMPRESAS_EXCLUIDAS.has(r.empresa));
-  console.log(`[ventas/v2] clienteRows=${clienteRows.length} (desde=${desdeParam})`);
-
   const result = {
     byEmpresaMes: aggregateByEmpresaMes(rows),
     topClientes: aggregateTopClientes(rows),
     prevYear: aggregatePrevYear(prev),
     clientesDetalle: aggregateClientesDetalle(clienteRows, lastDates ?? []),
   };
-  console.log(`[ventas/v2] response: byEmpresaMes=${result.byEmpresaMes.length} topClientes=${result.topClientes.length} prevYear=${result.prevYear.length} clientesDetalle=${result.clientesDetalle.length}`);
   return NextResponse.json(result);
 }
