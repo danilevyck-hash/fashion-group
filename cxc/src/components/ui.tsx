@@ -273,10 +273,10 @@ export function Badge({ children, color = "gray" }: { children: ReactNode; color
 const STATUS_COLORS: Record<string, string> = {
   // Yellow: pending/draft
   pendiente: "yellow", borrador: "yellow", "Borrador": "yellow", "pendiente_aprobacion": "yellow",
-  // Blue: active/open/sent
-  activo: "blue", abierto: "blue", "Enviado": "blue",
-  // Green: completed/resolved/deposited
-  depositado: "green", aprobado: "green", "Aplicado": "green", cerrado: "green", "Aplicada": "green", "Entregado": "green", despachada: "green",
+  // Green: active/open
+  activo: "green", abierto: "green", "Enviado": "blue",
+  // Green: completed/resolved/deposited — cerrado is gray (inactive)
+  depositado: "green", aprobado: "green", "Aplicado": "green", cerrado: "gray", "Aplicada": "green", "Entregado": "green", despachada: "green",
   // Orange/amber: pending but overdue
   pendiente_vencido: "orange",
   // Red: rejected/expired/bounced

@@ -191,8 +191,15 @@ export default function ClientTable({
 
   const activeFilterCount = (riskFilter !== "all" ? 1 : 0) + (companyFilter !== "all" ? 1 : 0);
 
+  const riskTooltips: Record<string, string> = {
+    current: "Al día — deuda con 0 a 90 días",
+    watch: "Vigilancia — deuda con 91 a 120 días sin pagar",
+    overdue: "Vencido — deuda con más de 121 días sin pagar",
+  };
+
   const filterBtn = (key: RiskFilter, label: string, count: number, activeClasses: string, inactiveClasses: string) => (
     <button onClick={() => setRiskFilter(key)}
+      title={riskTooltips[key] || ""}
       className={`px-3 min-h-[44px] rounded-lg text-xs font-medium transition ${riskFilter === key ? activeClasses : inactiveClasses}`}>
       {label} <span className="opacity-60 ml-0.5">{count}</span>
     </button>

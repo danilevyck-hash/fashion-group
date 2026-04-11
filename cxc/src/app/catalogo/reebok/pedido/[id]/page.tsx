@@ -310,6 +310,10 @@ export default function OrderDetailPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
+      {/* Back button */}
+      <button onClick={() => router.push("/catalogo/reebok/pedidos")} className="text-sm text-gray-400 hover:text-black transition mb-4 inline-block">
+        ← Volver a Pedidos
+      </button>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3" ref={nameRef}>

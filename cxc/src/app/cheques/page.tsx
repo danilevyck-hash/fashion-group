@@ -820,13 +820,14 @@ function ChequesPage() {
       {viewMode === "lista" && <div className="flex flex-wrap items-center gap-4 mb-6">
         <div className="flex gap-4 flex-wrap">
           {([
-            ["all", "Todos", cheques.length],
-            ["pendiente", "Pendientes", pendientes.length],
-            ["depositado", "Depositados", depositados.length],
-            ["vencido", "Vencidos", vencidos.length],
-            ["rebotado", "Rebotados", rebotados.length],
-          ] as [Filter, string, number][]).map(([key, label, count]) => (
+            ["all", "Todos", cheques.length, ""],
+            ["pendiente", "Pendientes", pendientes.length, "Cheques pendientes de depositar"],
+            ["depositado", "Depositados", depositados.length, "Cheques ya depositados en el banco"],
+            ["vencido", "Vencidos", vencidos.length, "Pasó la fecha de depósito y no se han depositado"],
+            ["rebotado", "Rebotados", rebotados.length, "El banco rechazó el cheque"],
+          ] as [Filter, string, number, string][]).map(([key, label, count, tooltip]) => (
             <button key={key} onClick={() => setFilter(key)}
+              title={tooltip}
               className={`text-sm transition ${filter === key ? "font-medium text-black" : "text-gray-400 hover:text-black"}`}>
               {label} <span className="text-xs text-gray-300 ml-1">{count}</span>
             </button>

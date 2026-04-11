@@ -324,7 +324,11 @@ function UploadPageInner() {
       if (countMismatch) {
         setMessage({ text: `${theFile.name}: Verificacion — se esperaban ${rows.length} filas, se insertaron ${count}. Los datos fueron guardados — verifica manualmente.`, type: "err" });
       } else {
-        setMessage({ text: `${theFile.name}: ${rows.length} registros cargados`, type: "ok" });
+        const prevCount = cxcUploads[companyKey]?.row_count;
+        const companyName = cxcCompanies.find(c => c.key === companyKey)?.name || companyKey;
+        const diff = prevCount != null ? (rows.length - prevCount) : null;
+        const diffText = diff != null && diff !== 0 ? ` (${diff > 0 ? "+" : ""}${diff} vs. carga anterior)` : "";
+        setMessage({ text: `${companyName}: ${rows.length} registros cargados correctamente${diffText}`, type: "ok" });
       }
       loadCxcUploads();
     } catch (err: unknown) {
@@ -725,11 +729,35 @@ function UploadPageInner() {
             badge={cxcPreview.formatError ? { ok: false, label: "Error de formato" } : { ok: true, label: "Formato valido" }}
             formatError={cxcPreview.formatError}
             summary={
-              <div className="flex gap-3 text-xs flex-wrap">
-                <span className="text-green-700 bg-green-50 px-2.5 py-1 rounded-full">{cxcPreview.validCount} validos</span>
-                {cxcPreview.errorCount > 0 && <span className="text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">{cxcPreview.errorCount} con advertencias</span>}
-                {cxcPreview.duplicateNames.size > 0 && <span className="text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full">{cxcPreview.duplicateNames.size} nombres duplicados</span>}
-                {cxcPreview.bucketExceedsTotal > 0 && <span className="text-orange-700 bg-orange-50 px-2.5 py-1 rounded-full">{cxcPreview.bucketExceedsTotal} filas donde la suma de rangos excede el total</span>}
+              <div>
+                <div className="flex gap-3 text-xs flex-wrap">
+                  <span className="text-green-700 bg-green-50 px-2.5 py-1 rounded-full">{cxcPreview.validCount} validos</span>
+                  {cxcPreview.errorCount > 0 && <span className="text-amber-700 bg-amber-50 px-2.5 py-1 rounded-full">{cxcPreview.errorCount} con advertencias</span>}
+                  {cxcPreview.duplicateNames.size > 0 && <span className="text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full">{cxcPreview.duplicateNames.size} nombres duplicados</span>}
+                  {cxcPreview.bucketExceedsTotal > 0 && <span className="text-orange-700 bg-orange-50 px-2.5 py-1 rounded-full">{cxcPreview.bucketExceedsTotal} filas donde la suma de rangos excede el total</span>}
+                </div>
+                {/* Specific error details per row */}
+                {cxcPreview.errorCount > 0 && (() => {
+                  const nombreIdx = cxcPreview.headers.findIndex(h => h.toUpperCase().includes("NOMBRE"));
+                  const errorRows = cxcPreview.rows
+                    .map((r, i) => ({ row: i + 2, nombre: nombreIdx >= 0 ? r.values[nombreIdx] : "", errors: r.errors }))
+                    .filter(r => r.errors.length > 0);
+                  const shown = errorRows.slice(0, 10);
+                  const remaining = errorRows.length - shown.length;
+                  return (
+                    <div className="mt-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      <p className="text-[11px] font-medium text-amber-800 mb-1">Detalle de advertencias:</p>
+                      <ul className="space-y-0.5">
+                        {shown.map((r, i) => (
+                          <li key={i} className="text-[11px] text-amber-700">
+                            <span className="font-medium">Fila {r.row}{r.nombre ? ` (${r.nombre})` : ""}:</span> {r.errors.join(", ")}
+                          </li>
+                        ))}
+                      </ul>
+                      {remaining > 0 && <p className="text-[11px] text-amber-600 mt-1">y {remaining} más...</p>}
+                    </div>
+                  );
+                })()}
               </div>
             }
             headerRow={cxcPreview.headers}
