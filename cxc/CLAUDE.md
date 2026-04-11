@@ -195,12 +195,57 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 - Password minimum length changed to 3 characters
 - Password field clears on edit (prevents double-hash bug)
 
+### Reebok Catalog & Orders (April 10-11)
+- Public catalog at `/catalogo-publico/reebok` (no login required, shareable link)
+- Orders via shareable link (`/pedido-reebok/[id]`) with photos, SKU, bulto quantities
+- Bulto system: footwear=12pzas, apparel/accessories=6pzas per bulto
+- Unified catalog design: CatalogHeader, CatalogFilters, CatalogProductCard, StickyCartBar (shared components)
+- "Compartir" button (copy link + PDF) for vendors
+- Removed old auth system and CartProvider (dead code)
+
+### Reclamos (April 10-11)
+- States renamed: Borrador → Enviado → Confirmado → Aplicado with progress indicator
+
+### CXC (April 10-11)
+- Simplified ContactPanel (6 clear sections)
+- Risk filter subtitles
+- Stale data banner
+
+### Cheques (April 10-11)
+- Guided rebotado → re-depositar flow
+
+### Préstamos (April 10-11)
+- Visual status badges + filter tabs + batch undo
+
+### Camisetas (April 10-11)
+- Batch edit with "Guardar cambios" sticky bar, force-dynamic fixed cache bug
+- Tab subtitles, cleaner layout, overflow menu for destructive actions
+
+### Ventas (April 10-11)
+- View preference saved to localStorage
+
+### Upload (April 10-11)
+- 3-step progress indicator
+
+### Directorio (April 10-11)
+- Chevron icons on expandable rows
+
+### Infrastructure (April 10-11)
+- All 58 API routes have `export const dynamic = 'force-dynamic'`
+- Sentry monitoring added
+- Backup cron exists
+- 20 tests (vitest)
+- Password min 3 chars, no double-hash on edit
+- Dead code cleaned: ChatPanel, MobileBottomBar, LoadingScreen, KeyboardShortcutsProvider, SessionWarning, old Reebok auth
+- console.logs cleaned from production
+
 ### Attempted & Reverted
 - Face ID (WebAuthn): implemented and removed — too unstable on serverless (DER/P1363 format issues, challenge storage in memory)
 - Trading bot dashboard: added and removed — localhost IBKR gateway not accessible from Vercel
 
 ## Testing
 ```bash
+npm test          # Vitest — 20 tests, run before pushing
 npx next build    # Build check — must pass before push
 ```
 
