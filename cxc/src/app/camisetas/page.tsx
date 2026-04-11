@@ -319,9 +319,9 @@ export default function CamisetasPage() {
   }
 
   const tabs = [
-    { key: "resumen" as const, label: "Resumen" },
-    { key: "cliente" as const, label: "Por Cliente" },
-    { key: "stock" as const, label: "Stock" },
+    { key: "resumen" as const, label: "Resumen", subtitle: "Totales por producto" },
+    { key: "cliente" as const, label: "Por Cliente", subtitle: "Pedidos individuales" },
+    { key: "stock" as const, label: "Stock", subtitle: "Disponibilidad" },
   ];
 
   return (
@@ -329,15 +329,15 @@ export default function CamisetasPage() {
       <AppHeader module="Camisetas" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
 
-        {/* Title + Nuevo Pedido */}
+        {/* Title + Actions */}
         <div className="flex items-start justify-between mt-4 mb-2">
           <div>
             <h1 className="text-xl font-light tracking-tight">Camisetas Selección</h1>
             <p className="text-sm text-gray-400 mt-1">Pre-órdenes Selección Panamá</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => { setShowInfo(true); setInfoTab("precios"); }} className="border border-gray-200 text-gray-500 px-4 py-2.5 rounded-md text-sm hover:border-gray-400 hover:text-black transition flex-shrink-0 min-h-[44px]">
-              Info Producto
+            <button onClick={() => { setShowInfo(true); setInfoTab("precios"); }} className="text-gray-400 hover:text-black transition flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center" title="Info de productos">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
             </button>
             <button onClick={openNuevo} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition flex-shrink-0 min-h-[44px]">
               + Nuevo Pedido
@@ -406,8 +406,9 @@ export default function CamisetasPage() {
         <div className="flex gap-6 border-b border-gray-200">
           {tabs.map(t => (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`pb-3 text-sm transition ${tab === t.key ? "text-black font-medium border-b-2 border-black" : "text-gray-400 hover:text-gray-600"}`}>
-              {t.label}
+              className={`pb-3 text-left transition ${tab === t.key ? "text-black border-b-2 border-black" : "text-gray-400 hover:text-gray-600"}`}>
+              <span className={`text-sm ${tab === t.key ? "font-medium" : ""}`}>{t.label}</span>
+              <span className="block text-[10px] text-gray-400 font-normal">{t.subtitle}</span>
             </button>
           ))}
         </div>
@@ -451,9 +452,10 @@ export default function CamisetasPage() {
                 Vista Resumen no disponible en móvil. Usa la pestaña <button onClick={() => setTab("cliente")} className="font-medium text-black underline">Por Cliente</button>.
               </div>
               <div className="hidden sm:block">
-                <button onClick={() => setShowMatrix(!showMatrix)} className="text-sm text-gray-400 hover:text-black transition flex items-center gap-1 mb-3">
-                  <span style={{ transform: showMatrix ? "rotate(90deg)" : "rotate(0)", transition: "transform 0.2s" }}>▶</span>
-                  Tabla detallada por cliente
+                <button onClick={() => setShowMatrix(!showMatrix)} className="text-sm text-gray-400 hover:text-black transition flex items-center gap-1.5 mb-3">
+                  <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${showMatrix ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  Matriz de pedidos
+                  <span className="text-[10px] text-gray-300 font-normal ml-1">productos vs clientes</span>
                 </button>
                 {showMatrix && (
                   <div className="overflow-x-auto -mx-6 px-6">
@@ -610,19 +612,24 @@ export default function CamisetasPage() {
                     </div>
 
                     {/* Action buttons */}
-                    <div className="flex flex-wrap gap-2 mt-4">
+                    <div className="flex flex-wrap items-center gap-2 mt-4">
+                      <button onClick={() => toggleEstado(cl.id)}
+                        className={`px-4 py-2.5 rounded-md text-sm transition min-h-[44px] ${isEntregado ? "border border-gray-200 text-gray-600 hover:border-gray-400" : "bg-green-600 text-white hover:bg-green-700"}`}>
+                        {isEntregado ? "Marcar como Pendiente" : "Marcar como Entregado"}
+                      </button>
                       {tPaq > 0 && (
                         <button onClick={() => downloadClientPDF(selectedClient)} className="border border-gray-200 px-4 py-2.5 rounded-md text-sm hover:border-gray-400 transition min-h-[44px]">
                           Imprimir Pedido
                         </button>
                       )}
-                      <button onClick={() => toggleEstado(cl.id)}
-                        className={`px-4 py-2.5 rounded-md text-sm transition min-h-[44px] ${isEntregado ? "border border-gray-200 text-gray-600 hover:border-gray-400" : "bg-green-600 text-white hover:bg-green-700"}`}>
-                        {isEntregado ? "Marcar como Pendiente" : "Marcar como Entregado"}
-                      </button>
-                      <button onClick={() => setDeleteTarget(cl)} className="border border-red-200 text-red-600 px-4 py-2.5 rounded-md text-sm hover:border-red-400 transition min-h-[44px]">
-                        Eliminar Cliente y Pedidos
-                      </button>
+                      <div className="relative group ml-auto">
+                        <button className="text-gray-300 hover:text-gray-600 transition min-h-[44px] min-w-[44px] flex items-center justify-center text-lg" title="Más opciones">···</button>
+                        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 hidden group-hover:block z-20 min-w-[200px]">
+                          <button onClick={() => setDeleteTarget(cl)} className="w-full text-left px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition">
+                            Eliminar cliente y pedidos
+                          </button>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="mt-6">

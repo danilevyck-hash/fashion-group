@@ -109,7 +109,13 @@ export default function VentasDashboard() {
   }, [authChecked, role, router]);
 
   const [año, setAño] = useState(new Date().getFullYear());
-  const [vista, setVista] = useState<"mensual" | "quarter">("mensual");
+  const [vista, setVista] = useState<"mensual" | "quarter">(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("fg_ventas_vista");
+      if (saved === "mensual" || saved === "quarter") return saved;
+    }
+    return "mensual";
+  });
   const [empresaFilter, setEmpresaFilter] = useState<string[]>([]); // empty = all
   const [filterMes, setFilterMes] = useState<number | null>(null); // null = all months
   const [loading, setLoading] = useState(true);
@@ -131,6 +137,11 @@ export default function VentasDashboard() {
   const [showInactive, setShowInactive] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+
+  // Persist vista preference
+  useEffect(() => {
+    try { localStorage.setItem("fg_ventas_vista", vista); } catch { /* */ }
+  }, [vista]);
 
   useEffect(() => {
     fetch("/api/ventas/años").then(r => r.json()).then(setAños).catch(() => {});
