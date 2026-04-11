@@ -318,7 +318,7 @@ function Productos() {
   }, [showShareMenu]);
 
   function handleCopyLink() {
-    navigator.clipboard.writeText("https://www.fashiongr.com/catalogo/reebok/ver").then(() => {
+    navigator.clipboard.writeText("https://www.fashiongr.com/catalogo-publico/reebok").then(() => {
       setToast("Link copiado");
     }).catch(() => {
       setToast("No se pudo copiar el link");
