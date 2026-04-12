@@ -19,6 +19,8 @@ const PUBLIC_PREFIXES = [
   "/pedido-reebok/",                // public order view page (no auth)
   "/api/catalogo/reebok/pedido-publico", // public order API (no auth)
   "/api/catalogo/joybees/public",       // Joybees public catalog (no auth)
+  "/api/catalogo/joybees/pedido-publico", // Joybees public order API (no auth)
+  "/pedido-joybees/",                  // Joybees public order view (no auth)
   "/_next/",
   "/icon-",
   "/manifest",
