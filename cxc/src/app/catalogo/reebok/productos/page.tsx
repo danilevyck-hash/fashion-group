@@ -23,10 +23,10 @@ function Productos() {
   const router = useRouter();
   const [products, setProducts] = useState<(Product & { _stock: number; _sizes: string[] })[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
+  const [search, setSearch] = useState(searchParams.get("search") || "");
   const [gender, setGender] = useState(searchParams.get("gender") || "");
-  const [category, setCategory] = useState("");
+  const [category, setCategory] = useState(searchParams.get("category") || "");
   const [saleFilter, setSaleFilter] = useState<"" | "oferta" | "nuevo">("");
   // color/size/price filters removed — kept simple
   const [sortBy, setSortBy] = useState("relevancia");
@@ -196,6 +196,17 @@ function Productos() {
 
   useEffect(() => { setPage(1); }, [gender, category, saleFilter, sortBy]);
 
+  // Sync filters to URL
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (gender) params.set("gender", gender);
+    if (category) params.set("category", category);
+    if (search) params.set("search", search);
+    const qs = params.toString();
+    const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, "", newUrl);
+  }, [gender, category, search]);
+
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -284,7 +295,13 @@ function Productos() {
   }, [showShareMenu]);
 
   function handleCopyLink() {
-    navigator.clipboard.writeText("https://www.fashiongr.com/catalogo-publico/reebok").then(() => {
+    const params = new URLSearchParams();
+    if (gender) params.set("gender", gender);
+    if (category) params.set("category", category);
+    if (search) params.set("search", search);
+    const qs = params.toString();
+    const url = `https://www.fashiongr.com/catalogo-publico/reebok${qs ? `?${qs}` : ""}`;
+    navigator.clipboard.writeText(url).then(() => {
       setToast("Link copiado");
     }).catch(() => {
       setToast("No se pudo copiar el link");

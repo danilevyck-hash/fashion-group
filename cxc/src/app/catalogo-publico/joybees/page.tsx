@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { JoybeesProduct } from "@/components/joybees/JoybeesProductCard";
 import { Toast } from "@/components/ui";
 import JoybeesHeader from "@/components/joybees/JoybeesHeader";
@@ -24,12 +25,13 @@ export default function PublicJoybeesCatalogPage() {
 }
 
 function PublicJoybeesCatalog() {
+  const searchParams = useSearchParams();
   const [products, setProducts] = useState<JoybeesProduct[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [gender, setGender] = useState("");
-  const [category, setCategory] = useState("");
+  const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const [gender, setGender] = useState(searchParams.get("gender") || "");
+  const [category, setCategory] = useState(searchParams.get("category") || "");
   const [sortBy, setSortBy] = useState("relevancia");
   const [toast, setToast] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -84,6 +86,17 @@ function PublicJoybeesCatalog() {
   }, [searchInput]);
 
   useEffect(() => { setPage(1); }, [gender, category, sortBy]);
+
+  // Sync filters to URL
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (gender) params.set("gender", gender);
+    if (category) params.set("category", category);
+    if (search) params.set("search", search);
+    const qs = params.toString();
+    const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, "", newUrl);
+  }, [gender, category, search]);
 
   // Load products
   useEffect(() => {

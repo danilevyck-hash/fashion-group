@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { Product } from "@/components/reebok/supabase";
 import { getBultoSize } from "@/lib/reebok-bulto";
 import { Toast } from "@/components/ui";
@@ -24,12 +25,13 @@ export default function PublicCatalogPage() {
 }
 
 function PublicCatalog() {
+  const searchParams = useSearchParams();
   const [products, setProducts] = useState<(Product & { _stock: number; _sizes: string[] })[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchInput, setSearchInput] = useState("");
-  const [search, setSearch] = useState("");
-  const [gender, setGender] = useState("");
-  const [category, setCategory] = useState("");
+  const [searchInput, setSearchInput] = useState(searchParams.get("search") || "");
+  const [search, setSearch] = useState(searchParams.get("search") || "");
+  const [gender, setGender] = useState(searchParams.get("gender") || "");
+  const [category, setCategory] = useState(searchParams.get("category") || "");
   const [saleFilter, setSaleFilter] = useState<"" | "oferta" | "nuevo">("");
   // color/size/price filters removed — kept simple
   const [sortBy, setSortBy] = useState("relevancia");
@@ -88,6 +90,17 @@ function PublicCatalog() {
   }, [searchInput]);
 
   useEffect(() => { setPage(1); }, [gender, category, saleFilter, sortBy]);
+
+  // Sync filters to URL
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (gender) params.set("gender", gender);
+    if (category) params.set("category", category);
+    if (search) params.set("search", search);
+    const qs = params.toString();
+    const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, "", newUrl);
+  }, [gender, category, search]);
 
   // Load products
   useEffect(() => {
