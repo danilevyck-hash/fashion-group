@@ -32,7 +32,7 @@ function PublicCatalog() {
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [gender, setGender] = useState(searchParams.get("gender") || "");
   const [category, setCategory] = useState(searchParams.get("category") || "");
-  const [saleFilter, setSaleFilter] = useState<"" | "oferta" | "nuevo">("");
+  const [saleFilter, setSaleFilter] = useState<"" | "oferta" | "nuevo">((searchParams.get("filter") as "" | "oferta" | "nuevo") || "");
   // color/size/price filters removed — kept simple
   const [sortBy, setSortBy] = useState("relevancia");
   const [toast, setToast] = useState<string | null>(null);
@@ -97,10 +97,11 @@ function PublicCatalog() {
     if (gender) params.set("gender", gender);
     if (category) params.set("category", category);
     if (search) params.set("search", search);
+    if (saleFilter) params.set("filter", saleFilter);
     const qs = params.toString();
     const newUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState(null, "", newUrl);
-  }, [gender, category, search]);
+  }, [gender, category, search, saleFilter]);
 
   // Load products
   useEffect(() => {

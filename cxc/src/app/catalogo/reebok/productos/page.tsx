@@ -299,6 +299,7 @@ function Productos() {
     if (gender) params.set("gender", gender);
     if (category) params.set("category", category);
     if (search) params.set("search", search);
+    if (saleFilter) params.set("filter", saleFilter);
     const qs = params.toString();
     const url = `https://www.fashiongr.com/catalogo-publico/reebok${qs ? `?${qs}` : ""}`;
     navigator.clipboard.writeText(url).then(() => {
