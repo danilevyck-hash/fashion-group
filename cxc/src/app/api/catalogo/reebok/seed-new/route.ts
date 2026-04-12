@@ -74,3 +74,47 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json(results);
 }
+
+// PATCH: Add inventory to existing products that are missing it
+export async function PATCH(req: NextRequest) {
+  const denied = requireAdmin(req);
+  if (denied) return denied;
+  if (!reebokServer) return NextResponse.json({ error: "Not configured" }, { status: 500 });
+
+  const results = { updated: 0, skipped: 0, errors: [] as string[] };
+
+  for (const product of NEW_PRODUCTS) {
+    const { data: existing } = await reebokServer
+      .from("products")
+      .select("id")
+      .eq("sku", product.sku)
+      .limit(1);
+
+    if (!existing || existing.length === 0) {
+      results.errors.push(`${product.sku} no encontrado`);
+      results.skipped++;
+      continue;
+    }
+
+    const productId = existing[0].id;
+
+    // Check if inventory already exists
+    const { data: inv } = await reebokServer
+      .from("inventory")
+      .select("id")
+      .eq("product_id", productId)
+      .limit(1);
+
+    if (inv && inv.length > 0) {
+      // Update existing inventory
+      await reebokServer.from("inventory").update({ quantity: product.qty }).eq("product_id", productId).eq("size", "UNICA");
+      results.updated++;
+    } else {
+      // Create inventory
+      await reebokServer.from("inventory").insert({ product_id: productId, size: "UNICA", quantity: product.qty });
+      results.updated++;
+    }
+  }
+
+  return NextResponse.json(results);
+}
