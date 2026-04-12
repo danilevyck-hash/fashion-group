@@ -91,25 +91,7 @@ export default function JoybeesFilters({
           ))}
         </div>
 
-        <div className="w-px h-5 bg-[#404041]/10 shrink-0" />
-
-        {/* Category chips */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[10px] font-semibold text-[#404041]/40 uppercase tracking-wider mr-0.5">Cat.</span>
-          {categoryOptions.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => onCategoryChange(category === opt.value ? "" : opt.value)}
-              className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[32px] ${
-                category === opt.value
-                  ? "bg-[#404041] text-white shadow-sm"
-                  : "bg-white text-[#404041]/60 border border-[#404041]/10 hover:border-[#404041]/25"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+        {/* Category chips removed — not needed for Joybees */}
       </div>
 
       {/* Sort + count + clear */}
