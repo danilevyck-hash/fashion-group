@@ -105,12 +105,13 @@ export async function PATCH(req: NextRequest) {
       .eq("product_id", productId)
       .limit(1);
 
+    // Update badge to 'nuevo'
+    await reebokServer.from("products").update({ badge: "nuevo" }).eq("id", productId);
+
     if (inv && inv.length > 0) {
-      // Update existing inventory
       await reebokServer.from("inventory").update({ quantity: product.qty }).eq("product_id", productId).eq("size", "UNICA");
       results.updated++;
     } else {
-      // Create inventory
       await reebokServer.from("inventory").insert({ product_id: productId, size: "UNICA", quantity: product.qty });
       results.updated++;
     }
