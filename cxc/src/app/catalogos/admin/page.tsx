@@ -21,7 +21,7 @@ export default function AdminCatalogosPage() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {/* Reebok */}
-          <Link href="/catalogo/reebok" className="group block">
+          <Link href="/catalogos/admin/reebok" className="group block">
             <div className="relative overflow-hidden rounded-2xl border border-[#1A2656]/10 bg-[#1A2656] p-8 transition-all duration-200 hover:shadow-xl hover:scale-[1.02] active:scale-[0.98]">
               <div className="absolute top-0 right-0 w-32 h-32 bg-[#E4002B]/15 rounded-full -translate-y-10 translate-x-10" />
               <div className="relative">

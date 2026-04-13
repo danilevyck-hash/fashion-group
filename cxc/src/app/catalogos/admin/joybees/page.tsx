@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import Image from "next/image";
 import Link from "next/link";
+import * as XLSX from "xlsx-js-style";
 
 interface JoybeesProduct {
   id: string;
@@ -17,6 +18,7 @@ interface JoybeesProduct {
   image_url: string | null;
   active: boolean;
   popular: boolean;
+  is_new: boolean;
   is_regalia: boolean;
   created_at: string;
 }
@@ -30,7 +32,30 @@ interface JoybeesPedido {
   created_at: string;
 }
 
-type Tab = "productos" | "inventario" | "pedidos";
+interface ImportRow {
+  sku: string;
+  name: string;
+  price: number;
+  stock: number;
+  gender: string;
+  category?: string;
+}
+
+interface ImportPreview {
+  rows: ImportRow[];
+  toUpdate: number;
+  toCreate: number;
+  toZero: number;
+}
+
+interface PhotoMatch {
+  file: File;
+  sku: string;
+  matched: boolean;
+  preview: string;
+}
+
+type Tab = "productos" | "pedidos" | "importar";
 
 function fmtMoney(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -62,9 +87,16 @@ export default function JoybeesAdminPage() {
   const [showNew, setShowNew] = useState(false);
   const [newProduct, setNewProduct] = useState({ sku: "", name: "", category: "clogs", gender: "unisex", price: 0 });
 
-  // Inventory edits
-  const [stockEdits, setStockEdits] = useState<Record<string, number>>({});
-  const [stockDirty, setStockDirty] = useState(false);
+  // Import state
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<{ updated: number; created: number; zeroed: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Photo batch state
+  const [photoMatches, setPhotoMatches] = useState<PhotoMatch[]>([]);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -77,9 +109,6 @@ export default function JoybeesAdminPage() {
       if (res.ok) {
         const data = await res.json();
         setProducts(data);
-        const edits: Record<string, number> = {};
-        data.forEach((p: JoybeesProduct) => { edits[p.id] = p.stock; });
-        setStockEdits(edits);
       }
     } catch { /* ignore */ }
   }, []);
@@ -126,7 +155,7 @@ export default function JoybeesAdminPage() {
     }
   }
 
-  async function handleToggle(product: JoybeesProduct, field: "active" | "popular") {
+  async function handleToggle(product: JoybeesProduct, field: "popular" | "is_new") {
     await handleSaveProduct({ ...product, [field]: !product[field] });
   }
 
@@ -169,38 +198,191 @@ export default function JoybeesAdminPage() {
     }
   }
 
-  async function handleSaveAllStock() {
-    setSaving(true);
+  // --- IMPORT: Download template ---
+  function handleDownloadTemplate() {
+    const rows = products.map(p => ({
+      SKU: p.sku,
+      Nombre: p.name,
+      Precio: p.price,
+      Cantidad: p.stock,
+      Genero: p.gender,
+      Categoria: p.category,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    // Column widths
+    ws["!cols"] = [
+      { wch: 18 }, // SKU
+      { wch: 30 }, // Nombre
+      { wch: 10 }, // Precio
+      { wch: 10 }, // Cantidad
+      { wch: 14 }, // Genero
+      { wch: 16 }, // Categoria
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Productos");
+    XLSX.writeFile(wb, `Joybees_Plantilla_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    showToast("Plantilla descargada");
+  }
+
+  // --- IMPORT: Parse file ---
+  function handleImportFile(file: File) {
+    setImportLoading(true);
+    setImportResult(null);
+    setImportPreview(null);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet);
+
+        if (json.length === 0) {
+          showToast("El archivo esta vacio");
+          setImportLoading(false);
+          return;
+        }
+
+        // Map columns (flexible naming)
+        const rows: ImportRow[] = json.map(row => {
+          const sku = String(row["SKU"] || row["sku"] || row["Sku"] || "").trim();
+          const name = String(row["Nombre"] || row["nombre"] || row["Name"] || row["name"] || "").trim();
+          const price = parseFloat(String(row["Precio"] || row["precio"] || row["Price"] || row["price"] || 0));
+          const stock = parseInt(String(row["Cantidad"] || row["cantidad"] || row["Stock"] || row["stock"] || row["Qty"] || 0));
+          const gender = String(row["Genero"] || row["genero"] || row["Gender"] || row["gender"] || "unisex").trim();
+          const category = String(row["Categoria"] || row["categoria"] || row["Category"] || row["category"] || "clogs").trim();
+          return { sku, name, price: isNaN(price) ? 0 : price, stock: isNaN(stock) ? 0 : stock, gender, category };
+        }).filter(r => r.sku);
+
+        if (rows.length === 0) {
+          showToast("No se encontraron filas con SKU valido");
+          setImportLoading(false);
+          return;
+        }
+
+        const existingSkus = new Set(products.map(p => p.sku));
+        const importedSkus = new Set(rows.map(r => r.sku));
+
+        const toUpdate = rows.filter(r => existingSkus.has(r.sku)).length;
+        const toCreate = rows.filter(r => !existingSkus.has(r.sku)).length;
+        const toZero = products.filter(p => !importedSkus.has(p.sku)).length;
+
+        setImportPreview({ rows, toUpdate, toCreate, toZero });
+      } catch (err) {
+        console.error("Parse error:", err);
+        showToast("Error al leer el archivo");
+      } finally {
+        setImportLoading(false);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // --- IMPORT: Confirm ---
+  async function handleConfirmImport() {
+    if (!importPreview) return;
+    setImportLoading(true);
     try {
-      const promises = products.map(p => {
-        const newStock = stockEdits[p.id];
-        if (newStock !== undefined && newStock !== p.stock) {
-          return fetch("/api/catalogo/joybees/products", {
+      const res = await fetch("/api/catalogo/joybees/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: importPreview.rows }),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        setImportResult({ updated: result.updated, created: result.created, zeroed: result.zeroed });
+        setImportPreview(null);
+        showToast("Importacion completada");
+        await loadProducts();
+      } else {
+        const err = await res.json();
+        showToast(err.error || "Error al importar");
+      }
+    } catch {
+      showToast("Error al importar");
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  // --- PHOTOS: Select files ---
+  function handlePhotoFiles(files: FileList) {
+    const skuSet = new Set(products.map(p => p.sku));
+    const matches: PhotoMatch[] = [];
+
+    Array.from(files).forEach(file => {
+      // Extract SKU from filename: "UAACG.BLK-M.jpg" → try matching
+      const nameWithoutExt = file.name.replace(/\.[^.]+$/, "");
+      // Try exact match first, then with dashes replaced
+      const matchedSku = products.find(p =>
+        p.sku === nameWithoutExt ||
+        p.sku.replace(/-/g, ".") === nameWithoutExt ||
+        p.sku.replace(/-/g, "") === nameWithoutExt.replace(/[.\-_]/g, "") ||
+        nameWithoutExt.replace(/[.\-_]/g, "").toUpperCase() === p.sku.replace(/[.\-_]/g, "").toUpperCase()
+      );
+
+      matches.push({
+        file,
+        sku: matchedSku?.sku || nameWithoutExt,
+        matched: !!matchedSku || skuSet.has(nameWithoutExt),
+        preview: URL.createObjectURL(file),
+      });
+    });
+
+    setPhotoMatches(matches);
+  }
+
+  // --- PHOTOS: Upload ---
+  async function handleUploadBatchPhotos() {
+    const matched = photoMatches.filter(m => m.matched);
+    if (matched.length === 0) {
+      showToast("No hay fotos con SKU valido");
+      return;
+    }
+
+    setUploadingPhotos(true);
+    let uploaded = 0;
+
+    for (const match of matched) {
+      const product = products.find(p =>
+        p.sku === match.sku ||
+        p.sku.replace(/-/g, ".") === match.sku ||
+        p.sku.replace(/[.\-_]/g, "").toUpperCase() === match.sku.replace(/[.\-_]/g, "").toUpperCase()
+      );
+      if (!product) continue;
+
+      const formData = new FormData();
+      formData.append("file", match.file);
+      try {
+        const res = await fetch("/api/catalogo/joybees/upload", { method: "POST", body: formData });
+        if (res.ok) {
+          const { url } = await res.json();
+          await fetch("/api/catalogo/joybees/products", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...p, stock: newStock }),
+            body: JSON.stringify({ ...product, image_url: url }),
           });
+          uploaded++;
         }
-        return null;
-      }).filter(Boolean);
-
-      await Promise.all(promises);
-      showToast("Inventario actualizado");
-      setStockDirty(false);
-      await loadProducts();
-    } catch {
-      showToast("Error al guardar inventario");
-    } finally {
-      setSaving(false);
+      } catch { /* continue */ }
     }
+
+    showToast(`${uploaded} foto${uploaded !== 1 ? "s" : ""} subida${uploaded !== 1 ? "s" : ""}`);
+    setPhotoMatches([]);
+    setUploadingPhotos(false);
+    await loadProducts();
   }
 
   if (!authChecked) return null;
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "productos", label: "Productos" },
-    { key: "inventario", label: "Inventario" },
     { key: "pedidos", label: "Pedidos" },
+    { key: "importar", label: "Importar" },
   ];
 
   return (
@@ -253,7 +435,7 @@ export default function JoybeesAdminPage() {
             {tab === "productos" && (
               <div>
                 <div className="flex items-center justify-between mb-4">
-                  <p className="text-sm text-gray-500">{products.length} productos</p>
+                  <p className="text-sm text-gray-500">{products.filter(p => p.stock > 0).length} con stock &middot; {products.length} total</p>
                   <button
                     onClick={() => setShowNew(true)}
                     className="px-4 py-2 bg-[#404041] text-white text-sm font-medium rounded-lg hover:bg-[#404041]/90 active:scale-[0.97] transition"
@@ -311,7 +493,7 @@ export default function JoybeesAdminPage() {
                     </div>
                     <div className="flex gap-2 mt-3">
                       <button
-                        onClick={() => handleSaveProduct({ ...newProduct, active: true, popular: false, stock: 0 })}
+                        onClick={() => handleSaveProduct({ ...newProduct, active: true, popular: false, is_new: false, stock: 0 })}
                         disabled={saving || !newProduct.sku || !newProduct.name}
                         className="px-4 py-2 bg-[#FFE443] text-[#404041] text-sm font-medium rounded-lg hover:bg-[#FFE443]/80 active:scale-[0.97] transition disabled:opacity-50"
                       >
@@ -432,8 +614,11 @@ export default function JoybeesAdminPage() {
                               {product.popular && (
                                 <span className="text-[10px] font-medium bg-[#FFE443]/30 text-[#404041] px-1.5 py-0.5 rounded">Popular</span>
                               )}
-                              {!product.active && (
-                                <span className="text-[10px] font-medium bg-red-50 text-red-500 px-1.5 py-0.5 rounded">Inactivo</span>
+                              {product.is_new && (
+                                <span className="text-[10px] font-medium bg-green-50 text-green-600 px-1.5 py-0.5 rounded">Nuevo</span>
+                              )}
+                              {product.stock === 0 && (
+                                <span className="text-[10px] font-medium bg-red-50 text-red-500 px-1.5 py-0.5 rounded">Sin stock</span>
                               )}
                             </div>
                             <p className="text-xs text-gray-400 mt-0.5">
@@ -449,18 +634,18 @@ export default function JoybeesAdminPage() {
                           {/* Toggles */}
                           <div className="flex items-center gap-2 flex-shrink-0">
                             <button
-                              onClick={() => handleToggle(product, "active")}
-                              title={product.active ? "Desactivar" : "Activar"}
-                              className={`w-8 h-5 rounded-full transition relative ${product.active ? "bg-green-500" : "bg-gray-300"}`}
-                            >
-                              <div className={`w-3.5 h-3.5 bg-white rounded-full absolute top-[3px] transition-all ${product.active ? "right-[3px]" : "left-[3px]"}`} />
-                            </button>
-                            <button
                               onClick={() => handleToggle(product, "popular")}
                               title={product.popular ? "Quitar popular" : "Marcar popular"}
                               className={`text-lg transition ${product.popular ? "text-[#FFE443]" : "text-gray-300 hover:text-gray-400"}`}
                             >
                               ★
+                            </button>
+                            <button
+                              onClick={() => handleToggle(product, "is_new")}
+                              title={product.is_new ? "Quitar nuevo" : "Marcar nuevo"}
+                              className={`text-xs font-bold px-1.5 py-0.5 rounded transition ${product.is_new ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400 hover:text-gray-500"}`}
+                            >
+                              NEW
                             </button>
                           </div>
 
@@ -493,58 +678,6 @@ export default function JoybeesAdminPage() {
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {/* INVENTARIO TAB */}
-            {tab === "inventario" && (
-              <div>
-                <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left px-4 py-3 font-medium text-gray-500">SKU</th>
-                        <th className="text-left px-4 py-3 font-medium text-gray-500">Nombre</th>
-                        <th className="text-right px-4 py-3 font-medium text-gray-500 w-32">Stock</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {products.map(product => (
-                        <tr key={product.id} className="hover:bg-gray-50 transition">
-                          <td className="px-4 py-3 text-gray-500 font-mono text-xs">{product.sku}</td>
-                          <td className="px-4 py-3 text-gray-900">{product.name}</td>
-                          <td className="px-4 py-3 text-right">
-                            <input
-                              type="number"
-                              min={0}
-                              value={stockEdits[product.id] ?? product.stock}
-                              onChange={e => {
-                                const val = parseInt(e.target.value) || 0;
-                                setStockEdits(prev => ({ ...prev, [product.id]: val }));
-                                setStockDirty(true);
-                              }}
-                              className="w-20 text-right border border-gray-200 rounded-md px-2 py-1.5 text-sm tabular-nums focus:ring-1 focus:ring-[#FFE443] focus:border-[#FFE443] outline-none"
-                            />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Sticky save bar */}
-                {stockDirty && (
-                  <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between z-50">
-                    <p className="text-sm text-gray-500">Tienes cambios sin guardar</p>
-                    <button
-                      onClick={handleSaveAllStock}
-                      disabled={saving}
-                      className="px-5 py-2 bg-[#FFE443] text-[#404041] text-sm font-semibold rounded-lg hover:bg-[#FFE443]/80 active:scale-[0.97] transition disabled:opacity-50"
-                    >
-                      {saving ? "Guardando..." : "Guardar cambios"}
-                    </button>
-                  </div>
-                )}
               </div>
             )}
 
@@ -592,9 +725,228 @@ export default function JoybeesAdminPage() {
                 )}
               </div>
             )}
+
+            {/* IMPORTAR TAB */}
+            {tab === "importar" && (
+              <div className="space-y-6">
+
+                {/* Section 1: Import Excel/CSV */}
+                <div className="bg-white border border-gray-200 rounded-lg p-5">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Actualizar inventario</h3>
+                  <p className="text-xs text-gray-400 mb-4">Descarga la plantilla, llena los datos y subela para actualizar inventario</p>
+
+                  <div className="flex flex-wrap gap-3 mb-4">
+                    <button
+                      onClick={handleDownloadTemplate}
+                      className="px-4 py-2 bg-[#404041] text-white text-sm font-medium rounded-lg hover:bg-[#404041]/90 active:scale-[0.97] transition flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                      Descargar plantilla
+                    </button>
+                  </div>
+
+                  {/* Drop zone */}
+                  <div
+                    className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center hover:border-[#FFE443] transition cursor-pointer"
+                    onClick={() => fileInputRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add("border-[#FFE443]", "bg-[#FFE443]/5"); }}
+                    onDragLeave={e => { e.preventDefault(); e.currentTarget.classList.remove("border-[#FFE443]", "bg-[#FFE443]/5"); }}
+                    onDrop={e => {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove("border-[#FFE443]", "bg-[#FFE443]/5");
+                      const file = e.dataTransfer.files[0];
+                      if (file) handleImportFile(file);
+                    }}
+                  >
+                    <svg className="w-8 h-8 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p className="text-sm text-gray-500">Arrastra un archivo .xlsx o .csv aqui</p>
+                    <p className="text-xs text-gray-400 mt-1">o haz click para seleccionar</p>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    className="hidden"
+                    onChange={e => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImportFile(file);
+                      e.target.value = "";
+                    }}
+                  />
+
+                  {/* Import loading */}
+                  {importLoading && !importPreview && (
+                    <div className="flex items-center gap-2 mt-4 text-sm text-gray-500">
+                      <div className="w-4 h-4 border-2 border-[#FFE443] border-t-transparent rounded-full animate-spin" />
+                      Procesando archivo...
+                    </div>
+                  )}
+
+                  {/* Import preview */}
+                  {importPreview && (
+                    <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <p className="text-sm font-medium text-gray-700">Vista previa de importacion</p>
+                        <div className="flex gap-4 mt-1 text-xs">
+                          <span className="text-blue-600">{importPreview.toUpdate} a actualizar</span>
+                          <span className="text-green-600">{importPreview.toCreate} nuevos</span>
+                          <span className="text-red-500">{importPreview.toZero} se pondran en 0</span>
+                        </div>
+                      </div>
+
+                      {/* Preview table */}
+                      <div className="max-h-64 overflow-y-auto">
+                        <table className="w-full text-xs">
+                          <thead className="sticky top-0 bg-white">
+                            <tr className="border-b border-gray-100">
+                              <th className="text-left px-3 py-2 font-medium text-gray-500">SKU</th>
+                              <th className="text-left px-3 py-2 font-medium text-gray-500">Nombre</th>
+                              <th className="text-right px-3 py-2 font-medium text-gray-500">Precio</th>
+                              <th className="text-right px-3 py-2 font-medium text-gray-500">Cant</th>
+                              <th className="text-left px-3 py-2 font-medium text-gray-500">Estado</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {importPreview.rows.slice(0, 50).map((row, i) => {
+                              const exists = products.some(p => p.sku === row.sku);
+                              return (
+                                <tr key={i} className="hover:bg-gray-50">
+                                  <td className="px-3 py-1.5 font-mono text-gray-600">{row.sku}</td>
+                                  <td className="px-3 py-1.5 text-gray-900">{row.name}</td>
+                                  <td className="px-3 py-1.5 text-right tabular-nums">${fmtMoney(row.price)}</td>
+                                  <td className="px-3 py-1.5 text-right tabular-nums">{row.stock}</td>
+                                  <td className="px-3 py-1.5">
+                                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${exists ? "bg-blue-50 text-blue-600" : "bg-green-50 text-green-600"}`}>
+                                      {exists ? "Actualizar" : "Nuevo"}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                        {importPreview.rows.length > 50 && (
+                          <p className="text-xs text-gray-400 px-3 py-2">... y {importPreview.rows.length - 50} mas</p>
+                        )}
+                      </div>
+
+                      <div className="flex gap-2 px-4 py-3 bg-gray-50 border-t border-gray-200">
+                        <button
+                          onClick={handleConfirmImport}
+                          disabled={importLoading}
+                          className="px-4 py-2 bg-[#FFE443] text-[#404041] text-sm font-semibold rounded-lg hover:bg-[#FFE443]/80 active:scale-[0.97] transition disabled:opacity-50"
+                        >
+                          {importLoading ? "Importando..." : "Confirmar importacion"}
+                        </button>
+                        <button
+                          onClick={() => setImportPreview(null)}
+                          className="px-4 py-2 text-gray-500 text-sm rounded-lg hover:bg-gray-100 transition"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Import result */}
+                  {importResult && (
+                    <div className="mt-4 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+                      <p className="text-sm font-medium text-green-800">Importacion completada</p>
+                      <p className="text-xs text-green-600 mt-1">
+                        {importResult.updated} actualizados &middot; {importResult.created} nuevos &middot; {importResult.zeroed} puestos en 0
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Section 2: Batch photos */}
+                <div className="bg-white border border-gray-200 rounded-lg p-5">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-1">Subir fotos en batch</h3>
+                  <p className="text-xs text-gray-400 mb-4">Selecciona imagenes nombradas por SKU (ej: UA-ACG-BLK.jpg)</p>
+
+                  <div
+                    className="border-2 border-dashed border-gray-200 rounded-lg p-8 text-center hover:border-[#FFE443] transition cursor-pointer"
+                    onClick={() => photoInputRef.current?.click()}
+                    onDragOver={e => { e.preventDefault(); e.currentTarget.classList.add("border-[#FFE443]", "bg-[#FFE443]/5"); }}
+                    onDragLeave={e => { e.preventDefault(); e.currentTarget.classList.remove("border-[#FFE443]", "bg-[#FFE443]/5"); }}
+                    onDrop={e => {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove("border-[#FFE443]", "bg-[#FFE443]/5");
+                      if (e.dataTransfer.files.length > 0) handlePhotoFiles(e.dataTransfer.files);
+                    }}
+                  >
+                    <svg className="w-8 h-8 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p className="text-sm text-gray-500">Selecciona o arrastra imagenes</p>
+                    <p className="text-xs text-gray-400 mt-1">Nombra cada archivo con el SKU del producto</p>
+                  </div>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={e => {
+                      if (e.target.files && e.target.files.length > 0) handlePhotoFiles(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+
+                  {/* Photo preview */}
+                  {photoMatches.length > 0 && (
+                    <div className="mt-4">
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-4">
+                        {photoMatches.map((match, i) => (
+                          <div key={i} className={`relative rounded-lg overflow-hidden border-2 ${match.matched ? "border-green-300" : "border-red-300"}`}>
+                            <Image
+                              src={match.preview}
+                              alt={match.sku}
+                              width={100}
+                              height={100}
+                              className="w-full aspect-square object-cover"
+                              unoptimized
+                            />
+                            <div className={`absolute bottom-0 left-0 right-0 px-1.5 py-1 text-[10px] font-mono truncate ${match.matched ? "bg-green-500/90 text-white" : "bg-red-500/90 text-white"}`}>
+                              {match.sku}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <p className="text-xs text-gray-500">
+                          {photoMatches.filter(m => m.matched).length} de {photoMatches.length} coinciden con un producto
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleUploadBatchPhotos}
+                            disabled={uploadingPhotos || photoMatches.filter(m => m.matched).length === 0}
+                            className="px-4 py-2 bg-[#FFE443] text-[#404041] text-sm font-semibold rounded-lg hover:bg-[#FFE443]/80 active:scale-[0.97] transition disabled:opacity-50"
+                          >
+                            {uploadingPhotos ? "Subiendo..." : "Subir fotos"}
+                          </button>
+                          <button
+                            onClick={() => setPhotoMatches([])}
+                            className="px-4 py-2 text-gray-500 text-sm rounded-lg hover:bg-gray-100 transition"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
     </div>
   );
 }
+
