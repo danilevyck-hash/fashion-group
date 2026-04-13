@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
 import { JoybeesProduct } from "./JoybeesProductCard";
 import { GroupedProduct } from "./groupByModel";
 
@@ -121,13 +120,12 @@ export default function JoybeesGroupedCard({
                   </button>
                 </div>
               ) : (
-                <Image
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
                   key={imageStatus}
                   src={group.image_url}
                   alt={group.name}
-                  fill
-                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                  className="object-contain p-3"
+                  className="w-full h-full object-contain p-2"
                   onLoad={() => setImageStatus("loaded")}
                   onError={() => setImageStatus("error")}
                 />
