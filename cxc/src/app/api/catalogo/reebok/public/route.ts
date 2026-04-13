@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/components/reebok/supabase";
+import { reebokServer } from "@/lib/reebok-supabase-server";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const { data: products, error: pErr } = await supabase
+  if (!reebokServer) return NextResponse.json({ error: "Not configured" }, { status: 500 });
+
+  const { data: products, error: pErr } = await reebokServer
     .from("products")
     .select("*")
     .eq("active", true)
@@ -18,7 +20,7 @@ export async function GET() {
     );
   }
 
-  const { data: inventory, error: iErr } = await supabase
+  const { data: inventory, error: iErr } = await reebokServer
     .from("inventory")
     .select("product_id,size,quantity")
     .order("size");
