@@ -6,7 +6,8 @@ import { JoybeesProduct } from "@/components/joybees/JoybeesProductCard";
 import { Toast } from "@/components/ui";
 import JoybeesHeader from "@/components/joybees/JoybeesHeader";
 import JoybeesFilters from "@/components/joybees/JoybeesFilters";
-import JoybeesProductCard from "@/components/joybees/JoybeesProductCard";
+import JoybeesGroupedCard from "@/components/joybees/JoybeesGroupedCard";
+import { groupByModel, GroupedProduct } from "@/components/joybees/groupByModel";
 import JoybeesStickyCartBar from "@/components/joybees/JoybeesStickyCartBar";
 
 const BULTO_SIZE = 12;
@@ -124,10 +125,6 @@ function PublicJoybeesCatalog() {
     riviera_sandal: "Riviera", everyday_sandal: "Everyday Sandal", varsity_flip: "Varsity Flip",
     studio_clog: "Studio Clog", popinz: "Popinz",
   };
-  const GENDER_LABELS: Record<string, string> = {
-    adults_m: "Adults", women: "Women", kids: "Kids", junior: "Junior",
-  };
-
   const filtered = products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()))
     .filter(p => !gender || p.gender === gender)
@@ -148,19 +145,22 @@ function PublicJoybeesCatalog() {
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const cartMap = new Map(cart.map(i => [i.product_id, i.quantity]));
 
-  type Group = { label: string; items: JoybeesProduct[] };
-  const groups: Group[] = [];
+  // Group products by model (merge gender variants)
+  const groupedProducts = groupByModel(paginated);
+
+  type CatGroup = { label: string; items: GroupedProduct[] };
+  const groups: CatGroup[] = [];
   let lastKey = "";
-  for (const p of paginated) {
-    const key = `${p.category}|${p.gender}`;
+  for (const gp of groupedProducts) {
+    const key = gp.category;
     if (key !== lastKey) {
       groups.push({
-        label: `${CATEGORY_LABELS[p.category] || p.category} — ${GENDER_LABELS[p.gender] || p.gender}`,
+        label: CATEGORY_LABELS[gp.category] || gp.category,
         items: [],
       });
       lastKey = key;
     }
-    groups[groups.length - 1].items.push(p);
+    groups[groups.length - 1].items.push(gp);
   }
 
   const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -242,11 +242,11 @@ function PublicJoybeesCatalog() {
                 <span className="text-[11px] text-[#404041]/25 tabular-nums">{g.items.length}</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                {g.items.map(p => (
-                  <JoybeesProductCard
-                    key={p.id}
-                    product={p}
-                    qty={cartMap.get(p.id) || 0}
+                {g.items.map(gp => (
+                  <JoybeesGroupedCard
+                    key={gp.baseSku}
+                    group={gp}
+                    cartMap={cartMap}
                     onQtyChange={handleQtyChange}
                   />
                 ))}
@@ -256,11 +256,11 @@ function PublicJoybeesCatalog() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-          {paginated.map(p => (
-            <JoybeesProductCard
-              key={p.id}
-              product={p}
-              qty={cartMap.get(p.id) || 0}
+          {groupedProducts.map(gp => (
+            <JoybeesGroupedCard
+              key={gp.baseSku}
+              group={gp}
+              cartMap={cartMap}
               onQtyChange={handleQtyChange}
             />
           ))}

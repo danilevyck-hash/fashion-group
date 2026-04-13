@@ -2,88 +2,79 @@
 
 import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
-
-export interface JoybeesProduct {
-  id: string;
-  sku: string;
-  name: string;
-  category: string;
-  gender: string;
-  price: number;
-  stock: number;
-  image_url: string | null;
-  active: boolean;
-  popular: boolean;
-  is_regalia: boolean;
-  created_at: string;
-}
+import { JoybeesProduct } from "./JoybeesProductCard";
+import { GroupedProduct } from "./groupByModel";
 
 const BULTO_SIZE = 12;
 
-interface JoybeesProductCardProps {
-  product: JoybeesProduct;
-  qty: number;
+interface JoybeesGroupedCardProps {
+  group: GroupedProduct;
+  cartMap: Map<string, number>;
   onQtyChange: (productId: string, qty: number, product: JoybeesProduct) => void;
   disabled?: boolean;
 }
 
-export default function JoybeesProductCard({
-  product, qty, onQtyChange, disabled,
-}: JoybeesProductCardProps) {
+const CATEGORY_LABELS: Record<string, string> = {
+  active_clog: "Active Clog",
+  casual_flip: "Casual Flip",
+  varsity_clog: "Varsity Clog",
+  trekking_slide: "Trekking Slide",
+  trekking_shoe: "Trekking Shoe",
+  work_clog: "Work Clog",
+  friday_flat: "Friday Flat",
+  garden_grove_clog: "Garden Grove",
+  lakeshore_sandal: "Lakeshore",
+  riviera_sandal: "Riviera",
+  everyday_sandal: "Everyday Sandal",
+  varsity_flip: "Varsity Flip",
+  studio_clog: "Studio Clog",
+  popinz: "Popinz",
+};
+
+export default function JoybeesGroupedCard({
+  group, cartMap, onQtyChange, disabled,
+}: JoybeesGroupedCardProps) {
   const [imageStatus, setImageStatus] = useState<"loading" | "loaded" | "error">("loading");
-  const [justAdded, setJustAdded] = useState(false);
   const [showLightbox, setShowLightbox] = useState(false);
-  const prevQtyRef = useRef(qty);
+
+  // Track "just added" per variant
+  const [justAddedId, setJustAddedId] = useState<string | null>(null);
+  const prevQtyMapRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
-    if (prevQtyRef.current === 0 && qty === 1) {
-      setJustAdded(true);
-      const t = setTimeout(() => setJustAdded(false), 600);
-      return () => clearTimeout(t);
+    for (const v of group.variants) {
+      const prevQty = prevQtyMapRef.current.get(v.product.id) || 0;
+      const curQty = cartMap.get(v.product.id) || 0;
+      if (prevQty === 0 && curQty === 1) {
+        setJustAddedId(v.product.id);
+        const t = setTimeout(() => setJustAddedId(null), 600);
+        return () => clearTimeout(t);
+      }
     }
-    prevQtyRef.current = qty;
-  }, [qty]);
+    // Update ref
+    const newMap = new Map<string, number>();
+    for (const v of group.variants) {
+      newMap.set(v.product.id, cartMap.get(v.product.id) || 0);
+    }
+    prevQtyMapRef.current = newMap;
+  }, [cartMap, group.variants]);
 
-  function setQty(n: number) {
-    onQtyChange(product.id, Math.max(0, n), product);
+  const isRegalia = group.is_regalia || group.price === 0;
+  const bultoTotal = group.price * BULTO_SIZE;
+  const isSingleVariant = group.variants.length === 1;
+
+  function setQty(productId: string, product: JoybeesProduct, n: number) {
+    onQtyChange(productId, Math.max(0, n), product);
   }
-
-  const inOrder = qty > 0;
-  const bultoTotal = product.price * BULTO_SIZE;
-  const isRegalia = product.is_regalia || product.price === 0;
-
-  const GENDER_LABELS: Record<string, string> = {
-    adults_m: "Adults",
-    women: "Women",
-    kids: "Kids",
-    junior: "Junior",
-  };
-
-  const CATEGORY_LABELS: Record<string, string> = {
-    active_clog: "Active Clog",
-    casual_flip: "Casual Flip",
-    varsity_clog: "Varsity Clog",
-    trekking_slide: "Trekking Slide",
-    trekking_shoe: "Trekking Shoe",
-    work_clog: "Work Clog",
-    friday_flat: "Friday Flat",
-    garden_grove_clog: "Garden Grove",
-    lakeshore_sandal: "Lakeshore",
-    riviera_sandal: "Riviera",
-    everyday_sandal: "Everyday Sandal",
-    varsity_flip: "Varsity Flip",
-    studio_clog: "Studio Clog",
-    popinz: "Popinz",
-  };
 
   return (
     <>
       <div
         className={`bg-white overflow-hidden rounded-xl relative transition-all duration-300 shadow-sm hover:shadow-md ${
-          justAdded ? "ring-2 ring-[#FFE443] scale-[1.02]" : ""
+          justAddedId ? "ring-2 ring-[#FFE443] scale-[1.02]" : ""
         }`}
       >
-        {justAdded && (
+        {justAddedId && (
           <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none" style={{ animation: "checkFade 0.6s ease-out forwards" }}>
             <div className="w-10 h-10 rounded-full bg-[#FFE443] flex items-center justify-center shadow-lg">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#404041" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -96,7 +87,7 @@ export default function JoybeesProductCard({
         {/* Image */}
         <div
           className="aspect-square bg-[#FFFEF5] relative overflow-hidden cursor-pointer"
-          onClick={() => { if (product.image_url) setShowLightbox(true); }}
+          onClick={() => { if (group.image_url) setShowLightbox(true); }}
         >
           {isRegalia && (
             <div className="absolute top-2 left-2 z-[5]">
@@ -106,7 +97,7 @@ export default function JoybeesProductCard({
             </div>
           )}
 
-          {product.popular && !isRegalia && (
+          {group.popular && !isRegalia && (
             <div className="absolute top-2 left-2 z-[5]">
               <span className="inline-block bg-[#404041] text-white text-[9px] font-bold uppercase tracking-wider px-2 py-[3px] rounded-md">
                 Popular
@@ -114,7 +105,7 @@ export default function JoybeesProductCard({
             </div>
           )}
 
-          {product.image_url ? (
+          {group.image_url ? (
             <>
               {imageStatus === "loading" && <div className="absolute inset-0 shimmer" />}
               {imageStatus === "error" ? (
@@ -132,8 +123,8 @@ export default function JoybeesProductCard({
               ) : (
                 <Image
                   key={imageStatus}
-                  src={product.image_url}
-                  alt={product.name}
+                  src={group.image_url}
+                  alt={group.name}
                   width={300}
                   height={300}
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
@@ -153,19 +144,33 @@ export default function JoybeesProductCard({
         {/* Product info */}
         <div className="p-3">
           <h3 className="text-sm font-semibold text-[#404041] line-clamp-2 leading-snug min-h-[2.5em]">
-            {product.name}
+            {group.name}
           </h3>
 
           <div className="flex items-center gap-1.5 mt-1">
             <span className="text-[10px] text-[#404041]/40 bg-[#FFE443]/20 px-1.5 py-0.5 rounded font-medium">
-              {CATEGORY_LABELS[product.category] || product.category}
+              {CATEGORY_LABELS[group.category] || group.category}
             </span>
-            <span className="text-[10px] text-[#404041]/40">
-              {GENDER_LABELS[product.gender] || product.gender}
-            </span>
+            {isSingleVariant && (
+              <span className="text-[10px] text-[#404041]/40">
+                {group.variants[0].genderLabel}
+              </span>
+            )}
           </div>
 
-          <div className="text-[10px] text-[#404041]/35 mt-1 font-mono">{product.sku}</div>
+          <div className="text-[10px] text-[#404041]/35 mt-1 font-mono">{group.baseSku}</div>
+
+          {/* Gender badges for multi-variant */}
+          {!isSingleVariant && (
+            <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+              <span className="text-[10px] text-[#404041]/40">Disponible en:</span>
+              {group.variants.map(v => (
+                <span key={v.product.id} className="text-[10px] font-semibold text-[#404041]/70 bg-[#404041]/5 px-1.5 py-0.5 rounded">
+                  {v.genderLabel}
+                </span>
+              ))}
+            </div>
+          )}
 
           {/* Price / Regalia */}
           <div className="mt-2">
@@ -177,7 +182,7 @@ export default function JoybeesProductCard({
               <>
                 <div className="flex items-baseline gap-2">
                   <span className="text-xl font-bold tabular-nums text-[#404041]">
-                    ${product.price.toFixed(2)}
+                    ${group.price.toFixed(2)}
                   </span>
                   <span className="text-[10px] text-[#404041]/40">/unidad</span>
                 </div>
@@ -190,7 +195,7 @@ export default function JoybeesProductCard({
             )}
           </div>
 
-          {/* Add/Qty button */}
+          {/* Action buttons */}
           {isRegalia ? (
             <a
               href="https://wa.me/50766745522?text=Hola%2C%20quiero%20consultar%20disponibilidad%20de%20Joybees%20Popinz"
@@ -203,62 +208,78 @@ export default function JoybeesProductCard({
               </svg>
               Consultar
             </a>
-          ) : inOrder ? (
-            <div className="mt-2.5">
-              <div className="flex items-center justify-between bg-[#FFE443]/20 rounded-lg px-1 border border-[#FFE443]/40">
-                <button
-                  onClick={() => setQty(qty - 1)}
-                  className={`h-11 flex items-center justify-center text-[#404041] text-lg font-medium hover:bg-[#FFE443]/30 rounded-lg transition ${
-                    qty === 1 ? "px-2 gap-1" : "w-11"
-                  }`}
-                >
-                  {qty === 1 ? (
-                    <>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="3 6 5 6 21 6" />
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                      </svg>
-                      <span className="text-xs font-medium">Quitar</span>
-                    </>
-                  ) : (
-                    <span className="text-xl leading-none">&minus;</span>
-                  )}
-                </button>
-                <div className="text-center min-w-[48px] py-1">
-                  <span className="text-base font-bold text-[#404041] tabular-nums">{qty}</span>
-                  <span className="text-[10px] text-[#404041]/60 ml-1">{qty === 1 ? "bulto" : "bultos"}</span>
-                </div>
-                <button
-                  onClick={() => setQty(qty + 1)}
-                  className="w-11 h-11 flex items-center justify-center text-[#404041] text-xl font-medium hover:bg-[#FFE443]/30 rounded-lg transition"
-                >
-                  +
-                </button>
-              </div>
-            </div>
           ) : (
-            <button
-              onClick={() => { if (!disabled) setQty(1); }}
-              disabled={disabled || product.stock === 0}
-              className={`w-full mt-2.5 py-3 rounded-lg text-sm font-semibold transition min-h-[44px] ${
-                disabled || product.stock === 0
-                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-[#404041] text-white hover:bg-[#2a2a2b] active:scale-[0.97]"
-              }`}
-            >
-              {product.stock === 0 ? "Agotado" : "Agregar"}
-            </button>
+            <div className={`mt-2.5 ${!isSingleVariant ? "space-y-1.5" : ""}`}>
+              {group.variants.map(v => {
+                const qty = cartMap.get(v.product.id) || 0;
+                const inOrder = qty > 0;
+                const buttonLabel = isSingleVariant
+                  ? (v.product.stock === 0 ? "Agotado" : "Agregar")
+                  : (v.product.stock === 0 ? `${v.genderLabel} — Agotado` : `Agregar ${v.genderLabel}`);
+
+                return inOrder ? (
+                  <div key={v.product.id}>
+                    {!isSingleVariant && (
+                      <div className="text-[10px] text-[#404041]/50 font-medium mb-0.5">{v.genderLabel}</div>
+                    )}
+                    <div className="flex items-center justify-between bg-[#FFE443]/20 rounded-lg px-1 border border-[#FFE443]/40">
+                      <button
+                        onClick={() => setQty(v.product.id, v.product, qty - 1)}
+                        className={`h-11 flex items-center justify-center text-[#404041] text-lg font-medium hover:bg-[#FFE443]/30 rounded-lg transition ${
+                          qty === 1 ? "px-2 gap-1" : "w-11"
+                        }`}
+                      >
+                        {qty === 1 ? (
+                          <>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <polyline points="3 6 5 6 21 6" />
+                              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                            </svg>
+                            <span className="text-xs font-medium">Quitar</span>
+                          </>
+                        ) : (
+                          <span className="text-xl leading-none">&minus;</span>
+                        )}
+                      </button>
+                      <div className="text-center min-w-[48px] py-1">
+                        <span className="text-base font-bold text-[#404041] tabular-nums">{qty}</span>
+                        <span className="text-[10px] text-[#404041]/60 ml-1">{qty === 1 ? "bulto" : "bultos"}</span>
+                      </div>
+                      <button
+                        onClick={() => setQty(v.product.id, v.product, qty + 1)}
+                        className="w-11 h-11 flex items-center justify-center text-[#404041] text-xl font-medium hover:bg-[#FFE443]/30 rounded-lg transition"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    key={v.product.id}
+                    onClick={() => { if (!disabled) setQty(v.product.id, v.product, 1); }}
+                    disabled={disabled || v.product.stock === 0}
+                    className={`w-full py-2.5 rounded-lg text-sm font-semibold transition min-h-[40px] ${
+                      disabled || v.product.stock === 0
+                        ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                        : "bg-[#404041] text-white hover:bg-[#2a2a2b] active:scale-[0.97]"
+                    }`}
+                  >
+                    {buttonLabel}
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
 
       {/* Lightbox */}
-      {showLightbox && product.image_url && (
+      {showLightbox && group.image_url && (
         <div
           className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-8"
           onClick={() => setShowLightbox(false)}
         >
-          <img src={product.image_url} alt={product.name} className="max-w-full max-h-full object-contain rounded-lg" />
+          <img src={group.image_url} alt={group.name} className="max-w-full max-h-full object-contain rounded-lg" />
           <button onClick={() => setShowLightbox(false)} className="absolute top-4 right-4 text-white/70 hover:text-white text-2xl">&times;</button>
         </div>
       )}
