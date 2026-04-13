@@ -19,6 +19,7 @@ export type Product = {
   image_url: string | null
   active: boolean
   on_sale: boolean
+  badge: string | null
   created_at: string
 }
 

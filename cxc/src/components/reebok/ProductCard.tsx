@@ -56,10 +56,17 @@ export default function ProductCard({ product, stock = 0, qty, onQtyChange, disa
           </div>
         )}
         <div className="aspect-square bg-[#F5F0E8] relative overflow-hidden cursor-pointer" onClick={() => { if (product.image_url) setShowLightbox(true); }}>
-          {!product.on_sale && (
+          {product.badge === "nuevo" && (
             <div className="absolute top-2.5 left-0 z-[5]">
               <span className="inline-block bg-[#1A2656] text-white text-[9px] font-bold uppercase tracking-[0.15em] pl-2.5 pr-2 py-[3px]">
                 Nuevo
+              </span>
+            </div>
+          )}
+          {product.badge === "oferta" && (
+            <div className="absolute top-2.5 left-0 z-[5]">
+              <span className="inline-block bg-[#E4002B] text-white text-[9px] font-bold uppercase tracking-[0.15em] pl-2.5 pr-2 py-[3px]">
+                Oferta
               </span>
             </div>
           )}
@@ -109,7 +116,7 @@ export default function ProductCard({ product, stock = 0, qty, onQtyChange, disa
             <p className="text-base font-semibold text-black">
               {product.price ? `$${product.price.toFixed(0)}` : "Consultar"}
             </p>
-            {product.on_sale && <span className="text-[10px] font-bold text-[#E4002B] bg-red-50 px-2 py-0.5 uppercase tracking-wider">OFERTA</span>}
+            {product.badge === "oferta" && <span className="text-[10px] font-bold text-[#E4002B] bg-red-50 px-2 py-0.5 uppercase tracking-wider">OFERTA</span>}
           </div>
 
           {inOrder ? (

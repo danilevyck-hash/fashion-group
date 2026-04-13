@@ -145,7 +145,7 @@ function PublicCatalog() {
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => !gender || p.gender === gender)
     .filter(p => !category || p.category === category)
-    .filter(p => !saleFilter || (saleFilter === "oferta" ? p.on_sale : !p.on_sale))
+    .filter(p => !saleFilter || p.badge === saleFilter)
     .sort((a, b) => {
       if (sortBy === "precio-asc") return (a.price || 0) - (b.price || 0);
       if (sortBy === "precio-desc") return (b.price || 0) - (a.price || 0);

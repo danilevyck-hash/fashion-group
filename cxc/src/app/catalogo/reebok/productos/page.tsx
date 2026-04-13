@@ -243,7 +243,7 @@ function Productos() {
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
     .filter(p => !gender || p.gender === gender)
     .filter(p => !category || p.category === category)
-    .filter(p => !saleFilter || (saleFilter === "oferta" ? p.on_sale : !p.on_sale))
+    .filter(p => !saleFilter || p.badge === saleFilter)
     .sort((a, b) => {
       if (sortBy === "precio-asc") return (a.price || 0) - (b.price || 0);
       if (sortBy === "precio-desc") return (b.price || 0) - (a.price || 0);
@@ -478,14 +478,14 @@ function Productos() {
               const dy = y + pad + (boxH - dh) / 2;
               doc.addImage(cached.data, "JPEG", dx, dy, dw, dh);
             }
-            if (p.on_sale) {
+            if (p.badge === "oferta") {
               doc.setFillColor(...RED);
               doc.roundedRect(x + 2, y + 2, 14, 4.5, 1, 1, "F");
               doc.setFontSize(6);
               doc.setTextColor(...WHITE);
               doc.setFont("helvetica", "bold");
               doc.text("OFERTA", x + 3.2, y + 5.2);
-            } else {
+            } else if (p.badge === "nuevo") {
               doc.setFillColor(...NAVY);
               doc.roundedRect(x + 2, y + 2, 13, 4.5, 1, 1, "F");
               doc.setFontSize(6);
@@ -512,7 +512,7 @@ function Productos() {
             ty += 5.5;
             doc.setFontSize(12);
             doc.setFont("helvetica", "bold");
-            if (p.on_sale) {
+            if (p.badge === "oferta") {
               doc.setTextColor(...RED);
             } else {
               doc.setTextColor(...NAVY);

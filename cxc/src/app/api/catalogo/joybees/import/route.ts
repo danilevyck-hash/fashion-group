@@ -17,6 +17,7 @@ interface ImportRow {
   price: number;
   stock: number;
   gender: string;
+  badge?: string;
   category?: string;
 }
 
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     // Validate rows
     for (const row of rows) {
       if (!row.sku || typeof row.sku !== "string") {
-        return NextResponse.json({ error: `Fila invalida: SKU requerido` }, { status: 400 });
+        return NextResponse.json({ error: "Fila invalida: SKU requerido" }, { status: 400 });
       }
     }
 
@@ -50,22 +51,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: fetchErr.message }, { status: 500 });
     }
 
-    const existingSkus = new Set((existing || []).map(p => p.sku));
-    const importedSkus = new Set(rows.map(r => r.sku));
+    const existingSkus = new Set((existing || []).map((p) => p.sku));
+    const importedSkus = new Set(rows.map((r) => r.sku));
 
     // Products to upsert (update existing + create new)
-    const upsertRows = rows.map(r => ({
-      sku: r.sku,
-      name: r.name,
-      price: r.price ?? 0,
-      stock: r.stock ?? 0,
-      gender: r.gender || "unisex",
-      category: r.category || "clogs",
-      active: (r.stock ?? 0) > 0,
-    }));
+    const upsertRows = rows.map((r) => {
+      const badgeValue = r.badge === "nuevo" || r.badge === "oferta" ? r.badge : null;
+      return {
+        sku: r.sku,
+        name: r.name,
+        price: r.price ?? 0,
+        stock: r.stock ?? 0,
+        gender: r.gender || "unisex",
+        category: r.category || "clogs",
+        active: (r.stock ?? 0) > 0,
+        badge: badgeValue,
+      };
+    });
 
-    // Products missing from import → set stock to 0
-    const missingSkus = (existing || []).filter(p => !importedSkus.has(p.sku));
+    // Products missing from import -> set stock to 0
+    const missingSkus = (existing || []).filter((p) => !importedSkus.has(p.sku));
 
     // Upsert imported rows
     let updated = 0;
@@ -92,7 +97,10 @@ export async function POST(req: NextRequest) {
       const { error: zeroErr } = await supabase
         .from("joybees_products")
         .update({ stock: 0, active: false })
-        .in("id", missingSkus.map(p => p.id));
+        .in(
+          "id",
+          missingSkus.map((p) => p.id)
+        );
 
       if (zeroErr) {
         return NextResponse.json({ error: zeroErr.message }, { status: 500 });

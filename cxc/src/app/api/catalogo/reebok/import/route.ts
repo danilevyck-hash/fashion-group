@@ -11,30 +11,46 @@ interface ImportProduct {
   price: number;
   quantity: number;
   gender: string;
+  badge?: string;
 }
+
+// Category filters for each company
+const COMPANY_CATEGORIES: Record<string, string[]> = {
+  active_shoes: ["footwear"],
+  active_wear: ["apparel", "accessories"],
+};
 
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   try {
-    const { products: incoming } = (await req.json()) as { products: ImportProduct[] };
+    const body = await req.json();
+    const incoming: ImportProduct[] = body.products;
+    const company: string | undefined = body.company;
 
     if (!Array.isArray(incoming) || incoming.length === 0) {
       return NextResponse.json({ error: "No se recibieron productos" }, { status: 400 });
     }
 
-    // Load existing products
-    const { data: existing, error: fetchErr } = await supabase
+    // Load existing products — filter by company categories if provided
+    const { data: allExisting, error: fetchErr } = await supabase
       .from("products")
-      .select("id, sku, name, price, gender");
+      .select("id, sku, name, price, gender, category, badge");
 
     if (fetchErr) {
       return NextResponse.json({ error: fetchErr.message }, { status: 500 });
     }
 
-    const existingBySku = new Map<string, { id: string; sku: string; name: string; price: number; gender: string | null }>();
-    for (const p of existing || []) {
+    // Only scope to the company's categories
+    const companyCategories = company ? COMPANY_CATEGORIES[company] : null;
+    const existing = (allExisting || []).filter((p) => {
+      if (!companyCategories) return true;
+      return companyCategories.includes(p.category);
+    });
+
+    const existingBySku = new Map<string, { id: string; sku: string; name: string; price: number; gender: string | null; category: string; badge: string | null }>();
+    for (const p of existing) {
       if (p.sku) existingBySku.set(p.sku, p);
     }
 
@@ -44,11 +60,15 @@ export async function POST(req: NextRequest) {
     let created = 0;
     let zeroed = 0;
 
+    // Determine default category for new products
+    const defaultCategory = companyCategories ? companyCategories[0] : "footwear";
+
     // Update or create products from file
     for (const item of incoming) {
-      const existing = existingBySku.get(item.sku);
+      const exist = existingBySku.get(item.sku);
+      const badgeValue = item.badge === "nuevo" || item.badge === "oferta" ? item.badge : null;
 
-      if (existing) {
+      if (exist) {
         // Update product fields
         await reebokServer
           .from("products")
@@ -56,14 +76,15 @@ export async function POST(req: NextRequest) {
             name: item.name,
             price: item.price,
             gender: item.gender || null,
+            badge: badgeValue,
           })
-          .eq("id", existing.id);
+          .eq("id", exist.id);
 
         // Upsert inventory with size UNICA
         await reebokServer
           .from("inventory")
           .upsert(
-            { product_id: existing.id, size: "UNICA", quantity: item.quantity },
+            { product_id: exist.id, size: "UNICA", quantity: item.quantity },
             { onConflict: "product_id,size" }
           );
 
@@ -77,9 +98,10 @@ export async function POST(req: NextRequest) {
             name: item.name,
             price: item.price,
             gender: item.gender || null,
-            category: "calzado",
+            category: defaultCategory,
             active: true,
             on_sale: false,
+            badge: badgeValue,
           })
           .select("id")
           .single();
@@ -94,7 +116,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Zero out products NOT in file
+    // Zero out products NOT in file — only within the company's scope
     for (const [sku, prod] of existingBySku) {
       if (!incomingSkus.has(sku)) {
         await reebokServer

@@ -88,16 +88,15 @@ export default function CatalogProductCard({
           className="aspect-square bg-[#F5F0E8] relative overflow-hidden cursor-pointer"
           onClick={() => { if (product.image_url) setShowLightbox(true); }}
         >
-          {/* Sale badge */}
-          {product.on_sale && (
+          {/* Badge */}
+          {product.badge === "oferta" && (
             <div className="absolute top-2 left-2 z-[5]">
               <span className="inline-block bg-[#E4002B] text-white text-[9px] font-bold uppercase tracking-wider px-2 py-[3px] rounded-md">
                 Oferta
               </span>
             </div>
           )}
-          {/* New badge */}
-          {!product.on_sale && (
+          {product.badge === "nuevo" && (
             <div className="absolute top-2 left-2 z-[5]">
               <span className="inline-block bg-[#1A2656] text-white text-[9px] font-bold uppercase tracking-wider px-2 py-[3px] rounded-md">
                 Nuevo
@@ -178,11 +177,11 @@ export default function CatalogProductCard({
           {/* Price */}
           <div className="mt-2">
             <div className="flex items-baseline gap-2">
-              <span className={`text-xl font-bold tabular-nums ${product.on_sale ? "text-[#E4002B]" : "text-[#1A2656]"}`}>
+              <span className={`text-xl font-bold tabular-nums ${product.badge === "oferta" ? "text-[#E4002B]" : "text-[#1A2656]"}`}>
                 {product.price ? `$${product.price.toFixed(2)}` : "Consultar"}
               </span>
               {product.price && <span className="text-[10px] text-[#1A2656]/40">/unidad</span>}
-              {product.on_sale && (
+              {product.badge === "oferta" && (
                 <span className="text-[10px] font-bold text-[#E4002B] bg-red-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
                   Oferta
                 </span>
