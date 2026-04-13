@@ -125,8 +125,7 @@ export default function JoybeesGroupedCard({
                   key={imageStatus}
                   src={group.image_url}
                   alt={group.name}
-                  width={300}
-                  height={300}
+                  fill
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   className="object-contain p-3"
                   onLoad={() => setImageStatus("loaded")}

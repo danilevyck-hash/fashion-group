@@ -134,8 +134,7 @@ export default function JoybeesProductCard({
                   key={imageStatus}
                   src={product.image_url}
                   alt={product.name}
-                  width={300}
-                  height={300}
+                  fill
                   sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                   className="object-contain p-3"
                   onLoad={() => setImageStatus("loaded")}

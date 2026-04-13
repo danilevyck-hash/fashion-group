@@ -79,6 +79,10 @@ export function groupByModel(products: JoybeesProduct[]): GroupedProduct[] {
           genderLabel: getGenderLabel(parsed.suffix, p.gender),
           suffix: parsed.suffix,
         });
+        // If group had no image but this variant does, use it
+        if (!existing.image_url && p.image_url) {
+          existing.image_url = p.image_url;
+        }
         continue;
       }
 

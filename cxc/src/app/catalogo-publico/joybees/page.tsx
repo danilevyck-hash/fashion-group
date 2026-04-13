@@ -36,8 +36,6 @@ function PublicJoybeesCatalog() {
   const [sortBy, setSortBy] = useState("relevancia");
   const [toast, setToast] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 24;
 
   // Cart
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -82,11 +80,9 @@ function PublicJoybeesCatalog() {
 
   // Debounced search
   useEffect(() => {
-    const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
+    const t = setTimeout(() => { setSearch(searchInput); }, 300);
     return () => clearTimeout(t);
   }, [searchInput]);
-
-  useEffect(() => { setPage(1); }, [gender, category, sortBy]);
 
   // Sync filters to URL
   useEffect(() => {
@@ -141,12 +137,10 @@ function PublicJoybeesCatalog() {
     });
 
   const isGrouped = sortBy === "relevancia";
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const cartMap = new Map(cart.map(i => [i.product_id, i.quantity]));
 
   // Group products by model (merge gender variants)
-  const groupedProducts = groupByModel(paginated);
+  const groupedProducts = groupByModel(filtered);
 
   type CatGroup = { label: string; items: GroupedProduct[] };
   const groups: CatGroup[] = [];
@@ -288,27 +282,6 @@ function PublicJoybeesCatalog() {
         />
 
         {loading ? skeletonGrid : filtered.length === 0 ? emptyState : productGrid}
-
-        {/* Pagination */}
-        {!loading && totalPages > 1 && (
-          <div className="flex items-center justify-center gap-3 mt-8 mb-4">
-            <button
-              onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-              disabled={page === 1}
-              className="text-xs font-semibold uppercase tracking-wider text-[#404041] px-4 py-2.5 rounded-lg border border-[#404041]/15 hover:border-[#404041]/30 transition disabled:opacity-25 disabled:cursor-not-allowed min-h-[44px]"
-            >
-              &larr; Anterior
-            </button>
-            <span className="text-xs text-[#404041]/35 tabular-nums font-medium">{page} / {totalPages}</span>
-            <button
-              onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-              disabled={page === totalPages}
-              className="text-xs font-semibold uppercase tracking-wider text-[#404041] px-4 py-2.5 rounded-lg border border-[#404041]/15 hover:border-[#404041]/30 transition disabled:opacity-25 disabled:cursor-not-allowed min-h-[44px]"
-            >
-              Siguiente &rarr;
-            </button>
-          </div>
-        )}
 
         <Toast message={toast} />
 

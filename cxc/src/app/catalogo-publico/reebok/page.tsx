@@ -37,8 +37,6 @@ function PublicCatalog() {
   const [sortBy, setSortBy] = useState("relevancia");
   const [toast, setToast] = useState<string | null>(null);
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const [page, setPage] = useState(1);
-  const PAGE_SIZE = 24;
 
   // Cart state
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -85,11 +83,9 @@ function PublicCatalog() {
 
   // Debounced search
   useEffect(() => {
-    const t = setTimeout(() => { setSearch(searchInput); setPage(1); }, 300);
+    const t = setTimeout(() => { setSearch(searchInput); }, 300);
     return () => clearTimeout(t);
   }, [searchInput]);
-
-  useEffect(() => { setPage(1); }, [gender, category, saleFilter, sortBy]);
 
   // Sync filters to URL
   useEffect(() => {
@@ -158,14 +154,12 @@ function PublicCatalog() {
     });
 
   const isGrouped = sortBy === "relevancia";
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const cartMap = new Map(cart.map(i => [i.product_id, i.quantity]));
 
   type Group = { label: string; items: typeof filtered };
   const groups: Group[] = [];
   let lastKey = "";
-  for (const p of paginated) {
+  for (const p of filtered) {
     const key = `${p.category}|${p.gender || "unisex"}`;
     if (key !== lastKey) {
       groups.push({ label: `${catLabel[p.category] || p.category} — ${genLabel[p.gender || "unisex"] || p.gender}`, items: [] });
@@ -286,7 +280,7 @@ function PublicCatalog() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-          {paginated.map(p => (
+          {filtered.map(p => (
             <CatalogProductCard
               key={p.id}
               product={p}
@@ -320,27 +314,6 @@ function PublicCatalog() {
         />
 
         {loading ? skeletonGrid : filtered.length === 0 ? emptyState : productGrid}
-
-        {/* Pagination */}
-        {!loading && totalPages > 1 && (
-          <div className="flex items-center justify-center gap-3 mt-8 mb-4">
-            <button
-              onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-              disabled={page === 1}
-              className="text-xs font-semibold uppercase tracking-wider text-[#1A2656] px-4 py-2.5 rounded-lg border border-[#1A2656]/15 hover:border-[#1A2656]/30 transition disabled:opacity-25 disabled:cursor-not-allowed min-h-[44px]"
-            >
-              &larr; Anterior
-            </button>
-            <span className="text-xs text-[#1A2656]/35 tabular-nums font-medium">{page} / {totalPages}</span>
-            <button
-              onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-              disabled={page === totalPages}
-              className="text-xs font-semibold uppercase tracking-wider text-[#1A2656] px-4 py-2.5 rounded-lg border border-[#1A2656]/15 hover:border-[#1A2656]/30 transition disabled:opacity-25 disabled:cursor-not-allowed min-h-[44px]"
-            >
-              Siguiente &rarr;
-            </button>
-          </div>
-        )}
 
         <Toast message={toast} />
 
