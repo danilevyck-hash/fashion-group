@@ -22,10 +22,11 @@ export default function JoybeesFilters({
 }: JoybeesFiltersProps) {
   const genderOptions = [
     { value: "", label: "Todos" },
-    { value: "adults_m", label: "Adults" },
-    { value: "women", label: "Women" },
+    { value: "mujer", label: "Mujer" },
+    { value: "hombre", label: "Hombre" },
+    { value: "adultos", label: "Adultos" },
     { value: "kids", label: "Kids" },
-    { value: "junior", label: "Junior" },
+    { value: "accesorios", label: "Accesorios" },
   ];
 
   const categoryOptions = [

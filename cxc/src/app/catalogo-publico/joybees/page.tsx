@@ -6,8 +6,9 @@ import { JoybeesProduct } from "@/components/joybees/JoybeesProductCard";
 import { Toast } from "@/components/ui";
 import JoybeesHeader from "@/components/joybees/JoybeesHeader";
 import JoybeesFilters from "@/components/joybees/JoybeesFilters";
-import JoybeesProductCard from "@/components/joybees/JoybeesProductCard";
+import JoybeesGroupedCard from "@/components/joybees/JoybeesGroupedCard";
 import JoybeesStickyCartBar from "@/components/joybees/JoybeesStickyCartBar";
+import { groupByModel, getDisplaySection, DisplaySection, SECTION_ORDER, SECTION_LABELS, GroupedProduct } from "@/components/joybees/groupByModel";
 
 const BULTO_SIZE = 12;
 
@@ -112,44 +113,55 @@ function PublicJoybeesCatalog() {
     load();
   }, []);
 
-  // Derived
-  const GENDER_LABELS: Record<string, string> = {
-    women: "Mujer", adults_m: "Hombre", adults: "Adultos", kids: "Kids", accessories: "Accesorios",
-  };
-  const GENDER_ORDER: Record<string, number> = {
-    women: 0, adults_m: 1, adults: 2, kids: 3, accessories: 4,
-  };
-  const filtered = products
-    .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()))
-    .filter(p => !gender || p.gender === gender)
-    .filter(p => !category || p.category === category)
-    .sort((a, b) => {
-      if (sortBy === "precio-asc") return (a.price || 0) - (b.price || 0);
-      if (sortBy === "precio-desc") return (b.price || 0) - (a.price || 0);
-      if (sortBy === "nombre-az") return a.name.localeCompare(b.name);
-      // Default: gender first, then model name
-      const ga = (GENDER_ORDER[a.gender] ?? 99) - (GENDER_ORDER[b.gender] ?? 99);
-      if (ga !== 0) return ga;
-      return a.name.localeCompare(b.name);
-    });
+  // Derived: group by model first, then assign display sections
+  const allGrouped = groupByModel(
+    products.filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase()))
+      .filter(p => !category || p.category === category)
+  );
+
+  // Assign display section to each group
+  const groupsWithSection = allGrouped.map(g => ({
+    group: g,
+    section: getDisplaySection(g),
+  }));
+
+  // Filter by selected gender (which is now a display section value)
+  const filteredGroups = groupsWithSection.filter(gs => !gender || gs.section === gender);
+
+  // Sort groups
+  const sortedGroups = [...filteredGroups].sort((a, b) => {
+    if (sortBy === "precio-asc") return (a.group.price || 0) - (b.group.price || 0);
+    if (sortBy === "precio-desc") return (b.group.price || 0) - (a.group.price || 0);
+    if (sortBy === "nombre-az") return a.group.name.localeCompare(b.group.name);
+    // Default: section order, then name
+    const sa = (SECTION_ORDER[a.section] ?? 99) - (SECTION_ORDER[b.section] ?? 99);
+    if (sa !== 0) return sa;
+    return a.group.name.localeCompare(b.group.name);
+  });
 
   const isGrouped = sortBy === "relevancia";
   const cartMap = new Map(cart.map(i => [i.product_id, i.quantity]));
 
-  // Section by gender
-  type GenderGroup = { label: string; items: JoybeesProduct[] };
-  const groups: GenderGroup[] = [];
-  let lastGender = "";
-  for (const p of filtered) {
-    if (p.gender !== lastGender) {
-      groups.push({
-        label: GENDER_LABELS[p.gender] || p.gender,
-        items: [],
-      });
-      lastGender = p.gender;
+  // Build sections for grouped display
+  type SectionGroup = { label: string; section: DisplaySection; items: GroupedProduct[] };
+  const sections: SectionGroup[] = [];
+  if (isGrouped) {
+    for (const gs of sortedGroups) {
+      const last = sections[sections.length - 1];
+      if (last && last.section === gs.section) {
+        last.items.push(gs.group);
+      } else {
+        sections.push({
+          label: SECTION_LABELS[gs.section],
+          section: gs.section,
+          items: [gs.group],
+        });
+      }
     }
-    groups[groups.length - 1].items.push(p);
   }
+
+  // Flat count for display
+  const filteredCount = sortedGroups.length;
 
   const fmt = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -220,21 +232,21 @@ function PublicJoybeesCatalog() {
     <div className={`${cartCount > 0 ? "pb-28" : ""}`}>
       {isGrouped ? (
         <div className="space-y-8">
-          {groups.map(g => (
-            <div key={g.label}>
+          {sections.map(s => (
+            <div key={s.section}>
               <div className="flex items-center gap-3 mb-4">
                 <h2 className="text-xs font-bold uppercase tracking-wider text-[#404041]">
-                  {g.label}
+                  {s.label}
                 </h2>
                 <div className="flex-1 h-px bg-[#404041]/10" />
-                <span className="text-[11px] text-[#404041]/25 tabular-nums">{g.items.length}</span>
+                <span className="text-[11px] text-[#404041]/25 tabular-nums">{s.items.length}</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-                {g.items.map(p => (
-                  <JoybeesProductCard
-                    key={p.id}
-                    product={p}
-                    qty={cartMap.get(p.id) || 0}
+                {s.items.map(g => (
+                  <JoybeesGroupedCard
+                    key={g.baseSku}
+                    group={g}
+                    cartMap={cartMap}
                     onQtyChange={handleQtyChange}
                   />
                 ))}
@@ -244,11 +256,11 @@ function PublicJoybeesCatalog() {
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
-          {filtered.map(p => (
-            <JoybeesProductCard
-              key={p.id}
-              product={p}
-              qty={cartMap.get(p.id) || 0}
+          {sortedGroups.map(gs => (
+            <JoybeesGroupedCard
+              key={gs.group.baseSku}
+              group={gs.group}
+              cartMap={cartMap}
               onQtyChange={handleQtyChange}
             />
           ))}
@@ -271,11 +283,11 @@ function PublicJoybeesCatalog() {
           onCategoryChange={setCategory}
           sortBy={sortBy}
           onSortByChange={setSortBy}
-          filteredCount={filtered.length}
+          filteredCount={filteredCount}
           onClearAll={handleClearAll}
         />
 
-        {loading ? skeletonGrid : filtered.length === 0 ? emptyState : productGrid}
+        {loading ? skeletonGrid : filteredCount === 0 ? emptyState : productGrid}
 
         <Toast message={toast} />
 

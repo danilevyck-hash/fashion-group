@@ -127,3 +127,48 @@ export function groupByModel(products: JoybeesProduct[]): GroupedProduct[] {
 
   return order.map(k => map.get(k)!);
 }
+
+export type DisplaySection = "mujer" | "hombre" | "adultos" | "kids" | "accesorios";
+
+const SECTION_ORDER: Record<DisplaySection, number> = {
+  mujer: 0,
+  hombre: 1,
+  adultos: 2,
+  kids: 3,
+  accesorios: 4,
+};
+
+const SECTION_LABELS: Record<DisplaySection, string> = {
+  mujer: "Mujer",
+  hombre: "Hombre",
+  adultos: "Adultos",
+  kids: "Kids",
+  accesorios: "Accesorios",
+};
+
+/**
+ * Determines the display section for a grouped product based on the
+ * gender field of its variants.
+ */
+export function getDisplaySection(group: GroupedProduct): DisplaySection {
+  const genders = new Set(group.variants.map(v => v.product.gender));
+
+  // If both adults_m and women exist → adultos (unisex grouped pair)
+  if (genders.has("adults_m") && genders.has("women")) return "adultos";
+
+  // Single-gender groups
+  if (genders.size === 1) {
+    const g = [...genders][0];
+    if (g === "women") return "mujer";
+    if (g === "adults_m") return "hombre";
+    if (g === "adults") return "adultos";
+    if (g === "kids") return "kids";
+    if (g === "accessories") return "accesorios";
+  }
+
+  // Fallback: if mixed kids/junior → kids, otherwise adultos
+  if (genders.has("kids")) return "kids";
+  return "adultos";
+}
+
+export { SECTION_ORDER, SECTION_LABELS };
