@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import Image from "next/image";
 import Link from "next/link";
+import { validateCsvImport, type CsvImportRow } from "@/lib/csv-import-validator";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -465,11 +466,12 @@ function ImportSection({
   onImportComplete: () => Promise<void>;
   accentColor: string;
 }) {
-  const [parsed, setParsed] = useState<ImportRow[] | null>(null);
+  const [parsed, setParsed] = useState<CsvImportRow[] | null>(null);
   const [preview, setPreview] = useState<{ updated: number; created: number; zeroed: number } | null>(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ updated: number; created: number; zeroed: number } | null>(null);
-  const [duplicateErrors, setDuplicateErrors] = useState<{ sku: string; lines: number[]; quantities: number[] }[]>([]);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -498,94 +500,26 @@ function ImportSection({
     setImportResult(null);
     setParsed(null);
     setPreview(null);
-    setDuplicateErrors([]);
+    setValidationErrors([]);
+    setValidationWarnings([]);
 
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
         const text = e.target?.result as string;
-        const json = parseCSV(text);
+        const existingSkus = new Set(companyProducts.map((p) => p.sku).filter(Boolean) as string[]);
+        const result = validateCsvImport(text, existingSkus);
 
-        if (json.length === 0) {
-          showToast("El archivo esta vacio");
-          return;
+        setValidationErrors(result.errors);
+        setValidationWarnings(result.warnings);
+
+        if (result.rows.length > 0) {
+          setParsed(result.rows);
         }
 
-        const rows: ImportRow[] = json.map((row) => {
-          const sku = String(row["SKU"] || row["sku"] || "").trim();
-          const name = String(row["Nombre"] || row["nombre"] || row["Name"] || "").trim();
-          const price = parseFloat(String(row["Precio"] || row["precio"] || row["Price"] || "0")) || 0;
-          const quantity = parseInt(String(row["Cantidad"] || row["cantidad"] || row["Qty"] || row["Stock"] || "0")) || 0;
-          const gender = String(row["Genero"] || row["genero"] || row["Gender"] || "").trim();
-          const estado = String(row["Estado"] || row["estado"] || "").trim();
-          const badge = estado.toLowerCase() === "nuevo" ? "nuevo" : estado.toLowerCase() === "oferta" ? "oferta" : "";
-          return { sku, name: name || sku, price, quantity, gender, badge };
-        }).filter((r) => r.sku);
-
-        if (rows.length === 0) {
-          showToast("No se encontraron filas con SKU valido");
-          return;
+        if (result.errors.length === 0 && result.summary) {
+          setPreview({ updated: result.summary.update, created: result.summary.create, zeroed: result.summary.zero });
         }
-
-        // Duplicate SKU detection
-        const skuOccurrences = new Map<string, { lines: number[]; quantities: number[] }>();
-        rows.forEach((r, idx) => {
-          const entry = skuOccurrences.get(r.sku);
-          if (entry) {
-            entry.lines.push(idx + 2); // +2 for 1-based + header
-            entry.quantities.push(r.quantity);
-          } else {
-            skuOccurrences.set(r.sku, { lines: [idx + 2], quantities: [r.quantity] });
-          }
-        });
-
-        const dupes: { sku: string; lines: number[]; quantities: number[] }[] = [];
-        const deduped: ImportRow[] = [];
-        const seen = new Set<string>();
-
-        for (const [sku, info] of skuOccurrences) {
-          if (info.lines.length > 1) {
-            // Check if all occurrences have the same data
-            const allSame = info.quantities.every((q) => q === info.quantities[0]);
-            if (!allSame) {
-              dupes.push({ sku, lines: info.lines, quantities: info.quantities });
-            }
-          }
-        }
-
-        // Deduplicate: keep first occurrence of each SKU
-        for (const r of rows) {
-          if (!seen.has(r.sku)) {
-            seen.add(r.sku);
-            deduped.push(r);
-          }
-        }
-
-        setDuplicateErrors(dupes);
-
-        if (dupes.length > 0) {
-          setParsed(deduped);
-          setPreview(null);
-          return;
-        }
-
-        const existingSkus = new Set(companyProducts.map((p) => p.sku));
-        const incomingSkus = new Set(deduped.map((r) => r.sku));
-
-        let updated = 0;
-        let created = 0;
-        let zeroed = 0;
-
-        for (const r of deduped) {
-          if (existingSkus.has(r.sku)) updated++;
-          else created++;
-        }
-        for (const sku of existingSkus) {
-          if (sku && !incomingSkus.has(sku)) zeroed++;
-        }
-
-        setParsed(deduped);
-        setPreview({ updated, created, zeroed });
       } catch {
         showToast("Error al leer el archivo");
       }
@@ -671,23 +605,20 @@ function ImportSection({
         }}
       />
 
-      {/* Duplicate SKU errors */}
-      {duplicateErrors.length > 0 && (
+      {/* Validation errors (critical — block import) */}
+      {validationErrors.length > 0 && (
         <div className="mt-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
-          <p className="text-sm font-semibold text-red-800 mb-2">Error: SKUs duplicados con datos diferentes</p>
-          <ul className="space-y-1">
-            {duplicateErrors.map((d) => (
-              <li key={d.sku} className="text-xs text-red-700">
-                SKU <span className="font-mono font-semibold">{d.sku}</span> aparece {d.lines.length} veces con cantidades diferentes
-                <span className="text-red-500 ml-1">
-                  (lineas {d.lines.join(", ")} — cantidades: {d.quantities.join(", ")})
-                </span>
-              </li>
+          <p className="text-sm font-semibold text-red-800 mb-2">
+            {validationErrors.length} error{validationErrors.length !== 1 ? "es" : ""} encontrado{validationErrors.length !== 1 ? "s" : ""}
+          </p>
+          <ul className="space-y-1 max-h-48 overflow-y-auto">
+            {validationErrors.map((err, i) => (
+              <li key={i} className="text-xs text-red-700">{err}</li>
             ))}
           </ul>
           <p className="text-xs text-red-600 mt-2">Corrige el archivo antes de importar.</p>
           <button
-            onClick={() => { setParsed(null); setPreview(null); setDuplicateErrors([]); }}
+            onClick={() => { setParsed(null); setPreview(null); setValidationErrors([]); setValidationWarnings([]); }}
             className="mt-2 px-3 py-1.5 text-xs text-red-700 border border-red-300 rounded-md hover:bg-red-100 transition"
           >
             Cerrar
@@ -695,8 +626,29 @@ function ImportSection({
         </div>
       )}
 
+      {/* Validation warnings (allow import) */}
+      {validationWarnings.length > 0 && validationErrors.length === 0 && (
+        <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+          <p className="text-sm font-semibold text-amber-800 mb-2">
+            {validationWarnings.length} advertencia{validationWarnings.length !== 1 ? "s" : ""}
+          </p>
+          <ul className="space-y-1 max-h-48 overflow-y-auto">
+            {validationWarnings.map((w, i) => (
+              <li key={i} className="text-xs text-amber-700">{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* All good message */}
+      {parsed && validationErrors.length === 0 && validationWarnings.length === 0 && preview && (
+        <div className="mt-4 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
+          <p className="text-sm font-medium text-green-800">Todo bien — sin errores ni advertencias</p>
+        </div>
+      )}
+
       {/* Preview */}
-      {preview && parsed && duplicateErrors.length === 0 && (
+      {preview && parsed && validationErrors.length === 0 && (
         <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden">
           <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
             <p className="text-sm font-medium text-gray-700">Vista previa</p>
