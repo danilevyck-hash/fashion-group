@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
 
 export interface JoybeesProduct {
   id: string;
@@ -130,13 +129,12 @@ export default function JoybeesProductCard({
                   </button>
                 </div>
               ) : (
-                <Image
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
                   key={imageStatus}
                   src={product.image_url}
                   alt={product.name}
-                  fill
-                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                  className="object-contain p-3"
+                  className="w-full h-full object-cover"
                   onLoad={() => setImageStatus("loaded")}
                   onError={() => setImageStatus("error")}
                 />
