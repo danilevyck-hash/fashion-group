@@ -406,6 +406,7 @@ function ImportSection({
   const [preview, setPreview] = useState<{ updated: number; created: number; zeroed: number } | null>(null);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ updated: number; created: number; zeroed: number } | null>(null);
+  const [duplicateErrors, setDuplicateErrors] = useState<{ sku: string; lines: number[]; quantities: number[] }[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -426,6 +427,7 @@ function ImportSection({
     setImportResult(null);
     setParsed(null);
     setPreview(null);
+    setDuplicateErrors([]);
 
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -454,14 +456,55 @@ function ImportSection({
           return;
         }
 
+        // Duplicate SKU detection
+        const skuOccurrences = new Map<string, { lines: number[]; quantities: number[] }>();
+        rows.forEach((r, idx) => {
+          const entry = skuOccurrences.get(r.sku);
+          if (entry) {
+            entry.lines.push(idx + 2); // +2 for 1-based + header
+            entry.quantities.push(r.stock);
+          } else {
+            skuOccurrences.set(r.sku, { lines: [idx + 2], quantities: [r.stock] });
+          }
+        });
+
+        const dupes: { sku: string; lines: number[]; quantities: number[] }[] = [];
+        const deduped: ImportRow[] = [];
+        const seen = new Set<string>();
+
+        for (const [sku, info] of skuOccurrences) {
+          if (info.lines.length > 1) {
+            const allSame = info.quantities.every((q) => q === info.quantities[0]);
+            if (!allSame) {
+              dupes.push({ sku, lines: info.lines, quantities: info.quantities });
+            }
+          }
+        }
+
+        // Deduplicate: keep first occurrence of each SKU
+        for (const r of rows) {
+          if (!seen.has(r.sku)) {
+            seen.add(r.sku);
+            deduped.push(r);
+          }
+        }
+
+        setDuplicateErrors(dupes);
+
+        if (dupes.length > 0) {
+          setParsed(deduped);
+          setPreview(null);
+          return;
+        }
+
         const existingSkus = new Set(products.map((p) => p.sku));
-        const incomingSkus = new Set(rows.map((r) => r.sku));
+        const incomingSkus = new Set(deduped.map((r) => r.sku));
 
         let updated = 0;
         let created = 0;
         let zeroed = 0;
 
-        for (const r of rows) {
+        for (const r of deduped) {
           if (existingSkus.has(r.sku)) updated++;
           else created++;
         }
@@ -469,7 +512,7 @@ function ImportSection({
           if (!incomingSkus.has(sku)) zeroed++;
         }
 
-        setParsed(rows);
+        setParsed(deduped);
         setPreview({ updated, created, zeroed });
       } catch {
         showToast("Error al leer el archivo");
@@ -555,8 +598,32 @@ function ImportSection({
         }}
       />
 
+      {/* Duplicate SKU errors */}
+      {duplicateErrors.length > 0 && (
+        <div className="mt-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3">
+          <p className="text-sm font-semibold text-red-800 mb-2">Error: SKUs duplicados con datos diferentes</p>
+          <ul className="space-y-1">
+            {duplicateErrors.map((d) => (
+              <li key={d.sku} className="text-xs text-red-700">
+                SKU <span className="font-mono font-semibold">{d.sku}</span> aparece {d.lines.length} veces con cantidades diferentes
+                <span className="text-red-500 ml-1">
+                  (lineas {d.lines.join(", ")} — cantidades: {d.quantities.join(", ")})
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-red-600 mt-2">Corrige el archivo antes de importar.</p>
+          <button
+            onClick={() => { setParsed(null); setPreview(null); setDuplicateErrors([]); }}
+            className="mt-2 px-3 py-1.5 text-xs text-red-700 border border-red-300 rounded-md hover:bg-red-100 transition"
+          >
+            Cerrar
+          </button>
+        </div>
+      )}
+
       {/* Preview */}
-      {preview && parsed && (
+      {preview && parsed && duplicateErrors.length === 0 && (
         <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden">
           <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
             <p className="text-sm font-medium text-gray-700">Vista previa</p>
