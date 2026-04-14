@@ -22,8 +22,7 @@ function GuiaDeleteModal({
   onConfirm: () => void;
 }) {
   const [input, setInput] = useState("");
-  const expectedValue = String(guiaNumero);
-  const matches = input.trim() === expectedValue;
+  const matches = input.trim().toUpperCase() === "ELIMINAR";
 
   // Reset input when modal opens/closes
   useEffect(() => {
@@ -45,14 +44,14 @@ function GuiaDeleteModal({
       <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-base font-semibold mb-1">Eliminar guia</h3>
         <p className="text-sm text-gray-500 mb-4">
-          Esta accion no se puede deshacer. Para confirmar, escribe el numero de la guia: <span className="font-semibold text-black">{guiaNumero}</span>
+          Esta acción no se puede deshacer. Para confirmar, escribe <span className="font-semibold text-black">ELIMINAR</span>
         </p>
         <input
           type="text"
           inputMode="numeric"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={`Escribe ${guiaNumero} para confirmar`}
+          placeholder="Escribe ELIMINAR para confirmar"
           className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition mb-4"
           autoFocus
         />
