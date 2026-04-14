@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function getSupabase() {
   return createClient(
@@ -25,5 +26,8 @@ export async function GET() {
     return NextResponse.json({ error: "Error al cargar productos" }, { status: 500 });
   }
 
-  return NextResponse.json({ products: products || [] });
+  return NextResponse.json(
+    { products: products || [] },
+    { headers: { "Cache-Control": "no-store, no-cache, must-revalidate", "CDN-Cache-Control": "no-store" } }
+  );
 }
