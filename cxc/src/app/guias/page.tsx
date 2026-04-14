@@ -1,14 +1,77 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { ConfirmModal, Toast, PullToRefresh } from "@/components/ui";
+import { Toast, PullToRefresh } from "@/components/ui";
 import { useGuiasState } from "./components/useGuiasState";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import GuiasList from "./components/GuiasList";
 import GuiaForm from "./components/GuiaForm";
 import GuiaDetail from "./components/GuiaDetail";
+
+function GuiaDeleteModal({
+  open,
+  guiaNumero,
+  onClose,
+  onConfirm,
+}: {
+  open: boolean;
+  guiaNumero: number;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const [input, setInput] = useState("");
+  const expectedValue = String(guiaNumero);
+  const matches = input.trim() === expectedValue;
+
+  // Reset input when modal opens/closes
+  useEffect(() => {
+    if (open) setInput("");
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-semibold mb-1">Eliminar guia</h3>
+        <p className="text-sm text-gray-500 mb-4">
+          Esta accion no se puede deshacer. Para confirmar, escribe el numero de la guia: <span className="font-semibold text-black">{guiaNumero}</span>
+        </p>
+        <input
+          type="text"
+          inputMode="numeric"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder={`Escribe ${guiaNumero} para confirmar`}
+          className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition mb-4"
+          autoFocus
+        />
+        <div className="flex gap-3">
+          <button
+            onClick={onConfirm}
+            disabled={!matches}
+            className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition-all bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] disabled:opacity-40 min-h-[44px]"
+          >
+            Eliminar
+          </button>
+          <button onClick={onClose} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 active:bg-gray-100 transition-all min-h-[44px]">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function GuiasPage() {
   const { authChecked, role } = useAuth({
@@ -92,14 +155,15 @@ export default function GuiasPage() {
           onDelete={s.requestDeleteGuia}
           onReject={s.rejectGuia}
         />
-        <ConfirmModal
+        <GuiaDeleteModal
           open={!!s.confirmDeleteId}
+          guiaNumero={(() => {
+            if (!s.confirmDeleteId) return 0;
+            const g = s.guias.find(g => g.id === s.confirmDeleteId);
+            return g?.numero ?? 0;
+          })()}
           onClose={() => s.setConfirmDeleteId(null)}
           onConfirm={s.confirmDeleteGuia}
-          title="Eliminar guía"
-          message="Esta acción no se puede deshacer."
-          confirmLabel="Eliminar"
-          destructive
         />
         <Toast message={s.toast} />
       </div>
