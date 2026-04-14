@@ -255,8 +255,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     await logActivity(session?.role || "unknown", estado ? "guia_dispatch" : "guia_edit", "guias", { guiaId: id, changes }, session?.userName);
   }
 
-  // Send email with PDF for BOTH dispatch flows
-  if (estado && data) {
+  // Send email with PDF only when transitioning TO Completada (not if already was)
+  if (estado === "Completada" && previous?.estado !== "Completada" && data) {
     await sendDispatchEmail(data as GuiaEmail, session?.userName || session?.role || "sistema");
   }
 
@@ -291,11 +291,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const session = getSession(req);
   await logActivity(session?.role || "unknown", "guia_patch", "guias", { guiaId: params.id, fields: Object.keys(update) }, session?.userName);
 
-  const { data: updated, error } = await supabaseServer.from("guia_transporte").update(update).eq("id", params.id).select("id").maybeSingle();
+  // If setting to Completada, add condition to prevent race: only update if NOT already Completada
+  let query = supabaseServer.from("guia_transporte").update(update).eq("id", params.id);
+  if (body.estado === "Completada") {
+    query = query.neq("estado", "Completada");
+  }
+  const { data: updated, error } = await query.select("id").maybeSingle();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!updated) return NextResponse.json({ error: "Guía no encontrada o sin cambios" }, { status: 404 });
+  if (!updated) return NextResponse.json({ error: "Guía no encontrada o ya fue despachada" }, { status: 404 });
 
-  // Send email with PDF if dispatched
+  // Send email with PDF only if we actually transitioned to Completada
   if (body.estado === "Completada") {
     const { data: guia } = await supabaseServer.from("guia_transporte").select("*, guia_items(*)").eq("id", params.id).single();
     if (guia) {
