@@ -37,7 +37,6 @@ interface Cheque {
   created_at: string;
 }
 
-const BANCOS = ["Banistmo", "BAC", "General", "Global", "Multibank", "Otro"];
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
@@ -135,7 +134,6 @@ function ChequesPage() {
   // Form fields
   const [fCliente, setFCliente] = useState("");
   const [fEmpresa, setFEmpresa] = useState("");
-  const [fBanco, setFBanco] = useState("");
   const [fNumero, setFNumero] = useState("");
   const [fMonto, setFMonto] = useState("");
   const [fFecha, setFFecha] = useState(todayStr());
@@ -152,17 +150,16 @@ function ChequesPage() {
 
   // Draft auto-save for new cheque form
   const chequeDraftData = useMemo(() => ({
-    cliente: fCliente, empresa: fEmpresa, banco: fBanco, numero: fNumero, monto: fMonto, fecha: fFecha,
-  }), [fCliente, fEmpresa, fBanco, fNumero, fMonto, fFecha]);
+    cliente: fCliente, empresa: fEmpresa, numero: fNumero, monto: fMonto, fecha: fFecha,
+  }), [fCliente, fEmpresa, fNumero, fMonto, fFecha]);
   const isChequeDraftEmpty = useCallback((d: typeof chequeDraftData) => {
-    return !d.cliente && !d.empresa && !d.banco && !d.numero && !d.monto;
+    return !d.cliente && !d.empresa && !d.numero && !d.monto;
   }, []);
   const { draft: chequeDraft, hasDraft: hasChequeDraft, clearDraft: clearChequeDraft, draftTimeAgo: chequeDraftTimeAgo } = useDraftAutoSave("cheque", chequeDraftData, isChequeDraftEmpty);
   function restoreChequeDraft() {
     if (!chequeDraft) return;
     setFCliente(chequeDraft.cliente || "");
     setFEmpresa(chequeDraft.empresa || "");
-    setFBanco(chequeDraft.banco || "");
     setFNumero(chequeDraft.numero || "");
     setFMonto(chequeDraft.monto || "");
     setFFecha(chequeDraft.fecha || todayStr());
@@ -340,19 +337,19 @@ function ChequesPage() {
   if (!authChecked) return null;
 
   function resetForm() {
-    setFCliente(""); setFEmpresa(""); setFBanco(""); setFNumero(""); setFMonto(""); setFFecha(todayStr()); setFNotas(""); setFWhatsapp(""); setEditingId(null); setEditingEstado(null); setError(null); setTouchedCheque({});
+    setFCliente(""); setFEmpresa(""); setFNumero(""); setFMonto(""); setFFecha(todayStr()); setFNotas(""); setFWhatsapp(""); setEditingId(null); setEditingEstado(null); setError(null); setTouchedCheque({});
   }
 
   function startEdit(c: Cheque) {
-    setFCliente(c.cliente); setFEmpresa(c.empresa); setFBanco(c.banco); setFNumero(c.numero_cheque);
+    setFCliente(c.cliente); setFEmpresa(c.empresa); setFNumero(c.numero_cheque);
     setFMonto(String(c.monto)); setFFecha(c.fecha_deposito); setFNotas(c.notas); setFWhatsapp(c.whatsapp || ""); setEditingId(c.id); setEditingEstado(c.estado); setShowForm(true);
   }
 
   async function saveCheque() {
-    if (!fCliente || !fEmpresa || !fBanco || !fNumero || !fMonto || !fFecha) { setError("Completa todos los campos obligatorios."); return; }
+    if (!fCliente || !fEmpresa || !fNumero || !fMonto || !fFecha) { setError("Completa todos los campos obligatorios."); return; }
     if (parseFloat(fMonto) <= 0) { setError("El monto debe ser mayor a 0."); return; }
     setSaving(true); setError(null);
-    const body = { cliente: fCliente, empresa: fEmpresa, banco: fBanco, numero_cheque: fNumero, monto: parseFloat(fMonto), fecha_deposito: fFecha, notas: fNotas, whatsapp: fWhatsapp };
+    const body = { cliente: fCliente, empresa: fEmpresa, numero_cheque: fNumero, monto: parseFloat(fMonto), fecha_deposito: fFecha, notas: fNotas, whatsapp: fWhatsapp };
     try {
       const url = editingId ? `/api/cheques/${editingId}` : "/api/cheques";
       const method = editingId ? "PUT" : "POST";
@@ -548,11 +545,11 @@ function ChequesPage() {
     r++;
 
     // Header row — navy bg, white bold
-    const hdrs = ["Cliente", "Banco", "Nº Cheque", "Monto", "Fecha Depósito", "WhatsApp"];
+    const hdrs = ["Cliente", "Nº Cheque", "Monto", "Fecha Depósito", "WhatsApp"];
     hdrs.forEach((h, ci) => {
       ws[ec({ r, c: ci })] = {
         v: h, t: "s",
-        s: { font: { bold: true, sz: 10, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: "1B3A5C" } }, alignment: { horizontal: ci === 3 ? "right" : "left", vertical: "center" }, border: B },
+        s: { font: { bold: true, sz: 10, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: "1B3A5C" } }, alignment: { horizontal: ci === 2 ? "right" : "left", vertical: "center" }, border: B },
       };
     });
     heights[r] = 22;
@@ -567,11 +564,10 @@ function ChequesPage() {
       const cellS = (fg = "333333", sz = 10) => ({ font: { sz, color: { rgb: fg }, name: "Calibri" }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: "left" as const }, border: B });
 
       ws[ec({ r, c: 0 })] = { v: ch.cliente, t: "s", s: cellS("111111") };
-      ws[ec({ r, c: 1 })] = { v: ch.banco, t: "s", s: cellS("333333", 9) };
-      ws[ec({ r, c: 2 })] = { v: ch.numero_cheque, t: "s", s: cellS("333333", 9) };
-      ws[ec({ r, c: 3 })] = { v: ch.monto, t: "n", z: '"$"#,##0.00', s: { font: { sz: 10, color: { rgb: "333333" }, name: "Calibri" }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: "right" }, border: B } };
-      ws[ec({ r, c: 4 })] = { v: fmtDate(ch.fecha_deposito), t: "s", s: cellS("555555", 9) };
-      ws[ec({ r, c: 5 })] = { v: ch.whatsapp || "", t: "s", s: cellS("555555", 9) };
+      ws[ec({ r, c: 1 })] = { v: ch.numero_cheque, t: "s", s: cellS("333333", 9) };
+      ws[ec({ r, c: 2 })] = { v: ch.monto, t: "n", z: '"$"#,##0.00', s: { font: { sz: 10, color: { rgb: "333333" }, name: "Calibri" }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: "right" }, border: B } };
+      ws[ec({ r, c: 3 })] = { v: fmtDate(ch.fecha_deposito), t: "s", s: cellS("555555", 9) };
+      ws[ec({ r, c: 4 })] = { v: ch.whatsapp || "", t: "s", s: cellS("555555", 9) };
       totalMonto += Number(ch.monto) || 0;
       heights[r] = 18;
       r++;
@@ -582,11 +578,11 @@ function ChequesPage() {
     r++;
 
     // Totals row
-    for (let ci = 0; ci < 6; ci++) {
+    for (let ci = 0; ci < 5; ci++) {
       const topB = { ...B, top: { style: "medium", color: { rgb: "1B3A5C" } } };
-      if (ci === 2) {
+      if (ci === 1) {
         ws[ec({ r, c: ci })] = { v: "TOTAL", t: "s", s: { font: { bold: true, sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "EBF0F0" } }, alignment: { horizontal: "right" }, border: topB } };
-      } else if (ci === 3) {
+      } else if (ci === 2) {
         ws[ec({ r, c: ci })] = { v: totalMonto, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "EBF0F0" } }, alignment: { horizontal: "right" }, border: topB } };
       } else {
         ws[ec({ r, c: ci })] = { v: "", t: "s", s: { font: { sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "EBF0F0" } }, border: topB } };
@@ -595,9 +591,9 @@ function ChequesPage() {
     heights[r] = 22;
     r++;
 
-    ws["!ref"] = `A1:F${r}`;
-    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } }];
-    ws["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 18 }];
+    ws["!ref"] = `A1:E${r}`;
+    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } }];
+    ws["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 18 }];
     ws["!rows"] = heights.map((h: number) => ({ hpt: h || 16 }));
 
     const wb = XLSX.utils.book_new();
@@ -762,14 +758,6 @@ function ChequesPage() {
                 {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
               </select>
               {chequeFieldError("empresa", fEmpresa) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Banco <span className="text-red-500">*</span></label>
-              <select value={fBanco} onChange={(e) => setFBanco(e.target.value)} onBlur={() => handleChequeBlur("banco")} className={`border-b ${chequeFieldError("banco", fBanco) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`}>
-                <option value="">Seleccionar...</option>
-                {BANCOS.map((b) => <option key={b} value={b}>{b}</option>)}
-              </select>
-              {chequeFieldError("banco", fBanco) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Cheque <span className="text-red-500">*</span></label>
@@ -982,7 +970,7 @@ function ChequesPage() {
                             {calPopover === c.id && (
                               <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg p-3 w-56" onClick={e => e.stopPropagation()}>
                                 <div className="text-xs font-medium mb-1">{c.cliente}</div>
-                                <div className="text-[11px] text-gray-500 mb-0.5">{c.banco} · {c.numero_cheque}</div>
+                                <div className="text-[11px] text-gray-500 mb-0.5">N° {c.numero_cheque}</div>
                                 <div className="text-sm font-semibold mb-2">${fmt(c.monto)}</div>
                                 <StatusBadge estado={ve} />
                                 {(ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido") && (
@@ -1151,10 +1139,9 @@ function ChequesPage() {
                     <span className="text-sm font-semibold tabular-nums">${fmt(c.monto)}</span>
                   </div>
                 </div>
-                {/* Row 2: Banco, fecha, status */}
+                {/* Row 2: fecha, status */}
                 <div className="flex items-center gap-2 mt-1.5">
                   <StatusBadge estado={ve} />
-                  <span className="text-xs text-gray-500 font-medium">{c.banco}</span>
                   <span className="text-xs text-gray-400 ml-auto">{fmtDate(c.fecha_deposito)}</span>
                 </div>
                 {/* Row 3: Secondary info */}
@@ -1203,7 +1190,7 @@ function ChequesPage() {
           const _df = filter === "depositado" ? "fecha_depositado" as keyof Cheque : "fecha_deposito" as keyof Cheque;
           const _cg = filter === "all" || filter === "pendiente" || filter === "depositado";
           const _tg = groupedView && _cg ? groupByTimePeriod(filtered, _df, _gm) : null;
-          const _th = (<thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500"><th className="text-left py-3 px-4 font-normal">Fecha Depósito</th><th className="text-left py-3 px-4 font-normal">Cliente</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell">Empresa</th><th className="text-left py-3 px-4 font-normal">Banco</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell">N° Cheque</th><th className="text-right py-3 px-4 font-normal">Monto</th><th className="text-left py-3 px-4 font-normal">Estado</th><th className="text-right py-3 px-4 font-normal"></th></tr></thead>);
+          const _th = (<thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500"><th className="text-left py-3 px-4 font-normal">Fecha Depósito</th><th className="text-left py-3 px-4 font-normal">Cliente</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell">Empresa</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell">N° Cheque</th><th className="text-right py-3 px-4 font-normal">Monto</th><th className="text-left py-3 px-4 font-normal">Estado</th><th className="text-right py-3 px-4 font-normal"></th></tr></thead>);
           const _rr = (c: Cheque) => {
               const ve = visualEstado(c);
               const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
@@ -1224,7 +1211,6 @@ function ChequesPage() {
                   <td className="py-3 px-4">{fmtDate(c.fecha_deposito)}</td>
                   <td className="py-3 px-4 font-medium">{c.cliente}</td>
                   <td className="py-3 px-4 text-gray-500 hidden lg:table-cell">{c.empresa}</td>
-                  <td className="py-3 px-4 text-gray-500">{c.banco}</td>
                   <td className="py-3 px-4 text-gray-500 hidden lg:table-cell">{c.numero_cheque}</td>
                   <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(c.monto)}</td>
                   <td className="py-3 px-4">
