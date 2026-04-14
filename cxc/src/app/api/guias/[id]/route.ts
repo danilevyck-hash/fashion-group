@@ -7,137 +7,6 @@ import { requireRole } from "@/lib/requireRole";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GUIAS_ROLES = ["admin", "secretaria", "bodega", "director", "vendedor"];
 
-// ── Shared: generate PDF + send email ──
-
-interface GuiaEmail {
-  numero: number;
-  fecha?: string;
-  transportista?: string;
-  placa?: string;
-  entregado_por?: string;
-  receptor_nombre?: string;
-  cedula?: string;
-  observaciones?: string;
-  numero_guia_transp?: string;
-  firma_base64?: string;
-  firma_entregador_base64?: string;
-  tipo_despacho?: string;
-  nombre_chofer?: string;
-  guia_items: { cliente: string; direccion?: string; empresa: string; bultos: number; facturas: string }[];
-}
-
-async function sendDispatchEmail(guia: GuiaEmail, dispatchedBy: string) {
-  try {
-    const { Resend } = await import("resend");
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const gi = guia.guia_items;
-    const totalB = gi.reduce((s, i) => s + (i.bultos || 0), 0);
-    const itemsHtml = gi.map(i => `• ${i.cliente} — ${i.empresa} — ${i.bultos} bultos — ${i.facturas}`).join("<br>");
-
-    // Generate PDF
-    let pdfBuffer: Buffer | null = null;
-    try {
-      const { jsPDF } = await import("jspdf");
-      const { default: autoTable } = await import("jspdf-autotable");
-      const doc = new jsPDF("portrait");
-      const W = 210;
-
-      doc.setFontSize(13); doc.setTextColor(26); doc.setFont("helvetica", "bold");
-      doc.text("GUÍA DE TRANSPORTE INTERIOR", W / 2, 16, { align: "center" });
-
-      doc.setFontSize(9); doc.setTextColor(60);
-      const hY = 26;
-      doc.setFont("helvetica", "bold"); doc.text("N° GUÍA:", 14, hY);
-      doc.setFont("helvetica", "normal"); doc.text(String(guia.numero), 42, hY);
-      doc.setFont("helvetica", "bold"); doc.text("FECHA:", 110, hY);
-      doc.setFont("helvetica", "normal"); doc.text(guia.fecha || "", 132, hY);
-
-      doc.setFont("helvetica", "bold"); doc.text("TRANSPORTISTA:", 14, hY + 7);
-      doc.setFont("helvetica", "normal"); doc.text(guia.transportista || "", 56, hY + 7);
-      doc.setFont("helvetica", "bold"); doc.text("PLACA:", 110, hY + 7);
-      doc.setFont("helvetica", "normal"); doc.text(guia.placa || "Sin placa", 132, hY + 7);
-
-      doc.setFont("helvetica", "bold"); doc.text("ENTREGADO POR:", 14, hY + 14);
-      doc.setFont("helvetica", "normal"); doc.text(guia.entregado_por || "", 56, hY + 14);
-
-      doc.setDrawColor(200); doc.line(14, hY + 19, W - 14, hY + 19);
-
-      autoTable(doc, {
-        startY: hY + 23,
-        head: [["#", "CLIENTE", "DIRECCIÓN", "EMPRESA", "FACTURA(S)", "BULTOS", "N° GUÍA TRANSP."]],
-        body: [
-          ...gi.map((it, idx) => [String(idx + 1), it.cliente, it.direccion || "", it.empresa, it.facturas, String(it.bultos), guia.numero_guia_transp || ""]),
-          [{ content: "TOTAL DE BULTOS DESPACHADOS", colSpan: 5, styles: { halign: "right" as const, fontStyle: "bold" as const } }, String(totalB), ""],
-        ],
-        styles: { fontSize: 8, cellPadding: 2, lineColor: [180, 180, 180], lineWidth: 0.2 },
-        headStyles: { fillColor: [240, 240, 240], textColor: [26, 26, 26], fontStyle: "bold" },
-        columnStyles: { 0: { cellWidth: 8 }, 5: { cellWidth: 14, halign: "center" }, 6: { cellWidth: 22 } },
-      });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let fy = (doc as any).lastAutoTable.finalY + 6;
-
-      doc.setFontSize(8); doc.setTextColor(26); doc.setFont("helvetica", "bold");
-      doc.text("OBSERVACIONES GENERALES DEL ENVÍO", 14, fy);
-      doc.setFont("helvetica", "normal");
-      doc.rect(14, fy + 2, W - 28, 12);
-      if (guia.observaciones) doc.text(guia.observaciones, 16, fy + 7, { maxWidth: W - 32 });
-      fy += 20;
-
-      const isDirect = guia.tipo_despacho === "directo";
-      doc.setFont("helvetica", "bold");
-      doc.text(isDirect ? "CHOFER" : "ENTREGADO POR", 14, fy);
-      doc.text(isDirect ? "RECIBIDO POR — CLIENTE" : "RECIBIDO CONFORME — TRANSPORTISTA", 110, fy);
-      fy += 6;
-      doc.setFont("helvetica", "normal");
-      doc.text(`NOMBRE: ${isDirect ? (guia.nombre_chofer || "________________") : (guia.entregado_por || "________________")}`, 14, fy);
-      if (!isDirect) doc.text(`PLACA: ${guia.placa || "________________"}`, 110, fy);
-      else doc.text(`NOMBRE: ${guia.receptor_nombre || "________________"}`, 110, fy);
-      fy += 5;
-      doc.text("FIRMA: ________________", 14, fy);
-      if (!isDirect) doc.text(`NOMBRE: ${guia.receptor_nombre || "________________"}`, 110, fy);
-      else doc.text(`CEDULA: ${guia.cedula || "________________"}`, 110, fy);
-      fy += 5;
-      doc.text("", 14, fy);
-      if (!isDirect) doc.text(`CEDULA: ${guia.cedula || "________________"}`, 110, fy);
-      else doc.text("FIRMA: ________________", 110, fy);
-      fy += 5;
-      if (!isDirect) {
-        doc.text("", 14, fy);
-        doc.text("FIRMA: ________________", 110, fy);
-      }
-
-      if (guia.firma_entregador_base64) {
-        try { doc.addImage(guia.firma_entregador_base64, "PNG", 14, fy - 12, 40, 15); } catch { /* */ }
-      }
-      if (guia.firma_base64) {
-        try { doc.addImage(guia.firma_base64, "PNG", 145, fy - (isDirect ? 12 : 7), 40, 15); } catch { /* */ }
-      }
-      fy += 12;
-
-      doc.setFontSize(6); doc.setTextColor(160);
-      doc.text("La firma del transportista constituye aceptación expresa de la mercancía detallada en este documento, en la cantidad y condición indicadas.", 14, fy, { maxWidth: W - 28 });
-      doc.text("Cualquier faltante o daño no reportado al momento de la recepción será responsabilidad exclusiva del transportista.", 14, fy + 4, { maxWidth: W - 28 });
-
-      pdfBuffer = Buffer.from(doc.output("arraybuffer"));
-    } catch { /* PDF failed */ }
-
-    const tipoLabel = guia.tipo_despacho === "directo" ? "Entrega directa" : "Transportista externo";
-    const emailOptions: { from: string; to: string[]; subject: string; html: string; attachments?: { filename: string; content: Buffer }[] } = {
-      from: "Fashion Group <notificaciones@fashiongr.com>",
-      to: ["daniel@fashiongr.com", "info@fashiongr.com"],
-      subject: `Guia #${guia.numero} despachada — ${guia.transportista}`,
-      html: `<h2 style="color:#1a1a1a">Guia #${guia.numero} despachada</h2>
-        <p><strong>Tipo:</strong> ${tipoLabel} | <strong>Transportista:</strong> ${guia.transportista}${guia.tipo_despacho === "directo" ? ` | <strong>Chofer:</strong> ${guia.nombre_chofer || "—"}` : ` | <strong>Placa:</strong> ${guia.placa || "—"}`} | <strong>Receptor:</strong> ${guia.receptor_nombre || "—"} | <strong>Total:</strong> ${totalB} bultos</p>
-        <p><strong>Items:</strong></p><p>${itemsHtml || "Sin items"}</p>
-        <p style="color:#888;font-size:12px;margin-top:16px">Fashion Group Panama — Despachado por ${dispatchedBy}</p>`,
-    };
-    if (pdfBuffer) {
-      emailOptions.attachments = [{ filename: `Guia-${guia.numero}.pdf`, content: pdfBuffer }];
-    }
-    await resend.emails.send(emailOptions);
-  } catch { /* email failed */ }
-}
-
 // ── GET ──
 
 export const dynamic = "force-dynamic";
@@ -255,10 +124,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     await logActivity(session?.role || "unknown", estado ? "guia_dispatch" : "guia_edit", "guias", { guiaId: id, changes }, session?.userName);
   }
 
-  // Send email with PDF only when transitioning TO Completada (not if already was)
-  if (estado === "Completada" && previous?.estado !== "Completada" && data) {
-    await sendDispatchEmail(data as GuiaEmail, session?.userName || session?.role || "sistema");
-  }
+  // Dispatch email removed — now handled by daily summary cron at 6pm
 
   return NextResponse.json(data);
 }
@@ -300,16 +166,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!updated) return NextResponse.json({ error: "Guía no encontrada o ya fue despachada" }, { status: 404 });
 
-  // Send email with PDF only if we actually transitioned to Completada
-  if (body.estado === "Completada") {
-    const { data: guia } = await supabaseServer.from("guia_transporte").select("*, guia_items(*)").eq("id", params.id).single();
-    if (guia) {
-      if (guia.guia_items) {
-        guia.guia_items = guia.guia_items.filter((i: { deleted?: boolean }) => !i.deleted);
-      }
-      await sendDispatchEmail(guia as GuiaEmail, session?.userName || session?.role || "sistema");
-    }
-  }
+  // Dispatch email removed — now handled by daily summary cron at 6pm
 
   return NextResponse.json({ ok: true });
 }
