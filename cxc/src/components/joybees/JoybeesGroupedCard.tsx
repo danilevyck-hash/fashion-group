@@ -125,7 +125,7 @@ export default function JoybeesGroupedCard({
                   key={imageStatus}
                   src={group.image_url}
                   alt={group.name}
-                  className="w-full h-full object-contain p-2"
+                  className="w-full h-full object-contain"
                   onLoad={() => setImageStatus("loaded")}
                   onError={() => setImageStatus("error")}
                 />
