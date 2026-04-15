@@ -1190,7 +1190,7 @@ function ChequesPage() {
           const _df = filter === "depositado" ? "fecha_depositado" as keyof Cheque : "fecha_deposito" as keyof Cheque;
           const _cg = filter === "all" || filter === "pendiente" || filter === "depositado";
           const _tg = groupedView && _cg ? groupByTimePeriod(filtered, _df, _gm) : null;
-          const _th = (<thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500"><th className="text-left py-3 px-4 font-normal w-[18%]">Cliente</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell w-[16%]">Empresa</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell w-[10%]">N° Cheque</th><th className="text-right py-3 px-4 font-normal w-[12%]">Monto</th><th className="text-left py-3 px-4 font-normal w-[11%] whitespace-nowrap">Fecha Dep.</th><th className="text-left py-3 px-4 font-normal w-[9%]">Estado</th><th className="text-right py-3 px-2 font-normal"></th></tr></thead>);
+          const _th = (<thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500"><th className="text-left py-3 px-4 font-normal">Cliente</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell">N° Cheque</th><th className="text-right py-3 px-4 font-normal">Monto</th><th className="text-left py-3 px-4 font-normal whitespace-nowrap">Fecha Dep.</th><th className="text-left py-3 px-4 font-normal">Estado</th><th className="text-right py-3 px-2 font-normal"></th></tr></thead>);
           const _rr = (c: Cheque) => {
               const ve = visualEstado(c);
               const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
@@ -1208,8 +1208,7 @@ function ChequesPage() {
                       <input type="checkbox" checked={selectedVencidos.has(c.id)} onChange={() => toggleSelectVencido(c.id)} className="accent-amber-600 w-3.5 h-3.5" />
                     </td>
                   )}
-                  <td className="py-3 px-4 font-medium">{c.cliente}</td>
-                  <td className="py-3 px-4 text-gray-500 hidden lg:table-cell">{c.empresa}</td>
+                  <td className="py-3 px-4"><div className="font-medium">{c.cliente}</div><div className="text-xs text-gray-400">{c.empresa}</div></td>
                   <td className="py-3 px-4 text-gray-500 hidden lg:table-cell">{c.numero_cheque}</td>
                   <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(c.monto)}</td>
                   <td className="py-3 px-4 text-gray-500 whitespace-nowrap">{fmtDate(c.fecha_deposito)}</td>
