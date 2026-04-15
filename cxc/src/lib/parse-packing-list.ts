@@ -101,7 +101,7 @@ const STYLE_CODE_RE = /^[A-Za-z0-9]{6,}/;
 const PRODUCT_KEYWORDS = /\b(CAMISA|POLO|PANTALON|CAMISETA|SUETER|CHAQUETA|GORRA|VESTIDO|BERMUDA|SHORT|FALDA|BLUSA|CORBATA|CINTURON)\b/i;
 
 /** Lines to skip */
-const SKIP_RE = /^(Bulto|Estilo|Total|Peso|Volumen|Dim|Pag|Departamento|Vendedor|Pais|País|Email|Tel|PACKING|NO\.|American|0{4,}|---)/i;
+const SKIP_RE = /^(Bulto|Estilo|Total|Peso|Volumen|Dim|Pag|Página|Departamento|Vendedor|Pais|País|Email|Tel|PACKING|NO\.|American|0{3,}|---)/i;
 
 /** Line is only numbers (size/qty data) */
 function isNumberLine(line: string): boolean {
@@ -128,9 +128,9 @@ export function parsePackingListText(text: string): ParsedPackingList {
     if (upperText.includes(co)) { empresa = co; break; }
   }
 
-  // 3. Fecha de entrega
-  const fechaMatch = text.match(/Fecha de entrega:\s*(\d{2}\/\d{2}\/\d{4})/i);
-  const fechaEntrega = fechaMatch ? fechaMatch[1] : "";
+  // 3. Fecha de entrega (DD/MM/YYYY → YYYY-MM-DD)
+  const fechaMatch = text.match(/Fecha de entrega:\s*(\d{2})\/(\d{2})\/(\d{4})/i);
+  const fechaEntrega = fechaMatch ? `${fechaMatch[3]}-${fechaMatch[2]}-${fechaMatch[1]}` : "";
 
   // 4. Split by "Bulto No. OCPA"
   const bultoSections = text.split(/Bulto No\.\s*OCPA/i);
@@ -210,27 +210,40 @@ export function parsePackingListText(text: string): ParsedPackingList {
             itemMap.set(currentEstilo, { estilo: currentEstilo, producto: currentProducto, qty });
           }
         }
-        // Don't reset currentEstilo — same estilo might have multiple number lines
-        // (e.g. when color wraps to next line and creates another number row)
+        // Reset after consuming the number line — next line needs a new style
+        currentEstilo = "";
+        currentProducto = "";
         continue;
       }
 
-      // If line starts with text that could be a continuation of color (like "AIR" or "WHITE/OATMEAL")
-      // followed by numbers — it's a number line for the current style
-      if (currentEstilo && /\d/.test(line)) {
-        const nums = line.match(/\d+/g);
-        if (nums && nums.length > 0) {
-          const qty = parseInt(nums[nums.length - 1], 10);
-          if (qty > 0) {
-            const existing = itemMap.get(currentEstilo);
-            if (existing) {
-              itemMap.set(currentEstilo, { ...existing, qty: existing.qty + qty });
-            } else {
-              itemMap.set(currentEstilo, { estilo: currentEstilo, producto: currentProducto, qty });
+      // If line has a color continuation (like "AIR" from "PLEIN AIR") followed by numbers
+      // Pattern: short text + numbers, and we still have a current style waiting for numbers
+      if (currentEstilo && /\d/.test(line) && line.split(/\s+/).length <= 8) {
+        // Only accept if the line has mostly numbers (more digits than letters)
+        const digitCount = (line.match(/\d/g) || []).length;
+        const letterCount = (line.match(/[A-Za-z]/g) || []).length;
+        if (digitCount > letterCount) {
+          const nums = line.match(/\d+/g);
+          if (nums && nums.length > 0) {
+            const qty = parseInt(nums[nums.length - 1], 10);
+            if (qty > 0 && qty < 10000) {
+              const existing = itemMap.get(currentEstilo);
+              if (existing) {
+                itemMap.set(currentEstilo, { ...existing, qty: existing.qty + qty });
+              } else {
+                itemMap.set(currentEstilo, { estilo: currentEstilo, producto: currentProducto, qty });
+              }
             }
           }
+          currentEstilo = "";
+          currentProducto = "";
+          continue;
         }
       }
+
+      // Any other line resets current style context
+      currentEstilo = "";
+      currentProducto = "";
     }
 
     bultos.push({
