@@ -30,7 +30,7 @@ interface Cheque {
   monto: number;
   fecha_deposito: string;
   notas: string;
-  whatsapp: string;
+  vendedor: string;
   estado: string;
   motivo_rebote?: string;
   fecha_depositado: string | null;
@@ -43,9 +43,9 @@ function todayStr() { return new Date().toISOString().slice(0, 10); }
 type Filter = "all" | "pendiente" | "depositado" | "vencido" | "rebotado" | "vencen_hoy" | "vencen_manana" | "vencen_semana";
 const VALID_FILTERS: Filter[] = ["all", "pendiente", "depositado", "vencido", "rebotado", "vencen_hoy", "vencen_manana", "vencen_semana"];
 
-function ChequeMoreMenu({ cheque, ve, role, onRebotado, onWA, onDelete, onRedepositar }: {
+function ChequeMoreMenu({ cheque, ve, role, onRebotado, onDelete, onRedepositar }: {
   cheque: Cheque; ve: string; role: string;
-  onRebotado: () => void; onWA: () => void; onDelete: () => void; onRedepositar?: () => void;
+  onRebotado: () => void; onDelete: () => void; onRedepositar?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
@@ -62,12 +62,6 @@ function ChequeMoreMenu({ cheque, ve, role, onRebotado, onWA, onDelete, onRedepo
         <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg z-20 py-1 min-w-[160px]">
           {isPending && (
             <button onClick={() => { onRebotado(); setOpen(false); }} title="Cheque devuelto por el banco" className="block w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition min-h-[44px]">Marcar como rebotado (devuelto)</button>
-          )}
-          {isPending && cheque.whatsapp && (
-            <button onClick={() => { onWA(); setOpen(false); }} className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-gray-50 transition min-h-[44px]" title="Enviar recordatorio por WhatsApp">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-              Enviar WhatsApp
-            </button>
           )}
           {isRebotado && onRedepositar && (
             <button onClick={() => { onRedepositar(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-gray-50 transition min-h-[44px]">Re-depositar</button>
@@ -138,7 +132,22 @@ function ChequesPage() {
   const [fMonto, setFMonto] = useState("");
   const [fFecha, setFFecha] = useState(todayStr());
   const [fNotas, setFNotas] = useState("");
-  const [fWhatsapp, setFWhatsapp] = useState("");
+  const [fVendedor, setFVendedor] = useState("");
+  const [vendedores, setVendedores] = useState<string[]>(() => {
+    if (typeof window === "undefined") return ["Rey", "Edwin"];
+    try {
+      const stored = localStorage.getItem("fg_cheque_vendedores");
+      if (stored) {
+        const parsed = JSON.parse(stored) as string[];
+        // Ensure defaults are always present
+        const merged = [...new Set(["Rey", "Edwin", ...parsed])];
+        return merged;
+      }
+    } catch {}
+    return ["Rey", "Edwin"];
+  });
+  const [showAddVendedor, setShowAddVendedor] = useState(false);
+  const [newVendedorName, setNewVendedorName] = useState("");
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -181,14 +190,6 @@ function ChequesPage() {
         onClick: () => setConfirmDepositId(c.id),
         hidden: !isPending,
         dividerAfter: isPending,
-      },
-      // Pendiente/Vencido: can send WhatsApp (only if has phone)
-      {
-        label: "WhatsApp",
-        shortcut: "W",
-        icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" className="text-emerald-600"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>,
-        onClick: () => sendWhatsApp(c),
-        hidden: !isPending || !c.whatsapp,
       },
       // Pendiente/Vencido: can mark rebotado
       {
@@ -294,14 +295,6 @@ function ChequesPage() {
     return "";
   }
 
-  // WhatsApp send handler (reusable)
-  function sendWhatsApp(c: Cheque) {
-    if (!c.whatsapp) { showToast("Este cliente no tiene WhatsApp registrado"); return; }
-    let phone = (c.whatsapp || "").replace(/\D/g, "");
-    if (!phone.startsWith("507") && phone.length <= 8) { phone = "507" + phone; }
-    const msg = `Hola, le recordamos que tiene un cheque #${c.numero_cheque} por $${fmt(c.monto)} con fecha de deposito ${fmtDate(c.fecha_deposito)}.`;
-    try { window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
-  }
 
   const pendientes = cheques.filter((c) => visualEstado(c) === "pendiente");
   const depositados = cheques.filter((c) => visualEstado(c) === "depositado");
@@ -337,19 +330,19 @@ function ChequesPage() {
   if (!authChecked) return null;
 
   function resetForm() {
-    setFCliente(""); setFEmpresa(""); setFNumero(""); setFMonto(""); setFFecha(todayStr()); setFNotas(""); setFWhatsapp(""); setEditingId(null); setEditingEstado(null); setError(null); setTouchedCheque({});
+    setFCliente(""); setFEmpresa(""); setFNumero(""); setFMonto(""); setFFecha(todayStr()); setFNotas(""); setFVendedor(""); setEditingId(null); setEditingEstado(null); setError(null); setTouchedCheque({}); setShowAddVendedor(false); setNewVendedorName("");
   }
 
   function startEdit(c: Cheque) {
     setFCliente(c.cliente); setFEmpresa(c.empresa); setFNumero(c.numero_cheque);
-    setFMonto(String(c.monto)); setFFecha(c.fecha_deposito); setFNotas(c.notas); setFWhatsapp(c.whatsapp || ""); setEditingId(c.id); setEditingEstado(c.estado); setShowForm(true);
+    setFMonto(String(c.monto)); setFFecha(c.fecha_deposito); setFNotas(c.notas); setFVendedor(c.vendedor || ""); setEditingId(c.id); setEditingEstado(c.estado); setShowForm(true);
   }
 
   async function saveCheque() {
-    if (!fCliente || !fEmpresa || !fNumero || !fMonto || !fFecha) { setError("Completa todos los campos obligatorios."); return; }
+    if (!fCliente || !fEmpresa || !fNumero || !fMonto || !fFecha || !fVendedor) { setError("Completa todos los campos obligatorios."); return; }
     if (parseFloat(fMonto) <= 0) { setError("El monto debe ser mayor a 0."); return; }
     setSaving(true); setError(null);
-    const body = { cliente: fCliente, empresa: fEmpresa, numero_cheque: fNumero, monto: parseFloat(fMonto), fecha_deposito: fFecha, notas: fNotas, whatsapp: fWhatsapp };
+    const body = { cliente: fCliente, empresa: fEmpresa, numero_cheque: fNumero, monto: parseFloat(fMonto), fecha_deposito: fFecha, notas: fNotas, vendedor: fVendedor };
     try {
       const url = editingId ? `/api/cheques/${editingId}` : "/api/cheques";
       const method = editingId ? "PUT" : "POST";
@@ -545,7 +538,7 @@ function ChequesPage() {
     r++;
 
     // Header row — navy bg, white bold
-    const hdrs = ["Cliente", "Nº Cheque", "Monto", "Fecha Depósito", "WhatsApp"];
+    const hdrs = ["Cliente", "Nº Cheque", "Monto", "Fecha Depósito", "Vendedor"];
     hdrs.forEach((h, ci) => {
       ws[ec({ r, c: ci })] = {
         v: h, t: "s",
@@ -567,7 +560,7 @@ function ChequesPage() {
       ws[ec({ r, c: 1 })] = { v: ch.numero_cheque, t: "s", s: cellS("333333", 9) };
       ws[ec({ r, c: 2 })] = { v: ch.monto, t: "n", z: '"$"#,##0.00', s: { font: { sz: 10, color: { rgb: "333333" }, name: "Calibri" }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: "right" }, border: B } };
       ws[ec({ r, c: 3 })] = { v: fmtDate(ch.fecha_deposito), t: "s", s: cellS("555555", 9) };
-      ws[ec({ r, c: 4 })] = { v: ch.whatsapp || "", t: "s", s: cellS("555555", 9) };
+      ws[ec({ r, c: 4 })] = { v: ch.vendedor || "", t: "s", s: cellS("555555", 9) };
       totalMonto += Number(ch.monto) || 0;
       heights[r] = 18;
       r++;
@@ -774,9 +767,83 @@ function ChequesPage() {
               <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleChequeBlur("fecha")} className={`border-b ${chequeFieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`} />
               {chequeFieldError("fecha", fFecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">WhatsApp</label>
-              <input type="text" value={fWhatsapp} onChange={(e) => setFWhatsapp(e.target.value)} placeholder="+507 6000-0000" className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition" />
+            <div className="flex flex-col gap-1 relative">
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Vendedor <span className="text-red-500">*</span></label>
+              {!showAddVendedor ? (
+                <select
+                  value={fVendedor}
+                  onChange={(e) => {
+                    if (e.target.value === "__add__") {
+                      setShowAddVendedor(true);
+                    } else {
+                      setFVendedor(e.target.value);
+                    }
+                  }}
+                  onBlur={() => handleChequeBlur("vendedor")}
+                  className={`border-b ${chequeFieldError("vendedor", fVendedor) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none cursor-pointer`}
+                >
+                  <option value="">Seleccionar vendedor</option>
+                  {vendedores.map((v) => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                  <option disabled>──────────</option>
+                  <option value="__add__">+ Agregar vendedor</option>
+                </select>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newVendedorName}
+                    onChange={(e) => setNewVendedorName(e.target.value)}
+                    placeholder="Nombre del vendedor"
+                    className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition flex-1"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newVendedorName.trim()) {
+                        const name = newVendedorName.trim();
+                        if (!vendedores.includes(name)) {
+                          const updated = [...vendedores, name];
+                          setVendedores(updated);
+                          try { localStorage.setItem("fg_cheque_vendedores", JSON.stringify(updated)); } catch {}
+                        }
+                        setFVendedor(name);
+                        setNewVendedorName("");
+                        setShowAddVendedor(false);
+                      } else if (e.key === "Escape") {
+                        setNewVendedorName("");
+                        setShowAddVendedor(false);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const name = newVendedorName.trim();
+                      if (name) {
+                        if (!vendedores.includes(name)) {
+                          const updated = [...vendedores, name];
+                          setVendedores(updated);
+                          try { localStorage.setItem("fg_cheque_vendedores", JSON.stringify(updated)); } catch {}
+                        }
+                        setFVendedor(name);
+                      }
+                      setNewVendedorName("");
+                      setShowAddVendedor(false);
+                    }}
+                    className="text-xs text-black font-medium hover:text-gray-600 transition min-h-[44px] px-2"
+                  >
+                    Agregar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setNewVendedorName(""); setShowAddVendedor(false); }}
+                    className="text-xs text-gray-400 hover:text-black transition min-h-[44px] px-1"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              )}
+              {chequeFieldError("vendedor", fVendedor) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Notas</label>
@@ -1121,21 +1188,12 @@ function ChequesPage() {
             } : undefined;
             const card = (
               <div className={`px-4 py-3 ${ve === "depositado" ? "opacity-60" : ""}`} onClick={() => startEdit(c)}>
-                {/* Row 1: Banco + Monto + WhatsApp */}
+                {/* Row 1: Cliente + Monto */}
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-sm font-medium truncate">{c.cliente}</span>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {isPending && c.whatsapp && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); sendWhatsApp(c); }}
-                        className="w-[36px] h-[36px] min-w-[36px] min-h-[36px] flex items-center justify-center rounded-full bg-emerald-500 text-white active:scale-[0.95] transition-transform"
-                        title="Enviar WhatsApp"
-                      >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                      </button>
-                    )}
                     <span className="text-sm font-semibold tabular-nums">${fmt(c.monto)}</span>
                   </div>
                 </div>
@@ -1215,16 +1273,6 @@ function ChequesPage() {
                   </td>
                   <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end gap-2">
-                    {/* Inline WhatsApp button for pending cheques with phone */}
-                    {isPending && c.whatsapp && (
-                      <button
-                        onClick={() => sendWhatsApp(c)}
-                        className="w-8 h-8 min-w-[34px] min-h-[34px] flex items-center justify-center rounded-full bg-emerald-500 text-white hover:bg-emerald-600 active:scale-[0.95] transition-all"
-                        title="Enviar WhatsApp"
-                      >
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                      </button>
-                    )}
                     {/* State machine: only show valid primary actions */}
                     {isPending && (
                       <button onClick={() => setConfirmDepositId(c.id)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">Depositar</button>
@@ -1247,7 +1295,6 @@ function ChequesPage() {
                       ve={ve}
                       role={role}
                       onRebotado={() => setRebotandoId(c.id)}
-                      onWA={() => sendWhatsApp(c)}
                       onDelete={() => setConfirmDeleteId(c.id)}
                       onRedepositar={isRebotado ? () => redepositar(c.id) : undefined}
                     />

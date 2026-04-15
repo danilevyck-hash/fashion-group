@@ -23,13 +23,13 @@ export async function POST(req: NextRequest) {
   const s = getSession(req);
   if (!s || !CHEQUES_ROLES.includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const body = await req.json();
-  const { cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas, whatsapp } = body;
+  const { cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas, vendedor } = body;
 
   if (!monto || monto <= 0) return NextResponse.json({ error: "El monto debe ser mayor a 0" }, { status: 400 });
 
   const { data, error } = await supabaseServer
     .from("cheques")
-    .insert({ cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas: notas || "", whatsapp: whatsapp || "", estado: "pendiente" })
+    .insert({ cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas: notas || "", vendedor: vendedor || "", estado: "pendiente" })
     .select()
     .single();
 
