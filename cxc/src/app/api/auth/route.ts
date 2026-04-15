@@ -61,18 +61,32 @@ export async function POST(req: NextRequest) {
           : password.toLowerCase() === user.password.toLowerCase();
 
         if (match) {
-          // Modules come from the role, not the individual user
+          // 1. Check per-user module overrides (fg_user_modules)
           let modules: string[] = [];
           try {
-            const { data: rolePerm } = await supabaseServer
-              .from("role_permissions")
-              .select("modulos")
-              .eq("role", user.role)
-              .single();
-            if (rolePerm?.modulos) modules = rolePerm.modulos;
-          } catch { /* use defaults below if table missing */ }
+            const { data: userMods } = await supabaseServer
+              .from("fg_user_modules")
+              .select("module_key")
+              .eq("user_id", user.id)
+              .eq("enabled", true);
+            if (userMods && userMods.length > 0) {
+              modules = userMods.map((m: { module_key: string }) => m.module_key);
+            }
+          } catch { /* table may not exist */ }
 
-          // Fallback to hardcoded defaults if no role_permissions entry
+          // 2. Fall back to role_permissions
+          if (modules.length === 0) {
+            try {
+              const { data: rolePerm } = await supabaseServer
+                .from("role_permissions")
+                .select("modulos")
+                .eq("role", user.role)
+                .single();
+              if (rolePerm?.modulos) modules = rolePerm.modulos;
+            } catch { /* use defaults below if table missing */ }
+          }
+
+          // 3. Fallback to hardcoded defaults if no role_permissions entry
           if (modules.length === 0) {
             const ALL = ["cxc","guias","caja","directorio","reclamos","prestamos","ventas","upload","cheques","reebok","camisetas"];
             const DEFAULTS: Record<string, string[]> = {
@@ -86,12 +100,20 @@ export async function POST(req: NextRequest) {
             modules = DEFAULTS[user.role] || [];
           }
 
+          // Per-user config (empresa restrictions, readonly flags)
+          const USER_CONFIG: Record<string, { empresaFilter?: string; guiasReadonly?: boolean }> = {
+            edwin: { empresaFilter: "vistana", guiasReadonly: true },
+          };
+          const userConfig = USER_CONFIG[user.name.toLowerCase()] || {};
+
           const payload = {
             authenticated: true,
             role: user.role,
             userId: user.id,
             userName: user.name,
             modules,
+            ...(userConfig.empresaFilter && { empresaFilter: userConfig.empresaFilter }),
+            ...(userConfig.guiasReadonly && { guiasReadonly: true }),
           };
 
           const sessionToken = randomUUID();
@@ -106,7 +128,11 @@ export async function POST(req: NextRequest) {
           } catch { /* table may not exist yet */ }
 
           const res = NextResponse.json(payload);
-          setSessionCookie(res, { role: user.role, userId: user.id, userName: user.name, modules, sessionToken });
+          setSessionCookie(res, {
+            role: user.role, userId: user.id, userName: user.name, modules, sessionToken,
+            ...(userConfig.empresaFilter && { empresaFilter: userConfig.empresaFilter }),
+            ...(userConfig.guiasReadonly && { guiasReadonly: true }),
+          });
           await logActivity(user.role, "login", "auth", { userName: user.name }, user.name);
           return res;
         }

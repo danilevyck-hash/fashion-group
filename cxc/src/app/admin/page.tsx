@@ -129,12 +129,25 @@ function buildVendorMsg(vendorName: string, companyName: string, brand: string, 
 // ── Main Component ───────────────────────────────────────
 
 export default function AdminDashboard() {
-  const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "director"] });
+  const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "director", "vendedor"] });
   const { clients, uploads, contactLog, loading, loadError, loadData, setContactLog } = useAdminData();
   usePersistedScroll("cxc", !loading && clients.length > 0);
   const [search, setSearch] = useState("");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
+
+  // Per-user empresa restriction (e.g. Edwin only sees Vistana International)
+  const [empresaRestriction, setEmpresaRestriction] = useState<string | null>(null);
+  useEffect(() => {
+    const ef = sessionStorage.getItem("fg_empresa_filter");
+    if (ef) setEmpresaRestriction(ef);
+  }, []);
   const [companyFilter, setCompanyFilter] = useState<string>("all");
+  // Force empresa filter when restriction exists
+  useEffect(() => {
+    if (empresaRestriction && companyFilter !== empresaRestriction) {
+      setCompanyFilter(empresaRestriction);
+    }
+  }, [empresaRestriction, companyFilter]);
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [toast, setToast] = useState<string | null>(null);
@@ -190,10 +203,12 @@ export default function AdminDashboard() {
   const roleCompanies = useMemo(() => getCompaniesForRole(userRole), [userRole]);
 
   const CXC_RESTRICTED = ["fashion_wear", "fashion_shoes", "vistana", "active_wear", "active_shoes"];
-  const cxcCompanies = useMemo(
-    () => userRole === "director" ? roleCompanies : roleCompanies.filter(c => CXC_RESTRICTED.includes(c.key)),
-    [userRole, roleCompanies]
-  );
+  const cxcCompanies = useMemo(() => {
+    const base = userRole === "director" ? roleCompanies : roleCompanies.filter(c => CXC_RESTRICTED.includes(c.key));
+    // If user has empresa restriction, only show that empresa
+    if (empresaRestriction) return base.filter(c => c.key === empresaRestriction);
+    return base;
+  }, [userRole, roleCompanies, empresaRestriction]);
 
   // ── Filtering + sorting ──────────────────────────────
 

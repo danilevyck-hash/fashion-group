@@ -49,6 +49,7 @@ interface GuiasListProps {
   onPrint: (id: string) => void;
   onDelete: (id: string) => void;
   onReject: (id: string, motivo: string) => void;
+  readOnly?: boolean;
 }
 
 const DESPACHO_ROLES = ["admin", "secretaria", "bodega", "director"];
@@ -66,6 +67,7 @@ export default function GuiasList({
   bChofer, setBChofer, bSaving, onConfirmarDespacho, showToast,
   pendingFirma1, pendingFirma2, onFirma1Change, onFirma2Change,
   onEdit, onPrint, onDelete, onReject,
+  readOnly,
 }: GuiasListProps) {
   const [visibleCount, setVisibleCount] = useState(15);
   const [groupedView, setGroupedView] = useState(true);
@@ -95,11 +97,11 @@ export default function GuiasList({
     const selected = guias.filter(g => selectedIds.has(g.id));
     exportGuiasExcel(selected, `${selected.length} guías seleccionadas`);
   }
-  const canCreate = role && CREATE_ROLES.includes(role);
-  const canDespacho = role && DESPACHO_ROLES.includes(role);
-  const canDelete = role && DELETE_ROLES.includes(role);
-  const canEdit = role && ["admin", "secretaria", "bodega"].includes(role);
-  const canReject = role && REJECT_ROLES.includes(role);
+  const canCreate = !readOnly && role && CREATE_ROLES.includes(role);
+  const canDespacho = !readOnly && role && DESPACHO_ROLES.includes(role);
+  const canDelete = !readOnly && role && DELETE_ROLES.includes(role);
+  const canEdit = !readOnly && role && ["admin", "secretaria", "bodega"].includes(role);
+  const canReject = !readOnly && role && REJECT_ROLES.includes(role);
 
   return (
     <div>

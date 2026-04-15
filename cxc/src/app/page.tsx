@@ -30,11 +30,15 @@ function LoginForm() {
     if (expired) setExpiredMsg(true);
   }, [expired]);
 
-  function storeSession(data: { role: string; userId?: string; userName?: string; modules?: string[] }) {
+  function storeSession(data: { role: string; userId?: string; userName?: string; modules?: string[]; empresaFilter?: string; guiasReadonly?: boolean }) {
     sessionStorage.setItem("cxc_role", data.role);
     if (data.userId) sessionStorage.setItem("fg_user_id", data.userId);
     if (data.userName) sessionStorage.setItem("fg_user_name", data.userName);
     if (data.modules) sessionStorage.setItem("fg_modules", JSON.stringify(data.modules));
+    if (data.empresaFilter) sessionStorage.setItem("fg_empresa_filter", data.empresaFilter);
+    else sessionStorage.removeItem("fg_empresa_filter");
+    if (data.guiasReadonly) sessionStorage.setItem("fg_guias_readonly", "1");
+    else sessionStorage.removeItem("fg_guias_readonly");
   }
 
   async function handleLogin(e: React.FormEvent) {

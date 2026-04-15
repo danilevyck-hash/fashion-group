@@ -81,6 +81,12 @@ export default function GuiasPage() {
   const s = useGuiasState();
   usePersistedScroll("guias", !s.loading && s.guias.length > 0);
 
+  // Per-user readonly flag (e.g. Edwin can view but not dispatch/create)
+  const [guiasReadonly, setGuiasReadonly] = useState(false);
+  useEffect(() => {
+    if (sessionStorage.getItem("fg_guias_readonly") === "1") setGuiasReadonly(true);
+  }, []);
+
   useEffect(() => {
     if (authChecked) {
       s.loadGuias();
@@ -153,6 +159,7 @@ export default function GuiasPage() {
           onPrint={s.openPrint}
           onDelete={s.requestDeleteGuia}
           onReject={s.rejectGuia}
+          readOnly={guiasReadonly}
         />
         <GuiaDeleteModal
           open={!!s.confirmDeleteId}
