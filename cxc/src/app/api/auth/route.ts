@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
               admin: ALL, director: ALL,
               contabilidad: ["prestamos","ventas"],
               secretaria: ["upload","guias","caja","reclamos","cheques","directorio"],
-              vendedor: ["reebok","cxc","directorio"],
+              vendedor: ["catalogos","reebok","cxc","directorio","camisetas","guias"],
               bodega: ["guias"],
               cliente: ["reebok"],
             };
