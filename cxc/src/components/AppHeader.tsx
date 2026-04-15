@@ -20,6 +20,7 @@ const NAV_MODULES = [
   { key: "reclamos", label: "Reclamos", href: "/reclamos", icon: "M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z M12 9v4 M12 17h.01" },
   { key: "prestamos", label: "Préstamos", href: "/prestamos", icon: "M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2 M9 7a4 4 0 100-8 4 4 0 000 8z" },
   { key: "ventas", label: "Ventas", href: "/ventas", icon: "M22 12h-4l-3 9L9 3l-3 9H2" },
+  { key: "packing-lists", label: "Packing Lists", href: "/packing-lists", icon: "M3 3h18a2 2 0 012 2v14a2 2 0 01-2 2H3a2 2 0 01-2-2V5a2 2 0 012-2z M1 9h22 M9 21V9" },
   { key: "camisetas", label: "Camisetas", href: "/camisetas", icon: "M20.38 3.46L16 2 12 5 8 2 3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" },
   { key: "reebok", label: "Reebok", href: "/catalogo/reebok", icon: "M20 12V8H6a2 2 0 01-2-2c0-1.1.9-2 2-2h12V0L22 4l-4 4" },
 ];

@@ -22,7 +22,8 @@ const MODULE_COLORS: Record<string, ModuleColor> = {
   directorio: { border: "border-cyan-500",    text: "text-cyan-500",    hex: "#06b6d4" },
   prestamos:  { border: "border-rose-500",    text: "text-rose-500",    hex: "#f43f5e" },
   ventas:     { border: "border-indigo-500",  text: "text-indigo-500",  hex: "#6366f1" },
-  reebok:     { border: "border-red-500",     text: "text-red-500",     hex: "#ef4444" },
+  reebok:          { border: "border-red-500",     text: "text-red-500",     hex: "#ef4444" },
+  "packing-lists": { border: "border-teal-500",    text: "text-teal-500",    hex: "#14b8a6" },
 };
 
 /** Map pathname to module key */
@@ -36,6 +37,7 @@ export function getModuleKeyFromPath(pathname: string): string | null {
   if (pathname.startsWith("/prestamos"))       return "prestamos";
   if (pathname.startsWith("/ventas"))          return "ventas";
   if (pathname.startsWith("/catalogo/reebok")) return "reebok";
+  if (pathname.startsWith("/packing-lists"))   return "packing-lists";
   if (pathname.startsWith("/camisetas"))       return null; // no color assigned
   return null;
 }
