@@ -1190,7 +1190,7 @@ function ChequesPage() {
           const _df = filter === "depositado" ? "fecha_depositado" as keyof Cheque : "fecha_deposito" as keyof Cheque;
           const _cg = filter === "all" || filter === "pendiente" || filter === "depositado";
           const _tg = groupedView && _cg ? groupByTimePeriod(filtered, _df, _gm) : null;
-          const _th = (<thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500"><th className="text-left py-3 px-4 font-normal">Cliente</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell">Empresa</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell">N° Cheque</th><th className="text-right py-3 px-4 font-normal">Monto</th><th className="text-left py-3 px-4 font-normal">Fecha Depósito</th><th className="text-left py-3 px-4 font-normal">Estado</th><th className="text-right py-3 px-4 font-normal"></th></tr></thead>);
+          const _th = (<thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500"><th className="text-left py-3 px-4 font-normal w-[18%]">Cliente</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell w-[16%]">Empresa</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell w-[10%]">N° Cheque</th><th className="text-right py-3 px-4 font-normal w-[12%]">Monto</th><th className="text-left py-3 px-4 font-normal w-[11%] whitespace-nowrap">Fecha Dep.</th><th className="text-left py-3 px-4 font-normal w-[9%]">Estado</th><th className="text-right py-3 px-2 font-normal"></th></tr></thead>);
           const _rr = (c: Cheque) => {
               const ve = visualEstado(c);
               const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
@@ -1212,7 +1212,7 @@ function ChequesPage() {
                   <td className="py-3 px-4 text-gray-500 hidden lg:table-cell">{c.empresa}</td>
                   <td className="py-3 px-4 text-gray-500 hidden lg:table-cell">{c.numero_cheque}</td>
                   <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(c.monto)}</td>
-                  <td className="py-3 px-4 text-gray-500">{fmtDate(c.fecha_deposito)}</td>
+                  <td className="py-3 px-4 text-gray-500 whitespace-nowrap">{fmtDate(c.fecha_deposito)}</td>
                   <td className="py-3 px-4">
                     <StatusBadge estado={ve} />
                   </td>
@@ -1230,7 +1230,7 @@ function ChequesPage() {
                     )}
                     {/* State machine: only show valid primary actions */}
                     {isPending && (
-                      <button onClick={() => setConfirmDepositId(c.id)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Confirmar depósito</button>
+                      <button onClick={() => setConfirmDepositId(c.id)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">Depositar</button>
                     )}
                     {isDep && (
                       <button onClick={() => setRebotandoId(c.id)} disabled={!isOnline} title="Si el banco devolvio este cheque, marcalo como rebotado" className="text-xs text-gray-400 hover:text-red-500 transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1">
