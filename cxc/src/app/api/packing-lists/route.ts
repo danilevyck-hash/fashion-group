@@ -31,19 +31,21 @@ export async function POST(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();
-  const { numeroPL, empresa, fechaEntrega, totalBultos, totalPiezas, items } = body as {
+  const { numeroPL, empresa, fechaEntrega, totalBultos, totalPiezas, items, indexRows } = body as {
     numeroPL: string;
     empresa: string;
     fechaEntrega: string;
     totalBultos: number;
     totalPiezas: number;
-    items: PLIndexRow[];
+    items?: PLIndexRow[];
+    indexRows?: PLIndexRow[];
   };
+  const plItems = items || indexRows || [];
 
   if (!numeroPL) {
     return NextResponse.json({ error: "Número de PL requerido" }, { status: 400 });
   }
-  if (!items || !Array.isArray(items) || items.length === 0) {
+  if (!plItems || !Array.isArray(plItems) || plItems.length === 0) {
     return NextResponse.json({ error: "El packing list debe tener al menos un item" }, { status: 400 });
   }
 
@@ -56,6 +58,7 @@ export async function POST(req: NextRequest) {
       fecha_entrega: fechaEntrega || null,
       total_bultos: totalBultos || 0,
       total_piezas: totalPiezas || 0,
+      total_estilos: plItems.length,
     })
     .select()
     .single();
@@ -66,13 +69,12 @@ export async function POST(req: NextRequest) {
   }
 
   // Insert items
-  const rows = items.map((item: PLIndexRow, i: number) => ({
+  const rows = plItems.map((item: PLIndexRow, i: number) => ({
     pl_id: pl.id,
-    orden: i + 1,
     estilo: item.estilo,
     producto: item.producto,
     total_pcs: item.totalPcs,
-    distribution: item.distribution,
+    bultos: item.distribution,
     bulto_muestra: item.bultoMuestra,
   }));
 

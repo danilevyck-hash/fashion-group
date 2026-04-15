@@ -108,11 +108,21 @@ export function normalizeProductName(nombre: string): string {
 
 // ── Style‑row detection ──────────────────────────────────────────────
 
-/** Returns true if the line looks like a style row (starts with alphanumeric code). */
+/** Returns true if the line looks like a style row (starts with a product style code). */
 function isStyleRow(line: string): boolean {
-  // Style codes start with letter or digit, followed by alphanumeric chars
-  // Must have at least 2 "words" (code + something)
-  return /^[A-Za-z0-9][A-Za-z0-9]+\s+/.test(line.trim());
+  const trimmed = line.trim();
+  // Skip known non-style lines
+  if (!trimmed || trimmed.length < 10) return false;
+  if (/^(Bulto|Estilo|Total|Peso|Volumen|Dim|Pagina|Departamento|Vendedor|Pais|Email|Tel|PACKING|NO\.|American|FASHION|VISTANA|ACTIVE|0{3,})/i.test(trimmed)) return false;
+  // Style codes look like: 40EM125430, MW0MW416570A4, 78JA5737UY, 4RC276G001, 4RD248G914, XM05183XLG, C81784980, AMOAM10339XJS
+  // They start with a digit or letter, contain mixed letters+digits, usually 8+ chars
+  const firstToken = trimmed.split(/\s{2,}/)[0]?.trim() || trimmed.split(/\s+/)[0]?.trim() || "";
+  if (firstToken.length < 6) return false;
+  if (!/[A-Za-z]/.test(firstToken) || !/\d/.test(firstToken)) return false;
+  // Must have a number somewhere in the rest of the line (the qty)
+  const rest = trimmed.slice(firstToken.length);
+  if (!/\d/.test(rest)) return false;
+  return true;
 }
 
 /** Extract qty (rightmost number) from a style row. */
@@ -123,54 +133,46 @@ function extractQty(line: string): number {
 }
 
 /**
- * Extract estilo (first token) and producto (the Spanish description between
- * colour and size columns).
+ * Extract estilo (first token) and producto (the Spanish description) from a style row.
+ *
+ * Lines look like (separated by 2+ spaces):
+ *   40EM125430  BLUE DESCENT  CAMISA PARA CABALLERO M/L  6  12  5  23
+ *   MW0MW416570A4  DESERT SKY  CAMISA M/L PARA CABALLERO  2  2  3  7
+ *   78JA5737UY  NEW VINTAGE KHAKI  PANTALON PARA CABALLERO  34  3
  */
 function parseStyleRow(line: string): { estilo: string; producto: string; qty: number } | null {
   const trimmed = line.trim();
   if (!isStyleRow(trimmed)) return null;
 
-  const tokens = trimmed.split(/\s{2,}/);
+  // Split by 2+ spaces to get columns
+  const tokens = trimmed.split(/\s{2,}/).map(t => t.trim()).filter(Boolean);
   if (tokens.length < 2) return null;
 
-  const estilo = tokens[0].trim();
+  const estilo = tokens[0];
   const qty = extractQty(trimmed);
 
-  // The product name is typically the third major token (after estilo + color).
-  // We search for multi-word Spanish descriptions among the tokens.
+  // Find the product name — look for tokens containing known product keywords
+  const KEYWORDS = /\b(CAMISA|POLO|PANTALON|CAMISETA|SUETER|CHAQUETA|GORRA|VESTIDO|BERMUDA|SHORT|FALDA|BLUSA|CORBATA|CINTURON|CALCETIN|MEDIA|BOXER|TRAJE)\b/i;
+
   let producto = "";
   for (let i = 1; i < tokens.length; i++) {
-    const t = tokens[i].trim();
-    // Product names are multi-word and contain letters (not pure numbers)
-    // They typically contain words like CAMISA, POLO, PANTALON, etc.
-    if (
-      /[A-Za-z]/.test(t) &&
-      /\s/.test(t) &&
-      /\b(CAMISA|POLO|PANTALON|CAMISETA|SUETER|CHAQUETA|GORRA|VESTIDO|BERMUDA|SHORT|FALDA|BLUSA|CORBATA|CINTURON|CALCETIN|MEDIA|BÓXER|BOXER|TRAJE)\b/i.test(t)
-    ) {
-      producto = t.trim();
+    if (KEYWORDS.test(tokens[i])) {
+      producto = tokens[i];
       break;
     }
   }
 
-  // Fallback: if not found with keyword matching, try the longest multi-word
-  // token that contains at least one letter
+  // Fallback: look for the longest text token (not a number)
   if (!producto) {
-    let bestLen = 0;
     for (let i = 1; i < tokens.length; i++) {
-      const t = tokens[i].trim();
-      if (/[A-Za-z]/.test(t) && /\s/.test(t) && t.length > bestLen) {
-        // Skip if it looks like the color (usually one or two words before product)
-        // Colors don't usually contain keywords; use length heuristic
-        if (t.split(/\s+/).length >= 3 || t.length > bestLen) {
-          producto = t;
-          bestLen = t.length;
-        }
+      const t = tokens[i];
+      if (/[A-Za-z]/.test(t) && t.split(/\s+/).length >= 2 && t.length > producto.length) {
+        producto = t;
       }
     }
   }
 
-  if (!estilo) return null;
+  if (!estilo || qty === 0) return null;
 
   return {
     estilo,

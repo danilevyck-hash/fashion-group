@@ -63,7 +63,7 @@ export default function PackingListsPage() {
     if (authChecked) loadList();
   }, [authChecked, loadList]);
 
-  // PDF extraction
+  // PDF extraction — group text items by Y position to reconstruct lines
   async function extractTextFromPDF(file: File): Promise<string> {
     const pdfjsLib = await import("pdfjs-dist");
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
@@ -75,9 +75,24 @@ export default function PackingListsPage() {
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
+      // Group items by Y position to reconstruct lines
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pageText = content.items.map((item: any) => item.str).join(" ");
-      fullText += pageText + "\n";
+      const items = content.items as any[];
+      const lineMap = new Map<number, { x: number; str: string }[]>();
+      for (const item of items) {
+        if (!item.str || !item.str.trim()) continue;
+        // Round Y to nearest integer to group items on the same line
+        const y = Math.round(item.transform[5]);
+        if (!lineMap.has(y)) lineMap.set(y, []);
+        lineMap.get(y)!.push({ x: item.transform[4], str: item.str });
+      }
+      // Sort by Y descending (PDF coordinates: top = higher Y)
+      const sortedYs = [...lineMap.keys()].sort((a, b) => b - a);
+      for (const y of sortedYs) {
+        const lineItems = lineMap.get(y)!.sort((a, b) => a.x - b.x);
+        fullText += lineItems.map(li => li.str).join("  ") + "\n";
+      }
+      fullText += "\n";
     }
     return fullText;
   }
