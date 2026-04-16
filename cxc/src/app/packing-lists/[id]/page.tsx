@@ -180,7 +180,7 @@ export default function PackingListDetailPage() {
 
     autoTable(doc, {
       startY: 32,
-      head: [["Estilo", "Total", "Muestra", "Distribución por Bulto"]],
+      head: [["Estilo", { content: "Total", styles: { halign: "center" } }, { content: "Muestra", styles: { halign: "center" } }, "Distribución por Bulto"]],
       body: tableBody,
       headStyles: {
         fillColor: [30, 58, 95],
@@ -193,9 +193,9 @@ export default function PackingListDetailPage() {
         cellPadding: 2,
       },
       columnStyles: {
-        0: { cellWidth: 32, font: "courier" },
-        1: { cellWidth: 14, halign: "right" },
-        2: { cellWidth: 18 },
+        0: { cellWidth: 30, font: "courier" },
+        1: { cellWidth: 12, halign: "center" },
+        2: { cellWidth: 16, halign: "center" },
         3: { cellWidth: "auto" },
       },
       alternateRowStyles: { fillColor: [245, 245, 245] },
@@ -368,13 +368,18 @@ export default function PackingListDetailPage() {
       {/* Print styles */}
       <style jsx global>{`
         @media print {
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; padding: 0; }
-          .print\\:hidden { display: none !important; }
-          nav, header, [data-app-header], .sticky { display: none !important; }
-          .max-w-6xl { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
-          table { font-size: 9pt !important; width: 100% !important; }
-          td, th { padding: 3px 6px !important; }
-          @page { size: letter; margin: 1cm; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          body { margin: 0 !important; padding: 0 !important; }
+          .print\\:hidden, nav, header, [class*="sticky"], [class*="AppHeader"],
+          button, [class*="print:hidden"] { display: none !important; }
+          .max-w-6xl, .max-w-7xl { max-width: 100% !important; padding: 0 8px !important; margin: 0 !important; }
+          .space-y-4 > * + * { margin-top: 8px !important; }
+          table { font-size: 9pt !important; width: 100% !important; border-collapse: collapse !important; }
+          td, th { padding: 4px 6px !important; }
+          .border { border: 1px solid #ddd !important; }
+          .rounded-lg { border-radius: 0 !important; }
+          .overflow-hidden { overflow: visible !important; }
+          @page { size: letter; margin: 1.5cm; }
         }
       `}</style>
     </div>
