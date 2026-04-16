@@ -83,13 +83,14 @@ export async function POST(req: NextRequest) {
   }
 
   // Insert items
-  const rows = plItems.map((item: PLIndexRow, i: number) => ({
+  const rows = plItems.map((item: PLIndexRow) => ({
     pl_id: pl.id,
     estilo: item.estilo,
     producto: item.producto,
     total_pcs: item.totalPcs,
     bultos: item.distribution,
     bulto_muestra: item.bultoMuestra,
+    is_os: item.isOS || false,
   }));
 
   const { error: itemsErr } = await supabaseServer.from("pl_items").insert(rows);

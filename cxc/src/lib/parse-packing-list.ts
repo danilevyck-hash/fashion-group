@@ -39,7 +39,8 @@ export interface PLIndexRow {
   producto: string;
   totalPcs: number;
   distribution: Record<string, number>;
-  bultoMuestra: string;  // bulto that has M (or 32 if no M)
+  bultoMuestra: string;  // bulto that has M (or 32 if no M), or first bulto as fallback
+  isOS: boolean;         // true when muestra was assigned by fallback (no M/32 found)
 }
 
 // ── Constants ────────────────────────────────────────────────────────
@@ -465,14 +466,17 @@ export function buildIndex(parsed: ParsedPackingList): PLIndexRow[] {
     }
   }
 
-  const rows: PLIndexRow[] = Array.from(groups.values()).map((g) => ({
-    estilo: g.estilo,
-    producto: g.producto,
-    totalPcs: g.totalPcs,
-    distribution: g.distribution,
-    // If no muestra found (no M or 32), leave empty
-    bultoMuestra: g.muestraBulto || "",
-  }));
+  const rows: PLIndexRow[] = Array.from(groups.values()).map((g) => {
+    const hasMor32 = !!g.muestraBulto;
+    return {
+      estilo: g.estilo,
+      producto: g.producto,
+      totalPcs: g.totalPcs,
+      distribution: g.distribution,
+      bultoMuestra: g.muestraBulto || Object.keys(g.distribution)[0] || "",
+      isOS: !hasMor32,
+    };
+  });
 
   // Sort by producto ascending (A-Z), then by estilo within each group
   rows.sort((a, b) => {
