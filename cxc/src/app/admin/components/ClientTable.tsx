@@ -262,13 +262,16 @@ export default function ClientTable({
               </div>
               {roleCompanies.length > 1 && (
                 <div>
-                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Empresa</div>
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    Empresa
+                    <span className="ml-2 normal-case tracking-normal text-[10px] font-normal text-gray-400">Según permisos de tu rol</span>
+                  </div>
                   <select
                     value={companyFilter}
                     onChange={(e) => setCompanyFilter(e.target.value)}
                     className="w-full border border-gray-200 rounded-lg px-3 min-h-[44px] text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white"
                   >
-                    <option value="all">Todas las empresas</option>
+                    <option value="all">Todas mis empresas</option>
                     {roleCompanies.map((co) => <option key={co.key} value={co.key}>{co.name}</option>)}
                   </select>
                 </div>
@@ -296,7 +299,7 @@ export default function ClientTable({
                 onChange={(e) => setCompanyFilter(e.target.value)}
                 className="border border-gray-200 rounded-lg px-3 min-h-[44px] text-xs focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white"
               >
-                <option value="all">Todas las empresas</option>
+                <option value="all">Todas mis empresas</option>
                 {roleCompanies.map((co) => <option key={co.key} value={co.key}>{co.name}</option>)}
               </select>
             )}
@@ -331,7 +334,7 @@ export default function ClientTable({
             onChange={(e) => setCompanyFilter(e.target.value)}
             className="border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white"
           >
-            <option value="all">Todas las empresas</option>
+            <option value="all">Todas mis empresas</option>
             {roleCompanies.map((co) => <option key={co.key} value={co.key}>{co.name}</option>)}
           </select>
         </div>

@@ -580,44 +580,6 @@ export type Database = {
       }
 
       // ─── VENTAS ──────────────────────────────────────────────────────────────
-      ventas_mensuales: {
-        Row: {
-          id: string
-          empresa: string
-          año: number
-          mes: number
-          ventas_brutas: number
-          notas_credito: number
-          notas_debito: number
-          costo_total: number
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          empresa: string
-          año: number
-          mes: number
-          ventas_brutas?: number
-          notas_credito?: number
-          notas_debito?: number
-          costo_total?: number
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          empresa?: string
-          año?: number
-          mes?: number
-          ventas_brutas?: number
-          notas_credito?: number
-          notas_debito?: number
-          costo_total?: number
-          created_at?: string | null
-          updated_at?: string | null
-        }
-      }
       ventas_clientes: {
         Row: {
           id: string
