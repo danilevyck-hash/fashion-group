@@ -39,6 +39,8 @@ interface Props {
   onRegisterContact: (clientName: string, data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) => Promise<void>;
   favorites?: Set<string>;
   onToggleFavorite?: (name: string) => void;
+  /** Search and risk filters are now managed by the parent page, hide them here */
+  hideSearchAndRiskFilters?: boolean;
 }
 
 export default function ClientTable({
@@ -65,12 +67,11 @@ export default function ClientTable({
   onRegisterContact,
   favorites,
   onToggleFavorite,
+  hideSearchAndRiskFilters,
 }: Props) {
   const [expanded, setExpanded] = usePersistedState<string | null>("cxc", "expanded", null);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedNames, setSelectedNames] = useState<Set<string>>(new Set());
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(25);
   const cancelledRef = useRef(false);
   const [batchProgress, setBatchProgress] = useState<{ sent: number; total: number } | null>(null);
   const { show: showContextMenu } = useContextMenu();
@@ -119,8 +120,7 @@ export default function ClientTable({
     ];
   }, [onOpenWhatsApp, onOpenEmail, onCopyCollectionMsg, onMarkContacted, setExpanded]);
 
-  // Reset page when filters change
-  useEffect(() => { setPage(0); }, [riskFilter, companyFilter, search]);
+  // (pagination removed — all clients rendered)
 
 
   const countCurrent = roleClients.filter((c) => c.overdue === 0 && c.watch === 0).length;
@@ -215,109 +215,127 @@ export default function ClientTable({
 
   return (
     <>
-      {/* Filters — Desktop inline, Mobile: search + "Filtros" button */}
-      {/* Mobile: search bar + filtros button */}
-      <div className="flex sm:hidden gap-2 mb-4">
-        <div className="flex-1 relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar cliente..."
-            className="w-full border border-gray-200 rounded-lg pl-9 pr-8 min-h-[44px] text-sm focus:outline-none focus:ring-1 focus:ring-gray-300"
-            onKeyDown={(e) => { if (e.key === "Escape") setSearch(""); }}
-          />
-          {search && (
-            <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          )}
-        </div>
-        <button
-          onClick={() => setMobileFiltersOpen(true)}
-          className={`flex items-center gap-1.5 px-4 min-h-[44px] rounded-lg border text-sm font-medium transition flex-shrink-0 ${activeFilterCount > 0 ? "border-blue-300 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
-        >
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-          Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-        </button>
-      </div>
-
-      {/* Mobile filters bottom sheet */}
-      <BottomSheet open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)}>
-        <div className="px-4 pb-6 space-y-5">
-          <div className="text-base font-semibold text-gray-900 pb-2 border-b border-gray-100">Filtros</div>
-          <div>
-            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Estado</div>
-            <div className="grid grid-cols-2 gap-2">
-              {filterBtn("all", "Todos", clients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600")}
-              {filterBtn("current", "Corriente", countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700")}
-              {filterBtn("watch", "Vigilancia", countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700")}
-              {filterBtn("overdue", "Vencido", countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700")}
+      {/* Company filter + mobile filter button (search & risk tabs moved to parent page) */}
+      {!hideSearchAndRiskFilters && (
+        <>
+          {/* Mobile: search bar + filtros button */}
+          <div className="flex sm:hidden gap-2 mb-4">
+            <div className="flex-1 relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar cliente..."
+                className="w-full border border-gray-200 rounded-lg pl-9 pr-8 min-h-[44px] text-sm focus:outline-none focus:ring-1 focus:ring-gray-300"
+                onKeyDown={(e) => { if (e.key === "Escape") setSearch(""); }}
+              />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-1">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              )}
             </div>
+            <button
+              onClick={() => setMobileFiltersOpen(true)}
+              className={`flex items-center gap-1.5 px-4 min-h-[44px] rounded-lg border text-sm font-medium transition flex-shrink-0 ${activeFilterCount > 0 ? "border-blue-300 bg-blue-50 text-blue-700" : "border-gray-200 text-gray-600 hover:bg-gray-50"}`}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              Filtros{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+            </button>
           </div>
-          {roleCompanies.length > 1 && (
-            <div>
-              <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Empresa</div>
+
+          {/* Mobile filters bottom sheet */}
+          <BottomSheet open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)}>
+            <div className="px-4 pb-6 space-y-5">
+              <div className="text-base font-semibold text-gray-900 pb-2 border-b border-gray-100">Filtros</div>
+              <div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Estado</div>
+                <div className="grid grid-cols-2 gap-2">
+                  {filterBtn("all", "Todos", clients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600")}
+                  {filterBtn("current", "Corriente", countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700")}
+                  {filterBtn("watch", "Vigilancia", countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700")}
+                  {filterBtn("overdue", "Vencido", countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700")}
+                </div>
+              </div>
+              {roleCompanies.length > 1 && (
+                <div>
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Empresa</div>
+                  <select
+                    value={companyFilter}
+                    onChange={(e) => setCompanyFilter(e.target.value)}
+                    className="w-full border border-gray-200 rounded-lg px-3 min-h-[44px] text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white"
+                  >
+                    <option value="all">Todas las empresas</option>
+                    {roleCompanies.map((co) => <option key={co.key} value={co.key}>{co.name}</option>)}
+                  </select>
+                </div>
+              )}
+              <button
+                onClick={() => setMobileFiltersOpen(false)}
+                className="w-full bg-black text-white rounded-lg min-h-[44px] text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all"
+              >
+                Aplicar filtros
+              </button>
+            </div>
+          </BottomSheet>
+
+          {/* Desktop filters — hidden on mobile */}
+          <div className="hidden sm:flex flex-row gap-3 mb-4">
+            <div className="flex gap-1.5 flex-wrap">
+              {filterBtn("all", "Todos", clients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
+              {filterBtn("current", "Corriente", countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700 hover:bg-emerald-100")}
+              {filterBtn("watch", "Vigilancia", countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700 hover:bg-amber-100")}
+              {filterBtn("overdue", "Vencido", countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700 hover:bg-red-100")}
+            </div>
+            {roleCompanies.length > 1 && (
               <select
                 value={companyFilter}
                 onChange={(e) => setCompanyFilter(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 min-h-[44px] text-sm focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white"
+                className="border border-gray-200 rounded-lg px-3 min-h-[44px] text-xs focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white"
               >
                 <option value="all">Todas las empresas</option>
                 {roleCompanies.map((co) => <option key={co.key} value={co.key}>{co.name}</option>)}
               </select>
+            )}
+            {/* Search with icon */}
+            <div className="flex-1 relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar por nombre, telefono, email..."
+                className="w-full border border-gray-200 rounded-lg pl-9 pr-8 min-h-[44px] text-xs focus:outline-none focus:ring-1 focus:ring-gray-300"
+                onKeyDown={(e) => { if (e.key === "Escape") setSearch(""); }}
+              />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              )}
             </div>
-          )}
-          <button
-            onClick={() => setMobileFiltersOpen(false)}
-            className="w-full bg-black text-white rounded-lg min-h-[44px] text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all"
-          >
-            Aplicar filtros
-          </button>
-        </div>
-      </BottomSheet>
+          </div>
+        </>
+      )}
 
-      {/* Desktop filters — hidden on mobile */}
-      <div className="hidden sm:flex flex-row gap-3 mb-4">
-        <div className="flex gap-1.5 flex-wrap">
-          {filterBtn("all", "Todos", clients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
-          {filterBtn("current", "Corriente", countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700 hover:bg-emerald-100")}
-          {filterBtn("watch", "Vigilancia", countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700 hover:bg-amber-100")}
-          {filterBtn("overdue", "Vencido", countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700 hover:bg-red-100")}
-        </div>
-        {roleCompanies.length > 1 && (
+      {/* Company filter only (when search/risk filters are on parent page) */}
+      {hideSearchAndRiskFilters && roleCompanies.length > 1 && (
+        <div className="flex items-center gap-3 mb-3">
           <select
             value={companyFilter}
             onChange={(e) => setCompanyFilter(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 min-h-[44px] text-xs focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-gray-300 bg-white"
           >
             <option value="all">Todas las empresas</option>
             {roleCompanies.map((co) => <option key={co.key} value={co.key}>{co.name}</option>)}
           </select>
-        )}
-        {/* Search with icon */}
-        <div className="flex-1 relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre, telefono, email..."
-            className="w-full border border-gray-200 rounded-lg pl-9 pr-8 min-h-[44px] text-xs focus:outline-none focus:ring-1 focus:ring-gray-300"
-            onKeyDown={(e) => { if (e.key === "Escape") setSearch(""); }}
-          />
-          {search && (
-            <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            </button>
-          )}
         </div>
-      </div>
+      )}
 
       {/* Result count + selection toggle */}
       <div className="flex items-center justify-between mb-2">
@@ -397,10 +415,7 @@ export default function ClientTable({
           </div>
         )}
 
-        {(() => {
-          const effectivePageSize = pageSize === 0 ? 100 : pageSize;
-          const paged = filtered.slice(page * effectivePageSize, (page + 1) * effectivePageSize);
-          return paged.map((client) => {
+        {filtered.map((client) => {
             const isExpanded = expanded === client.nombre_normalized;
             const isSelected = selectedNames.has(client.nombre_normalized);
             return (
@@ -440,48 +455,7 @@ export default function ClientTable({
                 )}
               </div>
             );
-          });
-        })()}
-      </div>
-
-      {/* Pagination controls */}
-      <div className="flex items-center justify-between mt-3 px-1">
-        <div className="flex items-center gap-2">
-          {(() => {
-            const eff = pageSize === 0 ? 100 : pageSize;
-            const start = page * eff + 1;
-            const end = Math.min((page + 1) * eff, filtered.length);
-            return (
-              <span className="text-[11px] text-gray-400">
-                {pageSize === 0 && filtered.length > 100
-                  ? `Mostrando 100 de ${filtered.length}. Usa filtros para refinar.`
-                  : `Mostrando ${start}-${end} de ${filtered.length}`}
-              </span>
-            );
-          })()}
-          <select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setPage(0); }}
-            className="text-[11px] border border-gray-200 rounded px-1.5 py-0.5 text-gray-500 bg-transparent">
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-            <option value={100}>100</option>
-            <option value={0}>Todos</option>
-          </select>
-        </div>
-        {(() => {
-          const eff = pageSize === 0 ? 100 : pageSize;
-          return filtered.length > eff ? (
-            <div className="flex items-center gap-2">
-              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
-                className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                Anterior
-              </button>
-              <button onClick={() => setPage(p => p + 1)} disabled={(page + 1) * eff >= filtered.length}
-                className="text-[11px] px-3 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                Siguiente
-              </button>
-            </div>
-          ) : null;
-        })()}
+          })}
       </div>
 
       <div className="mt-3 text-[11px] text-gray-400 text-center">

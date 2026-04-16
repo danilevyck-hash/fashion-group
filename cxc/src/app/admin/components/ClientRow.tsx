@@ -101,15 +101,15 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
             <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
               <div className="bg-emerald-50 rounded-md px-2 py-1.5 text-center">
                 <div className="text-[10px] text-emerald-600 font-medium">0-90d</div>
-                <div className="tabular-nums text-emerald-800 font-semibold">${fmt(client.current)}</div>
+                <div className="tabular-nums text-emerald-800 font-semibold">{client.current === 0 ? <span className="text-gray-300">—</span> : `$${fmt(client.current)}`}</div>
               </div>
               <div className="bg-amber-50 rounded-md px-2 py-1.5 text-center">
                 <div className="text-[10px] text-amber-600 font-medium">91-120d</div>
-                <div className="tabular-nums text-amber-800 font-semibold">${fmt(client.watch)}</div>
+                <div className="tabular-nums text-amber-800 font-semibold">{client.watch === 0 ? <span className="text-gray-300">—</span> : `$${fmt(client.watch)}`}</div>
               </div>
               <div className="bg-red-50 rounded-md px-2 py-1.5 text-center">
                 <div className="text-[10px] text-red-600 font-medium">121d+</div>
-                <div className="tabular-nums text-red-800 font-semibold">${fmt(client.overdue)}</div>
+                <div className="tabular-nums text-red-800 font-semibold">{client.overdue === 0 ? <span className="text-gray-300">—</span> : `$${fmt(client.overdue)}`}</div>
               </div>
             </div>
           )}
@@ -158,10 +158,10 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
                 <span className="inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 flex-shrink-0">Sin contacto</span>
               )}
             </div>
-            <div className="col-span-2 text-right tabular-nums text-emerald-700">{fmt(client.current)}</div>
-            <div className="col-span-2 text-right tabular-nums text-amber-600">{fmt(client.watch)}</div>
+            <div className="col-span-2 text-right tabular-nums text-emerald-700">{client.current === 0 ? <span className="text-gray-300">—</span> : fmt(client.current)}</div>
+            <div className="col-span-2 text-right tabular-nums text-amber-600">{client.watch === 0 ? <span className="text-gray-300">—</span> : fmt(client.watch)}</div>
             <div className="col-span-2 text-right tabular-nums text-red-600 relative">
-              {fmt(client.overdue)}
+              {client.overdue === 0 ? <span className="text-gray-300">—</span> : fmt(client.overdue)}
               {/* Quick actions on hover — only when not in selection mode */}
               {!selectionMode && (
                 <span className="hidden group-hover:inline-flex absolute right-0 -top-0.5 items-center gap-1 ml-2" onClick={(e) => e.stopPropagation()}>

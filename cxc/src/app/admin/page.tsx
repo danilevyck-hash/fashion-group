@@ -10,16 +10,13 @@ import { normalizeName } from "@/lib/normalize";
 import { VENDOR_MAP } from "@/lib/vendors";
 import AppHeader from "@/components/AppHeader";
 import { Toast, PullToRefresh } from "@/components/ui";
-import UploadFreshness from "./components/UploadFreshness";
 import KpiCards from "./components/KpiCards";
-import CompanySummary from "./components/CompanySummary";
 import ClientTable from "./components/ClientTable";
 import { SkeletonRow } from "./components/Skeleton";
 import { generatePDFResumen, generatePDFDetallado } from "@/lib/pdf-cxc";
 import useAdminData from "./hooks/useAdminData";
 import { exportConsolidado } from "@/lib/excel-cxc-consolidado";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
-import SuggestionCard from "@/components/SuggestionCard";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 
 // ── Helpers ──────────────────────────────────────────────
@@ -369,7 +366,8 @@ export default function AdminDashboard() {
     return suggestions;
   }, [clients, contactLog]);
 
-  const { suggestion: cxcSuggestion, dismiss: dismissCxc } = useSmartSuggestions(cxcSuggestions);
+  // Hook still called to maintain hook order, but SuggestionCard removed from render
+  useSmartSuggestions(cxcSuggestions);
 
   if (!authChecked) return null;
 
@@ -584,13 +582,17 @@ export default function AdminDashboard() {
     );
   }
 
+  const canExport = userRole === "admin" || userRole === "secretaria";
+
   return (
     <PullToRefresh onRefresh={loadData}>
     <div>
       <AppHeader module="Panel CXC" />
       <div className="max-w-6xl mx-auto px-6 py-8">
-      {/* Export */}
-      <div className="flex justify-end items-center gap-2 sm:gap-3 mb-6 flex-wrap">
+
+      {/* Export buttons — admin/secretaria only */}
+      {canExport && (
+        <div className="flex justify-end items-center gap-2 sm:gap-3 mb-6 flex-wrap">
           <button
             onClick={() => (window.location.href = "/upload?tab=cxc")}
             className="text-sm border border-gray-200 text-gray-700 px-4 sm:px-5 rounded-lg font-medium hover:bg-gray-50 active:bg-gray-100 transition-all flex items-center gap-2 min-h-[44px]"
@@ -667,13 +669,8 @@ export default function AdminDashboard() {
               </div>
             </>)}
           </div>
-      </div>
-
-      {userRole === "vendedor" && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-xs text-blue-700 mb-4">Mostrando todos los clientes. Contacta al administrador para filtrar por vendedor.</div>
+        </div>
       )}
-
-      <UploadFreshness roleCompanies={cxcCompanies} uploads={uploads} />
 
       {/* Smart empty state: no CXC data loaded */}
       {!loading && roleClients.length === 0 && (
@@ -683,51 +680,33 @@ export default function AdminDashboard() {
             <path d="M12 8v4m0 4h.01" />
           </svg>
           <p className="text-sm font-medium text-gray-500 mb-1">No hay datos de cartera cargados</p>
-          {(() => {
-            const uploadDates = Object.values(uploads).map(u => new Date(u.uploaded_at).getTime());
-            const lastUploadMs = uploadDates.length > 0 ? Math.max(...uploadDates) : 0;
-            const daysSinceUpload = lastUploadMs ? Math.floor((Date.now() - lastUploadMs) / (1000 * 60 * 60 * 24)) : null;
-            return (
-              <>
-                {daysSinceUpload !== null && daysSinceUpload > 14 && (
-                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-4 py-2 text-xs mb-3">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                    La ultima carga fue hace {daysSinceUpload} dias. Los datos pueden estar desactualizados.
-                  </div>
-                )}
-                <p className="text-xs text-gray-400 mb-4 max-w-xs">Importa el archivo CSV de cartera desde Switch para ver el panel de cuentas por cobrar.</p>
-              </>
-            );
-          })()}
-          <button
-            onClick={() => (window.location.href = "/upload?tab=cxc")}
-            className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all min-h-[44px] flex items-center gap-2"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Importar archivo de cartera
-          </button>
+          <p className="text-xs text-gray-400 mb-4 max-w-xs">Importa el archivo CSV de cartera desde Switch para ver el panel de cuentas por cobrar.</p>
+          {canExport && (
+            <button
+              onClick={() => (window.location.href = "/upload?tab=cxc")}
+              className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all min-h-[44px] flex items-center gap-2"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+              Importar archivo de cartera
+            </button>
+          )}
         </div>
       )}
 
-      <KpiCards roleClients={roleClients} onFilterOverdue={() => setRiskFilter("overdue")} onSortByFollowUp={() => { setSortKey("follow_up"); setSortDir("asc"); }} />
+      {/* Search input — above KPIs */}
+      <div className="relative mb-4">
+        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar por nombre, telefono, email..."
+          className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+      </div>
 
-      {cxcSuggestion && <SuggestionCard suggestion={cxcSuggestion} onDismiss={dismissCxc} />}
-
-      <CompanySummary
-        roleCompanies={cxcCompanies}
-        roleClients={roleClients}
-        companyFilter={companyFilter}
-        clients={clients}
-        onSendVendorWhatsApp={sendVendorWhatsApp}
-      />
-
-      {/* Company selection hint for multi-company users */}
-      {cxcCompanies.length > 1 && companyFilter === "all" && roleClients.length > 0 && (
-        <div className="flex items-center gap-2 mb-4 bg-blue-50 border border-blue-100 rounded-lg px-4 py-2.5">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-          <p className="text-xs text-blue-700">Estas viendo todas las empresas. Selecciona una empresa en los filtros para ver cuentas especificas.</p>
-        </div>
-      )}
+      {/* Clickable KPI cards = risk filter */}
+      <KpiCards roleClients={roleClients} riskFilter={riskFilter} onRiskFilterChange={setRiskFilter} />
 
       <ClientTable
         filtered={filtered}
@@ -754,6 +733,7 @@ export default function AdminDashboard() {
         onRegisterContact={handleRegisterContact}
         favorites={favorites}
         onToggleFavorite={toggleFavorite}
+        hideSearchAndRiskFilters
       />
 
       <Toast message={toast} />
