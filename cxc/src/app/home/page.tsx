@@ -134,7 +134,7 @@ export default function PlantillasPage() {
     vencenHoy: number; vencenEstaSemana: number; prestamosPendientes: number;
     reclamosViejos: number; reclamosPendientes: number; reclamosResueltosEsteMes: number;
     cxcStale: boolean; lastUpload: string | null;
-    ventasMes: number; ventasPrev: number;
+    ventasMes: number; ventasMesLabel?: string; ventasPrev: number;
     cxcTotal: number; cxcVencida: number;
     chequesTotalPendiente: number;
     guiasPendientes: number;
@@ -260,7 +260,7 @@ export default function PlantillasPage() {
               onClick={() => setShowFinancials(!showFinancials)}
               className={`rounded-lg p-3 border cursor-pointer transition ${darkMode ? "border-gray-800 bg-gray-900 hover:border-gray-600" : "border-gray-200 bg-white hover:border-gray-300"}`}
             >
-              <p className="text-xs uppercase tracking-wider text-gray-500">Ventas del mes</p>
+              <p className="text-xs uppercase tracking-wider text-gray-500">Ventas del mes{stats.ventasMesLabel ? ` (${stats.ventasMesLabel})` : ""}</p>
               {showFinancials ? (
                 <>
                   <p className="text-lg font-semibold tabular-nums mt-0.5">${stats.ventasMes > 0 ? (stats.ventasMes / 1000).toFixed(0) + "K" : "—"}</p>
