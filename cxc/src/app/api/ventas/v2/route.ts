@@ -180,6 +180,8 @@ export async function GET(req: NextRequest) {
       .from("ventas_raw")
       .select("empresa, mes, subtotal, costo, utilidad, cliente, tipo, fecha")
       .eq("anio", año)
+      .order("fecha", { ascending: true })
+      .order("n_sistema", { ascending: true })
       .range(offset, offset + PAGE - 1);
     if (filterEmpresa) q = q.eq("empresa", filterEmpresa);
     const { data, error } = await q;
@@ -203,6 +205,8 @@ export async function GET(req: NextRequest) {
       .from("ventas_raw")
       .select("empresa, mes, subtotal, utilidad")
       .eq("anio", año - 1)
+      .order("fecha", { ascending: true })
+      .order("n_sistema", { ascending: true })
       .range(prevOffset, prevOffset + PAGE - 1);
     if (filterEmpresa) q = q.eq("empresa", filterEmpresa);
     const { data, error } = await q;
