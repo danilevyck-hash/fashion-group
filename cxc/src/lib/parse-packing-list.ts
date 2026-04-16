@@ -163,43 +163,6 @@ function hasNumericValueNearX(dataRawLine: RawLine | undefined, targetX: number,
   });
 }
 
-/** Find a raw line that matches a text line, searching within a specific range of rawLines */
-function findRawLineInRange(
-  rawLines: RawLine[],
-  textLine: string,
-  startIdx: number,
-  endIdx: number
-): RawLine | undefined {
-  const trimmed = textLine.trim();
-  if (!trimmed) return undefined;
-  const end = Math.min(endIdx, rawLines.length);
-  const start = Math.max(0, startIdx);
-  // Exact text match within range
-  for (let i = start; i < end; i++) {
-    if (rawLines[i].text.trim() === trimmed) return rawLines[i];
-  }
-  // Fuzzy: first token match within range
-  const firstToken = trimmed.split(/\s+/)[0];
-  for (let i = start; i < end; i++) {
-    if (rawLines[i].text.trim().startsWith(firstToken)) return rawLines[i];
-  }
-  return undefined;
-}
-
-/**
- * Find all header raw lines (Estilo + Color + Nombre) and their indices.
- * Returns array of { index, rawLine } sorted by index.
- */
-function findAllHeaderIndices(rawLines: RawLine[]): { index: number; rawLine: RawLine }[] {
-  const headers: { index: number; rawLine: RawLine }[] = [];
-  for (let i = 0; i < rawLines.length; i++) {
-    const t = rawLines[i].text;
-    if (/Estilo/i.test(t) && /Color/i.test(t) && /Nombre/i.test(t)) {
-      headers.push({ index: i, rawLine: rawLines[i] });
-    }
-  }
-  return headers;
-}
 
 // ── Main parser ──────────────────────────────────────────────────────
 
@@ -220,10 +183,11 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
   // Each page repeats: company header, address, phone, email, dept, then footer with page number.
   // We identify and remove these by pattern.
   const cleanLines: string[] = [];
+  const cleanToRawIndex: number[] = []; // maps cleanLines index → allLines/rawLines index
   const allLines = text.split("\n");
   for (let i = 0; i < allLines.length; i++) {
     const line = allLines[i].trim();
-    if (!line) { cleanLines.push(""); continue; }
+    if (!line) { cleanLines.push(""); cleanToRawIndex.push(i); continue; }
     // Skip page footers: "0080000166 PANAMA PANAMA PA  PACKING LIST" or "0070000008 VISTA..."
     if (/^0{3,}\d+\s/.test(line)) continue;
     // Skip "Página: X / Y"
@@ -250,168 +214,192 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
     if (/^L$/.test(line)) continue;
 
     cleanLines.push(allLines[i]);
+    cleanToRawIndex.push(i);
   }
-  const cleanText = cleanLines.join("\n");
+  // Helper: get rawLine by cleanLines index via direct index mapping
+  function getRawLine(cleanLineIdx: number): RawLine | undefined {
+    if (!rawLines || cleanLineIdx < 0 || cleanLineIdx >= cleanToRawIndex.length) return undefined;
+    const rawIdx = cleanToRawIndex[cleanLineIdx];
+    return rawLines[rawIdx];
+  }
 
-  const bultoSections = cleanText.split(/Bulto No\.\s*OCPA/i);
-  const rawBultos = bultoSections.slice(1);
+  // ── Single-pass over cleanLines ──────────────────────────────────────
+  // Instead of splitting into sections and matching text to find rawLines,
+  // we iterate cleanLines directly and use cleanToRawIndex for direct mapping.
 
   const bultos: PLBulto[] = [];
 
-  // Pre-compute all header indices in rawLines for scoped searching
-  const allHeaders = rawLines ? findAllHeaderIndices(rawLines) : [];
-  let headerCursor = 0; // tracks which header we're on across bultos
+  let currentBultoId = "";
+  let currentBultoTotalPiezas = 0;
+  let currentItemMap = new Map<string, PLBultoItem>();
+  let currentSizeInfo = { columns: [] as string[], mIndex: -1, dim32Index: -1, hasOS: false };
+  let mXPos = -1;
+  let dim32XPos = -1;
+  let currentEstilo = "";
+  let currentProducto = "";
 
-  for (const section of rawBultos) {
-    const idMatch = section.match(/^(\S+)/);
-    const ocpaId = idMatch ? `OCPA${idMatch[1]}` : "";
-    const bultoId = extractBultoId(ocpaId);
-
-    const piezasMatch = section.match(/Total piezas:\s*(\d+)/i);
-    const totalPiezas = piezasMatch ? parseInt(piezasMatch[1], 10) : 0;
-
-    const lines = section.split("\n").map(l => l.trim()).filter(Boolean);
-    let sizeInfo = { columns: [] as string[], mIndex: -1, dim32Index: -1, hasOS: false };
-    // X positions for M and 32 columns from PDF coordinates
-    let mXPos = -1;
-    let dim32XPos = -1;
-    // Range in rawLines that belongs to this bulto (for scoped searching)
-    let bultoRawStart = 0;
-    let bultoRawEnd = rawLines ? rawLines.length : 0;
-
-    for (const line of lines) {
-      if (/^Estilo\s+Color\s+Nombre/i.test(line)) {
-        sizeInfo = parseSizeHeader(line);
-        // If we have rawLines, find the X positions of M and 32 from PDF coordinates
-        if (rawLines && allHeaders.length > 0 && headerCursor < allHeaders.length) {
-          const currentHeader = allHeaders[headerCursor];
-          mXPos = findColumnXPos(currentHeader.rawLine, "M");
-          dim32XPos = findColumnXPos(currentHeader.rawLine, "32");
-          // Set search range: from this header to the next header (or end)
-          bultoRawStart = currentHeader.index;
-          bultoRawEnd = headerCursor + 1 < allHeaders.length
-            ? allHeaders[headerCursor + 1].index
-            : rawLines.length;
-          headerCursor++;
-        }
-        break;
-      }
+  function saveBulto() {
+    if (currentBultoId) {
+      bultos.push({
+        id: currentBultoId,
+        items: Array.from(currentItemMap.values()),
+        totalPiezas: currentBultoTotalPiezas,
+        sizeColumns: currentSizeInfo.columns,
+      });
     }
+  }
 
-    const itemMap = new Map<string, PLBultoItem>();
-    let currentEstilo = "";
-    let currentProducto = "";
+  for (let cli = 0; cli < cleanLines.length; cli++) {
+    const line = cleanLines[cli].trim();
+    if (!line) continue;
 
-    for (const line of lines) {
-      if (SKIP_RE.test(line)) continue;
-      if (/^Página:/i.test(line)) continue;
-      if (/^L$/.test(line.trim())) continue;
-      if (/^Estilo\s+Color/i.test(line)) continue;
+    const rawLine = getRawLine(cli);
 
-      const firstToken = line.split(/\s{2,}/)[0]?.trim() || "";
-
-      // Style line: first token is alphanumeric code with mixed letters+digits, 6+ chars
-      if (STYLE_CODE_RE.test(firstToken) && firstToken.length >= 6 && /[A-Za-z]/.test(firstToken) && /\d/.test(firstToken)) {
-        const parts = line.split(/\s{2,}/).map(p => p.trim()).filter(Boolean);
-
-        // Find the part that matches a known product keyword (CAMISA, POLO, etc.)
-        // This handles cases where the color has internal double-spaces creating extra parts
-        let producto = "";
-        for (let pi = 1; pi < parts.length; pi++) {
-          if (PRODUCT_KEYWORDS.test(parts[pi])) {
-            producto = parts[pi];
-            break;
-          }
-        }
-        // Fallback to parts[2] if no keyword match found
-        // If parts[2] looks like a number-only or too-short token (e.g. from a double-space color),
-        // try subsequent parts to find one that looks like a product name
-        if (!producto && parts.length >= 3) {
-          for (let fi = 2; fi < parts.length; fi++) {
-            const candidate = parts[fi];
-            // Skip tokens that are purely numeric or suspiciously short (< 4 chars)
-            if (/^\d+$/.test(candidate) || candidate.length < 4) continue;
-            producto = candidate;
-            break;
-          }
-          // Last resort: use parts[2] even if short
-          if (!producto) producto = parts[2];
-        }
-
-        currentEstilo = firstToken;
-        currentProducto = producto ? normalizeProductName(producto) : "";
-        continue;
-      }
-
-      // Number line or continuation line (text + numbers) following a style
-      if (currentEstilo) {
-        const nums = line.match(/\d+/g);
-        if (nums && nums.length > 0) {
-          const qty = parseInt(nums[nums.length - 1], 10);
-          if (qty > 0 && qty < 10000) {
-            // Check if M or 32 is present using X-position coordinates when available
-            let hasM: boolean;
-            let has32: boolean;
-
-            if (rawLines && (mXPos >= 0 || dim32XPos >= 0)) {
-              // Use X-position matching from PDF coordinates (accurate even when columns collapse)
-              const dataRawLine = findRawLineInRange(rawLines, line, bultoRawStart, bultoRawEnd);
-              hasM = hasNumericValueNearX(dataRawLine, mXPos);
-              has32 = hasNumericValueNearX(dataRawLine, dim32XPos);
-            } else {
-              // Fallback: positional index matching (original heuristic)
-              const numValues = line.trim().split(/\s+/).filter(t => /^\d+$/.test(t));
-              const expectedCols = sizeInfo.columns.length;
-              if (numValues.length >= expectedCols + 1) {
-                hasM = sizeInfo.mIndex >= 0 && parseInt(numValues[sizeInfo.mIndex]) > 0;
-                has32 = sizeInfo.dim32Index >= 0 && parseInt(numValues[sizeInfo.dim32Index]) > 0;
-              } else if (sizeInfo.hasOS && numValues.length <= 2) {
-                hasM = false;
-                has32 = false;
-              } else if (numValues.length > 2) {
-                hasM = sizeInfo.mIndex >= 0 && numValues.length > sizeInfo.mIndex;
-                has32 = sizeInfo.dim32Index >= 0 && numValues.length > sizeInfo.dim32Index;
-              } else {
-                hasM = false;
-                has32 = false;
-              }
-            }
-
-            const existing = itemMap.get(currentEstilo);
-            if (existing) {
-              itemMap.set(currentEstilo, {
-                ...existing,
-                qty: existing.qty + qty,
-                hasM: existing.hasM || hasM,
-                has32: existing.has32 || has32,
-              });
-            } else {
-              itemMap.set(currentEstilo, {
-                estilo: currentEstilo,
-                producto: currentProducto,
-                qty,
-                hasM,
-                has32,
-              });
-            }
-            currentEstilo = "";
-            currentProducto = "";
-            continue;
-          }
-        }
-      }
-
+    // Detect new bulto
+    if (/Bulto No\.\s*OCPA/i.test(line)) {
+      // Save previous bulto if any
+      saveBulto();
+      // Start new bulto
+      const idMatch = line.match(/OCPA\s*(\S+)/i);
+      const ocpaId = idMatch ? `OCPA${idMatch[1]}` : "";
+      currentBultoId = extractBultoId(ocpaId);
+      // Total piezas is often on the same line as "Bulto No. OCPA..."
+      const piezasOnLine = line.match(/Total piezas:\s*(\d+)/i);
+      currentBultoTotalPiezas = piezasOnLine ? parseInt(piezasOnLine[1], 10) : 0;
+      currentItemMap = new Map<string, PLBultoItem>();
+      currentSizeInfo = { columns: [] as string[], mIndex: -1, dim32Index: -1, hasOS: false };
+      mXPos = -1;
+      dim32XPos = -1;
       currentEstilo = "";
       currentProducto = "";
+      continue;
     }
 
-    bultos.push({
-      id: bultoId,
-      items: Array.from(itemMap.values()),
-      totalPiezas,
-      sizeColumns: sizeInfo.columns,
-    });
+    // Not inside a bulto yet
+    if (!currentBultoId) continue;
+
+    // Detect "Total piezas" on a separate line (fallback)
+    if (!currentBultoTotalPiezas) {
+      const piezasMatch = line.match(/Total piezas:\s*(\d+)/i);
+      if (piezasMatch) {
+        currentBultoTotalPiezas = parseInt(piezasMatch[1], 10);
+        continue;
+      }
+    }
+
+    // Detect header line
+    if (/^Estilo\s+Color\s+Nombre/i.test(line)) {
+      currentSizeInfo = parseSizeHeader(line);
+      if (rawLine) {
+        mXPos = findColumnXPos(rawLine, "M");
+        dim32XPos = findColumnXPos(rawLine, "32");
+      }
+      continue;
+    }
+
+    // Skip known non-data lines
+    if (SKIP_RE.test(line)) continue;
+    if (/^Página:/i.test(line)) continue;
+    if (/^L$/.test(line)) continue;
+
+    const firstToken = line.split(/\s{2,}/)[0]?.trim() || "";
+
+    // Style line: first token is alphanumeric code with mixed letters+digits, 6+ chars
+    if (STYLE_CODE_RE.test(firstToken) && firstToken.length >= 6 && /[A-Za-z]/.test(firstToken) && /\d/.test(firstToken)) {
+      const parts = line.split(/\s{2,}/).map(p => p.trim()).filter(Boolean);
+
+      // Find the part that matches a known product keyword (CAMISA, POLO, etc.)
+      // This handles cases where the color has internal double-spaces creating extra parts
+      let producto = "";
+      for (let pi = 1; pi < parts.length; pi++) {
+        if (PRODUCT_KEYWORDS.test(parts[pi])) {
+          producto = parts[pi];
+          break;
+        }
+      }
+      // Fallback to parts[2] if no keyword match found
+      // If parts[2] looks like a number-only or too-short token (e.g. from a double-space color),
+      // try subsequent parts to find one that looks like a product name
+      if (!producto && parts.length >= 3) {
+        for (let fi = 2; fi < parts.length; fi++) {
+          const candidate = parts[fi];
+          // Skip tokens that are purely numeric or suspiciously short (< 4 chars)
+          if (/^\d+$/.test(candidate) || candidate.length < 4) continue;
+          producto = candidate;
+          break;
+        }
+        // Last resort: use parts[2] even if short
+        if (!producto) producto = parts[2];
+      }
+
+      currentEstilo = firstToken;
+      currentProducto = producto ? normalizeProductName(producto) : "";
+      continue;
+    }
+
+    // Number line or continuation line (text + numbers) following a style
+    if (currentEstilo) {
+      const nums = line.match(/\d+/g);
+      if (nums && nums.length > 0) {
+        const qty = parseInt(nums[nums.length - 1], 10);
+        if (qty > 0 && qty < 10000) {
+          // Check if M or 32 is present using X-position coordinates when available
+          let hasM: boolean;
+          let has32: boolean;
+
+          if (rawLines && (mXPos >= 0 || dim32XPos >= 0)) {
+            // Use direct index mapping — no text matching needed!
+            hasM = hasNumericValueNearX(rawLine, mXPos);
+            has32 = hasNumericValueNearX(rawLine, dim32XPos);
+          } else {
+            // Fallback: positional index matching (original heuristic)
+            const numValues = line.trim().split(/\s+/).filter(t => /^\d+$/.test(t));
+            const expectedCols = currentSizeInfo.columns.length;
+            if (numValues.length >= expectedCols + 1) {
+              hasM = currentSizeInfo.mIndex >= 0 && parseInt(numValues[currentSizeInfo.mIndex]) > 0;
+              has32 = currentSizeInfo.dim32Index >= 0 && parseInt(numValues[currentSizeInfo.dim32Index]) > 0;
+            } else if (currentSizeInfo.hasOS && numValues.length <= 2) {
+              hasM = false;
+              has32 = false;
+            } else if (numValues.length > 2) {
+              hasM = currentSizeInfo.mIndex >= 0 && numValues.length > currentSizeInfo.mIndex;
+              has32 = currentSizeInfo.dim32Index >= 0 && numValues.length > currentSizeInfo.dim32Index;
+            } else {
+              hasM = false;
+              has32 = false;
+            }
+          }
+
+          const existing = currentItemMap.get(currentEstilo);
+          if (existing) {
+            currentItemMap.set(currentEstilo, {
+              ...existing,
+              qty: existing.qty + qty,
+              hasM: existing.hasM || hasM,
+              has32: existing.has32 || has32,
+            });
+          } else {
+            currentItemMap.set(currentEstilo, {
+              estilo: currentEstilo,
+              producto: currentProducto,
+              qty,
+              hasM,
+              has32,
+            });
+          }
+          currentEstilo = "";
+          currentProducto = "";
+          continue;
+        }
+      }
+    }
+
+    currentEstilo = "";
+    currentProducto = "";
   }
+
+  // Save the last bulto
+  saveBulto();
 
   const totalBultos = bultos.length;
   const totalPiezas = bultos.reduce((sum, b) => sum + b.totalPiezas, 0);
