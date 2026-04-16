@@ -178,23 +178,8 @@ export function parsePackingListText(text: string): ParsedPackingList {
         if (producto) {
           currentEstilo = firstToken;
           currentProducto = normalizeProductName(producto);
-
-          // Check if the same line also has numbers at the end (sometimes qty is on same line)
-          // e.g. "40EM125430  BLUE DESCENT  CAMISA PARA CABALLERO M/L  6  12  5  23"
-          // But from our extraction, numbers are usually on the NEXT line
-          // Still check: if the last parts are numbers, use the last as qty
-          const trailingNums = parts.filter(p => /^\d+$/.test(p));
-          if (trailingNums.length > 0) {
-            const qty = parseInt(trailingNums[trailingNums.length - 1], 10);
-            if (qty > 0) {
-              const existing = itemMap.get(currentEstilo);
-              if (existing) {
-                itemMap.set(currentEstilo, { ...existing, qty: existing.qty + qty });
-              } else {
-                itemMap.set(currentEstilo, { estilo: currentEstilo, producto: currentProducto, qty });
-              }
-            }
-          }
+          // Qty is ALWAYS on the next line(s), never on the style line itself.
+          // Trailing numbers on style lines are size headers (e.g. "34" for pants).
         }
         continue;
       }
@@ -216,28 +201,24 @@ export function parsePackingListText(text: string): ParsedPackingList {
         continue;
       }
 
-      // If line has a color continuation (like "AIR" from "PLEIN AIR") followed by numbers
-      // Pattern: short text + numbers, and we still have a current style waiting for numbers
-      if (currentEstilo && /\d/.test(line) && line.split(/\s+/).length <= 8) {
-        // Only accept if the line has mostly numbers (more digits than letters)
-        const digitCount = (line.match(/\d/g) || []).length;
-        const letterCount = (line.match(/[A-Za-z]/g) || []).length;
-        if (digitCount > letterCount) {
-          const nums = line.match(/\d+/g);
-          if (nums && nums.length > 0) {
-            const qty = parseInt(nums[nums.length - 1], 10);
-            if (qty > 0 && qty < 10000) {
-              const existing = itemMap.get(currentEstilo);
-              if (existing) {
-                itemMap.set(currentEstilo, { ...existing, qty: existing.qty + qty });
-              } else {
-                itemMap.set(currentEstilo, { estilo: currentEstilo, producto: currentProducto, qty });
-              }
+      // Continuation line: text (color/product wrap) + numbers (sizes + qty)
+      // e.g. "CABALLERO  2  13  7  3  2  27" or "AIR  12  12  6  1  31" or "STRIPE  1  3  2  2  1  9"
+      // Also pure number lines that weren't caught above (have leading spaces or mixed)
+      if (currentEstilo) {
+        const nums = line.match(/\d+/g);
+        if (nums && nums.length > 0) {
+          const qty = parseInt(nums[nums.length - 1], 10);
+          if (qty > 0 && qty < 10000) {
+            const existing = itemMap.get(currentEstilo);
+            if (existing) {
+              itemMap.set(currentEstilo, { ...existing, qty: existing.qty + qty });
+            } else {
+              itemMap.set(currentEstilo, { estilo: currentEstilo, producto: currentProducto, qty });
             }
+            currentEstilo = "";
+            currentProducto = "";
+            continue;
           }
-          currentEstilo = "";
-          currentProducto = "";
-          continue;
         }
       }
 
