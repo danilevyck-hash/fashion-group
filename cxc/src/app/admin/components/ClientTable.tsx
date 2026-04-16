@@ -122,16 +122,6 @@ export default function ClientTable({
   // Reset page when filters change
   useEffect(() => { setPage(0); }, [riskFilter, companyFilter, search]);
 
-  // When page loads with a persisted expanded row, scroll it into view
-  useEffect(() => {
-    if (expanded && filtered.length > 0) {
-      requestAnimationFrame(() => {
-        const el = document.getElementById(`cxc-row-${encodeURIComponent(expanded)}`);
-        if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-      });
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered.length > 0]); // Only on initial data load
 
   const countCurrent = roleClients.filter((c) => c.overdue === 0 && c.watch === 0).length;
   const countWatch = roleClients.filter((c) => c.watch > 0).length;
@@ -414,23 +404,14 @@ export default function ClientTable({
             const isExpanded = expanded === client.nombre_normalized;
             const isSelected = selectedNames.has(client.nombre_normalized);
             return (
-              <div key={client.nombre_normalized} className={`scroll-mt-20 ${isSelected ? "bg-emerald-50/50" : ""}`} id={`cxc-row-${encodeURIComponent(client.nombre_normalized)}`}>
+              <div key={client.nombre_normalized} className={isSelected ? "bg-emerald-50/50" : ""}>
+                <div className={isExpanded ? "sticky top-[80px] z-[4] bg-white" : ""}>
                 <ClientRow
                   client={client}
                   isExpanded={isExpanded}
                   onToggle={() => {
                     if (selectionMode) { toggleSelection(client.nombre_normalized); }
-                    else {
-                      const next = isExpanded ? null : client.nombre_normalized;
-                      setExpanded(next);
-                      if (next) {
-                        // Scroll the row into view so it doesn't hide behind the sticky header
-                        requestAnimationFrame(() => {
-                          const el = document.getElementById(`cxc-row-${encodeURIComponent(client.nombre_normalized)}`);
-                          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-                        });
-                      }
-                    }
+                    else { setExpanded(isExpanded ? null : client.nombre_normalized); }
                   }}
                   userRole={userRole}
                   contactLog={contactLog}
@@ -443,6 +424,7 @@ export default function ClientTable({
                   onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(client.nombre_normalized) : undefined}
                   onRowContextMenu={(e) => showContextMenu(e, buildClientContextMenu(client))}
                 />
+                </div>
                 {!selectionMode && (
                   <AccordionContent open={isExpanded}>
                     <ContactPanel
