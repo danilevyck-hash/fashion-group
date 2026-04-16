@@ -49,6 +49,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "El packing list debe tener al menos un item" }, { status: 400 });
   }
 
+  // Check if a PL with the same numero_pl already exists — if so, delete old one (cascade deletes pl_items)
+  const { data: existingPLs } = await supabaseServer
+    .from("packing_lists")
+    .select("id")
+    .eq("numero_pl", numeroPL);
+
+  if (existingPLs && existingPLs.length > 0) {
+    for (const old of existingPLs) {
+      // Delete pl_items first (in case no cascade)
+      await supabaseServer.from("pl_items").delete().eq("pl_id", old.id);
+      await supabaseServer.from("packing_lists").delete().eq("id", old.id);
+    }
+  }
+
   // Insert packing list
   const { data: pl, error: plErr } = await supabaseServer
     .from("packing_lists")

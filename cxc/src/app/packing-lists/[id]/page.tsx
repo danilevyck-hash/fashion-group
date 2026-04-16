@@ -31,6 +31,7 @@ export default function PackingListDetailPage() {
   const [pl, setPl] = useState<PLDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
 
   const loadPL = useCallback(async () => {
     try {
@@ -84,6 +85,18 @@ export default function PackingListDetailPage() {
 
     return groups;
   }, [pl]);
+
+  // Filter groups by search query
+  const filteredGroups = useMemo(() => {
+    const q = search.trim().toUpperCase();
+    if (!q) return groupedRows;
+    return groupedRows
+      .map((group) => ({
+        ...group,
+        rows: group.rows.filter((row) => row.estilo.toUpperCase().includes(q)),
+      }))
+      .filter((group) => group.rows.length > 0);
+  }, [groupedRows, search]);
 
   // PDF generation
   async function generatePDF() {
@@ -321,6 +334,17 @@ export default function PackingListDetailPage() {
           </div>
         </div>
 
+        {/* Search */}
+        <div className="print:hidden">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar estilo..."
+            className="w-full sm:w-64 px-3 py-2 border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+          />
+        </div>
+
         {/* Index table */}
         <div className="border border-gray-200 rounded-lg overflow-hidden">
           <div className="overflow-x-auto">
@@ -336,14 +360,14 @@ export default function PackingListDetailPage() {
                 </tr>
               </thead>
               <tbody>
-                {groupedRows.length === 0 && (
+                {filteredGroups.length === 0 && (
                   <tr>
                     <td colSpan={4} className="px-3 py-8 text-center text-gray-400 text-sm">
-                      Sin datos de estilos
+                      {search ? "No se encontraron estilos" : "Sin datos de estilos"}
                     </td>
                   </tr>
                 )}
-                {groupedRows.map((group, gi) => (
+                {filteredGroups.map((group, gi) => (
                   <GroupRows key={gi} group={group} rowOffset={gi} />
                 ))}
               </tbody>

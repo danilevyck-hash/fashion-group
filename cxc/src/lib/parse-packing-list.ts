@@ -189,12 +189,15 @@ export function parsePackingListText(text: string): ParsedPackingList {
     // Skip phone: "445-7050" or similar standalone phone
     if (/^\d{3}-\d{4}$/.test(line)) continue;
     // Skip address/company lines that repeat on each page
-    if (/^(FASHION WEAR|VISTANA|ACTIVE|VISTA HERMOSA|MIRIAM)/i.test(line) && !/Bulto/i.test(line) && i > 5) continue;
+    if (/^(FASHION WEAR|FASHION SHOES|VISTANA|ACTIVE SHOES|ACTIVE WEAR|ACTIVE|JOYSTEP|CONFECCIONES BOSTON|MULTIFASHION|VISTA HERMOSA|MIRIAM)/i.test(line) && !/Bulto/i.test(line) && i > 5) continue;
     // Skip Tel/Email/País/Dept/Vendedor repeats
     if (/^(Tel:|Email:|País:|Departamento:|Vendedor:)/i.test(line) && i > 10) continue;
-    // Skip address patterns
+    // Skip address patterns (generic: PANAMA + postal codes, EDIFICIO, etc.)
     if (/^PANAMA\s+D\.V\./i.test(line)) continue;
     if (/PANAMA\s*0555/i.test(line)) continue;
+    if (/\bPANAMA\b.*\b\d{4,}\b/i.test(line) && i > 5) continue;
+    if (/^(EDIFICIO|CALLE|AVENIDA|AV\.|BARRIADA|CORREGIMIENTO|APARTADO|ZONA\s+LIBRE)/i.test(line) && i > 5) continue;
+    if (/\bR\.?U\.?C\.?\b/i.test(line) && i > 5) continue;
     // Skip standalone "L" (from XL/XXL header wrap)
     if (/^L$/.test(line)) continue;
 
@@ -238,7 +241,7 @@ export function parsePackingListText(text: string): ParsedPackingList {
       const firstToken = line.split(/\s{2,}/)[0]?.trim() || "";
 
       // Style line: first token is alphanumeric code with mixed letters+digits, 6+ chars
-      if (STYLE_CODE_RE.test(firstToken) && /[A-Za-z]/.test(firstToken) && /\d/.test(firstToken)) {
+      if (STYLE_CODE_RE.test(firstToken) && firstToken.length >= 6 && /[A-Za-z]/.test(firstToken) && /\d/.test(firstToken)) {
         const parts = line.split(/\s{2,}/).map(p => p.trim()).filter(Boolean);
 
         // Find the part that matches a known product keyword (CAMISA, POLO, etc.)
@@ -251,8 +254,18 @@ export function parsePackingListText(text: string): ParsedPackingList {
           }
         }
         // Fallback to parts[2] if no keyword match found
+        // If parts[2] looks like a number-only or too-short token (e.g. from a double-space color),
+        // try subsequent parts to find one that looks like a product name
         if (!producto && parts.length >= 3) {
-          producto = parts[2];
+          for (let fi = 2; fi < parts.length; fi++) {
+            const candidate = parts[fi];
+            // Skip tokens that are purely numeric or suspiciously short (< 4 chars)
+            if (/^\d+$/.test(candidate) || candidate.length < 4) continue;
+            producto = candidate;
+            break;
+          }
+          // Last resort: use parts[2] even if short
+          if (!producto) producto = parts[2];
         }
 
         currentEstilo = firstToken;
@@ -267,10 +280,24 @@ export function parsePackingListText(text: string): ParsedPackingList {
           const qty = parseInt(nums[nums.length - 1], 10);
           if (qty > 0 && qty < 10000) {
             // Check if M or 32 is present: M is in the size columns
-            // For simplicity, check if the number line has enough values to cover M position
             const numValues = line.trim().split(/\s+/).filter(t => /^\d+$/.test(t));
-            const hasM = sizeInfo.mIndex >= 0 && numValues.length > sizeInfo.mIndex && parseInt(numValues[sizeInfo.mIndex]) > 0;
-            const has32 = sizeInfo.dim32Index >= 0 && numValues.length > sizeInfo.dim32Index && parseInt(numValues[sizeInfo.dim32Index]) > 0;
+            // Total size columns expected (excluding Qty at end)
+            const expectedCols = sizeInfo.columns.length;
+            // If data line has enough values to map positionally, use exact position
+            // If fewer values (empty sizes collapsed in text extraction), fall back to conservative:
+            // assume M/32 exists if the column is in the header (we can't tell which cols are missing)
+            let hasM: boolean;
+            let has32: boolean;
+            if (numValues.length >= expectedCols + 1) {
+              // Enough values: positional mapping reliable (numValues includes Qty at end)
+              hasM = sizeInfo.mIndex >= 0 && parseInt(numValues[sizeInfo.mIndex]) > 0;
+              has32 = sizeInfo.dim32Index >= 0 && parseInt(numValues[sizeInfo.dim32Index]) > 0;
+            } else {
+              // Fewer values than expected: can't reliably map positions
+              // Conservative: if M/32 is in header and this style has data, assume it might have M/32
+              hasM = sizeInfo.mIndex >= 0;
+              has32 = sizeInfo.dim32Index >= 0;
+            }
 
             const existing = itemMap.get(currentEstilo);
             if (existing) {

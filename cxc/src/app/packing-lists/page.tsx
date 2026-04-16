@@ -81,13 +81,23 @@ export default function PackingListsPage() {
       // Group items by Y position to reconstruct lines
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const items = content.items as any[];
-      const lineMap = new Map<number, { x: number; str: string }[]>();
+      // Collect all Y positions first, then cluster them (within 2px = same line)
+      const rawItems: { x: number; y: number; str: string }[] = [];
       for (const item of items) {
         if (!item.str || !item.str.trim()) continue;
-        // Round Y to nearest integer to group items on the same line
-        const y = Math.round(item.transform[5]);
-        if (!lineMap.has(y)) lineMap.set(y, []);
-        lineMap.get(y)!.push({ x: item.transform[4], str: item.str });
+        rawItems.push({ x: item.transform[4], y: item.transform[5], str: item.str });
+      }
+      // Sort by Y descending to cluster from top to bottom
+      rawItems.sort((a, b) => b.y - a.y);
+      // Cluster Y positions: if two Ys are within 2px, they belong to the same line
+      const lineMap = new Map<number, { x: number; str: string }[]>();
+      let currentClusterY = -Infinity;
+      for (const item of rawItems) {
+        if (Math.abs(item.y - currentClusterY) > 2) {
+          currentClusterY = item.y;
+        }
+        if (!lineMap.has(currentClusterY)) lineMap.set(currentClusterY, []);
+        lineMap.get(currentClusterY)!.push({ x: item.x, str: item.str });
       }
       // Sort by Y descending (PDF coordinates: top = higher Y)
       const sortedYs = [...lineMap.keys()].sort((a, b) => b - a);
