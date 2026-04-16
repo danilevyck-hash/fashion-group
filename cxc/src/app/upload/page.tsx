@@ -15,8 +15,7 @@ import { logActivityClient } from "@/lib/logActivityClient";
 // ── Empresas for the upload grid ──────────────────────────────────────────────
 
 const UPLOAD_EMPRESAS = [
-  { key: "multifashion", name: "Multifashion", brand: "Multi-marca", weekly: true },
-  { key: "vistana_international", name: "Vistana International", brand: "Calvin Klein" },
+  { key: "vistana", name: "Vistana International", brand: "Calvin Klein" },
   { key: "fashion_wear", name: "Fashion Wear", brand: "Tommy Hilfiger Apparel" },
   { key: "fashion_shoes", name: "Fashion Shoes", brand: "Tommy Hilfiger Shoes" },
   { key: "active_shoes", name: "Active Shoes", brand: "Reebok Shoes" },
@@ -504,7 +503,7 @@ function UploadPageInner() {
       const up = ventasUploads[key] ?? ventasUploads[UPLOAD_EMPRESAS.find(e => e.key === key)?.name ?? ""];
       if (!up) return <div className="flex items-center gap-1.5 text-xs text-gray-400"><span className="opacity-50">&#9898;</span> Sin datos</div>;
       const days = (Date.now() - new Date(up.date).getTime()) / 86400000;
-      const thresholds = key === "multifashion" ? { warn: 7, alert: 14 } : { warn: 30, alert: 60 };
+      const thresholds = { warn: 30, alert: 60 };
       const detail = `${up.label}${up.count ? ` · ${up.count.toLocaleString()} reg.` : ""}`;
       if (days > thresholds.alert) return <div className="flex items-center gap-1.5 text-xs text-red-600"><span>&#128308;</span> Atrasado &middot; {detail}</div>;
       if (days > thresholds.warn) return <div className="flex items-center gap-1.5 text-xs text-amber-600"><span>&#9888;&#65039;</span> Pendiente &middot; {detail}</div>;
@@ -733,12 +732,11 @@ function UploadPageInner() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               {UPLOAD_EMPRESAS.map((co) => (
                 <div key={co.key}
-                  className={`border rounded-lg p-4 transition cursor-pointer relative ${dragOver === co.key ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"} ${co.key === "multifashion" ? "bg-amber-50/30" : ""} ${ventasUploading === co.name ? "opacity-60 pointer-events-none" : ""}`}
+                  className={`border rounded-lg p-4 transition cursor-pointer relative ${dragOver === co.key ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"} ${ventasUploading === co.name ? "opacity-60 pointer-events-none" : ""}`}
                   onDragOver={(e) => { e.preventDefault(); setDragOver(co.key); }}
                   onDragLeave={() => setDragOver(null)}
                   onDrop={(e) => { e.preventDefault(); setDragOver(null); const f = e.dataTransfer.files[0]; if (f) openVentasPreview(co.key, co.name, f); }}
                   onClick={() => ventasFileRefs.current[co.key]?.click()}>
-                  {"weekly" in co && <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-medium absolute top-3 right-3">Semanal</span>}
                   {ventasUploading === co.name && <span className="text-[9px] bg-black text-white px-2 py-0.5 rounded-full font-medium absolute top-3 right-3">Subiendo...</span>}
                   <div className="text-sm font-medium mb-0.5">{co.name}</div>
                   <div className="text-xs text-gray-400 mb-3">{co.brand}</div>
