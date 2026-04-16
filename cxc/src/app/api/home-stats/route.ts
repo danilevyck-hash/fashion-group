@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { getVentasMensuales } from "@/lib/empresa-mapping";
 
 export const dynamic = "force-dynamic";
 
@@ -42,9 +43,9 @@ export async function GET(req: NextRequest) {
     supabaseServer.from("cxc_uploads").select("uploaded_at").order("uploaded_at", { ascending: false }).limit(1),
     supabaseServer.from("prestamos_movimientos").select("*", { count: "exact", head: true }).eq("estado", "pendiente_aprobacion"),
     // Ventas mes actual
-    supabaseServer.from("ventas_mensuales").select("ventas_brutas, notas_credito").eq("año", currentYear).eq("mes", currentMonth),
+    getVentasMensuales(currentYear, currentMonth).then(d => ({ data: d, error: null })).catch(() => ({ data: null, error: null })),
     // Ventas mes anterior
-    supabaseServer.from("ventas_mensuales").select("ventas_brutas, notas_credito").eq("año", prevYear).eq("mes", prevMonth),
+    getVentasMensuales(prevYear, prevMonth).then(d => ({ data: d, error: null })).catch(() => ({ data: null, error: null })),
     // CxC totals
     supabaseServer.from("cxc_rows").select("total, d121_180, d181_270, d271_365, mas_365"),
   ]);
@@ -66,8 +67,8 @@ export async function GET(req: NextRequest) {
   const cxcStale = lastUpload ? new Date(lastUpload) < new Date(staleDate) : true;
 
   // Ventas
-  const ventasMes = (ventasMesRes.data || []).reduce((s, r) => s + (Number(r.ventas_brutas) || 0) - (Number(r.notas_credito) || 0), 0);
-  const ventasPrev = (ventasPrevRes.data || []).reduce((s, r) => s + (Number(r.ventas_brutas) || 0) - (Number(r.notas_credito) || 0), 0);
+  const ventasMes = (ventasMesRes.data || []).reduce((s: number, r: { ventas_netas: number }) => s + (Number(r.ventas_netas) || 0), 0);
+  const ventasPrev = (ventasPrevRes.data || []).reduce((s: number, r: { ventas_netas: number }) => s + (Number(r.ventas_netas) || 0), 0);
 
   // CxC
   const cxcRows = cxcRes.data || [];

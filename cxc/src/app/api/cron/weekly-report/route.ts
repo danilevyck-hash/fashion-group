@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { Resend } from "resend";
+import { getVentasMensuales } from "@/lib/empresa-mapping";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -30,12 +31,11 @@ export async function GET(req: NextRequest) {
   const weekFromNow = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10);
 
   // Ventas this month by empresa
-  const { data: ventas } = await supabaseServer.from("ventas_mensuales").select("empresa, ventas_brutas, notas_credito").eq("año", year).eq("mes", month);
-  const ventasHtml = (ventas || []).map(v => {
-    const netas = (Number(v.ventas_brutas) || 0) - (Number(v.notas_credito) || 0);
-    return `<tr><td style="padding:4px 8px">${v.empresa}</td><td style="padding:4px 8px;text-align:right">$${fmt(netas)}</td></tr>`;
+  const ventas = await getVentasMensuales(year, month);
+  const ventasHtml = ventas.map(v => {
+    return `<tr><td style="padding:4px 8px">${v.empresa}</td><td style="padding:4px 8px;text-align:right">$${fmt(v.ventas_netas)}</td></tr>`;
   }).join("");
-  const totalVentas = (ventas || []).reduce((s, v) => s + (Number(v.ventas_brutas) || 0) - (Number(v.notas_credito) || 0), 0);
+  const totalVentas = ventas.reduce((s, v) => s + v.ventas_netas, 0);
 
   // CxC vencida
   const { data: cxc } = await supabaseServer.from("cxc_rows").select("total, d121_180, d181_270, d271_365, mas_365");

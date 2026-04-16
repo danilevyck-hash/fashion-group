@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { reebokServer } from "@/lib/reebok-supabase-server";
 import { requireRole } from "@/lib/requireRole";
+import { getVentasMensuales } from "@/lib/empresa-mapping";
 
 const BASE_SYSTEM_PROMPT = `Eres el asistente de inteligencia de negocios de Fashion Group Panamá, un grupo de distribución de moda.
 
@@ -113,7 +114,7 @@ async function buildSystemData(): Promise<string> {
     safe(supabaseServer.from("cxc_rows").select("company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365")),
     safe(supabaseServer.from("cxc_uploads").select("uploaded_at, company_key").order("uploaded_at", { ascending: false }).limit(5)),
     // Ventas
-    safe(supabaseServer.from("ventas_mensuales").select("empresa, mes, ventas_brutas, notas_credito, costo_total").eq("año", year)),
+    safe(getVentasMensuales(year).then(d => ({ data: d }))),
     safe(supabaseServer.from("ventas_metas").select("empresa, mes, meta").eq("anio", year)),
     // Facturas recientes
     safe(supabaseServer.from("ventas_raw").select("fecha, tipo, n_sistema, n_fiscal, cliente, vendedor, subtotal, total, utilidad, empresa").order("fecha", { ascending: false }).limit(50)),
@@ -180,13 +181,12 @@ async function buildSystemData(): Promise<string> {
 
   // ── Ventas ──
   {
-    const ventasPorEmpresa: Record<string, Record<number, { brutas: number; nc: number; costo: number }>> = {};
+    const ventasPorEmpresa: Record<string, Record<number, { netas: number; costo: number }>> = {};
     for (const v of ventasThisYear) {
       if (!ventasPorEmpresa[v.empresa]) ventasPorEmpresa[v.empresa] = {};
       ventasPorEmpresa[v.empresa][v.mes] = {
-        brutas: Number(v.ventas_brutas) || 0,
-        nc: Number(v.notas_credito) || 0,
-        costo: Number(v.costo_total) || 0,
+        netas: Number(v.ventas_netas) || 0,
+        costo: Number(v.costo) || 0,
       };
     }
     const metasPorEmpresa: Record<string, Record<number, number>> = {};
@@ -198,10 +198,9 @@ async function buildSystemData(): Promise<string> {
     let totalMesActual = 0, totalMesAnterior = 0, totalAnio = 0, totalMetaMes = 0;
     for (const [, meses] of Object.entries(ventasPorEmpresa)) {
       for (const [mesStr, d] of Object.entries(meses)) {
-        const netas = d.brutas - d.nc;
-        totalAnio += netas;
-        if (Number(mesStr) === month) totalMesActual += netas;
-        if (Number(mesStr) === month - 1) totalMesAnterior += netas;
+        totalAnio += d.netas;
+        if (Number(mesStr) === month) totalMesActual += d.netas;
+        if (Number(mesStr) === month - 1) totalMesAnterior += d.netas;
       }
     }
     for (const [, meses] of Object.entries(metasPorEmpresa)) {
@@ -215,7 +214,7 @@ async function buildSystemData(): Promise<string> {
 
     // Per company this month
     const empThisMonth = Object.entries(ventasPorEmpresa)
-      .map(([emp, meses]) => ({ emp, netas: meses[month] ? meses[month].brutas - meses[month].nc : 0, meta: metasPorEmpresa[emp]?.[month] || 0 }))
+      .map(([emp, meses]) => ({ emp, netas: meses[month] ? meses[month].netas : 0, meta: metasPorEmpresa[emp]?.[month] || 0 }))
       .filter(e => e.netas !== 0 || e.meta !== 0)
       .sort((a, b) => b.netas - a.netas);
     if (empThisMonth.length > 0) {

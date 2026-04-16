@@ -2,22 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 import { normalizeName } from "@/lib/normalize";
+import { mapEmpresaName } from "@/lib/empresa-mapping";
 
-// ─── Empresa key → display name mapping (ventas_raw uses snake_case keys) ────
-
-const EMPRESA_KEY_TO_NAME: Record<string, string> = {
-  vistana: "Vistana International",
-  fashion_wear: "Fashion Wear",
-  fashion_shoes: "Fashion Shoes",
-  active_shoes: "Active Shoes",
-  active_wear: "Active Wear",
-  joystep: "Joystep",
-  boston: "Confecciones Boston",
-  american_classic: "Multifashion",
-};
+// ─── Empresa key → display name mapping (uses shared helper) ─────────────────
 
 function mapEmpresa<T extends { empresa: string }>(row: T): T {
-  return { ...row, empresa: EMPRESA_KEY_TO_NAME[row.empresa] ?? row.empresa };
+  return { ...row, empresa: mapEmpresaName(row.empresa) };
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────

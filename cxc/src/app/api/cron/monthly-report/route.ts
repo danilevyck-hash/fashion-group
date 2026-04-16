@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { Resend } from "resend";
+import { getVentasMensuales } from "@/lib/empresa-mapping";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -70,32 +71,22 @@ export async function GET(req: NextRequest) {
 
   // ── 1. VENTAS ──
 
-  const { data: ventasCurrent } = await supabaseServer
-    .from("ventas_mensuales")
-    .select("empresa, ventas_brutas, notas_credito")
-    .eq("año", reportYear)
-    .eq("mes", reportMonth);
-
-  const { data: ventasPrev } = await supabaseServer
-    .from("ventas_mensuales")
-    .select("empresa, ventas_brutas, notas_credito")
-    .eq("año", prevYear)
-    .eq("mes", prevMonth);
+  const ventasCurrentData = await getVentasMensuales(reportYear, reportMonth);
+  const ventasPrevData = await getVentasMensuales(prevYear, prevMonth);
 
   const prevMap: Record<string, number> = {};
-  for (const v of ventasPrev || []) {
-    prevMap[v.empresa] = (Number(v.ventas_brutas) || 0) - (Number(v.notas_credito) || 0);
+  for (const v of ventasPrevData) {
+    prevMap[v.empresa] = v.ventas_netas;
   }
 
   type VentasRow = { empresa: string; current: number; prev: number };
   const ventasRows: VentasRow[] = [];
   let totalCurrent = 0, totalPrev = 0;
 
-  for (const v of ventasCurrent || []) {
-    const netas = (Number(v.ventas_brutas) || 0) - (Number(v.notas_credito) || 0);
+  for (const v of ventasCurrentData) {
     const prev = prevMap[v.empresa] || 0;
-    ventasRows.push({ empresa: v.empresa, current: netas, prev });
-    totalCurrent += netas;
+    ventasRows.push({ empresa: v.empresa, current: v.ventas_netas, prev });
+    totalCurrent += v.ventas_netas;
     totalPrev += prev;
     delete prevMap[v.empresa];
   }
