@@ -80,6 +80,7 @@ export function normalizeProductName(nombre: string): string {
     .replace(/\bPARA\s+MUJER\b/g, "")
     .replace(/\bDE\s+CABALLERO\b/g, "")
     .replace(/\bDE\s+VESTIR\b/g, "")
+    .replace(/\bPARA\s*$/g, "")  // trailing "PARA" alone
     .replace(/\s{2,}/g, " ")
     .trim();
 
@@ -104,6 +105,9 @@ function extractBultoId(ocpaFull: string): string {
 
 /** Style code: mixed letters+digits, 6+ chars */
 const STYLE_CODE_RE = /^[A-Za-z0-9]{6,}/;
+
+/** Product keywords for prioritizing product name extraction */
+const PRODUCT_KEYWORDS = /\b(CAMISAS?|POLOS?|PANTALON|CAMISETAS?|SUETER|CHAQUETAS?|GORRAS?|VESTIDOS?|BERMUDAS?|SHORTS?|FALDAS?|BLUSAS?|CORBATAS?|CINTURON)\b/i;
 
 /** Lines to always skip */
 const SKIP_RE = /^(Bulto|Estilo|Total|Peso|Volumen|Dim|Pag|Página|Departamento|Vendedor|Pais|País|Email|Tel|PACKING|NO\.|American|0{3,}|---)/i;
@@ -236,13 +240,19 @@ export function parsePackingListText(text: string): ParsedPackingList {
       if (STYLE_CODE_RE.test(firstToken) && /[A-Za-z]/.test(firstToken) && /\d/.test(firstToken)) {
         const parts = line.split(/\s{2,}/).map(p => p.trim()).filter(Boolean);
 
-        // Extract product name: find multi-word token with letters
+        // Extract product name: FIRST try keyword match, THEN fallback to longest
         let producto = "";
+        // 1. Look for token with a product keyword (CAMISA, POLO, PANTALON, etc.)
         for (let i = 1; i < parts.length; i++) {
-          const p = parts[i];
-          if (/[A-Za-z]/.test(p) && p.split(/\s+/).length >= 2 && p.length > producto.length) {
-            // Skip the color (usually 1-2 words, shorter) — take the longest multi-word token
-            producto = p;
+          if (PRODUCT_KEYWORDS.test(parts[i])) { producto = parts[i]; break; }
+        }
+        // 2. Fallback: longest multi-word text token (but skip colors with "/" which are not products)
+        if (!producto) {
+          for (let i = 1; i < parts.length; i++) {
+            const p = parts[i];
+            if (/[A-Za-z]/.test(p) && p.split(/\s+/).length >= 2 && p.length > producto.length) {
+              producto = p;
+            }
           }
         }
 
