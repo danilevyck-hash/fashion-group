@@ -228,7 +228,31 @@ export default function PackingListDetailPage() {
   }
 
   function handlePrint() {
-    window.print();
+    // Create a print-only window with just the table content
+    const printContent = document.getElementById("pl-print-area");
+    if (!printContent) return;
+    const win = window.open("", "_blank");
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html><html><head><title>PL #${pl?.numero_pl || ""}</title>
+      <style>
+        body { font-family: -apple-system, sans-serif; margin: 1cm; font-size: 9pt; }
+        h1 { font-size: 14pt; margin: 0 0 4px; }
+        .sub { font-size: 9pt; color: #666; margin-bottom: 12px; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #1e3a5f; color: white; text-align: left; padding: 5px 6px; font-size: 8pt; }
+        td { padding: 4px 6px; border-bottom: 1px solid #eee; font-size: 9pt; }
+        tr:nth-child(even) { background: #f8f8f8; }
+        .group { background: #d2d7e1 !important; font-weight: bold; font-size: 9pt; }
+        .mono { font-family: Courier, monospace; }
+        .center { text-align: center; }
+        .right { text-align: right; }
+        @page { size: letter; margin: 1.5cm; }
+      </style></head><body>`);
+    win.document.write(printContent.innerHTML);
+    win.document.write("</body></html>");
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); win.close(); }, 300);
   }
 
   if (!authChecked) return null;
@@ -274,6 +298,7 @@ export default function PackingListDetailPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-4">
+        <div id="pl-print-area">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
@@ -341,8 +366,8 @@ export default function PackingListDetailPage() {
               <thead>
                 <tr className="bg-[#1e3a5f] text-white">
                   <th className="text-left px-3 py-2.5 font-medium text-xs">Estilo</th>
-                  <th className="text-right px-3 py-2.5 font-medium text-xs">Total</th>
-                  <th className="text-left px-3 py-2.5 font-medium text-xs">Muestra</th>
+                  <th className="text-center px-3 py-2.5 font-medium text-xs">Total</th>
+                  <th className="text-center px-3 py-2.5 font-medium text-xs">Muestra</th>
                   <th className="text-left px-3 py-2.5 font-medium text-xs">
                     Distribución por Bulto
                   </th>
@@ -363,6 +388,7 @@ export default function PackingListDetailPage() {
             </table>
           </div>
         </div>
+        </div>{/* close pl-print-area */}
       </div>
 
       {/* Print styles */}
@@ -407,10 +433,10 @@ function GroupRows({
           className={ri % 2 === 0 ? "bg-white" : "bg-gray-50/50"}
         >
           <td className="px-3 py-1.5 font-mono text-xs">{row.estilo}</td>
-          <td className="px-3 py-1.5 text-xs text-right tabular-nums font-medium">
+          <td className="px-3 py-1.5 text-xs text-center tabular-nums font-medium">
             {row.totalPcs}
           </td>
-          <td className="px-3 py-1.5 text-xs font-mono text-gray-600">
+          <td className="px-3 py-1.5 text-xs text-center font-mono text-gray-600">
             {row.bultoMuestra || "-"}
           </td>
           <td className="px-3 py-1.5 text-xs">
