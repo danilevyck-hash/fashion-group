@@ -286,6 +286,7 @@ export default function PackingListsPage() {
                         <th className="text-left px-3 py-2 font-medium text-xs">Estilo</th>
                         <th className="text-left px-3 py-2 font-medium text-xs">Producto</th>
                         <th className="text-right px-3 py-2 font-medium text-xs">Total</th>
+                        <th className="text-left px-3 py-2 font-medium text-xs">Muestra</th>
                         <th className="text-left px-3 py-2 font-medium text-xs">Distribución</th>
                       </tr>
                     </thead>
@@ -297,16 +298,15 @@ export default function PackingListsPage() {
                           <td className="px-3 py-1.5 text-xs text-right tabular-nums">
                             {row.totalPcs}
                           </td>
+                          <td className="px-3 py-1.5 text-xs font-mono text-gray-600">
+                            {row.bultoMuestra || "-"}
+                          </td>
                           <td className="px-3 py-1.5 text-xs">
                             <div className="flex flex-wrap gap-1">
                               {Object.entries(row.distribution).map(([bultoId, pcs]) => (
                                 <span
                                   key={bultoId}
-                                  className={`inline-block px-1.5 py-0.5 rounded text-[11px] ${
-                                    bultoId === row.bultoMuestra
-                                      ? "bg-gray-200 text-gray-900 font-bold"
-                                      : "bg-gray-100 text-gray-500"
-                                  }`}
+                                  className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600"
                                 >
                                   ({bultoId}: {pcs}pcs)
                                 </span>

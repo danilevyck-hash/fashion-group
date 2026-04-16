@@ -116,13 +116,11 @@ export default function PackingListDetailPage() {
     const subtitle = `${pl.empresa} · ${pl.total_estilos} estilos · ${pl.total_piezas.toLocaleString()} piezas · ${pl.total_bultos} bultos`;
     doc.text(subtitle, 14 + FG_LOGO_WIDTH + 4, 22);
 
-    if (pl.bulto_muestra) {
-      doc.text(
-        `Bulto resaltado = muestra (${pl.bulto_muestra})`,
-        14 + FG_LOGO_WIDTH + 4,
-        27
-      );
-    }
+    doc.text(
+      "Muestra = bulto con talla M o 32",
+      14 + FG_LOGO_WIDTH + 4,
+      27
+    );
     doc.setTextColor(0);
 
     // Build table data with product group headers
@@ -132,7 +130,7 @@ export default function PackingListDetailPage() {
       tableBody.push([
         {
           content: group.producto || "SIN PRODUCTO",
-          colSpan: 4,
+          colSpan: 5,
           styles: {
             fillColor: [235, 235, 235],
             fontStyle: "bold",
@@ -143,15 +141,15 @@ export default function PackingListDetailPage() {
       ]);
 
       for (const row of group.rows) {
-        const distParts = Object.entries(row.distribution).map(([bultoId, pcs]) => {
-          const isMuestra = row.bultoMuestra && bultoId === row.bultoMuestra;
-          return isMuestra ? `**(${bultoId}: ${pcs}pcs)**` : `(${bultoId}: ${pcs}pcs)`;
-        });
+        const distParts = Object.entries(row.distribution).map(([bultoId, pcs]) =>
+          `(${bultoId}: ${pcs}pcs)`
+        );
 
         tableBody.push([
           row.estilo,
           row.producto,
           String(row.totalPcs),
+          row.bultoMuestra || "-",
           distParts.join("  "),
         ]);
       }
@@ -159,7 +157,7 @@ export default function PackingListDetailPage() {
 
     autoTable(doc, {
       startY: 32,
-      head: [["Estilo", "Producto", "Total", "Distribución por Bulto"]],
+      head: [["Estilo", "Producto", "Total", "Muestra", "Distribución por Bulto"]],
       body: tableBody,
       headStyles: {
         fillColor: [30, 58, 95],
@@ -172,22 +170,14 @@ export default function PackingListDetailPage() {
         cellPadding: 1.5,
       },
       columnStyles: {
-        0: { cellWidth: 28, font: "courier" },
-        1: { cellWidth: 35 },
-        2: { cellWidth: 15, halign: "right" },
-        3: { cellWidth: "auto" },
+        0: { cellWidth: 25, font: "courier" },
+        1: { cellWidth: 30 },
+        2: { cellWidth: 12, halign: "right" },
+        3: { cellWidth: 16 },
+        4: { cellWidth: "auto" },
       },
       alternateRowStyles: { fillColor: [248, 248, 248] },
       margin: { left: 14, right: 14 },
-      didParseCell(data) {
-        if (data.section === "body" && data.column.index === 3) {
-          const raw = String(data.cell.raw || "");
-          if (raw.includes("**")) {
-            // Mark muestra with >>> arrows and brackets
-            data.cell.text = [raw.replace(/\*\*\(([^)]+)\)\*\*/g, ">> [$1]").replace(/\*\*/g, "")];
-          }
-        }
-      },
     });
 
     // Footer
@@ -264,8 +254,7 @@ export default function PackingListDetailPage() {
               {pl.total_piezas > 0 && ` · ${pl.total_piezas.toLocaleString()} piezas`}
               {pl.total_bultos > 0 && ` · ${pl.total_bultos} bultos`}
               {" · "}
-              <span className="font-semibold text-gray-600">[bulto en negrita]</span>
-              <span className="text-gray-400"> = muestra M / dim 32</span>
+              <span className="text-gray-400">Muestra = bulto con talla M o 32</span>
             </p>
           </div>
           <div className="flex gap-2 print:hidden">
@@ -303,6 +292,7 @@ export default function PackingListDetailPage() {
                   <th className="text-left px-3 py-2.5 font-medium text-xs">Estilo</th>
                   <th className="text-left px-3 py-2.5 font-medium text-xs">Producto</th>
                   <th className="text-right px-3 py-2.5 font-medium text-xs">Total</th>
+                  <th className="text-left px-3 py-2.5 font-medium text-xs">Muestra</th>
                   <th className="text-left px-3 py-2.5 font-medium text-xs">
                     Distribución por Bulto
                   </th>
@@ -311,13 +301,13 @@ export default function PackingListDetailPage() {
               <tbody>
                 {groupedRows.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-gray-400 text-sm">
+                    <td colSpan={5} className="px-3 py-8 text-center text-gray-400 text-sm">
                       Sin datos de estilos
                     </td>
                   </tr>
                 )}
                 {groupedRows.map((group, gi) => (
-                  <GroupRows key={gi} group={group} bultoMuestra={pl.bulto_muestra} rowOffset={gi} />
+                  <GroupRows key={gi} group={group} rowOffset={gi} />
                 ))}
               </tbody>
             </table>
@@ -339,18 +329,16 @@ export default function PackingListDetailPage() {
 
 function GroupRows({
   group,
-  bultoMuestra,
   rowOffset,
 }: {
   group: { producto: string; rows: PLIndexRow[] };
-  bultoMuestra: string | null;
   rowOffset: number;
 }) {
   return (
     <>
       {/* Product group header */}
       <tr className="bg-gray-100">
-        <td colSpan={4} className="px-3 py-1.5 text-xs font-bold text-gray-600 uppercase tracking-wide">
+        <td colSpan={5} className="px-3 py-1.5 text-xs font-bold text-gray-600 uppercase tracking-wide">
           {group.producto || "SIN PRODUCTO"}
         </td>
       </tr>
@@ -364,16 +352,15 @@ function GroupRows({
           <td className="px-3 py-1.5 text-xs text-right tabular-nums font-medium">
             {row.totalPcs}
           </td>
+          <td className="px-3 py-1.5 text-xs font-mono text-gray-600">
+            {row.bultoMuestra || "-"}
+          </td>
           <td className="px-3 py-1.5 text-xs">
             <div className="flex flex-wrap gap-1">
               {Object.entries(row.distribution).map(([bultoId, pcs]) => (
                 <span
                   key={bultoId}
-                  className={`inline-block px-1.5 py-0.5 rounded text-[11px] ${
-                    row.bultoMuestra && bultoId === row.bultoMuestra
-                      ? "bg-gray-200 text-gray-900 font-bold"
-                      : "bg-gray-100 text-gray-500"
-                  }`}
+                  className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600"
                 >
                   ({bultoId}: {pcs}pcs)
                 </span>
