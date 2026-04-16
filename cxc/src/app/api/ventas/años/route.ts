@@ -6,28 +6,22 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "director", "contabilidad"]); if (auth instanceof NextResponse) return auth;
-  // Fetch all distinct years from ventas_raw — paginate to get all rows
+  // Fetch distinct years efficiently using a simple query with ordering
   const years = new Set<number>();
-  let offset = 0;
-  const PAGE = 1000;
 
-  while (true) {
-    const { data, error } = await supabaseServer
-      .from("ventas_raw")
-      .select("anio")
-      .range(offset, offset + PAGE - 1);
+  // Get min and max year in one query each (uses index, instant)
+  const [{ data: minData }, { data: maxData }] = await Promise.all([
+    supabaseServer.from("ventas_raw").select("anio").order("anio", { ascending: true }).limit(1),
+    supabaseServer.from("ventas_raw").select("anio").order("anio", { ascending: false }).limit(1),
+  ]);
 
-    if (error) {
-      console.error("[ventas/años]", error.code, error.message);
-      break;
+  const minYear = minData?.[0]?.anio;
+  const maxYear = maxData?.[0]?.anio;
+
+  if (minYear && maxYear) {
+    for (let y = minYear; y <= maxYear; y++) {
+      years.add(y);
     }
-
-    for (const r of data ?? []) {
-      years.add(r.anio);
-    }
-
-    if (!data || data.length < PAGE) break;
-    offset += PAGE;
   }
 
   const currentYear = new Date().getFullYear();
