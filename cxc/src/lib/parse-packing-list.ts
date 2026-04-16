@@ -104,8 +104,9 @@ export function normalizeProductName(nombre: string): string {
 
 // ── Helpers ──────────────────────────────────────────────────────────
 
-function extractBultoId(ocpaFull: string): string {
-  const digits = ocpaFull.replace(/^OCPA/i, "");
+function extractBultoId(raw: string): string {
+  // Remove OCPA prefix if present, then take last 7 digits as ID
+  const digits = raw.replace(/^OCPA/i, "");
   const last7 = digits.slice(-7);
   return String(parseInt(last7, 10));
 }
@@ -114,7 +115,7 @@ function extractBultoId(ocpaFull: string): string {
 const STYLE_CODE_RE = /^[A-Za-z0-9]{6,}/;
 
 /** Product keywords for prioritizing product name extraction */
-const PRODUCT_KEYWORDS = /\b(CAMISAS?|POLOS?|PANTALON|CAMISETAS?|SUETER|CHAQUETAS?|GORRAS?|VESTIDOS?|BERMUDAS?|SHORTS?|FALDAS?|BLUSAS?|CORBATAS?|CINTURON)\b/i;
+const PRODUCT_KEYWORDS = /\b(CAMISAS?|POLOS?|PANTALON|CAMISETAS?|SUETER|CHAQUETAS?|GORRAS?|VESTIDOS?|BERMUDAS?|SHORTS?|FALDAS?|BLUSAS?|CORBATAS?|CINTURON|PANTIS?|BOXERS?|BRASSIERES?|MEDIAS?|CALCETINES?|PIJAMAS?|ROPA\s+INTERIOR)\b/i;
 
 /** Lines to always skip */
 const SKIP_RE = /^(Bulto|Estilo|Total|Peso|Volumen|Dim|Pag|Página|Departamento|Vendedor|Pais|País|Email|Tel|PACKING|NO\.|American|0{3,}|---)/i;
@@ -256,14 +257,14 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
 
     const rawLine = getRawLine(cli);
 
-    // Detect new bulto
-    if (/Bulto No\.\s*OCPA/i.test(line)) {
+    // Detect new bulto (OCPA prefix or pure numeric ID)
+    if (/Bulto No\.\s*(OCPA|\d)/i.test(line)) {
       // Save previous bulto if any
       saveBulto();
-      // Start new bulto
-      const idMatch = line.match(/OCPA\s*(\S+)/i);
-      const ocpaId = idMatch ? `OCPA${idMatch[1]}` : "";
-      currentBultoId = extractBultoId(ocpaId);
+      // Start new bulto — extract the ID after "Bulto No."
+      const idMatch = line.match(/Bulto No\.\s*(\S+)/i);
+      const rawId = idMatch ? idMatch[1] : "";
+      currentBultoId = extractBultoId(rawId);
       // Total piezas is often on the same line as "Bulto No. OCPA..."
       const piezasOnLine = line.match(/Total piezas:\s*(\d+)/i);
       currentBultoTotalPiezas = piezasOnLine ? parseInt(piezasOnLine[1], 10) : 0;
