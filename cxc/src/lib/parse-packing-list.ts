@@ -124,22 +124,21 @@ function lastNumber(line: string): number {
 }
 
 /** Parse the size column header to find positions of M and 32 */
-function parseSizeHeader(headerLine: string): { columns: string[]; mIndex: number; dim32Index: number } {
+function parseSizeHeader(headerLine: string): { columns: string[]; mIndex: number; dim32Index: number; hasOS: boolean } {
   // Header looks like: "Estilo  Color  Nombre  Dim  S  M  L  XL  XX  32  34  Qty"
   const parts = headerLine.split(/\s{2,}/).map(p => p.trim()).filter(Boolean);
-  // Find index of "Dim" — sizes start after it
   const dimIdx = parts.findIndex(p => p === "Dim");
-  if (dimIdx === -1) return { columns: [], mIndex: -1, dim32Index: -1 };
+  if (dimIdx === -1) return { columns: [], mIndex: -1, dim32Index: -1, hasOS: false };
 
-  // Everything between Dim and Qty are size columns
   const qtyIdx = parts.findIndex((p, i) => i > dimIdx && p === "Qty");
   const end = qtyIdx === -1 ? parts.length : qtyIdx;
   const columns = parts.slice(dimIdx + 1, end);
 
   const mIndex = columns.indexOf("M");
   const dim32Index = columns.indexOf("32");
+  const hasOS = columns.includes("OS");
 
-  return { columns, mIndex, dim32Index };
+  return { columns, mIndex, dim32Index, hasOS };
 }
 
 /** Check if a number line has a value at a specific size column position */
@@ -292,11 +291,20 @@ export function parsePackingListText(text: string): ParsedPackingList {
               // Enough values: positional mapping reliable (numValues includes Qty at end)
               hasM = sizeInfo.mIndex >= 0 && parseInt(numValues[sizeInfo.mIndex]) > 0;
               has32 = sizeInfo.dim32Index >= 0 && parseInt(numValues[sizeInfo.dim32Index]) > 0;
+            } else if (sizeInfo.hasOS && numValues.length <= 2) {
+              // OS column present and only 1-2 values: this is likely an OS item (gorra, etc.)
+              // Don't assume it has M or 32
+              hasM = false;
+              has32 = false;
+            } else if (numValues.length > 2) {
+              // Multiple values but fewer than expected: style likely has multiple sizes
+              // If M column exists and there are enough values to potentially cover it, assume M
+              hasM = sizeInfo.mIndex >= 0 && numValues.length > sizeInfo.mIndex;
+              has32 = sizeInfo.dim32Index >= 0 && numValues.length > sizeInfo.dim32Index;
             } else {
-              // Fewer values than expected: can't reliably map positions
-              // Conservative: if M/32 is in header and this style has data, assume it might have M/32
-              hasM = sizeInfo.mIndex >= 0;
-              has32 = sizeInfo.dim32Index >= 0;
+              // Very few values, no OS: conservative but check position
+              hasM = false;
+              has32 = false;
             }
 
             const existing = itemMap.get(currentEstilo);
