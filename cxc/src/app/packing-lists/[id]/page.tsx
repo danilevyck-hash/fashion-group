@@ -154,7 +154,6 @@ export default function PackingListDetailPage() {
           String(row.totalPcs),
           distParts.join("  "),
         ]);
-        bodyIdx++;
       }
     }
 
