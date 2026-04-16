@@ -3,6 +3,11 @@
 /*  Pure TypeScript — no React, no DOM, no external deps.             */
 /* ------------------------------------------------------------------ */
 
+// ── Raw line types (from PDF extraction with X positions) ───────────
+
+export interface RawLineItem { x: number; str: string; }
+export interface RawLine { text: string; items: RawLineItem[]; }
+
 // ── Types ────────────────────────────────────────────────────────────
 
 export interface PLBultoItem {
@@ -141,20 +146,64 @@ function parseSizeHeader(headerLine: string): { columns: string[]; mIndex: numbe
   return { columns, mIndex, dim32Index, hasOS };
 }
 
-/** Check if a number line has a value at a specific size column position */
-function hasValueAtPosition(numberLine: string, position: number, totalColumns: number): boolean {
-  if (position < 0) return false;
-  const nums = numberLine.trim().split(/\s+/);
-  // The number line has values for each size column + Qty at end
-  // But not all columns may have values (empty = no stock in that size)
-  // We can't reliably map by position since gaps collapse in text extraction
-  // So we use a simpler heuristic: if there are enough numbers and position is within range
-  return position < nums.length;
+/** Find the X position of a column header (e.g. "M" or "32") in a raw line */
+function findColumnXPos(rawLine: RawLine | undefined, columnName: string): number {
+  if (!rawLine) return -1;
+  const item = rawLine.items.find(i => i.str.trim() === columnName);
+  return item ? item.x : -1;
+}
+
+/** Check if a data raw line has a numeric value > 0 near a target X position */
+function hasNumericValueNearX(dataRawLine: RawLine | undefined, targetX: number, tolerance: number = 15): boolean {
+  if (!dataRawLine || targetX < 0) return false;
+  return dataRawLine.items.some(item => {
+    const trimmed = item.str.trim();
+    const isNumeric = /^\d+$/.test(trimmed);
+    return isNumeric && Math.abs(item.x - targetX) <= tolerance && parseInt(trimmed) > 0;
+  });
+}
+
+/** Find a raw line that matches a text line, searching within a specific range of rawLines */
+function findRawLineInRange(
+  rawLines: RawLine[],
+  textLine: string,
+  startIdx: number,
+  endIdx: number
+): RawLine | undefined {
+  const trimmed = textLine.trim();
+  if (!trimmed) return undefined;
+  const end = Math.min(endIdx, rawLines.length);
+  const start = Math.max(0, startIdx);
+  // Exact text match within range
+  for (let i = start; i < end; i++) {
+    if (rawLines[i].text.trim() === trimmed) return rawLines[i];
+  }
+  // Fuzzy: first token match within range
+  const firstToken = trimmed.split(/\s+/)[0];
+  for (let i = start; i < end; i++) {
+    if (rawLines[i].text.trim().startsWith(firstToken)) return rawLines[i];
+  }
+  return undefined;
+}
+
+/**
+ * Find all header raw lines (Estilo + Color + Nombre) and their indices.
+ * Returns array of { index, rawLine } sorted by index.
+ */
+function findAllHeaderIndices(rawLines: RawLine[]): { index: number; rawLine: RawLine }[] {
+  const headers: { index: number; rawLine: RawLine }[] = [];
+  for (let i = 0; i < rawLines.length; i++) {
+    const t = rawLines[i].text;
+    if (/Estilo/i.test(t) && /Color/i.test(t) && /Nombre/i.test(t)) {
+      headers.push({ index: i, rawLine: rawLines[i] });
+    }
+  }
+  return headers;
 }
 
 // ── Main parser ──────────────────────────────────────────────────────
 
-export function parsePackingListText(text: string): ParsedPackingList {
+export function parsePackingListText(text: string, rawLines?: RawLine[]): ParsedPackingList {
   const plMatch = text.match(/NO\.\s*(\d+)/);
   const numeroPL = plMatch ? plMatch[1] : "";
 
@@ -209,6 +258,10 @@ export function parsePackingListText(text: string): ParsedPackingList {
 
   const bultos: PLBulto[] = [];
 
+  // Pre-compute all header indices in rawLines for scoped searching
+  const allHeaders = rawLines ? findAllHeaderIndices(rawLines) : [];
+  let headerCursor = 0; // tracks which header we're on across bultos
+
   for (const section of rawBultos) {
     const idMatch = section.match(/^(\S+)/);
     const ocpaId = idMatch ? `OCPA${idMatch[1]}` : "";
@@ -218,11 +271,29 @@ export function parsePackingListText(text: string): ParsedPackingList {
     const totalPiezas = piezasMatch ? parseInt(piezasMatch[1], 10) : 0;
 
     const lines = section.split("\n").map(l => l.trim()).filter(Boolean);
-    let sizeInfo = { columns: [] as string[], mIndex: -1, dim32Index: -1 };
+    let sizeInfo = { columns: [] as string[], mIndex: -1, dim32Index: -1, hasOS: false };
+    // X positions for M and 32 columns from PDF coordinates
+    let mXPos = -1;
+    let dim32XPos = -1;
+    // Range in rawLines that belongs to this bulto (for scoped searching)
+    let bultoRawStart = 0;
+    let bultoRawEnd = rawLines ? rawLines.length : 0;
 
     for (const line of lines) {
       if (/^Estilo\s+Color\s+Nombre/i.test(line)) {
         sizeInfo = parseSizeHeader(line);
+        // If we have rawLines, find the X positions of M and 32 from PDF coordinates
+        if (rawLines && allHeaders.length > 0 && headerCursor < allHeaders.length) {
+          const currentHeader = allHeaders[headerCursor];
+          mXPos = findColumnXPos(currentHeader.rawLine, "M");
+          dim32XPos = findColumnXPos(currentHeader.rawLine, "32");
+          // Set search range: from this header to the next header (or end)
+          bultoRawStart = currentHeader.index;
+          bultoRawEnd = headerCursor + 1 < allHeaders.length
+            ? allHeaders[headerCursor + 1].index
+            : rawLines.length;
+          headerCursor++;
+        }
         break;
       }
     }
@@ -278,33 +349,32 @@ export function parsePackingListText(text: string): ParsedPackingList {
         if (nums && nums.length > 0) {
           const qty = parseInt(nums[nums.length - 1], 10);
           if (qty > 0 && qty < 10000) {
-            // Check if M or 32 is present: M is in the size columns
-            const numValues = line.trim().split(/\s+/).filter(t => /^\d+$/.test(t));
-            // Total size columns expected (excluding Qty at end)
-            const expectedCols = sizeInfo.columns.length;
-            // If data line has enough values to map positionally, use exact position
-            // If fewer values (empty sizes collapsed in text extraction), fall back to conservative:
-            // assume M/32 exists if the column is in the header (we can't tell which cols are missing)
+            // Check if M or 32 is present using X-position coordinates when available
             let hasM: boolean;
             let has32: boolean;
-            if (numValues.length >= expectedCols + 1) {
-              // Enough values: positional mapping reliable (numValues includes Qty at end)
-              hasM = sizeInfo.mIndex >= 0 && parseInt(numValues[sizeInfo.mIndex]) > 0;
-              has32 = sizeInfo.dim32Index >= 0 && parseInt(numValues[sizeInfo.dim32Index]) > 0;
-            } else if (sizeInfo.hasOS && numValues.length <= 2) {
-              // OS column present and only 1-2 values: this is likely an OS item (gorra, etc.)
-              // Don't assume it has M or 32
-              hasM = false;
-              has32 = false;
-            } else if (numValues.length > 2) {
-              // Multiple values but fewer than expected: style likely has multiple sizes
-              // If M column exists and there are enough values to potentially cover it, assume M
-              hasM = sizeInfo.mIndex >= 0 && numValues.length > sizeInfo.mIndex;
-              has32 = sizeInfo.dim32Index >= 0 && numValues.length > sizeInfo.dim32Index;
+
+            if (rawLines && (mXPos >= 0 || dim32XPos >= 0)) {
+              // Use X-position matching from PDF coordinates (accurate even when columns collapse)
+              const dataRawLine = findRawLineInRange(rawLines, line, bultoRawStart, bultoRawEnd);
+              hasM = hasNumericValueNearX(dataRawLine, mXPos);
+              has32 = hasNumericValueNearX(dataRawLine, dim32XPos);
             } else {
-              // Very few values, no OS: conservative but check position
-              hasM = false;
-              has32 = false;
+              // Fallback: positional index matching (original heuristic)
+              const numValues = line.trim().split(/\s+/).filter(t => /^\d+$/.test(t));
+              const expectedCols = sizeInfo.columns.length;
+              if (numValues.length >= expectedCols + 1) {
+                hasM = sizeInfo.mIndex >= 0 && parseInt(numValues[sizeInfo.mIndex]) > 0;
+                has32 = sizeInfo.dim32Index >= 0 && parseInt(numValues[sizeInfo.dim32Index]) > 0;
+              } else if (sizeInfo.hasOS && numValues.length <= 2) {
+                hasM = false;
+                has32 = false;
+              } else if (numValues.length > 2) {
+                hasM = sizeInfo.mIndex >= 0 && numValues.length > sizeInfo.mIndex;
+                has32 = sizeInfo.dim32Index >= 0 && numValues.length > sizeInfo.dim32Index;
+              } else {
+                hasM = false;
+                has32 = false;
+              }
             }
 
             const existing = itemMap.get(currentEstilo);

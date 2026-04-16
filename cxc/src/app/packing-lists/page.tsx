@@ -13,6 +13,7 @@ import {
   type ParsedPackingList,
   type PLIndexRow,
   type PLValidationError,
+  type RawLine,
 } from "@/lib/parse-packing-list";
 
 interface PLRecord {
@@ -67,7 +68,7 @@ export default function PackingListsPage() {
   }, [authChecked, loadList]);
 
   // PDF extraction — group text items by Y position to reconstruct lines
-  async function extractTextFromPDF(file: File): Promise<string> {
+  async function extractTextFromPDF(file: File): Promise<{ text: string; rawLines: RawLine[] }> {
     const pdfjsLib = await import("pdfjs-dist");
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
@@ -75,6 +76,7 @@ export default function PackingListsPage() {
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
     let fullText = "";
+    const rawLines: RawLine[] = [];
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
@@ -82,17 +84,17 @@ export default function PackingListsPage() {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const items = content.items as any[];
       // Collect all Y positions first, then cluster them (within 2px = same line)
-      const rawItems: { x: number; y: number; str: string }[] = [];
+      const pdfItems: { x: number; y: number; str: string }[] = [];
       for (const item of items) {
         if (!item.str || !item.str.trim()) continue;
-        rawItems.push({ x: item.transform[4], y: item.transform[5], str: item.str });
+        pdfItems.push({ x: item.transform[4], y: item.transform[5], str: item.str });
       }
       // Sort by Y descending to cluster from top to bottom
-      rawItems.sort((a, b) => b.y - a.y);
+      pdfItems.sort((a, b) => b.y - a.y);
       // Cluster Y positions: if two Ys are within 2px, they belong to the same line
       const lineMap = new Map<number, { x: number; str: string }[]>();
       let currentClusterY = -Infinity;
-      for (const item of rawItems) {
+      for (const item of pdfItems) {
         if (Math.abs(item.y - currentClusterY) > 2) {
           currentClusterY = item.y;
         }
@@ -103,11 +105,17 @@ export default function PackingListsPage() {
       const sortedYs = [...lineMap.keys()].sort((a, b) => b - a);
       for (const y of sortedYs) {
         const lineItems = lineMap.get(y)!.sort((a, b) => a.x - b.x);
-        fullText += lineItems.map(li => li.str).join("  ") + "\n";
+        const lineText = lineItems.map(li => li.str).join("  ") + "\n";
+        fullText += lineText;
+        rawLines.push({
+          text: lineText.trimEnd(),
+          items: lineItems.map(li => ({ x: li.x, str: li.str })),
+        });
       }
       fullText += "\n";
+      rawLines.push({ text: "", items: [] });
     }
-    return fullText;
+    return { text: fullText, rawLines };
   }
 
   // Handle file selection
@@ -118,8 +126,8 @@ export default function PackingListsPage() {
     }
     setUploading(true);
     try {
-      const text = await extractTextFromPDF(file);
-      const parsed = parsePackingListText(text);
+      const { text, rawLines } = await extractTextFromPDF(file);
+      const parsed = parsePackingListText(text, rawLines);
       const index = buildIndex(parsed);
       const errors = validateParsedPL(parsed);
       setParsedPreview(parsed);
