@@ -66,9 +66,16 @@ export async function GET(req: NextRequest) {
   const lastUpload = uploadsRes.data?.[0]?.uploaded_at || null;
   const cxcStale = lastUpload ? new Date(lastUpload) < new Date(staleDate) : true;
 
-  // Ventas
-  const ventasMes = (ventasMesRes.data || []).reduce((s: number, r: { ventas_netas: number }) => s + (Number(r.ventas_netas) || 0), 0);
+  // Ventas — if current month has no data, fall back to previous month
+  const MESES_LABEL = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+  let ventasMes = (ventasMesRes.data || []).reduce((s: number, r: { ventas_netas: number }) => s + (Number(r.ventas_netas) || 0), 0);
   const ventasPrev = (ventasPrevRes.data || []).reduce((s: number, r: { ventas_netas: number }) => s + (Number(r.ventas_netas) || 0), 0);
+  let ventasMesLabel = `${MESES_LABEL[currentMonth]} ${currentYear}`;
+  if (ventasMes === 0 && ventasPrev !== 0) {
+    // Current month has no data — show previous month instead
+    ventasMes = ventasPrev;
+    ventasMesLabel = `${MESES_LABEL[prevMonth]} ${prevYear}`;
+  }
 
   // CxC
   const cxcRows = cxcRes.data || [];
@@ -91,6 +98,7 @@ export async function GET(req: NextRequest) {
     cxcStale,
     lastUpload,
     ventasMes,
+    ventasMesLabel,
     ventasPrev,
     cxcTotal,
     cxcVencida,

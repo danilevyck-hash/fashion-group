@@ -18,25 +18,33 @@ export default function ReportExport({ stats, darkMode }: { stats: Stats; darkMo
     setGenerating("ventas"); setOpen(false);
     try {
       const XLSX = (await import("xlsx-js-style")).default;
-      const res = await fetch("/api/ventas");
-      const data = await res.json();
       const now = new Date();
       const currentMonth = now.getMonth() + 1;
       const currentYear = now.getFullYear();
       const prevMonth = currentMonth === 1 ? 12 : currentMonth - 1;
       const prevYear = currentMonth === 1 ? currentYear - 1 : currentYear;
 
+      // Fetch current + prev month from v2-compatible endpoint
+      const [curRes, prevRes] = await Promise.all([
+        fetch(`/api/ventas/v2?anio=${currentYear}`).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch(`/api/ventas/v2?anio=${prevYear}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      ]);
+
       const hs = { font: { bold: true, color: { rgb: "FFFFFF" } }, fill: { fgColor: { rgb: "1A1A1A" }, patternType: "solid" as const } };
 
-      // Group by empresa
+      // Group by empresa from v2 byEmpresaMes data
       const empresas = new Map<string, { mesActual: number; mesAnterior: number }>();
-      for (const row of data || []) {
+      for (const row of curRes?.byEmpresaMes || []) {
+        if (row.mes !== currentMonth) continue;
         const key = row.empresa || "Otro";
         if (!empresas.has(key)) empresas.set(key, { mesActual: 0, mesAnterior: 0 });
-        const e = empresas.get(key)!;
-        const neto = (Number(row.ventas_brutas) || 0) - (Number(row.notas_credito) || 0);
-        if (row.año === currentYear && row.mes === currentMonth) e.mesActual += neto;
-        if (row.año === prevYear && row.mes === prevMonth) e.mesAnterior += neto;
+        empresas.get(key)!.mesActual += Number(row.subtotal) || 0;
+      }
+      for (const row of prevRes?.byEmpresaMes || []) {
+        if (row.mes !== prevMonth) continue;
+        const key = row.empresa || "Otro";
+        if (!empresas.has(key)) empresas.set(key, { mesActual: 0, mesAnterior: 0 });
+        empresas.get(key)!.mesAnterior += Number(row.subtotal) || 0;
       }
 
       const wb = XLSX.utils.book_new();
