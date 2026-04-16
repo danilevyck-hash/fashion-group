@@ -304,8 +304,8 @@ export default function PackingListsPage() {
                                   key={bultoId}
                                   className={`inline-block px-1.5 py-0.5 rounded text-[11px] ${
                                     bultoId === row.bultoMuestra
-                                      ? "bg-amber-100 text-amber-800 font-medium"
-                                      : "bg-gray-100 text-gray-600"
+                                      ? "bg-gray-200 text-gray-900 font-bold"
+                                      : "bg-gray-100 text-gray-500"
                                   }`}
                                 >
                                   ({bultoId}: {pcs}pcs)

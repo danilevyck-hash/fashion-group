@@ -180,12 +180,12 @@ export default function PackingListDetailPage() {
       alternateRowStyles: { fillColor: [248, 248, 248] },
       margin: { left: 14, right: 14 },
       didParseCell(data) {
-        // Clean ** markers from distribution text (used for web bold, not needed in PDF)
         if (data.section === "body" && data.column.index === 3) {
           const raw = String(data.cell.raw || "");
           if (raw.includes("**")) {
-            // Replace **(...)**  with [...] to visually distinguish muestra in PDF
+            // Replace **(...)** with [...] and make cell bold
             data.cell.text = [raw.replace(/\*\*\(([^)]+)\)\*\*/g, "[$1]").replace(/\*\*/g, "")];
+            data.cell.styles.fontStyle = "bold";
           }
         }
       },
