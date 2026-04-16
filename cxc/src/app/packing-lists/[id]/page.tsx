@@ -61,14 +61,20 @@ export default function PackingListDetailPage() {
     if (authChecked) loadPL();
   }, [authChecked, loadPL]);
 
-  // Group rows by product type
+  // Group rows by product type (sort by producto A-Z, then estilo A-Z)
   const groupedRows = useMemo(() => {
     if (!pl?.index_rows) return [];
+
+    const sorted = [...pl.index_rows].sort((a, b) => {
+      const p = a.producto.localeCompare(b.producto);
+      if (p !== 0) return p;
+      return a.estilo.localeCompare(b.estilo);
+    });
 
     const groups: { producto: string; rows: PLIndexRow[] }[] = [];
     let currentProduct = "";
 
-    for (const row of pl.index_rows) {
+    for (const row of sorted) {
       if (row.producto !== currentProduct) {
         currentProduct = row.producto;
         groups.push({ producto: currentProduct, rows: [] });
@@ -122,6 +128,10 @@ export default function PackingListDetailPage() {
     // Build table data with product group headers
     const tableBody: (string | { content: string; colSpan?: number; styles?: Record<string, unknown> })[][] = [];
 
+    // Track which rows have muestra for PDF highlighting
+    const rowMuestraMap: Record<number, string> = {};
+    let bodyIdx = 0;
+
     for (const group of groupedRows) {
       // Group header row
       tableBody.push([
@@ -136,11 +146,14 @@ export default function PackingListDetailPage() {
           },
         },
       ]);
+      bodyIdx++;
 
       for (const row of group.rows) {
         const distParts = Object.entries(row.distribution).map(([bultoId, pcs]) => {
           return `(${bultoId}: ${pcs}pcs)`;
         });
+
+        if (row.bultoMuestra) rowMuestraMap[bodyIdx] = row.bultoMuestra;
 
         tableBody.push([
           row.estilo,
@@ -148,6 +161,7 @@ export default function PackingListDetailPage() {
           String(row.totalPcs),
           distParts.join(" "),
         ]);
+        bodyIdx++;
       }
     }
 
@@ -174,11 +188,15 @@ export default function PackingListDetailPage() {
       alternateRowStyles: { fillColor: [248, 248, 248] },
       margin: { left: 14, right: 14 },
       didParseCell(data) {
-        // Highlight muestra bulto references in distribution column
-        if (data.section === "body" && data.column.index === 3 && pl.bulto_muestra) {
-          const text = String(data.cell.raw || "");
-          if (text.includes(`(${pl.bulto_muestra}:`)) {
-            data.cell.styles.fillColor = [255, 251, 235];
+        // Highlight muestra bulto in distribution column (per-style)
+        if (data.section === "body" && data.column.index === 3) {
+          const muestra = rowMuestraMap[data.row.index];
+          if (muestra) {
+            const text = String(data.cell.raw || "");
+            if (text.includes(`(${muestra}:`)) {
+              data.cell.styles.fillColor = [255, 243, 191];
+              data.cell.styles.textColor = [120, 80, 0];
+            }
           }
         }
       },
