@@ -179,21 +179,13 @@ export default function PackingListDetailPage() {
       },
       alternateRowStyles: { fillColor: [248, 248, 248] },
       margin: { left: 14, right: 14 },
-      willDrawCell(data) {
+      didParseCell(data) {
         if (data.section === "body" && data.column.index === 3) {
           const raw = String(data.cell.raw || "");
           if (raw.includes("**")) {
-            const cleaned = raw.replace(/\*\*\(([^)]+)\)\*\*/g, "[$1]").replace(/\*\*/g, "");
-            data.cell.text = [cleaned];
-            // Force bold font for this cell
-            doc.setFont("helvetica", "bold");
+            // Mark muestra with >>> arrows and brackets
+            data.cell.text = [raw.replace(/\*\*\(([^)]+)\)\*\*/g, ">> [$1]").replace(/\*\*/g, "")];
           }
-        }
-      },
-      didDrawCell(data) {
-        // Reset font after bold cell
-        if (data.section === "body" && data.column.index === 3) {
-          doc.setFont("helvetica", "normal");
         }
       },
     });
