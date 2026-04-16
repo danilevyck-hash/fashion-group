@@ -80,6 +80,13 @@ export function normalizeProductName(nombre: string): string {
     .replace(/\s{2,}/g, " ")
     .trim();
 
+  // Normalize plurals
+  n = n.replace(/^CAMISAS\b/, "CAMISA")
+    .replace(/^POLOS\b/, "POLO")
+    .replace(/^CAMISETAS\b/, "CAMISETA")
+    .replace(/^CHAQUETAS\b/, "CHAQUETA")
+    .replace(/^GORRAS\b/, "GORRA");
+
   if (sleeve) n = `${n} ${sleeve}`;
   return n;
 }
@@ -98,7 +105,7 @@ function extractBultoId(ocpaFull: string): string {
 const STYLE_CODE_RE = /^[A-Za-z0-9]{6,}/;
 
 /** Known product keywords */
-const PRODUCT_KEYWORDS = /\b(CAMISA|POLO|PANTALON|CAMISETA|SUETER|CHAQUETA|GORRA|VESTIDO|BERMUDA|SHORT|FALDA|BLUSA|CORBATA|CINTURON)\b/i;
+const PRODUCT_KEYWORDS = /\b(CAMISAS?|POLOS?|PANTALON|CAMISETAS?|SUETER|CHAQUETAS?|GORRAS?|VESTIDOS?|BERMUDAS?|SHORTS?|FALDAS?|BLUSAS?|CORBATAS?|CINTURON)\b/i;
 
 /** Lines to skip */
 const SKIP_RE = /^(Bulto|Estilo|Total|Peso|Volumen|Dim|Pag|Página|Departamento|Vendedor|Pais|País|Email|Tel|PACKING|NO\.|American|0{3,}|---)/i;
