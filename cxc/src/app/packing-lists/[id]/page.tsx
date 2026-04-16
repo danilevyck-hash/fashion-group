@@ -32,6 +32,7 @@ export default function PackingListDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [muestrasOpen, setMuestrasOpen] = useState(false);
 
   const loadPL = useCallback(async () => {
     try {
@@ -86,17 +87,57 @@ export default function PackingListDetailPage() {
     return groups;
   }, [pl]);
 
-  // Filter groups by search query
-  const filteredGroups = useMemo(() => {
-    const q = search.trim().toUpperCase();
-    if (!q) return groupedRows;
+  // Build bulto groups for "Vista para muestras"
+  const bultoGroups = useMemo(() => {
+    if (!pl?.index_rows) return [];
+    const map = new Map<string, { estilo: string; producto: string }[]>();
+    for (const row of pl.index_rows) {
+      if (!row.bultoMuestra) continue;
+      if (!map.has(row.bultoMuestra)) map.set(row.bultoMuestra, []);
+      map.get(row.bultoMuestra)!.push({ estilo: row.estilo, producto: row.producto });
+    }
+    for (const styles of map.values()) {
+      styles.sort((a, b) => a.estilo.localeCompare(b.estilo));
+    }
+    return [...map.entries()].sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+  }, [pl]);
+
+  // Styles WITH muestra grouped by product
+  const groupsWithMuestra = useMemo(() => {
     return groupedRows
+      .map((g) => ({ ...g, rows: g.rows.filter((r) => r.bultoMuestra) }))
+      .filter((g) => g.rows.length > 0);
+  }, [groupedRows]);
+
+  // Styles WITHOUT muestra grouped by product
+  const groupsWithoutMuestra = useMemo(() => {
+    return groupedRows
+      .map((g) => ({ ...g, rows: g.rows.filter((r) => !r.bultoMuestra) }))
+      .filter((g) => g.rows.length > 0);
+  }, [groupedRows]);
+
+  // Filter groups by search query
+  const filteredGroupsWithMuestra = useMemo(() => {
+    const q = search.trim().toUpperCase();
+    if (!q) return groupsWithMuestra;
+    return groupsWithMuestra
       .map((group) => ({
         ...group,
         rows: group.rows.filter((row) => row.estilo.toUpperCase().includes(q)),
       }))
       .filter((group) => group.rows.length > 0);
-  }, [groupedRows, search]);
+  }, [groupsWithMuestra, search]);
+
+  const filteredGroupsWithoutMuestra = useMemo(() => {
+    const q = search.trim().toUpperCase();
+    if (!q) return groupsWithoutMuestra;
+    return groupsWithoutMuestra
+      .map((group) => ({
+        ...group,
+        rows: group.rows.filter((row) => row.estilo.toUpperCase().includes(q)),
+      }))
+      .filter((group) => group.rows.length > 0);
+  }, [groupsWithoutMuestra, search]);
 
   // PDF generation
   async function generatePDF() {
@@ -109,20 +150,23 @@ export default function PackingListDetailPage() {
 
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const marginLeft = 14;
+    const marginRight = 14;
+    const contentRight = pageWidth - marginRight;
 
-    // Logo
-    doc.addImage(FG_LOGO_BASE64, "JPEG", 14, 10, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
+    // ── HEADER ──
+    doc.addImage(FG_LOGO_BASE64, "JPEG", marginLeft, 10, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
 
-    // Title
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
+    doc.setTextColor(0);
     doc.text(
       `Indice de Estilos por Bulto — PL #${pl.numero_pl}`,
-      14 + FG_LOGO_WIDTH + 4,
+      marginLeft + FG_LOGO_WIDTH + 4,
       16
     );
 
-    // Format date
     const meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
     let fechaDisplay = pl.fecha_entrega || "";
     if (fechaDisplay && /^\d{4}-\d{2}-\d{2}$/.test(fechaDisplay)) {
@@ -130,105 +174,237 @@ export default function PackingListDetailPage() {
       fechaDisplay = `${parseInt(d)} de ${meses[parseInt(m) - 1]} ${y}`;
     }
 
-    // Subtitle
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100);
     const subtitle = `${pl.empresa} · ${fechaDisplay ? fechaDisplay + " · " : ""}${pl.total_estilos} estilos · ${pl.total_piezas.toLocaleString()} piezas · ${pl.total_bultos} bultos`;
-    doc.text(subtitle, 14 + FG_LOGO_WIDTH + 4, 22);
-
-    doc.text(
-      "Muestra = bulto con talla M o 32",
-      14 + FG_LOGO_WIDTH + 4,
-      27
-    );
+    doc.text(subtitle, marginLeft + FG_LOGO_WIDTH + 4, 22);
+    doc.text("Muestra = bulto con talla M o 32", marginLeft + FG_LOGO_WIDTH + 4, 27);
     doc.setTextColor(0);
 
-    // Build table data with product group headers
-    const tableBody: (string | { content: string; colSpan?: number; styles?: Record<string, unknown> })[][] = [];
+    let currentY = 34;
 
-    for (const group of groupedRows) {
-      tableBody.push([
-        {
-          content: group.producto || "SIN PRODUCTO",
-          colSpan: 4,
-          styles: {
-            fillColor: [210, 215, 225],
-            fontStyle: "bold",
-            fontSize: 9,
-            textColor: [30, 40, 60],
-          },
-        },
-      ]);
+    // ── SECTION 1: Vista para sacar muestras ──
+    // Build bulto groups
+    const pdfBultoGroups = new Map<string, { estilo: string; producto: string }[]>();
+    for (const row of pl.index_rows) {
+      if (!row.bultoMuestra) continue;
+      if (!pdfBultoGroups.has(row.bultoMuestra)) pdfBultoGroups.set(row.bultoMuestra, []);
+      pdfBultoGroups.get(row.bultoMuestra)!.push({ estilo: row.estilo, producto: row.producto });
+    }
+    for (const styles of pdfBultoGroups.values()) {
+      styles.sort((a, b) => a.estilo.localeCompare(b.estilo));
+    }
+    const sortedBultos = [...pdfBultoGroups.entries()].sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
 
-      for (const row of group.rows) {
-        const distParts = Object.entries(row.distribution).map(([bultoId, pcs]) =>
-          `(${bultoId}: ${pcs})`
+    if (sortedBultos.length > 0) {
+      // Section header
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 58, 95);
+      doc.text("Vista para sacar muestras (agrupado por bulto)", marginLeft, currentY);
+      currentY += 2;
+      doc.setDrawColor(30, 58, 95);
+      doc.line(marginLeft, currentY, contentRight, currentY);
+      currentY += 4;
+
+      // Draw each bulto block
+      const checkboxSize = 2.8; // ~8pt
+      const lineHeight = 4.5;
+      const indentX = marginLeft + 6;
+
+      for (const [bultoId, styles] of sortedBultos) {
+        // Check if we need a page break (header line + all style lines)
+        const blockHeight = lineHeight + (styles.length * lineHeight) + 3;
+        if (currentY + blockHeight > pageHeight - 15) {
+          doc.addPage();
+          currentY = 15;
+        }
+
+        // Bulto header checkbox + label
+        doc.setDrawColor(150);
+        doc.setLineWidth(0.3);
+        doc.rect(marginLeft, currentY - checkboxSize + 0.5, checkboxSize, checkboxSize);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(30, 40, 60);
+        doc.text(
+          `Bulto #${bultoId}  ·  ${styles.length} muestra${styles.length > 1 ? "s" : ""}`,
+          marginLeft + checkboxSize + 2,
+          currentY
         );
+        currentY += lineHeight + 0.5;
 
-        tableBody.push([
-          row.estilo,
-          String(row.totalPcs),
-          row.bultoMuestra || "-",
-          distParts.join("  "),
-        ]);
+        // Style rows
+        for (const style of styles) {
+          doc.setDrawColor(180);
+          doc.rect(indentX, currentY - checkboxSize + 0.5, checkboxSize, checkboxSize);
+          doc.setFontSize(9);
+          doc.setFont("courier", "normal");
+          doc.setTextColor(50);
+          doc.text(style.estilo, indentX + checkboxSize + 2, currentY);
+          // Product description
+          const estiloWidth = doc.getTextWidth(style.estilo);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(100);
+          doc.text(` —  ${style.producto}`, indentX + checkboxSize + 2 + estiloWidth, currentY);
+          currentY += lineHeight;
+        }
+
+        // Separator line between bultos
+        currentY += 1;
+        doc.setDrawColor(220);
+        doc.setLineWidth(0.2);
+        doc.line(marginLeft, currentY, contentRight, currentY);
+        currentY += 3;
       }
     }
 
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const plLabel = `PL #${pl.numero_pl}`;
+    // ── SECTION 2: Distribución completa por estilo (con muestra) ──
+    const pdfGroupsWithMuestra = groupedRows
+      .map((g) => ({ ...g, rows: g.rows.filter((r) => r.bultoMuestra) }))
+      .filter((g) => g.rows.length > 0);
 
-    autoTable(doc, {
-      startY: 32,
-      head: [["Estilo", { content: "Total", styles: { halign: "center" } }, { content: "Muestra", styles: { halign: "center" } }, "Distribución por Bulto"]],
-      body: tableBody,
-      headStyles: {
-        fillColor: [30, 58, 95],
-        textColor: 255,
-        fontSize: 8,
-        fontStyle: "bold",
-      },
-      styles: {
-        fontSize: 9,
-        cellPadding: 2,
-      },
-      columnStyles: {
-        0: { cellWidth: 30, font: "courier" },
-        1: { cellWidth: 12, halign: "center" },
-        2: { cellWidth: 16, halign: "center" },
-        3: { cellWidth: "auto" },
-      },
-      alternateRowStyles: { fillColor: [245, 245, 245] },
-      margin: { left: 14, right: 14, top: 20 },
-      didDrawPage(data) {
-        // Page number top-right on every page
-        doc.setFontSize(8);
-        doc.setTextColor(160);
-        doc.text(
-          `${data.pageNumber}`,
-          pageWidth - 14,
-          8,
-          { align: "right" }
-        );
-      },
-    });
+    if (pdfGroupsWithMuestra.length > 0) {
+      // Section header
+      currentY += 4;
+      if (currentY > pageHeight - 30) {
+        doc.addPage();
+        currentY = 15;
+      }
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 58, 95);
+      doc.text("Distribución completa por estilo", marginLeft, currentY);
+      currentY += 2;
+      doc.setDrawColor(30, 58, 95);
+      doc.line(marginLeft, currentY, contentRight, currentY);
+      currentY += 4;
 
-    // Update page numbers with correct total
+      const tableBody: (string | { content: string; colSpan?: number; styles?: Record<string, unknown> })[][] = [];
+      for (const group of pdfGroupsWithMuestra) {
+        tableBody.push([
+          {
+            content: group.producto || "SIN PRODUCTO",
+            colSpan: 3,
+            styles: {
+              fillColor: [210, 215, 225],
+              fontStyle: "bold",
+              fontSize: 9,
+              textColor: [30, 40, 60],
+            },
+          },
+        ]);
+        for (const row of group.rows) {
+          const distParts = Object.entries(row.distribution).map(([bId, pcs]) => `(${bId}: ${pcs})`);
+          tableBody.push([row.estilo, String(row.totalPcs), distParts.join("  ")]);
+        }
+      }
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [["Estilo", { content: "Total", styles: { halign: "center" } }, "Distribución por Bulto"]],
+        body: tableBody,
+        headStyles: {
+          fillColor: [30, 58, 95],
+          textColor: 255,
+          fontSize: 8,
+          fontStyle: "bold",
+        },
+        styles: {
+          fontSize: 9,
+          cellPadding: 1.5,
+        },
+        columnStyles: {
+          0: { cellWidth: 32, font: "courier" },
+          1: { cellWidth: 14, halign: "center" },
+          2: { cellWidth: "auto" },
+        },
+        alternateRowStyles: { fillColor: [245, 245, 245] },
+        margin: { left: marginLeft, right: marginRight, top: 20 },
+      });
+
+      currentY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+    }
+
+    // ── SECTION 3: Estilos sin muestra ──
+    const pdfGroupsWithoutMuestra = groupedRows
+      .map((g) => ({ ...g, rows: g.rows.filter((r) => !r.bultoMuestra) }))
+      .filter((g) => g.rows.length > 0);
+
+    if (pdfGroupsWithoutMuestra.length > 0) {
+      currentY += 6;
+      if (currentY > pageHeight - 30) {
+        doc.addPage();
+        currentY = 15;
+      }
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(100, 100, 100);
+      doc.text("Estilos sin muestra disponible (sin talla M ni 32)", marginLeft, currentY);
+      currentY += 2;
+      doc.setDrawColor(160);
+      doc.line(marginLeft, currentY, contentRight, currentY);
+      currentY += 4;
+
+      const tableBody3: (string | { content: string; colSpan?: number; styles?: Record<string, unknown> })[][] = [];
+      for (const group of pdfGroupsWithoutMuestra) {
+        tableBody3.push([
+          {
+            content: group.producto || "SIN PRODUCTO",
+            colSpan: 3,
+            styles: {
+              fillColor: [230, 230, 230],
+              fontStyle: "bold",
+              fontSize: 9,
+              textColor: [100, 100, 100],
+            },
+          },
+        ]);
+        for (const row of group.rows) {
+          const distParts = Object.entries(row.distribution).map(([bId, pcs]) => `(${bId}: ${pcs})`);
+          tableBody3.push([row.estilo, String(row.totalPcs), distParts.join("  ")]);
+        }
+      }
+
+      autoTable(doc, {
+        startY: currentY,
+        head: [["Estilo", { content: "Total", styles: { halign: "center" } }, "Distribución por Bulto"]],
+        body: tableBody3,
+        headStyles: {
+          fillColor: [130, 130, 130],
+          textColor: 255,
+          fontSize: 8,
+          fontStyle: "bold",
+        },
+        styles: {
+          fontSize: 9,
+          cellPadding: 1,
+          textColor: [102, 102, 102],
+        },
+        columnStyles: {
+          0: { cellWidth: 32, font: "courier" },
+          1: { cellWidth: 14, halign: "center" },
+          2: { cellWidth: "auto" },
+        },
+        alternateRowStyles: { fillColor: [248, 248, 248] },
+        margin: { left: marginLeft, right: marginRight, top: 20 },
+      });
+    }
+
+    // ── PAGE NUMBERS (final loop only) ──
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
-      doc.setFillColor(255, 255, 255);
-      doc.rect(pageWidth - 30, 3, 20, 7, "F");
       doc.setFontSize(8);
       doc.setTextColor(160);
-      doc.text(`${i} / ${totalPages}`, pageWidth - 14, 8, { align: "right" });
+      doc.text(`${i} / ${totalPages}`, pageWidth - marginRight, 8, { align: "right" });
     }
 
     doc.save(`PL-${pl.numero_pl || "sin-numero"}.pdf`);
   }
 
   function handlePrint() {
-    // Create a print-only window with just the table content
     const printContent = document.getElementById("pl-print-area");
     if (!printContent) return;
     const win = window.open("", "_blank");
@@ -348,6 +524,56 @@ export default function PackingListDetailPage() {
           </div>
         </div>
 
+        {/* Vista para muestras — collapsible */}
+        {bultoGroups.length > 0 && (
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setMuestrasOpen(!muestrasOpen)}
+              className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+            >
+              <span className="text-sm font-semibold text-[#1e3a5f]">
+                Vista para sacar muestras ({bultoGroups.length} bulto{bultoGroups.length !== 1 ? "s" : ""})
+              </span>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`text-gray-400 transition-transform ${muestrasOpen ? "rotate-180" : ""}`}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {muestrasOpen && (
+              <div className="px-3 py-3 space-y-3 border-t border-gray-200">
+                {bultoGroups.map(([bultoId, styles]) => (
+                  <div key={bultoId}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-3 h-3 border border-gray-400 rounded-sm flex-shrink-0" />
+                      <span className="text-sm font-bold text-gray-700">
+                        Bulto #{bultoId} · {styles.length} muestra{styles.length > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <div className="ml-5 space-y-0.5">
+                      {styles.map((s) => (
+                        <div key={s.estilo} className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 border border-gray-300 rounded-sm flex-shrink-0" />
+                          <span className="font-mono text-xs text-gray-600">{s.estilo}</span>
+                          <span className="text-xs text-gray-400">— {s.producto}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Search */}
         <div className="print:hidden">
           <input
@@ -359,35 +585,67 @@ export default function PackingListDetailPage() {
           />
         </div>
 
-        {/* Index table */}
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-[#1e3a5f] text-white">
-                  <th className="text-left px-3 py-2.5 font-medium text-xs">Estilo</th>
-                  <th className="text-center px-3 py-2.5 font-medium text-xs">Total</th>
-                  <th className="text-center px-3 py-2.5 font-medium text-xs">Muestra</th>
-                  <th className="text-left px-3 py-2.5 font-medium text-xs">
-                    Distribución por Bulto
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredGroups.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="px-3 py-8 text-center text-gray-400 text-sm">
-                      {search ? "No se encontraron estilos" : "Sin datos de estilos"}
-                    </td>
+        {/* Section 2: Styles with muestra */}
+        {filteredGroupsWithMuestra.length > 0 && (
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-[#1e3a5f] text-white">
+                    <th className="text-left px-3 py-2.5 font-medium text-xs">Estilo</th>
+                    <th className="text-center px-3 py-2.5 font-medium text-xs">Total</th>
+                    <th className="text-left px-3 py-2.5 font-medium text-xs">
+                      Distribución por Bulto
+                    </th>
                   </tr>
-                )}
-                {filteredGroups.map((group, gi) => (
-                  <GroupRows key={gi} group={group} rowOffset={gi} />
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {filteredGroupsWithMuestra.map((group, gi) => (
+                    <GroupRows key={gi} group={group} rowOffset={gi} />
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Section 3: Styles without muestra */}
+        {filteredGroupsWithoutMuestra.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">
+              Estilos sin muestra disponible (sin talla M ni 32)
+            </p>
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-400 text-white">
+                      <th className="text-left px-3 py-2 font-medium text-xs">Estilo</th>
+                      <th className="text-center px-3 py-2 font-medium text-xs">Total</th>
+                      <th className="text-left px-3 py-2 font-medium text-xs">
+                        Distribución por Bulto
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredGroupsWithoutMuestra.map((group, gi) => (
+                      <GroupRows key={gi} group={group} rowOffset={gi + 1000} muted />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {filteredGroupsWithMuestra.length === 0 && filteredGroupsWithoutMuestra.length === 0 && (
+          <div className="border border-gray-200 rounded-lg">
+            <p className="px-3 py-8 text-center text-gray-400 text-sm">
+              {search ? "No se encontraron estilos" : "Sin datos de estilos"}
+            </p>
+          </div>
+        )}
+
         </div>{/* close pl-print-area */}
       </div>
 
@@ -415,15 +673,17 @@ export default function PackingListDetailPage() {
 function GroupRows({
   group,
   rowOffset,
+  muted,
 }: {
   group: { producto: string; rows: PLIndexRow[] };
   rowOffset: number;
+  muted?: boolean;
 }) {
   return (
     <>
       {/* Product group header */}
-      <tr className="bg-gray-200">
-        <td colSpan={4} className="px-3 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide">
+      <tr className={muted ? "bg-gray-100" : "bg-gray-200"}>
+        <td colSpan={3} className={`px-3 py-2 text-sm font-bold uppercase tracking-wide ${muted ? "text-gray-400" : "text-gray-700"}`}>
           {group.producto || "SIN PRODUCTO"}
         </td>
       </tr>
@@ -432,19 +692,16 @@ function GroupRows({
           key={`${rowOffset}-${ri}`}
           className={ri % 2 === 0 ? "bg-white" : "bg-gray-50/50"}
         >
-          <td className="px-3 py-1.5 font-mono text-xs">{row.estilo}</td>
-          <td className="px-3 py-1.5 text-xs text-center tabular-nums font-medium">
+          <td className={`px-3 py-1.5 font-mono text-xs ${muted ? "text-gray-400" : ""}`}>{row.estilo}</td>
+          <td className={`px-3 py-1.5 text-xs text-center tabular-nums font-medium ${muted ? "text-gray-400" : ""}`}>
             {row.totalPcs}
-          </td>
-          <td className="px-3 py-1.5 text-xs text-center font-mono text-gray-600">
-            {row.bultoMuestra || "-"}
           </td>
           <td className="px-3 py-1.5 text-xs">
             <div className="flex flex-wrap gap-1">
               {Object.entries(row.distribution).map(([bultoId, pcs]) => (
                 <span
                   key={bultoId}
-                  className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600"
+                  className={`inline-block px-1.5 py-0.5 rounded text-[11px] ${muted ? "bg-gray-50 text-gray-400" : "bg-gray-100 text-gray-600"}`}
                 >
                   ({bultoId}: {pcs})
                 </span>
