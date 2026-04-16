@@ -421,7 +421,7 @@ export default function PackingListsPage() {
                           {pl.total_estilos}
                         </td>
                         <td className="px-3 py-2.5 text-gray-400 text-xs hidden lg:table-cell">
-                          {fmtDate(pl.created_at)}
+                          {new Date(pl.created_at).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" })}
                         </td>
                         {canEdit && (
                           <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>

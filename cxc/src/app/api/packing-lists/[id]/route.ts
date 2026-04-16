@@ -31,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .from("pl_items")
     .select("*")
     .eq("pl_id", params.id)
-    .order("orden", { ascending: true });
+    .order("estilo", { ascending: true });
 
   if (itemsErr) {
     console.error(itemsErr);
