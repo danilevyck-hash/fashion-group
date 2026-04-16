@@ -58,16 +58,47 @@ export async function GET(req: NextRequest) {
     offset += PAGE;
   }
 
-  // Get existing user overrides from ventas_metas
+  // Get existing user overrides from ventas_metas (annual metas per empresa)
   const { data: userMetas } = await supabaseServer
     .from("ventas_metas")
-    .select("empresa, mes, meta")
+    .select("empresa, meta")
     .eq("anio", targetYear);
 
-  const userMetasMap = new Map<string, Map<number, number>>();
+  // Build user metas map: empresa → annual meta
+  const userAnnualMap = new Map<string, number>();
   for (const m of userMetas ?? []) {
-    if (!userMetasMap.has(m.empresa)) userMetasMap.set(m.empresa, new Map());
-    userMetasMap.get(m.empresa)!.set(m.mes, m.meta);
+    if ((m.meta ?? 0) > 0) userAnnualMap.set(m.empresa, m.meta);
+  }
+
+  // Compute distribution weights from prior year for distributing annual metas
+  const { getVentasMensuales } = await import("@/lib/empresa-mapping");
+  const prevVentasData = await getVentasMensuales(targetYear - 1);
+  const distWeights = new Map<string, number[]>();
+  {
+    const byEmp = new Map<string, Map<number, number>>();
+    for (const r of prevVentasData) {
+      if (!byEmp.has(r.empresa)) byEmp.set(r.empresa, new Map());
+      byEmp.get(r.empresa)!.set(r.mes, (byEmp.get(r.empresa)!.get(r.mes) ?? 0) + r.ventas_netas);
+    }
+    for (const [emp, mm] of byEmp) {
+      const total = [...mm.values()].reduce((s, v) => s + Math.max(v, 0), 0);
+      if (total <= 0) { distWeights.set(emp, Array(12).fill(1/12)); continue; }
+      const w: number[] = [];
+      for (let m = 1; m <= 12; m++) w.push(Math.max(mm.get(m) ?? 0, 0) / total);
+      const s = w.reduce((a, b) => a + b, 0);
+      distWeights.set(emp, s > 0 ? w.map(v => v / s) : Array(12).fill(1/12));
+    }
+  }
+
+  // Convert annual metas to monthly using distribution weights
+  const userMetasMap = new Map<string, Map<number, number>>();
+  for (const [empresa, annual] of userAnnualMap) {
+    const weights = distWeights.get(empresa) ?? Array(12).fill(1/12);
+    const monthMap = new Map<number, number>();
+    for (let m = 1; m <= 12; m++) {
+      monthMap.set(m, Math.round(annual * weights[m - 1] * 100) / 100);
+    }
+    userMetasMap.set(empresa, monthMap);
   }
 
   // Group by empresa
