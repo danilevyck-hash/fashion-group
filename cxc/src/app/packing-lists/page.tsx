@@ -9,8 +9,10 @@ import { fmtDate } from "@/lib/format";
 import {
   parsePackingListText,
   buildIndex,
+  validateParsedPL,
   type ParsedPackingList,
   type PLIndexRow,
+  type PLValidationError,
 } from "@/lib/parse-packing-list";
 
 interface PLRecord {
@@ -39,6 +41,7 @@ export default function PackingListsPage() {
   const [uploading, setUploading] = useState(false);
   const [parsedPreview, setParsedPreview] = useState<ParsedPackingList | null>(null);
   const [indexPreview, setIndexPreview] = useState<PLIndexRow[]>([]);
+  const [validationErrors, setValidationErrors] = useState<PLValidationError[]>([]);
   const [toast, setToast] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -108,8 +111,10 @@ export default function PackingListsPage() {
       const text = await extractTextFromPDF(file);
       const parsed = parsePackingListText(text);
       const index = buildIndex(parsed);
+      const errors = validateParsedPL(parsed);
       setParsedPreview(parsed);
       setIndexPreview(index);
+      setValidationErrors(errors);
     } catch (err) {
       console.error(err);
       setToast("No se pudo leer el PDF. Intenta con otro archivo.");
@@ -152,7 +157,7 @@ export default function PackingListsPage() {
       if (res.ok) {
         const data = await res.json();
         setParsedPreview(null);
-        setIndexPreview([]);
+        setIndexPreview([]); setValidationErrors([]);
         setToast("Packing List guardado");
         if (data.id) {
           router.push(`/packing-lists/${data.id}`);
@@ -277,6 +282,23 @@ export default function PackingListsPage() {
                 </div>
               </div>
 
+              {/* Validation */}
+              {validationErrors.length > 0 && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                  <p className="text-sm font-semibold text-red-700 mb-1">⚠️ Errores de validación ({validationErrors.length} bultos no cuadran)</p>
+                  <div className="text-xs text-red-600 space-y-0.5">
+                    {validationErrors.map(e => (
+                      <p key={e.bultoId}>Bulto {e.bultoId}: PDF dice {e.pdfTotal} piezas, parser calculó {e.parserTotal} (dif: {e.diff})</p>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {validationErrors.length === 0 && parsedPreview.totalBultos > 0 && (
+                <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                  <p className="text-sm text-green-700">✓ Validación correcta — todos los bultos cuadran con el PDF</p>
+                </div>
+              )}
+
               {/* Preview table */}
               {indexPreview.length > 0 && (
                 <div className="overflow-x-auto -mx-4 px-4">
@@ -345,7 +367,7 @@ export default function PackingListsPage() {
                 <button
                   onClick={() => {
                     setParsedPreview(null);
-                    setIndexPreview([]);
+                    setIndexPreview([]); setValidationErrors([]);
                   }}
                   className="px-5 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-md hover:bg-gray-50 active:bg-gray-100 transition-all min-h-[44px]"
                 >

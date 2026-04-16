@@ -240,21 +240,9 @@ export function parsePackingListText(text: string): ParsedPackingList {
       if (STYLE_CODE_RE.test(firstToken) && /[A-Za-z]/.test(firstToken) && /\d/.test(firstToken)) {
         const parts = line.split(/\s{2,}/).map(p => p.trim()).filter(Boolean);
 
-        // Extract product name: FIRST try keyword match, THEN fallback to longest
-        let producto = "";
-        // 1. Look for token with a product keyword (CAMISA, POLO, PANTALON, etc.)
-        for (let i = 1; i < parts.length; i++) {
-          if (PRODUCT_KEYWORDS.test(parts[i])) { producto = parts[i]; break; }
-        }
-        // 2. Fallback: longest multi-word text token (but skip colors with "/" which are not products)
-        if (!producto) {
-          for (let i = 1; i < parts.length; i++) {
-            const p = parts[i];
-            if (/[A-Za-z]/.test(p) && p.split(/\s+/).length >= 2 && p.length > producto.length) {
-              producto = p;
-            }
-          }
-        }
+        // Product is ALWAYS the 3rd token (index 2): parts = [Estilo, Color, Producto, ...]
+        // This is positional based on the PDF format: Estilo | Color | Nombre
+        const producto = parts.length >= 3 ? parts[2] : "";
 
         currentEstilo = firstToken;
         currentProducto = producto ? normalizeProductName(producto) : "";
@@ -313,6 +301,32 @@ export function parsePackingListText(text: string): ParsedPackingList {
   const totalPiezas = bultos.reduce((sum, b) => sum + b.totalPiezas, 0);
 
   return { numeroPL, empresa, fechaEntrega, totalBultos, totalPiezas, bultos };
+}
+
+// ── Validation ──────────────────────────────────────────────────────
+
+export interface PLValidationError {
+  bultoId: string;
+  pdfTotal: number;
+  parserTotal: number;
+  diff: number;
+}
+
+/** Validate parsed PL by comparing parser totals vs PDF-stated totals per bulto */
+export function validateParsedPL(parsed: ParsedPackingList): PLValidationError[] {
+  const errors: PLValidationError[] = [];
+  for (const b of parsed.bultos) {
+    const parserTotal = b.items.reduce((s, i) => s + i.qty, 0);
+    if (parserTotal !== b.totalPiezas) {
+      errors.push({
+        bultoId: b.id,
+        pdfTotal: b.totalPiezas,
+        parserTotal,
+        diff: b.totalPiezas - parserTotal,
+      });
+    }
+  }
+  return errors;
 }
 
 // ── Index builder ────────────────────────────────────────────────────
