@@ -118,15 +118,22 @@ function aggregateClientesDetalle(
   prevRows: VentasRawRow[],
   last12mMap?: Map<string, { total: number; lastDate: string }>,
 ): ClienteDetalle[] {
-  // Build lastFecha map — RPC already returns MAX(fecha) per normalized cliente
+  console.log("[DEBUG-INACTIVE] last12mMap size:", last12mMap?.size ?? "N/A");
+  console.log("[DEBUG-INACTIVE] lastDates count:", lastDates.length);
+  console.log("[DEBUG-INACTIVE] filteredRows count:", filteredRows.length);
+  console.log("[DEBUG-INACTIVE] prevRows count:", prevRows.length);
+
+  // Build lastFecha map
   const lastFechaMap = new Map<string, string>();
+  let skippedInterno = 0;
   for (const r of lastDates) {
     const key = normalizeName(r.cliente ?? "") || "(Sin nombre)";
-    if (CLIENTES_INTERNOS.has(key)) continue;
+    if (CLIENTES_INTERNOS.has(key)) { skippedInterno++; continue; }
     lastFechaMap.set(key, String(r.ultima_fecha ?? ""));
   }
+  console.log("[DEBUG-INACTIVE] lastFechaMap size:", lastFechaMap.size, "| skipped by CLIENTES_INTERNOS:", skippedInterno);
 
-  // Build prev-year subtotal per client (for inactive KPI calculation)
+  // Build prev-year subtotal per client
   const prevSubtotalMap = new Map<string, number>();
   for (const r of prevRows) {
     const key = normalizeName(r.cliente ?? "") || "(Sin nombre)";
@@ -148,17 +155,22 @@ function aggregateClientesDetalle(
     e.subtotal += r.subtotal ?? 0;
     e.utilidad += r.utilidad ?? 0;
   }
+  console.log("[DEBUG-INACTIVE] map size after filteredRows:", map.size);
 
   // Add clients from lastDates who are NOT in current-year data
-  // (they stopped buying — needed for inactive KPI)
+  let addedZeroSales = 0;
+  let skippedAlreadyInMap = 0;
+  let skippedGenerico = 0;
   for (const [cliente, lastFecha] of lastFechaMap) {
-    if (map.has(cliente)) continue; // already in current year
-    if (CLIENTES_GENERICOS.has(cliente)) continue;
-    // Add as a zero-sales entry so frontend can see them in inactive list
+    if (map.has(cliente)) { skippedAlreadyInMap++; continue; }
+    if (CLIENTES_GENERICOS.has(cliente)) { skippedGenerico++; continue; }
     map.set(cliente, { subtotal: 0, utilidad: 0, empresas: new Map() });
+    addedZeroSales++;
   }
+  console.log("[DEBUG-INACTIVE] zero-sales added:", addedZeroSales, "| skipped (already in map):", skippedAlreadyInMap, "| skipped (generico):", skippedGenerico);
+  console.log("[DEBUG-INACTIVE] final map size:", map.size);
 
-  return [...map.entries()]
+  const result = [...map.entries()]
     .map(([cliente, d]) => ({
       cliente,
       subtotal: d.subtotal,
@@ -171,6 +183,21 @@ function aggregateClientesDetalle(
       })).sort((a, b) => b.subtotal - a.subtotal),
     }))
     .sort((a, b) => b.subtotal - a.subtotal);
+
+  // Count how many would be inactive with the frontend logic
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
+  const wouldBeInactive = result.filter(c => {
+    if (!c.lastFecha || c.lastFecha >= sixtyDaysAgo) return false;
+    const n = c.cliente.toUpperCase().trim();
+    if (n.includes("BOSTON") || n.includes("MULTI FASHION") || n.includes("MULTIFASHION")) return false;
+    if (CLIENTES_GENERICOS.has(n)) return false;
+    const total12m = c.last12mTotal || (c.subtotal + c.prevSubtotal);
+    return total12m >= 5000;
+  });
+  console.log("[DEBUG-INACTIVE] would-be-inactive count (simulated frontend):", wouldBeInactive.length);
+  wouldBeInactive.slice(0, 5).forEach(c => console.log("[DEBUG-INACTIVE]  ", c.cliente, "last12m:", c.last12mTotal, "lastFecha:", c.lastFecha));
+
+  return result;
 }
 
 function aggregatePrevYear(rows: VentasRawRow[]): PrevYearAgg[] {
