@@ -37,6 +37,16 @@ export default function PackingListDetailPage() {
       const res = await fetch(`/api/packing-lists/${id}`);
       if (res.ok) {
         const data = await res.json();
+        // Map API response (items with DB column names) to frontend format
+        if (data.items && !data.index_rows) {
+          data.index_rows = data.items.map((item: { estilo: string; producto: string; total_pcs: number; bultos: Record<string, number>; bulto_muestra: string }) => ({
+            estilo: item.estilo,
+            producto: item.producto,
+            totalPcs: item.total_pcs,
+            distribution: item.bultos || {},
+            bultoMuestra: item.bulto_muestra || "",
+          }));
+        }
         setPl(data);
       } else {
         setError("No se encontró el Packing List");
