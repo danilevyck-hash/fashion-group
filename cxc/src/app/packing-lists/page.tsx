@@ -50,6 +50,7 @@ export default function PackingListsPage() {
   const [uploading, setUploading] = useState(false);
   const [previewItems, setPreviewItems] = useState<PLPreviewItem[]>([]);
   const [savedItems, setSavedItems] = useState<PLPreviewItem[]>([]); // kept after save for PDF download
+  const [selectedForDownload, setSelectedForDownload] = useState<Set<string>>(new Set());
   const [expandedPreview, setExpandedPreview] = useState<string | null>(null);
   const [toast, setToast] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -198,7 +199,9 @@ export default function PackingListsPage() {
 
       if (res.ok) {
         const data = await res.json();
-        setSavedItems([...previewItems]); // keep for combined PDF download
+        const justSaved = [...previewItems];
+        setSavedItems(justSaved);
+        setSelectedForDownload(new Set(justSaved.map(i => i.parsed.numeroPL)));
         setPreviewItems([]);
         const saved = data.totalSaved || 0;
         const failed = data.totalFailed || 0;
@@ -590,30 +593,70 @@ export default function PackingListsPage() {
           </div>
         )}
 
-        {/* Post-save: download combined PDF */}
-        {savedItems.length > 0 && previewItems.length === 0 && (
-          <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-3 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-green-800">{savedItems.length} Packing List{savedItems.length !== 1 ? "s" : ""} guardado{savedItems.length !== 1 ? "s" : ""}</p>
-              <p className="text-xs text-green-600 mt-0.5">{savedItems.reduce((s, i) => s + i.parsed.totalPiezas, 0).toLocaleString()} piezas en total</p>
+        {/* Post-save: select and download PLs */}
+        {savedItems.length > 0 && previewItems.length === 0 && (() => {
+          const selectedItems = savedItems.filter(i => selectedForDownload.has(i.parsed.numeroPL));
+          const allSelected = selectedForDownload.size === savedItems.length;
+          return (
+            <div className="border border-green-200 rounded-lg overflow-hidden">
+              <div className="bg-green-50 px-4 py-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={() => {
+                      if (allSelected) setSelectedForDownload(new Set());
+                      else setSelectedForDownload(new Set(savedItems.map(i => i.parsed.numeroPL)));
+                    }}
+                    className="accent-teal-600 w-4 h-4"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-green-800">{savedItems.length} PL{savedItems.length !== 1 ? "s" : ""} guardado{savedItems.length !== 1 ? "s" : ""}</p>
+                    <p className="text-xs text-green-600">{selectedItems.length} seleccionado{selectedItems.length !== 1 ? "s" : ""} para descargar</p>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => generateCombinedPDF(selectedItems)}
+                    disabled={selectedItems.length === 0}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-md hover:bg-teal-700 active:scale-[0.97] transition-all disabled:opacity-50 min-h-[44px]"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+                    Descargar PDF{selectedItems.length !== 1 ? ` (${selectedItems.length})` : ""}
+                  </button>
+                  <button onClick={() => setSavedItems([])} className="text-xs text-gray-400 hover:text-gray-600 transition px-2">
+                    Cerrar
+                  </button>
+                </div>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {savedItems.map((item) => {
+                  const checked = selectedForDownload.has(item.parsed.numeroPL);
+                  return (
+                    <label key={item.parsed.numeroPL} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          const next = new Set(selectedForDownload);
+                          if (checked) next.delete(item.parsed.numeroPL);
+                          else next.add(item.parsed.numeroPL);
+                          setSelectedForDownload(next);
+                        }}
+                        className="accent-teal-600 w-3.5 h-3.5"
+                      />
+                      <span className="text-sm font-medium">PL #{item.parsed.numeroPL}</span>
+                      <span className="text-xs text-gray-500">{item.parsed.empresa}</span>
+                      <span className="text-xs text-gray-400">{item.parsed.totalBultos} bultos</span>
+                      <span className="text-xs text-gray-400">{item.parsed.totalPiezas.toLocaleString()} pzas</span>
+                      <span className="text-xs text-gray-400">{item.index.length} estilos</span>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => generateCombinedPDF(savedItems)}
-                className="flex items-center gap-1.5 px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-md hover:bg-teal-700 active:scale-[0.97] transition-all min-h-[44px]"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-                Descargar PDF ({savedItems.length} PLs)
-              </button>
-              <button
-                onClick={() => setSavedItems([])}
-                className="text-xs text-gray-400 hover:text-gray-600 transition px-2"
-              >
-                Cerrar
-              </button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* History */}
         <div>
