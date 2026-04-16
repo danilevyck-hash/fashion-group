@@ -53,6 +53,7 @@ interface ClienteDetalle {
   utilidad: number;
   lastFecha: string;
   prevSubtotal: number;
+  last12mTotal: number;
   empresas: { empresa: string; subtotal: number; utilidad: number; lastFecha: string }[];
 }
 
@@ -115,6 +116,7 @@ function aggregateClientesDetalle(
   filteredRows: VentasRawRow[],
   lastDates: { cliente: string; ultima_fecha: string }[],
   prevRows: VentasRawRow[],
+  last12mMap?: Map<string, { total: number; lastDate: string }>,
 ): ClienteDetalle[] {
   // Build lastFecha map — RPC already returns MAX(fecha) per normalized cliente
   const lastFechaMap = new Map<string, string>();
@@ -148,15 +150,11 @@ function aggregateClientesDetalle(
   }
 
   // Add clients from lastDates who are NOT in current-year data
-  // (they stopped buying but had prev-year sales — needed for inactive KPI)
-  const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
+  // (they stopped buying — needed for inactive KPI)
   for (const [cliente, lastFecha] of lastFechaMap) {
     if (map.has(cliente)) continue; // already in current year
     if (CLIENTES_GENERICOS.has(cliente)) continue;
-    if (!lastFecha || lastFecha >= sixtyDaysAgo) continue; // not inactive
-    const prevSales = prevSubtotalMap.get(cliente) ?? 0;
-    if (prevSales < 5000) continue; // not meaningful enough
-    // Add as a zero-sales entry so frontend can see them
+    // Add as a zero-sales entry so frontend can see them in inactive list
     map.set(cliente, { subtotal: 0, utilidad: 0, empresas: new Map() });
   }
 
@@ -167,6 +165,7 @@ function aggregateClientesDetalle(
       utilidad: d.utilidad,
       lastFecha: lastFechaMap.get(cliente) || "",
       prevSubtotal: prevSubtotalMap.get(cliente) ?? 0,
+      last12mTotal: last12mMap?.get(cliente)?.total ?? 0,
       empresas: [...d.empresas.entries()].map(([empresa, ed]) => ({
         empresa, ...ed, lastFecha: "",
       })).sort((a, b) => b.subtotal - a.subtotal),
@@ -261,9 +260,42 @@ export async function GET(req: NextRequest) {
     prevOffset += PAGE;
   }
 
-  // ── Fetch historical last-fecha per client via RPC (aggregated, efficient) ──
-  const { data: lastDates, error: lastDatesErr } = await supabaseServer.rpc("get_ultima_compra");
-  if (lastDatesErr) console.error("[ventas/v2] get_ultima_compra error:", lastDatesErr.code, lastDatesErr.message);
+  // ── Fetch last 12 months rows for inactive client detection ──────────────
+  const twelveMonthsAgo = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+  let allLast12Rows: VentasRawRow[] = [];
+  let l12Offset = 0;
+  while (true) {
+    const { data, error } = await supabaseServer
+      .from("ventas_raw")
+      .select("empresa, mes, subtotal, utilidad, cliente, tipo, fecha")
+      .gte("fecha", twelveMonthsAgo)
+      .order("fecha", { ascending: true })
+      .order("n_sistema", { ascending: true })
+      .range(l12Offset, l12Offset + PAGE - 1);
+    if (error) { console.error("[ventas/v2] last12m query error", error.code); break; }
+    allLast12Rows = allLast12Rows.concat((data ?? []) as VentasRawRow[]);
+    if (!data || data.length < PAGE) break;
+    l12Offset += PAGE;
+  }
+  const last12Rows = allLast12Rows.map(mapEmpresa);
+
+  // Build inactive clients from last 12 months data (NOT from RPC)
+  const EMPRESAS_EXCL_INACTIVE = new Set(["Confecciones Boston", "Multifashion"]);
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
+  const inactiveMap = new Map<string, { total: number; lastDate: string }>();
+  for (const r of last12Rows) {
+    if (EMPRESAS_EXCL_INACTIVE.has(r.empresa)) continue;
+    const name = normalizeName(r.cliente ?? "") || "(Sin nombre)";
+    if (CLIENTES_GENERICOS.has(name)) continue;
+    const entry = inactiveMap.get(name) ?? { total: 0, lastDate: "" };
+    entry.total += Number(r.subtotal) || 0;
+    if ((r.fecha ?? "") > entry.lastDate) entry.lastDate = r.fecha ?? "";
+    inactiveMap.set(name, entry);
+  }
+  // Build lastDates-compatible array from the inactive map (for aggregateClientesDetalle)
+  const lastDatesFromRaw = [...inactiveMap.entries()].map(([cliente, d]) => ({
+    cliente, ultima_fecha: d.lastDate,
+  }));
 
   // ── Map empresa keys to display names ────────────────────────────────────
   const rows = currentRows.map(mapEmpresa);
@@ -279,7 +311,7 @@ export async function GET(req: NextRequest) {
     byEmpresaMes: aggregateByEmpresaMes(rows),
     topClientes: aggregateTopClientes(rows),
     prevYear: aggregatePrevYear(prev),
-    clientesDetalle: aggregateClientesDetalle(clienteRows, lastDates ?? [], prev),
+    clientesDetalle: aggregateClientesDetalle(clienteRows, lastDatesFromRaw, prev, inactiveMap),
   };
   return NextResponse.json(result);
 }

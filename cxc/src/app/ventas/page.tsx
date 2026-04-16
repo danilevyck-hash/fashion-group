@@ -51,6 +51,7 @@ interface ClienteDetalle {
   utilidad: number;
   lastFecha: string;
   prevSubtotal: number;
+  last12mTotal: number;
   empresas: { empresa: string; subtotal: number; utilidad: number; lastFecha: string }[];
 }
 
@@ -379,14 +380,14 @@ export default function VentasDashboard() {
   const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
   const GENERIC_NAMES = new Set(["CONTADO", "VENTAS", "(SIN NOMBRE)"]);
   const MIN_SALES_INACTIVE = 5000;
-  // Compute inactive from ALL clientesData (not just subtotal>0) to include clients with zero current-year sales
+  // Compute inactive: clients with >=5k in last 12 months but no purchase in 60 days
   const inactiveClients = clientesData.filter(c => {
     if (!c.lastFecha || c.lastFecha >= sixtyDaysAgo) return false;
     if (esInterno(c.cliente)) return false;
     if (GENERIC_NAMES.has(c.cliente.toUpperCase().trim())) return false;
-    const combinedSales = c.subtotal + (c.prevSubtotal ?? 0);
-    return combinedSales >= MIN_SALES_INACTIVE;
-  }).sort((a, b) => (b.subtotal + (b.prevSubtotal ?? 0)) - (a.subtotal + (a.prevSubtotal ?? 0)));
+    const total12m = Number(c.last12mTotal) || (Number(c.subtotal) + Number(c.prevSubtotal ?? 0));
+    return total12m >= MIN_SALES_INACTIVE;
+  }).sort((a, b) => (Number(b.last12mTotal) || 0) - (Number(a.last12mTotal) || 0));
   const inactiveCount = inactiveClients.length;
 
   const clientesSorted = useMemo(() => {
