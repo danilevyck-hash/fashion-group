@@ -105,8 +105,8 @@ export function normalizeProductName(nombre: string): string {
 // ── Helpers ──────────────────────────────────────────────────────────
 
 function extractBultoId(raw: string): string {
-  // Remove OCPA prefix if present, then take last 7 digits as ID
-  const digits = raw.replace(/^OCPA/i, "");
+  // Remove known prefixes (OCPA, IBPA), then take last 7 digits as ID
+  const digits = raw.replace(/^(OCPA|IBPA)/i, "");
   const last7 = digits.slice(-7);
   return String(parseInt(last7, 10));
 }
@@ -237,6 +237,8 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
   let currentSizeInfo = { columns: [] as string[], mIndex: -1, dim32Index: -1, hasOS: false };
   let mXPos = -1;
   let dim32XPos = -1;
+  let qtyXPos = -1;    // X position of the "Qty" column header
+  let dimXPos = -1;    // X position of the "Dim" column header (start of size zone)
   let currentEstilo = "";
   let currentProducto = "";
 
@@ -257,8 +259,8 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
 
     const rawLine = getRawLine(cli);
 
-    // Detect new bulto (OCPA prefix or pure numeric ID)
-    if (/Bulto No\.\s*(OCPA|\d)/i.test(line)) {
+    // Detect new bulto (OCPA/IBPA prefix or pure numeric ID)
+    if (/Bulto No\.\s*(OCPA|IBPA|\d)/i.test(line)) {
       // Save previous bulto if any
       saveBulto();
       // Start new bulto — extract the ID after "Bulto No."
@@ -272,6 +274,8 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
       currentSizeInfo = { columns: [] as string[], mIndex: -1, dim32Index: -1, hasOS: false };
       mXPos = -1;
       dim32XPos = -1;
+      qtyXPos = -1;
+      dimXPos = -1;
       currentEstilo = "";
       currentProducto = "";
       continue;
@@ -295,6 +299,8 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
       if (rawLine) {
         mXPos = findColumnXPos(rawLine, "M");
         dim32XPos = findColumnXPos(rawLine, "32");
+        qtyXPos = findColumnXPos(rawLine, "Qty");
+        dimXPos = findColumnXPos(rawLine, "Dim");
       }
       continue;
     }
@@ -306,8 +312,11 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
 
     const firstToken = line.split(/\s{2,}/)[0]?.trim() || "";
 
-    // Style line: first token is alphanumeric code with mixed letters+digits, 6+ chars
-    if (STYLE_CODE_RE.test(firstToken) && firstToken.length >= 6 && /[A-Za-z]/.test(firstToken) && /\d/.test(firstToken)) {
+    // Style line: first token starts with an alphanumeric code that has BOTH letters AND digits
+    // e.g. "40EM124110", "QD5209511", "4LB125G001" — NOT "HEATHER" (letters only)
+    const styleMatch = firstToken.match(STYLE_CODE_RE);
+    const styleCandidate = styleMatch ? styleMatch[0] : "";
+    if (styleCandidate.length >= 6 && /[A-Za-z]/.test(styleCandidate) && /\d/.test(styleCandidate)) {
       const parts = line.split(/\s{2,}/).map(p => p.trim()).filter(Boolean);
 
       // Find the part that matches a known product keyword (CAMISA, POLO, etc.)
@@ -319,18 +328,26 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
           break;
         }
       }
+      // Fallback: search for keyword INSIDE concatenated parts (pdfjs sometimes merges color+product)
+      // e.g. "SHORELINE/ GREYPANTI PARA DAMA" — "PANTI" is inside the string
+      if (!producto) {
+        for (let pi = 1; pi < parts.length; pi++) {
+          const kwMatch = parts[pi].match(PRODUCT_KEYWORDS);
+          if (kwMatch) {
+            // Extract from the keyword match position to end of string
+            producto = parts[pi].substring(parts[pi].indexOf(kwMatch[0]));
+            break;
+          }
+        }
+      }
       // Fallback to parts[2] if no keyword match found
-      // If parts[2] looks like a number-only or too-short token (e.g. from a double-space color),
-      // try subsequent parts to find one that looks like a product name
       if (!producto && parts.length >= 3) {
         for (let fi = 2; fi < parts.length; fi++) {
           const candidate = parts[fi];
-          // Skip tokens that are purely numeric or suspiciously short (< 4 chars)
           if (/^\d+$/.test(candidate) || candidate.length < 4) continue;
           producto = candidate;
           break;
         }
-        // Last resort: use parts[2] even if short
         if (!producto) producto = parts[2];
       }
 
@@ -339,12 +356,32 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
       continue;
     }
 
+    // Skip standalone "0" lines (common in underwear PLs after each qty line)
+    if (/^0$/.test(line.trim())) continue;
+
     // Number line or continuation line (text + numbers) following a style
     if (currentEstilo) {
       const nums = line.match(/\d+/g);
       if (nums && nums.length > 0) {
-        const qty = parseInt(nums[nums.length - 1], 10);
-        if (qty > 0 && qty < 10000) {
+        // Determine qty: sum of size columns (more reliable than Qty column)
+        // The Qty column sometimes shows pack count, not piece count
+        let qty: number;
+        if (rawLine && qtyXPos > 0 && dimXPos > 0) {
+          // Sum all numeric values in the SIZE ZONE (between Dim and Qty columns)
+          // This gives piece count, which is more reliable than the Qty column
+          qty = rawLine.items.reduce((sum: number, item: { x: number; str: string }) => {
+            const trimmed = item.str.trim();
+            if (/^\d+$/.test(trimmed) && item.x >= dimXPos - 5 && item.x < qtyXPos - 10) {
+              return sum + parseInt(trimmed, 10);
+            }
+            return sum;
+          }, 0);
+          // Fallback: if no size values found, use last number (single-column layouts)
+          if (qty === 0) qty = parseInt(nums[nums.length - 1], 10);
+        } else {
+          qty = parseInt(nums[nums.length - 1], 10);
+        }
+        if (qty > 0 && qty < 100000) {
           // Check if M or 32 is present using X-position coordinates when available
           let hasM: boolean;
           let has32: boolean;
@@ -394,6 +431,10 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
           continue;
         }
       }
+      // Line has no valid qty but we have a current estilo — this is likely
+      // a continuation of the color name (e.g. "HEATHER/ MOONL 18 18" or "DE")
+      // or a color fragment like "21037". Keep currentEstilo alive.
+      continue;
     }
 
     currentEstilo = "";
@@ -487,4 +528,66 @@ export function buildIndex(parsed: ParsedPackingList): PLIndexRow[] {
   });
 
   return rows;
+}
+
+// ── Multi-PL splitter ───────────────────────────────────────────────
+
+/**
+ * Split a full PDF text (and optional rawLines) into per-PL sections.
+ * Each section contains the text and rawLines for a single Packing List.
+ * Handles the case where the same NO. XXXXX appears on every page of the same PL.
+ */
+export function splitTextIntoPLSections(
+  text: string,
+  rawLines?: RawLine[]
+): { text: string; rawLines?: RawLine[] }[] {
+  const allLines = text.split("\n");
+
+  // Find first occurrence of each distinct PL number
+  const plBoundaries: { plNumber: string; lineIndex: number }[] = [];
+  const seenNumbers = new Set<string>();
+
+  for (let i = 0; i < allLines.length; i++) {
+    const match = allLines[i].match(/NO\.\s*(\d{5,})/);
+    if (match) {
+      const num = match[1];
+      if (!seenNumbers.has(num)) {
+        seenNumbers.add(num);
+        plBoundaries.push({ plNumber: num, lineIndex: i });
+      }
+    }
+  }
+
+  // If 0 or 1 PL found, return entire text as single section
+  if (plBoundaries.length <= 1) {
+    return [{ text, rawLines }];
+  }
+
+  // Split into sections using boundaries
+  const sections: { text: string; rawLines?: RawLine[] }[] = [];
+
+  for (let b = 0; b < plBoundaries.length; b++) {
+    const start = plBoundaries[b].lineIndex;
+    const end = b + 1 < plBoundaries.length ? plBoundaries[b + 1].lineIndex : allLines.length;
+
+    const sectionLines = allLines.slice(start, end);
+    const sectionText = sectionLines.join("\n");
+    const sectionRawLines = rawLines ? rawLines.slice(start, end) : undefined;
+
+    sections.push({ text: sectionText, rawLines: sectionRawLines });
+  }
+
+  return sections;
+}
+
+/**
+ * Parse a PDF that may contain multiple Packing Lists.
+ * Returns an array of ParsedPackingList (one per PL found).
+ */
+export function parseMultiplePackingLists(
+  text: string,
+  rawLines?: RawLine[]
+): ParsedPackingList[] {
+  const sections = splitTextIntoPLSections(text, rawLines);
+  return sections.map((section) => parsePackingListText(section.text, section.rawLines));
 }

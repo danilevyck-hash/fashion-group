@@ -257,7 +257,16 @@ export default function VentasDashboard() {
   }, [vista]);
 
   useEffect(() => {
-    fetch("/api/ventas/años").then(r => r.json()).then(setAños).catch(() => {});
+    fetch("/api/ventas/a%C3%B1os").then(r => {
+      if (!r.ok) throw new Error("años API " + r.status);
+      return r.json();
+    }).then(data => {
+      if (Array.isArray(data) && data.length > 0) setAños(data);
+    }).catch(() => {
+      // Fallback: generate range from current year back 4 years
+      const cy = new Date().getFullYear();
+      setAños([cy, cy-1, cy-2, cy-3, cy-4]);
+    });
   }, []);
 
   // Clientes always uses last 12 months
