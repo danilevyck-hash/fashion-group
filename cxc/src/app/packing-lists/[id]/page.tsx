@@ -140,10 +140,10 @@ export default function PackingListDetailPage() {
           content: group.producto || "SIN PRODUCTO",
           colSpan: 4,
           styles: {
-            fillColor: [235, 235, 235],
+            fillColor: [210, 215, 225],
             fontStyle: "bold",
-            fontSize: 8,
-            textColor: [60, 60, 60],
+            fontSize: 9,
+            textColor: [30, 40, 60],
           },
         },
       ]);
@@ -162,6 +162,9 @@ export default function PackingListDetailPage() {
       }
     }
 
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const plLabel = `PL #${pl.numero_pl}`;
+
     autoTable(doc, {
       startY: 32,
       head: [["Estilo", "Total", "Muestra", "Distribución por Bulto"]],
@@ -174,30 +177,51 @@ export default function PackingListDetailPage() {
       },
       styles: {
         fontSize: 9,
-        cellPadding: 1.5,
+        cellPadding: 2,
       },
       columnStyles: {
-        0: { cellWidth: 30, font: "courier" },
-        1: { cellWidth: 15, halign: "right" },
+        0: { cellWidth: 32, font: "courier" },
+        1: { cellWidth: 14, halign: "right" },
         2: { cellWidth: 18 },
         3: { cellWidth: "auto" },
       },
-      alternateRowStyles: { fillColor: [248, 248, 248] },
-      margin: { left: 14, right: 14 },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+      margin: { left: 14, right: 14, top: 20 },
+      didDrawPage(data) {
+        // Header on every page (except page 1 which has the full title)
+        if (data.pageNumber > 1) {
+          doc.setFontSize(10);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(30, 58, 95);
+          doc.text(plLabel, 14, 12);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(140);
+          doc.setFontSize(8);
+          doc.text(pl.empresa || "", 14, 17);
+        }
+        // Page number top-right on every page
+        doc.setFontSize(8);
+        doc.setTextColor(160);
+        const pageCount = doc.getNumberOfPages();
+        doc.text(
+          `${data.pageNumber} / ${pageCount}`,
+          pageWidth - 14,
+          8,
+          { align: "right" }
+        );
+      },
     });
 
-    // Footer
-    const pageCount = doc.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
+    // Fix page count (didDrawPage runs before all pages exist, so update page numbers)
+    const totalPages = doc.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
-      doc.setFontSize(7);
+      // Overwrite page number with correct total
+      doc.setFillColor(255, 255, 255);
+      doc.rect(pageWidth - 40, 3, 30, 8, "F");
+      doc.setFontSize(8);
       doc.setTextColor(160);
-      doc.text(
-        `Pág ${i} de ${pageCount}`,
-        pageWidth - 14,
-        doc.internal.pageSize.getHeight() - 8,
-        { align: "right" }
-      );
+      doc.text(`${i} / ${totalPages}`, pageWidth - 14, 8, { align: "right" });
     }
 
     doc.save(`PL-${pl.numero_pl || "sin-numero"}.pdf`);
@@ -350,8 +374,8 @@ function GroupRows({
   return (
     <>
       {/* Product group header */}
-      <tr className="bg-gray-100">
-        <td colSpan={4} className="px-3 py-1.5 text-xs font-bold text-gray-600 uppercase tracking-wide">
+      <tr className="bg-gray-200">
+        <td colSpan={4} className="px-3 py-2 text-sm font-bold text-gray-700 uppercase tracking-wide">
           {group.producto || "SIN PRODUCTO"}
         </td>
       </tr>
