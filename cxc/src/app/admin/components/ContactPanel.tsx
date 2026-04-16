@@ -36,6 +36,7 @@ export default function ContactPanel({
   const [editData, setEditData] = useState({ correo: "", telefono: "", celular: "", contacto: "" });
   const [copied, setCopied] = useState<string | null>(null);
   const [contactInlineOpen, setContactInlineOpen] = useState(false);
+  const [desgloseOpen, setDesgloseOpen] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const editDataRef = useRef(editData);
@@ -109,7 +110,7 @@ export default function ContactPanel({
     : roleCompanies.filter((co) => client.companies[co.key]);
 
   return (
-    <div className="bg-gray-50/80 px-6 py-5 border-b border-gray-200 space-y-5">
+    <div className="bg-gray-50/80 px-6 py-4 border-b border-gray-200 space-y-3">
 
       {/* ── Section 1: Ultimo contacto ────────────────────── */}
       <div>
@@ -309,52 +310,51 @@ export default function ContactPanel({
       {/* ── Section 5: Notas ──────────────────────────────── */}
       <ClientNote clientName={client.nombre_normalized} />
 
-      {/* ── Section 6: Desglose por empresa ───────────────── */}
+      {/* ── Section 6: Desglose por empresa (colapsable) ──── */}
       {visibleCompanies.length > 0 && (
         <div>
-          <div className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <button
+            onClick={() => setDesgloseOpen(!desgloseOpen)}
+            className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5 hover:text-gray-700 transition"
+          >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            {roleCompanies.length === 1 || companyFilter !== "all" ? "Detalle de aging" : "Desglose por empresa"}
-          </div>
-          <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="text-[10px] text-gray-400 uppercase tracking-wider">
-                {roleCompanies.length > 1 && <th className="text-left py-1.5 font-medium">Empresa</th>}
-                <th className="text-left py-1.5 font-medium">Codigo</th>
-                <th className="text-right py-1.5 font-medium">0-30</th>
-                <th className="text-right py-1.5 font-medium">31-60</th>
-                <th className="text-right py-1.5 font-medium">61-90</th>
-                <th className="text-right py-1.5 font-medium text-amber-600">91-120</th>
-                <th className="text-right py-1.5 font-medium text-amber-600">121-180</th>
-                <th className="text-right py-1.5 font-medium text-red-500">181-270</th>
-                <th className="text-right py-1.5 font-medium text-red-500">271-365</th>
-                <th className="text-right py-1.5 font-medium text-red-500">+365</th>
-                <th className="text-right py-1.5 font-medium">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleCompanies.map((co) => {
-                const d = client.companies[co.key];
-                return (
-                  <tr key={co.key} className="border-t border-gray-200 hover:bg-white transition">
-                    {roleCompanies.length > 1 && <td className="py-1.5 font-medium">{co.name}</td>}
-                    <td className="py-1.5 text-gray-400">{d.codigo}</td>
-                    <td className="text-right py-1.5 tabular-nums">{fmt(d.d0_30)}</td>
-                    <td className="text-right py-1.5 tabular-nums">{fmt(d.d31_60)}</td>
-                    <td className="text-right py-1.5 tabular-nums">{fmt(d.d61_90)}</td>
-                    <td className="text-right py-1.5 tabular-nums text-amber-600">{fmt(d.d91_120)}</td>
-                    <td className="text-right py-1.5 tabular-nums text-amber-600">{fmt(d.d121_180)}</td>
-                    <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(d.d181_270)}</td>
-                    <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(d.d271_365)}</td>
-                    <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(d.mas_365)}</td>
-                    <td className="text-right py-1.5 tabular-nums font-semibold">{fmt(d.total)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          </div>
+            <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${desgloseOpen ? "rotate-90" : ""}`} fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg>
+            {roleCompanies.length === 1 || companyFilter !== "all" ? "Detalle de aging" : `Desglose por empresa (${visibleCompanies.length})`}
+          </button>
+          {desgloseOpen && (
+            <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-[10px] text-gray-400 uppercase tracking-wider">
+                  {roleCompanies.length > 1 && <th className="text-left py-1.5 font-medium">Empresa</th>}
+                  <th className="text-left py-1.5 font-medium">Codigo</th>
+                  <th className="text-right py-1.5 font-medium text-emerald-600">0-90d</th>
+                  <th className="text-right py-1.5 font-medium text-amber-600">91-120d</th>
+                  <th className="text-right py-1.5 font-medium text-red-500">121d+</th>
+                  <th className="text-right py-1.5 font-medium">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleCompanies.map((co) => {
+                  const d = client.companies[co.key];
+                  const current = d.d0_30 + d.d31_60 + d.d61_90;
+                  const watch = d.d91_120;
+                  const overdue = d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365;
+                  return (
+                    <tr key={co.key} className="border-t border-gray-200 hover:bg-white transition">
+                      {roleCompanies.length > 1 && <td className="py-1.5 font-medium">{co.name}</td>}
+                      <td className="py-1.5 text-gray-400">{d.codigo}</td>
+                      <td className="text-right py-1.5 tabular-nums text-emerald-700">{fmt(current)}</td>
+                      <td className="text-right py-1.5 tabular-nums text-amber-600">{fmt(watch)}</td>
+                      <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(overdue)}</td>
+                      <td className="text-right py-1.5 tabular-nums font-semibold">{fmt(d.total)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -382,7 +382,7 @@ function ClientNote({ clientName }: { clientName: string }) {
   }
   const agoMin = savedAt ? Math.floor((Date.now() - savedAt) / 60000) : null;
   return (
-    <div className="mt-4 mb-2">
+    <div>
       <div className="text-[11px] uppercase tracking-wider text-gray-400 mb-1.5 font-medium flex items-center gap-1.5">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
         Nota interna
@@ -390,7 +390,7 @@ function ClientNote({ clientName }: { clientName: string }) {
       </div>
       <textarea value={note} onChange={(e) => setNote(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => { setFocused(false); save(); }}
         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); } }}
-        placeholder="Ej: Acuerdo de pago, cliente VIP..." rows={2}
+        placeholder="Ej: Acuerdo de pago, cliente VIP..." rows={1}
         className="w-full border border-gray-200 rounded-lg p-2.5 text-xs outline-none focus:ring-1 focus:ring-gray-300 resize-none text-gray-600 placeholder:text-gray-300" />
       <div className="flex items-center gap-2 mt-0.5">
         {focused && <span className="text-[10px] text-gray-300">Presiona Enter para guardar</span>}
