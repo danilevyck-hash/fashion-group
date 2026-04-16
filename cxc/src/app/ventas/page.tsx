@@ -50,6 +50,7 @@ interface ClienteDetalle {
   subtotal: number;
   utilidad: number;
   lastFecha: string;
+  prevSubtotal: number;
   empresas: { empresa: string; subtotal: number; utilidad: number; lastFecha: string }[];
 }
 
@@ -372,11 +373,20 @@ export default function VentasDashboard() {
   }, [clientesData, empresaFilter, clientSearch]);
 
   const clientesForKPI = useMemo(() => [...clientesFiltered].sort((a, b) => b.subtotal - a.subtotal), [clientesFiltered]);
-  const totalVentas = clientesForKPI.reduce((s, c) => s + c.subtotal, 0);
+  const totalVentas = useMemo(() => clientesFiltered.reduce((s, c) => s + (Number(c.subtotal) || 0), 0), [clientesFiltered]);
   const topClient = clientesForKPI[0] || null;
-  const top5Pct = totalVentas > 0 ? (clientesForKPI.slice(0, 5).reduce((s, c) => s + c.subtotal, 0) / totalVentas) * 100 : 0;
+  const top5Pct = totalVentas > 0 ? (clientesForKPI.slice(0, 5).reduce((s, c) => s + (Number(c.subtotal) || 0), 0) / totalVentas) * 100 : 0;
   const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
-  const inactiveClients = clientesForKPI.filter(c => c.lastFecha && c.lastFecha < sixtyDaysAgo);
+  const GENERIC_NAMES = new Set(["CONTADO", "VENTAS", "(SIN NOMBRE)"]);
+  const MIN_SALES_INACTIVE = 5000;
+  // Compute inactive from ALL clientesData (not just subtotal>0) to include clients with zero current-year sales
+  const inactiveClients = clientesData.filter(c => {
+    if (!c.lastFecha || c.lastFecha >= sixtyDaysAgo) return false;
+    if (esInterno(c.cliente)) return false;
+    if (GENERIC_NAMES.has(c.cliente.toUpperCase().trim())) return false;
+    const combinedSales = c.subtotal + (c.prevSubtotal ?? 0);
+    return combinedSales >= MIN_SALES_INACTIVE;
+  }).sort((a, b) => (b.subtotal + (b.prevSubtotal ?? 0)) - (a.subtotal + (a.prevSubtotal ?? 0)));
   const inactiveCount = inactiveClients.length;
 
   const clientesSorted = useMemo(() => {
@@ -902,7 +912,9 @@ export default function VentasDashboard() {
                 <tbody>
                   {displayClients.map(c => {
                     const margen = c.subtotal ? (c.utilidad / c.subtotal * 100) : 0;
-                    const pct = totalVentas ? (c.subtotal / totalVentas * 100) : 0;
+                    const clientSubtotal = Number(c.subtotal) || 0;
+                    const pct = totalVentas > 0 ? (clientSubtotal / totalVentas * 100) : 0;
+                    const pctStr = pct > 0 && pct < 0.1 ? pct.toFixed(4) : pct.toFixed(2);
                     const lastCompra = c.lastFecha ? new Date(c.lastFecha).toLocaleDateString("es-PA", { month: "short", year: "numeric" }).replace(".", "") : "—";
                     const expanded = expandedClient === c.cliente;
                     const isInactive = c.lastFecha && c.lastFecha < sixtyDaysAgo;
@@ -916,7 +928,7 @@ export default function VentasDashboard() {
                         <td className="text-right px-3 py-2.5 tabular-nums min-h-[44px]">{fmtK(c.subtotal)}</td>
                         <td className="text-right px-3 py-2.5 tabular-nums min-h-[44px]">{fmtK(c.utilidad)}</td>
                         <td className={`text-right px-3 py-2.5 tabular-nums min-h-[44px] ${margen < 15 ? "text-red-600" : ""}`}>{margen.toFixed(1)}%</td>
-                        <td className="text-right px-3 py-2.5 tabular-nums text-gray-500 min-h-[44px]">{pct.toFixed(1)}%</td>
+                        <td className="text-right px-3 py-2.5 tabular-nums text-gray-500 min-h-[44px]">{pctStr}%</td>
                         <td className={`text-right px-3 py-2.5 min-h-[44px] ${isInactive ? "text-red-500" : "text-gray-500"}`}>{lastCompra}</td>
                       </tr>,
                       expanded && c.empresas.map(e => (

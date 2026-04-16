@@ -52,6 +52,7 @@ interface ClienteDetalle {
   subtotal: number;
   utilidad: number;
   lastFecha: string;
+  prevSubtotal: number;
   empresas: { empresa: string; subtotal: number; utilidad: number; lastFecha: string }[];
 }
 
@@ -108,10 +109,12 @@ function aggregateTopClientes(rows: VentasRawRow[], topN = 10): ClienteAgg[] {
 }
 
 const CLIENTES_INTERNOS = new Set(["CONFECCIONES BOSTON", "MULTI FASHION HOLDING", "MULTIFASHION", "BOSTON"]);
+const CLIENTES_GENERICOS = new Set(["CONTADO", "VENTAS", "(SIN NOMBRE)"]);
 
 function aggregateClientesDetalle(
   filteredRows: VentasRawRow[],
   lastDates: { cliente: string; ultima_fecha: string }[],
+  prevRows: VentasRawRow[],
 ): ClienteDetalle[] {
   // Build lastFecha map — RPC already returns MAX(fecha) per normalized cliente
   const lastFechaMap = new Map<string, string>();
@@ -119,6 +122,14 @@ function aggregateClientesDetalle(
     const key = normalizeName(r.cliente ?? "") || "(Sin nombre)";
     if (CLIENTES_INTERNOS.has(key)) continue;
     lastFechaMap.set(key, String(r.ultima_fecha ?? ""));
+  }
+
+  // Build prev-year subtotal per client (for inactive KPI calculation)
+  const prevSubtotalMap = new Map<string, number>();
+  for (const r of prevRows) {
+    const key = normalizeName(r.cliente ?? "") || "(Sin nombre)";
+    if (CLIENTES_INTERNOS.has(key)) continue;
+    prevSubtotalMap.set(key, (prevSubtotalMap.get(key) ?? 0) + (r.subtotal ?? 0));
   }
 
   // Aggregate subtotal/utilidad from period-filtered rows only
@@ -136,12 +147,26 @@ function aggregateClientesDetalle(
     e.utilidad += r.utilidad ?? 0;
   }
 
+  // Add clients from lastDates who are NOT in current-year data
+  // (they stopped buying but had prev-year sales — needed for inactive KPI)
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
+  for (const [cliente, lastFecha] of lastFechaMap) {
+    if (map.has(cliente)) continue; // already in current year
+    if (CLIENTES_GENERICOS.has(cliente)) continue;
+    if (!lastFecha || lastFecha >= sixtyDaysAgo) continue; // not inactive
+    const prevSales = prevSubtotalMap.get(cliente) ?? 0;
+    if (prevSales < 5000) continue; // not meaningful enough
+    // Add as a zero-sales entry so frontend can see them
+    map.set(cliente, { subtotal: 0, utilidad: 0, empresas: new Map() });
+  }
+
   return [...map.entries()]
     .map(([cliente, d]) => ({
       cliente,
       subtotal: d.subtotal,
       utilidad: d.utilidad,
       lastFecha: lastFechaMap.get(cliente) || "",
+      prevSubtotal: prevSubtotalMap.get(cliente) ?? 0,
       empresas: [...d.empresas.entries()].map(([empresa, ed]) => ({
         empresa, ...ed, lastFecha: "",
       })).sort((a, b) => b.subtotal - a.subtotal),
@@ -220,7 +245,7 @@ export async function GET(req: NextRequest) {
   while (true) {
     let q = supabaseServer
       .from("ventas_raw")
-      .select("empresa, mes, subtotal, utilidad")
+      .select("empresa, mes, subtotal, utilidad, cliente")
       .eq("anio", año - 1)
       .order("fecha", { ascending: true })
       .order("n_sistema", { ascending: true })
@@ -254,7 +279,7 @@ export async function GET(req: NextRequest) {
     byEmpresaMes: aggregateByEmpresaMes(rows),
     topClientes: aggregateTopClientes(rows),
     prevYear: aggregatePrevYear(prev),
-    clientesDetalle: aggregateClientesDetalle(clienteRows, lastDates ?? []),
+    clientesDetalle: aggregateClientesDetalle(clienteRows, lastDates ?? [], prev),
   };
   return NextResponse.json(result);
 }
