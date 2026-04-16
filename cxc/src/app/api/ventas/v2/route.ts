@@ -183,9 +183,6 @@ function aggregateClientesDetalle(
     };
   }).sort((a, b) => b.subtotal - a.subtotal);
 
-  const inactiveCount = result.filter(c => c.isInactive).length;
-  console.log("[DEBUG-INACTIVE] total isInactive=true:", inactiveCount);
-
   return result;
 }
 
