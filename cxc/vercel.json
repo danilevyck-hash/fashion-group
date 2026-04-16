@@ -2,9 +2,7 @@
   "crons": [
     { "path": "/api/cron/cheques", "schedule": "0 13 * * *" },
     { "path": "/api/cron/cheques-alert", "schedule": "0 13 * * *" },
-    { "path": "/api/cron/weekly-report", "schedule": "0 14 * * 1" },
     { "path": "/api/cron/backup", "schedule": "0 6 * * *" },
-    { "path": "/api/cron/monthly-report", "schedule": "0 14 1 * *" },
     { "path": "/api/cron/guias-summary", "schedule": "0 23 * * *" }
   ]
 }
