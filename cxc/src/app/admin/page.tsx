@@ -465,21 +465,10 @@ export default function AdminDashboard() {
 
   async function markContacted(clientName: string, method: string) {
     const now = new Date().toISOString();
-    // Audit trail: keep insert to contact_log
     await supabase.from("cxc_contact_log").insert({
       nombre_normalized: clientName,
       method,
     });
-    // Source of truth: upsert overrides with last contact info
-    await supabase.from("cxc_client_overrides").upsert(
-      {
-        nombre_normalized: clientName,
-        ultimo_contacto_fecha: now,
-        ultimo_contacto_metodo: method.toLowerCase(),
-        updated_at: now,
-      },
-      { onConflict: "nombre_normalized" }
-    );
     setContactLog((prev) => ({
       ...prev,
       [clientName]: { date: now, method },
@@ -525,8 +514,6 @@ export default function AdminDashboard() {
       telefono: existingClient?.telefono || "",
       celular: existingClient?.celular || "",
       contacto: existingClient?.contacto || "",
-      ultimo_contacto_fecha: now,
-      ultimo_contacto_metodo: data.metodo.toLowerCase(),
       updated_at: now,
     };
     if (data.resultado_contacto) {

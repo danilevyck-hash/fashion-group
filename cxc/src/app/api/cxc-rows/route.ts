@@ -8,10 +8,11 @@ export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria", "director"]);
   if (auth instanceof NextResponse) return auth;
   const name = req.nextUrl.searchParams.get("name");
-  if (!name) return NextResponse.json([]);
-  const { data } = await supabaseServer
+  if (!name) return NextResponse.json({ error: "Falta el parametro name" }, { status: 400 });
+  const { data, error } = await supabaseServer
     .from("cxc_rows")
     .select("company_key, codigo, nombre, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365, total")
     .eq("nombre_normalized", name);
+  if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json(data || []);
 }

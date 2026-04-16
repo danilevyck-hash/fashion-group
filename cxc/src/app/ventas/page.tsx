@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { fmt } from "@/lib/format";
-import { SkeletonTable, SkeletonKPI, Toast, Modal } from "@/components/ui";
+import { SkeletonTable, SkeletonKPI, Toast } from "@/components/ui";
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer } from "recharts";
 import XLSX from "xlsx-js-style";
 
@@ -236,10 +236,7 @@ export default function VentasDashboard() {
   const [ventasPrev, setVentasPrev] = useState<PrevYearRow[]>([]);
   const [años, setAños] = useState<number[]>([]);
   const [metasAuto, setMetasAuto] = useState<MetaAutoEmpresa[]>([]);
-  const [metasAutoMeta, setMetasAutoMeta] = useState<{ groupAvgCAGR: number; ceiling: number }>({ groupAvgCAGR: 0, ceiling: 0 });
-  const [showMetas, setShowMetas] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [savingMetas, setSavingMetas] = useState(false);
   const [activeTab, setActiveTab] = useState<"resumen" | "clientes">("resumen");
   const [resumenMode, setResumenMode] = useState<"ventas" | "utilidad">("ventas");
   const [clientesData, setClientesData] = useState<ClienteDetalle[]>([]);
@@ -249,8 +246,6 @@ export default function VentasDashboard() {
   const [expandedClient, setExpandedClient] = useState<string | null>(null);
   const [showInactive, setShowInactive] = useState(false);
 
-  // Metas modal draft: custom rate per empresa (null = use suggested)
-  const [metaRateDraft, setMetaRateDraft] = useState<Record<string, string>>({});
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
@@ -297,10 +292,6 @@ export default function VentasDashboard() {
 
       const autoRes = metasAutoRes as MetaAutoResponse | null;
       setMetasAuto(autoRes?.empresas ?? []);
-      setMetasAutoMeta({
-        groupAvgCAGR: autoRes?.groupAvgCAGR ?? 0,
-        ceiling: autoRes?.ceiling ?? 0,
-      });
     } catch { showToast("Error al cargar datos de ventas"); }
     setLoading(false);
   }, [año, desdeStr]);
@@ -408,54 +399,6 @@ export default function VentasDashboard() {
     else { setClientSort(col); setClientSortDir("desc"); }
   }
 
-  // ── Metas modal ────────────────────────────────────────────────────────────
-
-  const openMetas = () => {
-    const draft: Record<string, string> = {};
-    for (const emp of metasAuto) {
-      // If user has overrides, show blank (meaning "using custom metas")
-      // Otherwise show empty to use suggested rate
-      draft[emp.empresa] = "";
-    }
-    setMetaRateDraft(draft);
-    setShowMetas(true);
-  };
-
-  const saveMetas = async () => {
-    setSavingMetas(true);
-    // Build monthly metas payload from rate adjustments
-    const payload: { empresa: string; año: number; mes: number; meta: number }[] = [];
-
-    for (const emp of metasAuto) {
-      const customRateStr = metaRateDraft[emp.empresa];
-      const customRate = customRateStr !== "" && customRateStr !== undefined ? parseFloat(customRateStr) / 100 : null;
-      const rate = customRate !== null && !isNaN(customRate) ? customRate : emp.suggestedRate;
-
-      for (let m = 0; m < 12; m++) {
-        const prevMonthVal = emp.monthlyPrevYear[m] ?? 0;
-        const meta = prevMonthVal * (1 + rate);
-        payload.push({ empresa: emp.empresa, año, mes: m + 1, meta });
-      }
-    }
-
-    try {
-      const res = await fetch("/api/ventas/metas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        showToast("Metas guardadas");
-        setShowMetas(false);
-        fetchData();
-      } else {
-        showToast("No se pudieron guardar las metas. Intenta de nuevo.");
-      }
-    } catch {
-      showToast("Error de conexión. Verifica tu internet e intenta de nuevo.");
-    }
-    setSavingMetas(false);
-  };
 
   // ── Excel export ───────────────────────────────────────────────────────────
 
@@ -563,7 +506,8 @@ export default function VentasDashboard() {
       subtitle: kpi.metaTotal > 0 ? `meta: ${fmtK(kpi.metaTotal)}` : "sin metas",
       value: kpi.metaTotal > 0 ? `${kpi.vsMeta.toFixed(0)}%` : "N/A",
       flag: kpi.metaTotal > 0 && kpi.vsMeta < 80,
-      trend: kpi.metaTotal > 0 ? (kpi.vsMeta >= 100 ? ("up" as const) : kpi.vsMeta < 80 ? ("down" as const) : null) : null,
+      trend: kpi.metaTotal > 0 ? (kpi.vsMeta >= 100 ? ("up" as const) : ("down" as const)) : null,
+      amber: kpi.metaTotal > 0 && kpi.vsMeta >= 80 && kpi.vsMeta < 100,
     },
   ];
 
@@ -598,7 +542,7 @@ export default function VentasDashboard() {
                   className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all">
                   ↓ Excel
                 </button>
-                <button onClick={openMetas}
+                <button onClick={() => router.push("/ventas/metas")}
                   className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all">
                   ⚙ Metas
                 </button>
@@ -655,7 +599,7 @@ export default function VentasDashboard() {
                 <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-0.5">{k.label}</p>
                 <div className="flex items-center gap-1">
                   <p className={`text-xl font-semibold tabular-nums ${
-                    k.trend === "up" ? "text-green-600" : k.trend === "down" ? "text-red-600" : ""
+                    "amber" in k && k.amber ? "text-amber-600" : k.trend === "up" ? "text-green-600" : k.trend === "down" ? "text-red-600" : ""
                   }`}>
                     {k.value}
                   </p>
@@ -948,85 +892,6 @@ export default function VentasDashboard() {
           </>
         )}
       </div>
-
-      {/* ── Metas Modal ───────────────────────────────────────────────── */}
-      <Modal open={showMetas} onClose={() => setShowMetas(false)} title={`Metas ${año} — Tasas de crecimiento`} maxWidth="max-w-3xl">
-        <div className="mb-4">
-          <p className="text-xs text-gray-500">
-            Las metas se calculan automaticamente usando el CAGR historico de cada empresa.
-            Puedes ajustar la tasa manualmente. Dejar vacio usa la tasa sugerida.
-          </p>
-          <div className="flex gap-4 mt-2 text-[11px] text-gray-400">
-            <span>CAGR promedio del grupo: <strong className="text-gray-600">{(metasAutoMeta.groupAvgCAGR * 100).toFixed(1)}%</strong></span>
-            <span>Techo: <strong className="text-gray-600">{(metasAutoMeta.ceiling * 100).toFixed(1)}%</strong></span>
-            <span>Piso: <strong className="text-gray-600">0%</strong></span>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead className="sticky top-0 bg-white z-10">
-              <tr className="border-b border-gray-200">
-                <th className="text-left px-2 py-2 font-medium text-gray-500">Empresa</th>
-                <th className="text-right px-2 py-2 font-medium text-gray-500">CAGR</th>
-                <th className="text-right px-2 py-2 font-medium text-gray-500">Tasa sugerida</th>
-                <th className="text-right px-2 py-2 font-medium text-gray-500 w-28">Tu ajuste (%)</th>
-                <th className="text-right px-2 py-2 font-medium text-gray-500">Meta anual</th>
-              </tr>
-            </thead>
-            <tbody>
-              {metasAuto.map(emp => {
-                const customRateStr = metaRateDraft[emp.empresa] ?? "";
-                const customRate = customRateStr !== "" ? parseFloat(customRateStr) / 100 : null;
-                const effectiveRate = customRate !== null && !isNaN(customRate) ? customRate : emp.suggestedRate;
-                const annualMeta = emp.monthlyPrevYear.reduce((s, v) => s + v * (1 + effectiveRate), 0);
-                const cagrLabel = emp.cagr === 0.05 && emp.monthlyPrevYear.every(v => v === 0)
-                  ? "default"
-                  : emp.cagr > metasAutoMeta.ceiling
-                    ? "techo"
-                    : emp.cagr < 0
-                      ? "piso"
-                      : "";
-
-                return (
-                  <tr key={emp.empresa} className="border-b border-gray-50">
-                    <td className="px-2 py-2 text-gray-700 whitespace-nowrap">{emp.empresa}</td>
-                    <td className="text-right px-2 py-2 tabular-nums text-gray-600">
-                      {(emp.cagr * 100).toFixed(1)}%
-                      {cagrLabel && <span className="text-[10px] text-gray-400 ml-1">({cagrLabel})</span>}
-                    </td>
-                    <td className="text-right px-2 py-2 tabular-nums font-medium">
-                      {(emp.suggestedRate * 100).toFixed(1)}%
-                    </td>
-                    <td className="text-right px-2 py-2">
-                      <input
-                        type="number"
-                        step="0.1"
-                        placeholder={(emp.suggestedRate * 100).toFixed(1)}
-                        value={customRateStr}
-                        onChange={e => setMetaRateDraft(prev => ({ ...prev, [emp.empresa]: e.target.value }))}
-                        className="w-full text-right text-xs border border-gray-200 rounded px-2 py-1"
-                      />
-                    </td>
-                    <td className="text-right px-2 py-2 tabular-nums text-gray-600">
-                      {fmtK(annualMeta)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        <div className="flex justify-end gap-2 mt-4">
-          <button onClick={() => setShowMetas(false)}
-            className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all">
-            Cancelar
-          </button>
-          <button onClick={saveMetas} disabled={savingMetas}
-            className="text-xs bg-black text-white rounded-md px-4 py-2 hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50">
-            {savingMetas ? "Guardando..." : "Guardar metas"}
-          </button>
-        </div>
-      </Modal>
 
       <Toast message={toast} />
     </>

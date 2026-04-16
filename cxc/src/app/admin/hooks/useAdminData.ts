@@ -46,7 +46,7 @@ export default function useAdminData() {
 
       const { data: rows } = await supabase.from("cxc_rows").select("*");
       const { data: overrides } = await supabase.from("cxc_client_overrides").select("*");
-      const overrideMap: Record<string, { correo: string; telefono: string; celular: string; contacto: string; resultado_contacto?: string; proximo_seguimiento?: string; ultimo_contacto_fecha?: string; ultimo_contacto_metodo?: string }> = {};
+      const overrideMap: Record<string, { correo: string; telefono: string; celular: string; contacto: string; resultado_contacto?: string; proximo_seguimiento?: string }> = {};
       if (overrides) {
         for (const o of overrides) overrideMap[o.nombre_normalized] = o;
       }
@@ -118,16 +118,8 @@ export default function useAdminData() {
 
       setClients(Array.from(map.values()).filter((c) => c.total !== 0));
 
-      // Build contact log from overrides (source of truth) first
+      // Last contact per client, sourced from cxc_contact_log
       const latestLog: Record<string, { date: string; method: string }> = {};
-      if (overrides) {
-        for (const o of overrides) {
-          if (o.ultimo_contacto_fecha) {
-            latestLog[o.nombre_normalized] = { date: o.ultimo_contacto_fecha, method: o.ultimo_contacto_metodo || "" };
-          }
-        }
-      }
-      // Fallback: fill in from contact_log for clients without override data
       const { data: logData } = await supabase
         .from("cxc_contact_log")
         .select("*")
