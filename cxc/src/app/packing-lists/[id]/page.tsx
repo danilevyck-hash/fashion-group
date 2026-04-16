@@ -128,12 +128,7 @@ export default function PackingListDetailPage() {
     // Build table data with product group headers
     const tableBody: (string | { content: string; colSpan?: number; styles?: Record<string, unknown> })[][] = [];
 
-    // Track which rows have muestra for PDF highlighting
-    const rowMuestraMap: Record<number, string> = {};
-    let bodyIdx = 0;
-
     for (const group of groupedRows) {
-      // Group header row
       tableBody.push([
         {
           content: group.producto || "SIN PRODUCTO",
@@ -146,20 +141,18 @@ export default function PackingListDetailPage() {
           },
         },
       ]);
-      bodyIdx++;
 
       for (const row of group.rows) {
         const distParts = Object.entries(row.distribution).map(([bultoId, pcs]) => {
-          return `(${bultoId}: ${pcs}pcs)`;
+          const isMuestra = row.bultoMuestra && bultoId === row.bultoMuestra;
+          return isMuestra ? `**(${bultoId}: ${pcs}pcs)**` : `(${bultoId}: ${pcs}pcs)`;
         });
-
-        if (row.bultoMuestra) rowMuestraMap[bodyIdx] = row.bultoMuestra;
 
         tableBody.push([
           row.estilo,
           row.producto,
           String(row.totalPcs),
-          distParts.join(" "),
+          distParts.join("  "),
         ]);
         bodyIdx++;
       }
@@ -188,15 +181,12 @@ export default function PackingListDetailPage() {
       alternateRowStyles: { fillColor: [248, 248, 248] },
       margin: { left: 14, right: 14 },
       didParseCell(data) {
-        // Highlight muestra bulto in distribution column (per-style)
+        // Clean ** markers from distribution text (used for web bold, not needed in PDF)
         if (data.section === "body" && data.column.index === 3) {
-          const muestra = rowMuestraMap[data.row.index];
-          if (muestra) {
-            const text = String(data.cell.raw || "");
-            if (text.includes(`(${muestra}:`)) {
-              data.cell.styles.fillColor = [255, 243, 191];
-              data.cell.styles.textColor = [120, 80, 0];
-            }
+          const raw = String(data.cell.raw || "");
+          if (raw.includes("**")) {
+            // Replace **(...)**  with [...] to visually distinguish muestra in PDF
+            data.cell.text = [raw.replace(/\*\*\(([^)]+)\)\*\*/g, "[$1]").replace(/\*\*/g, "")];
           }
         }
       },
@@ -275,11 +265,9 @@ export default function PackingListDetailPage() {
               {pl.total_estilos > 0 && ` · ${pl.total_estilos} estilos`}
               {pl.total_piezas > 0 && ` · ${pl.total_piezas.toLocaleString()} piezas`}
               {pl.total_bultos > 0 && ` · ${pl.total_bultos} bultos`}
-              {pl.bulto_muestra && (
-                <span className="ml-1">
-                  · <span className="inline-block px-1.5 py-0.5 bg-amber-100 text-amber-700 text-xs rounded">bulto resaltado = muestra ({pl.bulto_muestra})</span>
-                </span>
-              )}
+              {" · "}
+              <span className="font-semibold text-gray-600">[bulto en negrita]</span>
+              <span className="text-gray-400"> = muestra M / dim 32</span>
             </p>
           </div>
           <div className="flex gap-2 print:hidden">
@@ -385,8 +373,8 @@ function GroupRows({
                   key={bultoId}
                   className={`inline-block px-1.5 py-0.5 rounded text-[11px] ${
                     row.bultoMuestra && bultoId === row.bultoMuestra
-                      ? "bg-amber-100 text-amber-800 font-medium"
-                      : "bg-gray-100 text-gray-600"
+                      ? "bg-gray-200 text-gray-900 font-bold"
+                      : "bg-gray-100 text-gray-500"
                   }`}
                 >
                   ({bultoId}: {pcs}pcs)
