@@ -346,13 +346,10 @@ export function buildIndex(parsed: ParsedPackingList): PLIndexRow[] {
     bultoMuestra: g.muestraBulto || "",
   }));
 
-  // Sort by PRODUCT_ORDER priority, then alphabetically by estilo
+  // Sort by producto ascending (A-Z), then by estilo within each group
   rows.sort((a, b) => {
-    const idxA = PRODUCT_ORDER.indexOf(a.producto);
-    const idxB = PRODUCT_ORDER.indexOf(b.producto);
-    const orderA = idxA === -1 ? PRODUCT_ORDER.length : idxA;
-    const orderB = idxB === -1 ? PRODUCT_ORDER.length : idxB;
-    if (orderA !== orderB) return orderA - orderB;
+    const prodCmp = a.producto.localeCompare(b.producto);
+    if (prodCmp !== 0) return prodCmp;
     return a.estilo.localeCompare(b.estilo);
   });
 
