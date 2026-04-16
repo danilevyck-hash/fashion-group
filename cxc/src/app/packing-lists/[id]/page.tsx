@@ -201,23 +201,11 @@ export default function PackingListDetailPage() {
       alternateRowStyles: { fillColor: [245, 245, 245] },
       margin: { left: 14, right: 14, top: 20 },
       didDrawPage(data) {
-        // Header on every page (except page 1 which has the full title)
-        if (data.pageNumber > 1) {
-          doc.setFontSize(10);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(30, 58, 95);
-          doc.text(plLabel, 14, 12);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(140);
-          doc.setFontSize(8);
-          doc.text(pl.empresa || "", 14, 17);
-        }
         // Page number top-right on every page
         doc.setFontSize(8);
         doc.setTextColor(160);
-        const pageCount = doc.getNumberOfPages();
         doc.text(
-          `${data.pageNumber} / ${pageCount}`,
+          `${data.pageNumber}`,
           pageWidth - 14,
           8,
           { align: "right" }
@@ -225,13 +213,12 @@ export default function PackingListDetailPage() {
       },
     });
 
-    // Fix page count (didDrawPage runs before all pages exist, so update page numbers)
+    // Update page numbers with correct total
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
-      // Overwrite page number with correct total
       doc.setFillColor(255, 255, 255);
-      doc.rect(pageWidth - 40, 3, 30, 8, "F");
+      doc.rect(pageWidth - 30, 3, 20, 7, "F");
       doc.setFontSize(8);
       doc.setTextColor(160);
       doc.text(`${i} / ${totalPages}`, pageWidth - 14, 8, { align: "right" });
@@ -276,13 +263,15 @@ export default function PackingListDetailPage() {
 
   return (
     <div>
-      <AppHeader
-        module="Packing Lists"
-        breadcrumbs={[
-          { label: "Historial", onClick: () => window.history.back() },
-          { label: `PL #${pl.numero_pl || "—"}` },
-        ]}
-      />
+      <div className="print:hidden">
+        <AppHeader
+          module="Packing Lists"
+          breadcrumbs={[
+            { label: "Historial", onClick: () => window.history.back() },
+            { label: `PL #${pl.numero_pl || "—"}` },
+          ]}
+        />
+      </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-4">
         {/* Header */}
@@ -379,9 +368,13 @@ export default function PackingListDetailPage() {
       {/* Print styles */}
       <style jsx global>{`
         @media print {
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; margin: 0; padding: 0; }
           .print\\:hidden { display: none !important; }
-          nav, header > div:first-child { display: none !important; }
+          nav, header, [data-app-header], .sticky { display: none !important; }
+          .max-w-6xl { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+          table { font-size: 9pt !important; width: 100% !important; }
+          td, th { padding: 3px 6px !important; }
+          @page { size: letter; margin: 1cm; }
         }
       `}</style>
     </div>
