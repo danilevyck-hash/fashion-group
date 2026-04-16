@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import {
-  parsePackingListText,
+  parseMultiplePackingLists,
   buildIndex,
   validateParsedPL,
   type ParsedPackingList,
@@ -36,13 +36,20 @@ export default function PackingListsPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Multi-PL preview item
+  interface PLPreviewItem {
+    parsed: ParsedPackingList;
+    index: PLIndexRow[];
+    errors: PLValidationError[];
+    existsInDB: boolean;
+  }
+
   // State
   const [plList, setPlList] = useState<PLRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [parsedPreview, setParsedPreview] = useState<ParsedPackingList | null>(null);
-  const [indexPreview, setIndexPreview] = useState<PLIndexRow[]>([]);
-  const [validationErrors, setValidationErrors] = useState<PLValidationError[]>([]);
+  const [previewItems, setPreviewItems] = useState<PLPreviewItem[]>([]);
+  const [expandedPreview, setExpandedPreview] = useState<string | null>(null);
   const [toast, setToast] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -118,7 +125,7 @@ export default function PackingListsPage() {
     return { text: fullText, rawLines };
   }
 
-  // Handle file selection
+  // Handle file selection — supports multi-PL PDFs
   async function handleFile(file: File) {
     if (!file.name.toLowerCase().endsWith(".pdf")) {
       setToast("Solo se aceptan archivos PDF");
@@ -127,12 +134,26 @@ export default function PackingListsPage() {
     setUploading(true);
     try {
       const { text, rawLines } = await extractTextFromPDF(file);
-      const parsed = parsePackingListText(text, rawLines);
-      const index = buildIndex(parsed);
-      const errors = validateParsedPL(parsed);
-      setParsedPreview(parsed);
-      setIndexPreview(index);
-      setValidationErrors(errors);
+      const parsedList = parseMultiplePackingLists(text, rawLines);
+
+      if (parsedList.length === 0 || (parsedList.length === 1 && parsedList[0].bultos.length === 0)) {
+        setToast("No se detectaron Packing Lists en el PDF. Verifica el formato.");
+        setUploading(false);
+        return;
+      }
+
+      const existingNums = new Set(plList.map(p => p.numero_pl));
+      const items: PLPreviewItem[] = parsedList
+        .filter(p => p.bultos.length > 0) // skip empty sections
+        .map(parsed => ({
+          parsed,
+          index: buildIndex(parsed),
+          errors: validateParsedPL(parsed),
+          existsInDB: existingNums.has(parsed.numeroPL),
+        }));
+
+      setPreviewItems(items);
+      setExpandedPreview(null);
     } catch (err) {
       console.error(err);
       setToast("No se pudo leer el PDF. Intenta con otro archivo.");
@@ -153,41 +174,45 @@ export default function PackingListsPage() {
     e.target.value = "";
   }
 
-  // Save PL
-  async function savePL() {
-    if (!parsedPreview) return;
+  // Save all PLs (batch)
+  async function saveAllPLs() {
+    if (previewItems.length === 0) return;
     setUploading(true);
     try {
+      const packingLists = previewItems.map(item => ({
+        numeroPL: item.parsed.numeroPL,
+        empresa: item.parsed.empresa,
+        fechaEntrega: item.parsed.fechaEntrega,
+        totalBultos: item.parsed.totalBultos,
+        totalPiezas: item.parsed.totalPiezas,
+        totalEstilos: item.index.length,
+        indexRows: item.index,
+      }));
+
       const res = await fetch("/api/packing-lists", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          numeroPL: parsedPreview.numeroPL,
-          empresa: parsedPreview.empresa,
-          fechaEntrega: parsedPreview.fechaEntrega,
-          totalBultos: parsedPreview.totalBultos,
-          totalPiezas: parsedPreview.totalPiezas,
-          totalEstilos: indexPreview.length,
-          bultos: parsedPreview.bultos,
-          indexRows: indexPreview,
-        }),
+        body: JSON.stringify({ packingLists }),
       });
+
       if (res.ok) {
         const data = await res.json();
-        setParsedPreview(null);
-        setIndexPreview([]); setValidationErrors([]);
-        setToast("Packing List guardado");
-        if (data.id) {
-          router.push(`/packing-lists/${data.id}`);
+        setPreviewItems([]);
+        const saved = data.totalSaved || 0;
+        const failed = data.totalFailed || 0;
+        if (failed > 0) {
+          const failedPLs = (data.results || []).filter((r: { error?: string }) => r.error).map((r: { numeroPL: string }) => r.numeroPL).join(", ");
+          setToast(`${saved} PLs guardados, ${failed} fallaron (${failedPLs})`);
         } else {
-          loadList();
+          setToast(`${saved} Packing List${saved !== 1 ? "s" : ""} guardado${saved !== 1 ? "s" : ""}`);
         }
+        loadList();
       } else {
         const err = await res.json().catch(() => ({}));
         setToast(err.error || "Error al guardar");
       }
     } catch {
-      setToast("Error de conexión al guardar");
+      setToast("Error de conexion al guardar");
     }
     setUploading(false);
   }
@@ -217,7 +242,7 @@ export default function PackingListsPage() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Upload zone — admin/secretaria only */}
-        {canEdit && !parsedPreview && (
+        {canEdit && previewItems.length === 0 && (
           <div
             onDragOver={(e) => {
               e.preventDefault();
@@ -265,132 +290,120 @@ export default function PackingListsPage() {
           </div>
         )}
 
-        {/* Preview section */}
-        {parsedPreview && (
-          <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-              <h2 className="text-sm font-semibold">Vista previa del Packing List</h2>
-            </div>
-            <div className="p-4 space-y-4">
-              {/* Summary */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                <div>
-                  <p className="text-[11px] text-gray-400 uppercase tracking-wider">PL #</p>
-                  <p className="text-sm font-semibold">{parsedPreview.numeroPL || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-gray-400 uppercase tracking-wider">Empresa</p>
-                  <p className="text-sm font-semibold">{parsedPreview.empresa || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-gray-400 uppercase tracking-wider">Fecha Entrega</p>
-                  <p className="text-sm font-semibold">{parsedPreview.fechaEntrega || "—"}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-gray-400 uppercase tracking-wider">Bultos</p>
-                  <p className="text-sm font-semibold">{parsedPreview.totalBultos}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-gray-400 uppercase tracking-wider">Piezas</p>
-                  <p className="text-sm font-semibold">{parsedPreview.totalPiezas.toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-gray-400 uppercase tracking-wider">Estilos</p>
-                  <p className="text-sm font-semibold">{indexPreview.length}</p>
-                </div>
+        {/* Multi-PL Preview section */}
+        {previewItems.length > 0 && (
+          <div className="space-y-3">
+            {/* Summary bar */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold">{previewItems.length} Packing List{previewItems.length !== 1 ? "s" : ""} detectado{previewItems.length !== 1 ? "s" : ""}</h2>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {previewItems.reduce((s, i) => s + i.parsed.totalBultos, 0)} bultos - {previewItems.reduce((s, i) => s + i.parsed.totalPiezas, 0).toLocaleString()} piezas - {previewItems.reduce((s, i) => s + i.index.length, 0)} estilos
+                </p>
               </div>
-
-              {/* Validation */}
-              {validationErrors.length > 0 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <p className="text-sm font-semibold text-red-700 mb-1">⚠️ Errores de validación ({validationErrors.length} bultos no cuadran)</p>
-                  <div className="text-xs text-red-600 space-y-0.5">
-                    {validationErrors.map(e => (
-                      <p key={e.bultoId}>Bulto {e.bultoId}: PDF dice {e.pdfTotal} piezas, parser calculó {e.parserTotal} (dif: {e.diff})</p>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {validationErrors.length === 0 && parsedPreview.totalBultos > 0 && (
-                <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2">
-                  <p className="text-sm text-green-700">✓ Validación correcta — todos los bultos cuadran con el PDF</p>
-                </div>
-              )}
-
-              {/* Preview table */}
-              {indexPreview.length > 0 && (
-                <div className="overflow-x-auto -mx-4 px-4">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-[#1e3a5f] text-white">
-                        <th className="text-left px-3 py-2 font-medium text-xs">Estilo</th>
-                        <th className="text-right px-3 py-2 font-medium text-xs">Total</th>
-                        <th className="text-left px-3 py-2 font-medium text-xs">Muestra</th>
-                        <th className="text-left px-3 py-2 font-medium text-xs">Distribución</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {indexPreview.slice(0, 10).map((row, i) => (
-                        <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                          <td className="px-3 py-1.5 font-mono text-xs">{row.estilo}</td>
-                          <td className="px-3 py-1.5 text-xs text-right tabular-nums">
-                            {row.totalPcs}
-                          </td>
-                          <td className="px-3 py-1.5 text-xs font-mono text-gray-600">
-                            {row.bultoMuestra || "-"}
-                          </td>
-                          <td className="px-3 py-1.5 text-xs">
-                            <div className="flex flex-wrap gap-1">
-                              {Object.entries(row.distribution).map(([bultoId, pcs]) => (
-                                <span
-                                  key={bultoId}
-                                  className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600"
-                                >
-                                  ({bultoId}: {pcs})
-                                </span>
-                              ))}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                  {indexPreview.length > 10 && (
-                    <p className="text-xs text-gray-400 mt-2 text-center">
-                      Mostrando 10 de {indexPreview.length} estilos
-                    </p>
-                  )}
-                </div>
-              )}
-
-              {indexPreview.length === 0 && (
-                <div className="text-center py-6">
-                  <p className="text-sm text-gray-500">
-                    No se detectaron estilos en el PDF. Verifica que el formato sea correcto.
-                  </p>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-2">
                 <button
-                  onClick={savePL}
+                  onClick={saveAllPLs}
                   disabled={uploading}
                   className="px-5 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-md hover:bg-teal-700 active:scale-[0.97] transition-all disabled:opacity-50 min-h-[44px]"
                 >
-                  {uploading ? "Guardando..." : "Guardar"}
+                  {uploading ? "Guardando..." : `Guardar ${previewItems.length} PL${previewItems.length !== 1 ? "s" : ""}`}
                 </button>
                 <button
-                  onClick={() => {
-                    setParsedPreview(null);
-                    setIndexPreview([]); setValidationErrors([]);
-                  }}
-                  className="px-5 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-md hover:bg-gray-50 active:bg-gray-100 transition-all min-h-[44px]"
+                  onClick={() => setPreviewItems([])}
+                  className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-md hover:bg-gray-50 transition-all min-h-[44px]"
                 >
                   Cancelar
                 </button>
               </div>
             </div>
+
+            {/* Per-PL cards */}
+            {previewItems.map((item, idx) => {
+              const isOpen = expandedPreview === item.parsed.numeroPL;
+              const hasErrors = item.errors.length > 0;
+              return (
+                <div key={idx} className="border border-gray-200 rounded-lg overflow-hidden">
+                  {/* PL header — click to expand */}
+                  <button
+                    onClick={() => setExpandedPreview(isOpen ? null : item.parsed.numeroPL)}
+                    className="w-full flex items-center justify-between px-4 py-3 bg-white hover:bg-gray-50 transition text-left"
+                  >
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-sm font-bold">PL #{item.parsed.numeroPL || "—"}</span>
+                      <span className="text-xs text-gray-500">{item.parsed.empresa}</span>
+                      <span className="text-xs text-gray-400">{item.parsed.fechaEntrega}</span>
+                      <span className="text-xs text-gray-500">{item.parsed.totalBultos} bultos</span>
+                      <span className="text-xs text-gray-500">{item.parsed.totalPiezas.toLocaleString()} pzas</span>
+                      <span className="text-xs text-gray-500">{item.index.length} estilos</span>
+                      {!hasErrors && item.parsed.totalBultos > 0 && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">OK</span>
+                      )}
+                      {hasErrors && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">{item.errors.length} error{item.errors.length !== 1 ? "es" : ""}</span>
+                      )}
+                      {item.existsInDB && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Ya existe - se actualizara</span>
+                      )}
+                    </div>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-gray-400 transition-transform flex-shrink-0 ${isOpen ? "rotate-180" : ""}`}>
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+
+                  {/* Expandable detail */}
+                  {isOpen && (
+                    <div className="px-4 py-3 border-t border-gray-200 space-y-3">
+                      {/* Validation */}
+                      {hasErrors && (
+                        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-red-700 mb-1">Errores de validacion ({item.errors.length} bultos no cuadran)</p>
+                          <div className="text-xs text-red-600 space-y-0.5">
+                            {item.errors.map(e => (
+                              <p key={e.bultoId}>Bulto {e.bultoId}: PDF dice {e.pdfTotal} piezas, parser calculo {e.parserTotal} (dif: {e.diff})</p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {/* Estilos table */}
+                      {item.index.length > 0 && (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="bg-[#1e3a5f] text-white">
+                                <th className="text-left px-3 py-2 font-medium text-xs">Estilo</th>
+                                <th className="text-right px-3 py-2 font-medium text-xs">Total</th>
+                                <th className="text-left px-3 py-2 font-medium text-xs">Muestra</th>
+                                <th className="text-left px-3 py-2 font-medium text-xs">Distribucion</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {item.index.slice(0, 10).map((row, i) => (
+                                <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                                  <td className="px-3 py-1.5 font-mono text-xs">{row.estilo}</td>
+                                  <td className="px-3 py-1.5 text-xs text-right tabular-nums">{row.totalPcs}</td>
+                                  <td className="px-3 py-1.5 text-xs font-mono text-gray-600">{row.bultoMuestra || "-"}</td>
+                                  <td className="px-3 py-1.5 text-xs">
+                                    <div className="flex flex-wrap gap-1">
+                                      {Object.entries(row.distribution).map(([bultoId, pcs]) => (
+                                        <span key={bultoId} className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600">({bultoId}: {pcs})</span>
+                                      ))}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                          {item.index.length > 10 && (
+                            <p className="text-xs text-gray-400 mt-2 text-center">Mostrando 10 de {item.index.length} estilos</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
