@@ -54,6 +54,7 @@ interface ClienteDetalle {
   lastFecha: string;
   prevSubtotal: number;
   last12mTotal: number;
+  isInactive: boolean;
   empresas: { empresa: string; subtotal: number; utilidad: number; lastFecha: string }[];
 }
 
@@ -118,20 +119,15 @@ function aggregateClientesDetalle(
   prevRows: VentasRawRow[],
   last12mMap?: Map<string, { total: number; lastDate: string }>,
 ): ClienteDetalle[] {
-  console.log("[DEBUG-INACTIVE] last12mMap size:", last12mMap?.size ?? "N/A");
-  console.log("[DEBUG-INACTIVE] lastDates count:", lastDates.length);
-  console.log("[DEBUG-INACTIVE] filteredRows count:", filteredRows.length);
-  console.log("[DEBUG-INACTIVE] prevRows count:", prevRows.length);
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
 
-  // Build lastFecha map
+  // Build lastFecha map from last12m data
   const lastFechaMap = new Map<string, string>();
-  let skippedInterno = 0;
   for (const r of lastDates) {
     const key = normalizeName(r.cliente ?? "") || "(Sin nombre)";
-    if (CLIENTES_INTERNOS.has(key)) { skippedInterno++; continue; }
+    if (CLIENTES_INTERNOS.has(key)) continue;
     lastFechaMap.set(key, String(r.ultima_fecha ?? ""));
   }
-  console.log("[DEBUG-INACTIVE] lastFechaMap size:", lastFechaMap.size, "| skipped by CLIENTES_INTERNOS:", skippedInterno);
 
   // Build prev-year subtotal per client
   const prevSubtotalMap = new Map<string, number>();
@@ -141,7 +137,7 @@ function aggregateClientesDetalle(
     prevSubtotalMap.set(key, (prevSubtotalMap.get(key) ?? 0) + (r.subtotal ?? 0));
   }
 
-  // Aggregate subtotal/utilidad from period-filtered rows only
+  // Aggregate subtotal/utilidad from period-filtered rows (current year)
   const map = new Map<string, { subtotal: number; utilidad: number; empresas: Map<string, { subtotal: number; utilidad: number }> }>();
   for (const r of filteredRows) {
     const key = normalizeName(r.cliente ?? "") || "(Sin nombre)";
@@ -155,47 +151,40 @@ function aggregateClientesDetalle(
     e.subtotal += r.subtotal ?? 0;
     e.utilidad += r.utilidad ?? 0;
   }
-  console.log("[DEBUG-INACTIVE] map size after filteredRows:", map.size);
 
-  // Add clients from lastDates who are NOT in current-year data
-  let addedZeroSales = 0;
-  let skippedAlreadyInMap = 0;
-  let skippedGenerico = 0;
-  for (const [cliente, lastFecha] of lastFechaMap) {
-    if (map.has(cliente)) { skippedAlreadyInMap++; continue; }
-    if (CLIENTES_GENERICOS.has(cliente)) { skippedGenerico++; continue; }
+  // Add clients from last12m who are NOT in current-year data (zero-sales entries)
+  for (const [cliente] of lastFechaMap) {
+    if (map.has(cliente)) continue;
+    if (CLIENTES_GENERICOS.has(cliente)) continue;
     map.set(cliente, { subtotal: 0, utilidad: 0, empresas: new Map() });
-    addedZeroSales++;
   }
-  console.log("[DEBUG-INACTIVE] zero-sales added:", addedZeroSales, "| skipped (already in map):", skippedAlreadyInMap, "| skipped (generico):", skippedGenerico);
-  console.log("[DEBUG-INACTIVE] final map size:", map.size);
 
-  const result = [...map.entries()]
-    .map(([cliente, d]) => ({
+  // Build result with isInactive computed server-side
+  const result = [...map.entries()].map(([cliente, d]) => {
+    const lastFecha = lastFechaMap.get(cliente) || "";
+    const total12m = last12mMap?.get(cliente)?.total ?? 0;
+    const isInactive = !!(
+      lastFecha &&
+      lastFecha < sixtyDaysAgo &&
+      total12m >= 5000 &&
+      !CLIENTES_GENERICOS.has(cliente)
+    );
+    return {
       cliente,
       subtotal: d.subtotal,
       utilidad: d.utilidad,
-      lastFecha: lastFechaMap.get(cliente) || "",
+      lastFecha,
       prevSubtotal: prevSubtotalMap.get(cliente) ?? 0,
-      last12mTotal: last12mMap?.get(cliente)?.total ?? 0,
+      last12mTotal: total12m,
+      isInactive,
       empresas: [...d.empresas.entries()].map(([empresa, ed]) => ({
         empresa, ...ed, lastFecha: "",
       })).sort((a, b) => b.subtotal - a.subtotal),
-    }))
-    .sort((a, b) => b.subtotal - a.subtotal);
+    };
+  }).sort((a, b) => b.subtotal - a.subtotal);
 
-  // Count how many would be inactive with the frontend logic
-  const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10);
-  const wouldBeInactive = result.filter(c => {
-    if (!c.lastFecha || c.lastFecha >= sixtyDaysAgo) return false;
-    const n = c.cliente.toUpperCase().trim();
-    if (n.includes("BOSTON") || n.includes("MULTI FASHION") || n.includes("MULTIFASHION")) return false;
-    if (CLIENTES_GENERICOS.has(n)) return false;
-    const total12m = c.last12mTotal || (c.subtotal + c.prevSubtotal);
-    return total12m >= 5000;
-  });
-  console.log("[DEBUG-INACTIVE] would-be-inactive count (simulated frontend):", wouldBeInactive.length);
-  wouldBeInactive.slice(0, 5).forEach(c => console.log("[DEBUG-INACTIVE]  ", c.cliente, "last12m:", c.last12mTotal, "lastFecha:", c.lastFecha));
+  const inactiveCount = result.filter(c => c.isInactive).length;
+  console.log("[DEBUG-INACTIVE] total isInactive=true:", inactiveCount);
 
   return result;
 }
