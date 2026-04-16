@@ -368,7 +368,7 @@ export default function ClientTable({
       <div className="border border-gray-200 rounded-lg overflow-hidden">
         {/* Sticky sortable header */}
         {/* Desktop header — hidden on mobile since mobile uses card layout */}
-        <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[11px] font-medium text-gray-500 uppercase tracking-wider select-none sticky top-11 z-[5]">
+        <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[11px] font-medium text-gray-500 uppercase tracking-wider select-none">
           {selectionMode && <div className="col-span-1" />}
           <div className={`${selectionMode ? "col-span-3" : "col-span-4"} cursor-pointer hover:text-gray-900 transition`} onClick={() => toggleSort("name")}>
             Cliente{sortArrow("name")}
@@ -405,7 +405,6 @@ export default function ClientTable({
             const isSelected = selectedNames.has(client.nombre_normalized);
             return (
               <div key={client.nombre_normalized} className={isSelected ? "bg-emerald-50/50" : ""}>
-                <div className={isExpanded ? "sticky top-[80px] z-[4] bg-white" : ""}>
                 <ClientRow
                   client={client}
                   isExpanded={isExpanded}
@@ -424,7 +423,6 @@ export default function ClientTable({
                   onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(client.nombre_normalized) : undefined}
                   onRowContextMenu={(e) => showContextMenu(e, buildClientContextMenu(client))}
                 />
-                </div>
                 {!selectionMode && (
                   <AccordionContent open={isExpanded}>
                     <ContactPanel
