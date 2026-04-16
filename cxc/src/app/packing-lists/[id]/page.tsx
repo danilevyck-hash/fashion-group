@@ -131,6 +131,19 @@ export default function PackingListDetailPage() {
     const marginRight = 14;
     const contentRight = pageWidth - marginRight;
 
+    // Sanitize text for jsPDF (replace Unicode chars that break Adobe Acrobat)
+    function safe(text: string): string {
+      return text
+        .replace(/\u2014/g, "-")   // em dash → hyphen
+        .replace(/\u2013/g, "-")   // en dash → hyphen
+        .replace(/\u2018/g, "'")   // left single quote
+        .replace(/\u2019/g, "'")   // right single quote
+        .replace(/\u201C/g, '"')   // left double quote
+        .replace(/\u201D/g, '"')   // right double quote
+        .replace(/\u2026/g, "...") // ellipsis
+        .replace(/\u00B7/g, "-");  // middle dot → hyphen
+    }
+
     // ── HEADER ──
     doc.addImage(FG_LOGO_BASE64, "JPEG", marginLeft, 10, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
 
@@ -138,7 +151,7 @@ export default function PackingListDetailPage() {
     doc.setFont("helvetica", "bold");
     doc.setTextColor(0);
     doc.text(
-      `Indice de Estilos por Bulto — PL #${pl.numero_pl}`,
+      safe(`Indice de Estilos por Bulto - PL #${pl.numero_pl}`),
       marginLeft + FG_LOGO_WIDTH + 4,
       16
     );
@@ -153,9 +166,9 @@ export default function PackingListDetailPage() {
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100);
-    const subtitle = `${pl.empresa} · ${fechaDisplay ? fechaDisplay + " · " : ""}${pl.total_estilos} estilos · ${pl.total_piezas.toLocaleString()} piezas · ${pl.total_bultos} bultos`;
-    doc.text(subtitle, marginLeft + FG_LOGO_WIDTH + 4, 22);
-    doc.text("Muestra = bulto con talla M o 32 · OS = otro tamaño", marginLeft + FG_LOGO_WIDTH + 4, 27);
+    const subtitle = `${pl.empresa} - ${fechaDisplay ? fechaDisplay + " - " : ""}${pl.total_estilos} estilos - ${pl.total_piezas.toLocaleString()} piezas - ${pl.total_bultos} bultos`;
+    doc.text(safe(subtitle), marginLeft + FG_LOGO_WIDTH + 4, 22);
+    doc.text(safe("Muestra = bulto con talla M o 32 - OS = otro tamano"), marginLeft + FG_LOGO_WIDTH + 4, 27);
     doc.setTextColor(0);
 
     let currentY = 34;
@@ -178,7 +191,7 @@ export default function PackingListDetailPage() {
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 58, 95);
-      doc.text("Vista para sacar muestras (agrupado por bulto)", marginLeft, currentY);
+      doc.text(safe("Vista para sacar muestras (agrupado por bulto)"), marginLeft, currentY);
       currentY += 2;
       doc.setDrawColor(30, 58, 95);
       doc.line(marginLeft, currentY, contentRight, currentY);
@@ -205,7 +218,7 @@ export default function PackingListDetailPage() {
         doc.setFont("helvetica", "bold");
         doc.setTextColor(30, 40, 60);
         doc.text(
-          `Bulto #${bultoId}  ·  ${styles.length} muestra${styles.length > 1 ? "s" : ""}`,
+          safe(`Bulto #${bultoId}  -  ${styles.length} muestra${styles.length > 1 ? "s" : ""}`),
           marginLeft + checkboxSize + 2,
           currentY
         );
@@ -218,17 +231,17 @@ export default function PackingListDetailPage() {
           doc.setFontSize(9);
           doc.setFont("courier", "normal");
           doc.setTextColor(50);
-          doc.text(style.estilo, indentX + checkboxSize + 2, currentY);
+          doc.text(safe(style.estilo), indentX + checkboxSize + 2, currentY);
           // Product description
-          const estiloWidth = doc.getTextWidth(style.estilo);
+          const estiloWidth = doc.getTextWidth(safe(style.estilo));
           doc.setFont("helvetica", "normal");
           doc.setTextColor(100);
-          const productoText = ` —  ${style.producto}`;
+          const productoText = safe(` -  ${style.producto}`);
           doc.text(productoText, indentX + checkboxSize + 2 + estiloWidth, currentY);
           if (style.isOS) {
             const productoWidth = doc.getTextWidth(productoText);
             doc.setTextColor(150);
-            doc.text("  · OS", indentX + checkboxSize + 2 + estiloWidth + productoWidth, currentY);
+            doc.text("  - OS", indentX + checkboxSize + 2 + estiloWidth + productoWidth, currentY);
             doc.setTextColor(50);
           }
           currentY += lineHeight;
@@ -254,7 +267,7 @@ export default function PackingListDetailPage() {
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 58, 95);
-      doc.text("Distribución completa por estilo", marginLeft, currentY);
+      doc.text(safe("Distribucion completa por estilo"), marginLeft, currentY);
       currentY += 2;
       doc.setDrawColor(30, 58, 95);
       doc.line(marginLeft, currentY, contentRight, currentY);
@@ -264,7 +277,7 @@ export default function PackingListDetailPage() {
       for (const group of groupedRows) {
         tableBody.push([
           {
-            content: group.producto || "SIN PRODUCTO",
+            content: safe(group.producto || "SIN PRODUCTO"),
             colSpan: 3,
             styles: {
               fillColor: [210, 215, 225],
@@ -276,13 +289,13 @@ export default function PackingListDetailPage() {
         ]);
         for (const row of group.rows) {
           const distParts = Object.entries(row.distribution).map(([bId, pcs]) => `(${bId}: ${pcs})`);
-          tableBody.push([row.estilo, String(row.totalPcs), distParts.join("  ")]);
+          tableBody.push([safe(row.estilo), String(row.totalPcs), distParts.join("  ")]);
         }
       }
 
       autoTable(doc, {
         startY: currentY,
-        head: [["Estilo", { content: "Total", styles: { halign: "center" } }, "Distribución por Bulto"]],
+        head: [["Estilo", { content: "Total", styles: { halign: "center" } }, "Distribucion por Bulto"]],
         body: tableBody,
         headStyles: {
           fillColor: [30, 58, 95],
