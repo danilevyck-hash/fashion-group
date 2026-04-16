@@ -3,6 +3,23 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
 import { normalizeName } from "@/lib/normalize";
 
+// ─── Empresa key → display name mapping (ventas_raw uses snake_case keys) ────
+
+const EMPRESA_KEY_TO_NAME: Record<string, string> = {
+  vistana: "Vistana International",
+  fashion_wear: "Fashion Wear",
+  fashion_shoes: "Fashion Shoes",
+  active_shoes: "Active Shoes",
+  active_wear: "Active Wear",
+  joystep: "Joystep",
+  boston: "Confecciones Boston",
+  american_classic: "Multifashion",
+};
+
+function mapEmpresa<T extends { empresa: string }>(row: T): T {
+  return { ...row, empresa: EMPRESA_KEY_TO_NAME[row.empresa] ?? row.empresa };
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface VentasRawRow {
@@ -223,9 +240,9 @@ export async function GET(req: NextRequest) {
   const { data: lastDates, error: lastDatesErr } = await supabaseServer.rpc("get_ultima_compra");
   if (lastDatesErr) console.error("[ventas/v2] get_ultima_compra error:", lastDatesErr.code, lastDatesErr.message);
 
-  // ── Aggregate ────────────────────────────────────────────────────────────
-  const rows = currentRows;
-  const prev = allPrevRows;
+  // ── Map empresa keys to display names ────────────────────────────────────
+  const rows = currentRows.map(mapEmpresa);
+  const prev = allPrevRows.map(mapEmpresa);
 
   // Filter rows for clientesDetalle by optional desde param + exclude internal empresas
   const EMPRESAS_EXCLUIDAS = new Set(["Confecciones Boston", "Multifashion"]);
