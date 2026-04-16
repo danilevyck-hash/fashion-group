@@ -124,7 +124,7 @@ export default function PackingListDetailPage() {
       "@/lib/pdf-logo"
     );
 
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter", putOnlyUsedFonts: true, compress: true });
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const marginLeft = 14;
@@ -328,7 +328,16 @@ export default function PackingListDetailPage() {
       doc.text(`${i} / ${totalPages}`, pageWidth - marginRight, 8, { align: "right" });
     }
 
-    doc.save(`PL-${pl.numero_pl || "sin-numero"}.pdf`);
+    // Use blob download instead of doc.save() for better Adobe Acrobat compatibility
+    const pdfBlob = doc.output("blob");
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `PL-${pl.numero_pl || "sin-numero"}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 
 
