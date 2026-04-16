@@ -5,7 +5,8 @@ import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
 import ContactInline from "./ContactInline";
 
-function riskInfo(current: number, watch: number, overdue: number): { border: string; tooltip: string } {
+function riskInfo(total: number, current: number, watch: number, overdue: number): { border: string; tooltip: string } {
+  if (total < 0) return { border: "border-l-blue-400", tooltip: "Credito a favor: saldo negativo (nota de credito o sobrepago)" };
   if (overdue > 0) return { border: "border-l-red-500", tooltip: "Vencido: tiene saldo mayor a 121 dias" };
   if (watch > 0) return { border: "border-l-amber-400", tooltip: "Vigilancia: saldo entre 91-120 dias" };
   return { border: "border-l-emerald-500", tooltip: "Corriente: saldo menor a 91 dias" };
@@ -30,7 +31,7 @@ interface Props {
 export default function ClientRow({ client, isExpanded, onToggle, userRole, contactLog, selectionMode, isSelected, onQuickWA, onQuickEmail, onRegisterContact, isFavorite, onToggleFavorite, onRowContextMenu }: Props) {
   const lastContact = contactLog?.[client.nombre_normalized];
   const daysSinceContact = lastContact ? Math.floor((Date.now() - new Date(lastContact.date).getTime()) / 86400000) : null;
-  const risk = riskInfo(client.current, client.watch, client.overdue);
+  const risk = riskInfo(client.total, client.current, client.watch, client.overdue);
   const [inlineOpen, setInlineOpen] = useState(false);
 
   // Determine follow-up urgency
@@ -70,7 +71,9 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
             </div>
             <div className="flex items-center gap-2 flex-shrink-0 ml-2">
               {/* Status badge */}
-              {client.overdue > 0 ? (
+              {client.total < 0 ? (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Credito</span>
+              ) : client.overdue > 0 ? (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">Vencido</span>
               ) : client.watch > 0 ? (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Vigilancia</span>

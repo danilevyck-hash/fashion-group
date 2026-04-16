@@ -404,32 +404,6 @@ export default function PackingListDetailPage() {
     doc.save(`PL-${pl.numero_pl || "sin-numero"}.pdf`);
   }
 
-  function handlePrint() {
-    const printContent = document.getElementById("pl-print-area");
-    if (!printContent) return;
-    const win = window.open("", "_blank");
-    if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><title>PL #${pl?.numero_pl || ""}</title>
-      <style>
-        body { font-family: -apple-system, sans-serif; margin: 1cm; font-size: 9pt; }
-        h1 { font-size: 14pt; margin: 0 0 4px; }
-        .sub { font-size: 9pt; color: #666; margin-bottom: 12px; }
-        table { width: 100%; border-collapse: collapse; }
-        th { background: #1e3a5f; color: white; text-align: left; padding: 5px 6px; font-size: 8pt; }
-        td { padding: 4px 6px; border-bottom: 1px solid #eee; font-size: 9pt; }
-        tr:nth-child(even) { background: #f8f8f8; }
-        .group { background: #d2d7e1 !important; font-weight: bold; font-size: 9pt; }
-        .mono { font-family: Courier, monospace; }
-        .center { text-align: center; }
-        .right { text-align: right; }
-        @page { size: letter; margin: 1.5cm; }
-      </style></head><body>`);
-    win.document.write(printContent.innerHTML);
-    win.document.write("</body></html>");
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); win.close(); }, 300);
-  }
 
   if (!authChecked) return null;
 
@@ -509,17 +483,6 @@ export default function PackingListDetailPage() {
                 <line x1="12" y1="15" x2="12" y2="3" />
               </svg>
               Descargar PDF
-            </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center gap-1.5 px-4 py-2 border border-teal-500 text-teal-600 text-sm rounded-md hover:bg-teal-50 active:scale-[0.97] transition-all min-h-[44px]"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="6 9 6 2 18 2 18 9" />
-                <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2" />
-                <rect x="6" y="14" width="12" height="8" />
-              </svg>
-              Imprimir
             </button>
           </div>
         </div>
@@ -649,23 +612,6 @@ export default function PackingListDetailPage() {
         </div>{/* close pl-print-area */}
       </div>
 
-      {/* Print styles */}
-      <style jsx global>{`
-        @media print {
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          body { margin: 0 !important; padding: 0 !important; }
-          .print\\:hidden, nav, header, [class*="sticky"], [class*="AppHeader"],
-          button, [class*="print:hidden"] { display: none !important; }
-          .max-w-6xl, .max-w-7xl { max-width: 100% !important; padding: 0 8px !important; margin: 0 !important; }
-          .space-y-4 > * + * { margin-top: 8px !important; }
-          table { font-size: 9pt !important; width: 100% !important; border-collapse: collapse !important; }
-          td, th { padding: 4px 6px !important; }
-          .border { border: 1px solid #ddd !important; }
-          .rounded-lg { border-radius: 0 !important; }
-          .overflow-hidden { overflow: visible !important; }
-          @page { size: letter; margin: 1.5cm; }
-        }
-      `}</style>
     </div>
   );
 }

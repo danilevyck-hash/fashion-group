@@ -171,7 +171,7 @@ export function generatePDFDetallado(
 
   let y = addHeader(doc, subtitle ? `${subtitle} · Detallado · ${data.length} clientes` : `Detallado · ${data.length} clientes`);
 
-  const clientsWithData = data.filter((c) => c.total > 0);
+  const clientsWithData = data.filter((c) => c.total !== 0);
 
   const tableBody: (string | { content: string; styles?: Record<string, unknown> })[][] = [];
 

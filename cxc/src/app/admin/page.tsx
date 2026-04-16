@@ -233,7 +233,7 @@ export default function AdminDashboard() {
         }
         return { ...c, companies: filteredCompanies, current, watch, overdue, total, d0_30: gd0, d31_60: gd1, d61_90: gd2, d91_120: gd3, d121_plus: gd4 };
       })
-      .filter((c): c is ConsolidatedClient => c !== null && c.total > 0);
+      .filter((c): c is ConsolidatedClient => c !== null && c.total !== 0);
 
     if (companyFilter !== "all") {
       result = result
@@ -252,7 +252,7 @@ export default function AdminDashboard() {
         });
     }
 
-    if (riskFilter === "current") result = result.filter((c) => c.overdue === 0 && c.watch === 0);
+    if (riskFilter === "current") result = result.filter((c) => c.total > 0 && c.overdue === 0 && c.watch === 0);
     else if (riskFilter === "watch") result = result.filter((c) => c.watch > 0);
     else if (riskFilter === "overdue") result = result.filter((c) => c.overdue > 0);
 
@@ -273,6 +273,11 @@ export default function AdminDashboard() {
       const aFav = favorites.has(a.nombre_normalized) ? 0 : 1;
       const bFav = favorites.has(b.nombre_normalized) ? 0 : 1;
       if (aFav !== bFav) return aFav - bFav;
+
+      // Negative totals (credit) always last
+      const aNeg = a.total < 0 ? 1 : 0;
+      const bNeg = b.total < 0 ? 1 : 0;
+      if (aNeg !== bNeg) return aNeg - bNeg;
 
       if (sortKey === "name") {
         const cmp = a.nombre_normalized.localeCompare(b.nombre_normalized, "es", { sensitivity: "base" });
@@ -324,7 +329,7 @@ export default function AdminDashboard() {
         }
         return { ...c, companies: fc, current, watch, overdue, total };
       })
-      .filter((c): c is ConsolidatedClient => c !== null && c.total > 0);
+      .filter((c): c is ConsolidatedClient => c !== null && c.total !== 0);
   }, [clients, cxcCompanies]);
 
   useEffect(() => {

@@ -116,7 +116,7 @@ export default function useAdminData() {
         client.d91_120 = gd3; client.d121_plus = gd4;
       }
 
-      setClients(Array.from(map.values()).filter((c) => c.total > 0));
+      setClients(Array.from(map.values()).filter((c) => c.total !== 0));
 
       // Build contact log from overrides (source of truth) first
       const latestLog: Record<string, { date: string; method: string }> = {};

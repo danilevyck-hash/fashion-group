@@ -177,7 +177,7 @@ function buildEmpresaSheet(clients: ConsolidatedClient[], companyKey: string, co
 
   // Filter and sort clients for this company
   const coClients = clients
-    .filter((c) => c.companies[companyKey] && c.companies[companyKey].total > 0)
+    .filter((c) => c.companies[companyKey] && c.companies[companyKey].total !== 0)
     .map((c) => ({ ...c, coData: c.companies[companyKey] }))
     .sort((a, b) => b.coData.total - a.coData.total);
 
@@ -258,7 +258,7 @@ function buildTop20Sheet(clients: ConsolidatedClient[], companies: Company[], da
   for (let i = 0; i < top20.length; i++) {
     const cl = top20[i];
     const empresas = companies
-      .filter((co) => cl.companies[co.key] && cl.companies[co.key].total > 0)
+      .filter((co) => cl.companies[co.key] && cl.companies[co.key].total !== 0)
       .map((co) => co.name)
       .join(", ");
 
