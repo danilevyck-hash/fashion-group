@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth, getSession } from "@/lib/require-auth";
 import { logActivity } from "@/lib/log-activity";
+import { normalizeName } from "@/lib/normalize";
 import * as XLSX from "xlsx-js-style";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -105,10 +106,10 @@ function parseCSV(text: string, empresa: string): RawRow[] {
       mes,
       quarter,
       tipo,
-      n_sistema: get("N.SISTEMA"),
+      n_sistema: get("N.SISTEMA") || get("N.INTERNO"),
       n_fiscal: get("N.FISCAL"),
       vendedor: get("VENDEDOR"),
-      cliente: (get("CLIENTE") || "").replace(/\s+/g, " ").trim(),
+      cliente: normalizeName(get("CLIENTE") || ""),
       costo: toNum(get("COSTO")),
       descuento: toNum(get("DESCUENTO")),
       subtotal,
@@ -179,10 +180,10 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): RawRow[] {
       mes,
       quarter,
       tipo,
-      n_sistema: get("N.SISTEMA"),
+      n_sistema: get("N.SISTEMA") || get("N.INTERNO"),
       n_fiscal: get("N.FISCAL"),
       vendedor: get("VENDEDOR"),
-      cliente: (get("CLIENTE") || "").replace(/\s+/g, " ").trim(),
+      cliente: normalizeName(get("CLIENTE") || ""),
       costo: getNum("COSTO"),
       descuento: getNum("DESCUENTO"),
       subtotal,

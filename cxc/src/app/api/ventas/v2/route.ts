@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
+import { normalizeName } from "@/lib/normalize";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,7 +75,7 @@ function aggregateTopClientes(rows: VentasRawRow[], topN = 10): ClienteAgg[] {
   const map = new Map<string, ClienteAgg>();
 
   for (const r of rows) {
-    const key = (r.cliente ?? "").trim() || "(Sin nombre)";
+    const key = normalizeName(r.cliente ?? "") || "(Sin nombre)";
     const existing = map.get(key);
     if (existing) {
       existing.subtotal += r.subtotal ?? 0;
@@ -98,16 +99,16 @@ function aggregateClientesDetalle(
   // Build lastFecha map — RPC already returns MAX(fecha) per normalized cliente
   const lastFechaMap = new Map<string, string>();
   for (const r of lastDates) {
-    const key = (r.cliente ?? "").trim().replace(/\s+/g, " ") || "(Sin nombre)";
-    if (CLIENTES_INTERNOS.has(key.toUpperCase())) continue;
+    const key = normalizeName(r.cliente ?? "") || "(Sin nombre)";
+    if (CLIENTES_INTERNOS.has(key)) continue;
     lastFechaMap.set(key, String(r.ultima_fecha ?? ""));
   }
 
   // Aggregate subtotal/utilidad from period-filtered rows only
   const map = new Map<string, { subtotal: number; utilidad: number; empresas: Map<string, { subtotal: number; utilidad: number }> }>();
   for (const r of filteredRows) {
-    const key = (r.cliente ?? "").trim().replace(/\s+/g, " ") || "(Sin nombre)";
-    if (CLIENTES_INTERNOS.has(key.toUpperCase())) continue;
+    const key = normalizeName(r.cliente ?? "") || "(Sin nombre)";
+    if (CLIENTES_INTERNOS.has(key)) continue;
     if (!map.has(key)) map.set(key, { subtotal: 0, utilidad: 0, empresas: new Map() });
     const c = map.get(key)!;
     c.subtotal += r.subtotal ?? 0;
