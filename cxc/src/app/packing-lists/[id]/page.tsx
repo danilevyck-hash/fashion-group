@@ -179,14 +179,21 @@ export default function PackingListDetailPage() {
       },
       alternateRowStyles: { fillColor: [248, 248, 248] },
       margin: { left: 14, right: 14 },
-      didParseCell(data) {
+      willDrawCell(data) {
         if (data.section === "body" && data.column.index === 3) {
           const raw = String(data.cell.raw || "");
           if (raw.includes("**")) {
-            // Replace **(...)** with [...] and make cell bold
-            data.cell.text = [raw.replace(/\*\*\(([^)]+)\)\*\*/g, "[$1]").replace(/\*\*/g, "")];
-            data.cell.styles.fontStyle = "bold";
+            const cleaned = raw.replace(/\*\*\(([^)]+)\)\*\*/g, "[$1]").replace(/\*\*/g, "");
+            data.cell.text = [cleaned];
+            // Force bold font for this cell
+            doc.setFont("helvetica", "bold");
           }
+        }
+      },
+      didDrawCell(data) {
+        // Reset font after bold cell
+        if (data.section === "body" && data.column.index === 3) {
+          doc.setFont("helvetica", "normal");
         }
       },
     });
