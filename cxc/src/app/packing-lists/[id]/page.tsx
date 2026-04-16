@@ -366,7 +366,7 @@ function GroupRows({
                 <span
                   key={bultoId}
                   className={`inline-block px-1.5 py-0.5 rounded text-[11px] ${
-                    bultoMuestra && bultoId === bultoMuestra
+                    row.bultoMuestra && bultoId === row.bultoMuestra
                       ? "bg-amber-100 text-amber-800 font-medium"
                       : "bg-gray-100 text-gray-600"
                   }`}
