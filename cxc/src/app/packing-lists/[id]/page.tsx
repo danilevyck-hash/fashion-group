@@ -168,7 +168,7 @@ export default function PackingListDetailPage() {
     doc.setTextColor(100);
     const subtitle = `${pl.empresa} - ${fechaDisplay ? fechaDisplay + " - " : ""}${pl.total_estilos} estilos - ${pl.total_piezas.toLocaleString()} piezas - ${pl.total_bultos} bultos`;
     doc.text(safe(subtitle), marginLeft + FG_LOGO_WIDTH + 4, 22);
-    doc.text(safe("Muestra = bulto con talla M o 32 - OS = otro tamano"), marginLeft + FG_LOGO_WIDTH + 4, 27);
+    doc.text(safe("Muestra = bulto con talla M o 32 - OS = otro tamaño"), marginLeft + FG_LOGO_WIDTH + 4, 27);
     doc.setTextColor(0);
 
     let currentY = 34;
@@ -267,7 +267,7 @@ export default function PackingListDetailPage() {
       doc.setFontSize(11);
       doc.setFont("helvetica", "bold");
       doc.setTextColor(30, 58, 95);
-      doc.text(safe("Distribucion completa por estilo"), marginLeft, currentY);
+      doc.text(safe("Distribución completa por estilo"), marginLeft, currentY);
       currentY += 2;
       doc.setDrawColor(30, 58, 95);
       doc.line(marginLeft, currentY, contentRight, currentY);
@@ -295,7 +295,7 @@ export default function PackingListDetailPage() {
 
       autoTable(doc, {
         startY: currentY,
-        head: [["Estilo", { content: "Total", styles: { halign: "center" } }, "Distribucion por Bulto"]],
+        head: [["Estilo", { content: "Total", styles: { halign: "center" } }, "Distribución por Bulto"]],
         body: tableBody,
         headStyles: {
           fillColor: [30, 58, 95],
