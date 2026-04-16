@@ -264,8 +264,11 @@ export default function PlantillasPage() {
               {showFinancials ? (
                 <>
                   <p className="text-lg font-semibold tabular-nums mt-0.5">${stats.ventasMes > 0 ? (stats.ventasMes / 1000).toFixed(0) + "K" : "—"}</p>
-                  <p className={`text-xs mt-1 ${stats.ventasPrev > 0 && stats.ventasMes >= stats.ventasPrev ? "text-green-600" : "text-gray-400"}`}>
-                    {stats.ventasPrev > 0 ? `vs $${(stats.ventasPrev / 1000).toFixed(0)}K prev` : "—"}
+                  <p className={`text-xs mt-1 ${stats.ventasPrev > 0 && stats.ventasMes >= stats.ventasPrev ? "text-green-600" : stats.ventasPrev > 0 ? "text-red-500" : "text-gray-400"}`}>
+                    {stats.ventasPrev > 0 ? (() => {
+                      const pct = ((stats.ventasMes - stats.ventasPrev) / stats.ventasPrev * 100);
+                      return `vs $${(stats.ventasPrev / 1000).toFixed(0)}K prev (${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%)`;
+                    })() : "—"}
                   </p>
                 </>
               ) : (

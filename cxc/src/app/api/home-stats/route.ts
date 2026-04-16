@@ -67,14 +67,30 @@ export async function GET(req: NextRequest) {
   const cxcStale = lastUpload ? new Date(lastUpload) < new Date(staleDate) : true;
 
   // Ventas — if current month has no data, fall back to previous month
+  // Then compare against the month BEFORE the one being shown
   const MESES_LABEL = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
   let ventasMes = (ventasMesRes.data || []).reduce((s: number, r: { ventas_netas: number }) => s + (Number(r.ventas_netas) || 0), 0);
-  const ventasPrev = (ventasPrevRes.data || []).reduce((s: number, r: { ventas_netas: number }) => s + (Number(r.ventas_netas) || 0), 0);
+  let ventasPrev = (ventasPrevRes.data || []).reduce((s: number, r: { ventas_netas: number }) => s + (Number(r.ventas_netas) || 0), 0);
   let ventasMesLabel = `${MESES_LABEL[currentMonth]} ${currentYear}`;
+  let shownMonth = currentMonth;
+  let shownYear = currentYear;
+
   if (ventasMes === 0 && ventasPrev !== 0) {
     // Current month has no data — show previous month instead
     ventasMes = ventasPrev;
     ventasMesLabel = `${MESES_LABEL[prevMonth]} ${prevYear}`;
+    shownMonth = prevMonth;
+    shownYear = prevYear;
+
+    // Now fetch the month BEFORE the one we're showing as the comparison
+    const compMonth = shownMonth === 1 ? 12 : shownMonth - 1;
+    const compYear = shownMonth === 1 ? shownYear - 1 : shownYear;
+    try {
+      const compData = await getVentasMensuales(compYear, compMonth);
+      ventasPrev = compData.reduce((s, r) => s + (Number(r.ventas_netas) || 0), 0);
+    } catch {
+      ventasPrev = 0;
+    }
   }
 
   // CxC
