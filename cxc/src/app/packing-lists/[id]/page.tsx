@@ -109,11 +109,19 @@ export default function PackingListDetailPage() {
       16
     );
 
+    // Format date
+    const meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+    let fechaDisplay = pl.fecha_entrega || "";
+    if (fechaDisplay && /^\d{4}-\d{2}-\d{2}$/.test(fechaDisplay)) {
+      const [y, m, d] = fechaDisplay.split("-");
+      fechaDisplay = `${parseInt(d)} de ${meses[parseInt(m) - 1]} ${y}`;
+    }
+
     // Subtitle
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100);
-    const subtitle = `${pl.empresa} · ${pl.total_estilos} estilos · ${pl.total_piezas.toLocaleString()} piezas · ${pl.total_bultos} bultos`;
+    const subtitle = `${pl.empresa} · ${fechaDisplay ? fechaDisplay + " · " : ""}${pl.total_estilos} estilos · ${pl.total_piezas.toLocaleString()} piezas · ${pl.total_bultos} bultos`;
     doc.text(subtitle, 14 + FG_LOGO_WIDTH + 4, 22);
 
     doc.text(
@@ -130,7 +138,7 @@ export default function PackingListDetailPage() {
       tableBody.push([
         {
           content: group.producto || "SIN PRODUCTO",
-          colSpan: 5,
+          colSpan: 4,
           styles: {
             fillColor: [235, 235, 235],
             fontStyle: "bold",
@@ -142,12 +150,11 @@ export default function PackingListDetailPage() {
 
       for (const row of group.rows) {
         const distParts = Object.entries(row.distribution).map(([bultoId, pcs]) =>
-          `(${bultoId}: ${pcs}pcs)`
+          `(${bultoId}: ${pcs})`
         );
 
         tableBody.push([
           row.estilo,
-          row.producto,
           String(row.totalPcs),
           row.bultoMuestra || "-",
           distParts.join("  "),
@@ -157,7 +164,7 @@ export default function PackingListDetailPage() {
 
     autoTable(doc, {
       startY: 32,
-      head: [["Estilo", "Producto", "Total", "Muestra", "Distribución por Bulto"]],
+      head: [["Estilo", "Total", "Muestra", "Distribución por Bulto"]],
       body: tableBody,
       headStyles: {
         fillColor: [30, 58, 95],
@@ -166,15 +173,14 @@ export default function PackingListDetailPage() {
         fontStyle: "bold",
       },
       styles: {
-        fontSize: 7,
+        fontSize: 9,
         cellPadding: 1.5,
       },
       columnStyles: {
-        0: { cellWidth: 25, font: "courier" },
-        1: { cellWidth: 30 },
-        2: { cellWidth: 12, halign: "right" },
-        3: { cellWidth: 16 },
-        4: { cellWidth: "auto" },
+        0: { cellWidth: 30, font: "courier" },
+        1: { cellWidth: 15, halign: "right" },
+        2: { cellWidth: 18 },
+        3: { cellWidth: "auto" },
       },
       alternateRowStyles: { fillColor: [248, 248, 248] },
       margin: { left: 14, right: 14 },
@@ -187,7 +193,7 @@ export default function PackingListDetailPage() {
       doc.setFontSize(7);
       doc.setTextColor(160);
       doc.text(
-        `PL #${pl.numero_pl} — Pag ${i}/${pageCount}`,
+        `Pág ${i} de ${pageCount}`,
         pageWidth - 14,
         doc.internal.pageSize.getHeight() - 8,
         { align: "right" }
@@ -250,6 +256,14 @@ export default function PackingListDetailPage() {
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
               {pl.empresa}
+              {pl.fecha_entrega && (() => {
+                const ms = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+                if (/^\d{4}-\d{2}-\d{2}$/.test(pl.fecha_entrega)) {
+                  const [y, m, d] = pl.fecha_entrega.split("-");
+                  return ` · ${parseInt(d)} de ${ms[parseInt(m) - 1]} ${y}`;
+                }
+                return ` · ${pl.fecha_entrega}`;
+              })()}
               {pl.total_estilos > 0 && ` · ${pl.total_estilos} estilos`}
               {pl.total_piezas > 0 && ` · ${pl.total_piezas.toLocaleString()} piezas`}
               {pl.total_bultos > 0 && ` · ${pl.total_bultos} bultos`}
@@ -290,7 +304,6 @@ export default function PackingListDetailPage() {
               <thead>
                 <tr className="bg-[#1e3a5f] text-white">
                   <th className="text-left px-3 py-2.5 font-medium text-xs">Estilo</th>
-                  <th className="text-left px-3 py-2.5 font-medium text-xs">Producto</th>
                   <th className="text-right px-3 py-2.5 font-medium text-xs">Total</th>
                   <th className="text-left px-3 py-2.5 font-medium text-xs">Muestra</th>
                   <th className="text-left px-3 py-2.5 font-medium text-xs">
@@ -301,7 +314,7 @@ export default function PackingListDetailPage() {
               <tbody>
                 {groupedRows.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-3 py-8 text-center text-gray-400 text-sm">
+                    <td colSpan={4} className="px-3 py-8 text-center text-gray-400 text-sm">
                       Sin datos de estilos
                     </td>
                   </tr>
@@ -338,7 +351,7 @@ function GroupRows({
     <>
       {/* Product group header */}
       <tr className="bg-gray-100">
-        <td colSpan={5} className="px-3 py-1.5 text-xs font-bold text-gray-600 uppercase tracking-wide">
+        <td colSpan={4} className="px-3 py-1.5 text-xs font-bold text-gray-600 uppercase tracking-wide">
           {group.producto || "SIN PRODUCTO"}
         </td>
       </tr>
@@ -348,7 +361,6 @@ function GroupRows({
           className={ri % 2 === 0 ? "bg-white" : "bg-gray-50/50"}
         >
           <td className="px-3 py-1.5 font-mono text-xs">{row.estilo}</td>
-          <td className="px-3 py-1.5 text-xs text-gray-600">{row.producto}</td>
           <td className="px-3 py-1.5 text-xs text-right tabular-nums font-medium">
             {row.totalPcs}
           </td>
@@ -362,7 +374,7 @@ function GroupRows({
                   key={bultoId}
                   className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600"
                 >
-                  ({bultoId}: {pcs}pcs)
+                  ({bultoId}: {pcs})
                 </span>
               ))}
             </div>

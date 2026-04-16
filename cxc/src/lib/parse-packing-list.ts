@@ -79,6 +79,7 @@ export function normalizeProductName(nombre: string): string {
     .replace(/\bPARA\s+DAMA\b/g, "")
     .replace(/\bPARA\s+MUJER\b/g, "")
     .replace(/\bDE\s+CABALLERO\b/g, "")
+    .replace(/\bDE\s+MUJER\b/g, "")
     .replace(/\bDE\s+VESTIR\b/g, "")
     .replace(/\bPARA\s*$/g, "")  // trailing "PARA" alone
     .replace(/\s{2,}/g, " ")
@@ -240,9 +241,19 @@ export function parsePackingListText(text: string): ParsedPackingList {
       if (STYLE_CODE_RE.test(firstToken) && /[A-Za-z]/.test(firstToken) && /\d/.test(firstToken)) {
         const parts = line.split(/\s{2,}/).map(p => p.trim()).filter(Boolean);
 
-        // Product is ALWAYS the 3rd token (index 2): parts = [Estilo, Color, Producto, ...]
-        // This is positional based on the PDF format: Estilo | Color | Nombre
-        const producto = parts.length >= 3 ? parts[2] : "";
+        // Find the part that matches a known product keyword (CAMISA, POLO, etc.)
+        // This handles cases where the color has internal double-spaces creating extra parts
+        let producto = "";
+        for (let pi = 1; pi < parts.length; pi++) {
+          if (PRODUCT_KEYWORDS.test(parts[pi])) {
+            producto = parts[pi];
+            break;
+          }
+        }
+        // Fallback to parts[2] if no keyword match found
+        if (!producto && parts.length >= 3) {
+          producto = parts[2];
+        }
 
         currentEstilo = firstToken;
         currentProducto = producto ? normalizeProductName(producto) : "";

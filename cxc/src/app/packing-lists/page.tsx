@@ -306,7 +306,6 @@ export default function PackingListsPage() {
                     <thead>
                       <tr className="bg-[#1e3a5f] text-white">
                         <th className="text-left px-3 py-2 font-medium text-xs">Estilo</th>
-                        <th className="text-left px-3 py-2 font-medium text-xs">Producto</th>
                         <th className="text-right px-3 py-2 font-medium text-xs">Total</th>
                         <th className="text-left px-3 py-2 font-medium text-xs">Muestra</th>
                         <th className="text-left px-3 py-2 font-medium text-xs">Distribución</th>
@@ -316,7 +315,6 @@ export default function PackingListsPage() {
                       {indexPreview.slice(0, 10).map((row, i) => (
                         <tr key={i} className={i % 2 === 0 ? "bg-white" : "bg-gray-50"}>
                           <td className="px-3 py-1.5 font-mono text-xs">{row.estilo}</td>
-                          <td className="px-3 py-1.5 text-xs">{row.producto}</td>
                           <td className="px-3 py-1.5 text-xs text-right tabular-nums">
                             {row.totalPcs}
                           </td>
@@ -330,7 +328,7 @@ export default function PackingListsPage() {
                                   key={bultoId}
                                   className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600"
                                 >
-                                  ({bultoId}: {pcs}pcs)
+                                  ({bultoId}: {pcs})
                                 </span>
                               ))}
                             </div>
