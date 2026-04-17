@@ -414,13 +414,21 @@ function ChequesPage() {
           const res = await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rebotado", motivo_rebote: motivo }) });
           if (!res.ok) { setCheques(snapshot); showToast("No se pudo marcar como rebotado. Intenta de nuevo."); return; }
           if (cheque) {
+            const nombre = cheque.cliente.toUpperCase().trim();
+            const linea = `⚠ Cheque rebotado ${todayStr()}: N° ${cheque.numero_cheque} por $${fmt(cheque.monto)} — ${motivo || "Sin motivo"}`;
+            let previo = "";
+            try {
+              const existingRes = await fetch("/api/overrides", { cache: "no-store" });
+              if (existingRes.ok) {
+                const all: Array<{ nombre_normalized: string; resultado_contacto?: string | null }> = await existingRes.json();
+                previo = (all.find(o => o.nombre_normalized === nombre)?.resultado_contacto || "").trim();
+              }
+            } catch { /* si falla el GET, escribimos solo la línea nueva */ }
+            const resultado_contacto = previo ? `${previo}\n${linea}` : linea;
             await fetch("/api/overrides", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                nombre_normalized: cheque.cliente.toUpperCase().trim(),
-                resultado_contacto: `⚠ Cheque rebotado: N° ${cheque.numero_cheque} por $${fmt(cheque.monto)} — ${motivo || "Sin motivo"}`,
-              }),
+              body: JSON.stringify({ nombre_normalized: nombre, resultado_contacto }),
             }).catch(() => {});
           }
           loadCheques();
