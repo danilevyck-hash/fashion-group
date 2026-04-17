@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -15,6 +15,29 @@ import {
   type PLValidationError,
   type RawLine,
 } from "@/lib/parse-packing-list";
+
+/** Convierte el nombre de empresa tal como está en DB a display legible.
+ *  "VISTANA INTERNACIONAL PANAMA" → "Vistana"
+ *  "FASHION WEAR" → "Fashion Wear"
+ *  "CONFECCIONES BOSTON" → "Confecciones Boston"
+ */
+function displayEmpresa(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  const upper = raw.toUpperCase();
+  if (upper.includes("VISTANA")) return "Vistana";
+  if (upper === "FASHION WEAR") return "Fashion Wear";
+  if (upper === "FASHION SHOES") return "Fashion Shoes";
+  if (upper === "ACTIVE WEAR") return "Active Wear";
+  if (upper === "ACTIVE SHOES") return "Active Shoes";
+  if (upper === "JOYSTEP") return "Joystep";
+  if (upper === "CONFECCIONES BOSTON") return "Confecciones Boston";
+  if (upper === "MULTIFASHION") return "Multifashion";
+  return raw
+    .toLowerCase()
+    .split(/\s+/)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
 
 interface PLRecord {
   id: string;
@@ -56,8 +79,24 @@ export default function PackingListsPage() {
   const [dragOver, setDragOver] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [empresaFilter, setEmpresaFilter] = useState<string>("all");
 
   const canEdit = role === "admin" || role === "secretaria";
+
+  // Counts por empresa (para KPI inline + tabs) + filtro
+  const empresaCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const pl of plList) {
+      const key = displayEmpresa(pl.empresa);
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [plList]);
+
+  const filteredPlList = useMemo(() => {
+    if (empresaFilter === "all") return plList;
+    return plList.filter(p => displayEmpresa(p.empresa) === empresaFilter);
+  }, [plList, empresaFilter]);
 
   // Load history
   const loadList = useCallback(async () => {
@@ -661,7 +700,39 @@ export default function PackingListsPage() {
 
         {/* History */}
         <div>
-          <h2 className="text-sm font-semibold mb-3">Historial</h2>
+          <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h2 className="text-sm font-semibold">Historial</h2>
+            {plList.length > 0 && (
+              <p className="text-xs text-gray-400">
+                {empresaCounts.map(([e, c], i) => (
+                  <span key={e}>
+                    {i > 0 && " · "}
+                    {e}: {c} PL{c !== 1 ? "s" : ""}
+                  </span>
+                ))}
+                {empresaCounts.length > 1 && ` · Total: ${plList.length}`}
+              </p>
+            )}
+          </div>
+          {empresaCounts.length > 1 && (
+            <div className="flex gap-2 mb-3 flex-wrap">
+              <button
+                onClick={() => setEmpresaFilter("all")}
+                className={`text-xs px-3 py-1.5 rounded-full border transition ${empresaFilter === "all" ? "bg-black text-white border-black" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
+              >
+                Todos <span className="opacity-60">({plList.length})</span>
+              </button>
+              {empresaCounts.map(([e, c]) => (
+                <button
+                  key={e}
+                  onClick={() => setEmpresaFilter(e)}
+                  className={`text-xs px-3 py-1.5 rounded-full border transition ${empresaFilter === e ? "bg-black text-white border-black" : "border-gray-200 text-gray-600 hover:border-gray-400"}`}
+                >
+                  {e} <span className="opacity-60">({c})</span>
+                </button>
+              ))}
+            </div>
+          )}
           {loading ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
@@ -671,6 +742,8 @@ export default function PackingListsPage() {
                 />
               ))}
             </div>
+          ) : filteredPlList.length === 0 && plList.length > 0 ? (
+            <p className="text-xs text-gray-400 py-8 text-center">No hay PLs de {empresaFilter}</p>
           ) : plList.length === 0 ? (
             <div className="text-center py-12 border border-gray-200 rounded-lg">
               <p className="text-sm text-gray-500">
@@ -705,14 +778,18 @@ export default function PackingListsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {plList.map((pl) => (
+                    {filteredPlList.map((pl) => (
                       <tr
                         key={pl.id}
                         className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition cursor-pointer"
                         onClick={() => router.push(`/packing-lists/${pl.id}`)}
                       >
                         <td className="px-3 py-2.5 font-medium">{pl.numero_pl || "—"}</td>
-                        <td className="px-3 py-2.5 text-gray-600">{pl.empresa || "—"}</td>
+                        <td className="px-3 py-2.5 text-gray-600">
+                          <span className="inline-block px-2 py-0.5 rounded-full text-[11px] bg-teal-50 text-teal-700 border border-teal-100">
+                            {displayEmpresa(pl.empresa)}
+                          </span>
+                        </td>
                         <td className="px-3 py-2.5 text-gray-600 hidden sm:table-cell">
                           {pl.fecha_entrega || "—"}
                         </td>
