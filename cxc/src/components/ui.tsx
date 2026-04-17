@@ -277,8 +277,6 @@ const STATUS_COLORS: Record<string, string> = {
   activo: "green", abierto: "green", "Enviado": "blue",
   // Green: completed/resolved/deposited — cerrado is gray (inactive)
   depositado: "green", aprobado: "green", "Aplicado": "green", cerrado: "gray", "Aplicada": "green", "Entregado": "green", despachada: "green",
-  // Orange/amber: pending but overdue
-  pendiente_vencido: "orange",
   // Red: rejected/expired/bounced
   rechazado: "red", "Rechazado": "red", vencido: "red", rebotado: "red", archivado: "red",
   // Purple: in review / confirmed
@@ -287,9 +285,7 @@ const STATUS_COLORS: Record<string, string> = {
   "Preparando": "orange", "En camino": "orange", "Pendiente Bodega": "orange",
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  pendiente_vencido: "Pendiente (vencido)",
-};
+const STATUS_LABELS: Record<string, string> = {};
 
 export function StatusBadge({ estado }: { estado: string }) {
   const color = STATUS_COLORS[estado] || "gray";

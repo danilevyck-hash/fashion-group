@@ -49,7 +49,7 @@ function ChequeMoreMenu({ cheque, ve, role, onRebotado, onDelete, onRedepositar 
   onRebotado: () => void; onDelete: () => void; onRedepositar?: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
+  const isPending = ve === "pendiente" || ve === "vencido";
   const isRebotado = ve === "rebotado";
   const isDep = ve === "depositado";
   // State machine: only show valid actions
@@ -179,7 +179,7 @@ function ChequesPage() {
   const { show: showContextMenu } = useContextMenu();
 
   function buildChequeContextMenu(c: Cheque, ve: string): ContextMenuItem[] {
-    const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
+    const isPending = ve === "pendiente" || ve === "vencido";
     const isRebotado = ve === "rebotado";
     const isDep = ve === "depositado";
     return [
@@ -279,16 +279,17 @@ function ChequesPage() {
   const today = todayStr();
   const weekFromNow = getVencenSemanaRange(today).end;
 
-  // Derive visual estado: pendiente + fecha < hoy → show as pendiente_vencido (NOT "vencido" — only the cron sets that in DB)
+  // Derive visual estado: pendiente + fecha < hoy → "vencido" (calculado runtime;
+  // el estado "vencido" ya no existe en DB desde bug #6 audit).
   function visualEstado(c: Cheque): string {
-    if (c.estado === "pendiente" && c.fecha_deposito < today) return "pendiente_vencido";
+    if (c.estado === "pendiente" && c.fecha_deposito < today) return "vencido";
     return c.estado;
   }
 
   // Urgency border class for color-coded left borders
   function urgencyBorder(c: Cheque, ve: string): string {
     if (ve === "depositado") return "border-l-4 border-l-emerald-400";
-    if (ve === "pendiente_vencido" || ve === "vencido") return "border-l-4 border-l-red-700";
+    if (ve === "vencido") return "border-l-4 border-l-red-700";
     if (ve === "pendiente" && c.fecha_deposito === today) return "border-l-4 border-l-red-500";
     if (ve === "pendiente" && c.fecha_deposito <= weekFromNow) return "border-l-4 border-l-amber-400";
     if (ve === "rebotado") return "border-l-4 border-l-red-700";
@@ -298,7 +299,7 @@ function ChequesPage() {
 
   const pendientes = cheques.filter((c) => visualEstado(c) === "pendiente");
   const depositados = cheques.filter((c) => visualEstado(c) === "depositado");
-  const vencidos = cheques.filter((c) => visualEstado(c) === "pendiente_vencido" || visualEstado(c) === "vencido");
+  const vencidos = cheques.filter((c) => visualEstado(c) === "vencido");
   const rebotados = cheques.filter((c) => visualEstado(c) === "rebotado");
   const totalPendiente = pendientes.reduce((s, c) => s + (Number(c.monto) || 0), 0);
   const proximo = pendientes.length > 0 ? pendientes[0].fecha_deposito : null;
@@ -497,7 +498,7 @@ function ChequesPage() {
         data = cheques.filter((c) => visualEstado(c) === "depositado");
         break;
       case "vencido":
-        data = cheques.filter((c) => visualEstado(c) === "pendiente_vencido" || visualEstado(c) === "vencido");
+        data = cheques.filter((c) => visualEstado(c) === "vencido");
         break;
       case "rebotado":
         data = cheques.filter((c) => visualEstado(c) === "rebotado");
@@ -996,7 +997,6 @@ function ChequesPage() {
 
         const pillColor = (estado: string) => {
           if (estado === "pendiente") return "bg-emerald-100 text-emerald-700";
-          if (estado === "pendiente_vencido") return "bg-amber-100 text-amber-700";
           if (estado === "vencido") return "bg-red-100 text-red-700";
           if (estado === "rebotado") return "bg-red-50 text-red-400";
           return "bg-gray-100 text-gray-500";
@@ -1048,7 +1048,7 @@ function ChequesPage() {
                                 <div className="text-[11px] text-gray-500 mb-0.5">N° {c.numero_cheque}</div>
                                 <div className="text-sm font-semibold mb-2">${fmt(c.monto)}</div>
                                 <StatusBadge estado={ve} />
-                                {(ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido") && (
+                                {(ve === "pendiente" || ve === "vencido") && (
                                   <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
                                     <button onClick={() => { setConfirmDepositId(c.id); setCalPopover(null); }} className="text-[11px] text-emerald-600 hover:underline">Confirmar depósito</button>
                                     <button onClick={() => { setRebotandoId(c.id); setCalPopover(null); }} title="Cheque devuelto por el banco" className="text-[11px] text-red-500 hover:underline">Rebotado</button>
@@ -1082,12 +1082,12 @@ function ChequesPage() {
                         <div key={c.id}>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${pillColor(ve)}`}>{ve === "pendiente_vencido" ? "vencido" : ve}</span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${pillColor(ve)}`}>{ve}</span>
                               <span className="text-sm truncate">{c.cliente}</span>
                             </div>
                             <span className="text-sm font-medium tabular-nums ml-2">${fmt(c.monto)}</span>
                           </div>
-                          {(ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido") && (
+                          {(ve === "pendiente" || ve === "vencido") && (
                             <div className="flex gap-3 mt-1 ml-1">
                               <button onClick={() => setConfirmDepositId(c.id)} className="text-xs text-emerald-600 hover:underline py-1">Confirmar depósito</button>
                               <button onClick={() => setRebotandoId(c.id)} title="Cheque devuelto por el banco" className="text-xs text-red-500 hover:underline py-1">Rebotado</button>
@@ -1186,7 +1186,7 @@ function ChequesPage() {
         <div className="sm:hidden space-y-1.5">
           {filtered.map((c) => {
             const ve = visualEstado(c);
-            const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
+            const isPending = ve === "pendiente" || ve === "vencido";
             const isRebotado = ve === "rebotado";
             const depositSwipe: SwipeAction | undefined = isPending ? {
               label: "Depositar",
@@ -1259,7 +1259,7 @@ function ChequesPage() {
           const _th = (<thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500"><th className="w-8"></th><th className="text-left py-3 px-4 font-normal">Cliente</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell">N° Cheque</th><th className="text-right py-3 px-4 font-normal">Monto</th><th className="text-left py-3 px-4 font-normal whitespace-nowrap">Fecha Dep.</th><th className="text-left py-3 px-4 font-normal">Estado</th><th className="text-right py-3 px-2 font-normal"></th></tr></thead>);
           const _rr = (c: Cheque) => {
               const ve = visualEstado(c);
-              const isPending = ve === "pendiente" || ve === "pendiente_vencido" || ve === "vencido";
+              const isPending = ve === "pendiente" || ve === "vencido";
               const isDep = ve === "depositado";
               const isRebotado = ve === "rebotado";
               return (
@@ -1268,7 +1268,7 @@ function ChequesPage() {
                     {ve === "pendiente" && (
                       <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} className="accent-emerald-600 w-3.5 h-3.5" />
                     )}
-                    {(ve === "pendiente_vencido" || ve === "vencido") && (
+                    {ve === "vencido" && (
                       <input type="checkbox" checked={selectedVencidos.has(c.id)} onChange={() => toggleSelectVencido(c.id)} className="accent-amber-600 w-3.5 h-3.5" />
                     )}
                   </td>

@@ -7,6 +7,7 @@ import { getCompany } from "@/lib/companies";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CHEQUES_ROLES = ["admin", "secretaria", "director"];
+const VALID_ESTADOS = new Set(["pendiente", "depositado", "rebotado"]);
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, CHEQUES_ROLES);
@@ -18,6 +19,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   for (const k of allowed) { if (k in body) update[k] = body[k]; }
   if ("empresa" in update && (typeof update.empresa !== "string" || !getCompany(update.empresa))) {
     return NextResponse.json({ error: "empresa inválida" }, { status: 400 });
+  }
+  if ("estado" in update && (typeof update.estado !== "string" || !VALID_ESTADOS.has(update.estado))) {
+    return NextResponse.json({ error: "estado inválido" }, { status: 400 });
   }
 
   const { data: previous } = await supabaseServer.from("cheques").select("estado, monto, cliente").eq("id", params.id).single();
