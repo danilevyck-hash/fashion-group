@@ -118,7 +118,6 @@ function ChequesPage() {
   const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
 
   // Re-depositar loading
-  const [redepositandoId, setRedepositandoId] = useState<string | null>(null);
 
   // Rebotado modal
   const [rebotandoId, setRebotandoId] = useState<string | null>(null);
@@ -448,20 +447,25 @@ function ChequesPage() {
     });
   }
 
-  async function redepositar(id: string) {
+  function redepositar(id: string) {
     const cheque = cheques.find(c => c.id === id);
     if (!cheque) return;
-    setRedepositandoId(id);
+    const snapshot = [...cheques];
     const hoy = todayStr();
     const notaExtra = `Re-depósito desde rebote (${hoy})`;
     const notas = cheque.notas ? `${cheque.notas}\n${notaExtra}` : notaExtra;
-    try {
-      const res = await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "pendiente", motivo_rebote: null, notas }) });
-      if (!res.ok) { showToast("No se pudo re-depositar. Intenta de nuevo."); return; }
-      showToast("Cheque marcado para re-depósito");
-    } catch { showToast("Error de conexión. Intenta de nuevo."); }
-    finally { setRedepositandoId(null); }
-    loadCheques();
+    setCheques(prev => prev.map(c => c.id === id ? { ...c, estado: "pendiente", motivo_rebote: undefined, notas } : c));
+    scheduleAction({
+      id: `redepositar-${id}`,
+      message: `Cheque N° ${cheque.numero_cheque} re-depositado`,
+      execute: async () => {
+        try {
+          const res = await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "pendiente", motivo_rebote: null, notas }) });
+          if (!res.ok) { setCheques(snapshot); showToast("No se pudo re-depositar. Intenta de nuevo."); }
+        } catch { setCheques(snapshot); showToast("Error de conexión. Intenta de nuevo."); }
+      },
+      onRevert: () => setCheques(snapshot),
+    });
   }
 
   function deleteCheque(id: string) {
@@ -1246,9 +1250,9 @@ function ChequesPage() {
                 {isRebotado && (
                   <div className="mt-2 pt-2 border-t border-red-100 bg-red-50/40 -mx-4 px-4 pb-1 rounded-b-lg">
                     <div className="text-[10px] text-red-400 mb-1">Este cheque reboto{c.motivo_rebote ? ` — ${c.motivo_rebote}` : ""}</div>
-                    <button onClick={(e) => { e.stopPropagation(); redepositar(c.id); }} disabled={redepositandoId === c.id} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-md font-medium min-h-[44px] flex items-center gap-1.5 hover:bg-emerald-700 transition disabled:opacity-40">
+                    <button onClick={(e) => { e.stopPropagation(); redepositar(c.id); }} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-md font-medium min-h-[44px] flex items-center gap-1.5 hover:bg-emerald-700 transition">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-                      {redepositandoId === c.id ? "Re-depositando..." : "Re-depositar cheque"}
+                      Re-depositar cheque
                     </button>
                   </div>
                 )}
@@ -1315,9 +1319,9 @@ function ChequesPage() {
                       </button>
                     )}
                     {isRebotado && (
-                      <button onClick={() => redepositar(c.id)} disabled={!isOnline || redepositandoId === c.id} title="Este cheque reboto. Click para re-depositarlo." className="text-sm bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-3 py-1 rounded-md transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 font-medium">
+                      <button onClick={() => redepositar(c.id)} disabled={!isOnline} title="Este cheque reboto. Click para re-depositarlo." className="text-sm bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-3 py-1 rounded-md transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 font-medium">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-                        {redepositandoId === c.id ? "Re-depositando..." : "Re-depositar"}
+                        Re-depositar
                       </button>
                     )}
                     <button onClick={() => startEdit(c)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Editar</button>
@@ -1406,7 +1410,7 @@ function ChequesPage() {
                             </>
                           )}
                           {isRebotado && (
-                            <button onClick={() => redepositar(c.id)} disabled={redepositandoId === c.id} className="text-xs text-emerald-600 hover:underline disabled:opacity-40">{redepositandoId === c.id ? "Re-depositando..." : "Re-depositar"}</button>
+                            <button onClick={() => redepositar(c.id)} className="text-xs text-emerald-600 hover:underline">Re-depositar</button>
                           )}
                         </div>
                       )}
