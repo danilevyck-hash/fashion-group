@@ -14,6 +14,12 @@ export function useCajaState(urlId: string, initialView: View) {
   const [view, _setView] = useState<View>(initialView);
   const [pendingDeleteGasto, setPendingDeleteGasto] = useState<CajaGasto | null>(null);
   const [pendingRestoreGasto, setPendingRestoreGasto] = useState<CajaGasto | null>(null);
+  const [pendingNegativeBalance, setPendingNegativeBalance] = useState<{
+    fondo: number;
+    gastado: number;
+    nuevo: number;
+    saldoFuturo: number;
+  } | null>(null);
 
   function setView(v: View, id?: string) {
     _setView(v);
@@ -232,8 +238,29 @@ export function useCajaState(urlId: string, initialView: View) {
     else setError("Error al aprobar reposición");
   }
 
-  async function addGasto() {
+  async function addGasto(skipNegativeCheck: boolean = false) {
     if (!current) return;
+
+    if (!skipNegativeCheck) {
+      const fondoInicial = Number(current.fondo_inicial) || 0;
+      const gastadoActual = (current.caja_gastos || []).reduce(
+        (s: number, g: CajaGasto) => s + (Number(g.total) || 0),
+        0,
+      );
+      const saldoFuturo = Math.round((fondoInicial - gastadoActual - totalNum) * 100) / 100;
+      if (saldoFuturo < 0) {
+        setPendingNegativeBalance({
+          fondo: fondoInicial,
+          gastado: gastadoActual,
+          nuevo: totalNum,
+          saldoFuturo,
+        });
+        // Abort here; user must confirm via modal. Throw so the caller's
+        // catch prevents the "Listo, guardado ✓" indicator from flashing.
+        throw new Error("__pending_negative_balance__");
+      }
+    }
+
     setAddingGasto(true);
     setError(null);
     const resolvedCategoria = normalizeStr(gCategoria === "Otro" ? gCategoriaOtro.trim() || "Otro" : gCategoria);
@@ -320,6 +347,19 @@ export function useCajaState(urlId: string, initialView: View) {
       loadPeriodos();
     } catch {
       setError("Error al eliminar gasto");
+    }
+  }
+
+  function cancelAddGastoNegative() {
+    setPendingNegativeBalance(null);
+  }
+
+  async function confirmAddGastoNegative() {
+    setPendingNegativeBalance(null);
+    try {
+      await addGasto(true);
+    } catch {
+      /* errors already surfaced by addGasto */
     }
   }
 
@@ -421,5 +461,6 @@ export function useCajaState(urlId: string, initialView: View) {
     addGasto, requestDeleteGasto, saveEditGasto, exportExcel,
     pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto,
     pendingRestoreGasto, requestRestoreGasto, doRestoreGasto, cancelRestoreGasto,
+    pendingNegativeBalance, confirmAddGastoNegative, cancelAddGastoNegative,
   };
 }
