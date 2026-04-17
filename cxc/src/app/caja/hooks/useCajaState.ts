@@ -268,14 +268,18 @@ export function useCajaState(urlId: string, initialView: View) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        const backendMsg = payload && typeof payload.error === "string" ? payload.error : null;
+        throw new Error(backendMsg || "Error al agregar gasto. Intenta de nuevo.");
+      }
       // Reload to get the real server ID
       await loadDetail(current.id);
       loadPeriodos();
     } catch (err) {
       // Revert optimistic update
       setCurrent(snapshot);
-      setError("Error al agregar gasto. Intenta de nuevo.");
+      setError(err instanceof Error && err.message ? err.message : "Error al agregar gasto. Intenta de nuevo.");
       throw err;
     } finally {
       setAddingGasto(false);
@@ -327,7 +331,12 @@ export function useCajaState(urlId: string, initialView: View) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(normalizedEdit),
       });
-      if (!res.ok) { setError("Error al guardar cambios"); return; }
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        const backendMsg = payload && typeof payload.error === "string" ? payload.error : null;
+        setError(backendMsg || "Error al guardar cambios");
+        return;
+      }
       setEditingGastoId(null); setEditGasto({});
       await loadDetail(current.id); loadPeriodos();
     } catch {
