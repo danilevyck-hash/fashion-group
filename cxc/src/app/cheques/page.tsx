@@ -6,6 +6,7 @@ import AppHeader from "@/components/AppHeader";
 import { SkeletonTable, EmptyState, Toast, StatusBadge, ConfirmModal, AnimatedNumber, useContextMenu, PullToRefresh, SwipeableRow } from "@/components/ui";
 import type { ContextMenuItem, SwipeAction } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
+import Drawer from "@/components/Drawer";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import XLSX from "xlsx-js-style";
 import { fmt, fmtDate } from "@/lib/format";
@@ -649,8 +650,8 @@ function ChequesPage() {
           <button onClick={exportCheques} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-md active:bg-gray-100 transition-all">
             ↓ Exportar {exportFilterLabel()}
           </button>
-          <button onClick={() => { resetForm(); setShowForm(!showForm); }} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-            {showForm ? "Cerrar" : "Nuevo Cheque"}
+          <button onClick={() => { resetForm(); setShowForm(true); }} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            Nuevo Cheque
           </button>
         </div>
       </div>
@@ -721,10 +722,19 @@ function ChequesPage() {
 
       {chequeSuggestion && <SuggestionCard suggestion={chequeSuggestion} onDismiss={dismissCheque} />}
 
-      {/* Form */}
-      {showForm && (
-        <div className="bg-gray-50 rounded-lg p-4 mb-8 overflow-visible">
-          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">{editingId ? "Editar Cheque" : "Nuevo Cheque"}</div>
+      {/* Form (Drawer) */}
+      <Drawer
+        open={showForm}
+        onClose={() => { resetForm(); setShowForm(false); }}
+        title={editingId ? "Editar Cheque" : "Nuevo Cheque"}
+        footer={
+          <div className="flex items-center gap-4">
+            <button onClick={saveCheque} disabled={saving || !isOnline} title={!isOnline ? "Sin conexion" : undefined} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">{!isOnline ? "Sin conexion" : saving ? "Guardando..." : "Guardar Cheque"}</button>
+            <button onClick={() => { resetForm(); setShowForm(false); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
+          </div>
+        }
+      >
+        <div className="overflow-visible">
           {hasChequeDraft && !editingId && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4 flex items-center justify-between gap-4">
               <p className="text-sm text-amber-800">Tienes un borrador guardado de {chequeDraftTimeAgo}. ¿Restaurar?</p>
@@ -734,7 +744,7 @@ function ChequesPage() {
               </div>
             </div>
           )}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 overflow-visible">
+          <div className="grid grid-cols-1 gap-y-4 overflow-visible">
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Cliente <span className="text-red-500">*</span></label>
               <div className="relative">
@@ -859,12 +869,8 @@ function ChequesPage() {
             </div>
           </div>
           {error && <p className="text-red-500 text-sm mt-3">{error}</p>}
-          <div className="flex items-center gap-4 mt-6">
-            <button onClick={saveCheque} disabled={saving || !isOnline} title={!isOnline ? "Sin conexion" : undefined} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">{!isOnline ? "Sin conexion" : saving ? "Guardando..." : "Guardar Cheque"}</button>
-            <button onClick={() => { resetForm(); setShowForm(false); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
-          </div>
         </div>
-      )}
+      </Drawer>
 
       {/* View toggle */}
       <div className="flex items-center gap-4 mb-6">
