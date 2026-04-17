@@ -73,9 +73,6 @@ export default function PrintView({ current, onBack }: Props) {
               <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">
                 Categoría
               </th>
-              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">
-                Empresa
-              </th>
               <th className="border border-gray-300 px-2 py-1.5 font-medium text-right">
                 Sub-total
               </th>
@@ -105,9 +102,6 @@ export default function PrintView({ current, onBack }: Props) {
                 <td className="border border-gray-300 px-2 py-1">
                   {g.categoria || "Varios"}
                 </td>
-                <td className="border border-gray-300 px-2 py-1">
-                  {g.empresa || "—"}
-                </td>
                 <td className="border border-gray-300 px-2 py-1 text-right">
                   ${fmt(g.subtotal)}
                 </td>
@@ -121,7 +115,7 @@ export default function PrintView({ current, onBack }: Props) {
             ))}
             <tr className="font-bold">
               <td
-                colSpan={6}
+                colSpan={5}
                 className="border border-gray-300 px-2 py-1.5 text-right uppercase"
               >
                 Totales

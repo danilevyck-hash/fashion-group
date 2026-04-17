@@ -2,7 +2,7 @@
 
 import { fmt, fmtDate } from "@/lib/format";
 import { CajaGasto } from "./types";
-import { CAJA_EMPRESAS, AutocompleteInput } from "./GastoForm";
+import { AutocompleteInput } from "./GastoForm";
 import { EmptyState, ScrollableTable } from "@/components/ui";
 
 interface Props {
@@ -71,7 +71,6 @@ export default function GastoTable({
                 <div className="flex items-center gap-3 text-xs text-gray-400">
                   <span>{fmtDate(g.fecha)}</span>
                   {g.responsable && <span>{g.responsable}</span>}
-                  {g.empresa && <span>{g.empresa}</span>}
                 </div>
                 {isOpen && (
                   <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
@@ -85,7 +84,6 @@ export default function GastoTable({
                           nro_factura: g.nro_factura || "",
                           responsable: g.responsable || "",
                           categoria: g.categoria || "Varios",
-                          empresa: g.empresa || "",
                           subtotal: g.subtotal,
                           itbms: g.itbms,
                         });
@@ -126,7 +124,6 @@ export default function GastoTable({
               <th className="text-left py-3 px-4 font-normal hidden sm:table-cell">Proveedor</th>
               <th className="text-left py-3 px-4 font-normal hidden sm:table-cell">Responsable</th>
               <th className="text-left py-3 px-4 font-normal">Categoría</th>
-              <th className="text-left py-3 px-4 font-normal">Empresa</th>
               <th className="text-left py-3 px-4 font-normal hidden sm:table-cell">N° Factura</th>
               <th className="text-right py-3 px-4 font-normal">Sub-total</th>
               <th className="text-right py-3 px-4 font-normal">ITBMS</th>
@@ -136,7 +133,7 @@ export default function GastoTable({
           <tbody>
             {gastos.length === 0 ? (
               <tr>
-                <td colSpan={11}>
+                <td colSpan={10}>
                   <EmptyState
                     title="Sin gastos registrados"
                     subtitle="Agrega el primer gasto de este período"
@@ -210,25 +207,6 @@ export default function GastoTable({
                           className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"
                         />
                       </td>
-                      <td className="py-2 pr-1">
-                        <select
-                          value={editGasto.empresa || ""}
-                          onChange={(e) =>
-                            setEditGasto({
-                              ...editGasto,
-                              empresa: e.target.value,
-                            })
-                          }
-                          className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"
-                        >
-                          <option value="">—</option>
-                          {CAJA_EMPRESAS.map((emp) => (
-                            <option key={emp} value={emp}>
-                              {emp}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
                       <td className="py-2 pr-1 hidden sm:table-cell">
                         <input
                           type="text"
@@ -296,7 +274,6 @@ export default function GastoTable({
                                   nro_factura: g.nro_factura || "",
                                   responsable: g.responsable || "",
                                   categoria: g.categoria || "Varios",
-                                  empresa: g.empresa || "",
                                   subtotal: g.subtotal,
                                   itbms: g.itbms,
                                 });
@@ -331,9 +308,6 @@ export default function GastoTable({
                       <td className="py-3 px-4 text-gray-500">
                         {g.categoria || "Varios"}
                       </td>
-                      <td className="py-3 px-4 text-gray-500">
-                        {g.empresa || "—"}
-                      </td>
                       <td className="py-3 px-4 text-gray-500 hidden sm:table-cell">
                         {g.nro_factura || "—"}
                       </td>
@@ -351,7 +325,7 @@ export default function GastoTable({
                 )}
                 <tr className="border-t border-gray-300">
                   <td
-                    colSpan={isOpen ? 8 : 7}
+                    colSpan={isOpen ? 7 : 6}
                     className="py-3 px-4 text-right text-[11px] uppercase tracking-[0.05em] text-gray-400"
                   >
                     Totales

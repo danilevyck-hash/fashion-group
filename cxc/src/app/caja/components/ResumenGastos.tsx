@@ -24,16 +24,12 @@ export default function ResumenGastos({ gastos }: Props) {
 
   // Resumen tables
   const catTotalsR: Record<string, number> = {};
-  const empTotalsR: Record<string, number> = {};
   for (const g of gastos) {
     const cat = g.categoria || "Varios";
     catTotalsR[cat] = (catTotalsR[cat] || 0) + g.total;
-    const emp = g.empresa || "Sin asignar";
-    empTotalsR[emp] = (empTotalsR[emp] || 0) + g.total;
   }
   const grandTotal = gastos.reduce((s, g) => s + g.total, 0);
   const catEntries = Object.entries(catTotalsR).sort((a, b) => b[1] - a[1]);
-  const empEntries = Object.entries(empTotalsR).sort((a, b) => b[1] - a[1]);
 
   return (
     <>
@@ -73,75 +69,33 @@ export default function ResumenGastos({ gastos }: Props) {
           Resumen de gastos
         </button>
         {showResumen && (
-          <div className="grid grid-cols-2 gap-8">
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2">
-                Por categoría
-              </div>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
-                    <th className="text-left py-3 px-4 font-normal">
-                      Categoría
-                    </th>
-                    <th className="text-right py-3 px-4 font-normal">Monto</th>
-                    <th className="text-right py-3 px-4 font-normal">%</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {catEntries.map(([cat, total]) => (
-                    <tr
-                      key={cat}
-                      className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="py-3 px-4">{cat}</td>
-                      <td className="py-3 px-4 text-right tabular-nums">
-                        ${fmt(total)}
-                      </td>
-                      <td className="py-3 px-4 text-right tabular-nums text-gray-400">
-                        {grandTotal > 0
-                          ? ((total / grandTotal) * 100).toFixed(1)
-                          : "0.0"}
-                        %
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2">
+              Por categoría
             </div>
-            <div>
-              <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2">
-                Por empresa
-              </div>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
-                    <th className="text-left py-3 px-4 font-normal">Empresa</th>
-                    <th className="text-right py-3 px-4 font-normal">Monto</th>
-                    <th className="text-right py-3 px-4 font-normal">%</th>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
+                  <th className="text-left py-3 px-4 font-normal">Categoría</th>
+                  <th className="text-right py-3 px-4 font-normal">Monto</th>
+                  <th className="text-right py-3 px-4 font-normal">%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {catEntries.map(([cat, total]) => (
+                  <tr
+                    key={cat}
+                    className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
+                  >
+                    <td className="py-3 px-4">{cat}</td>
+                    <td className="py-3 px-4 text-right tabular-nums">${fmt(total)}</td>
+                    <td className="py-3 px-4 text-right tabular-nums text-gray-400">
+                      {grandTotal > 0 ? ((total / grandTotal) * 100).toFixed(1) : "0.0"}%
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {empEntries.map(([emp, total]) => (
-                    <tr
-                      key={emp}
-                      className="border-b border-gray-200 hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="py-3 px-4">{emp}</td>
-                      <td className="py-3 px-4 text-right tabular-nums">
-                        ${fmt(total)}
-                      </td>
-                      <td className="py-3 px-4 text-right tabular-nums text-gray-400">
-                        {grandTotal > 0
-                          ? ((total / grandTotal) * 100).toFixed(1)
-                          : "0.0"}
-                        %
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

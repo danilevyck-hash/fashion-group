@@ -4,7 +4,7 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 
-const ALLOWED_FIELDS = ["fecha", "descripcion", "proveedor", "categoria", "subtotal", "itbms", "total", "responsable", "metodo_pago", "numero_factura", "empresa"];
+const ALLOWED_FIELDS = ["fecha", "descripcion", "proveedor", "categoria", "subtotal", "itbms", "total", "responsable", "metodo_pago", "numero_factura"];
 
 function normalizeStr(s: string): string {
   const t = s.trim();
@@ -81,12 +81,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const normalized = typeof fields.responsable === "string" ? normalizeStr(fields.responsable) : "";
     if (!normalized) return NextResponse.json({ error: "El responsable es obligatorio." }, { status: 400 });
     fields.responsable = normalized;
-  }
-
-  if ("empresa" in fields) {
-    const raw = typeof fields.empresa === "string" ? fields.empresa.trim() : "";
-    if (!raw || raw === "—") return NextResponse.json({ error: "La empresa es obligatoria." }, { status: 400 });
-    fields.empresa = raw;
   }
 
   if ("proveedor" in fields) {

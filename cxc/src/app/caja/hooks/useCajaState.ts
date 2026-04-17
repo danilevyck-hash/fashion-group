@@ -55,8 +55,6 @@ export function useCajaState(urlId: string, initialView: View) {
   const [gCategoria, setGCategoria] = useState("Transporte");
   const [gCategoriaOtro, setGCategoriaOtro] = useState("");
   const [gResponsable, setGResponsable] = useState("");
-  const [gEmpresa, setGEmpresa] = useState("");
-  const [gEmpresaOtro, setGEmpresaOtro] = useState("");
   const [addingGasto, setAddingGasto] = useState(false);
   const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
   const [editGasto, setEditGasto] = useState<Partial<CajaGasto>>({});
@@ -68,12 +66,12 @@ export function useCajaState(urlId: string, initialView: View) {
   const formValues: GastoFormValues = {
     gFecha, gDescripcion, gProveedor, gNroFactura,
     gSubtotal, gItbmsPct, gCategoria, gCategoriaOtro,
-    gResponsable, gEmpresa, gEmpresaOtro,
+    gResponsable,
   };
   const formSetters: GastoFormSetters = {
     setGFecha, setGDescripcion, setGProveedor, setGNroFactura,
     setGSubtotal, setGItbmsPct, setGCategoria, setGCategoriaOtro,
-    setGResponsable, setGEmpresa, setGEmpresaOtro,
+    setGResponsable,
   };
 
   // Merge distinct categories/responsables from loaded gastos with managed lists
@@ -264,14 +262,13 @@ export function useCajaState(urlId: string, initialView: View) {
     setAddingGasto(true);
     setError(null);
     const resolvedCategoria = normalizeStr(gCategoria === "Otro" ? gCategoriaOtro.trim() || "Otro" : gCategoria);
-    const resolvedEmpresa = gEmpresa === "Otro / General" ? gEmpresaOtro.trim() || "Otro / General" : gEmpresa;
     const resolvedResponsable = normalizeStr(gResponsable);
 
     // Capture request body BEFORE clearing form
     const requestBody = {
       periodo_id: current.id, fecha: gFecha, descripcion: gDescripcion,
       proveedor: gProveedor, nro_factura: gNroFactura, responsable: resolvedResponsable,
-      categoria: resolvedCategoria, empresa: resolvedEmpresa,
+      categoria: resolvedCategoria,
       subtotal: subtotalNum, itbms: itbmsNum, total: totalNum,
     };
 
@@ -280,7 +277,7 @@ export function useCajaState(urlId: string, initialView: View) {
     const optimisticGasto: CajaGasto = {
       id: tempId, periodo_id: current.id, fecha: gFecha,
       descripcion: gDescripcion, proveedor: gProveedor, nro_factura: gNroFactura,
-      responsable: resolvedResponsable, categoria: resolvedCategoria, empresa: resolvedEmpresa,
+      responsable: resolvedResponsable, categoria: resolvedCategoria, empresa: "",
       subtotal: subtotalNum, itbms: itbmsNum, total: totalNum,
     };
     const snapshot = current;
@@ -293,7 +290,7 @@ export function useCajaState(urlId: string, initialView: View) {
     // Clear form immediately (feels instant)
     setGFecha(new Date().toISOString().split("T")[0]);
     setGDescripcion(""); setGProveedor(""); setGNroFactura(""); setGSubtotal(""); setGItbmsPct("0");
-    setGCategoria("Transporte"); setGCategoriaOtro(""); setGResponsable(""); setGEmpresa(""); setGEmpresaOtro("");
+    setGCategoria("Transporte"); setGCategoriaOtro(""); setGResponsable("");
 
     try {
       const res = await fetch("/api/caja/gastos", {

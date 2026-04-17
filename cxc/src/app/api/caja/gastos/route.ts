@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   if (!auth.userId) return NextResponse.json({ error: "Sesión inválida" }, { status: 401 });
 
   const body = await req.json();
-  const { periodo_id, fecha, descripcion, proveedor, nro_factura, empresa, subtotal, itbms, total } = body;
+  const { periodo_id, fecha, descripcion, proveedor, nro_factura, subtotal, itbms, total } = body;
   const responsable = normalizeStr(body.responsable || "");
   const categoria = normalizeStr(body.categoria || "") || "Varios";
 
@@ -22,9 +22,6 @@ export async function POST(req: NextRequest) {
 
   if (!periodo_id) return NextResponse.json({ error: "Falta el período" }, { status: 400 });
   if (!fecha || typeof fecha !== "string") return NextResponse.json({ error: "La fecha es obligatoria." }, { status: 400 });
-
-  const empresaRaw = typeof empresa === "string" ? empresa.trim() : "";
-  if (!empresaRaw || empresaRaw === "—") return NextResponse.json({ error: "La empresa es obligatoria." }, { status: 400 });
 
   const proveedorRaw = typeof proveedor === "string" ? proveedor.trim() : "";
   if (!proveedorRaw || proveedorRaw === "—") return NextResponse.json({ error: "El proveedor es obligatorio." }, { status: 400 });
@@ -55,7 +52,6 @@ export async function POST(req: NextRequest) {
       nro_factura: nro_factura || "",
       responsable,
       categoria,
-      empresa: empresaRaw,
       subtotal, itbms: roundedItbms, total: roundedTotal,
       // Keep old fields populated for backwards compat
       nombre: descripcion || "",

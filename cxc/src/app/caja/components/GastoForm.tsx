@@ -2,9 +2,6 @@
 
 import { useState } from "react";
 import { fmt } from "@/lib/format";
-import { EMPRESAS } from "@/lib/companies";
-
-export const CAJA_EMPRESAS = [...EMPRESAS, "Multifashion", "Otro / General"];
 
 export interface GastoFormValues {
   gFecha: string;
@@ -16,8 +13,6 @@ export interface GastoFormValues {
   gCategoria: string;
   gCategoriaOtro: string;
   gResponsable: string;
-  gEmpresa: string;
-  gEmpresaOtro: string;
 }
 
 export interface GastoFormSetters {
@@ -30,8 +25,6 @@ export interface GastoFormSetters {
   setGCategoria: (v: string) => void;
   setGCategoriaOtro: (v: string) => void;
   setGResponsable: (v: string) => void;
-  setGEmpresa: (v: string) => void;
-  setGEmpresaOtro: (v: string) => void;
 }
 
 export function normalizeStr(s: string): string {
@@ -139,12 +132,12 @@ export default function GastoForm({
   const {
     gFecha, gDescripcion, gProveedor, gNroFactura,
     gSubtotal, gItbmsPct, gCategoria, gCategoriaOtro,
-    gResponsable, gEmpresa, gEmpresaOtro,
+    gResponsable,
   } = values;
   const {
     setGFecha, setGDescripcion, setGProveedor, setGNroFactura,
     setGSubtotal, setGItbmsPct, setGCategoria, setGCategoriaOtro,
-    setGResponsable, setGEmpresa, setGEmpresaOtro,
+    setGResponsable,
   } = setters;
 
   const [showMoreDetails, setShowMoreDetails] = useState(true);
@@ -312,7 +305,7 @@ export default function GastoForm({
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 items-end">
         <div className="hidden lg:block">
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
             Responsable <span className="text-red-500">*</span>
@@ -324,35 +317,6 @@ export default function GastoForm({
             placeholder="Nombre"
             className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition"
           />
-        </div>
-        <div>
-          <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
-            Empresa <span className="text-red-500">*</span>
-          </label>
-          <select
-            value={gEmpresa}
-            onChange={(e) => {
-              setGEmpresa(e.target.value);
-              if (e.target.value !== "Otro / General") setGEmpresaOtro("");
-            }}
-            className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none"
-          >
-            <option value="">—</option>
-            {CAJA_EMPRESAS.map((e) => (
-              <option key={e} value={e}>
-                {e}
-              </option>
-            ))}
-          </select>
-          {gEmpresa === "Otro / General" && (
-            <input
-              type="text"
-              value={gEmpresaOtro}
-              onChange={(e) => setGEmpresaOtro(e.target.value)}
-              placeholder="Especificar empresa"
-              className="w-full border-b border-gray-200 py-1 text-xs outline-none focus:border-black transition mt-1"
-            />
-          )}
         </div>
         <div>
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
@@ -394,7 +358,7 @@ export default function GastoForm({
         <div>
           <button
             onClick={async () => { try { await onAddGasto(); setJustSaved(true); setTimeout(() => setJustSaved(false), 2000); } catch { /* error handled by parent */ } }}
-            disabled={addingGasto || !gDescripcion.trim() || subtotalNum <= 0 || !gEmpresa || !gResponsable.trim() || !gProveedor.trim()}
+            disabled={addingGasto || !gDescripcion.trim() || subtotalNum <= 0 || !gResponsable.trim() || !gProveedor.trim()}
             className="bg-black text-white px-6 py-1.5 rounded-full text-sm hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
           >
             {justSaved ? "Listo, guardado \u2713" : "Guardar gasto"}
