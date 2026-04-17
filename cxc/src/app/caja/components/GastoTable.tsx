@@ -36,6 +36,11 @@ export default function GastoTable({
   const totalSubtotal = gastos.reduce((s, g) => s + (g.subtotal || 0), 0);
   const totalItbms = gastos.reduce((s, g) => s + (g.itbms || 0), 0);
 
+  // Backend ships gastos ASC (fecha, created_at). Display them with the newest
+  // first so a freshly entered gasto lands at the top of the table.
+  // PrintView and Excel export keep the ASC convention (they are reports).
+  const sortedGastos = [...gastos].reverse();
+
   return (
     <div className="mb-10">
       <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">
@@ -51,7 +56,7 @@ export default function GastoTable({
           />
         ) : (
           <>
-            {gastos.map((g) => (
+            {sortedGastos.map((g) => (
               <div
                 key={g.id}
                 className={`border border-gray-200 rounded-lg p-4 ${recentlyAddedIds.has(g.id) ? "new-row-highlight" : ""}`}
@@ -140,7 +145,7 @@ export default function GastoTable({
               </tr>
             ) : (
               <>
-                {gastos.map((g) =>
+                {sortedGastos.map((g) =>
                   editingGastoId === g.id ? (
                     <tr key={g.id} className="border-b border-gray-200 bg-gray-50">
                       {isOpen && <td className="py-2 px-4 text-xs">
