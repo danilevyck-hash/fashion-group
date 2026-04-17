@@ -103,6 +103,20 @@ export default function PackingListDetailPage() {
     return [...map.entries()].sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
   }, [pl]);
 
+  // Numeración secuencial 1..N de bultos, en orden canónico (por id numérico ascendente).
+  // "Bulto 3 (ID: 1316856)" en vez de solo "Bulto 1316856".
+  const bultoNumberMap = useMemo(() => {
+    const map = new Map<string, number>();
+    if (!pl?.index_rows) return map;
+    const ids = new Set<string>();
+    for (const row of pl.index_rows) {
+      for (const bId of Object.keys(row.distribution)) ids.add(bId);
+    }
+    const sorted = [...ids].sort((a, b) => parseInt(a) - parseInt(b));
+    sorted.forEach((id, i) => map.set(id, i + 1));
+    return map;
+  }, [pl]);
+
   // Filter groups by search query
   const filteredGroups = useMemo(() => {
     const q = search.trim().toUpperCase();
@@ -218,7 +232,7 @@ export default function PackingListDetailPage() {
         doc.setFont("helvetica", "bold");
         doc.setTextColor(30, 40, 60);
         doc.text(
-          safe(`Bulto #${bultoId}  -  ${styles.length} muestra${styles.length > 1 ? "s" : ""}`),
+          safe(`Bulto ${bultoNumberMap.get(bultoId) ?? "?"} (ID: ${bultoId})  -  ${styles.length} muestra${styles.length > 1 ? "s" : ""}`),
           marginLeft + checkboxSize + 2,
           currentY
         );
@@ -288,7 +302,9 @@ export default function PackingListDetailPage() {
           },
         ]);
         for (const row of group.rows) {
-          const distParts = Object.entries(row.distribution).map(([bId, pcs]) => `(${bId}: ${pcs})`);
+          const distParts = Object.entries(row.distribution)
+            .sort(([a], [b]) => parseInt(a) - parseInt(b))
+            .map(([bId, pcs]) => `(B${bultoNumberMap.get(bId) ?? "?"}: ${pcs})`);
           tableBody.push([safe(row.estilo), String(row.totalPcs), distParts.join("  ")]);
         }
       }
@@ -454,7 +470,7 @@ export default function PackingListDetailPage() {
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-3 h-3 border border-gray-400 rounded-sm flex-shrink-0" />
                       <span className="text-sm font-bold text-gray-700">
-                        Bulto #{bultoId} · {styles.length} muestra{styles.length > 1 ? "s" : ""}
+                        Bulto {bultoNumberMap.get(bultoId) ?? "?"} (ID: {bultoId}) · {styles.length} muestra{styles.length > 1 ? "s" : ""}
                       </span>
                     </div>
                     <div className="ml-5 space-y-0.5">
@@ -501,7 +517,7 @@ export default function PackingListDetailPage() {
                 </thead>
                 <tbody>
                   {filteredGroups.map((group, gi) => (
-                    <GroupRows key={gi} group={group} rowOffset={gi} />
+                    <GroupRows key={gi} group={group} rowOffset={gi} bultoNumberMap={bultoNumberMap} />
                   ))}
                 </tbody>
               </table>
@@ -525,9 +541,11 @@ export default function PackingListDetailPage() {
 function GroupRows({
   group,
   rowOffset,
+  bultoNumberMap,
 }: {
   group: { producto: string; rows: PLIndexRow[] };
   rowOffset: number;
+  bultoNumberMap: Map<string, number>;
 }) {
   return (
     <>
@@ -548,14 +566,17 @@ function GroupRows({
           </td>
           <td className="px-3 py-1.5 text-xs">
             <div className="flex flex-wrap gap-1">
-              {Object.entries(row.distribution).map(([bultoId, pcs]) => (
-                <span
-                  key={bultoId}
-                  className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600"
-                >
-                  ({bultoId}: {pcs})
-                </span>
-              ))}
+              {Object.entries(row.distribution)
+                .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                .map(([bultoId, pcs]) => (
+                  <span
+                    key={bultoId}
+                    title={`ID: ${bultoId}`}
+                    className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600"
+                  >
+                    (B{bultoNumberMap.get(bultoId) ?? "?"}: {pcs})
+                  </span>
+                ))}
             </div>
           </td>
         </tr>

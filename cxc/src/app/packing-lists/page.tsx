@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast } from "@/components/ui";
+import { Toast, ConfirmModal } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import {
   parseMultiplePackingLists,
@@ -55,6 +55,7 @@ export default function PackingListsPage() {
   const [toast, setToast] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
   const canEdit = role === "admin" || role === "secretaria";
 
@@ -728,7 +729,7 @@ export default function PackingListsPage() {
                         {canEdit && (
                           <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
                             <button
-                              onClick={() => deletePL(pl.id)}
+                              onClick={() => setConfirmDeleteId(pl.id)}
                               disabled={deleting === pl.id}
                               className="text-gray-300 hover:text-red-500 transition p-1"
                               title="Eliminar"
@@ -760,6 +761,24 @@ export default function PackingListsPage() {
       </div>
 
       <Toast message={toast} />
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={() => {
+          if (confirmDeleteId) {
+            const id = confirmDeleteId;
+            setConfirmDeleteId(null);
+            deletePL(id);
+          }
+        }}
+        title="Eliminar Packing List"
+        message={(() => {
+          const pl = plList.find(p => p.id === confirmDeleteId);
+          return pl ? `¿Eliminar PL ${pl.numero_pl || "—"}? No se puede deshacer.` : "";
+        })()}
+        confirmLabel="Eliminar"
+        destructive
+      />
     </div>
   );
 }
