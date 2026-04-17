@@ -74,14 +74,31 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
-  const { data: existing } = await supabaseServer.from("caja_gastos").select("id, descripcion, total").eq("id", params.id).maybeSingle();
+  if (!auth.userId) return NextResponse.json({ error: "Sesión inválida" }, { status: 401 });
+
+  const { data: existing } = await supabaseServer
+    .from("caja_gastos")
+    .select("id, descripcion, total, categoria, responsable, fecha, proveedor, empresa")
+    .eq("id", params.id)
+    .maybeSingle();
   if (!existing) return NextResponse.json({ error: "Gasto no encontrado" }, { status: 404 });
 
-  const { error } = await supabaseServer.from("caja_gastos").update({ deleted: true }).eq("id", params.id);
+  const { error } = await supabaseServer
+    .from("caja_gastos")
+    .update({ deleted: true, deleted_by: auth.userId, deleted_at: new Date().toISOString() })
+    .eq("id", params.id);
   if (error) return NextResponse.json({ error: "Error al eliminar gasto" }, { status: 500 });
 
-  const session = getSession(req);
-  await logActivity(session?.role || "unknown", "caja_gasto_delete", "caja", { gastoId: params.id, descripcion: existing.descripcion, total: existing.total }, session?.userName);
+  await logActivity(auth.role, "caja_gasto_delete", "caja", {
+    gastoId: params.id,
+    descripcion: existing.descripcion,
+    total: existing.total,
+    categoria: existing.categoria,
+    responsable: existing.responsable,
+    fecha: existing.fecha,
+    proveedor: existing.proveedor,
+    empresa: existing.empresa,
+  }, auth.userName);
 
   return NextResponse.json({ ok: true });
 }

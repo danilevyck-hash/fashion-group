@@ -295,7 +295,8 @@ export function useCajaState(urlId: string, initialView: View) {
   function requestDeleteGasto(gastoId: string) {
     if (!current) return;
     const gasto = (current.caja_gastos || []).find((g: CajaGasto) => g.id === gastoId);
-    const desc = gasto ? gasto.descripcion : "gasto";
+    const desc = gasto?.descripcion?.trim() || "Sin descripción";
+    const totalStr = (gasto?.total ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const prevGastos = current.caja_gastos || [];
     const periodoId = current.id;
     setCurrent(prev => {
@@ -305,7 +306,7 @@ export function useCajaState(urlId: string, initialView: View) {
     });
     scheduleUndoCaja({
       id: `delete-gasto-${gastoId}`,
-      message: `Gasto "${desc}" eliminado`,
+      message: `Gasto "${desc}" $${totalStr} eliminado. Deshacer en 5s`,
       execute: async () => {
         await fetch(`/api/caja/gastos/${gastoId}`, { method: "DELETE" });
         await loadDetail(periodoId);
