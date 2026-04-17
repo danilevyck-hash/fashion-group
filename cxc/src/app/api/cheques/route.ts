@@ -26,10 +26,11 @@ export async function POST(req: NextRequest) {
   const { cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas, vendedor } = body;
 
   if (!monto || monto <= 0) return NextResponse.json({ error: "El monto debe ser mayor a 0" }, { status: 400 });
+  if (typeof vendedor !== "string" || !vendedor.trim()) return NextResponse.json({ error: "vendedor requerido" }, { status: 400 });
 
   const { data, error } = await supabaseServer
     .from("cheques")
-    .insert({ cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas: notas || "", vendedor: vendedor || "", estado: "pendiente" })
+    .insert({ cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas: notas || "", vendedor: vendedor.trim(), estado: "pendiente" })
     .select()
     .single();
 
