@@ -899,6 +899,7 @@ function ChequesPage() {
           {([
             ["all", "Todos", cheques.length, ""],
             ["pendiente", "Pendientes", pendientes.length, "Cheques pendientes de depositar"],
+            ["vencen_manana", "Vencen mañana", vencenManana.length, "Cheques que vencen mañana"],
             ["depositado", "Depositados", depositados.length, "Cheques ya depositados en el banco"],
             ["vencido", "Vencidos", vencidos.length, "Pasó la fecha de depósito y no se han depositado"],
             ["rebotado", "Rebotados", rebotados.length, "El banco rechazó el cheque"],
