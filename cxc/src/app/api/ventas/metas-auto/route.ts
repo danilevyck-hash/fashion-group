@@ -47,6 +47,8 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabaseServer
       .from("ventas_raw")
       .select("empresa, anio, mes, subtotal")
+      .order("fecha", { ascending: true })
+      .order("n_sistema", { ascending: true })
       .range(offset, offset + PAGE - 1);
     if (error) {
       console.error("[metas-auto]", error.code, error.message);
@@ -57,6 +59,10 @@ export async function GET(req: NextRequest) {
     if (!data || data.length < PAGE) break;
     offset += PAGE;
   }
+
+  // Map empresa keys to display names
+  const { mapEmpresaName } = await import("@/lib/empresa-mapping");
+  allRows = allRows.map(r => ({ ...r, empresa: mapEmpresaName(r.empresa) }));
 
   // Get existing user overrides from ventas_metas (annual metas per empresa)
   const { data: userMetas } = await supabaseServer
