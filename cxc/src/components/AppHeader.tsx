@@ -28,9 +28,10 @@ const NAV_MODULES = [
 interface AppHeaderProps {
   module: string;
   breadcrumbs?: { label: string; onClick?: () => void }[];
+  hideBreadcrumbBar?: boolean;
 }
 
-export default function AppHeader({ module, breadcrumbs }: AppHeaderProps) {
+export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: AppHeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -121,22 +122,24 @@ export default function AppHeader({ module, breadcrumbs }: AppHeaderProps) {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
         </div>
-        {/* Breadcrumb bar — hidden on mobile */}
-        <div className="hidden sm:flex flex-wrap px-6 py-1 text-[11px] text-gray-400 items-center gap-1">
-          <button onClick={() => router.push("/home")} className="hover:text-gray-700 transition">Inicio</button>
-          <span>›</span>
-          <span className="text-gray-500">{module}</span>
-          {breadcrumbs?.map((b, i) => (
-            <span key={i} className="flex items-center gap-1">
-              <span>›</span>
-              {b.onClick ? (
-                <button onClick={b.onClick} className="hover:text-gray-700 transition">{b.label}</button>
-              ) : (
-                <span className="text-gray-500">{b.label}</span>
-              )}
-            </span>
-          ))}
-        </div>
+        {/* Breadcrumb bar — hidden on mobile, opt-out via hideBreadcrumbBar for root module pages */}
+        {!hideBreadcrumbBar && (
+          <div className="hidden sm:flex flex-wrap px-6 py-1 text-[11px] text-gray-400 items-center gap-1">
+            <button onClick={() => router.push("/home")} className="hover:text-gray-700 transition">Inicio</button>
+            <span>›</span>
+            <span className="text-gray-500">{module}</span>
+            {breadcrumbs?.map((b, i) => (
+              <span key={i} className="flex items-center gap-1">
+                <span>›</span>
+                {b.onClick ? (
+                  <button onClick={b.onClick} className="hover:text-gray-700 transition">{b.label}</button>
+                ) : (
+                  <span className="text-gray-500">{b.label}</span>
+                )}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Mobile search overlay */}

@@ -574,7 +574,7 @@ export default function AdminDashboard() {
   return (
     <PullToRefresh onRefresh={loadData}>
     <div>
-      <AppHeader module="Panel CXC" />
+      <AppHeader module="Panel CXC" hideBreadcrumbBar />
       <div className="max-w-6xl mx-auto px-6 py-8">
 
       {/* Export buttons — admin/secretaria only */}
