@@ -23,6 +23,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const fields = pick(body, ALLOWED_FIELDS);
+
+  // Validate the gasto belongs to an open, non-deleted period before touching it.
+  const { data: owning } = await supabaseServer
+    .from("caja_gastos")
+    .select("id, caja_periodos(estado, deleted)")
+    .eq("id", params.id)
+    .maybeSingle();
+  if (!owning) return NextResponse.json({ error: "Gasto no encontrado" }, { status: 404 });
+  const periodo = Array.isArray(owning.caja_periodos) ? owning.caja_periodos[0] : owning.caja_periodos;
+  if (!periodo || periodo.deleted) return NextResponse.json({ error: "Este período ya no existe." }, { status: 400 });
+  if (periodo.estado !== "abierto") return NextResponse.json({ error: "No se pueden editar gastos de un período cerrado." }, { status: 400 });
+
+  if (typeof fields.fecha === "string" && fields.fecha) {
+    const hoyPanama = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+    if (fields.fecha > hoyPanama) return NextResponse.json({ error: "La fecha no puede ser futura. Usa hoy o una fecha anterior." }, { status: 400 });
+  }
+
   if (typeof fields.categoria === "string") fields.categoria = normalizeStr(fields.categoria) || "Varios";
   if (typeof fields.responsable === "string") fields.responsable = normalizeStr(fields.responsable);
   if (fields.itbms !== undefined) fields.itbms = Math.round((Number(fields.itbms) || 0) * 100) / 100;

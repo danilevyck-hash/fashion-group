@@ -20,6 +20,21 @@ export async function POST(req: NextRequest) {
 
   if (!subtotal || Number(subtotal) <= 0) return NextResponse.json({ error: "El monto debe ser mayor a 0" }, { status: 400 });
 
+  if (!periodo_id) return NextResponse.json({ error: "Falta el período" }, { status: 400 });
+  if (!fecha || typeof fecha !== "string") return NextResponse.json({ error: "La fecha es obligatoria." }, { status: 400 });
+
+  // Panama is UTC-5 year-round (no DST). "Today" in Panama as YYYY-MM-DD.
+  const hoyPanama = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+  if (fecha > hoyPanama) return NextResponse.json({ error: "La fecha no puede ser futura. Usa hoy o una fecha anterior." }, { status: 400 });
+
+  const { data: periodo } = await supabaseServer
+    .from("caja_periodos")
+    .select("estado, deleted")
+    .eq("id", periodo_id)
+    .maybeSingle();
+  if (!periodo || periodo.deleted) return NextResponse.json({ error: "Este período ya no existe." }, { status: 400 });
+  if (periodo.estado !== "abierto") return NextResponse.json({ error: "No se pueden agregar gastos a un período cerrado." }, { status: 400 });
+
   const roundedItbms = Math.round((Number(itbms) || 0) * 100) / 100;
   const roundedTotal = Math.round((Number(total) || 0) * 100) / 100;
 
