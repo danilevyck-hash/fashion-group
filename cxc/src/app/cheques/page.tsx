@@ -80,7 +80,7 @@ export default function ChequesPageWrapper() {
 }
 
 function ChequesPage() {
-  const { authChecked, role } = useAuth({ moduleKey: "cheques", allowedRoles: ["admin","secretaria","upload","director"] });
+  const { authChecked, role } = useAuth({ moduleKey: "cheques", allowedRoles: ["admin","secretaria","director"] });
   const searchParams = useSearchParams();
   const isOnline = useOnline();
   const [cheques, setCheques] = useState<Cheque[]>([]);
