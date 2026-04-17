@@ -26,7 +26,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(data);
 }
 
-// Save a single PL (reusable by both single and batch)
+// Save a single PL atómicamente via RPC save_packing_list.
+// La RPC envuelve los 4 pasos (DELETE items, DELETE header, INSERT header,
+// INSERT items) en una transacción plpgsql — si cualquier paso falla todo
+// se revierte. Ver supabase/migrations/packing-lists-rpc.sql.
 async function saveSinglePL(
   numeroPL: string,
   empresa: string,
@@ -35,40 +38,15 @@ async function saveSinglePL(
   totalPiezas: number,
   plItems: PLIndexRow[],
 ): Promise<{ id: string } | { error: string }> {
-  // Delete existing PL with same numero_pl
-  const { data: existingPLs } = await supabaseServer
-    .from("packing_lists")
-    .select("id")
-    .eq("numero_pl", numeroPL);
-
-  if (existingPLs && existingPLs.length > 0) {
-    for (const old of existingPLs) {
-      await supabaseServer.from("pl_items").delete().eq("pl_id", old.id);
-      await supabaseServer.from("packing_lists").delete().eq("id", old.id);
-    }
-  }
-
-  // Insert packing list
-  const { data: pl, error: plErr } = await supabaseServer
-    .from("packing_lists")
-    .insert({
-      numero_pl: numeroPL,
-      empresa: empresa || null,
-      fecha_entrega: fechaEntrega || null,
-      total_bultos: totalBultos || 0,
-      total_piezas: totalPiezas || 0,
-      total_estilos: plItems.length,
-    })
-    .select()
-    .single();
-
-  if (plErr || !pl) {
-    return { error: plErr?.message || "Error al crear packing list" };
-  }
-
-  // Insert items
-  const rows = plItems.map((item: PLIndexRow) => ({
-    pl_id: pl.id,
+  const pl_header = {
+    numero_pl: numeroPL,
+    empresa: empresa || null,
+    fecha_entrega: fechaEntrega || null,
+    total_bultos: totalBultos || 0,
+    total_piezas: totalPiezas || 0,
+    total_estilos: plItems.length,
+  };
+  const pl_items_payload = plItems.map((item) => ({
     estilo: item.estilo,
     producto: item.producto,
     total_pcs: item.totalPcs,
@@ -77,12 +55,15 @@ async function saveSinglePL(
     is_os: item.isOS || false,
   }));
 
-  const { error: itemsErr } = await supabaseServer.from("pl_items").insert(rows);
-  if (itemsErr) {
-    return { error: itemsErr.message };
-  }
+  const { data, error } = await supabaseServer.rpc("save_packing_list", {
+    pl_header,
+    pl_items_payload,
+  });
 
-  return { id: pl.id };
+  if (error) {
+    return { error: error.message };
+  }
+  return { id: data as string };
 }
 
 export async function POST(req: NextRequest) {
