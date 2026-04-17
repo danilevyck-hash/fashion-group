@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { CajaPeriodo, CajaGasto, View, CATEGORIAS_DEFAULT } from "../components/types";
 import { GastoFormValues, GastoFormSetters } from "../components/GastoForm";
 
@@ -12,8 +11,8 @@ function normalizeStr(s: string): string {
 }
 
 export function useCajaState(urlId: string, initialView: View) {
-  const { pendingUndo: pendingUndoCaja, scheduleAction: scheduleUndoCaja, undoAction: undoActionCaja } = useUndoAction();
   const [view, _setView] = useState<View>(initialView);
+  const [pendingDeleteGasto, setPendingDeleteGasto] = useState<CajaGasto | null>(null);
 
   function setView(v: View, id?: string) {
     _setView(v);
@@ -295,30 +294,32 @@ export function useCajaState(urlId: string, initialView: View) {
   function requestDeleteGasto(gastoId: string) {
     if (!current) return;
     const gasto = (current.caja_gastos || []).find((g: CajaGasto) => g.id === gastoId);
-    const desc = gasto?.descripcion?.trim() || "Sin descripción";
-    const totalStr = (gasto?.total ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    const prevGastos = current.caja_gastos || [];
+    if (!gasto) return;
+    setPendingDeleteGasto(gasto);
+  }
+
+  function cancelDeleteGasto() {
+    setPendingDeleteGasto(null);
+  }
+
+  async function doDeleteGasto() {
+    if (!current || !pendingDeleteGasto) return;
+    const gastoId = pendingDeleteGasto.id;
     const periodoId = current.id;
-    setCurrent(prev => {
-      if (!prev) return prev;
-      const filtered = (prev.caja_gastos || []).filter((g: CajaGasto) => g.id !== gastoId);
-      return { ...prev, caja_gastos: filtered, total_gastado: filtered.reduce((s: number, g: CajaGasto) => s + (g.total || 0), 0) };
-    });
-    scheduleUndoCaja({
-      id: `delete-gasto-${gastoId}`,
-      message: `Gasto "${desc}" $${totalStr} eliminado. Deshacer en 5s`,
-      execute: async () => {
-        await fetch(`/api/caja/gastos/${gastoId}`, { method: "DELETE" });
-        await loadDetail(periodoId);
-        loadPeriodos();
-      },
-      onRevert: () => {
-        setCurrent(prev => {
-          if (!prev) return prev;
-          return { ...prev, caja_gastos: prevGastos, total_gastado: prevGastos.reduce((s: number, g: CajaGasto) => s + (g.total || 0), 0) };
-        });
-      },
-    });
+    setPendingDeleteGasto(null);
+    try {
+      const res = await fetch(`/api/caja/gastos/${gastoId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        const backendMsg = payload && typeof payload.error === "string" ? payload.error : null;
+        setError(backendMsg || "Error al eliminar gasto");
+        return;
+      }
+      await loadDetail(periodoId);
+      loadPeriodos();
+    } catch {
+      setError("Error al eliminar gasto");
+    }
   }
 
   async function saveEditGasto() {
@@ -385,6 +386,6 @@ export function useCajaState(urlId: string, initialView: View) {
     requestDeletePeriodo, doDeletePeriodo,
     aprobarReposicion,
     addGasto, requestDeleteGasto, saveEditGasto, exportExcel,
-    pendingUndoCaja, undoActionCaja,
+    pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto,
   };
 }
