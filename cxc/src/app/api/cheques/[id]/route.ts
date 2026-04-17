@@ -46,8 +46,11 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if (auth instanceof NextResponse) return auth;
   if (!UUID_RE.test(params.id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
 
-  const { data: existing } = await supabaseServer.from("cheques").select("id, cliente, monto").eq("id", params.id).maybeSingle();
-  if (!existing) return NextResponse.json({ error: "Cheque no encontrado" }, { status: 404 });
+  const { data: existing } = await supabaseServer.from("cheques").select("id, cliente, monto, estado, deleted").eq("id", params.id).maybeSingle();
+  if (!existing || existing.deleted) return NextResponse.json({ error: "Cheque no encontrado" }, { status: 404 });
+  if (existing.estado === "depositado") {
+    return NextResponse.json({ error: "No se puede eliminar un cheque depositado" }, { status: 400 });
+  }
 
   const { error } = await supabaseServer.from("cheques").update({ deleted: true }).eq("id", params.id);
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }

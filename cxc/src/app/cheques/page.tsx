@@ -53,8 +53,9 @@ function ChequeMoreMenu({ cheque, ve, role, onRebotado, onDelete, onRedepositar 
   const isPending = ve === "pendiente" || ve === "vencido";
   const isRebotado = ve === "rebotado";
   const isDep = ve === "depositado";
-  // State machine: only show valid actions
-  const hasActions = isPending || (isRebotado && onRedepositar) || (isDep && role === "admin") || role === "admin";
+  // State machine: only show valid actions. Depositados no se pueden eliminar (data histórica).
+  const canDelete = role === "admin" && !isDep;
+  const hasActions = isPending || (isRebotado && onRedepositar) || canDelete;
   if (!hasActions) return null;
   return (
     <div className="relative">
@@ -68,7 +69,7 @@ function ChequeMoreMenu({ cheque, ve, role, onRebotado, onDelete, onRedepositar 
           {isRebotado && onRedepositar && (
             <button onClick={() => { onRedepositar(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-gray-50 transition min-h-[44px]">Re-depositar</button>
           )}
-          {role === "admin" && (
+          {canDelete && (
             <button onClick={() => { onDelete(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-gray-50 transition min-h-[44px]">Eliminar Cheque</button>
           )}
         </div>
@@ -209,15 +210,14 @@ function ChequesPage() {
         onClick: () => redepositar(c.id),
         hidden: !isRebotado,
       },
-      // Depositado: admin can delete (only valid action)
-      // All states: admin can delete
+      // Admin puede eliminar pendiente/vencido/rebotado. NO depositado (data histórica).
       {
         label: "Eliminar",
         shortcut: "Del",
         icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>,
         onClick: () => setConfirmDeleteId(c.id),
         destructive: true,
-        hidden: role !== "admin" || (!isDep && !isPending && !isRebotado),
+        hidden: role !== "admin" || isDep || (!isPending && !isRebotado),
       },
     ];
   }
