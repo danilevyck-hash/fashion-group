@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
+import { getEndOfWeek } from "@/lib/cheques-dates";
 
 export const dynamic = "force-dynamic";
 
@@ -10,19 +11,19 @@ export async function GET(req: NextRequest) {
 
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
-  const sevenDaysFromNow = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+  const endOfWeek = getEndOfWeek(today);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000).toISOString();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
 
   // All queries in parallel for speed
   const [chequesRes, reclamosRes, prestamosRes, guiasRes, cxcUploadsRes] = await Promise.all([
-    // Cheques: pendiente + vencen en próximos 7 días (criterio unificado bug #5 audit)
+    // Cheques: pendiente + vencen esta semana calendario (today → domingo)
     supabaseServer
       .from("cheques")
       .select("id", { count: "exact", head: true })
       .eq("deleted", false)
       .eq("estado", "pendiente")
-      .lte("fecha_deposito", sevenDaysFromNow)
+      .lte("fecha_deposito", endOfWeek)
       .gte("fecha_deposito", today),
 
     // Reclamos: Borrador o Enviado con más de 30 días
