@@ -101,6 +101,7 @@ function ChequesPage() {
   const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista");
   const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
   const [calPopover, setCalPopover] = useState<string | null>(null);
+  const [dayChequesModal, setDayChequesModal] = useState<string | null>(null);
   const [showResumen, setShowResumen] = useState(false);
   const [resumenSort, setResumenSort] = useState<"monto" | "count">("monto");
 
@@ -256,6 +257,14 @@ function ChequesPage() {
       fetch("/api/directorio").then(r => r.ok ? r.json() : []).then(d => setDirClientes((d || []).map((c: { nombre: string }) => c.nombre))).catch(() => {});
     }
   }, [authChecked, loadCheques]);
+
+  // ESC cierra el modal de "ver todos" los cheques del día
+  useEffect(() => {
+    if (!dayChequesModal) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDayChequesModal(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [dayChequesModal]);
 
   // Resumen por cliente
   const resumenClientes = useMemo(() => {
@@ -1059,7 +1068,11 @@ function ChequesPage() {
                           </div>
                           );
                         })}
-                        {dayCheques.length > 3 && <div className="text-[9px] text-gray-400 px-1">+{dayCheques.length - 3} más</div>}
+                        {dayCheques.length > 3 && (
+                          <button onClick={() => { setCalPopover(null); setDayChequesModal(dateStr); }} className="text-[9px] text-gray-500 hover:text-black px-1 w-full text-left transition">
+                            +{dayCheques.length - 3} más
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -1339,6 +1352,59 @@ function ChequesPage() {
       <Toast message={error} type="error" />
       <Toast message={toast} />
       {pendingUndo && <UndoToast message={pendingUndo.message} startedAt={pendingUndo.startedAt} onUndo={undoAction} />}
+      {/* Day cheques modal — opened via "+N más" en calendario */}
+      {dayChequesModal && (() => {
+        const dayItems = cheques.filter(c => c.fecha_deposito === dayChequesModal);
+        const close = () => setDayChequesModal(null);
+        return (
+          <div onClick={close} role="dialog" aria-modal="true" aria-label={`Cheques del ${fmtDate(dayChequesModal)}`} className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4">
+            <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-lg border border-gray-200 w-full max-w-md max-h-[80vh] flex flex-col">
+              <header className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+                <h2 className="text-base font-medium">Cheques del {fmtDate(dayChequesModal)}</h2>
+                <button onClick={close} aria-label="Cerrar" className="text-gray-400 hover:text-black transition p-1 min-h-[44px] min-w-[44px] flex items-center justify-center -mr-2">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </header>
+              <div className="flex-1 overflow-y-auto divide-y divide-gray-100">
+                {dayItems.map(c => {
+                  const ve = visualEstado(c);
+                  const isPending = ve === "pendiente" || ve === "vencido";
+                  const isRebotado = ve === "rebotado";
+                  return (
+                    <div key={c.id} className="px-5 py-3">
+                      <button onClick={() => { close(); startEdit(c); }} className="w-full text-left">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium truncate">{c.cliente}</span>
+                          <span className="text-sm font-semibold tabular-nums flex-shrink-0">${fmt(c.monto)}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-500">
+                          <StatusBadge estado={ve} />
+                          <span>N° {c.numero_cheque}</span>
+                          <span>·</span>
+                          <span className="truncate">{getCompanyDisplay(c.empresa)}</span>
+                        </div>
+                      </button>
+                      {(isPending || isRebotado) && (
+                        <div className="flex gap-3 mt-2 pt-2 border-t border-gray-100">
+                          {isPending && (
+                            <>
+                              <button onClick={() => setConfirmDepositId(c.id)} className="text-xs text-emerald-600 hover:underline">Confirmar depósito</button>
+                              <button onClick={() => setRebotandoId(c.id)} className="text-xs text-red-500 hover:underline">Rebotado</button>
+                            </>
+                          )}
+                          {isRebotado && (
+                            <button onClick={() => redepositar(c.id)} disabled={redepositandoId === c.id} className="text-xs text-emerald-600 hover:underline disabled:opacity-40">{redepositandoId === c.id ? "Re-depositando..." : "Re-depositar"}</button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       {/* Confirm deposit */}
       <ConfirmModal
         open={!!confirmDepositId}
