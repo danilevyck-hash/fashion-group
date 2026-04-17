@@ -29,7 +29,6 @@ interface Props {
   toggleSort: (key: SortKey) => void;
   sortArrow: (key: SortKey) => string;
   userRole: string;
-  clients: ConsolidatedClient[];
   contactLog: Record<string, { date: string; method: string }>;
   onOpenWhatsApp: (client: ConsolidatedClient) => void;
   onCopyCollectionMsg: (client: ConsolidatedClient) => void;
@@ -57,7 +56,6 @@ export default function ClientTable({
   toggleSort,
   sortArrow,
   userRole,
-  clients,
   contactLog,
   onOpenWhatsApp,
   onCopyCollectionMsg,
@@ -254,7 +252,7 @@ export default function ClientTable({
               <div>
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Estado</div>
                 <div className="grid grid-cols-2 gap-2">
-                  {filterBtn("all", "Todos", clients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600")}
+                  {filterBtn("all", "Todos", roleClients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600")}
                   {filterBtn("current", "Corriente", countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700")}
                   {filterBtn("watch", "Vigilancia", countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700")}
                   {filterBtn("overdue", "Vencido", countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700")}
@@ -288,7 +286,7 @@ export default function ClientTable({
           {/* Desktop filters — hidden on mobile */}
           <div className="hidden sm:flex flex-row gap-3 mb-4">
             <div className="flex gap-1.5 flex-wrap">
-              {filterBtn("all", "Todos", clients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
+              {filterBtn("all", "Todos", roleClients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
               {filterBtn("current", "Corriente", countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700 hover:bg-emerald-100")}
               {filterBtn("watch", "Vigilancia", countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700 hover:bg-amber-100")}
               {filterBtn("overdue", "Vencido", countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700 hover:bg-red-100")}
@@ -344,7 +342,7 @@ export default function ClientTable({
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-3">
           <div className="text-xs text-gray-400">
-            {(search || riskFilter !== "all" || companyFilter !== "all") ? `${filtered.length} de ${clients.length} clientes` : `${filtered.length} clientes`}
+            {(search || riskFilter !== "all" || companyFilter !== "all") ? `${filtered.length} de ${roleClients.length} clientes` : `${filtered.length} clientes`}
           </div>
           <button
             onClick={() => toggleSort("follow_up")}

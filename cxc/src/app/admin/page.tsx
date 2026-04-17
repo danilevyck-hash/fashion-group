@@ -710,7 +710,6 @@ export default function AdminDashboard() {
         toggleSort={toggleSort}
         sortArrow={sortArrow}
         userRole={userRole}
-        clients={clients}
         contactLog={contactLog}
         onOpenWhatsApp={openWhatsApp}
         onCopyCollectionMsg={copyCollectionMsg}
