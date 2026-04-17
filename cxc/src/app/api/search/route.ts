@@ -77,6 +77,7 @@ export async function GET(req: NextRequest) {
       .from("caja_gastos")
       .select("id, descripcion, proveedor, total, fecha, periodo_id")
       .or(`descripcion.ilike.${pattern},proveedor.ilike.${pattern}`)
+      .eq("deleted", false)
       .order("fecha", { ascending: false })
       .limit(5),
   ]);

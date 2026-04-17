@@ -194,7 +194,8 @@ export async function GET(req: NextRequest) {
     const { data: gastos } = await supabaseServer
       .from("caja_gastos")
       .select("total")
-      .eq("periodo_id", periodo.id);
+      .eq("periodo_id", periodo.id)
+      .eq("deleted", false);
     const totalGastos = (gastos || []).reduce((s, g) => s + (Number(g.total) || 0), 0);
     const fondo = periodo.fondo_inicial || 200;
     const disponible = fondo - totalGastos;

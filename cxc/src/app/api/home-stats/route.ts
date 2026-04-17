@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
 
   let cajaDisponible: number | null = null;
   if (periodoAbierto) {
-    const { data: gastos } = await supabaseServer.from("caja_gastos").select("total").eq("periodo_id", periodoAbierto.id);
+    const { data: gastos } = await supabaseServer.from("caja_gastos").select("total").eq("periodo_id", periodoAbierto.id).eq("deleted", false);
     const totalG = (gastos || []).reduce((s, g) => s + (Number(g.total) || 0), 0);
     cajaDisponible = (periodoAbierto.fondo_inicial || 200) - totalG;
   }

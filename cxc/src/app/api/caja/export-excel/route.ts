@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
 
   const { data: periodo, error: pErr } = await supabaseServer.from("caja_periodos").select("*").eq("id", periodo_id).single();
   if (pErr || !periodo) return NextResponse.json({ error: "Período no encontrado" }, { status: 404 });
-  const { data: gastos } = await supabaseServer.from("caja_gastos").select("*").eq("periodo_id", periodo_id).order("fecha", { ascending: true });
+  const { data: gastos } = await supabaseServer.from("caja_gastos").select("*").eq("periodo_id", periodo_id).eq("deleted", false).order("fecha", { ascending: true });
 
   const fondo = periodo?.fondo_inicial || 200;
   const ws: XLSX.WorkSheet = {};

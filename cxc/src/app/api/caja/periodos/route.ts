@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   if (auth instanceof NextResponse) return auth;
   const { data, error } = await supabaseServer
     .from("caja_periodos")
-    .select("*, caja_gastos(total)")
+    .select("*, caja_gastos(total, deleted)")
     .eq("deleted", false)
     .order("numero", { ascending: false });
 
@@ -19,7 +19,9 @@ export async function GET(req: NextRequest) {
 
   const result = (data || []).map((p) => ({
     ...p,
-    total_gastado: (p.caja_gastos || []).reduce((s: number, g: { total: number }) => s + (g.total || 0), 0),
+    total_gastado: (p.caja_gastos || [])
+      .filter((g: { deleted?: boolean }) => !g.deleted)
+      .reduce((s: number, g: { total: number }) => s + (g.total || 0), 0),
   }));
 
   return NextResponse.json(result);
