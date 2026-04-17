@@ -11,13 +11,48 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, CAJA_ROLES);
   if (auth instanceof NextResponse) return auth;
+
+  const includeDeleted = req.nextUrl.searchParams.get("include_deleted") === "1";
+
   const { data, error } = await supabaseServer
     .from("caja_periodos").select("*, caja_gastos(*)").eq("id", params.id).single();
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
+
   if (data?.caja_gastos) {
-    data.caja_gastos = data.caja_gastos.filter((g: { deleted?: boolean }) => !g.deleted);
-    data.caja_gastos.sort((a: { fecha: string; created_at: string }, b: { fecha: string; created_at: string }) =>
-      a.fecha.localeCompare(b.fecha) || a.created_at.localeCompare(b.created_at));
+    type RawGasto = {
+      deleted?: boolean;
+      fecha: string;
+      created_at: string;
+      deleted_at?: string | null;
+      deleted_by?: string | null;
+    };
+    const active: RawGasto[] = [];
+    const removed: RawGasto[] = [];
+    for (const g of data.caja_gastos as RawGasto[]) {
+      if (g.deleted) removed.push(g);
+      else active.push(g);
+    }
+    active.sort((a, b) => a.fecha.localeCompare(b.fecha) || a.created_at.localeCompare(b.created_at));
+    data.caja_gastos = active;
+
+    if (includeDeleted) {
+      removed.sort((a, b) => (b.deleted_at || "").localeCompare(a.deleted_at || ""));
+
+      const uuids = Array.from(new Set(removed.map((g) => g.deleted_by).filter((v): v is string => !!v)));
+      const userMap: Record<string, string> = {};
+      if (uuids.length > 0) {
+        const { data: users } = await supabaseServer
+          .from("fg_users")
+          .select("id, name")
+          .in("id", uuids);
+        for (const u of users || []) userMap[u.id] = u.name;
+      }
+
+      data.deleted_gastos = removed.map((g) => ({
+        ...g,
+        deleted_by_name: g.deleted_by ? (userMap[g.deleted_by] || null) : null,
+      }));
+    }
   }
   return NextResponse.json(data);
 }

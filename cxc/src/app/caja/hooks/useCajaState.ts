@@ -13,6 +13,7 @@ function normalizeStr(s: string): string {
 export function useCajaState(urlId: string, initialView: View) {
   const [view, _setView] = useState<View>(initialView);
   const [pendingDeleteGasto, setPendingDeleteGasto] = useState<CajaGasto | null>(null);
+  const [pendingRestoreGasto, setPendingRestoreGasto] = useState<CajaGasto | null>(null);
 
   function setView(v: View, id?: string) {
     _setView(v);
@@ -124,7 +125,7 @@ export function useCajaState(urlId: string, initialView: View) {
   }, []);
 
   async function loadDetail(id: string) {
-    const res = await fetch(`/api/caja/periodos/${id}`);
+    const res = await fetch(`/api/caja/periodos/${id}?include_deleted=1`);
     if (res.ok) {
       const data = await res.json();
       const gastos = data.caja_gastos || [];
@@ -322,6 +323,38 @@ export function useCajaState(urlId: string, initialView: View) {
     }
   }
 
+  function requestRestoreGasto(gasto: CajaGasto) {
+    setPendingRestoreGasto(gasto);
+  }
+
+  function cancelRestoreGasto() {
+    setPendingRestoreGasto(null);
+  }
+
+  async function doRestoreGasto() {
+    if (!current || !pendingRestoreGasto) return;
+    const gastoId = pendingRestoreGasto.id;
+    const periodoId = current.id;
+    setPendingRestoreGasto(null);
+    try {
+      const res = await fetch(`/api/caja/gastos/${gastoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "restore" }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        const backendMsg = payload && typeof payload.error === "string" ? payload.error : null;
+        setError(backendMsg || "Error al restaurar gasto");
+        return;
+      }
+      await loadDetail(periodoId);
+      loadPeriodos();
+    } catch {
+      setError("Error al restaurar gasto");
+    }
+  }
+
   async function saveEditGasto() {
     if (!current || !editingGastoId) return;
     const sub = parseFloat(String(editGasto.subtotal)) || 0;
@@ -387,5 +420,6 @@ export function useCajaState(urlId: string, initialView: View) {
     aprobarReposicion,
     addGasto, requestDeleteGasto, saveEditGasto, exportExcel,
     pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto,
+    pendingRestoreGasto, requestRestoreGasto, doRestoreGasto, cancelRestoreGasto,
   };
 }

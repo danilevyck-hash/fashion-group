@@ -22,6 +22,41 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   const body = await req.json();
+
+  // ── Restore branch ──
+  if (body.action === "restore") {
+    const { data: existing } = await supabaseServer
+      .from("caja_gastos")
+      .select("id, deleted, descripcion, total, categoria, responsable, fecha, proveedor, empresa, caja_periodos(estado, deleted)")
+      .eq("id", params.id)
+      .maybeSingle();
+    if (!existing) return NextResponse.json({ error: "Gasto no encontrado" }, { status: 404 });
+
+    const owningPeriodo = Array.isArray(existing.caja_periodos) ? existing.caja_periodos[0] : existing.caja_periodos;
+    if (!owningPeriodo || owningPeriodo.deleted) return NextResponse.json({ error: "Este período ya no existe." }, { status: 400 });
+    if (owningPeriodo.estado !== "abierto") return NextResponse.json({ error: "No se pueden restaurar gastos de un período cerrado." }, { status: 400 });
+    if (!existing.deleted) return NextResponse.json({ error: "Este gasto no está eliminado." }, { status: 400 });
+
+    const { error: restoreError } = await supabaseServer
+      .from("caja_gastos")
+      .update({ deleted: false, deleted_by: null, deleted_at: null })
+      .eq("id", params.id);
+    if (restoreError) return NextResponse.json({ error: "Error al restaurar gasto" }, { status: 500 });
+
+    await logActivity(auth.role, "caja_gasto_restore", "caja", {
+      gastoId: params.id,
+      descripcion: existing.descripcion,
+      total: existing.total,
+      categoria: existing.categoria,
+      responsable: existing.responsable,
+      fecha: existing.fecha,
+      proveedor: existing.proveedor,
+      empresa: existing.empresa,
+    }, auth.userName);
+
+    return NextResponse.json({ ok: true });
+  }
+
   const fields = pick(body, ALLOWED_FIELDS);
 
   // Validate the gasto belongs to an open, non-deleted period before touching it.
