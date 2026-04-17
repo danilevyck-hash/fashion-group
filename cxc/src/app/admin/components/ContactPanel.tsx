@@ -169,7 +169,6 @@ export default function ContactPanel({
               <thead>
                 <tr className="text-[10px] text-gray-400 uppercase tracking-wider">
                   {roleCompanies.length > 1 && <th className="text-left py-1.5 font-medium">Empresa</th>}
-                  <th className="text-left py-1.5 font-medium">Codigo</th>
                   <th className="text-right py-1.5 font-medium text-emerald-600">0-90d</th>
                   <th className="text-right py-1.5 font-medium text-amber-600">91-120d</th>
                   <th className="text-right py-1.5 font-medium text-red-500">121d+</th>
@@ -185,7 +184,6 @@ export default function ContactPanel({
                   return (
                     <tr key={co.key} className="border-t border-gray-200 hover:bg-white transition">
                       {roleCompanies.length > 1 && <td className="py-1.5 font-medium">{co.name}</td>}
-                      <td className="py-1.5 text-gray-400">{d.codigo}</td>
                       <td className="text-right py-1.5 tabular-nums text-emerald-700">{fmt(current)}</td>
                       <td className="text-right py-1.5 tabular-nums text-amber-600">{fmt(watch)}</td>
                       <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(overdue)}</td>
@@ -292,7 +290,6 @@ export default function ContactPanel({
                     <thead>
                       <tr className="text-[10px] text-gray-400 uppercase tracking-wider">
                         <th className="text-left py-1.5 font-medium">Empresa</th>
-                        <th className="text-left py-1.5 font-medium">Codigo</th>
                         <th className="text-right py-1.5 font-medium">0-90d</th>
                         <th className="text-right py-1.5 font-medium text-amber-600">91-120d</th>
                         <th className="text-right py-1.5 font-medium text-red-500">121d+</th>
@@ -308,7 +305,6 @@ export default function ContactPanel({
                         return (
                           <tr key={i} className="border-t border-gray-200 hover:bg-white transition">
                             <td className="py-1.5 font-medium">{COMPANIES.find(c => c.key === inv.company_key)?.name ?? inv.company_key}</td>
-                            <td className="py-1.5 text-gray-400">{inv.codigo}</td>
                             <td className="text-right py-1.5 tabular-nums">{fmt(current)}</td>
                             <td className="text-right py-1.5 tabular-nums text-amber-600">{fmt(watch)}</td>
                             <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(overdue)}</td>
