@@ -103,9 +103,6 @@ export default function ContactPanel({
     setTimeout(() => setCopied(null), 2000);
   }
 
-  const lastContact = contactLog[client.nombre_normalized];
-  const daysSince = lastContact ? Math.floor((Date.now() - new Date(lastContact.date).getTime()) / 86400000) : null;
-
   const visibleCompanies = companyFilter !== "all"
     ? roleCompanies.filter((co) => co.key === companyFilter && client.companies[co.key])
     : roleCompanies.filter((co) => client.companies[co.key]);
@@ -115,7 +112,7 @@ export default function ContactPanel({
 
       {/* ═══ LEVEL 1: Always visible when expanded ═══ */}
 
-      {/* ── Quick actions (WhatsApp, Email, Copiar) + last contact ── */}
+      {/* ── Quick actions (WhatsApp, Email, Copiar) ── */}
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={(e) => { e.stopPropagation(); onOpenWhatsApp(client); }}
@@ -138,18 +135,6 @@ export default function ContactPanel({
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
           Copiar mensaje
         </button>
-
-        {/* Ultimo contacto — compact, one line */}
-        <span className="ml-auto text-xs text-gray-400">
-          {lastContact ? (
-            <span className={`inline-flex items-center gap-1 ${daysSince !== null && daysSince <= 7 ? "text-emerald-600" : daysSince !== null && daysSince <= 30 ? "text-amber-600" : "text-red-500"}`}>
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              Hace {daysSince} dias via {lastContact.method}
-            </span>
-          ) : (
-            <span className="italic">Sin contacto registrado</span>
-          )}
-        </span>
       </div>
 
       {/* ── Company breakdown table (expanded by default) ──── */}
