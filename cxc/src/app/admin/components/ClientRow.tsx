@@ -160,11 +160,12 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
             </div>
             <div className="col-span-2 text-right tabular-nums text-emerald-700">{client.current === 0 ? <span className="text-gray-300">—</span> : fmt(client.current)}</div>
             <div className="col-span-2 text-right tabular-nums text-amber-600">{client.watch === 0 ? <span className="text-gray-300">—</span> : fmt(client.watch)}</div>
-            <div className="col-span-2 text-right tabular-nums text-red-600 relative">
+            <div className="col-span-2 text-right tabular-nums text-red-600">
               {client.overdue === 0 ? <span className="text-gray-300">—</span> : fmt(client.overdue)}
-              {/* Quick actions on hover — only when not in selection mode */}
+            </div>
+            <div className="col-span-2 text-right tabular-nums font-semibold relative">
               {!selectionMode && (
-                <span className="hidden group-hover:inline-flex absolute right-0 -top-0.5 items-center gap-1 ml-2" onClick={(e) => e.stopPropagation()}>
+                <span className="hidden group-hover:inline-flex absolute left-0 top-1/2 -translate-y-1/2 items-center gap-1 bg-white shadow-sm rounded px-1.5 py-1 z-10" onClick={(e) => e.stopPropagation()}>
                   {onRegisterContact && (
                     <button
                       onClick={() => setInlineOpen(true)}
@@ -186,8 +187,8 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
                   )}
                 </span>
               )}
+              {fmt(client.total)}
             </div>
-            <div className="col-span-2 text-right tabular-nums font-semibold">{fmt(client.total)}</div>
           </>
         </div>
       </div>
