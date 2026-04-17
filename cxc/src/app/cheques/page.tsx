@@ -39,15 +39,23 @@ interface Cheque {
   created_at: string;
 }
 
+interface HistorialEntry {
+  id: string;
+  user_role: string;
+  action: string;
+  details: string | null;
+  created_at: string;
+}
+
 
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 type Filter = "all" | "pendiente" | "depositado" | "vencido" | "rebotado" | "vencen_hoy" | "vencen_manana" | "vencen_semana";
 const VALID_FILTERS: Filter[] = ["all", "pendiente", "depositado", "vencido", "rebotado", "vencen_hoy", "vencen_manana", "vencen_semana"];
 
-function ChequeMoreMenu({ cheque, ve, role, onRebotado, onDelete, onRedepositar }: {
+function ChequeMoreMenu({ cheque, ve, role, onRebotado, onDelete, onRedepositar, onHistorial }: {
   cheque: Cheque; ve: string; role: string;
-  onRebotado: () => void; onDelete: () => void; onRedepositar?: () => void;
+  onRebotado: () => void; onDelete: () => void; onRedepositar?: () => void; onHistorial: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const isPending = ve === "pendiente" || ve === "vencido";
@@ -55,8 +63,6 @@ function ChequeMoreMenu({ cheque, ve, role, onRebotado, onDelete, onRedepositar 
   const isDep = ve === "depositado";
   // State machine: only show valid actions. Depositados no se pueden eliminar (data histórica).
   const canDelete = role === "admin" && !isDep;
-  const hasActions = isPending || (isRebotado && onRedepositar) || canDelete;
-  if (!hasActions) return null;
   return (
     <div className="relative">
       <button onClick={() => setOpen(!open)} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] px-1">&#x22EF;</button>
@@ -69,6 +75,7 @@ function ChequeMoreMenu({ cheque, ve, role, onRebotado, onDelete, onRedepositar 
           {isRebotado && onRedepositar && (
             <button onClick={() => { onRedepositar(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-emerald-600 hover:bg-gray-50 transition min-h-[44px]">Re-depositar</button>
           )}
+          <button onClick={() => { onHistorial(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition min-h-[44px]">Ver historial</button>
           {canDelete && (
             <button onClick={() => { onDelete(); setOpen(false); }} className="block w-full text-left px-3 py-2 text-sm text-red-500 hover:bg-gray-50 transition min-h-[44px]">Eliminar Cheque</button>
           )}
@@ -103,6 +110,9 @@ function ChequesPage() {
   const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
   const [calPopover, setCalPopover] = useState<string | null>(null);
   const [dayChequesModal, setDayChequesModal] = useState<string | null>(null);
+  const [historialCheque, setHistorialCheque] = useState<Cheque | null>(null);
+  const [historialEntries, setHistorialEntries] = useState<HistorialEntry[] | null>(null);
+  const [historialLoading, setHistorialLoading] = useState(false);
   const [showResumen, setShowResumen] = useState(false);
   const [resumenSort, setResumenSort] = useState<"monto" | "count">("monto");
 
@@ -208,6 +218,12 @@ function ChequesPage() {
         icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>,
         onClick: () => redepositar(c.id),
         hidden: !isRebotado,
+      },
+      // Ver historial: disponible en todos los estados, todos los roles con acceso
+      {
+        label: "Ver historial",
+        icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+        onClick: () => openHistorial(c),
       },
       // Admin puede eliminar pendiente/vencido/rebotado. NO depositado (data histórica).
       {
@@ -466,6 +482,34 @@ function ChequesPage() {
       },
       onRevert: () => setCheques(snapshot),
     });
+  }
+
+  async function openHistorial(cheque: Cheque) {
+    setHistorialCheque(cheque);
+    setHistorialEntries(null);
+    setHistorialLoading(true);
+    try {
+      const res = await fetch(`/api/cheques/${cheque.id}/historial`, { cache: "no-store" });
+      if (res.ok) setHistorialEntries(await res.json());
+      else setHistorialEntries([]);
+    } catch { setHistorialEntries([]); }
+    finally { setHistorialLoading(false); }
+  }
+
+  function describeHistorial(entry: HistorialEntry): { who: string; what: string; when: string } {
+    let parsed: Record<string, unknown> = {};
+    try { parsed = entry.details ? JSON.parse(entry.details) : {}; } catch { /* details no-JSON */ }
+    const userName = typeof parsed.user_name === "string" ? parsed.user_name : null;
+    const who = userName || entry.user_role || "—";
+    const from = typeof parsed.from === "string" ? parsed.from : null;
+    const to = typeof parsed.to === "string" ? parsed.to : null;
+    let what: string;
+    if (entry.action === "cheque_delete") what = "Eliminado";
+    else if (from && to && from !== to) what = `Estado: ${from} → ${to}`;
+    else what = "Editado";
+    const d = new Date(entry.created_at);
+    const when = d.toLocaleString("es-PA", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+    return { who, what, when };
   }
 
   function deleteCheque(id: string) {
@@ -1333,6 +1377,7 @@ function ChequesPage() {
                       onRebotado={() => setRebotandoId(c.id)}
                       onDelete={() => setConfirmDeleteId(c.id)}
                       onRedepositar={isRebotado ? () => redepositar(c.id) : undefined}
+                      onHistorial={() => openHistorial(c)}
                     />
                     </div>
                   </td>
@@ -1367,6 +1412,31 @@ function ChequesPage() {
       <Toast message={error} type="error" />
       <Toast message={toast} />
       {pendingUndo && <UndoToast message={pendingUndo.message} startedAt={pendingUndo.startedAt} onUndo={undoAction} />}
+      {/* Historial drawer */}
+      <Drawer
+        open={!!historialCheque}
+        onClose={() => { setHistorialCheque(null); setHistorialEntries(null); }}
+        title={historialCheque ? `Historial — Cheque N° ${historialCheque.numero_cheque}` : "Historial"}
+      >
+        {historialLoading && <p className="text-sm text-gray-400">Cargando...</p>}
+        {!historialLoading && historialEntries && historialEntries.length === 0 && (
+          <p className="text-sm text-gray-500">Sin cambios registrados.</p>
+        )}
+        {!historialLoading && historialEntries && historialEntries.length > 0 && (
+          <ul className="divide-y divide-gray-100">
+            {historialEntries.map((e) => {
+              const { who, what, when } = describeHistorial(e);
+              return (
+                <li key={e.id} className="py-3">
+                  <div className="text-sm text-gray-900">{what}</div>
+                  <div className="text-[11px] text-gray-500 mt-0.5">{when} · {who}</div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Drawer>
+
       {/* Day cheques modal — opened via "+N más" en calendario */}
       {dayChequesModal && (() => {
         const dayItems = cheques.filter(c => c.fecha_deposito === dayChequesModal);
