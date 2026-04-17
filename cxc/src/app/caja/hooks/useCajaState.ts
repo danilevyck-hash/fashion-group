@@ -191,7 +191,13 @@ export function useCajaState(urlId: string, initialView: View) {
     const id = confirmClosePeriodo;
     setConfirmClosePeriodo(null);
     try {
-      await fetch(`/api/caja/periodos/${id}`, { method: "PATCH" });
+      const res = await fetch(`/api/caja/periodos/${id}`, { method: "PATCH" });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        const backendMsg = payload && typeof payload.error === "string" ? payload.error : null;
+        setError(backendMsg || "Error al cerrar periodo");
+        return;
+      }
       await loadDetail(id);
       loadPeriodos();
     } catch {
