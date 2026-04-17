@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { getCompanyDisplay } from "@/lib/companies";
 
 function getPanamaDate() {
   const now = new Date();
@@ -51,7 +52,7 @@ function buildHtml(cheque: Record<string, unknown>, isToday: boolean) {
       <h2 style="font-size:16px;margin:0 0 16px">${isToday ? "⚠️ Depositar HOY" : "Recordatorio: Depositar mañana"}</h2>
       <table style="width:100%;font-size:14px;border-collapse:collapse">
         <tr><td style="padding:6px 0;color:#888">Cliente</td><td style="padding:6px 0;font-weight:500">${esc(cheque.cliente)}</td></tr>
-        <tr><td style="padding:6px 0;color:#888">Empresa</td><td style="padding:6px 0">${esc(cheque.empresa)}</td></tr>
+        <tr><td style="padding:6px 0;color:#888">Empresa</td><td style="padding:6px 0">${esc(getCompanyDisplay(String(cheque.empresa ?? "")))}</td></tr>
         <tr><td style="padding:6px 0;color:#888">Banco</td><td style="padding:6px 0">${esc(cheque.banco)}</td></tr>
         <tr><td style="padding:6px 0;color:#888">N° Cheque</td><td style="padding:6px 0">${esc(cheque.numero_cheque)}</td></tr>
         <tr><td style="padding:6px 0;color:#888">Monto</td><td style="padding:6px 0;font-weight:600;font-size:18px">${fmtMonto(Number(cheque.monto))}</td></tr>

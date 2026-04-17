@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
+import { getCompany } from "@/lib/companies";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CHEQUES_ROLES = ["admin", "secretaria", "director"];
@@ -15,6 +16,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const allowed = ["cliente", "empresa", "banco", "numero_cheque", "monto", "fecha_deposito", "notas", "vendedor", "estado", "motivo_rebote", "fecha_depositado"];
   const update: Record<string, unknown> = {};
   for (const k of allowed) { if (k in body) update[k] = body[k]; }
+  if ("empresa" in update && (typeof update.empresa !== "string" || !getCompany(update.empresa))) {
+    return NextResponse.json({ error: "empresa inválida" }, { status: 400 });
+  }
 
   const { data: previous } = await supabaseServer.from("cheques").select("estado, monto, cliente").eq("id", params.id).single();
 

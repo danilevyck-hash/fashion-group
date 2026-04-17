@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
+import { getCompany } from "@/lib/companies";
 
 const CHEQUES_ROLES = ["admin", "secretaria", "director"];
 
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
 
   if (!monto || monto <= 0) return NextResponse.json({ error: "El monto debe ser mayor a 0" }, { status: 400 });
   if (typeof vendedor !== "string" || !vendedor.trim()) return NextResponse.json({ error: "vendedor requerido" }, { status: 400 });
+  if (typeof empresa !== "string" || !getCompany(empresa)) return NextResponse.json({ error: "empresa inválida" }, { status: 400 });
 
   const { data, error } = await supabaseServer
     .from("cheques")

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { Resend } from "resend";
+import { getCompanyDisplay } from "@/lib/companies";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const NOTIFY_EMAILS = ["daniel@fashiongr.com", "info@fashiongr.com"];
@@ -76,7 +77,7 @@ export async function GET(req: NextRequest) {
     <p>${cheques.length} cheque${cheques.length > 1 ? "s" : ""} por un total de <strong>$${totalMonto.toLocaleString()}</strong></p>
     <table style="border-collapse:collapse;width:100%;font-size:14px">
       <tr style="background:#f5f5f5"><th style="padding:8px;text-align:left">Cliente</th><th style="padding:8px">Empresa</th><th style="padding:8px;text-align:right">Monto</th><th style="padding:8px">Fecha Depósito</th><th style="padding:8px">Vendedor</th><th style="padding:8px">Vence</th></tr>
-      ${cheques.map(c => `<tr style="border-bottom:1px solid #eee"><td style="padding:8px">${c.cliente}</td><td style="padding:8px">${c.empresa}</td><td style="padding:8px;text-align:right">$${Number(c.monto).toLocaleString()}</td><td style="padding:8px">${c.fecha_deposito}</td><td style="padding:8px">${c.vendedor || "—"}</td><td style="padding:8px;font-weight:600;color:${c.fecha_deposito === today ? "#d97706" : "#2563eb"}">${c.fecha_deposito === today ? "HOY" : "MAÑANA"}</td></tr>`).join("")}
+      ${cheques.map(c => `<tr style="border-bottom:1px solid #eee"><td style="padding:8px">${c.cliente}</td><td style="padding:8px">${getCompanyDisplay(c.empresa)}</td><td style="padding:8px;text-align:right">$${Number(c.monto).toLocaleString()}</td><td style="padding:8px">${c.fecha_deposito}</td><td style="padding:8px">${c.vendedor || "—"}</td><td style="padding:8px;font-weight:600;color:${c.fecha_deposito === today ? "#d97706" : "#2563eb"}">${c.fecha_deposito === today ? "HOY" : "MAÑANA"}</td></tr>`).join("")}
     </table>
     <p style="margin-top:16px;color:#888;font-size:12px">WhatsApp para seguimiento: ${WA_NUMBERS.join(", ")}</p>
     <p style="color:#888;font-size:11px">Fashion Group Panamá — Alerta automática</p>

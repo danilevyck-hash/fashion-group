@@ -12,7 +12,7 @@ import { fmt, fmtDate } from "@/lib/format";
 import { groupByTimePeriod } from "@/lib/group-by-time";
 import TimeGroupHeader from "@/components/TimeGroupHeader";
 
-import { EMPRESAS } from "@/lib/companies";
+import { ALL_COMPANIES, getCompanyDisplay } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
@@ -748,7 +748,7 @@ function ChequesPage() {
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa <span className="text-red-500">*</span></label>
               <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} onBlur={() => handleChequeBlur("empresa")} className={`border-b ${chequeFieldError("empresa", fEmpresa) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`}>
                 <option value="">Seleccionar...</option>
-                {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
+                {ALL_COMPANIES.map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
               </select>
               {chequeFieldError("empresa", fEmpresa) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
@@ -1205,7 +1205,7 @@ function ChequesPage() {
                 {/* Row 3: Secondary info */}
                 <div className="flex items-center gap-2 mt-1">
                   <span className="text-[11px] text-gray-400">N° {c.numero_cheque}</span>
-                  <span className="text-[11px] text-gray-400">· {c.empresa}</span>
+                  <span className="text-[11px] text-gray-400">· {getCompanyDisplay(c.empresa)}</span>
                 </div>
                 {/* State-valid actions with inline guide */}
                 {ve === "depositado" && (
@@ -1264,7 +1264,7 @@ function ChequesPage() {
                       <input type="checkbox" checked={selectedVencidos.has(c.id)} onChange={() => toggleSelectVencido(c.id)} className="accent-amber-600 w-3.5 h-3.5" />
                     )}
                   </td>
-                  <td className="py-3 px-4"><div className="font-medium">{c.cliente}</div><div className="text-xs text-gray-400">{c.empresa}</div></td>
+                  <td className="py-3 px-4"><div className="font-medium">{c.cliente}</div><div className="text-xs text-gray-400">{getCompanyDisplay(c.empresa)}</div></td>
                   <td className="py-3 px-4 text-gray-500 hidden lg:table-cell">{c.numero_cheque}</td>
                   <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(c.monto)}</td>
                   <td className="py-3 px-4 text-gray-500 whitespace-nowrap">{fmtDate(c.fecha_deposito)}</td>
