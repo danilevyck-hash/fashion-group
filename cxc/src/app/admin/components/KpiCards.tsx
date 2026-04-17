@@ -1,7 +1,7 @@
 "use client";
 
 import type { ConsolidatedClient } from "@/lib/types";
-import { fmt } from "@/lib/format";
+import { fmt, fmtCompact } from "@/lib/format";
 import { AnimatedNumber } from "@/components/ui";
 
 type RiskFilter = "all" | "current" | "watch" | "overdue";
@@ -81,8 +81,9 @@ export default function KpiCards({ roleClients, riskFilter, onRiskFilterChange }
             <div className="text-[10px] text-gray-500 uppercase tracking-wider font-medium leading-tight">
               {card.label}{card.sublabel ? ` ${card.sublabel}` : ""}
             </div>
-            <div className={`text-lg font-bold tabular-nums mt-0.5 ${card.color}`}>
-              $<AnimatedNumber value={card.value} formatter={(n: number) => fmt(n)} />
+            <div className={`text-lg font-bold tabular-nums mt-0.5 ${card.color}`} title={`$${fmt(card.value)}`}>
+              <span className="sm:hidden">{fmtCompact(card.value)}</span>
+              <span className="hidden sm:inline">$<AnimatedNumber value={card.value} formatter={(n: number) => fmt(n)} /></span>
             </div>
             <div className="text-[10px] text-gray-400 mt-0.5">
               {card.count} {card.countLabel}
