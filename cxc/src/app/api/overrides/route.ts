@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const { nombre_normalized, correo, telefono, celular, contacto, resultado_contacto, proximo_seguimiento } = body;
 
