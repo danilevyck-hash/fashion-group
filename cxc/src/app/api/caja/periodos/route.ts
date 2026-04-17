@@ -30,6 +30,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, CAJA_ROLES);
   if (auth instanceof NextResponse) return auth;
+  if (!auth.userId) return NextResponse.json({ error: "Sesión inválida" }, { status: 401 });
+
   let fondo = 200;
   try {
     const body = await req.json();
@@ -50,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabaseServer
     .from("caja_periodos")
-    .insert({ numero, fecha_apertura: today, fondo_inicial: fondo, estado: "abierto" })
+    .insert({ numero, fecha_apertura: today, fondo_inicial: fondo, estado: "abierto", created_by: auth.userId })
     .select()
     .single();
 

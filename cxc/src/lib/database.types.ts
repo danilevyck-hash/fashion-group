@@ -256,7 +256,7 @@ export type Database = {
       }
 
       // ─── CAJA MENUDA ─────────────────────────────────────────────────────────
-      // caja_periodos columns from: schema.sql + migration_caja_mejoras.sql + migration_caja_fondo.sql
+      // caja_periodos columns from: schema.sql + migration_caja_mejoras.sql + migration_caja_fondo.sql + caja-created-by.sql
       caja_periodos: {
         Row: {
           id: string
@@ -269,6 +269,8 @@ export type Database = {
           // from migration_caja_mejoras.sql
           repuesto: boolean | null
           repuesto_at: string | null
+          // from caja-created-by.sql
+          created_by: string | null
         }
         Insert: {
           id?: string
@@ -280,6 +282,7 @@ export type Database = {
           created_at?: string | null
           repuesto?: boolean | null
           repuesto_at?: string | null
+          created_by?: string | null
         }
         Update: {
           id?: string
@@ -291,9 +294,10 @@ export type Database = {
           created_at?: string | null
           repuesto?: boolean | null
           repuesto_at?: string | null
+          created_by?: string | null
         }
       }
-      // caja_gastos columns from: schema.sql + migration_caja_mejoras.sql + add-caja-categoria.sql + migration_caja_campos.sql
+      // caja_gastos columns from: schema.sql + migration_caja_mejoras.sql + add-caja-categoria.sql + migration_caja_campos.sql + caja-created-by.sql
       caja_gastos: {
         Row: {
           id: string
@@ -316,6 +320,8 @@ export type Database = {
           descripcion: string | null
           proveedor: string | null
           nro_factura: string | null
+          // from caja-created-by.sql
+          created_by: string | null
         }
         Insert: {
           id?: string
@@ -335,6 +341,7 @@ export type Database = {
           descripcion?: string | null
           proveedor?: string | null
           nro_factura?: string | null
+          created_by?: string | null
         }
         Update: {
           id?: string
@@ -354,6 +361,7 @@ export type Database = {
           descripcion?: string | null
           proveedor?: string | null
           nro_factura?: string | null
+          created_by?: string | null
         }
       }
       caja_responsables: {

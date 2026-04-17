@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { getSession } from "@/lib/require-auth";
+import { requireRole } from "@/lib/requireRole";
 
 function normalizeStr(s: string): string {
   const t = s.trim();
@@ -9,8 +9,10 @@ function normalizeStr(s: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  const session = getSession(req);
-  if (!session || !["admin", "secretaria"].includes(session.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
+  const auth = requireRole(req, ["admin", "secretaria"]);
+  if (auth instanceof NextResponse) return auth;
+  if (!auth.userId) return NextResponse.json({ error: "Sesión inválida" }, { status: 401 });
+
   const body = await req.json();
   const { periodo_id, fecha, descripcion, proveedor, nro_factura, empresa, subtotal, itbms, total } = body;
   const responsable = normalizeStr(body.responsable || "");
@@ -34,6 +36,7 @@ export async function POST(req: NextRequest) {
       subtotal, itbms: roundedItbms, total: roundedTotal,
       // Keep old fields populated for backwards compat
       nombre: descripcion || "",
+      created_by: auth.userId,
     })
     .select()
     .single();
