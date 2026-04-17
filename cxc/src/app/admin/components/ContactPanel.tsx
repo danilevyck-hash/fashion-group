@@ -5,37 +5,31 @@ import type { Company } from "@/lib/companies";
 import { COMPANIES } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
-import ContactInline from "./ContactInline";
 
 type InvoiceRow = { company_key: string; codigo: string; nombre: string; d0_30: number; d31_60: number; d61_90: number; d91_120: number; d121_180: number; d181_270: number; d271_365: number; mas_365: number; total: number };
 
 interface Props {
   client: ConsolidatedClient;
-  contactLog: Record<string, { date: string; method: string }>;
   onOpenWhatsApp: (client: ConsolidatedClient) => void;
   onCopyCollectionMsg: (client: ConsolidatedClient) => void;
   onOpenEmail: (client: ConsolidatedClient) => void;
   onSaveEdit: (nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) => void;
-  onRegisterContact?: (data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) => Promise<void>;
   companyFilter: string;
   roleCompanies: Company[];
 }
 
 export default function ContactPanel({
   client,
-  contactLog,
   onOpenWhatsApp,
   onCopyCollectionMsg,
   onOpenEmail,
   onSaveEdit,
-  onRegisterContact,
   companyFilter,
   roleCompanies,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState({ correo: "", telefono: "", celular: "", contacto: "" });
   const [copied, setCopied] = useState<string | null>(null);
-  const [contactInlineOpen, setContactInlineOpen] = useState(false);
   const [actionsMenuOpen, setActionsMenuOpen] = useState(false);
   const [desgloseOpen, setDesgloseOpen] = useState(true);
   const [showDetail, setShowDetail] = useState(false);
@@ -327,28 +321,6 @@ export default function ContactPanel({
 
           {/* ── Nota interna ───────────────────────────────── */}
           <ClientNote clientName={client.nombre_normalized} />
-
-          {/* ── Registrar contacto (inline form) ───────────── */}
-          {onRegisterContact && (
-            <div>
-              <button
-                onClick={(e) => { e.stopPropagation(); setContactInlineOpen(!contactInlineOpen); }}
-                className={`flex items-center gap-2 text-xs border px-3 py-2 rounded-lg transition font-medium min-h-[36px] ${contactInlineOpen ? "bg-purple-600 text-white border-purple-600" : "border-purple-200 text-purple-700 hover:bg-purple-50"}`}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
-                Registrar contacto
-              </button>
-            </div>
-          )}
-          {onRegisterContact && contactInlineOpen && (
-            <ContactInline
-              clientName={client.nombre_normalized}
-              initialResultado={client.resultado_contacto || ""}
-              initialProximoSeguimiento={client.proximo_seguimiento || ""}
-              onSave={onRegisterContact}
-              onClose={() => setContactInlineOpen(false)}
-            />
-          )}
         </>
       )}
     </div>

@@ -1,9 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
-import ContactInline from "./ContactInline";
 
 function riskInfo(total: number, current: number, watch: number, overdue: number): { border: string; tooltip: string } {
   if (total < 0) return { border: "border-l-blue-400", tooltip: "Credito a favor: saldo negativo (nota de credito o sobrepago)" };
@@ -21,17 +20,113 @@ interface Props {
   selectionMode?: boolean;
   isSelected?: boolean;
   onQuickWA?: () => void;
-  onRegisterContact?: (data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) => Promise<void>;
+  onQuickMarkContacted?: (clientName: string, method: string) => void;
   isFavorite?: boolean;
   onToggleFavorite?: () => void;
   onRowContextMenu?: (e: React.MouseEvent) => void;
 }
 
-export default function ClientRow({ client, isExpanded, onToggle, userRole, contactLog, selectionMode, isSelected, onQuickWA, onRegisterContact, isFavorite, onToggleFavorite, onRowContextMenu }: Props) {
+type ContactMethod = "whatsapp" | "email" | "llamada" | "visita";
+
+const CONTACT_METHODS: { key: ContactMethod; label: string; icon: JSX.Element }[] = [
+  { key: "whatsapp", label: "WhatsApp", icon: (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" className="text-emerald-600"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+  )},
+  { key: "email", label: "Email", icon: (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+  )},
+  { key: "llamada", label: "Llamada", icon: (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+  )},
+  { key: "visita", label: "Visita", icon: (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-purple-500"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+  )},
+];
+
+interface ContactBadgeProps {
+  clientName: string;
+  daysSinceContact: number | null;
+  lastMethod: string | undefined;
+  onMark: (clientName: string, method: string) => void;
+  placement?: "below-left" | "below-right";
+}
+
+function ContactBadge({ clientName, daysSinceContact, lastMethod, onMark, placement = "below-left" }: ContactBadgeProps) {
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setOpen(false); }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  // Badge visual state (matches prior <span> styles)
+  let label: string, cls: string;
+  if (daysSinceContact === null) {
+    label = "Sin contacto";
+    cls = "bg-red-100 text-red-600";
+  } else if (daysSinceContact > 30) {
+    label = "30d+";
+    cls = "bg-orange-100 text-orange-700";
+  } else if (daysSinceContact <= 7) {
+    label = `${daysSinceContact}d`;
+    cls = "bg-emerald-100 text-emerald-700";
+  } else {
+    label = `${daysSinceContact}d`;
+    cls = "bg-amber-100 text-amber-700";
+  }
+
+  const titleAttr = daysSinceContact !== null
+    ? `Contactado hace ${daysSinceContact} dias via ${lastMethod || "-"} · Click para marcar contacto`
+    : "Click para marcar contacto";
+
+  const popoverPos = placement === "below-right" ? "right-0" : "left-0";
+
+  return (
+    <div className="relative inline-flex flex-shrink-0">
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${cls} hover:opacity-80 transition cursor-pointer`}
+        title={titleAttr}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        {label}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setOpen(false); }} />
+          <div
+            className={`absolute ${popoverPos} top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[160px] py-1`}
+            onClick={(e) => e.stopPropagation()}
+            role="menu"
+          >
+            <div className="px-3 py-1 text-[10px] text-gray-400 uppercase tracking-wider">Marcar contactado vía</div>
+            {CONTACT_METHODS.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setOpen(false); onMark(clientName, m.key); }}
+                className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                role="menuitem"
+              >
+                {m.icon}
+                {m.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function ClientRow({ client, isExpanded, onToggle, userRole, contactLog, selectionMode, isSelected, onQuickWA, onQuickMarkContacted, isFavorite, onToggleFavorite, onRowContextMenu }: Props) {
   const lastContact = contactLog?.[client.nombre_normalized];
   const daysSinceContact = lastContact ? Math.floor((Date.now() - new Date(lastContact.date).getTime()) / 86400000) : null;
   const risk = riskInfo(client.total, client.current, client.watch, client.overdue);
-  const [inlineOpen, setInlineOpen] = useState(false);
 
   // Determine follow-up urgency
   const today = new Date().toISOString().slice(0, 10);
@@ -86,13 +181,23 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
               </svg>
             </div>
           </div>
-          {/* Follow-up badge below name on mobile */}
-          {followUpBadge && (
-            <div className="mt-1 ml-6">
-              <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${followUpBadge.bg} ${followUpBadge.text} font-medium`}>
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                {followUpBadge.label}
-              </span>
+          {/* Follow-up + contact badge below name on mobile */}
+          {(followUpBadge || (!selectionMode && onQuickMarkContacted)) && (
+            <div className="mt-1 ml-6 flex items-center gap-1.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
+              {followUpBadge && (
+                <span className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded-full ${followUpBadge.bg} ${followUpBadge.text} font-medium`}>
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  {followUpBadge.label}
+                </span>
+              )}
+              {!selectionMode && onQuickMarkContacted && (
+                <ContactBadge
+                  clientName={client.nombre_normalized}
+                  daysSinceContact={daysSinceContact}
+                  lastMethod={lastContact?.method}
+                  onMark={onQuickMarkContacted}
+                />
+              )}
             </div>
           )}
           {/* Age buckets — revealed on expand (mobile only) */}
@@ -145,16 +250,13 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
                   {followUpBadge.label}
                 </span>
               )}
-              {daysSinceContact !== null ? (
-                daysSinceContact > 30 ? (
-                  <span className="inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-orange-100 text-orange-700 flex-shrink-0">30d+</span>
-                ) : (
-                  <span className={`inline-flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0 ${daysSinceContact <= 7 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`} title={`Contactado hace ${daysSinceContact} dias via ${lastContact?.method}`}>
-                    {daysSinceContact}d
-                  </span>
-                )
-              ) : (
-                <span className="inline-flex text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-600 flex-shrink-0">Sin contacto</span>
+              {!selectionMode && onQuickMarkContacted && (
+                <ContactBadge
+                  clientName={client.nombre_normalized}
+                  daysSinceContact={daysSinceContact}
+                  lastMethod={lastContact?.method}
+                  onMark={onQuickMarkContacted}
+                />
               )}
             </div>
             <div className="col-span-2 text-right tabular-nums text-emerald-700">{client.current === 0 ? <span className="text-gray-300">—</span> : fmt(client.current)}</div>
@@ -176,15 +278,6 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, cont
         </div>
       </div>
 
-      {onRegisterContact && inlineOpen && (
-        <ContactInline
-          clientName={client.nombre_normalized}
-          initialResultado={client.resultado_contacto || ""}
-          initialProximoSeguimiento={client.proximo_seguimiento || ""}
-          onSave={onRegisterContact}
-          onClose={() => setInlineOpen(false)}
-        />
-      )}
     </>
   );
 }

@@ -10,6 +10,7 @@ import { normalizeName } from "@/lib/normalize";
 import { VENDOR_MAP } from "@/lib/vendors";
 import AppHeader from "@/components/AppHeader";
 import { Toast, PullToRefresh } from "@/components/ui";
+import UndoToast from "@/components/UndoToast";
 import KpiCards from "./components/KpiCards";
 import ClientTable from "./components/ClientTable";
 import { SkeletonRow } from "./components/Skeleton";
@@ -18,6 +19,7 @@ import useAdminData from "./hooks/useAdminData";
 import { exportConsolidado } from "@/lib/excel-cxc-consolidado";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
+import { useUndoAction } from "@/lib/hooks/useUndoAction";
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -148,6 +150,7 @@ export default function AdminDashboard() {
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [toast, setToast] = useState<string | null>(null);
+  const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
 
   function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(null), 3000); }
   const [showExport, setShowExport] = useState(false);
@@ -463,16 +466,38 @@ export default function AdminDashboard() {
     window.open(`mailto:${client.correo}?subject=${subject}&body=${body}`, "_blank");
   }
 
-  async function markContacted(clientName: string, method: string) {
+  function handleQuickMarkContacted(clientName: string, method: string) {
+    const prevEntry = contactLog[clientName];
     const now = new Date().toISOString();
-    await supabase.from("cxc_contact_log").insert({
-      nombre_normalized: clientName,
-      method,
+    const methodLabel: Record<string, string> = {
+      whatsapp: "WhatsApp", email: "Email", llamada: "Llamada", visita: "Visita",
+    };
+
+    // Optimistic: badge transita a "0d" inmediatamente
+    setContactLog((prev) => ({ ...prev, [clientName]: { date: now, method } }));
+
+    scheduleAction({
+      id: `contact-${clientName}-${now}`,
+      message: `Contacto registrado vía ${methodLabel[method] ?? method}`,
+      execute: async () => {
+        const { error } = await supabase.from("cxc_contact_log").insert({
+          nombre_normalized: clientName,
+          method,
+        });
+        if (error) {
+          showToast("No se pudo registrar el contacto. Intenta de nuevo.");
+          throw error;
+        }
+      },
+      onRevert: () => {
+        setContactLog((prev) => {
+          const next = { ...prev };
+          if (prevEntry) next[clientName] = prevEntry;
+          else delete next[clientName];
+          return next;
+        });
+      },
     });
-    setContactLog((prev) => ({
-      ...prev,
-      [clientName]: { date: now, method },
-    }));
   }
 
   async function handleSaveEdit(nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) {
@@ -495,46 +520,6 @@ export default function AdminDashboard() {
         body: JSON.stringify({ nombre_normalized: nombre, ...data }),
       });
     } catch (err) { console.error('Directorio sync error:', err); }
-  }
-
-  async function handleRegisterContact(clientName: string, data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) {
-    const existingClient = clients.find((c) => c.nombre_normalized === clientName);
-    const now = new Date().toISOString();
-
-    // Optimistic: update contactLog immediately so the row shows the contact date
-    const contactLogSnapshot = { ...contactLog };
-    setContactLog((prev) => ({
-      ...prev,
-      [clientName]: { date: now, method: data.metodo.toLowerCase() },
-    }));
-
-    const upsertData: Record<string, unknown> = {
-      nombre_normalized: clientName,
-      correo: existingClient?.correo || "",
-      telefono: existingClient?.telefono || "",
-      celular: existingClient?.celular || "",
-      contacto: existingClient?.contacto || "",
-      updated_at: now,
-    };
-    if (data.resultado_contacto) {
-      upsertData.resultado_contacto = data.resultado_contacto;
-    }
-    if (data.proximo_seguimiento) {
-      upsertData.proximo_seguimiento = data.proximo_seguimiento;
-    }
-
-    try {
-      const { error } = await supabase.from("cxc_client_overrides").upsert(
-        upsertData,
-        { onConflict: "nombre_normalized" }
-      );
-      if (error) throw error;
-      await markContacted(clientName, data.metodo.toLowerCase());
-    } catch {
-      // Revert optimistic update on failure
-      setContactLog(contactLogSnapshot);
-      showToast("No se pudo registrar el contacto. Intenta de nuevo.");
-    }
   }
 
   function buildExportSubtitle() {
@@ -715,13 +700,16 @@ export default function AdminDashboard() {
         onCopyCollectionMsg={copyCollectionMsg}
         onOpenEmail={openEmail}
         onSaveEdit={handleSaveEdit}
-        onRegisterContact={handleRegisterContact}
+        onQuickMarkContacted={handleQuickMarkContacted}
         favorites={favorites}
         onToggleFavorite={toggleFavorite}
         hideSearchAndRiskFilters
       />
 
       <Toast message={toast} />
+      {pendingUndo && (
+        <UndoToast message={pendingUndo.message} startedAt={pendingUndo.startedAt} onUndo={undoAction} />
+      )}
     </div>
     </div>
     </PullToRefresh>

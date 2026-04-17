@@ -34,7 +34,7 @@ interface Props {
   onCopyCollectionMsg: (client: ConsolidatedClient) => void;
   onOpenEmail: (client: ConsolidatedClient) => void;
   onSaveEdit: (nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) => void;
-  onRegisterContact: (clientName: string, data: { resultado_contacto: string; proximo_seguimiento: string; metodo: string }) => Promise<void>;
+  onQuickMarkContacted: (clientName: string, method: string) => void;
   favorites?: Set<string>;
   onToggleFavorite?: (name: string) => void;
   /** Search and risk filters are now managed by the parent page, hide them here */
@@ -60,7 +60,7 @@ export default function ClientTable({
   onCopyCollectionMsg,
   onOpenEmail,
   onSaveEdit,
-  onRegisterContact,
+  onQuickMarkContacted,
   favorites,
   onToggleFavorite,
   hideSearchAndRiskFilters,
@@ -100,12 +100,6 @@ export default function ClientTable({
         icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>,
         onClick: () => onCopyCollectionMsg(client),
         dividerAfter: true,
-      },
-      {
-        label: "Registrar contacto",
-        shortcut: "R",
-        icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>,
-        onClick: () => { setExpanded(client.nombre_normalized); },
       },
       {
         label: "Ver en directorio",
@@ -430,7 +424,7 @@ export default function ClientTable({
                   selectionMode={selectionMode}
                   isSelected={isSelected}
                   onQuickWA={() => onOpenWhatsApp(client)}
-                  onRegisterContact={(data) => onRegisterContact(client.nombre_normalized, data)}
+                  onQuickMarkContacted={onQuickMarkContacted}
                   isFavorite={favorites?.has(client.nombre_normalized)}
                   onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(client.nombre_normalized) : undefined}
                   onRowContextMenu={(e) => showContextMenu(e, buildClientContextMenu(client))}
@@ -439,12 +433,10 @@ export default function ClientTable({
                   <AccordionContent open={isExpanded}>
                     <ContactPanel
                       client={client}
-                      contactLog={contactLog}
                       onOpenWhatsApp={onOpenWhatsApp}
                       onCopyCollectionMsg={onCopyCollectionMsg}
                       onOpenEmail={onOpenEmail}
                       onSaveEdit={onSaveEdit}
-                      onRegisterContact={(data) => onRegisterContact(client.nombre_normalized, data)}
                       companyFilter={companyFilter}
                       roleCompanies={roleCompanies}
                     />
