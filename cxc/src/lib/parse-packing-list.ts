@@ -55,7 +55,11 @@ export const PRODUCT_ORDER: string[] = [
   "GORRA", "VESTIDO MUJER",
 ];
 
-const KNOWN_COMPANIES = [
+// Nombres de empresa tal como aparecen en el PDF del proveedor. Orden importa:
+// strings más largos ANTES de sus prefijos (ej. "VISTANA INTERNACIONAL PANAMA"
+// antes que "VISTANA INTERNACIONAL") para que el match detecte la variante específica.
+// Caso Fashion Wear: header del PDF dice "FASHION WEAR" suelto, soportado.
+export const KNOWN_COMPANIES = [
   "VISTANA INTERNACIONAL PANAMA",
   "VISTANA INTERNACIONAL",
   "FASHION WEAR",
