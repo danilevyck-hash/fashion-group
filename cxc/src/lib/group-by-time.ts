@@ -3,6 +3,8 @@
  * Returns only non-empty groups.
  */
 
+import { addDaysISO } from "./cheques-dates";
+
 export interface TimeGroup<T> {
   key: string;
   label: string;
@@ -59,21 +61,22 @@ const GROUP_DEFS: Record<PresetMode, {
       label: "Esta semana",
       color: "text-gray-700",
       bgColor: "bg-gray-50",
-      match: (d, today, weekStart, weekEnd) => d > today && d >= weekStart && d <= weekEnd,
+      // Rolling 7d desde hoy (criterio unificado bug #5 audit). Excluye hoy porque tiene bucket propio.
+      match: (d, today) => d > today && d <= addDaysISO(today, 7),
     },
     {
       key: "proxima_semana",
       label: "Próxima semana",
       color: "text-gray-700",
       bgColor: "bg-gray-50",
-      match: (d, _today, _ws, _we, nextWeekStart, nextWeekEnd) => d >= nextWeekStart && d <= nextWeekEnd,
+      match: (d, today) => d > addDaysISO(today, 7) && d <= addDaysISO(today, 14),
     },
     {
       key: "mas_adelante",
       label: "Más adelante",
       color: "text-gray-400",
       bgColor: "bg-gray-50/50",
-      match: (d, _today, _ws, _we, _nws, nextWeekEnd) => d > nextWeekEnd,
+      match: (d, today) => d > addDaysISO(today, 14),
     },
   ],
   depositado: [

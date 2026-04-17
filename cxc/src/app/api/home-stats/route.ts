@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getVentasMensuales } from "@/lib/empresa-mapping";
+import { getVencenSemanaRange } from "@/lib/cheques-dates";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria", "director", "contabilidad", "bodega", "vendedor"]); if (auth instanceof NextResponse) return auth;
   const now = new Date();
-  const weekFromNow = new Date(now.getTime() + 7 * 86400000);
   const todayStr = now.toISOString().slice(0, 10);
-  const weekStr = weekFromNow.toISOString().slice(0, 10);
+  const weekStr = getVencenSemanaRange(todayStr).end;
   const staleDate = new Date(now.getTime() - 7 * 86400000).toISOString();
   const dias45 = new Date(now.getTime() - 45 * 86400000).toISOString().slice(0, 10);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();

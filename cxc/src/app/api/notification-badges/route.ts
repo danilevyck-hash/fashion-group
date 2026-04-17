@@ -10,19 +10,19 @@ export async function GET(req: NextRequest) {
 
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
-  const threeDaysFromNow = new Date(now.getTime() + 3 * 86400000).toISOString().slice(0, 10);
+  const sevenDaysFromNow = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10);
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000).toISOString();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
 
   // All queries in parallel for speed
   const [chequesRes, reclamosRes, prestamosRes, guiasRes, cxcUploadsRes] = await Promise.all([
-    // Cheques: pendiente + vencen en próximos 3 días
+    // Cheques: pendiente + vencen en próximos 7 días (criterio unificado bug #5 audit)
     supabaseServer
       .from("cheques")
       .select("id", { count: "exact", head: true })
       .eq("deleted", false)
-      .in("estado", ["pendiente", "vencido"])
-      .lte("fecha_deposito", threeDaysFromNow)
+      .eq("estado", "pendiente")
+      .lte("fecha_deposito", sevenDaysFromNow)
       .gte("fecha_deposito", today),
 
     // Reclamos: Borrador o Enviado con más de 30 días

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { getVencenSemanaRange } from "@/lib/cheques-dates";
 
 interface PendingAction {
   id: string;
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest) {
 
   const now = new Date();
   const todayStr = now.toISOString().slice(0, 10);
-  const weekStr = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+  const weekStr = getVencenSemanaRange(todayStr).end;
   const dias45 = new Date(now.getTime() - 45 * 86400000).toISOString().slice(0, 10);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
 
@@ -52,13 +53,13 @@ export async function GET(req: NextRequest) {
       .eq("deleted", false)
       .eq("fecha_deposito", todayStr),
 
-    // Cheques that expire this week (not today)
+    // Cheques that expire this week (incluye hoy — criterio unificado bug #5 audit)
     supabaseServer
       .from("cheques")
       .select("id, numero_cheque, monto, fecha_deposito, cliente")
       .eq("estado", "pendiente")
       .eq("deleted", false)
-      .gt("fecha_deposito", todayStr)
+      .gte("fecha_deposito", todayStr)
       .lte("fecha_deposito", weekStr),
 
     // Old unresolved reclamos (45+ days)

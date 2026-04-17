@@ -13,6 +13,7 @@ import { groupByTimePeriod } from "@/lib/group-by-time";
 import TimeGroupHeader from "@/components/TimeGroupHeader";
 
 import { ALL_COMPANIES, getCompanyDisplay } from "@/lib/companies";
+import { getVencenSemanaRange } from "@/lib/cheques-dates";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
@@ -276,8 +277,7 @@ function ChequesPage() {
   }, [cheques, resumenSort]);
 
   const today = todayStr();
-  const now = new Date();
-  const weekFromNow = new Date(now.getTime() + 7 * 86400000).toISOString().slice(0, 10);
+  const weekFromNow = getVencenSemanaRange(today).end;
 
   // Derive visual estado: pendiente + fecha < hoy → show as pendiente_vencido (NOT "vencido" — only the cron sets that in DB)
   function visualEstado(c: Cheque): string {
@@ -487,7 +487,7 @@ function ChequesPage() {
 
   function exportCheques() {
     const hoy = todayStr();
-    const semana = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
+    const semana = getVencenSemanaRange(hoy).end;
     let data: Cheque[];
     switch (filter) {
       case "pendiente":
