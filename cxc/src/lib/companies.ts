@@ -31,6 +31,11 @@ export function getCompany(key: string) {
   return ALL_COMPANIES.find((c) => c.key === key);
 }
 
+export function getCompanyDisplay(key: string | null | undefined): string {
+  if (!key) return "";
+  return getCompany(key)?.name ?? key;
+}
+
 /** Display names used across modules (cheques, caja, prestamos, ventas, guias) */
 export const EMPRESAS = ALL_COMPANIES.map((c) => c.name);
 
