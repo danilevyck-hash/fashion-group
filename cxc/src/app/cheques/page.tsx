@@ -98,7 +98,6 @@ function ChequesPage() {
   const [editingEstado, setEditingEstado] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista");
-  const [groupedView, setGroupedView] = useState(true);
   const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
   const [calPopover, setCalPopover] = useState<string | null>(null);
   const [showResumen, setShowResumen] = useState(false);
@@ -873,11 +872,6 @@ function ChequesPage() {
         <button onClick={() => setViewMode("lista")} className={`py-1.5 px-4 text-xs rounded-full transition ${viewMode === "lista" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Lista</button>
         <button onClick={() => setViewMode("calendario")} className={`py-1.5 px-4 text-xs rounded-full transition ${viewMode === "calendario" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Calendario</button>
         </div>
-        {viewMode === "lista" && (
-          <button onClick={() => setGroupedView(!groupedView)} className={`text-xs transition ${groupedView ? "text-black font-medium" : "text-gray-400 hover:text-black"}`}>
-            {groupedView ? "Lista plana" : "Agrupar por fecha"}
-          </button>
-        )}
       </div>
 
       {/* Filter tabs + search — CAMBIO 40 search by cliente */}
@@ -1255,7 +1249,7 @@ function ChequesPage() {
           const _gm = filter === "depositado" ? "depositado" as const : "pendiente" as const;
           const _df = filter === "depositado" ? "fecha_depositado" as keyof Cheque : "fecha_deposito" as keyof Cheque;
           const _cg = filter === "all" || filter === "pendiente" || filter === "depositado";
-          const _tg = groupedView && _cg ? groupByTimePeriod(filtered, _df, _gm) : null;
+          const _tg = _cg ? groupByTimePeriod(filtered, _df, _gm) : null;
           const _th = (<thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500"><th className="w-8"></th><th className="text-left py-3 px-4 font-normal">Cliente</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell">N° Cheque</th><th className="text-right py-3 px-4 font-normal">Monto</th><th className="text-left py-3 px-4 font-normal whitespace-nowrap">Fecha Dep.</th><th className="text-left py-3 px-4 font-normal">Estado</th><th className="text-right py-3 px-2 font-normal"></th></tr></thead>);
           const _rr = (c: Cheque) => {
               const ve = visualEstado(c);
