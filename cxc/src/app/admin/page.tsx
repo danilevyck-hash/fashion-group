@@ -714,7 +714,6 @@ export default function AdminDashboard() {
         onOpenWhatsApp={openWhatsApp}
         onCopyCollectionMsg={copyCollectionMsg}
         onOpenEmail={openEmail}
-        onMarkContacted={markContacted}
         onSaveEdit={handleSaveEdit}
         onRegisterContact={handleRegisterContact}
         favorites={favorites}
