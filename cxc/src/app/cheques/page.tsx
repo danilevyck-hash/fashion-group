@@ -1221,7 +1221,12 @@ function ChequesPage() {
                 {/* Row 2: fecha, status */}
                 <div className="flex items-center gap-2 mt-1.5">
                   <StatusBadge estado={ve} />
-                  <span className="text-xs text-gray-400 ml-auto">{fmtDate(c.fecha_deposito)}</span>
+                  <div className="ml-auto text-right">
+                    <div className="text-xs text-gray-400">{fmtDate(c.fecha_deposito)}</div>
+                    {ve === "depositado" && c.fecha_depositado && c.fecha_depositado !== c.fecha_deposito && (
+                      <div className={`text-[10px] ${c.fecha_depositado > c.fecha_deposito ? "text-amber-600" : "text-gray-500"}`}>Depositado: {fmtDate(c.fecha_depositado)}</div>
+                    )}
+                  </div>
                 </div>
                 {/* Row 3: Secondary info */}
                 <div className="flex items-center gap-2 mt-1">
@@ -1288,7 +1293,12 @@ function ChequesPage() {
                   <td className="py-3 px-4"><div className="font-medium">{c.cliente}</div><div className="text-xs text-gray-400">{getCompanyDisplay(c.empresa)}</div></td>
                   <td className="py-3 px-4 text-gray-500 hidden lg:table-cell">{c.numero_cheque}</td>
                   <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(c.monto)}</td>
-                  <td className="py-3 px-4 text-gray-500 whitespace-nowrap">{fmtDate(c.fecha_deposito)}</td>
+                  <td className="py-3 px-4 text-gray-500 whitespace-nowrap">
+                    <div>{fmtDate(c.fecha_deposito)}</div>
+                    {isDep && c.fecha_depositado && c.fecha_depositado !== c.fecha_deposito && (
+                      <div className={`text-[10px] mt-0.5 ${c.fecha_depositado > c.fecha_deposito ? "text-amber-600" : "text-gray-500"}`}>Depositado: {fmtDate(c.fecha_depositado)}</div>
+                    )}
+                  </td>
                   <td className="py-3 px-4">
                     <StatusBadge estado={ve} />
                   </td>
@@ -1383,6 +1393,9 @@ function ChequesPage() {
                           <span>·</span>
                           <span className="truncate">{getCompanyDisplay(c.empresa)}</span>
                         </div>
+                        {ve === "depositado" && c.fecha_depositado && c.fecha_depositado !== c.fecha_deposito && (
+                          <div className={`text-[10px] mt-1 ${c.fecha_depositado > c.fecha_deposito ? "text-amber-600" : "text-gray-500"}`}>Depositado: {fmtDate(c.fecha_depositado)}</div>
+                        )}
                       </button>
                       {(isPending || isRebotado) && (
                         <div className="flex gap-3 mt-2 pt-2 border-t border-gray-100">
