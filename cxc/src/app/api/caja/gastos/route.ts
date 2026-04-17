@@ -23,6 +23,14 @@ export async function POST(req: NextRequest) {
   if (!periodo_id) return NextResponse.json({ error: "Falta el período" }, { status: 400 });
   if (!fecha || typeof fecha !== "string") return NextResponse.json({ error: "La fecha es obligatoria." }, { status: 400 });
 
+  const empresaRaw = typeof empresa === "string" ? empresa.trim() : "";
+  if (!empresaRaw || empresaRaw === "—") return NextResponse.json({ error: "La empresa es obligatoria." }, { status: 400 });
+
+  const proveedorRaw = typeof proveedor === "string" ? proveedor.trim() : "";
+  if (!proveedorRaw || proveedorRaw === "—") return NextResponse.json({ error: "El proveedor es obligatorio." }, { status: 400 });
+
+  if (!responsable) return NextResponse.json({ error: "El responsable es obligatorio." }, { status: 400 });
+
   // Panama is UTC-5 year-round (no DST). "Today" in Panama as YYYY-MM-DD.
   const hoyPanama = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
   if (fecha > hoyPanama) return NextResponse.json({ error: "La fecha no puede ser futura. Usa hoy o una fecha anterior." }, { status: 400 });
@@ -43,11 +51,11 @@ export async function POST(req: NextRequest) {
     .insert({
       periodo_id, fecha,
       descripcion: descripcion || "",
-      proveedor: proveedor || "",
+      proveedor: proveedorRaw,
       nro_factura: nro_factura || "",
       responsable,
       categoria,
-      empresa: empresa || "",
+      empresa: empresaRaw,
       subtotal, itbms: roundedItbms, total: roundedTotal,
       // Keep old fields populated for backwards compat
       nombre: descripcion || "",

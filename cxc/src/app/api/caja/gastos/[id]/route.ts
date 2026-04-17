@@ -41,7 +41,25 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   if (typeof fields.categoria === "string") fields.categoria = normalizeStr(fields.categoria) || "Varios";
-  if (typeof fields.responsable === "string") fields.responsable = normalizeStr(fields.responsable);
+
+  if ("responsable" in fields) {
+    const normalized = typeof fields.responsable === "string" ? normalizeStr(fields.responsable) : "";
+    if (!normalized) return NextResponse.json({ error: "El responsable es obligatorio." }, { status: 400 });
+    fields.responsable = normalized;
+  }
+
+  if ("empresa" in fields) {
+    const raw = typeof fields.empresa === "string" ? fields.empresa.trim() : "";
+    if (!raw || raw === "—") return NextResponse.json({ error: "La empresa es obligatoria." }, { status: 400 });
+    fields.empresa = raw;
+  }
+
+  if ("proveedor" in fields) {
+    const raw = typeof fields.proveedor === "string" ? fields.proveedor.trim() : "";
+    if (!raw || raw === "—") return NextResponse.json({ error: "El proveedor es obligatorio." }, { status: 400 });
+    fields.proveedor = raw;
+  }
+
   if (fields.itbms !== undefined) fields.itbms = Math.round((Number(fields.itbms) || 0) * 100) / 100;
   if (fields.total !== undefined) fields.total = Math.round((Number(fields.total) || 0) * 100) / 100;
   const { data, error } = await supabaseServer.from("caja_gastos").update(fields).eq("id", params.id).select().single();

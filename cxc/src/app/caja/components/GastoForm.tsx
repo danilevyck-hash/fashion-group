@@ -147,7 +147,7 @@ export default function GastoForm({
     setGResponsable, setGEmpresa, setGEmpresaOtro,
   } = setters;
 
-  const [showMoreDetails, setShowMoreDetails] = useState(false);
+  const [showMoreDetails, setShowMoreDetails] = useState(true);
   const [justSaved, setJustSaved] = useState(false);
 
   const restante = fondoInicial - totalGastado;
@@ -196,7 +196,7 @@ export default function GastoForm({
         </div>
         <div className="hidden lg:block">
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
-            Proveedor
+            Proveedor <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
@@ -286,12 +286,12 @@ export default function GastoForm({
       {/* Mobile-only collapsible for optional fields */}
       <div className="lg:hidden mb-3">
         <button onClick={() => setShowMoreDetails(!showMoreDetails)} className="text-xs text-gray-500 hover:text-black transition flex items-center gap-1 border border-gray-200 rounded px-2 py-1 hover:border-gray-400">
-          {showMoreDetails ? "\uFF0D Ocultar campos opcionales" : "\uFF0B Proveedor, Factura y Responsable"}
+          {showMoreDetails ? "\uFF0D Ocultar" : "\uFF0B Proveedor, Factura y Responsable"}
         </button>
         {showMoreDetails && (
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 items-end mt-2">
             <div>
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Proveedor</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Proveedor <span className="text-red-500">*</span></label>
               <input type="text" value={gProveedor} onChange={(e) => setGProveedor(e.target.value)} placeholder="Dónde se compró" className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
             </div>
             <div>
@@ -299,7 +299,7 @@ export default function GastoForm({
               <input type="text" value={gNroFactura} onChange={(e) => setGNroFactura(e.target.value)} placeholder="Opcional" className="w-full border-b border-gray-200 py-1.5 text-sm outline-none focus:border-black transition" />
             </div>
             <div>
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Responsable</label>
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Responsable <span className="text-red-500">*</span></label>
               <AutocompleteInput
                 value={gResponsable}
                 onChange={(v) => setGResponsable(v)}
@@ -315,7 +315,7 @@ export default function GastoForm({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 items-end">
         <div className="hidden lg:block">
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
-            Responsable
+            Responsable <span className="text-red-500">*</span>
           </label>
           <AutocompleteInput
             value={gResponsable}
@@ -394,7 +394,7 @@ export default function GastoForm({
         <div>
           <button
             onClick={async () => { try { await onAddGasto(); setJustSaved(true); setTimeout(() => setJustSaved(false), 2000); } catch { /* error handled by parent */ } }}
-            disabled={addingGasto || !gDescripcion || subtotalNum <= 0}
+            disabled={addingGasto || !gDescripcion.trim() || subtotalNum <= 0 || !gEmpresa || !gResponsable.trim() || !gProveedor.trim()}
             className="bg-black text-white px-6 py-1.5 rounded-full text-sm hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
           >
             {justSaved ? "Listo, guardado \u2713" : "Guardar gasto"}
