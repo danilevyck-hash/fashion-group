@@ -14,9 +14,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   if (auth instanceof NextResponse) return auth;
   if (!UUID_RE.test(params.id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const body = await req.json();
-  const allowed = ["cliente", "empresa", "banco", "numero_cheque", "monto", "fecha_deposito", "notas", "vendedor", "estado", "motivo_rebote", "fecha_depositado"];
+  const allowed = ["cliente", "empresa", "numero_cheque", "monto", "fecha_deposito", "notas", "vendedor", "estado", "motivo_rebote", "fecha_depositado"];
   const update: Record<string, unknown> = {};
   for (const k of allowed) { if (k in body) update[k] = body[k]; }
+  if ("numero_cheque" in update && typeof update.numero_cheque === "string") update.numero_cheque = update.numero_cheque.trim();
   if ("empresa" in update && (typeof update.empresa !== "string" || !getCompany(update.empresa))) {
     return NextResponse.json({ error: "empresa inválida" }, { status: 400 });
   }

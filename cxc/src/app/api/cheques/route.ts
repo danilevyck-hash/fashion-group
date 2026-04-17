@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   const s = getSession(req);
   if (!s || !CHEQUES_ROLES.includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const body = await req.json();
-  const { cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas, vendedor } = body;
+  const { cliente, empresa, numero_cheque, monto, fecha_deposito, notas, vendedor } = body;
 
   if (!monto || monto <= 0) return NextResponse.json({ error: "El monto debe ser mayor a 0" }, { status: 400 });
   if (typeof vendedor !== "string" || !vendedor.trim()) return NextResponse.json({ error: "vendedor requerido" }, { status: 400 });
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabaseServer
     .from("cheques")
-    .insert({ cliente, empresa, banco, numero_cheque, monto, fecha_deposito, notas: notas || "", vendedor: vendedor.trim(), estado: "pendiente" })
+    .insert({ cliente, empresa, numero_cheque: numero_cheque.trim(), monto, fecha_deposito, notas: notas || "", vendedor: vendedor.trim(), estado: "pendiente" })
     .select()
     .single();
 
