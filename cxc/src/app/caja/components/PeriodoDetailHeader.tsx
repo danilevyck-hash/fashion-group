@@ -11,9 +11,9 @@ interface Props {
   pctUsed: number;
   onBack: () => void;
   onClosePeriodo?: () => void;
-  onPrint: () => void;
-  onExportExcel: () => void;
-  onAprobarReposicion: (id: string) => void;
+  onPrint?: () => void;
+  onExportExcel?: () => void;
+  onAprobarReposicion?: (id: string) => void;
 }
 
 function fmtRepuestoDate(iso: string | null): string {
@@ -53,9 +53,8 @@ export default function PeriodoDetailHeader({
     ...(isOpen && onClosePeriodo
       ? [{ label: "Cerrar período", onClick: onClosePeriodo, destructive: true }]
       : []),
-    { label: "Imprimir", onClick: onPrint },
-    { label: "Descargar Excel", onClick: onExportExcel },
-    ...(!isOpen && !current.repuesto
+    ...(onExportExcel ? [{ label: "Descargar Excel", onClick: onExportExcel }] : []),
+    ...(!isOpen && !current.repuesto && onAprobarReposicion
       ? [{ label: "Aprobar reposición", onClick: () => onAprobarReposicion(current.id) }]
       : []),
   ];
@@ -136,7 +135,23 @@ export default function PeriodoDetailHeader({
                 </div>
               </div>
             </div>
-            <OverflowMenu items={menuItems} />
+            <div className="flex items-center gap-2">
+              {onPrint && (
+                <button
+                  onClick={onPrint}
+                  title="Imprimir"
+                  className="text-sm text-gray-500 hover:text-black border border-gray-200 rounded-md px-2 sm:px-3 py-1.5 hover:border-gray-400 transition flex items-center gap-1.5"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="6 9 6 2 18 2 18 9" />
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                    <rect x="6" y="14" width="12" height="8" />
+                  </svg>
+                  <span className="hidden sm:inline">Imprimir</span>
+                </button>
+              )}
+              <OverflowMenu items={menuItems} />
+            </div>
           </div>
           {/* Progress bar */}
           <div className="mt-2 h-1 bg-gray-100 rounded-full overflow-hidden">

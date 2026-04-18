@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useMemo } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -173,6 +172,7 @@ function CajaPage() {
               setEditGasto={setEditGasto}
               onSaveEdit={saveEditGasto}
               onDeleteGasto={requestDeleteGasto}
+              nuevoHref={detailIsOpen ? `/caja/${current.id}/nuevo` : undefined}
             />
 
             <DeletedGastosSection
@@ -181,22 +181,6 @@ function CajaPage() {
               onRestore={requestRestoreGasto}
             />
           </div>
-
-          {/* FAB — "Agregar gasto" on open-period detail view */}
-          {detailIsOpen && (
-            <Link
-              href={`/caja/${current.id}/nuevo`}
-              aria-label="Agregar gasto"
-              className="fixed right-4 sm:right-6 z-[45] bg-black text-white rounded-full pl-4 pr-5 py-3 shadow-lg hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2 text-sm font-medium"
-              style={{ bottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19" />
-                <line x1="5" y1="12" x2="19" y2="12" />
-              </svg>
-              Agregar gasto
-            </Link>
-          )}
         </div>
       )}
 

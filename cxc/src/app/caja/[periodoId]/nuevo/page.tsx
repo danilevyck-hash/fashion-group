@@ -204,7 +204,6 @@ function NuevoGastoPage() {
   const formSetters = { setGFecha, setGDescripcion, setGProveedor, setGNroFactura, setGSubtotal, setGItbmsPct, setGCategoria, setGResponsableId };
 
   const backToDetail = () => router.push(`/caja?view=detail&id=${periodo.id}`);
-  const noop = () => {};
 
   return (
     <div>
@@ -214,10 +213,6 @@ function NuevoGastoPage() {
         saldo={saldo}
         pctUsed={pctUsed}
         onBack={backToDetail}
-        onClosePeriodo={undefined}
-        onPrint={noop}
-        onExportExcel={noop}
-        onAprobarReposicion={noop}
       />
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-4 pb-24">
