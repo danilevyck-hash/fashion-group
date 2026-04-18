@@ -74,7 +74,21 @@ export default function PlantillasPage() {
   const [userName, setUserName] = useState("");
   const [userId, setUserId] = useState("");
   const [fgModules, setFgModules] = useState<string[] | null>(null);
-  const [moduleOrder, setModuleOrder] = useState<string[]>([]);
+  // Inicializar sincrónicamente desde localStorage si existe — evita layout
+  // shift en la primera render para usuarios con orden custom guardado.
+  const [moduleOrder, setModuleOrder] = useState<string[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const r = sessionStorage.getItem("cxc_role") || "";
+      const saved = localStorage.getItem(`module_order_${r}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch { /* ignore */ }
+    return [];
+  });
+  const [orderLoaded, setOrderLoaded] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [showActivity, setShowActivity] = useState(false);
@@ -105,7 +119,7 @@ export default function PlantillasPage() {
     setAuthChecked(true);
   }, [router]);
 
-  // Load saved module order
+  // Load saved module order (DB wins sobre localStorage inicial)
   const loadOrder = useCallback(async () => {
     const uid = sessionStorage.getItem("fg_user_id");
     if (uid) {
@@ -116,17 +130,9 @@ export default function PlantillasPage() {
           if (data.module_order?.length) setModuleOrder(data.module_order);
         }
       } catch { console.error('Failed to load module order'); }
-    } else {
-      // Legacy: load from localStorage
-      const r = sessionStorage.getItem("cxc_role") || "";
-      try {
-        const saved = localStorage.getItem(`module_order_${r}`);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) setModuleOrder(parsed);
-        }
-      } catch { console.error('Failed to parse saved module order'); }
     }
+    // Sin userId: ya leímos localStorage en el initializer del useState.
+    setOrderLoaded(true);
   }, []);
 
   // Home stats for alerts + KPIs
@@ -349,8 +355,22 @@ export default function PlantillasPage() {
         )}
       </div>
 
-      {/* Module grid — grouped when not editing, flat when editing */}
-      {!editMode ? (
+      {/* Skeleton mientras no tenemos orden cargado — evita layout shift */}
+      {!orderLoaded ? (
+        <div className="space-y-6">
+          {GROUP_ORDER.map((g) => (
+            <div key={g}>
+              <div className="h-4 w-32 bg-gray-100 rounded animate-pulse mb-3" />
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className={`rounded-xl p-4 h-[108px] animate-pulse ${darkMode ? "bg-gray-900 border border-gray-800" : "bg-gray-50 border border-gray-100"}`} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : /* Module grid — grouped when not editing, flat when editing */
+      !editMode ? (
         // Grouped view
         <div className="space-y-6">
           {GROUP_ORDER.map(groupKey => {
