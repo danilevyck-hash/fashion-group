@@ -80,6 +80,7 @@ export default function PackingListsPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [empresaFilter, setEmpresaFilter] = useState<string>("all");
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
 
   const canEdit = role === "admin" || role === "secretaria";
 
@@ -174,9 +175,15 @@ export default function PackingListsPage() {
       return;
     }
     setUploading(true);
+    setDebugLogs([]); // reset panel por cada nuevo PDF
     try {
       const { text, rawLines } = await extractTextFromPDF(file);
-      const parsedList = parseMultiplePackingLists(text, rawLines);
+      const collected: string[] = [];
+      const onDebugLog = (label: string, data: unknown) => {
+        collected.push(`${label}\n${JSON.stringify(data, null, 2)}`);
+      };
+      const parsedList = parseMultiplePackingLists(text, rawLines, onDebugLog);
+      if (collected.length > 0) setDebugLogs(collected);
 
       if (parsedList.length === 0 || (parsedList.length === 1 && parsedList[0].bultos.length === 0)) {
         setToast("No se detectaron Packing Lists en el PDF. Verifica el formato.");
@@ -536,7 +543,7 @@ export default function PackingListsPage() {
                   {uploading ? "Guardando..." : `Guardar ${previewItems.length} PL${previewItems.length !== 1 ? "s" : ""}`}
                 </button>
                 <button
-                  onClick={() => setPreviewItems([])}
+                  onClick={() => { setPreviewItems([]); setDebugLogs([]); }}
                   className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm rounded-md hover:bg-gray-50 transition-all min-h-[44px]"
                 >
                   Cancelar
@@ -630,6 +637,19 @@ export default function PackingListsPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Debug panel temporal — bug parser FW bultos 547946/547949 */}
+        {debugLogs.length > 0 && (
+          <div className="mt-4 bg-black text-green-300 text-xs font-mono p-3 rounded max-h-96 overflow-auto whitespace-pre-wrap">
+            <div className="flex items-center justify-between mb-2 text-green-400">
+              <span>[DEBUG] {debugLogs.length} entries</span>
+              <button onClick={() => setDebugLogs([])} className="text-green-500 hover:text-green-300">× cerrar</button>
+            </div>
+            {debugLogs.map((log, i) => (
+              <div key={i} className="mb-2 pb-2 border-b border-green-900">{log}</div>
+            ))}
           </div>
         )}
 

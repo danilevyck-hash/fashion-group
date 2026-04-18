@@ -172,7 +172,13 @@ function hasNumericValueNearX(dataRawLine: RawLine | undefined, targetX: number,
 
 // ── Main parser ──────────────────────────────────────────────────────
 
-export function parsePackingListText(text: string, rawLines?: RawLine[]): ParsedPackingList {
+export type DebugLogFn = (label: string, data: unknown) => void;
+
+export function parsePackingListText(
+  text: string,
+  rawLines?: RawLine[],
+  debugLog?: DebugLogFn,
+): ParsedPackingList {
   const plMatch = text.match(/NO\.\s*(\d+)/);
   const numeroPL = plMatch ? plMatch[1] : "";
 
@@ -304,10 +310,9 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
     if (currentBultoId) {
       const items = Array.from(currentItemMap.values());
       // [DEBUG TEMPORAL — bug parser FW bultos 547946/547949, revert después]
-      if (typeof window !== "undefined" && (currentBultoId === "547946" || currentBultoId === "547949")) {
+      if (debugLog && (currentBultoId === "547946" || currentBultoId === "547949")) {
         const sum = items.reduce((s, i) => s + i.qty, 0);
-        // eslint-disable-next-line no-console
-        console.log("[PARSER DEBUG BULTO TOTAL]", {
+        debugLog("[PARSER DEBUG BULTO TOTAL]", {
           bultoId: currentBultoId,
           totalCalculado: sum,
           totalHeaderPdf: currentBultoTotalPiezas,
@@ -456,9 +461,8 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
           qty = parseInt(nums[nums.length - 1], 10);
         }
         // [DEBUG TEMPORAL — bug parser FW bultos 547946/547949, revert después]
-        if (typeof window !== "undefined" && (currentBultoId === "547946" || currentBultoId === "547949")) {
-          // eslint-disable-next-line no-console
-          console.log("[PARSER DEBUG]", {
+        if (debugLog && (currentBultoId === "547946" || currentBultoId === "547949")) {
+          debugLog("[PARSER DEBUG]", {
             bultoId: currentBultoId,
             estilo: currentEstilo,
             producto: currentProducto,
@@ -676,8 +680,9 @@ export function splitTextIntoPLSections(
  */
 export function parseMultiplePackingLists(
   text: string,
-  rawLines?: RawLine[]
+  rawLines?: RawLine[],
+  debugLog?: DebugLogFn,
 ): ParsedPackingList[] {
   const sections = splitTextIntoPLSections(text, rawLines);
-  return sections.map((section) => parsePackingListText(section.text, section.rawLines));
+  return sections.map((section) => parsePackingListText(section.text, section.rawLines, debugLog));
 }
