@@ -215,9 +215,6 @@ export default function PackingListDetailPage() {
       const checkboxSize = 3.5;
       const lineHeight = 5.2;
       const indentX = marginLeft + 7;
-      // Columna "Notas" a la derecha — línea para que bodega escriba a mano
-      const notesX = marginLeft + 115;
-      const notesWidth = contentRight - notesX - 2;
 
       for (const [bultoId, styles] of sortedBultos) {
         const blockHeight = lineHeight + (styles.length * lineHeight) + 2;
@@ -238,12 +235,6 @@ export default function PackingListDetailPage() {
           marginLeft + checkboxSize + 2,
           currentY
         );
-        // Header de la columna Notas (solo en el primer bulto de la página)
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(140);
-        doc.text(safe("Notas"), notesX, currentY);
-        doc.setTextColor(30, 40, 60);
         currentY += lineHeight + 0.5;
 
         // Style rows
@@ -254,28 +245,18 @@ export default function PackingListDetailPage() {
           doc.setFont("courier", "normal");
           doc.setTextColor(50);
           doc.text(safe(style.estilo), indentX + checkboxSize + 2, currentY);
-          // Product description — truncar si pasaría notesX
+          // Product description
           const estiloWidth = doc.getTextWidth(safe(style.estilo));
-          const productoStartX = indentX + checkboxSize + 2 + estiloWidth;
-          const productoMaxWidth = notesX - productoStartX - 3;
           doc.setFont("helvetica", "normal");
           doc.setTextColor(100);
-          let productoText = safe(` -  ${style.producto}`);
-          if (doc.getTextWidth(productoText) > productoMaxWidth) {
-            const lines = doc.splitTextToSize(productoText, productoMaxWidth);
-            productoText = (lines[0] || "").replace(/\s+$/, "") + "…";
-          }
-          doc.text(productoText, productoStartX, currentY);
+          const productoText = safe(` -  ${style.producto}`);
+          doc.text(productoText, indentX + checkboxSize + 2 + estiloWidth, currentY);
           if (style.isOS) {
             const productoWidth = doc.getTextWidth(productoText);
             doc.setTextColor(150);
-            doc.text("  - OS", productoStartX + productoWidth, currentY);
+            doc.text("  - OS", indentX + checkboxSize + 2 + estiloWidth + productoWidth, currentY);
             doc.setTextColor(50);
           }
-          // Línea para notas a la derecha
-          doc.setDrawColor(200);
-          doc.setLineWidth(0.2);
-          doc.line(notesX, currentY + 0.8, notesX + notesWidth, currentY + 0.8);
           currentY += lineHeight;
         }
 
