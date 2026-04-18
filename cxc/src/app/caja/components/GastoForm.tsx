@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { fmt } from "@/lib/format";
+import { CajaResponsable } from "./types";
 
 export interface GastoFormValues {
   gFecha: string;
@@ -11,7 +12,7 @@ export interface GastoFormValues {
   gSubtotal: string;
   gItbmsPct: string;
   gCategoria: string;
-  gResponsable: string;
+  gResponsableId: string;
 }
 
 export interface GastoFormSetters {
@@ -22,7 +23,7 @@ export interface GastoFormSetters {
   setGSubtotal: (v: string) => void;
   setGItbmsPct: (v: string) => void;
   setGCategoria: (v: string) => void;
-  setGResponsable: (v: string) => void;
+  setGResponsableId: (v: string) => void;
 }
 
 export function normalizeStr(s: string): string {
@@ -85,19 +86,13 @@ interface Props {
   subtotalNum: number;
   totalNum: number;
   categorias: string[];
-  responsables: string[];
-  allResponsables: string[];
+  responsablesCatalog: CajaResponsable[];
   showManageCat: boolean;
-  showAddResponsable: boolean;
   newCatName: string;
-  newResponsable: string;
   isOwner: boolean;
   setCategorias: (v: string[]) => void;
   setShowManageCat: (v: boolean) => void;
-  setShowAddResponsable: (v: boolean) => void;
   setNewCatName: (v: string) => void;
-  setNewResponsable: (v: string) => void;
-  setResponsables: (v: string[]) => void;
   onAddGasto: () => void | Promise<void>;
   fondoInicial?: number;
   totalGastado?: number;
@@ -110,19 +105,13 @@ export default function GastoForm({
   subtotalNum,
   totalNum,
   categorias,
-  responsables,
-  allResponsables,
+  responsablesCatalog,
   showManageCat,
-  showAddResponsable,
   newCatName,
-  newResponsable,
   isOwner,
   setCategorias,
   setShowManageCat,
-  setShowAddResponsable,
   setNewCatName,
-  setNewResponsable,
-  setResponsables,
   onAddGasto,
   fondoInicial = 0,
   totalGastado = 0,
@@ -130,12 +119,12 @@ export default function GastoForm({
   const {
     gFecha, gDescripcion, gProveedor, gNroFactura,
     gSubtotal, gItbmsPct, gCategoria,
-    gResponsable,
+    gResponsableId,
   } = values;
   const {
     setGFecha, setGDescripcion, setGProveedor, setGNroFactura,
     setGSubtotal, setGItbmsPct, setGCategoria,
-    setGResponsable,
+    setGResponsableId,
   } = setters;
 
   const [showMoreDetails, setShowMoreDetails] = useState(true);
@@ -316,13 +305,16 @@ export default function GastoForm({
             </div>
             <div>
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">Responsable <span className="text-red-500">*</span></label>
-              <AutocompleteInput
-                value={gResponsable}
-                onChange={(v) => setGResponsable(v)}
-                options={allResponsables}
-                placeholder="Nombre"
-                className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition"
-              />
+              <select
+                value={gResponsableId}
+                onChange={(e) => setGResponsableId(e.target.value)}
+                className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none"
+              >
+                <option value="">—</option>
+                {responsablesCatalog.map((r) => (
+                  <option key={r.id} value={r.id}>{r.nombre}</option>
+                ))}
+              </select>
             </div>
           </div>
         )}
@@ -333,13 +325,16 @@ export default function GastoForm({
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
             Responsable <span className="text-red-500">*</span>
           </label>
-          <AutocompleteInput
-            value={gResponsable}
-            onChange={(v) => setGResponsable(v)}
-            options={allResponsables}
-            placeholder="Nombre"
-            className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition"
-          />
+          <select
+            value={gResponsableId}
+            onChange={(e) => setGResponsableId(e.target.value)}
+            className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none"
+          >
+            <option value="">—</option>
+            {responsablesCatalog.map((r) => (
+              <option key={r.id} value={r.id}>{r.nombre}</option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
@@ -381,7 +376,7 @@ export default function GastoForm({
         <div>
           <button
             onClick={async () => { try { await onAddGasto(); setJustSaved(true); setTimeout(() => setJustSaved(false), 2000); } catch { /* error handled by parent */ } }}
-            disabled={addingGasto || !gDescripcion.trim() || subtotalNum <= 0 || !gResponsable.trim() || !gProveedor.trim()}
+            disabled={addingGasto || !gDescripcion.trim() || subtotalNum <= 0 || !gResponsableId || !gProveedor.trim()}
             className="bg-black text-white px-6 py-1.5 rounded-full text-sm hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
           >
             {justSaved ? "Listo, guardado \u2713" : "Guardar gasto"}

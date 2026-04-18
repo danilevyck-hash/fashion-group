@@ -20,6 +20,7 @@ export interface CajaGasto {
   proveedor: string;
   nro_factura: string;
   responsable: string;
+  responsable_id?: string | null;
   categoria: string;
   empresa: string;
   subtotal: number;
@@ -30,6 +31,12 @@ export interface CajaGasto {
   deleted_by?: string | null;
   deleted_at?: string | null;
   deleted_by_name?: string | null;
+}
+
+export interface CajaResponsable {
+  id: string;
+  nombre: string;
+  activo: boolean;
 }
 
 export type View = "list" | "detail" | "print";

@@ -297,7 +297,7 @@ export type Database = {
           created_by?: string | null
         }
       }
-      // caja_gastos columns from: schema.sql + migration_caja_mejoras.sql + add-caja-categoria.sql + migration_caja_campos.sql + caja-created-by.sql
+      // caja_gastos columns from: schema.sql + migration_caja_mejoras.sql + add-caja-categoria.sql + migration_caja_campos.sql + caja-created-by.sql + caja-responsables-fk.sql
       caja_gastos: {
         Row: {
           id: string
@@ -322,6 +322,8 @@ export type Database = {
           nro_factura: string | null
           // from caja-created-by.sql
           created_by: string | null
+          // from caja-responsables-fk.sql
+          responsable_id: string | null
         }
         Insert: {
           id?: string
@@ -342,6 +344,7 @@ export type Database = {
           proveedor?: string | null
           nro_factura?: string | null
           created_by?: string | null
+          responsable_id?: string | null
         }
         Update: {
           id?: string
@@ -362,6 +365,7 @@ export type Database = {
           proveedor?: string | null
           nro_factura?: string | null
           created_by?: string | null
+          responsable_id?: string | null
         }
       }
       caja_responsables: {

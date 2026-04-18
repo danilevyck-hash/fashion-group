@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { CajaPeriodo, CajaGasto, View } from "../components/types";
+import { CajaPeriodo, CajaGasto, CajaResponsable, View } from "../components/types";
 import { GastoFormValues, GastoFormSetters } from "../components/GastoForm";
 
 function normalizeStr(s: string): string {
@@ -41,9 +41,7 @@ export function useCajaState(urlId: string, initialView: View) {
   const [confirmDeletePeriodoId, setConfirmDeletePeriodoId] = useState<string | null>(null);
   const [showNewPeriodoModal, setShowNewPeriodoModal] = useState(false);
   const [fondoInput, setFondoInput] = useState("200");
-  const [responsables, setResponsables] = useState<string[]>([]);
-  const [showAddResponsable, setShowAddResponsable] = useState(false);
-  const [newResponsable, setNewResponsable] = useState("");
+  const [responsablesCatalog, setResponsablesCatalog] = useState<CajaResponsable[]>([]);
 
   // Add expense form state
   const [gFecha, setGFecha] = useState(new Date().toISOString().slice(0, 10));
@@ -53,7 +51,7 @@ export function useCajaState(urlId: string, initialView: View) {
   const [gSubtotal, setGSubtotal] = useState("");
   const [gItbmsPct, setGItbmsPct] = useState("0");
   const [gCategoria, setGCategoria] = useState("Transporte");
-  const [gResponsable, setGResponsable] = useState("");
+  const [gResponsableId, setGResponsableId] = useState("");
   const [addingGasto, setAddingGasto] = useState(false);
   const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
   const [editGasto, setEditGasto] = useState<Partial<CajaGasto>>({});
@@ -65,12 +63,12 @@ export function useCajaState(urlId: string, initialView: View) {
   const formValues: GastoFormValues = {
     gFecha, gDescripcion, gProveedor, gNroFactura,
     gSubtotal, gItbmsPct, gCategoria,
-    gResponsable,
+    gResponsableId,
   };
   const formSetters: GastoFormSetters = {
     setGFecha, setGDescripcion, setGProveedor, setGNroFactura,
     setGSubtotal, setGItbmsPct, setGCategoria,
-    setGResponsable,
+    setGResponsableId,
   };
 
   // Merge distinct categories/responsables from loaded gastos with managed lists
@@ -84,9 +82,10 @@ export function useCajaState(urlId: string, initialView: View) {
   const allResponsables = useMemo(() => {
     const gastos = current?.caja_gastos || [];
     const fromGastos = gastos.map((g) => normalizeStr(g.responsable || "")).filter(Boolean);
-    const merged = new Set([...responsables, ...fromGastos]);
+    const fromCatalog = responsablesCatalog.map((r) => r.nombre);
+    const merged = new Set([...fromCatalog, ...fromGastos]);
     return Array.from(merged).sort((a, b) => a.localeCompare(b, "es"));
-  }, [responsables, current]);
+  }, [responsablesCatalog, current]);
 
   const loadPeriodos = useCallback(async () => {
     setLoading(true);
@@ -112,19 +111,10 @@ export function useCajaState(urlId: string, initialView: View) {
     loadPeriodos();
     fetch("/api/caja/responsables")
       .then((r) => (r.ok ? r.json() : []))
-      .then((data) => {
-        const names = (data || []).map((r: { nombre: string }) => r.nombre);
-        if (names.length > 0) {
-          setResponsables(names);
-          localStorage.setItem("fg_responsables", JSON.stringify(names));
-        } else {
-          try { const cached = JSON.parse(localStorage.getItem("fg_responsables") || "[]"); if (cached.length > 0) setResponsables(cached); } catch { console.error('Failed to parse cached responsables'); }
-        }
+      .then((data: CajaResponsable[]) => {
+        setResponsablesCatalog(Array.isArray(data) ? data : []);
       })
-      .catch(() => {
-        console.error('Failed to load responsables');
-        try { const cached = JSON.parse(localStorage.getItem("fg_responsables") || "[]"); if (cached.length > 0) setResponsables(cached); } catch { console.error('Failed to parse cached responsables'); }
-      });
+      .catch(() => { console.error('Failed to load responsables'); });
   }, []);
 
   async function loadDetail(id: string) {
@@ -261,12 +251,14 @@ export function useCajaState(urlId: string, initialView: View) {
     setAddingGasto(true);
     setError(null);
     const resolvedCategoria = normalizeStr(gCategoria) || "Otros";
-    const resolvedResponsable = normalizeStr(gResponsable);
+    const resolvedResponsable =
+      responsablesCatalog.find((r) => r.id === gResponsableId)?.nombre || "";
 
     // Capture request body BEFORE clearing form
     const requestBody = {
       periodo_id: current.id, fecha: gFecha, descripcion: gDescripcion,
-      proveedor: gProveedor, nro_factura: gNroFactura, responsable: resolvedResponsable,
+      proveedor: gProveedor, nro_factura: gNroFactura,
+      responsable_id: gResponsableId,
       categoria: resolvedCategoria,
       subtotal: subtotalNum, itbms: itbmsNum, total: totalNum,
     };
@@ -276,7 +268,8 @@ export function useCajaState(urlId: string, initialView: View) {
     const optimisticGasto: CajaGasto = {
       id: tempId, periodo_id: current.id, fecha: gFecha,
       descripcion: gDescripcion, proveedor: gProveedor, nro_factura: gNroFactura,
-      responsable: resolvedResponsable, categoria: resolvedCategoria, empresa: "",
+      responsable: resolvedResponsable, responsable_id: gResponsableId,
+      categoria: resolvedCategoria, empresa: "",
       subtotal: subtotalNum, itbms: itbmsNum, total: totalNum,
     };
     const snapshot = current;
@@ -289,7 +282,7 @@ export function useCajaState(urlId: string, initialView: View) {
     // Clear form immediately (feels instant)
     setGFecha(new Date().toISOString().split("T")[0]);
     setGDescripcion(""); setGProveedor(""); setGNroFactura(""); setGSubtotal(""); setGItbmsPct("0");
-    setGCategoria("Transporte"); setGResponsable("");
+    setGCategoria("Transporte"); setGResponsableId("");
 
     try {
       const res = await fetch("/api/caja/gastos", {
@@ -444,7 +437,7 @@ export function useCajaState(urlId: string, initialView: View) {
     periodos, loading, current, setCurrent, error,
     categorias, setCategorias, allCategorias, showManageCat, setShowManageCat, newCatName, setNewCatName,
     showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,
-    responsables, setResponsables, allResponsables, showAddResponsable, setShowAddResponsable, newResponsable, setNewResponsable,
+    responsablesCatalog, allResponsables,
     addingGasto, subtotalNum, totalNum,
     editingGastoId, setEditingGastoId, editGasto, setEditGasto,
     formValues, formSetters,

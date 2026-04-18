@@ -42,7 +42,7 @@ function CajaPage() {
     periodos, loading, current, setCurrent, error,
     categorias, setCategorias, allCategorias, showManageCat, setShowManageCat, newCatName, setNewCatName,
     showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,
-    responsables, setResponsables, allResponsables, showAddResponsable, setShowAddResponsable, newResponsable, setNewResponsable,
+    responsablesCatalog, allResponsables,
     addingGasto, subtotalNum, totalNum,
     editingGastoId, setEditingGastoId, editGasto, setEditGasto,
     formValues, formSetters,
@@ -173,19 +173,13 @@ function CajaPage() {
               subtotalNum={subtotalNum}
               totalNum={totalNum}
               categorias={categorias}
-              responsables={responsables}
-              allResponsables={allResponsables}
+              responsablesCatalog={responsablesCatalog}
               showManageCat={showManageCat}
-              showAddResponsable={showAddResponsable}
               newCatName={newCatName}
-              newResponsable={newResponsable}
               isOwner={isOwner}
               setCategorias={setCategorias}
               setShowManageCat={setShowManageCat}
-              setShowAddResponsable={setShowAddResponsable}
               setNewCatName={setNewCatName}
-              setNewResponsable={setNewResponsable}
-              setResponsables={setResponsables}
               onAddGasto={addGasto}
               fondoInicial={current.fondo_inicial}
               totalGastado={detailTotalGastado}

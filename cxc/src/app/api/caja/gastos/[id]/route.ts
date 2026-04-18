@@ -4,7 +4,7 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 
-const ALLOWED_FIELDS = ["fecha", "descripcion", "proveedor", "categoria", "subtotal", "itbms", "total", "responsable", "metodo_pago", "numero_factura"];
+const ALLOWED_FIELDS = ["fecha", "descripcion", "proveedor", "categoria", "subtotal", "itbms", "total", "responsable", "responsable_id", "metodo_pago", "numero_factura"];
 
 function normalizeStr(s: string): string {
   const t = s.trim();
@@ -77,7 +77,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   if (typeof fields.categoria === "string") fields.categoria = normalizeStr(fields.categoria) || "Varios";
 
-  if ("responsable" in fields) {
+  if ("responsable_id" in fields) {
+    const rid = typeof fields.responsable_id === "string" ? fields.responsable_id : "";
+    if (!rid) return NextResponse.json({ error: "El responsable es obligatorio." }, { status: 400 });
+    const { data: responsableRow } = await supabaseServer
+      .from("caja_responsables")
+      .select("id, nombre, activo")
+      .eq("id", rid)
+      .maybeSingle();
+    if (!responsableRow || !responsableRow.activo) {
+      return NextResponse.json({ error: "Responsable inválido o inactivo." }, { status: 400 });
+    }
+    fields.responsable_id = rid;
+    // Keep the text column in sync for display paths (PrintView, mobile card, Excel).
+    fields.responsable = responsableRow.nombre;
+  } else if ("responsable" in fields) {
+    // Legacy inline-edit path: text-only update. Backward compat for GastoTable.
     const normalized = typeof fields.responsable === "string" ? normalizeStr(fields.responsable) : "";
     if (!normalized) return NextResponse.json({ error: "El responsable es obligatorio." }, { status: 400 });
     fields.responsable = normalized;

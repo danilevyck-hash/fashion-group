@@ -15,8 +15,8 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
   const { periodo_id, fecha, descripcion, proveedor, nro_factura, subtotal, itbms, total } = body;
-  const responsable = normalizeStr(body.responsable || "");
   const categoria = normalizeStr(body.categoria || "") || "Varios";
+  const responsableId = typeof body.responsable_id === "string" ? body.responsable_id : "";
 
   if (!subtotal || Number(subtotal) <= 0) return NextResponse.json({ error: "El monto debe ser mayor a 0" }, { status: 400 });
 
@@ -26,7 +26,17 @@ export async function POST(req: NextRequest) {
   const proveedorRaw = typeof proveedor === "string" ? proveedor.trim() : "";
   if (!proveedorRaw || proveedorRaw === "—") return NextResponse.json({ error: "El proveedor es obligatorio." }, { status: 400 });
 
-  if (!responsable) return NextResponse.json({ error: "El responsable es obligatorio." }, { status: 400 });
+  if (!responsableId) return NextResponse.json({ error: "El responsable es obligatorio." }, { status: 400 });
+
+  const { data: responsableRow } = await supabaseServer
+    .from("caja_responsables")
+    .select("id, nombre, activo")
+    .eq("id", responsableId)
+    .maybeSingle();
+  if (!responsableRow || !responsableRow.activo) {
+    return NextResponse.json({ error: "Responsable inválido o inactivo." }, { status: 400 });
+  }
+  const responsable = responsableRow.nombre;
 
   // Panama is UTC-5 year-round (no DST). "Today" in Panama as YYYY-MM-DD.
   const hoyPanama = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
@@ -51,6 +61,7 @@ export async function POST(req: NextRequest) {
       proveedor: proveedorRaw,
       nro_factura: nro_factura || "",
       responsable,
+      responsable_id: responsableId,
       categoria,
       subtotal, itbms: roundedItbms, total: roundedTotal,
       // Keep old fields populated for backwards compat
