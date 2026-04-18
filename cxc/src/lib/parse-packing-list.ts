@@ -302,9 +302,25 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
 
   function saveBulto() {
     if (currentBultoId) {
+      const items = Array.from(currentItemMap.values());
+      // [DEBUG TEMPORAL — bug parser FW bultos 547946/547949, revert después]
+      if (typeof window !== "undefined" && (currentBultoId === "547946" || currentBultoId === "547949")) {
+        const sum = items.reduce((s, i) => s + i.qty, 0);
+        // eslint-disable-next-line no-console
+        console.log("[PARSER DEBUG BULTO TOTAL]", {
+          bultoId: currentBultoId,
+          totalCalculado: sum,
+          totalHeaderPdf: currentBultoTotalPiezas,
+          diff: currentBultoTotalPiezas - sum,
+          itemCount: items.length,
+          items: items.map(i => ({ estilo: i.estilo, producto: i.producto, qty: i.qty, hasM: i.hasM, has32: i.has32 })),
+          columns: currentSizeInfo.columns,
+          xPositions: { dimXPos, qtyXPos, mXPos, dim32XPos },
+        });
+      }
       bultos.push({
         id: currentBultoId,
-        items: Array.from(currentItemMap.values()),
+        items,
         totalPiezas: currentBultoTotalPiezas,
         sizeColumns: currentSizeInfo.columns,
       });
@@ -438,6 +454,22 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
           if (qty === 0) qty = parseInt(nums[nums.length - 1], 10);
         } else {
           qty = parseInt(nums[nums.length - 1], 10);
+        }
+        // [DEBUG TEMPORAL — bug parser FW bultos 547946/547949, revert después]
+        if (typeof window !== "undefined" && (currentBultoId === "547946" || currentBultoId === "547949")) {
+          // eslint-disable-next-line no-console
+          console.log("[PARSER DEBUG]", {
+            bultoId: currentBultoId,
+            estilo: currentEstilo,
+            producto: currentProducto,
+            rawLineText: rawLine?.text || line,
+            rawItems: rawLine?.items?.map(it => ({ str: it.str, x: Math.round(it.x * 100) / 100 })),
+            nums,
+            qtyCalculado: qty,
+            usedXRangeSum: !!(rawLine && qtyXPos > 0 && dimXPos > 0),
+            xPositions: { dimXPos, qtyXPos, mXPos, dim32XPos },
+            columns: currentSizeInfo.columns,
+          });
         }
         if (qty > 0 && qty < 100000) {
           // Check if M or 32 is present using X-position coordinates when available
