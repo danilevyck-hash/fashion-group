@@ -12,7 +12,6 @@ import { View } from "./components/types";
 import { useCajaState } from "./hooks/useCajaState";
 import PeriodoList from "./components/PeriodoList";
 import PeriodoDetailHeader from "./components/PeriodoDetailHeader";
-import ResumenGastos from "./components/ResumenGastos";
 import GastoTable from "./components/GastoTable";
 import DeletedGastosSection from "./components/DeletedGastosSection";
 import PrintView from "./components/PrintView";
@@ -161,8 +160,6 @@ function CajaPage() {
           <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-12">
             {cajaSuggestion && <SuggestionCard suggestion={cajaSuggestion} onDismiss={dismissCaja} />}
 
-            <ResumenGastos gastos={detailGastos} />
-
             {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
             <GastoTable
@@ -184,6 +181,22 @@ function CajaPage() {
               onRestore={requestRestoreGasto}
             />
           </div>
+
+          {/* FAB — "Agregar gasto" on open-period detail view */}
+          {detailIsOpen && (
+            <Link
+              href={`/caja/${current.id}/nuevo`}
+              aria-label="Agregar gasto"
+              className="fixed right-4 sm:right-6 z-[45] bg-black text-white rounded-full pl-4 pr-5 py-3 shadow-lg hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2 text-sm font-medium"
+              style={{ bottom: "max(1.5rem, calc(env(safe-area-inset-bottom) + 1rem))" }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Agregar gasto
+            </Link>
+          )}
         </div>
       )}
 
@@ -256,20 +269,6 @@ function CajaPage() {
             </div>
           </div>
         </div>
-      )}
-      {/* FAB — "Agregar gasto" on open-period detail view */}
-      {view === "detail" && current && current.estado === "abierto" && (
-        <Link
-          href={`/caja/${current.id}/nuevo`}
-          className="fixed bottom-6 right-6 z-40 bg-black text-white rounded-full pl-4 pr-5 py-3 shadow-lg hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2 text-sm font-medium"
-          aria-label="Agregar gasto"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" />
-            <line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Agregar gasto
-        </Link>
       )}
     </>
   );
