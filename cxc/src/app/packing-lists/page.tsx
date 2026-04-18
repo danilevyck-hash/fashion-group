@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, ConfirmModal } from "@/components/ui";
@@ -56,6 +56,7 @@ export default function PackingListsPage() {
     allowedRoles: ["admin", "secretaria", "bodega", "director", "vendedor"],
   });
 
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const collapseInitRef = useRef(false);
 
@@ -998,14 +999,13 @@ export default function PackingListsPage() {
                         Estilos
                       </th>
                       {canEdit && <th className="px-3 py-2 w-10" />}
-                      <th className="px-3 py-2 w-10" aria-label="Ver detalle" />
                     </tr>
                   </thead>
                   <tbody>
                     {groupedByDay.map((group) => {
                       const ids = group.pls.map(p => p.id);
                       const allDaySelected = ids.length > 0 && ids.every(id => selectedIds.has(id));
-                      const colSpan = canEdit ? 9 : 8;
+                      const colSpan = canEdit ? 8 : 7;
                       const isCollapsed = collapsedDays.has(group.dayIso);
                       return (
                         <Fragment key={group.dayIso}>
@@ -1032,7 +1032,7 @@ export default function PackingListsPage() {
                       <tr
                         key={pl.id}
                         className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition cursor-pointer"
-                        onClick={() => toggleOne(pl.id)}
+                        onClick={() => router.push(`/packing-lists/${pl.id}`)}
                       >
                         <td className="px-3 py-2.5 w-10" onClick={(e) => e.stopPropagation()}>
                           <input
@@ -1042,14 +1042,7 @@ export default function PackingListsPage() {
                             className="accent-teal-600 w-3.5 h-3.5"
                           />
                         </td>
-                        <td className="px-3 py-2.5 font-medium" onClick={(e) => e.stopPropagation()}>
-                          <Link
-                            href={`/packing-lists/${pl.id}`}
-                            className="hover:underline text-teal-700"
-                          >
-                            {pl.numero_pl || "—"}
-                          </Link>
-                        </td>
+                        <td className="px-3 py-2.5 font-medium">{pl.numero_pl || "—"}</td>
                         <td className="px-3 py-2.5 text-gray-600">
                           <span className="inline-block px-2 py-0.5 rounded-full text-[11px] bg-teal-50 text-teal-700 border border-teal-100">
                             {displayEmpresa(pl.empresa)}
@@ -1089,26 +1082,6 @@ export default function PackingListsPage() {
                             </button>
                           </td>
                         )}
-                        <td className="px-3 py-2.5 w-10" onClick={(e) => e.stopPropagation()}>
-                          <Link
-                            href={`/packing-lists/${pl.id}`}
-                            className="inline-flex items-center justify-center text-gray-400 hover:text-gray-700 transition p-1"
-                            title="Ver detalle"
-                          >
-                            <svg
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <polyline points="9 18 15 12 9 6" />
-                            </svg>
-                          </Link>
-                        </td>
                       </tr>
                           ))}
                         </Fragment>
