@@ -11,7 +11,6 @@ export interface GastoFormValues {
   gSubtotal: string;
   gItbmsPct: string;
   gCategoria: string;
-  gCategoriaOtro: string;
   gResponsable: string;
 }
 
@@ -23,7 +22,6 @@ export interface GastoFormSetters {
   setGSubtotal: (v: string) => void;
   setGItbmsPct: (v: string) => void;
   setGCategoria: (v: string) => void;
-  setGCategoriaOtro: (v: string) => void;
   setGResponsable: (v: string) => void;
 }
 
@@ -87,13 +85,13 @@ interface Props {
   subtotalNum: number;
   totalNum: number;
   categorias: string[];
-  allCategorias: string[];
   responsables: string[];
   allResponsables: string[];
   showManageCat: boolean;
   showAddResponsable: boolean;
   newCatName: string;
   newResponsable: string;
+  isOwner: boolean;
   setCategorias: (v: string[]) => void;
   setShowManageCat: (v: boolean) => void;
   setShowAddResponsable: (v: boolean) => void;
@@ -112,13 +110,13 @@ export default function GastoForm({
   subtotalNum,
   totalNum,
   categorias,
-  allCategorias,
   responsables,
   allResponsables,
   showManageCat,
   showAddResponsable,
   newCatName,
   newResponsable,
+  isOwner,
   setCategorias,
   setShowManageCat,
   setShowAddResponsable,
@@ -131,17 +129,18 @@ export default function GastoForm({
 }: Props) {
   const {
     gFecha, gDescripcion, gProveedor, gNroFactura,
-    gSubtotal, gItbmsPct, gCategoria, gCategoriaOtro,
+    gSubtotal, gItbmsPct, gCategoria,
     gResponsable,
   } = values;
   const {
     setGFecha, setGDescripcion, setGProveedor, setGNroFactura,
-    setGSubtotal, setGItbmsPct, setGCategoria, setGCategoriaOtro,
+    setGSubtotal, setGItbmsPct, setGCategoria,
     setGResponsable,
   } = setters;
 
   const [showMoreDetails, setShowMoreDetails] = useState(true);
   const [justSaved, setJustSaved] = useState(false);
+  const [catError, setCatError] = useState<string | null>(null);
 
   const restante = fondoInicial - totalGastado;
   const restantePct = fondoInicial > 0 ? (restante / fondoInicial) * 100 : 100;
@@ -215,63 +214,87 @@ export default function GastoForm({
           <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1 block">
             Categoría <span className="text-red-500">*</span>
           </label>
-          <AutocompleteInput
+          <select
             value={gCategoria}
-            onChange={(v) => setGCategoria(v)}
-            options={allCategorias}
-            placeholder="Ej: Transporte"
-            className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition"
-          />
-          <button
-            onClick={() => setShowManageCat(!showManageCat)}
-            className="text-[10px] text-gray-500 hover:text-black mt-1.5 inline-flex items-center gap-1 border border-gray-200 rounded px-1.5 py-0.5 hover:border-gray-400 transition"
-            title="Gestionar categorias"
+            onChange={(e) => setGCategoria(e.target.value)}
+            className="w-full border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent focus:border-black transition appearance-none"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            Categorias
-          </button>
-          {showManageCat && (
-            <div className="mt-2 p-2 bg-gray-50 rounded text-xs space-y-1">
-              {categorias.map((c) => (
-                <div key={c} className="flex items-center justify-between py-1">
-                  <span>{c}</span>
-                  <button
-                    onClick={() => {
-                      setCategorias(categorias.filter((x) => x !== c));
-                    }}
-                    className="text-gray-300 hover:text-red-500 text-xs ml-3"
-                  >
-                    ×
-                  </button>
+            {categorias.length === 0 && <option value="">—</option>}
+            {categorias.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          {isOwner && (
+            <>
+              <button
+                onClick={() => { setCatError(null); setShowManageCat(!showManageCat); }}
+                className="text-[10px] text-gray-500 hover:text-black mt-1.5 inline-flex items-center gap-1 border border-gray-200 rounded px-1.5 py-0.5 hover:border-gray-400 transition"
+                title="Gestionar categorias"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                Categorias
+              </button>
+              {showManageCat && (
+                <div className="mt-2 p-2 bg-gray-50 rounded text-xs space-y-1">
+                  {categorias.map((c) => (
+                    <div key={c} className="flex items-center justify-between py-1">
+                      <span>{c}</span>
+                      <button
+                        onClick={async () => {
+                          setCatError(null);
+                          const res = await fetch("/api/caja/categorias", {
+                            method: "DELETE",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ nombre: c }),
+                          });
+                          if (!res.ok) {
+                            const payload = await res.json().catch(() => null);
+                            setCatError(payload && typeof payload.error === "string" ? payload.error : "No se pudo eliminar la categoría.");
+                            return;
+                          }
+                          setCategorias(categorias.filter((x) => x !== c));
+                        }}
+                        className="text-gray-300 hover:text-red-500 text-xs ml-3"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  <div className="flex items-center gap-1 mt-1">
+                    <input
+                      type="text"
+                      value={newCatName}
+                      onChange={(e) => setNewCatName(e.target.value)}
+                      placeholder="Nueva categoría"
+                      className="flex-1 border-b border-gray-200 py-0.5 text-xs outline-none"
+                    />
+                    <button
+                      onClick={async () => {
+                        setCatError(null);
+                        const normalized = normalizeStr(newCatName);
+                        if (!normalized || categorias.includes(normalized)) return;
+                        const res = await fetch("/api/caja/categorias", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ nombre: normalized }),
+                        });
+                        if (!res.ok) {
+                          const payload = await res.json().catch(() => null);
+                          setCatError(payload && typeof payload.error === "string" ? payload.error : "No se pudo crear la categoría.");
+                          return;
+                        }
+                        setCategorias([...categorias, normalized]);
+                        setNewCatName("");
+                      }}
+                      className="text-xs text-gray-500 hover:text-black"
+                    >
+                      ＋
+                    </button>
+                  </div>
+                  {catError && <p className="text-[10px] text-red-600 mt-1">{catError}</p>}
                 </div>
-              ))}
-              <div className="flex items-center gap-1 mt-1">
-                <input
-                  type="text"
-                  value={newCatName}
-                  onChange={(e) => setNewCatName(e.target.value)}
-                  placeholder="Nueva categoría"
-                  className="flex-1 border-b border-gray-200 py-0.5 text-xs outline-none"
-                />
-                <button
-                  onClick={async () => {
-                    const normalized = normalizeStr(newCatName);
-                    if (!normalized || categorias.includes(normalized))
-                      return;
-                    await fetch("/api/caja/categorias", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ nombre: normalized }),
-                    });
-                    setCategorias([...categorias, normalized]);
-                    setNewCatName("");
-                  }}
-                  className="text-xs text-gray-500 hover:text-black"
-                >
-                  ＋
-                </button>
-              </div>
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>

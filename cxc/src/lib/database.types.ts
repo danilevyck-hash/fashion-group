@@ -1045,6 +1045,8 @@ export type Database = {
           associated_company: string | null
           created_at: string | null
           updated_at: string | null
+          // from fg-users-is-owner.sql
+          is_owner: boolean
         }
         Insert: {
           id?: string
@@ -1055,6 +1057,7 @@ export type Database = {
           associated_company?: string | null
           created_at?: string | null
           updated_at?: string | null
+          is_owner?: boolean
         }
         Update: {
           id?: string
@@ -1065,6 +1068,7 @@ export type Database = {
           associated_company?: string | null
           created_at?: string | null
           updated_at?: string | null
+          is_owner?: boolean
         }
       }
       fg_user_modules: {

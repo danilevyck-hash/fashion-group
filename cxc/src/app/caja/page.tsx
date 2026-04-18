@@ -29,7 +29,7 @@ export default function CajaPageWrapper() {
 }
 
 function CajaPage() {
-  const { authChecked, role } = useAuth({
+  const { authChecked, role, isOwner } = useAuth({
     moduleKey: "caja",
     allowedRoles: ["admin", "secretaria"],
   });
@@ -173,13 +173,13 @@ function CajaPage() {
               subtotalNum={subtotalNum}
               totalNum={totalNum}
               categorias={categorias}
-              allCategorias={allCategorias}
               responsables={responsables}
               allResponsables={allResponsables}
               showManageCat={showManageCat}
               showAddResponsable={showAddResponsable}
               newCatName={newCatName}
               newResponsable={newResponsable}
+              isOwner={isOwner}
               setCategorias={setCategorias}
               setShowManageCat={setShowManageCat}
               setShowAddResponsable={setShowAddResponsable}

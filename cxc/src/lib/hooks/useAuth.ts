@@ -13,6 +13,7 @@ export function useAuth({ moduleKey, allowedRoles }: UseAuthOptions) {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
   const [role, setRole] = useState("");
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role") || "";
@@ -30,8 +31,9 @@ export function useAuth({ moduleKey, allowedRoles }: UseAuthOptions) {
       return;
     }
     setRole(r);
+    setIsOwner(sessionStorage.getItem("fg_is_owner") === "1");
     setAuthChecked(true);
   }, [router, moduleKey, allowedRoles]);
 
-  return { authChecked, role };
+  return { authChecked, role, isOwner };
 }

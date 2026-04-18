@@ -7,6 +7,7 @@ interface SessionPayload {
   userId?: string;
   userName?: string;
   modules?: string[];
+  isOwner?: boolean;
 }
 
 /**

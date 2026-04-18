@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
   try {
     const { data: users } = await supabaseServer
       .from("fg_users")
-      .select("id, name, role, password, active")
+      .select("id, name, role, password, active, is_owner")
       .eq("active", true);
 
     if (users) {
@@ -112,6 +112,7 @@ export async function POST(req: NextRequest) {
             userId: user.id,
             userName: user.name,
             modules,
+            isOwner: !!user.is_owner,
             ...(userConfig.empresaFilter && { empresaFilter: userConfig.empresaFilter }),
             ...(userConfig.guiasReadonly && { guiasReadonly: true }),
           };
@@ -130,6 +131,7 @@ export async function POST(req: NextRequest) {
           const res = NextResponse.json(payload);
           setSessionCookie(res, {
             role: user.role, userId: user.id, userName: user.name, modules, sessionToken,
+            isOwner: !!user.is_owner,
             ...(userConfig.empresaFilter && { empresaFilter: userConfig.empresaFilter }),
             ...(userConfig.guiasReadonly && { guiasReadonly: true }),
           });

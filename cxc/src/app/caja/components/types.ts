@@ -33,13 +33,3 @@ export interface CajaGasto {
 }
 
 export type View = "list" | "detail" | "print";
-
-export const CATEGORIAS_DEFAULT = [
-  "Transporte",
-  "Papelería",
-  "Alimentación",
-  "Limpieza",
-  "Mensajería",
-  "Servicios varios",
-  "Otro",
-];

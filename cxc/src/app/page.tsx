@@ -30,7 +30,7 @@ function LoginForm() {
     if (expired) setExpiredMsg(true);
   }, [expired]);
 
-  function storeSession(data: { role: string; userId?: string; userName?: string; modules?: string[]; empresaFilter?: string; guiasReadonly?: boolean }) {
+  function storeSession(data: { role: string; userId?: string; userName?: string; modules?: string[]; empresaFilter?: string; guiasReadonly?: boolean; isOwner?: boolean }) {
     sessionStorage.setItem("cxc_role", data.role);
     if (data.userId) sessionStorage.setItem("fg_user_id", data.userId);
     if (data.userName) sessionStorage.setItem("fg_user_name", data.userName);
@@ -39,6 +39,8 @@ function LoginForm() {
     else sessionStorage.removeItem("fg_empresa_filter");
     if (data.guiasReadonly) sessionStorage.setItem("fg_guias_readonly", "1");
     else sessionStorage.removeItem("fg_guias_readonly");
+    if (data.isOwner) sessionStorage.setItem("fg_is_owner", "1");
+    else sessionStorage.removeItem("fg_is_owner");
   }
 
   async function handleLogin(e: React.FormEvent) {

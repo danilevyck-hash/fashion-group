@@ -8,6 +8,7 @@ export interface SessionPayload {
   userName?: string;
   modules?: string[];
   sessionToken?: string;
+  isOwner?: boolean;
 }
 
 /**

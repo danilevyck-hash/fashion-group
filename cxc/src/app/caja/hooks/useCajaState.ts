@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { CajaPeriodo, CajaGasto, View, CATEGORIAS_DEFAULT } from "../components/types";
+import { CajaPeriodo, CajaGasto, View } from "../components/types";
 import { GastoFormValues, GastoFormSetters } from "../components/GastoForm";
 
 function normalizeStr(s: string): string {
@@ -34,7 +34,7 @@ export function useCajaState(urlId: string, initialView: View) {
   const [loading, setLoading] = useState(true);
   const [current, setCurrent] = useState<CajaPeriodo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [categorias, setCategorias] = useState(CATEGORIAS_DEFAULT);
+  const [categorias, setCategorias] = useState<string[]>([]);
   const [showManageCat, setShowManageCat] = useState(false);
   const [newCatName, setNewCatName] = useState("");
   const [confirmClosePeriodo, setConfirmClosePeriodo] = useState<string | null>(null);
@@ -53,7 +53,6 @@ export function useCajaState(urlId: string, initialView: View) {
   const [gSubtotal, setGSubtotal] = useState("");
   const [gItbmsPct, setGItbmsPct] = useState("0");
   const [gCategoria, setGCategoria] = useState("Transporte");
-  const [gCategoriaOtro, setGCategoriaOtro] = useState("");
   const [gResponsable, setGResponsable] = useState("");
   const [addingGasto, setAddingGasto] = useState(false);
   const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
@@ -65,12 +64,12 @@ export function useCajaState(urlId: string, initialView: View) {
 
   const formValues: GastoFormValues = {
     gFecha, gDescripcion, gProveedor, gNroFactura,
-    gSubtotal, gItbmsPct, gCategoria, gCategoriaOtro,
+    gSubtotal, gItbmsPct, gCategoria,
     gResponsable,
   };
   const formSetters: GastoFormSetters = {
     setGFecha, setGDescripcion, setGProveedor, setGNroFactura,
-    setGSubtotal, setGItbmsPct, setGCategoria, setGCategoriaOtro,
+    setGSubtotal, setGItbmsPct, setGCategoria,
     setGResponsable,
   };
 
@@ -105,9 +104,9 @@ export function useCajaState(urlId: string, initialView: View) {
 
   useEffect(() => {
     fetch("/api/caja/categorias")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data: string[] | null) => {
-        if (data && data.length > 0) setCategorias(data);
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: string[]) => {
+        setCategorias(Array.isArray(data) ? data : []);
       })
       .catch(() => { console.error('Failed to load categorias'); });
     loadPeriodos();
@@ -261,7 +260,7 @@ export function useCajaState(urlId: string, initialView: View) {
 
     setAddingGasto(true);
     setError(null);
-    const resolvedCategoria = normalizeStr(gCategoria === "Otro" ? gCategoriaOtro.trim() || "Otro" : gCategoria);
+    const resolvedCategoria = normalizeStr(gCategoria) || "Otros";
     const resolvedResponsable = normalizeStr(gResponsable);
 
     // Capture request body BEFORE clearing form
@@ -290,7 +289,7 @@ export function useCajaState(urlId: string, initialView: View) {
     // Clear form immediately (feels instant)
     setGFecha(new Date().toISOString().split("T")[0]);
     setGDescripcion(""); setGProveedor(""); setGNroFactura(""); setGSubtotal(""); setGItbmsPct("0");
-    setGCategoria("Transporte"); setGCategoriaOtro(""); setGResponsable("");
+    setGCategoria("Transporte"); setGResponsable("");
 
     try {
       const res = await fetch("/api/caja/gastos", {
