@@ -50,9 +50,7 @@ export default function PeriodoDetailHeader({
   const barWidth = Math.min(100, fondoInicial > 0 ? (totalGastado / fondoInicial) * 100 : 0);
 
   const menuItems: OverflowMenuItem[] = [
-    ...(isOpen && onClosePeriodo
-      ? [{ label: "Cerrar período", onClick: onClosePeriodo, destructive: true }]
-      : []),
+    ...(onPrint ? [{ label: "Imprimir", onClick: onPrint }] : []),
     ...(onExportExcel ? [{ label: "Descargar Excel", onClick: onExportExcel }] : []),
     ...(!isOpen && !current.repuesto && onAprobarReposicion
       ? [{ label: "Aprobar reposición", onClick: () => onAprobarReposicion(current.id) }]
@@ -136,18 +134,14 @@ export default function PeriodoDetailHeader({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {onPrint && (
+              {isOpen && onClosePeriodo && (
                 <button
-                  onClick={onPrint}
-                  title="Imprimir"
-                  className="text-sm text-gray-500 hover:text-black border border-gray-200 rounded-md px-2 sm:px-3 py-1.5 hover:border-gray-400 transition flex items-center gap-1.5"
+                  onClick={onClosePeriodo}
+                  title="Cerrar período"
+                  className="text-sm text-black bg-white border border-gray-300 rounded-md px-3 py-1.5 hover:bg-gray-50 active:scale-[0.97] transition font-medium"
                 >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <polyline points="6 9 6 2 18 2 18 9" />
-                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                    <rect x="6" y="14" width="12" height="8" />
-                  </svg>
-                  <span className="hidden sm:inline">Imprimir</span>
+                  <span className="sm:hidden">Cerrar</span>
+                  <span className="hidden sm:inline">Cerrar período</span>
                 </button>
               )}
               <OverflowMenu items={menuItems} />
