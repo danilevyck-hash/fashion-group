@@ -5,25 +5,12 @@ import FGLogo from "@/components/FGLogo";
 import SearchBar from "@/components/SearchBar";
 import NotificationCenter from "@/components/NotificationCenter";
 import { getModuleColor } from "@/lib/moduleColors";
+import { ALL_MODULES, getVisibleModules } from "@/lib/modules";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin", secretaria: "Secretaria", bodega: "Bodega",
   director: "Director", contabilidad: "Contabilidad", vendedor: "Vendedor", cliente: "Cliente",
 };
-
-const NAV_MODULES = [
-  { key: "cxc", label: "CXC", href: "/admin", icon: "M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" },
-  { key: "guias", label: "Guías", href: "/guias", icon: "M13 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V9z M13 2v7h7" },
-  { key: "cheques", label: "Cheques", href: "/cheques", icon: "M2 17l10 5 10-5M2 12l10 5 10-5M12 2L2 7l10 5 10-5-10-5z" },
-  { key: "caja", label: "Caja", href: "/caja", icon: "M21 4H3a1 1 0 00-1 1v14a1 1 0 001 1h18a1 1 0 001-1V5a1 1 0 00-1-1zM1 10h22" },
-  { key: "directorio", label: "Directorio", href: "/directorio", icon: "M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2 M9 7a4 4 0 100-8 4 4 0 000 8z M23 21v-2a4 4 0 00-3-3.87 M16 3.13a4 4 0 010 7.75" },
-  { key: "reclamos", label: "Reclamos", href: "/reclamos", icon: "M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z M12 9v4 M12 17h.01" },
-  { key: "prestamos", label: "Préstamos", href: "/prestamos", icon: "M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2 M9 7a4 4 0 100-8 4 4 0 000 8z" },
-  { key: "ventas", label: "Ventas", href: "/ventas", icon: "M22 12h-4l-3 9L9 3l-3 9H2" },
-  { key: "packing-lists", label: "Packing Lists", href: "/packing-lists", icon: "M3 3h18a2 2 0 012 2v14a2 2 0 01-2 2H3a2 2 0 01-2-2V5a2 2 0 012-2z M1 9h22 M9 21V9" },
-  { key: "camisetas", label: "Camisetas", href: "/camisetas", icon: "M20.38 3.46L16 2 12 5 8 2 3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z" },
-  { key: "reebok", label: "Reebok", href: "/catalogo/reebok", icon: "M20 12V8H6a2 2 0 01-2-2c0-1.1.9-2 2-2h12V0L22 4l-4 4" },
-];
 
 interface AppHeaderProps {
   module: string;
@@ -38,11 +25,18 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const [userName, setUserName] = useState("");
   const [userRole, setUserRole] = useState("");
+  const [fgModules, setFgModules] = useState<string[] | null>(null);
 
   useEffect(() => {
     setUserName(sessionStorage.getItem("fg_user_name") || "");
     setUserRole(sessionStorage.getItem("cxc_role") || "");
+    try {
+      const mods = sessionStorage.getItem("fg_modules");
+      if (mods) setFgModules(JSON.parse(mods));
+    } catch { /* ignore */ }
   }, []);
+
+  const visibleNav = userRole ? getVisibleModules(userRole, fgModules) : [];
 
   function handleLogout() {
     fetch("/api/auth", { method: "DELETE" }).catch(() => {});
@@ -61,7 +55,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
   }, [drawerOpen]);
 
   const moduleColor = getModuleColor(pathname);
-  const currentNav = NAV_MODULES.find(m => moduleColor && pathname.startsWith(m.href));
+  const currentNav = ALL_MODULES.find(m => moduleColor && pathname.startsWith(m.href));
 
   return (
     <>
@@ -178,7 +172,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
                 </svg>
                 Inicio
               </button>
-              {NAV_MODULES.map(m => {
+              {visibleNav.map(m => {
                 const active = pathname.startsWith(m.href);
                 return (
                   <button key={m.key} onClick={() => { router.push(m.href); setDrawerOpen(false); }}
