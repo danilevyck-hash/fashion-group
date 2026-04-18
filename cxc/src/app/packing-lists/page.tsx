@@ -362,12 +362,15 @@ export default function PackingListsPage() {
         doc.line(marginLeft, currentY, contentRight, currentY);
         currentY += 4;
 
-        const checkboxSize = 4.6;
-        const lineHeight = 6.5;
-        const indentX = marginLeft + 8;
+        // Checkboxes ~10pt y columna "Notas" a la derecha
+        const checkboxSize = 3.5;
+        const lineHeight = 5.2;
+        const indentX = marginLeft + 7;
+        const notesX = marginLeft + 115;
+        const notesWidth = contentRight - notesX - 2;
 
         for (const [bultoId, styles] of sortedBultos) {
-          const blockHeight = lineHeight + (styles.length * lineHeight) + 3;
+          const blockHeight = lineHeight + (styles.length * lineHeight) + 2;
           if (currentY + blockHeight > pageHeight - 15) { doc.addPage(); currentY = 15; }
 
           doc.setDrawColor(150);
@@ -377,6 +380,11 @@ export default function PackingListsPage() {
           doc.setFont("helvetica", "bold");
           doc.setTextColor(30, 40, 60);
           doc.text(safe(`Bulto ${bultoNumberMap.get(bultoId) ?? "?"}  -  ${styles.length} muestra${styles.length > 1 ? "s" : ""}`), marginLeft + checkboxSize + 2, currentY);
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(140);
+          doc.text(safe("Notas"), notesX, currentY);
+          doc.setTextColor(30, 40, 60);
           currentY += lineHeight + 0.5;
 
           for (const style of styles) {
@@ -387,22 +395,31 @@ export default function PackingListsPage() {
             doc.setTextColor(50);
             doc.text(safe(style.estilo), indentX + checkboxSize + 2, currentY);
             const estiloWidth = doc.getTextWidth(safe(style.estilo));
+            const productoStartX = indentX + checkboxSize + 2 + estiloWidth;
+            const productoMaxWidth = notesX - productoStartX - 3;
             doc.setFont("helvetica", "normal");
             doc.setTextColor(100);
-            const productoText = safe(` -  ${style.producto}`);
-            doc.text(productoText, indentX + checkboxSize + 2 + estiloWidth, currentY);
+            let productoText = safe(` -  ${style.producto}`);
+            if (doc.getTextWidth(productoText) > productoMaxWidth) {
+              const lines = doc.splitTextToSize(productoText, productoMaxWidth);
+              productoText = (lines[0] || "").replace(/\s+$/, "") + "…";
+            }
+            doc.text(productoText, productoStartX, currentY);
             if (style.isOS) {
               const productoWidth = doc.getTextWidth(productoText);
               doc.setTextColor(150);
-              doc.text("  - OS", indentX + checkboxSize + 2 + estiloWidth + productoWidth, currentY);
+              doc.text("  - OS", productoStartX + productoWidth, currentY);
             }
+            doc.setDrawColor(200);
+            doc.setLineWidth(0.2);
+            doc.line(notesX, currentY + 0.8, notesX + notesWidth, currentY + 0.8);
             currentY += lineHeight;
           }
-          currentY += 1;
+          currentY += 0.5;
           doc.setDrawColor(220);
           doc.setLineWidth(0.2);
           doc.line(marginLeft, currentY, contentRight, currentY);
-          currentY += 3;
+          currentY += 2;
         }
       }
 
@@ -553,9 +570,15 @@ export default function PackingListsPage() {
         {previewItems.length > 0 && (
           <div className="space-y-3">
             {/* Banner de validación obligatoria */}
-            <div className="bg-amber-50 border border-amber-300 text-amber-900 p-4 rounded text-base font-medium">
-              <p>⚠ Valida cada PL contra el PDF original antes de guardar.</p>
-              <p className="mt-1">Bodega necesita esta información correcta para inventario.</p>
+            <div className="bg-amber-50 border border-amber-300 text-amber-900 p-4 rounded">
+              <p className="text-base font-bold">⚠ Valida cada PL contra el PDF original antes de guardar</p>
+              <p className="text-sm mt-2">Compara estos 3 datos del PDF original:</p>
+              <ul className="text-sm mt-1 ml-5 list-disc">
+                <li>Número de PL</li>
+                <li>Total de piezas</li>
+                <li>Total de bultos</li>
+              </ul>
+              <p className="text-sm mt-2">Bodega necesita esta información correcta para inventario.</p>
             </div>
             {/* Summary bar */}
             <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between">

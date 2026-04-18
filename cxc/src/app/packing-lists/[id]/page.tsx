@@ -211,14 +211,16 @@ export default function PackingListDetailPage() {
       doc.line(marginLeft, currentY, contentRight, currentY);
       currentY += 4;
 
-      // Draw each bulto block. Checkboxes grandes para bodega (~13pt ≈ 4.6mm)
-      const checkboxSize = 4.6;
-      const lineHeight = 6.5;
-      const indentX = marginLeft + 8;
+      // Checkboxes para bodega ~10pt ≈ 3.5mm (tachable con bolígrafo)
+      const checkboxSize = 3.5;
+      const lineHeight = 5.2;
+      const indentX = marginLeft + 7;
+      // Columna "Notas" a la derecha — línea para que bodega escriba a mano
+      const notesX = marginLeft + 115;
+      const notesWidth = contentRight - notesX - 2;
 
       for (const [bultoId, styles] of sortedBultos) {
-        // Check if we need a page break (header line + all style lines)
-        const blockHeight = lineHeight + (styles.length * lineHeight) + 3;
+        const blockHeight = lineHeight + (styles.length * lineHeight) + 2;
         if (currentY + blockHeight > pageHeight - 15) {
           doc.addPage();
           currentY = 15;
@@ -236,6 +238,12 @@ export default function PackingListDetailPage() {
           marginLeft + checkboxSize + 2,
           currentY
         );
+        // Header de la columna Notas (solo en el primer bulto de la página)
+        doc.setFontSize(8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(140);
+        doc.text(safe("Notas"), notesX, currentY);
+        doc.setTextColor(30, 40, 60);
         currentY += lineHeight + 0.5;
 
         // Style rows
@@ -246,27 +254,37 @@ export default function PackingListDetailPage() {
           doc.setFont("courier", "normal");
           doc.setTextColor(50);
           doc.text(safe(style.estilo), indentX + checkboxSize + 2, currentY);
-          // Product description
+          // Product description — truncar si pasaría notesX
           const estiloWidth = doc.getTextWidth(safe(style.estilo));
+          const productoStartX = indentX + checkboxSize + 2 + estiloWidth;
+          const productoMaxWidth = notesX - productoStartX - 3;
           doc.setFont("helvetica", "normal");
           doc.setTextColor(100);
-          const productoText = safe(` -  ${style.producto}`);
-          doc.text(productoText, indentX + checkboxSize + 2 + estiloWidth, currentY);
+          let productoText = safe(` -  ${style.producto}`);
+          if (doc.getTextWidth(productoText) > productoMaxWidth) {
+            const lines = doc.splitTextToSize(productoText, productoMaxWidth);
+            productoText = (lines[0] || "").replace(/\s+$/, "") + "…";
+          }
+          doc.text(productoText, productoStartX, currentY);
           if (style.isOS) {
             const productoWidth = doc.getTextWidth(productoText);
             doc.setTextColor(150);
-            doc.text("  - OS", indentX + checkboxSize + 2 + estiloWidth + productoWidth, currentY);
+            doc.text("  - OS", productoStartX + productoWidth, currentY);
             doc.setTextColor(50);
           }
+          // Línea para notas a la derecha
+          doc.setDrawColor(200);
+          doc.setLineWidth(0.2);
+          doc.line(notesX, currentY + 0.8, notesX + notesWidth, currentY + 0.8);
           currentY += lineHeight;
         }
 
         // Separator line between bultos
-        currentY += 1;
+        currentY += 0.5;
         doc.setDrawColor(220);
         doc.setLineWidth(0.2);
         doc.line(marginLeft, currentY, contentRight, currentY);
-        currentY += 3;
+        currentY += 2;
       }
     }
 
