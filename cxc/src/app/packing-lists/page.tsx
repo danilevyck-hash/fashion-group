@@ -998,13 +998,14 @@ export default function PackingListsPage() {
                         Estilos
                       </th>
                       {canEdit && <th className="px-3 py-2 w-10" />}
+                      <th className="px-3 py-2 w-10" aria-label="Ver detalle" />
                     </tr>
                   </thead>
                   <tbody>
                     {groupedByDay.map((group) => {
                       const ids = group.pls.map(p => p.id);
                       const allDaySelected = ids.length > 0 && ids.every(id => selectedIds.has(id));
-                      const colSpan = canEdit ? 8 : 7;
+                      const colSpan = canEdit ? 9 : 8;
                       const isCollapsed = collapsedDays.has(group.dayIso);
                       return (
                         <Fragment key={group.dayIso}>
@@ -1022,8 +1023,7 @@ export default function PackingListsPage() {
                               />
                             </td>
                             <td colSpan={colSpan} className="px-3 py-2 font-medium text-gray-700 text-sm">
-                              <span className="inline-block w-3 text-gray-400 text-[10px] mr-1">{isCollapsed ? "▶" : "▼"}</span>
-                              <span className="mr-2">📅</span>
+                              <span className="inline-block w-4 text-gray-400 text-[10px] mr-2">{isCollapsed ? "▶" : "▼"}</span>
                               {group.label}
                               <span className="text-gray-500 font-normal"> · {group.pls.length} PL{group.pls.length !== 1 ? "s" : ""} · {group.totalPiezas.toLocaleString()} piezas</span>
                             </td>
@@ -1089,6 +1089,26 @@ export default function PackingListsPage() {
                             </button>
                           </td>
                         )}
+                        <td className="px-3 py-2.5 w-10" onClick={(e) => e.stopPropagation()}>
+                          <Link
+                            href={`/packing-lists/${pl.id}`}
+                            className="inline-flex items-center justify-center text-gray-400 hover:text-gray-700 transition p-1"
+                            title="Ver detalle"
+                          >
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <polyline points="9 18 15 12 9 6" />
+                            </svg>
+                          </Link>
+                        </td>
                       </tr>
                           ))}
                         </Fragment>
