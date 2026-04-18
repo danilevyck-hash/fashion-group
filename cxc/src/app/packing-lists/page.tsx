@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, ConfirmModal } from "@/components/ui";
@@ -56,8 +56,8 @@ export default function PackingListsPage() {
     allowedRoles: ["admin", "secretaria", "bodega", "director", "vendedor"],
   });
 
-  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const collapseInitRef = useRef(false);
 
   // Multi-PL preview item
   interface PLPreviewItem {
@@ -83,6 +83,7 @@ export default function PackingListsPage() {
   const [saveMismatchWarning, setSaveMismatchWarning] = useState<{ numeroPL: string; pdfPiezas: number; dbPiezas: number }[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);
+  const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
 
   // Cualquier PL con errores de validación bloquea el guardado
   const hasPreviewErrors = previewItems.some(i => i.errors.length > 0);
@@ -124,6 +125,28 @@ export default function PackingListsPage() {
         return { dayIso: day, label, pls, totalPiezas };
       });
   }, [filteredPlList]);
+
+  // Primera vez que llega data, colapsar todos los días excepto el más reciente.
+  // Después de la init las interacciones del usuario (expand/collapse manual)
+  // quedan preservadas: nuevos días que aparezcan quedan expandidos por default
+  // (porque no están en collapsedDays).
+  useEffect(() => {
+    if (collapseInitRef.current) return;
+    if (groupedByDay.length === 0) return;
+    const days = groupedByDay.map(g => g.dayIso);
+    const mostRecent = days[0];
+    setCollapsedDays(new Set(days.filter(d => d !== mostRecent)));
+    collapseInitRef.current = true;
+  }, [groupedByDay]);
+
+  function toggleCollapsedDay(dayIso: string) {
+    setCollapsedDays(prev => {
+      const next = new Set(prev);
+      if (next.has(dayIso)) next.delete(dayIso);
+      else next.add(dayIso);
+      return next;
+    });
+  }
 
   // Helpers checkbox selection
   const visibleIds = useMemo(() => new Set(filteredPlList.map(p => p.id)), [filteredPlList]);
@@ -982,10 +1005,14 @@ export default function PackingListsPage() {
                       const ids = group.pls.map(p => p.id);
                       const allDaySelected = ids.length > 0 && ids.every(id => selectedIds.has(id));
                       const colSpan = canEdit ? 8 : 7;
+                      const isCollapsed = collapsedDays.has(group.dayIso);
                       return (
                         <Fragment key={group.dayIso}>
-                          <tr className="bg-gray-50 border-t border-b border-gray-200">
-                            <td className="px-3 py-2 w-10">
+                          <tr
+                            className="bg-gray-50 border-t border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition"
+                            onClick={() => toggleCollapsedDay(group.dayIso)}
+                          >
+                            <td className="px-3 py-2 w-10" onClick={(e) => e.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={allDaySelected}
@@ -995,16 +1022,17 @@ export default function PackingListsPage() {
                               />
                             </td>
                             <td colSpan={colSpan} className="px-3 py-2 font-medium text-gray-700 text-sm">
+                              <span className="inline-block w-3 text-gray-400 text-[10px] mr-1">{isCollapsed ? "▶" : "▼"}</span>
                               <span className="mr-2">📅</span>
                               {group.label}
                               <span className="text-gray-500 font-normal"> · {group.pls.length} PL{group.pls.length !== 1 ? "s" : ""} · {group.totalPiezas.toLocaleString()} piezas</span>
                             </td>
                           </tr>
-                          {group.pls.map((pl) => (
+                          {!isCollapsed && group.pls.map((pl) => (
                       <tr
                         key={pl.id}
                         className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition cursor-pointer"
-                        onClick={() => router.push(`/packing-lists/${pl.id}`)}
+                        onClick={() => toggleOne(pl.id)}
                       >
                         <td className="px-3 py-2.5 w-10" onClick={(e) => e.stopPropagation()}>
                           <input
@@ -1014,7 +1042,14 @@ export default function PackingListsPage() {
                             className="accent-teal-600 w-3.5 h-3.5"
                           />
                         </td>
-                        <td className="px-3 py-2.5 font-medium">{pl.numero_pl || "—"}</td>
+                        <td className="px-3 py-2.5 font-medium" onClick={(e) => e.stopPropagation()}>
+                          <Link
+                            href={`/packing-lists/${pl.id}`}
+                            className="hover:underline text-teal-700"
+                          >
+                            {pl.numero_pl || "—"}
+                          </Link>
+                        </td>
                         <td className="px-3 py-2.5 text-gray-600">
                           <span className="inline-block px-2 py-0.5 rounded-full text-[11px] bg-teal-50 text-teal-700 border border-teal-100">
                             {displayEmpresa(pl.empresa)}
