@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { fmt, fmtDate } from "@/lib/format";
+import AppHeader from "@/components/AppHeader";
 
 const EMPRESAS = ["Vistana International", "Fashion Wear", "Fashion Shoes", "Active Shoes", "Active Wear", "Joystep", "Confecciones Boston", "Multifashion"];
 const MES_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -17,6 +18,7 @@ interface ClienteDetalle {
 }
 
 function ReportePage() {
+  const router = useRouter();
   const params = useSearchParams();
   const año = Number(params.get("anio")) || new Date().getFullYear();
   const empresaFilter = params.get("empresa") || "all";
@@ -75,9 +77,16 @@ function ReportePage() {
       .slice(0, 10);
   }, [clientesDetalle]);
 
-  if (loading) return <div className="p-12 flex justify-center"><svg className="animate-spin h-6 w-6 text-gray-300" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>;
+  if (loading) return (
+    <>
+      <div className="print:hidden"><AppHeader module="Ventas" breadcrumbs={[{ label: "Ventas", onClick: () => router.push("/ventas") }, { label: "Reporte" }]} /></div>
+      <div className="p-12 flex justify-center"><svg className="animate-spin h-6 w-6 text-gray-300" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
+    </>
+  );
 
   return (
+    <>
+    <div className="print:hidden"><AppHeader module="Ventas" breadcrumbs={[{ label: "Ventas", onClick: () => router.push("/ventas") }, { label: "Reporte" }]} /></div>
     <div className="print-report max-w-[900px] mx-auto p-6">
       {/* Print button */}
       <button
@@ -276,6 +285,7 @@ function ReportePage() {
         }
       `}</style>
     </div>
+    </>
   );
 }
 

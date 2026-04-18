@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { fmt } from "@/lib/format";
+import AppHeader from "@/components/AppHeader";
 import PeriodoDetailHeader from "../../components/PeriodoDetailHeader";
 import GastoForm, { normalizeStr } from "../../components/GastoForm";
 import { CajaPeriodo, CajaResponsable } from "../../components/types";
@@ -171,21 +172,29 @@ function NuevoGastoPage() {
 
   if (!authChecked) return null;
 
+  const headerBreadcrumbs = [
+    { label: "Caja Menuda", onClick: () => router.push("/caja") },
+    { label: "Nuevo gasto" },
+  ];
+
   if (loading && !periodo) {
     return (
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
-        <p className="text-sm text-gray-400">Cargando período...</p>
+      <div>
+        <AppHeader module="Caja Menuda" breadcrumbs={headerBreadcrumbs} />
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
+          <p className="text-sm text-gray-400">Cargando período...</p>
+        </div>
       </div>
     );
   }
 
   if (!periodo) {
     return (
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
-        <p className="text-sm text-red-500 mb-4">{error || "Período no encontrado."}</p>
-        <button onClick={() => router.push("/caja")} className="text-sm text-gray-500 hover:text-black">
-          ← Volver a Caja Menuda
-        </button>
+      <div>
+        <AppHeader module="Caja Menuda" breadcrumbs={headerBreadcrumbs} />
+        <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
+          <p className="text-sm text-red-500">{error || "Período no encontrado."}</p>
+        </div>
       </div>
     );
   }
@@ -207,6 +216,7 @@ function NuevoGastoPage() {
 
   return (
     <div>
+      <AppHeader module="Caja Menuda" breadcrumbs={headerBreadcrumbs} />
       <PeriodoDetailHeader
         current={periodo}
         totalGastado={totalGastado}
