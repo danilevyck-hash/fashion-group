@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { ContextMenuProviderWrapper } from "@/components/ContextMenuWrapper";
 import { OnlineProvider } from "@/lib/OnlineContext";
 import OfflineBanner from "@/components/OfflineBanner";
+import Sidebar, { SidebarAwareMain } from "@/components/Sidebar";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -45,7 +46,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <OnlineProvider>
           <OfflineBanner />
           <ContextMenuProviderWrapper>
-            {children}
+            <Sidebar />
+            <SidebarAwareMain>{children}</SidebarAwareMain>
           </ContextMenuProviderWrapper>
 
         </OnlineProvider>
