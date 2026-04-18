@@ -2,7 +2,7 @@
 
 import { fmt, fmtDate } from "@/lib/format";
 import { CajaGasto } from "./types";
-import { AutocompleteInput } from "./GastoForm";
+import AutocompleteInput from "./AutocompleteInput";
 import { EmptyState, ScrollableTable } from "@/components/ui";
 
 interface Props {

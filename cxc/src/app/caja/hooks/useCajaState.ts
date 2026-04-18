@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { CajaPeriodo, CajaGasto, CajaResponsable, View } from "../components/types";
-import { GastoFormValues, GastoFormSetters } from "../components/GastoForm";
 
 function normalizeStr(s: string): string {
   const t = s.trim();
@@ -14,12 +13,6 @@ export function useCajaState(urlId: string, initialView: View) {
   const [view, _setView] = useState<View>(initialView);
   const [pendingDeleteGasto, setPendingDeleteGasto] = useState<CajaGasto | null>(null);
   const [pendingRestoreGasto, setPendingRestoreGasto] = useState<CajaGasto | null>(null);
-  const [pendingNegativeBalance, setPendingNegativeBalance] = useState<{
-    fondo: number;
-    gastado: number;
-    nuevo: number;
-    saldoFuturo: number;
-  } | null>(null);
 
   function setView(v: View, id?: string) {
     _setView(v);
@@ -35,41 +28,15 @@ export function useCajaState(urlId: string, initialView: View) {
   const [current, setCurrent] = useState<CajaPeriodo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [categorias, setCategorias] = useState<string[]>([]);
-  const [showManageCat, setShowManageCat] = useState(false);
-  const [newCatName, setNewCatName] = useState("");
   const [confirmClosePeriodo, setConfirmClosePeriodo] = useState<string | null>(null);
   const [confirmDeletePeriodoId, setConfirmDeletePeriodoId] = useState<string | null>(null);
   const [showNewPeriodoModal, setShowNewPeriodoModal] = useState(false);
   const [fondoInput, setFondoInput] = useState("200");
   const [responsablesCatalog, setResponsablesCatalog] = useState<CajaResponsable[]>([]);
 
-  // Add expense form state
-  const [gFecha, setGFecha] = useState(new Date().toISOString().slice(0, 10));
-  const [gDescripcion, setGDescripcion] = useState("");
-  const [gProveedor, setGProveedor] = useState("");
-  const [gNroFactura, setGNroFactura] = useState("");
-  const [gSubtotal, setGSubtotal] = useState("");
-  const [gItbmsPct, setGItbmsPct] = useState("0");
-  const [gCategoria, setGCategoria] = useState("Transporte");
-  const [gResponsableId, setGResponsableId] = useState("");
-  const [addingGasto, setAddingGasto] = useState(false);
+  // Inline-edit state (still lives here because GastoTable edits in place)
   const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
   const [editGasto, setEditGasto] = useState<Partial<CajaGasto>>({});
-
-  const subtotalNum = parseFloat(gSubtotal) || 0;
-  const itbmsNum = Math.round(subtotalNum * (parseFloat(gItbmsPct) / 100) * 100) / 100;
-  const totalNum = Math.round((subtotalNum + itbmsNum) * 100) / 100;
-
-  const formValues: GastoFormValues = {
-    gFecha, gDescripcion, gProveedor, gNroFactura,
-    gSubtotal, gItbmsPct, gCategoria,
-    gResponsableId,
-  };
-  const formSetters: GastoFormSetters = {
-    setGFecha, setGDescripcion, setGProveedor, setGNroFactura,
-    setGSubtotal, setGItbmsPct, setGCategoria,
-    setGResponsableId,
-  };
 
   // Merge distinct categories/responsables from loaded gastos with managed lists
   const allCategorias = useMemo(() => {
@@ -225,89 +192,6 @@ export function useCajaState(urlId: string, initialView: View) {
     else setError("Error al aprobar reposición");
   }
 
-  async function addGasto(skipNegativeCheck: boolean = false) {
-    if (!current) return;
-
-    if (!skipNegativeCheck) {
-      const fondoInicial = Number(current.fondo_inicial) || 0;
-      const gastadoActual = (current.caja_gastos || []).reduce(
-        (s: number, g: CajaGasto) => s + (Number(g.total) || 0),
-        0,
-      );
-      const saldoFuturo = Math.round((fondoInicial - gastadoActual - totalNum) * 100) / 100;
-      if (saldoFuturo < 0) {
-        setPendingNegativeBalance({
-          fondo: fondoInicial,
-          gastado: gastadoActual,
-          nuevo: totalNum,
-          saldoFuturo,
-        });
-        // Abort here; user must confirm via modal. Throw so the caller's
-        // catch prevents the "Listo, guardado ✓" indicator from flashing.
-        throw new Error("__pending_negative_balance__");
-      }
-    }
-
-    setAddingGasto(true);
-    setError(null);
-    const resolvedCategoria = normalizeStr(gCategoria) || "Otros";
-    const resolvedResponsable =
-      responsablesCatalog.find((r) => r.id === gResponsableId)?.nombre || "";
-
-    // Capture request body BEFORE clearing form
-    const requestBody = {
-      periodo_id: current.id, fecha: gFecha, descripcion: gDescripcion,
-      proveedor: gProveedor, nro_factura: gNroFactura,
-      responsable_id: gResponsableId,
-      categoria: resolvedCategoria,
-      subtotal: subtotalNum, itbms: itbmsNum, total: totalNum,
-    };
-
-    // Optimistic: add temporary gasto to table immediately
-    const tempId = "temp-" + Date.now();
-    const optimisticGasto: CajaGasto = {
-      id: tempId, periodo_id: current.id, fecha: gFecha,
-      descripcion: gDescripcion, proveedor: gProveedor, nro_factura: gNroFactura,
-      responsable: resolvedResponsable, responsable_id: gResponsableId,
-      categoria: resolvedCategoria, empresa: "",
-      subtotal: subtotalNum, itbms: itbmsNum, total: totalNum,
-    };
-    const snapshot = current;
-    setCurrent({
-      ...current,
-      caja_gastos: [...(current.caja_gastos || []), optimisticGasto],
-      total_gastado: current.total_gastado + totalNum,
-    });
-
-    // Clear form immediately (feels instant)
-    setGFecha(new Date().toISOString().split("T")[0]);
-    setGDescripcion(""); setGProveedor(""); setGNroFactura(""); setGSubtotal(""); setGItbmsPct("0");
-    setGCategoria("Transporte"); setGResponsableId("");
-
-    try {
-      const res = await fetch("/api/caja/gastos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => null);
-        const backendMsg = payload && typeof payload.error === "string" ? payload.error : null;
-        throw new Error(backendMsg || "Error al agregar gasto. Intenta de nuevo.");
-      }
-      // Reload to get the real server ID
-      await loadDetail(current.id);
-      loadPeriodos();
-    } catch (err) {
-      // Revert optimistic update
-      setCurrent(snapshot);
-      setError(err instanceof Error && err.message ? err.message : "Error al agregar gasto. Intenta de nuevo.");
-      throw err;
-    } finally {
-      setAddingGasto(false);
-    }
-  }
-
   function requestDeleteGasto(gastoId: string) {
     if (!current) return;
     const gasto = (current.caja_gastos || []).find((g: CajaGasto) => g.id === gastoId);
@@ -336,19 +220,6 @@ export function useCajaState(urlId: string, initialView: View) {
       loadPeriodos();
     } catch {
       setError("Error al eliminar gasto");
-    }
-  }
-
-  function cancelAddGastoNegative() {
-    setPendingNegativeBalance(null);
-  }
-
-  async function confirmAddGastoNegative() {
-    setPendingNegativeBalance(null);
-    try {
-      await addGasto(true);
-    } catch {
-      /* errors already surfaced by addGasto */
     }
   }
 
@@ -435,21 +306,18 @@ export function useCajaState(urlId: string, initialView: View) {
   return {
     view, setView, _setView,
     periodos, loading, current, setCurrent, error,
-    categorias, setCategorias, allCategorias, showManageCat, setShowManageCat, newCatName, setNewCatName,
+    allCategorias,
     showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,
-    responsablesCatalog, allResponsables,
-    addingGasto, subtotalNum, totalNum,
+    allResponsables,
     editingGastoId, setEditingGastoId, editGasto, setEditGasto,
-    formValues, formSetters,
     confirmClosePeriodo, setConfirmClosePeriodo,
     confirmDeletePeriodoId, setConfirmDeletePeriodoId,
     loadDetail, createPeriodo, confirmCreatePeriodo,
     requestClosePeriodo, doClosePeriodo,
     requestDeletePeriodo, doDeletePeriodo,
     aprobarReposicion,
-    addGasto, requestDeleteGasto, saveEditGasto, exportExcel,
+    requestDeleteGasto, saveEditGasto, exportExcel,
     pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto,
     pendingRestoreGasto, requestRestoreGasto, doRestoreGasto, cancelRestoreGasto,
-    pendingNegativeBalance, confirmAddGastoNegative, cancelAddGastoNegative,
   };
 }

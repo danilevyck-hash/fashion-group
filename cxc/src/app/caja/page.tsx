@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useMemo } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -12,7 +13,6 @@ import { useCajaState } from "./hooks/useCajaState";
 import PeriodoList from "./components/PeriodoList";
 import PeriodoDetailHeader from "./components/PeriodoDetailHeader";
 import ResumenGastos from "./components/ResumenGastos";
-import GastoForm from "./components/GastoForm";
 import GastoTable from "./components/GastoTable";
 import DeletedGastosSection from "./components/DeletedGastosSection";
 import PrintView from "./components/PrintView";
@@ -39,22 +39,19 @@ function CajaPage() {
   const {
     view, setView,
     periodos, loading, current, setCurrent, error,
-    categorias, setCategorias, allCategorias, showManageCat, setShowManageCat, newCatName, setNewCatName,
+    allCategorias,
     showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,
-    responsablesCatalog, allResponsables,
-    addingGasto, subtotalNum, totalNum,
+    allResponsables,
     editingGastoId, setEditingGastoId, editGasto, setEditGasto,
-    formValues, formSetters,
     confirmClosePeriodo, setConfirmClosePeriodo,
     confirmDeletePeriodoId, setConfirmDeletePeriodoId,
     loadDetail, createPeriodo, confirmCreatePeriodo,
     requestClosePeriodo, doClosePeriodo,
     requestDeletePeriodo, doDeletePeriodo,
     aprobarReposicion,
-    addGasto, requestDeleteGasto, saveEditGasto, exportExcel,
+    requestDeleteGasto, saveEditGasto, exportExcel,
     pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto,
     pendingRestoreGasto, requestRestoreGasto, doRestoreGasto, cancelRestoreGasto,
-    pendingNegativeBalance, confirmAddGastoNegative, cancelAddGastoNegative,
   } = useCajaState(urlId, initialView);
 
   // ── Smart suggestion: period close (hooks must be before any conditional return) ──
@@ -168,27 +165,6 @@ function CajaPage() {
 
             {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
 
-            {detailIsOpen && (
-              <GastoForm
-                values={formValues}
-                setters={formSetters}
-                addingGasto={addingGasto}
-                subtotalNum={subtotalNum}
-                totalNum={totalNum}
-                categorias={categorias}
-                responsablesCatalog={responsablesCatalog}
-                showManageCat={showManageCat}
-                newCatName={newCatName}
-                isOwner={isOwner}
-                setCategorias={setCategorias}
-                setShowManageCat={setShowManageCat}
-                setNewCatName={setNewCatName}
-                onAddGasto={addGasto}
-                fondoInicial={current.fondo_inicial}
-                totalGastado={detailTotalGastado}
-              />
-            )}
-
             <GastoTable
               gastos={detailGastos}
               isOpen={!!detailIsOpen}
@@ -281,32 +257,19 @@ function CajaPage() {
           </div>
         </div>
       )}
-      {pendingNegativeBalance && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" onClick={cancelAddGastoNegative}>
-          <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-medium mb-3">¿Continuar con saldo negativo?</h3>
-            <p className="text-sm text-gray-800 mb-2">
-              Este gasto deja el fondo en <strong>${fmt(pendingNegativeBalance.saldoFuturo)}</strong> (fondo ${fmt(pendingNegativeBalance.fondo)}, gastos ${fmt(pendingNegativeBalance.gastado)}, nuevo ${fmt(pendingNegativeBalance.nuevo)}).
-            </p>
-            <p className="text-xs text-gray-500 mb-6">
-              Considera solicitar reabastecimiento antes de seguir gastando.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={confirmAddGastoNegative}
-                className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] transition-all min-h-[44px]"
-              >
-                Sí, guardar igual
-              </button>
-              <button
-                onClick={cancelAddGastoNegative}
-                className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 active:bg-gray-100 transition-all min-h-[44px]"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* FAB — "Agregar gasto" on open-period detail view */}
+      {view === "detail" && current && current.estado === "abierto" && (
+        <Link
+          href={`/caja/${current.id}/nuevo`}
+          className="fixed bottom-6 right-6 z-40 bg-black text-white rounded-full pl-4 pr-5 py-3 shadow-lg hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2 text-sm font-medium"
+          aria-label="Agregar gasto"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          Agregar gasto
+        </Link>
       )}
     </>
   );
