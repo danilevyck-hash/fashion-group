@@ -141,70 +141,13 @@ export async function POST(req: NextRequest) {
       }
     }
   } catch {
-    // fg_users table may not exist yet — continue to role_passwords
+    // fg_users query failed — fall through to 401. Shared role-based
+    // passwords (role_passwords table + env vars) were retired in
+    // Sprint 1E to restore traceability; every login must now match a
+    // named row in fg_users.
   }
 
-  // 2. Legacy: Check role_passwords table (supports both hashed and plaintext)
-  let role: string | null = null;
-  try {
-    const { data: rows } = await supabaseServer
-      .from("role_passwords")
-      .select("role, password");
-
-    if (rows) {
-      for (const row of rows) {
-        const match = isHash(row.password)
-          ? (await bcrypt.compare(password, row.password) || await bcrypt.compare(password.toLowerCase(), row.password))
-          : password.toLowerCase() === row.password.toLowerCase();
-
-        if (match) {
-          role = row.role;
-          break;
-        }
-      }
-    }
-  } catch { /* */ }
-
-  // 3. Legacy fallback: env var passwords (for roles without fg_users entries)
-  if (!role) {
-    const envRoles: Record<string, string> = {};
-    if (process.env.ADMIN_PASSWORD) envRoles[process.env.ADMIN_PASSWORD] = "admin";
-    if (process.env.DIRECTOR_PASSWORD) envRoles[process.env.DIRECTOR_PASSWORD] = "director";
-    if (process.env.UPLOAD_PASSWORD) envRoles[process.env.UPLOAD_PASSWORD] = "secretaria";
-    if (process.env.CONTABILIDAD_PASSWORD) envRoles[process.env.CONTABILIDAD_PASSWORD] = "contabilidad";
-    role = envRoles[password] || null;
-  }
-
-  if (!role) {
-    return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
-  }
-
-  // 3. Check if legacy role is active
-  try {
-    const { data } = await supabaseServer
-      .from("role_permissions")
-      .select("activo")
-      .eq("role", role)
-      .single();
-    if (data && data.activo === false) {
-      return NextResponse.json({ error: "Este acceso ha sido desactivado" }, { status: 403 });
-    }
-  } catch { /* */ }
-
-  const sessionToken = randomUUID();
-  try {
-    await supabaseServer.from("user_sessions").insert({
-      user_name: role,
-      user_role: role,
-      session_token: sessionToken,
-      ip_address: ip,
-    });
-  } catch { /* table may not exist yet */ }
-
-  const res = NextResponse.json({ role });
-  setSessionCookie(res, { role, sessionToken });
-  await logActivity(role, "login", "auth");
-  return res;
+  return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
 }
 
 // DELETE — logout (clear cookie + revoke session)

@@ -43,23 +43,15 @@ function mockSupabaseChain(finalData: unknown, finalError: unknown = null) {
 describe("POST /api/auth", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset env
-    delete process.env.ADMIN_PASSWORD;
   });
 
-  it("returns 401 for wrong password (no matching users, no env vars)", async () => {
-    // fg_users query returns no matches
+  it("returns 401 for wrong password when no fg_users match", async () => {
     mockFrom.mockImplementation((table: string) => {
       if (table === "fg_users") {
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockResolvedValue({ data: [], error: null }),
           }),
-        };
-      }
-      if (table === "role_passwords") {
-        return {
-          select: vi.fn().mockResolvedValue({ data: [], error: null }),
         };
       }
       return mockSupabaseChain(null);
@@ -72,44 +64,26 @@ describe("POST /api/auth", () => {
     expect(json.error).toBe("Contraseña incorrecta");
   });
 
-  it("returns 200 with role when password matches env var", async () => {
+  it("returns 401 for env var passwords (role-based login retired in Sprint 1E)", async () => {
+    // ADMIN_PASSWORD used to grant admin access via a shared role password.
+    // It must no longer work — every login goes through fg_users now.
     process.env.ADMIN_PASSWORD = "secret123";
 
     mockFrom.mockImplementation((table: string) => {
       if (table === "fg_users") {
-        // Simulate table not existing / no users
         return {
           select: vi.fn().mockReturnValue({
             eq: vi.fn().mockResolvedValue({ data: [], error: null }),
           }),
         };
       }
-      if (table === "role_passwords") {
-        return {
-          select: vi.fn().mockResolvedValue({ data: [], error: null }),
-        };
-      }
-      if (table === "role_permissions") {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              single: vi.fn().mockResolvedValue({ data: null, error: null }),
-            }),
-          }),
-        };
-      }
-      if (table === "user_sessions") {
-        return {
-          insert: vi.fn().mockResolvedValue({ error: null }),
-        };
-      }
-      return { select: vi.fn().mockResolvedValue({ data: null, error: null }) };
+      return mockSupabaseChain(null);
     });
 
     const req = makeRequest({ password: "secret123" });
     const res = await POST(req);
-    expect(res.status).toBe(200);
-    const json = await res.json();
-    expect(json.role).toBe("admin");
+    expect(res.status).toBe(401);
+
+    delete process.env.ADMIN_PASSWORD;
   });
 });
