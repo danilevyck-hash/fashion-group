@@ -216,11 +216,65 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
     if (/\bPANAMA\b.*\b\d{4,}\b/i.test(line) && i > 5) continue;
     if (/^(EDIFICIO|CALLE|AVENIDA|AV\.|BARRIADA|CORREGIMIENTO|APARTADO|ZONA\s+LIBRE)/i.test(line) && i > 5) continue;
     if (/\bR\.?U\.?C\.?\b/i.test(line) && i > 5) continue;
-    // Skip standalone "L" (from XL/XXL header wrap)
-    if (/^L$/.test(line)) continue;
+    // Standalone "L" = wrap vertical de XXL. Si la línea anterior termina en "XX",
+    // fusionamos ahí ("XX" → "XXL") en vez de descartar. Bug #5 parser FW: esto
+    // permite que parseSizeHeader trate XXL como una sola columna y que
+    // findColumnXPos("Qty") sobre una rawLine fusionada encuentre Qty correctamente.
+    if (/^L$/.test(line)) {
+      const n = cleanLines.length;
+      if (n > 0 && /\bXX\s*$/.test(cleanLines[n - 1])) {
+        cleanLines[n - 1] = cleanLines[n - 1].replace(/\bXX\s*$/, "XXL");
+        // También renombramos el item "XX" del rawLine previo a "XXL" para que
+        // findColumnXPos("XXL") pueda localizarlo si se busca por ese nombre.
+        if (rawLines) {
+          const rawPrev = rawLines[cleanToRawIndex[n - 1]];
+          if (rawPrev) {
+            const xxItem = rawPrev.items.find(it => it.str.trim() === "XX");
+            if (xxItem) xxItem.str = "XXL";
+          }
+        }
+      }
+      continue;
+    }
 
     cleanLines.push(allLines[i]);
     cleanToRawIndex.push(i);
+  }
+
+  // ── Header wrap fuse ────────────────────────────────────────────────
+  // En Fashion Wear el header "Estilo Color Nombre Dim S M L XL XXL 30 32 ... Qty"
+  // se parte en 2-3 líneas por wrap visual del PDF:
+  //   "Estilo Color Nombre Dim S M L XL XX"
+  //   (L sola ya fue fusionada arriba a "XXL")
+  //   "30 32 33 34 36 38 40 41 42 43 Qty"
+  // Fusionamos las líneas de continuación al header principal para que
+  // parseSizeHeader vea todas las columnas Y que qtyXPos sea válido (suma
+  // por X range en vez de caer al fallback "último número").
+  for (let i = 0; i < cleanLines.length; i++) {
+    const line = cleanLines[i].trim();
+    if (!/^Estilo\s+Color\s+Nombre\s+Dim/i.test(line) || /\bQty\b/i.test(line)) continue;
+    // Mira hasta 3 líneas siguientes buscando la continuación hasta "Qty"
+    for (let j = i + 1; j < Math.min(i + 4, cleanLines.length); j++) {
+      const next = cleanLines[j].trim();
+      if (!next) continue;
+      const firstToken = next.split(/\s+/)[0] || "";
+      const looksLikeStyle = firstToken.length >= 6 && /[A-Za-z]/.test(firstToken) && /\d/.test(firstToken);
+      const looksLikeBulto = /^Bulto\s+No\./i.test(next);
+      if (looksLikeStyle || looksLikeBulto) break;
+      // Solo fusionar si la línea contiene tokens cortos (tallas numéricas/alfa o "Qty")
+      if (!/^[\w\s/]+$/.test(next) || next.length > 120) break;
+      cleanLines[i] = cleanLines[i] + "  " + next;
+      if (rawLines) {
+        const rawI = rawLines[cleanToRawIndex[i]];
+        const rawJ = rawLines[cleanToRawIndex[j]];
+        if (rawI && rawJ) {
+          rawI.items = [...rawI.items, ...rawJ.items];
+          rawI.text = cleanLines[i];
+        }
+      }
+      cleanLines[j] = ""; // blank out para que el main loop la skippee
+      if (/\bQty\b/i.test(next)) break;
+    }
   }
   // Helper: get rawLine by cleanLines index via direct index mapping
   function getRawLine(cleanLineIdx: number): RawLine | undefined {
