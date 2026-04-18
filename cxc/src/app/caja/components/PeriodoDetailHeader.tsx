@@ -14,6 +14,10 @@ interface Props {
   onPrint?: () => void;
   onExportExcel?: () => void;
   onAprobarReposicion?: (id: string) => void;
+  /** Count shown beside the "Ver gastos eliminados" menu entry. */
+  deletedCount?: number;
+  /** When provided and deletedCount > 0, the menu entry appears. */
+  onViewDeleted?: () => void;
 }
 
 function fmtRepuestoDate(iso: string | null): string {
@@ -37,6 +41,8 @@ export default function PeriodoDetailHeader({
   onPrint,
   onExportExcel,
   onAprobarReposicion,
+  deletedCount,
+  onViewDeleted,
 }: Props) {
   const isOpen = current.estado === "abierto";
   const fondoInicial = current.fondo_inicial;
@@ -54,6 +60,9 @@ export default function PeriodoDetailHeader({
     ...(onExportExcel ? [{ label: "Descargar Excel", onClick: onExportExcel }] : []),
     ...(!isOpen && !current.repuesto && onAprobarReposicion
       ? [{ label: "Aprobar reposición", onClick: () => onAprobarReposicion(current.id) }]
+      : []),
+    ...(onViewDeleted && (deletedCount ?? 0) > 0
+      ? [{ label: `Ver gastos eliminados (${deletedCount})`, onClick: onViewDeleted }]
       : []),
   ];
 

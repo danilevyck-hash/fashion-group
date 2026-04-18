@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -12,7 +12,7 @@ import { useCajaState } from "./hooks/useCajaState";
 import PeriodoList from "./components/PeriodoList";
 import PeriodoDetailHeader from "./components/PeriodoDetailHeader";
 import GastoTable from "./components/GastoTable";
-import DeletedGastosSection from "./components/DeletedGastosSection";
+import DeletedGastosModal from "./components/DeletedGastosModal";
 import PrintView from "./components/PrintView";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
@@ -33,6 +33,7 @@ function CajaPage() {
   const searchParams = useSearchParams();
   const urlId = searchParams.get("id") || "";
   const initialView = (searchParams.get("view") as View) || "list";
+  const [showDeletedModal, setShowDeletedModal] = useState(false);
 
   const {
     view, setView,
@@ -154,6 +155,8 @@ function CajaPage() {
             onPrint={() => setView("print", current.id)}
             onExportExcel={exportExcel}
             onAprobarReposicion={aprobarReposicion}
+            deletedCount={(current.deleted_gastos || []).length}
+            onViewDeleted={() => setShowDeletedModal(true)}
           />
 
           <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-12">
@@ -174,13 +177,15 @@ function CajaPage() {
               onDeleteGasto={requestDeleteGasto}
               nuevoHref={detailIsOpen ? `/caja/${current.id}/nuevo` : undefined}
             />
-
-            <DeletedGastosSection
-              deletedGastos={current.deleted_gastos || []}
-              isOpen={!!detailIsOpen}
-              onRestore={requestRestoreGasto}
-            />
           </div>
+
+          <DeletedGastosModal
+            open={showDeletedModal}
+            onClose={() => setShowDeletedModal(false)}
+            deletedGastos={current.deleted_gastos || []}
+            periodOpen={!!detailIsOpen}
+            onRestore={requestRestoreGasto}
+          />
         </div>
       )}
 
