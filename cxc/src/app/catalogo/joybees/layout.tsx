@@ -14,7 +14,7 @@ export default function JoybeesLayout({ children }: { children: React.ReactNode 
           <div className="h-[2px] bg-[#FFE443]" />
           <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4 border-b border-gray-100">
             <a href="/home" className="text-xs text-[#404041] hover:text-[#FFE443] transition flex-shrink-0 py-2">
-              &larr; Dashboard
+              &larr; Inicio
             </a>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="text-lg">🐝</span>

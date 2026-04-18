@@ -29,7 +29,7 @@ export default function Navbar() {
         <div className="h-[2px] bg-[#E4002B]" />
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-4 border-b border-gray-100">
           {showSystem && (
-            <Link href="/home" className="text-xs text-[#1A2656] hover:text-[#E4002B] transition flex-shrink-0 py-2">← Dashboard</Link>
+            <Link href="/home" className="text-xs text-[#1A2656] hover:text-[#E4002B] transition flex-shrink-0 py-2">← Inicio</Link>
           )}
           <Link href="/catalogo/reebok" className="flex-shrink-0">
             <img src="/reebok/reebok-logo.png" alt="Reebok" className="h-7" />
