@@ -211,10 +211,10 @@ export default function PackingListDetailPage() {
       doc.line(marginLeft, currentY, contentRight, currentY);
       currentY += 4;
 
-      // Draw each bulto block
-      const checkboxSize = 2.8; // ~8pt
-      const lineHeight = 4.5;
-      const indentX = marginLeft + 6;
+      // Draw each bulto block. Checkboxes grandes para bodega (~13pt ≈ 4.6mm)
+      const checkboxSize = 4.6;
+      const lineHeight = 6.5;
+      const indentX = marginLeft + 8;
 
       for (const [bultoId, styles] of sortedBultos) {
         // Check if we need a page break (header line + all style lines)
@@ -232,7 +232,7 @@ export default function PackingListDetailPage() {
         doc.setFont("helvetica", "bold");
         doc.setTextColor(30, 40, 60);
         doc.text(
-          safe(`Bulto ${bultoNumberMap.get(bultoId) ?? "?"} (ID: ${bultoId})  -  ${styles.length} muestra${styles.length > 1 ? "s" : ""}`),
+          safe(`Bulto ${bultoNumberMap.get(bultoId) ?? "?"}  -  ${styles.length} muestra${styles.length > 1 ? "s" : ""}`),
           marginLeft + checkboxSize + 2,
           currentY
         );
@@ -470,7 +470,7 @@ export default function PackingListDetailPage() {
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-3 h-3 border border-gray-400 rounded-sm flex-shrink-0" />
                       <span className="text-sm font-bold text-gray-700">
-                        Bulto {bultoNumberMap.get(bultoId) ?? "?"} (ID: {bultoId}) · {styles.length} muestra{styles.length > 1 ? "s" : ""}
+                        Bulto {bultoNumberMap.get(bultoId) ?? "?"} · {styles.length} muestra{styles.length > 1 ? "s" : ""}
                       </span>
                     </div>
                     <div className="ml-5 space-y-0.5">
@@ -568,15 +568,18 @@ function GroupRows({
             <div className="flex flex-wrap gap-1">
               {Object.entries(row.distribution)
                 .sort(([a], [b]) => parseInt(a) - parseInt(b))
-                .map(([bultoId, pcs]) => (
-                  <span
-                    key={bultoId}
-                    title={`ID: ${bultoId}`}
-                    className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600"
-                  >
-                    (B{bultoNumberMap.get(bultoId) ?? "?"}: {pcs})
-                  </span>
-                ))}
+                .map(([bultoId, pcs]) => {
+                  const n = bultoNumberMap.get(bultoId) ?? "?";
+                  return (
+                    <span
+                      key={bultoId}
+                      title={`Bulto ${n}`}
+                      className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600"
+                    >
+                      (Bulto {n}: {pcs})
+                    </span>
+                  );
+                })}
             </div>
           </td>
         </tr>

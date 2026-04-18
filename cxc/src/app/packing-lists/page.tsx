@@ -80,6 +80,10 @@ export default function PackingListsPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [empresaFilter, setEmpresaFilter] = useState<string>("all");
+  const [saveMismatchWarning, setSaveMismatchWarning] = useState<{ numeroPL: string; pdfPiezas: number; dbPiezas: number }[]>([]);
+
+  // Cualquier PL con errores de validación bloquea el guardado
+  const hasPreviewErrors = previewItems.some(i => i.errors.length > 0);
 
   const canEdit = role === "admin" || role === "secretaria";
 
@@ -242,13 +246,29 @@ export default function PackingListsPage() {
         const justSaved = [...previewItems];
         setSavedItems(justSaved);
         setSelectedForDownload(new Set(justSaved.map(i => i.parsed.numeroPL)));
+        // Comparar totales del preview vs lo que quedó guardado en DB
+        type SaveResult = { numeroPL: string; id?: string; error?: string; saved?: { total_piezas: number; total_bultos: number; total_estilos: number } };
+        const mismatches: { numeroPL: string; pdfPiezas: number; dbPiezas: number }[] = [];
+        for (const r of (data.results || []) as SaveResult[]) {
+          if (!r.id || !r.saved) continue;
+          const originalPreview = justSaved.find(p => p.parsed.numeroPL === r.numeroPL);
+          if (!originalPreview) continue;
+          if (originalPreview.parsed.totalPiezas !== r.saved.total_piezas) {
+            mismatches.push({
+              numeroPL: r.numeroPL,
+              pdfPiezas: originalPreview.parsed.totalPiezas,
+              dbPiezas: r.saved.total_piezas,
+            });
+          }
+        }
+        setSaveMismatchWarning(mismatches);
         setPreviewItems([]);
         const saved = data.totalSaved || 0;
         const failed = data.totalFailed || 0;
         if (failed > 0) {
           const failedPLs = (data.results || []).filter((r: { error?: string }) => r.error).map((r: { numeroPL: string }) => r.numeroPL).join(", ");
           setToast(`${saved} PLs guardados, ${failed} fallaron (${failedPLs})`);
-        } else {
+        } else if (mismatches.length === 0) {
           setToast(`${saved} Packing List${saved !== 1 ? "s" : ""} guardado${saved !== 1 ? "s" : ""}`);
         }
         loadList();
@@ -321,6 +341,17 @@ export default function PackingListsPage() {
       for (const styles of bultoGroupsMap.values()) styles.sort((a, b) => a.estilo.localeCompare(b.estilo));
       const sortedBultos = [...bultoGroupsMap.entries()].sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
 
+      // Numeración secuencial 1..N por PL (todos los bultos distintos de este PL,
+      // incluye los que no tienen muestra). Orden canónico por id numérico ascendente.
+      const allBultoIdsThisPL = new Set<string>();
+      for (const row of index) {
+        for (const bId of Object.keys(row.distribution)) allBultoIdsThisPL.add(bId);
+      }
+      const bultoNumberMap = new Map<string, number>();
+      [...allBultoIdsThisPL]
+        .sort((a, b) => parseInt(a) - parseInt(b))
+        .forEach((bId, i) => bultoNumberMap.set(bId, i + 1));
+
       if (sortedBultos.length > 0) {
         doc.setFontSize(11);
         doc.setFont("helvetica", "bold");
@@ -331,9 +362,9 @@ export default function PackingListsPage() {
         doc.line(marginLeft, currentY, contentRight, currentY);
         currentY += 4;
 
-        const checkboxSize = 2.8;
-        const lineHeight = 4.5;
-        const indentX = marginLeft + 6;
+        const checkboxSize = 4.6;
+        const lineHeight = 6.5;
+        const indentX = marginLeft + 8;
 
         for (const [bultoId, styles] of sortedBultos) {
           const blockHeight = lineHeight + (styles.length * lineHeight) + 3;
@@ -345,7 +376,7 @@ export default function PackingListsPage() {
           doc.setFontSize(10);
           doc.setFont("helvetica", "bold");
           doc.setTextColor(30, 40, 60);
-          doc.text(safe(`Bulto #${bultoId}  -  ${styles.length} muestra${styles.length > 1 ? "s" : ""}`), marginLeft + checkboxSize + 2, currentY);
+          doc.text(safe(`Bulto ${bultoNumberMap.get(bultoId) ?? "?"}  -  ${styles.length} muestra${styles.length > 1 ? "s" : ""}`), marginLeft + checkboxSize + 2, currentY);
           currentY += lineHeight + 0.5;
 
           for (const style of styles) {
@@ -403,7 +434,9 @@ export default function PackingListsPage() {
         for (const group of groupedRows) {
           tableBody.push([{ content: safe(group.producto || "SIN PRODUCTO"), colSpan: 3, styles: { fillColor: [210, 215, 225], fontStyle: "bold", fontSize: 9, textColor: [30, 40, 60] } }]);
           for (const row of group.rows) {
-            const distParts = Object.entries(row.distribution).map(([bId, pcs]) => `(${bId}: ${pcs})`);
+            const distParts = Object.entries(row.distribution)
+              .sort(([a], [b]) => parseInt(a) - parseInt(b))
+              .map(([bId, pcs]) => `(B${bultoNumberMap.get(bId) ?? "?"}: ${pcs})`);
             tableBody.push([safe(row.estilo), String(row.totalPcs), distParts.join("  ")]);
           }
         }
@@ -519,6 +552,11 @@ export default function PackingListsPage() {
         {/* Multi-PL Preview section */}
         {previewItems.length > 0 && (
           <div className="space-y-3">
+            {/* Banner de validación obligatoria */}
+            <div className="bg-amber-50 border border-amber-300 text-amber-900 p-4 rounded text-base font-medium">
+              <p>⚠ Valida cada PL contra el PDF original antes de guardar.</p>
+              <p className="mt-1">Bodega necesita esta información correcta para inventario.</p>
+            </div>
             {/* Summary bar */}
             <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 flex items-center justify-between">
               <div>
@@ -530,8 +568,9 @@ export default function PackingListsPage() {
               <div className="flex gap-2">
                 <button
                   onClick={saveAllPLs}
-                  disabled={uploading}
-                  className="px-5 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-md hover:bg-teal-700 active:scale-[0.97] transition-all disabled:opacity-50 min-h-[44px]"
+                  disabled={uploading || hasPreviewErrors}
+                  title={hasPreviewErrors ? "Corrige los errores antes de guardar" : undefined}
+                  className="px-5 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-md hover:bg-teal-700 active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
                 >
                   {uploading ? "Guardando..." : `Guardar ${previewItems.length} PL${previewItems.length !== 1 ? "s" : ""}`}
                 </button>
@@ -698,10 +737,32 @@ export default function PackingListsPage() {
           );
         })()}
 
+        {/* Banner rojo si el save devolvió totales que no cuadran con el preview */}
+        {saveMismatchWarning.length > 0 && (
+          <div className="bg-red-50 border-2 border-red-500 text-red-900 p-5 rounded text-lg font-semibold space-y-2">
+            <p>⚠ ATENCIÓN: Los datos guardados NO coinciden con el PDF original.</p>
+            {saveMismatchWarning.map((m) => (
+              <p key={m.numeroPL} className="text-base font-normal">
+                PL {m.numeroPL}: PDF dice {m.pdfPiezas.toLocaleString()} piezas, sistema guardó {m.dbPiezas.toLocaleString()}.
+              </p>
+            ))}
+            <p className="text-base font-normal">Revisa con bodega.</p>
+            <button
+              onClick={() => setSaveMismatchWarning([])}
+              className="text-sm underline text-red-700 hover:text-red-900"
+            >
+              Cerrar aviso
+            </button>
+          </div>
+        )}
+
         {/* History */}
         <div>
           <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-            <h2 className="text-sm font-semibold">Historial</h2>
+            <div>
+              <h2 className="text-sm font-semibold">Historial</h2>
+              <p className="text-xs text-gray-400 mt-0.5">Los PLs se eliminan automáticamente después de 7 días.</p>
+            </div>
             {plList.length > 0 && (
               <p className="text-xs text-gray-400">
                 {empresaCounts.map(([e, c], i) => (

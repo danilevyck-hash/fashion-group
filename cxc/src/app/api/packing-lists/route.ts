@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
 
   // Batch mode: { packingLists: [...] }
   if (Array.isArray(body.packingLists)) {
-    const results: { numeroPL: string; id?: string; error?: string }[] = [];
+    const results: { numeroPL: string; id?: string; error?: string; saved?: { total_bultos: number; total_piezas: number; total_estilos: number } }[] = [];
 
     for (const pl of body.packingLists) {
       const plItems = pl.items || pl.indexRows || [];
@@ -89,7 +89,17 @@ export async function POST(req: NextRequest) {
       if ("error" in result) {
         results.push({ numeroPL: pl.numeroPL, error: result.error });
       } else {
-        results.push({ numeroPL: pl.numeroPL, id: result.id });
+        // Re-fetch totales del DB para comparar contra el preview (bug #6 audit)
+        const { data: saved } = await supabaseServer
+          .from("packing_lists")
+          .select("total_bultos, total_piezas, total_estilos")
+          .eq("id", result.id)
+          .single();
+        results.push({
+          numeroPL: pl.numeroPL,
+          id: result.id,
+          saved: saved || { total_bultos: 0, total_piezas: 0, total_estilos: 0 },
+        });
       }
     }
 
