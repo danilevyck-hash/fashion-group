@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -81,6 +81,8 @@ export default function PackingListsPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [empresaFilter, setEmpresaFilter] = useState<string>("all");
   const [saveMismatchWarning, setSaveMismatchWarning] = useState<{ numeroPL: string; pdfPiezas: number; dbPiezas: number }[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [downloading, setDownloading] = useState(false);
 
   // Cualquier PL con errores de validación bloquea el guardado
   const hasPreviewErrors = previewItems.some(i => i.errors.length > 0);
@@ -101,6 +103,112 @@ export default function PackingListsPage() {
     if (empresaFilter === "all") return plList;
     return plList.filter(p => displayEmpresa(p.empresa) === empresaFilter);
   }, [plList, empresaFilter]);
+
+  // Agrupación del historial por día de carga (DATE(created_at)), desc.
+  const groupedByDay = useMemo(() => {
+    const dias = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    const meses = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+    const map = new Map<string, PLRecord[]>();
+    for (const pl of filteredPlList) {
+      const day = (pl.created_at || "").slice(0, 10);
+      if (!map.has(day)) map.set(day, []);
+      map.get(day)!.push(pl);
+    }
+    for (const pls of map.values()) pls.sort((a, b) => a.numero_pl.localeCompare(b.numero_pl));
+    return [...map.entries()]
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([day, pls]) => {
+        const d = new Date(day + "T12:00:00Z");
+        const label = `${dias[d.getUTCDay()]} ${d.getUTCDate()} ${meses[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+        const totalPiezas = pls.reduce((s, p) => s + (p.total_piezas || 0), 0);
+        return { dayIso: day, label, pls, totalPiezas };
+      });
+  }, [filteredPlList]);
+
+  // Helpers checkbox selection
+  const visibleIds = useMemo(() => new Set(filteredPlList.map(p => p.id)), [filteredPlList]);
+  const visibleSelectedCount = useMemo(
+    () => [...selectedIds].filter(id => visibleIds.has(id)).length,
+    [selectedIds, visibleIds],
+  );
+  const allVisibleSelected = visibleIds.size > 0 && visibleSelectedCount === visibleIds.size;
+
+  function toggleOne(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+  function toggleAllVisible() {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (allVisibleSelected) {
+        visibleIds.forEach(id => next.delete(id));
+      } else {
+        visibleIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  }
+  function toggleDay(pls: PLRecord[]) {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      const ids = pls.map(p => p.id);
+      const allSel = ids.every(id => next.has(id));
+      if (allSel) ids.forEach(id => next.delete(id));
+      else ids.forEach(id => next.add(id));
+      return next;
+    });
+  }
+
+  // Descarga PDF combinado a partir de registros de historial (hay que
+  // fetchear items de cada PL vía GET /api/packing-lists/[id]).
+  async function downloadPLsByRecords(records: PLRecord[]) {
+    if (records.length === 0) return;
+    setDownloading(true);
+    try {
+      const items: PLPreviewItem[] = await Promise.all(
+        records.map(async (pl): Promise<PLPreviewItem> => {
+          const res = await fetch(`/api/packing-lists/${pl.id}`);
+          const data = await res.json();
+          const indexRows: PLIndexRow[] = (data.items || []).map(
+            (item: { estilo: string; producto: string; total_pcs: number; bultos: Record<string, number>; bulto_muestra: string; is_os?: boolean }) => ({
+              estilo: item.estilo,
+              producto: item.producto,
+              totalPcs: item.total_pcs,
+              distribution: item.bultos || {},
+              bultoMuestra: item.bulto_muestra || "",
+              isOS: item.is_os || false,
+            })
+          );
+          return {
+            parsed: {
+              numeroPL: pl.numero_pl,
+              empresa: pl.empresa,
+              fechaEntrega: pl.fecha_entrega,
+              totalBultos: pl.total_bultos,
+              totalPiezas: pl.total_piezas,
+              bultos: [],
+            },
+            index: indexRows,
+            errors: [],
+            existsInDB: true,
+          };
+        })
+      );
+      await generateCombinedPDF(items);
+    } catch {
+      setToast("Error al descargar PDFs");
+    }
+    setDownloading(false);
+  }
+  async function downloadSelected() {
+    await downloadPLsByRecords(filteredPlList.filter(p => selectedIds.has(p.id)));
+  }
+  async function downloadAllFiltered() {
+    await downloadPLsByRecords(filteredPlList);
+  }
 
   // Load history
   const loadList = useCallback(async () => {
@@ -823,11 +931,39 @@ export default function PackingListsPage() {
               )}
             </div>
           ) : (
+            <>
+              <div className="flex items-center justify-end gap-2 mb-3 flex-wrap">
+                {visibleSelectedCount > 0 && (
+                  <button
+                    onClick={downloadSelected}
+                    disabled={downloading}
+                    className="px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-md hover:bg-teal-700 active:scale-[0.97] transition-all disabled:opacity-50 min-h-[44px]"
+                  >
+                    {downloading ? "Generando..." : `Descargar ${visibleSelectedCount} seleccionado${visibleSelectedCount !== 1 ? "s" : ""}`}
+                  </button>
+                )}
+                <button
+                  onClick={downloadAllFiltered}
+                  disabled={downloading || filteredPlList.length === 0}
+                  className="px-4 py-2 border border-teal-500 text-teal-600 text-sm font-medium rounded-md hover:bg-teal-50 active:scale-[0.97] transition-all disabled:opacity-50 min-h-[44px]"
+                >
+                  Descargar todos ({filteredPlList.length})
+                </button>
+              </div>
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="px-3 py-2 w-10">
+                        <input
+                          type="checkbox"
+                          checked={allVisibleSelected}
+                          onChange={toggleAllVisible}
+                          className="accent-teal-600 w-3.5 h-3.5"
+                          title="Seleccionar todos"
+                        />
+                      </th>
                       <th className="text-left px-3 py-2 font-medium text-xs text-gray-500">PL #</th>
                       <th className="text-left px-3 py-2 font-medium text-xs text-gray-500">Empresa</th>
                       <th className="text-left px-3 py-2 font-medium text-xs text-gray-500 hidden sm:table-cell">
@@ -838,19 +974,46 @@ export default function PackingListsPage() {
                       <th className="text-right px-3 py-2 font-medium text-xs text-gray-500 hidden sm:table-cell">
                         Estilos
                       </th>
-                      <th className="text-left px-3 py-2 font-medium text-xs text-gray-500 hidden lg:table-cell">
-                        Creado
-                      </th>
                       {canEdit && <th className="px-3 py-2 w-10" />}
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredPlList.map((pl) => (
+                    {groupedByDay.map((group) => {
+                      const ids = group.pls.map(p => p.id);
+                      const allDaySelected = ids.length > 0 && ids.every(id => selectedIds.has(id));
+                      const colSpan = canEdit ? 8 : 7;
+                      return (
+                        <Fragment key={group.dayIso}>
+                          <tr className="bg-gray-50 border-t border-b border-gray-200">
+                            <td className="px-3 py-2 w-10">
+                              <input
+                                type="checkbox"
+                                checked={allDaySelected}
+                                onChange={() => toggleDay(group.pls)}
+                                className="accent-teal-600 w-3.5 h-3.5"
+                                title={`Seleccionar todos del ${group.label}`}
+                              />
+                            </td>
+                            <td colSpan={colSpan} className="px-3 py-2 font-medium text-gray-700 text-sm">
+                              <span className="mr-2">📅</span>
+                              {group.label}
+                              <span className="text-gray-500 font-normal"> · {group.pls.length} PL{group.pls.length !== 1 ? "s" : ""} · {group.totalPiezas.toLocaleString()} piezas</span>
+                            </td>
+                          </tr>
+                          {group.pls.map((pl) => (
                       <tr
                         key={pl.id}
                         className="border-b border-gray-100 last:border-0 hover:bg-gray-50 transition cursor-pointer"
                         onClick={() => router.push(`/packing-lists/${pl.id}`)}
                       >
+                        <td className="px-3 py-2.5 w-10" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(pl.id)}
+                            onChange={() => toggleOne(pl.id)}
+                            className="accent-teal-600 w-3.5 h-3.5"
+                          />
+                        </td>
                         <td className="px-3 py-2.5 font-medium">{pl.numero_pl || "—"}</td>
                         <td className="px-3 py-2.5 text-gray-600">
                           <span className="inline-block px-2 py-0.5 rounded-full text-[11px] bg-teal-50 text-teal-700 border border-teal-100">
@@ -866,9 +1029,6 @@ export default function PackingListsPage() {
                         </td>
                         <td className="px-3 py-2.5 text-right tabular-nums hidden sm:table-cell">
                           {pl.total_estilos}
-                        </td>
-                        <td className="px-3 py-2.5 text-gray-400 text-xs hidden lg:table-cell">
-                          {new Date(pl.created_at).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" })}
                         </td>
                         {canEdit && (
                           <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
@@ -895,11 +1055,15 @@ export default function PackingListsPage() {
                           </td>
                         )}
                       </tr>
-                    ))}
+                          ))}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             </div>
+            </>
           )}
         </div>
       </div>
