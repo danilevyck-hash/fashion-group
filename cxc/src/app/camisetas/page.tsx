@@ -34,7 +34,32 @@ export default function CamisetasPage() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
-  const [selectedClient, setSelectedClient] = useState<string | null>(null);
+  const [selectedClient, _setSelectedClient] = useState<string | null>(null);
+
+  // Wrapper: sincroniza selectedClient con la URL para que el Back del browser
+  // regrese a la lista en lugar de saltar a /home.
+  const setSelectedClient = useCallback((id: string | null) => {
+    _setSelectedClient(id);
+    if (typeof window === "undefined") return;
+    const url = id ? `/camisetas?cliente=${id}` : "/camisetas";
+    if (window.location.pathname + window.location.search !== url) {
+      window.history.pushState(null, "", url);
+    }
+  }, []);
+
+  // Popstate listener: al Back/Forward, sincroniza el state con la URL.
+  useEffect(() => {
+    function onPopState() {
+      const params = new URLSearchParams(window.location.search);
+      _setSelectedClient(params.get("cliente"));
+    }
+    window.addEventListener("popstate", onPopState);
+    // Init inicial desde URL (ej. usuario llega con /camisetas?cliente=X)
+    const params = new URLSearchParams(window.location.search);
+    const initial = params.get("cliente");
+    if (initial) _setSelectedClient(initial);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
   const [editCell, setEditCell] = useState<{ cId: string; pId: string } | null>(null);
   const [editVal, setEditVal] = useState("");
   const [pendingChanges, setPendingChanges] = useState<Record<string, number>>({});
