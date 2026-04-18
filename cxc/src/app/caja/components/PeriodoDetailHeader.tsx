@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
 import { fmt, fmtDate } from "@/lib/format";
-import { AnimatedNumber } from "@/components/ui";
 import { CajaPeriodo } from "./types";
+import OverflowMenu, { OverflowMenuItem } from "@/components/ui/OverflowMenu";
 
 interface Props {
   current: CajaPeriodo;
@@ -12,6 +11,20 @@ interface Props {
   pctUsed: number;
   onBack: () => void;
   onClosePeriodo?: () => void;
+  onPrint: () => void;
+  onExportExcel: () => void;
+  onAprobarReposicion: (id: string) => void;
+}
+
+function fmtRepuestoDate(iso: string | null): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso)
+      .toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" })
+      .replace(".", "");
+  } catch {
+    return "";
+  }
 }
 
 export default function PeriodoDetailHeader({
@@ -21,152 +34,123 @@ export default function PeriodoDetailHeader({
   pctUsed,
   onBack,
   onClosePeriodo,
+  onPrint,
+  onExportExcel,
+  onAprobarReposicion,
 }: Props) {
-  const [kpiTooltip, setKpiTooltip] = useState<string | null>(null);
-  const [shaking, setShaking] = useState(false);
-  const prevPctUsed = useRef(pctUsed);
   const isOpen = current.estado === "abierto";
-
-  useEffect(() => {
-    if (pctUsed < 20 && prevPctUsed.current >= 20) {
-      setShaking(true);
-      const t = setTimeout(() => setShaking(false), 500);
-      return () => clearTimeout(t);
-    }
-    prevPctUsed.current = pctUsed;
-  }, [pctUsed]);
+  const fondoInicial = current.fondo_inicial;
 
   const daysSinceOpen = isOpen
     ? Math.floor((Date.now() - new Date(current.fecha_apertura).getTime()) / (24 * 60 * 60 * 1000))
     : 0;
 
+  // Progress bar color: green when saldo healthy, orange when 10–20%, red below 10%
+  const barColor = pctUsed < 10 ? "#dc2626" : pctUsed < 20 ? "#d97706" : "#059669";
+  const barWidth = Math.min(100, fondoInicial > 0 ? (totalGastado / fondoInicial) * 100 : 0);
+
+  const menuItems: OverflowMenuItem[] = [
+    ...(isOpen && onClosePeriodo
+      ? [{ label: "Cerrar período", onClick: onClosePeriodo, destructive: true }]
+      : []),
+    { label: "Imprimir", onClick: onPrint },
+    { label: "Descargar Excel", onClick: onExportExcel },
+    ...(!isOpen && !current.repuesto
+      ? [{ label: "Aprobar reposición", onClick: () => onAprobarReposicion(current.id) }]
+      : []),
+  ];
+
   return (
     <>
-      <button
-        onClick={onBack}
-        className="text-sm text-gray-400 hover:text-black transition mb-6 block"
-      >
-        ← Períodos
-      </button>
-
-      {/* Period status banner */}
-      {isOpen ? (
-        <div className={`rounded-lg px-4 py-3 mb-6 flex flex-wrap items-center justify-between gap-3 ${daysSinceOpen > 30 ? "bg-amber-50 border border-amber-200" : "bg-emerald-50 border border-emerald-200"}`}>
-          <div className="flex items-center gap-2">
-            <span className={`w-2 h-2 rounded-full ${daysSinceOpen > 30 ? "bg-amber-500" : "bg-emerald-500"}`} />
-            <p className={`text-sm ${daysSinceOpen > 30 ? "text-amber-800" : "text-emerald-800"}`}>
-              {daysSinceOpen > 30
-                ? `Este período lleva ${daysSinceOpen} días abierto — abierto desde ${fmtDate(current.fecha_apertura)}`
-                : `Período abierto desde ${fmtDate(current.fecha_apertura)}`}
-            </p>
-          </div>
-          {onClosePeriodo && (
-            <button
-              onClick={onClosePeriodo}
-              className={`text-sm px-4 py-1.5 rounded-md font-medium transition active:scale-[0.97] ${daysSinceOpen > 30 ? "bg-amber-600 text-white hover:bg-amber-700" : "border border-emerald-300 text-emerald-700 hover:bg-emerald-100"}`}
-            >
-              Cerrar período
-            </button>
+      {/* ── Top (scrolls away) ── */}
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 pb-4">
+        <button
+          onClick={onBack}
+          className="text-sm text-gray-400 hover:text-black transition mb-4 block"
+        >
+          ← Períodos
+        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-xl font-light tracking-tight">
+            Período N° {current.numero}
+          </h1>
+          <span className="text-sm text-gray-400">{fmtDate(current.fecha_apertura)}</span>
+          {isOpen ? (
+            <>
+              <span className="text-[11px] bg-black text-white px-2.5 py-0.5 rounded-full">
+                Abierto
+              </span>
+              {daysSinceOpen > 30 && (
+                <span className="text-xs text-amber-600">
+                  {daysSinceOpen} días abierto
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              <span className="text-[11px] bg-gray-200 text-gray-500 px-2.5 py-0.5 rounded-full">
+                Cerrado — {fmtDate(current.fecha_cierre || "")}
+              </span>
+              {current.repuesto && current.repuesto_at && (
+                <span className="text-xs text-emerald-600">
+                  Repuesto ✓ {fmtRepuestoDate(current.repuesto_at)}
+                </span>
+              )}
+            </>
           )}
         </div>
-      ) : (
-        <div className="bg-gray-100 border border-gray-200 rounded-lg px-4 py-3 mb-6 flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-gray-400" />
-          <p className="text-sm text-gray-600">
-            Período cerrado — {fmtDate(current.fecha_cierre || "")}
-          </p>
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-4 mb-8">
-        <h1 className="text-xl font-light tracking-tight">
-          Período N° {current.numero}
-        </h1>
-        <span className="text-sm text-gray-400">
-          {fmtDate(current.fecha_apertura)}
-        </span>
-        {isOpen ? (
-          <span className="text-[11px] bg-black text-white px-2.5 py-0.5 rounded-full">
-            Abierto
-          </span>
-        ) : (
-          <span className="text-[11px] bg-gray-200 text-gray-500 px-2.5 py-0.5 rounded-full">
-            Cerrado — {fmtDate(current.fecha_cierre || "")}
-          </span>
-        )}
       </div>
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-8 mb-10">
-        <div>
-          <div className="flex items-center">
-            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">
-              Fondo
+      {/* ── Sticky KPI bar (pins on scroll) ── */}
+      <div className="sticky top-0 z-30 bg-white border-b border-gray-200">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3">
+          <div className="flex items-center gap-4">
+            {/* Desktop: three KPIs side by side */}
+            <div className="hidden sm:flex items-center gap-8 flex-1">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.05em] text-gray-400">Fondo</div>
+                <div className="text-sm tabular-nums text-gray-600">${fmt(fondoInicial)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.05em] text-gray-400">Gastado</div>
+                <div className="text-sm tabular-nums font-medium">${fmt(totalGastado)}</div>
+              </div>
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.05em] text-gray-400">Saldo</div>
+                <div className={`text-base tabular-nums font-semibold ${saldo < 0 ? "text-red-600" : ""}`}>
+                  ${fmt(saldo)}
+                </div>
+              </div>
             </div>
-            <button onClick={() => setKpiTooltip(kpiTooltip === "fondo" ? null : "fondo")} className="text-gray-300 hover:text-gray-500 text-xs ml-1 mb-1">?</button>
-          </div>
-          <div className="text-2xl font-semibold tabular-nums">
-            ${fmt(current.fondo_inicial)}
-          </div>
-          {kpiTooltip === "fondo" && <p className="text-xs text-gray-500 mt-1">Monto inicial asignado al período de caja menuda</p>}
-        </div>
-        <div>
-          <div className="flex items-center">
-            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">
-              Gastado
+            {/* Mobile: compact saldo-first layout */}
+            <div className="sm:hidden flex-1 min-w-0">
+              <div className="flex items-baseline justify-between gap-3">
+                <div>
+                  <span className="text-[10px] uppercase tracking-[0.05em] text-gray-400 mr-1">Saldo</span>
+                  <span className={`text-base font-semibold tabular-nums ${saldo < 0 ? "text-red-600" : ""}`}>
+                    ${fmt(saldo)}
+                  </span>
+                </div>
+                <div className="text-[11px] text-gray-500 tabular-nums whitespace-nowrap">
+                  Gastado ${fmt(totalGastado)} / ${fmt(fondoInicial)}
+                </div>
+              </div>
             </div>
-            <button onClick={() => setKpiTooltip(kpiTooltip === "gastado" ? null : "gastado")} className="text-gray-300 hover:text-gray-500 text-xs ml-1 mb-1">?</button>
+            <OverflowMenu items={menuItems} />
           </div>
-          <div className="text-2xl font-semibold tabular-nums">
-            $<AnimatedNumber value={totalGastado} formatter={(n: number) => fmt(n)} />
-          </div>
-          <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          {/* Progress bar */}
+          <div className="mt-2 h-1 bg-gray-100 rounded-full overflow-hidden">
             <div
               className="h-full rounded-full"
               style={{
-                width: `${Math.min(100, current.fondo_inicial > 0 ? (totalGastado / current.fondo_inicial) * 100 : 0)}%`,
-                transition: "width 500ms ease-out",
-                backgroundColor: pctUsed < 10 ? "#dc2626" : pctUsed < 20 ? "#d97706" : "#059669",
+                width: `${barWidth}%`,
+                transition: "width 500ms ease-out, background-color 300ms ease-out",
+                backgroundColor: barColor,
               }}
             />
           </div>
-          {kpiTooltip === "gastado" && <p className="text-xs text-gray-500 mt-1">Total de gastos registrados en este período</p>}
-        </div>
-        <div className={shaking ? "saldo-shake" : ""}>
-          <div className="flex items-center">
-            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">
-              Saldo
-            </div>
-            <button onClick={() => setKpiTooltip(kpiTooltip === "saldo" ? null : "saldo")} className="text-gray-300 hover:text-gray-500 text-xs ml-1 mb-1">?</button>
-          </div>
-          <div
-            className={`text-2xl font-semibold tabular-nums ${saldo < 0 ? "text-red-600" : ""}`}
-          >
-            $<AnimatedNumber value={saldo} formatter={(n: number) => fmt(n)} />
-          </div>
-          {kpiTooltip === "saldo" && <p className="text-xs text-gray-500 mt-1">Dinero disponible: Fondo menos lo gastado</p>}
         </div>
       </div>
-
-      {/* Low balance alerts */}
-      {pctUsed < 10 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 mb-6 flex items-center gap-3">
-          <span className="text-red-500 text-base">&#9888;</span>
-          <p className="text-sm text-red-700">
-            Saldo bajo — quedan ${fmt(saldo)} de ${fmt(current.fondo_inicial)}{" "}
-            ({pctUsed.toFixed(0)}%). Considera reabastecer el fondo.
-          </p>
-        </div>
-      )}
-      {pctUsed >= 10 && pctUsed < 20 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-6 flex items-center gap-3">
-          <span className="text-amber-500 text-base">&#9888;</span>
-          <p className="text-sm text-amber-700">
-            Saldo bajo — quedan ${fmt(saldo)} de ${fmt(current.fondo_inicial)}{" "}
-            ({pctUsed.toFixed(0)}%). Considera reabastecer el fondo.
-          </p>
-        </div>
-      )}
     </>
   );
 }

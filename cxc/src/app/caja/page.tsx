@@ -11,7 +11,6 @@ import { View } from "./components/types";
 import { useCajaState } from "./hooks/useCajaState";
 import PeriodoList from "./components/PeriodoList";
 import PeriodoDetailHeader from "./components/PeriodoDetailHeader";
-import PeriodoDetailFooter from "./components/PeriodoDetailFooter";
 import ResumenGastos from "./components/ResumenGastos";
 import GastoForm from "./components/GastoForm";
 import GastoTable from "./components/GastoTable";
@@ -149,7 +148,7 @@ function CajaPage() {
       )}
 
       {view === "detail" && current && (
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-12">
+        <div>
           <PeriodoDetailHeader
             current={current}
             totalGastado={detailTotalGastado}
@@ -157,63 +156,58 @@ function CajaPage() {
             pctUsed={detailPctUsed}
             onBack={() => { setView("list", undefined); setCurrent(null); }}
             onClosePeriodo={detailIsOpen ? () => requestClosePeriodo(current.id) : undefined}
-          />
-
-          {cajaSuggestion && <SuggestionCard suggestion={cajaSuggestion} onDismiss={dismissCaja} />}
-
-          <ResumenGastos gastos={detailGastos} />
-
-          {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-
-          {detailIsOpen && (
-            <GastoForm
-              values={formValues}
-              setters={formSetters}
-              addingGasto={addingGasto}
-              subtotalNum={subtotalNum}
-              totalNum={totalNum}
-              categorias={categorias}
-              responsablesCatalog={responsablesCatalog}
-              showManageCat={showManageCat}
-              newCatName={newCatName}
-              isOwner={isOwner}
-              setCategorias={setCategorias}
-              setShowManageCat={setShowManageCat}
-              setNewCatName={setNewCatName}
-              onAddGasto={addGasto}
-              fondoInicial={current.fondo_inicial}
-              totalGastado={detailTotalGastado}
-            />
-          )}
-
-          <GastoTable
-            gastos={detailGastos}
-            isOpen={!!detailIsOpen}
-            categorias={allCategorias}
-            responsables={allResponsables}
-            editingGastoId={editingGastoId}
-            editGasto={editGasto}
-            setEditingGastoId={setEditingGastoId}
-            setEditGasto={setEditGasto}
-            onSaveEdit={saveEditGasto}
-            onDeleteGasto={requestDeleteGasto}
-          />
-
-          <DeletedGastosSection
-            deletedGastos={current.deleted_gastos || []}
-            isOpen={!!detailIsOpen}
-            onRestore={requestRestoreGasto}
-          />
-
-          <PeriodoDetailFooter
-            current={current}
-            totalGastado={detailTotalGastado}
-            isOpen={!!detailIsOpen}
             onPrint={() => setView("print", current.id)}
-            onClose={() => requestClosePeriodo(current.id)}
-            onAprobarReposicion={aprobarReposicion}
             onExportExcel={exportExcel}
+            onAprobarReposicion={aprobarReposicion}
           />
+
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-12">
+            {cajaSuggestion && <SuggestionCard suggestion={cajaSuggestion} onDismiss={dismissCaja} />}
+
+            <ResumenGastos gastos={detailGastos} />
+
+            {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+
+            {detailIsOpen && (
+              <GastoForm
+                values={formValues}
+                setters={formSetters}
+                addingGasto={addingGasto}
+                subtotalNum={subtotalNum}
+                totalNum={totalNum}
+                categorias={categorias}
+                responsablesCatalog={responsablesCatalog}
+                showManageCat={showManageCat}
+                newCatName={newCatName}
+                isOwner={isOwner}
+                setCategorias={setCategorias}
+                setShowManageCat={setShowManageCat}
+                setNewCatName={setNewCatName}
+                onAddGasto={addGasto}
+                fondoInicial={current.fondo_inicial}
+                totalGastado={detailTotalGastado}
+              />
+            )}
+
+            <GastoTable
+              gastos={detailGastos}
+              isOpen={!!detailIsOpen}
+              categorias={allCategorias}
+              responsables={allResponsables}
+              editingGastoId={editingGastoId}
+              editGasto={editGasto}
+              setEditingGastoId={setEditingGastoId}
+              setEditGasto={setEditGasto}
+              onSaveEdit={saveEditGasto}
+              onDeleteGasto={requestDeleteGasto}
+            />
+
+            <DeletedGastosSection
+              deletedGastos={current.deleted_gastos || []}
+              isOpen={!!detailIsOpen}
+              onRestore={requestRestoreGasto}
+            />
+          </div>
         </div>
       )}
 
