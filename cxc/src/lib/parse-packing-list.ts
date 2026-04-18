@@ -172,13 +172,7 @@ function hasNumericValueNearX(dataRawLine: RawLine | undefined, targetX: number,
 
 // ── Main parser ──────────────────────────────────────────────────────
 
-export type DebugLogFn = (label: string, data: unknown) => void;
-
-export function parsePackingListText(
-  text: string,
-  rawLines?: RawLine[],
-  debugLog?: DebugLogFn,
-): ParsedPackingList {
+export function parsePackingListText(text: string, rawLines?: RawLine[]): ParsedPackingList {
   const plMatch = text.match(/NO\.\s*(\d+)/);
   const numeroPL = plMatch ? plMatch[1] : "";
 
@@ -308,24 +302,9 @@ export function parsePackingListText(
 
   function saveBulto() {
     if (currentBultoId) {
-      const items = Array.from(currentItemMap.values());
-      // [DEBUG TEMPORAL — bug parser FW bultos 547946/547949, revert después]
-      if (debugLog && (currentBultoId === "547946" || currentBultoId === "547949")) {
-        const sum = items.reduce((s, i) => s + i.qty, 0);
-        debugLog("[PARSER DEBUG BULTO TOTAL]", {
-          bultoId: currentBultoId,
-          totalCalculado: sum,
-          totalHeaderPdf: currentBultoTotalPiezas,
-          diff: currentBultoTotalPiezas - sum,
-          itemCount: items.length,
-          items: items.map(i => ({ estilo: i.estilo, producto: i.producto, qty: i.qty, hasM: i.hasM, has32: i.has32 })),
-          columns: currentSizeInfo.columns,
-          xPositions: { dimXPos, qtyXPos, mXPos, dim32XPos },
-        });
-      }
       bultos.push({
         id: currentBultoId,
-        items,
+        items: Array.from(currentItemMap.values()),
         totalPiezas: currentBultoTotalPiezas,
         sizeColumns: currentSizeInfo.columns,
       });
@@ -457,23 +436,19 @@ export function parsePackingListText(
           }, 0);
           // Fallback: if no size values found, use last number (single-column layouts)
           if (qty === 0) qty = parseInt(nums[nums.length - 1], 10);
+          // Cross-check con el Qty del PDF (número cuya X está cerca/después de qtyXPos):
+          // pdfjs-dist a veces pierde un token de talla por problemas de spacing,
+          // dejando la suma por X-range corta. El Qty del PDF es la fuente de verdad
+          // del proveedor — si difieren, confiamos en el Qty del PDF.
+          const qtyFromPdfItem = rawLine.items.find(
+            (it: { x: number; str: string }) => /^\d+$/.test(it.str.trim()) && it.x >= qtyXPos - 5
+          );
+          const qtyFromPdf = qtyFromPdfItem ? parseInt(qtyFromPdfItem.str, 10) : null;
+          if (qtyFromPdf !== null && qty > 0 && qtyFromPdf !== qty) {
+            qty = qtyFromPdf;
+          }
         } else {
           qty = parseInt(nums[nums.length - 1], 10);
-        }
-        // [DEBUG TEMPORAL — bug parser FW bultos 547946/547949, revert después]
-        if (debugLog && (currentBultoId === "547946" || currentBultoId === "547949")) {
-          debugLog("[PARSER DEBUG]", {
-            bultoId: currentBultoId,
-            estilo: currentEstilo,
-            producto: currentProducto,
-            rawLineText: rawLine?.text || line,
-            rawItems: rawLine?.items?.map(it => ({ str: it.str, x: Math.round(it.x * 100) / 100 })),
-            nums,
-            qtyCalculado: qty,
-            usedXRangeSum: !!(rawLine && qtyXPos > 0 && dimXPos > 0),
-            xPositions: { dimXPos, qtyXPos, mXPos, dim32XPos },
-            columns: currentSizeInfo.columns,
-          });
         }
         if (qty > 0 && qty < 100000) {
           // Check if M or 32 is present using X-position coordinates when available
@@ -680,9 +655,8 @@ export function splitTextIntoPLSections(
  */
 export function parseMultiplePackingLists(
   text: string,
-  rawLines?: RawLine[],
-  debugLog?: DebugLogFn,
+  rawLines?: RawLine[]
 ): ParsedPackingList[] {
   const sections = splitTextIntoPLSections(text, rawLines);
-  return sections.map((section) => parsePackingListText(section.text, section.rawLines, debugLog));
+  return sections.map((section) => parsePackingListText(section.text, section.rawLines));
 }
