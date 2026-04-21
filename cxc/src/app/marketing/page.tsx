@@ -102,9 +102,9 @@ function MarketingPage() {
 
   const mostrandoVistaExtra = vistaParam === "papelera" || vistaParam === "reportes";
 
-  const breadcrumbs: { label: string; onClick?: () => void }[] = [
-    { label: "Marketing", onClick: () => navegar({ marca: null, proyecto: null, vista: null }) },
-  ];
+  // AppHeader ya renderiza "Inicio > Marketing" automáticamente. Acá solo
+  // agregamos los segmentos que vienen DESPUÉS de "Marketing".
+  const breadcrumbs: { label: string; onClick?: () => void }[] = [];
   if (vistaParam === "papelera") {
     breadcrumbs.push({ label: "Papelera" });
   } else if (vistaParam === "reportes") {

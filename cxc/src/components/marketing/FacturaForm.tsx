@@ -371,11 +371,11 @@ export function FacturaForm({
       <PasoInstruccion
         numero={3}
         titulo="Revisa el cobrable por marca y guarda"
-        descripcion="El cobrable se calcula sobre el subtotal según el % de cada marca."
+        descripcion="El cobrable se calcula sobre el total (subtotal + ITBMS) según el % de cada marca."
       >
         <div className="space-y-1.5">
           {proyecto.marcas.map((m) => {
-            const cobrable = (subtotal * m.porcentaje) / 100;
+            const cobrable = (total * m.porcentaje) / 100;
             return (
               <div
                 key={m.marca.id}

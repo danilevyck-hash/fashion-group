@@ -31,7 +31,7 @@ export function FacturaCard({
 
   const desgloseCobrable = porcentajesMarcas
     .map((m) => {
-      const cobrable = (factura.subtotal * m.porcentaje) / 100;
+      const cobrable = (factura.total * m.porcentaje) / 100;
       return `${m.marca.nombre} ${m.porcentaje}%: ${formatearMonto(cobrable)}`;
     })
     .join(" · ");

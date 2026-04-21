@@ -16,11 +16,13 @@ import {
 interface FacturasSectionProps {
   proyecto: ProyectoConMarcas;
   onChange?: () => void;
+  readonly?: boolean;
 }
 
 export default function FacturasSection({
   proyecto,
   onChange,
+  readonly = false,
 }: FacturasSectionProps) {
   const { toast } = useToast();
   const [facturas, setFacturas] = useState<FacturaConAdjuntos[]>([]);
@@ -197,7 +199,7 @@ export default function FacturasSection({
               : ""}
           </p>
         </div>
-        {!showForm && (
+        {!showForm && !readonly && (
           <button
             type="button"
             onClick={() => {
@@ -248,7 +250,7 @@ export default function FacturasSection({
           {facturas.map((f) => (
             <div key={f.id} className="relative group">
               <FacturaCard factura={f} porcentajesMarcas={proyecto.marcas} />
-              {!f.anulado_en && (
+              {!f.anulado_en && !readonly && (
                 <button
                   type="button"
                   onClick={(e) => {

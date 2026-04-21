@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
+import { Home } from "lucide-react";
 import { getVisibleModules } from "@/lib/modules";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -136,15 +137,13 @@ export default function Sidebar() {
               : "text-gray-600 hover:bg-gray-50 border-l-transparent"
           }`}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            <polyline points="9 22 9 12 15 12 15 22" />
-          </svg>
+          <Home size={16} strokeWidth={1.5} />
           {!collapsed && <span className="truncate">Inicio</span>}
         </button>
         <div className="h-px bg-gray-100 my-1 mx-5" />
         {visibleModules.map((m) => {
           const active = pathname.startsWith(m.href) && m.href !== "/home";
+          const Icon = m.icon;
           return (
             <button
               key={m.key}
@@ -156,9 +155,7 @@ export default function Sidebar() {
                   : "text-gray-600 hover:bg-gray-50 border-l-transparent"
               }`}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d={m.icon} />
-              </svg>
+              <Icon size={16} strokeWidth={1.5} />
               {!collapsed && <span className="truncate">{m.label}</span>}
             </button>
           );

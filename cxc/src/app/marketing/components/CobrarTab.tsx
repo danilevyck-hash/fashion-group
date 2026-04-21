@@ -149,7 +149,7 @@ export default function CobrarTab({ proyecto, onChange }: Props) {
               <EstadoBadge tipo="cobranza" estado={c.estado} />
             </div>
 
-            <div className="space-y-0.5 text-sm mb-4">
+            <div className="space-y-1 text-sm mb-4">
               <div className="flex items-center justify-between">
                 <span className="text-gray-500">Monto</span>
                 <span className="font-mono tabular-nums text-gray-900 font-semibold">
@@ -157,19 +157,13 @@ export default function CobrarTab({ proyecto, onChange }: Props) {
                 </span>
               </div>
               {c.fecha_envio && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-500">Enviada el</span>
-                  <span className="text-gray-700">
-                    {formatearFecha(c.fecha_envio)}
-                  </span>
+                <div className="text-xs text-gray-500">
+                  Enviada el {formatearFecha(c.fecha_envio)}
                 </div>
               )}
               {c.fecha_cobro && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-500">Cobrada el</span>
-                  <span className="text-emerald-700">
-                    {formatearFecha(c.fecha_cobro)}
-                  </span>
+                <div className="text-xs text-emerald-700">
+                  Cobrada el {formatearFecha(c.fecha_cobro)}
                 </div>
               )}
             </div>

@@ -10,9 +10,10 @@ import { subirAdjunto } from "./uploadHelpers";
 
 interface FotosSectionProps {
   proyectoId: string;
+  readonly?: boolean;
 }
 
-export default function FotosSection({ proyectoId }: FotosSectionProps) {
+export default function FotosSection({ proyectoId, readonly = false }: FotosSectionProps) {
   const { toast } = useToast();
   const [fotos, setFotos] = useState<MkAdjunto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,7 +52,6 @@ export default function FotosSection({ proyectoId }: FotosSectionProps) {
       proyectoId,
       tipo: "foto_proyecto",
     });
-    // Optimistic: agregar la foto al estado inmediatamente con URL firmada
     setFotos((prev) => [
       {
         id: adj.id,
@@ -93,22 +93,16 @@ export default function FotosSection({ proyectoId }: FotosSectionProps) {
     }
   };
 
+  const hayFotos = fotos.length > 0;
+
   return (
     <section className="space-y-3">
       <div>
         <h2 className="text-base font-semibold text-gray-900">Fotos del proyecto</h2>
         <p className="text-xs text-gray-500">
-          Sube fotos de la obra o del local — sirven como respaldo para la cobranza a la marca.
+          Respaldo visual que se adjunta a la cobranza a la marca.
         </p>
       </div>
-
-      <FotoUploader
-        onUpload={handleUpload}
-        label="Sube fotos del proyecto"
-        accept="image/*"
-        maxSizeMb={10}
-        multiple
-      />
 
       {loading ? (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
@@ -119,47 +113,68 @@ export default function FotosSection({ proyectoId }: FotosSectionProps) {
             />
           ))}
         </div>
-      ) : fotos.length === 0 ? (
+      ) : hayFotos ? (
+        <>
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+            {fotos.map((f) => (
+              <div
+                key={f.id}
+                className="relative aspect-square rounded-md border border-gray-200 overflow-hidden bg-gray-50 group"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={f.url}
+                  alt={f.nombre_original ?? "Foto del proyecto"}
+                  className="w-full h-full object-cover cursor-zoom-in"
+                  onClick={() => setLightbox(f.url)}
+                />
+                {!readonly && (
+                  <button
+                    type="button"
+                    onClick={() => eliminar(f.id)}
+                    disabled={eliminando === f.id}
+                    aria-label="Eliminar foto"
+                    className="absolute top-1 right-1 bg-white/90 rounded-full w-6 h-6 flex items-center justify-center text-red-600 opacity-0 group-hover:opacity-100 transition disabled:opacity-50"
+                  >
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          {!readonly && (
+            <FotoUploader
+              onUpload={handleUpload}
+              accept="image/*"
+              maxSizeMb={10}
+              multiple
+              compact
+            />
+          )}
+        </>
+      ) : readonly ? (
         <div className="rounded-lg border border-dashed border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-          Todavía no hay fotos del proyecto.
+          Este proyecto no tiene fotos.
         </div>
       ) : (
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
-          {fotos.map((f) => (
-            <div
-              key={f.id}
-              className="relative aspect-square rounded-md border border-gray-200 overflow-hidden bg-gray-50 group"
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={f.url}
-                alt={f.nombre_original ?? "Foto del proyecto"}
-                className="w-full h-full object-cover cursor-zoom-in"
-                onClick={() => setLightbox(f.url)}
-              />
-              <button
-                type="button"
-                onClick={() => eliminar(f.id)}
-                disabled={eliminando === f.id}
-                aria-label="Eliminar foto"
-                className="absolute top-1 right-1 bg-white/90 rounded-full w-6 h-6 flex items-center justify-center text-red-600 opacity-0 group-hover:opacity-100 transition disabled:opacity-50"
-              >
-                <svg
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                >
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-          ))}
-        </div>
+        <FotoUploader
+          onUpload={handleUpload}
+          label="Sube fotos del proyecto"
+          accept="image/*"
+          maxSizeMb={10}
+          multiple
+        />
       )}
 
       <FotoLightbox src={lightbox} onClose={() => setLightbox(null)} />

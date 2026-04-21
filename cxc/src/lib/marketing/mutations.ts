@@ -758,17 +758,37 @@ export async function puedeReabrirProyecto(
     .eq("proyecto_id", proyectoId)
     .is("anulado_en", null);
   if (error) throw new Error(`puedeReabrirProyecto: ${error.message}`);
-  const tieneEnviada = (data ?? []).some(
-    (r) =>
-      String((r as { estado: string }).estado) !== "borrador",
+  const estados = (data ?? []).map((r) =>
+    String((r as { estado: string }).estado),
   );
-  if (tieneEnviada) {
-    return {
-      puede: false,
-      razon: "Ya hay una cobranza enviada. Anula la cobranza primero.",
-    };
-  }
-  return { puede: true };
+  // Siempre se puede reabrir. El efecto depende de los estados:
+  //   - si hay cobradas: se revierten a 'enviada'
+  //   - si solo hay borradores: se eliminan
+  //   - si hay enviadas: se mantienen como enviadas
+  return {
+    puede: true,
+    razon: estados.includes("cobrada")
+      ? "Las cobranzas cobradas volverán a estado Enviada."
+      : estados.includes("enviada")
+        ? "Las cobranzas enviadas se mantienen, el proyecto vuelve a Abierto."
+        : undefined,
+  };
+}
+
+// Revierte cobranzas 'cobrada' a 'enviada' (limpia fecha_cobro).
+export async function revertirCobranzasCobradas(
+  proyectoId: string,
+): Promise<number> {
+  const { data, error } = await supabaseServer
+    .from("mk_cobranzas")
+    .update({ estado: "enviada", fecha_cobro: null })
+    .eq("proyecto_id", proyectoId)
+    .eq("estado", "cobrada")
+    .is("anulado_en", null)
+    .select("id");
+  if (error)
+    throw new Error(`revertirCobranzasCobradas: ${error.message}`);
+  return (data ?? []).length;
 }
 
 export async function eliminarCobranzasBorrador(

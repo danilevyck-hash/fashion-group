@@ -17,6 +17,7 @@ interface FotoUploaderProps {
   accept?: string;
   maxSizeMb?: number;
   multiple?: boolean;
+  compact?: boolean;
 }
 
 interface Item {
@@ -35,6 +36,7 @@ export function FotoUploader({
   accept = "image/*",
   maxSizeMb = 10,
   multiple = true,
+  compact = false,
 }: FotoUploaderProps) {
   const [items, setItems] = useState<Item[]>([]);
   const [dragging, setDragging] = useState(false);
@@ -200,7 +202,9 @@ export function FotoUploader({
         onDrop={onDrop}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
-        className={`rounded-md border-2 border-dashed p-6 text-center transition ${
+        className={`rounded-md border-2 border-dashed transition ${
+          compact ? "p-2" : "p-6"
+        } ${compact ? "" : "text-center"} ${
           dragging
             ? "border-fuchsia-500 bg-fuchsia-50"
             : "border-gray-300 bg-white hover:border-gray-400"
@@ -214,20 +218,39 @@ export function FotoUploader({
           className="hidden"
           onChange={onFileChange}
         />
-        <div className="text-sm text-gray-600 mb-2">{label}</div>
-        <div className="text-xs text-gray-400 mb-3">
-          Arrastra {multiple ? "fotos" : "una foto"} aquí o
-        </div>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition"
-        >
-          Elegir {multiple ? "fotos" : "foto"}
-        </button>
-        <div className="text-xs text-gray-400 mt-2">
-          Máximo {maxSizeMb}MB por foto
-        </div>
+        {compact ? (
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-xs text-gray-500">
+              {dragging
+                ? "Suelta aquí para agregar"
+                : `Arrastra aquí o máx ${maxSizeMb}MB por foto`}
+            </div>
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="rounded-md bg-black text-white px-3 py-1.5 text-xs active:scale-[0.97] transition shrink-0"
+            >
+              + Agregar {multiple ? "fotos" : "foto"}
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="text-sm text-gray-600 mb-2">{label}</div>
+            <div className="text-xs text-gray-400 mb-3">
+              Arrastra {multiple ? "fotos" : "una foto"} aquí o
+            </div>
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition"
+            >
+              Elegir {multiple ? "fotos" : "foto"}
+            </button>
+            <div className="text-xs text-gray-400 mt-2">
+              Máximo {maxSizeMb}MB por foto
+            </div>
+          </>
+        )}
       </div>
 
       {items.length > 0 && (

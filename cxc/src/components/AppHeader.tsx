@@ -64,9 +64,10 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
           <FGLogo variant="icon" theme="light" size={22} />
           <div className="w-px h-4 bg-gray-200" />
           <div className="flex items-center gap-1 text-sm text-gray-500 flex-1 min-w-0">
-            {currentNav && (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={`flex-shrink-0 ${moduleColor!.text}`}><path d={currentNav.icon}/></svg>
-            )}
+            {currentNav && (() => {
+              const Icon = currentNav.icon;
+              return <Icon size={14} strokeWidth={1.5} className={`flex-shrink-0 ${moduleColor!.text}`} />;
+            })()}
             <span className="truncate">{module}</span>
             {/* breadcrumbs inline removidos — fuente única: breadcrumb bar inferior */}
           </div>
@@ -160,10 +161,11 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
               </button>
               {visibleNav.map(m => {
                 const active = pathname.startsWith(m.href);
+                const Icon = m.icon;
                 return (
                   <button key={m.key} onClick={() => { router.push(m.href); setDrawerOpen(false); }}
                     className={`w-full flex items-center gap-3 px-5 py-3 text-sm transition-all ${active ? "bg-gray-50 text-black font-medium" : "text-gray-600 hover:bg-gray-50 active:bg-gray-100"}`}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={m.icon}/></svg>
+                    <Icon size={16} strokeWidth={1.5} />
                     {m.label}
                   </button>
                 );

@@ -7,7 +7,6 @@ import { EstadoBadge, MarcaBadge } from "@/components/marketing";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
 import type {
   FacturaConAdjuntos,
-  MkCobranza,
   MkMarca,
   ProyectoConMarcas,
 } from "@/lib/marketing/types";
@@ -39,12 +38,12 @@ export default function ProyectoOverlay({
   const { toast } = useToast();
   const [proyecto, setProyecto] = useState<ProyectoConMarcas | null>(null);
   const [facturas, setFacturas] = useState<FacturaConAdjuntos[]>([]);
-  const [cobranzas, setCobranzas] = useState<MkCobranza[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("facturas");
   const [cerrando, setCerrando] = useState(false);
   const [showCerrar, setShowCerrar] = useState(false);
   const [reabriendo, setReabriendo] = useState(false);
+  const [showReabrir, setShowReabrir] = useState(false);
   const [puedeReabrir, setPuedeReabrir] = useState<{
     puede: boolean;
     razon?: string;
@@ -56,15 +55,11 @@ export default function ProyectoOverlay({
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const [pRes, fRes, cRes] = await Promise.all([
+      const [pRes, fRes] = await Promise.all([
         fetch(`/api/marketing/proyectos/${proyectoId}`, { cache: "no-store" }),
         fetch(`/api/marketing/proyectos/${proyectoId}/facturas`, {
           cache: "no-store",
         }),
-        fetch(
-          `/api/marketing/cobranzas?proyecto_id=${proyectoId}`,
-          { cache: "no-store" },
-        ),
       ]);
       if (!pRes.ok) throw new Error("Proyecto no encontrado");
       const p = (await pRes.json()) as ProyectoConMarcas;
@@ -74,13 +69,6 @@ export default function ProyectoOverlay({
       }
       if (fRes.ok) {
         setFacturas((await fRes.json()) as FacturaConAdjuntos[]);
-      }
-      if (cRes.ok) {
-        const raw = (await cRes.json()) as unknown;
-        const items: MkCobranza[] = Array.isArray(raw)
-          ? (raw as MkCobranza[])
-          : [];
-        setCobranzas(items);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al cargar";
@@ -129,24 +117,19 @@ export default function ProyectoOverlay({
     };
   }, [facturas]);
 
-  // Cobrable por marca: si hay cobranzas activas usa sus montos, si no calcula
-  // desde (total facturado × porcentaje) como estimación.
+  // Cobrable por marca = SUM(facturas.total) × porcentaje.
+  // Regla de negocio: la cobranza siempre es sobre el total (subtotal + ITBMS).
   const cobrablePorMarca = useMemo(() => {
     if (!proyecto) return [];
     return proyecto.marcas.map((m) => {
-      const desdeCobranzas = cobranzas
-        .filter((c) => c.marca_id === m.marca.id && !c.anulado_en)
-        .reduce((acc, c) => acc + c.monto, 0);
-      const estimado = (totales.total * m.porcentaje) / 100;
-      const monto = desdeCobranzas > 0 ? desdeCobranzas : estimado;
+      const monto = (totales.total * m.porcentaje) / 100;
       return {
         marca: m.marca,
         porcentaje: m.porcentaje,
         monto: Number(monto.toFixed(2)),
-        esEstimado: desdeCobranzas === 0,
       };
     });
-  }, [proyecto, cobranzas, totales.total]);
+  }, [proyecto, totales.total]);
 
   const handleCerrar = async () => {
     if (!proyecto) return;
@@ -194,6 +177,7 @@ export default function ProyectoOverlay({
         throw new Error(err?.error ?? "No se pudo reabrir");
       }
       toast("Proyecto reabierto", "success");
+      setShowReabrir(false);
       setTab("facturas");
       await cargar();
       onChange();
@@ -232,11 +216,12 @@ export default function ProyectoOverlay({
     }
   };
 
-  const reabrirBloqueado =
-    !!proyecto &&
-    proyecto.estado !== "abierto" &&
-    puedeReabrir !== null &&
-    !puedeReabrir.puede;
+  const mensajeReabrir = proyecto
+    ? proyecto.estado === "cobrado"
+      ? "La cobranza volverá a estado Enviada. ¿Seguro que quieres reabrir?"
+      : puedeReabrir?.razon ??
+        "El proyecto volverá a estado Abierto. Las cobranzas borrador se eliminarán."
+    : "";
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center sm:justify-center">
@@ -267,10 +252,9 @@ export default function ProyectoOverlay({
                 ) : (
                   <button
                     type="button"
-                    onClick={handleReabrir}
-                    disabled={reabriendo || reabrirBloqueado}
-                    title={reabrirBloqueado ? puedeReabrir?.razon : undefined}
-                    className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                    onClick={() => setShowReabrir(true)}
+                    disabled={reabriendo}
+                    className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50 transition"
                   >
                     {reabriendo ? "Reabriendo…" : "Reabrir"}
                   </button>
@@ -434,9 +418,15 @@ export default function ProyectoOverlay({
                   cargar();
                   onChange();
                 }}
+                readonly={proyecto.estado === "cobrado"}
               />
             )}
-            {tab === "fotos" && <FotosSection proyectoId={proyecto.id} />}
+            {tab === "fotos" && (
+              <FotosSection
+                proyectoId={proyecto.id}
+                readonly={proyecto.estado === "cobrado"}
+              />
+            )}
             {tab === "cobrar" && proyecto.estado !== "abierto" && (
               <CobrarTab
                 proyecto={proyecto}
@@ -457,6 +447,16 @@ export default function ProyectoOverlay({
           message="El proyecto pasa a 'Por cobrar' y se creará una cobranza borrador por cada marca del proyecto. Podrás editarlas antes de enviarlas."
           confirmLabel="Cerrar proyecto"
           loading={cerrando}
+        />
+
+        <ConfirmModal
+          open={showReabrir}
+          onClose={() => !reabriendo && setShowReabrir(false)}
+          onConfirm={handleReabrir}
+          title="Reabrir proyecto"
+          message={mensajeReabrir}
+          confirmLabel="Reabrir"
+          loading={reabriendo}
         />
 
         {showAnular && (
