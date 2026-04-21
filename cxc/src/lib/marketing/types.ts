@@ -67,6 +67,14 @@ export interface MkProyectoMarca {
   porcentaje: number;
 }
 
+export interface MkFacturaMarca {
+  id: string;
+  factura_id: string;
+  marca_id: string;
+  porcentaje: number;
+  created_at: string;
+}
+
 export interface MkFactura {
   id: string;
   proyecto_id: string;
