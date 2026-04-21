@@ -6,9 +6,8 @@ import { MarcaBadge } from "@/components/marketing";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 
 interface MarcaStats {
-  marcaId: string;
-  proyectosAbiertos: number;
-  pendienteCobrar: number;
+  activos: number;
+  porCobrar: number;
 }
 
 interface Props {
@@ -22,34 +21,6 @@ function esMarcaConocida(c: string): c is "TH" | "CK" | "RBK" {
   return c === "TH" || c === "CK" || c === "RBK";
 }
 
-async function cargarStats(marcaId: string): Promise<MarcaStats> {
-  const [proyRes, cobRes] = await Promise.all([
-    fetch(`/api/marketing/proyectos?marca_id=${marcaId}&estado=abierto`),
-    fetch(`/api/marketing/cobranzas?marca_id=${marcaId}`),
-  ]);
-  const proyectos = proyRes.ok ? ((await proyRes.json()) as unknown[]) : [];
-  const cobranzasRaw = cobRes.ok ? ((await cobRes.json()) as unknown) : [];
-  const cobranzas = Array.isArray(cobranzasRaw)
-    ? cobranzasRaw
-    : Array.isArray((cobranzasRaw as { items?: unknown[] })?.items)
-      ? (cobranzasRaw as { items: unknown[] }).items
-      : [];
-
-  const pendiente = (cobranzas as Array<Record<string, unknown>>).reduce((acc, c) => {
-    const monto = Number(c.monto ?? 0);
-    const estado = String(c.estado ?? "");
-    // Pendiente = cobranzas enviadas que aún no están cobradas
-    if (estado !== "enviada") return acc;
-    return acc + monto;
-  }, 0);
-
-  return {
-    marcaId,
-    proyectosAbiertos: Array.isArray(proyectos) ? proyectos.length : 0,
-    pendienteCobrar: Number(pendiente.toFixed(2)),
-  };
-}
-
 export default function MarcaSelector({ marcas, loading, onSelect, refreshKey }: Props) {
   const [stats, setStats] = useState<Record<string, MarcaStats>>({});
 
@@ -57,15 +28,25 @@ export default function MarcaSelector({ marcas, loading, onSelect, refreshKey }:
     if (marcas.length === 0) return;
     let cancelado = false;
     (async () => {
-      const results = await Promise.all(
-        marcas.map((m) => cargarStats(m.id).catch(() => null)),
-      );
-      if (cancelado) return;
-      const acc: Record<string, MarcaStats> = {};
-      for (const r of results) {
-        if (r) acc[r.marcaId] = r;
+      try {
+        const res = await fetch("/api/marketing/resumen-marcas", {
+          cache: "no-store",
+        });
+        if (!res.ok) throw new Error();
+        const data = (await res.json()) as Array<{
+          marcaId: string;
+          activos: number;
+          porCobrar: number;
+        }>;
+        if (cancelado) return;
+        const acc: Record<string, MarcaStats> = {};
+        for (const r of data) {
+          acc[r.marcaId] = { activos: r.activos, porCobrar: r.porCobrar };
+        }
+        setStats(acc);
+      } catch {
+        if (!cancelado) setStats({});
       }
-      setStats(acc);
     })();
     return () => {
       cancelado = true;
@@ -117,18 +98,18 @@ export default function MarcaSelector({ marcas, loading, onSelect, refreshKey }:
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-gray-400">
-                  Abiertos
+                  Activos
                 </div>
                 <div className="text-sm font-semibold tabular-nums text-gray-900">
-                  {s ? s.proyectosAbiertos : "—"}
+                  {s ? s.activos : "—"}
                 </div>
               </div>
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-gray-400">
-                  Pendiente
+                  Por cobrar
                 </div>
                 <div className="text-sm font-semibold font-mono tabular-nums text-gray-900">
-                  {s ? formatearMonto(s.pendienteCobrar) : "—"}
+                  {s ? formatearMonto(s.porCobrar) : "—"}
                 </div>
               </div>
             </div>

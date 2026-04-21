@@ -10,7 +10,13 @@ import type {
 import { EstadoBadge } from "@/components/marketing";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
 
-type FilterKey = "all" | EstadoProyecto;
+type FilterKey = "activos" | "all" | EstadoProyecto;
+
+const ACTIVOS_ESTADOS: ReadonlyArray<EstadoProyecto> = [
+  "abierto",
+  "por_cobrar",
+  "enviado",
+];
 
 interface ProyectoListItem extends MkProyecto {
   marcas: MarcaConPorcentaje[];
@@ -30,6 +36,7 @@ interface Props {
 }
 
 const PILL_ORDER: Array<{ key: FilterKey; label: string }> = [
+  { key: "activos", label: "Activos" },
   { key: "all", label: "Todos" },
   { key: "abierto", label: "Abiertos" },
   { key: "por_cobrar", label: "Por cobrar" },
@@ -48,7 +55,7 @@ export default function ProyectosView({
 }: Props) {
   const [proyectos, setProyectos] = useState<ProyectoListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<FilterKey>("all");
+  const [filter, setFilter] = useState<FilterKey>("activos");
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -72,6 +79,7 @@ export default function ProyectosView({
 
   const counts = useMemo(() => {
     const c: Record<FilterKey, number> = {
+      activos: 0,
       all: proyectos.length,
       abierto: 0,
       por_cobrar: 0,
@@ -80,12 +88,18 @@ export default function ProyectosView({
     };
     for (const p of proyectos) {
       if (p.estado in c) c[p.estado as EstadoProyecto] += 1;
+      if (ACTIVOS_ESTADOS.includes(p.estado as EstadoProyecto)) c.activos += 1;
     }
     return c;
   }, [proyectos]);
 
   const filtrados = useMemo(() => {
     if (filter === "all") return proyectos;
+    if (filter === "activos") {
+      return proyectos.filter((p) =>
+        ACTIVOS_ESTADOS.includes(p.estado as EstadoProyecto),
+      );
+    }
     return proyectos.filter((p) => p.estado === filter);
   }, [proyectos, filter]);
 
