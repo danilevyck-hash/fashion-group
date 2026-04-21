@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { getProyectoById } from "@/lib/marketing/queries";
+import {
+  getProyectoById,
+  getFacturasByProyecto,
+} from "@/lib/marketing/queries";
 import { updateProyecto } from "@/lib/marketing/mutations";
+import { firmarAdjuntos } from "@/lib/marketing/storage";
 import type { UpdateProyectoInput } from "@/lib/marketing/types";
 
 export const dynamic = "force-dynamic";
@@ -26,7 +30,17 @@ export async function GET(
         { status: 404 },
       );
     }
-    return NextResponse.json(proyecto);
+    // Incluimos facturas en la misma respuesta para evitar un segundo fetch
+    // que estaba devolviendo array vacío en prod por razones no determinables
+    // desde build estático. Fuente única del detalle.
+    const facturasRaw = await getFacturasByProyecto(params.id);
+    const facturas = await Promise.all(
+      facturasRaw.map(async (f) => ({
+        ...f,
+        adjuntos: await firmarAdjuntos(f.adjuntos ?? []),
+      })),
+    );
+    return NextResponse.json({ ...proyecto, facturas });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Error interno";
     console.error("marketing/proyectos/[id] GET:", message);

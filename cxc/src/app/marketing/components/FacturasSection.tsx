@@ -15,18 +15,22 @@ import {
 
 interface FacturasSectionProps {
   proyecto: ProyectoConMarcas;
+  facturasIniciales?: FacturaConAdjuntos[];
   onChange?: () => void;
   readonly?: boolean;
 }
 
 export default function FacturasSection({
   proyecto,
+  facturasIniciales,
   onChange,
   readonly = false,
 }: FacturasSectionProps) {
   const { toast } = useToast();
-  const [facturas, setFacturas] = useState<FacturaConAdjuntos[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [facturas, setFacturas] = useState<FacturaConAdjuntos[]>(
+    facturasIniciales ?? [],
+  );
+  const [loading, setLoading] = useState(!facturasIniciales);
   const [showForm, setShowForm] = useState(false);
   const [anulando, setAnulando] = useState<FacturaConAdjuntos | null>(null);
   const [anulandoMotivo, setAnulandoMotivo] = useState("");
@@ -34,7 +38,20 @@ export default function FacturasSection({
   // Path del PDF pre-subido para IA (antes de tener facturaId)
   const [pdfPathPreSubido, setPdfPathPreSubido] = useState<string | null>(null);
 
+  // Sincroniza cuando el parent pasa nuevas facturas (después de un onChange).
+  useEffect(() => {
+    if (facturasIniciales) {
+      setFacturas(facturasIniciales);
+      setLoading(false);
+    }
+  }, [facturasIniciales]);
+
   const cargar = useCallback(async () => {
+    // Si el parent maneja las facturas, solo delegamos el refresh.
+    if (facturasIniciales !== undefined) {
+      onChange?.();
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch(
@@ -54,11 +71,14 @@ export default function FacturasSection({
     } finally {
       setLoading(false);
     }
-  }, [proyecto.id, toast]);
+  }, [proyecto.id, toast, facturasIniciales, onChange]);
 
   useEffect(() => {
-    cargar();
-  }, [cargar]);
+    // Solo hace fetch propio si no le pasaron facturasIniciales.
+    if (facturasIniciales === undefined) {
+      cargar();
+    }
+  }, [cargar, facturasIniciales]);
 
   // Cuando el usuario sube el PDF, lo subimos a Storage bajo el path del
   // proyecto (sin facturaId todavía) y devolvemos el path para que el form

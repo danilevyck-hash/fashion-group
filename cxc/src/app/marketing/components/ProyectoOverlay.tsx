@@ -66,19 +66,19 @@ export default function ProyectoOverlay({
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const [pRes, fRes] = await Promise.all([
-        fetch(`/api/marketing/proyectos/${proyectoId}`, { cache: "no-store" }),
-        fetch(`/api/marketing/proyectos/${proyectoId}/facturas`, {
-          cache: "no-store",
-        }),
-      ]);
-      if (!pRes.ok) throw new Error("Proyecto no encontrado");
-      const p = (await pRes.json()) as ProyectoConMarcas;
-      setProyecto(p);
-      onNombreProyectoRef.current?.(p.nombre || p.tienda);
-      if (fRes.ok) {
-        setFacturas((await fRes.json()) as FacturaConAdjuntos[]);
+      const pRes = await fetch(`/api/marketing/proyectos/${proyectoId}`, {
+        cache: "no-store",
+      });
+      if (!pRes.ok) {
+        const err = await pRes.json().catch(() => null);
+        throw new Error(err?.error ?? "Proyecto no encontrado");
       }
+      const body = (await pRes.json()) as ProyectoConMarcas & {
+        facturas?: FacturaConAdjuntos[];
+      };
+      setProyecto(body);
+      onNombreProyectoRef.current?.(body.nombre || body.tienda);
+      setFacturas(Array.isArray(body.facturas) ? body.facturas : []);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al cargar";
       toast(msg, "error");
@@ -429,6 +429,7 @@ export default function ProyectoOverlay({
             {tab === "facturas" && (
               <FacturasSection
                 proyecto={proyecto}
+                facturasIniciales={facturas}
                 onChange={() => {
                   cargar();
                   onChange();
