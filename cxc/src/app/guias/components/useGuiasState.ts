@@ -285,7 +285,9 @@ export function useGuiasState() {
   }
 
   function addRow() {
+    console.log("[guia] agregar-linea antes", { items: items.length });
     setItems([...items, emptyItem(items.length + 1)]);
+    console.log("[guia] agregar-linea despues", { items: items.length + 1 });
   }
   function removeRow(idx: number) {
     if (items.length <= 1) return;
@@ -333,7 +335,9 @@ export function useGuiasState() {
     return true;
   }
 
-  async function saveGuia() {
+  async function saveGuia(opts?: { silent?: boolean }) {
+    const silent = opts?.silent === true;
+    console.log(`[guia] saveGuia start (silent=${silent}, editing=${editingId ?? "new"})`);
     if (!validate()) return;
     const transp = transportista === "__other__" ? transportistaOtro : transportista;
     try { localStorage.setItem("fg_last_transportista", transportista); localStorage.setItem("fg_last_entregado_por", entregadoPor); } catch { /* */ }
@@ -359,7 +363,7 @@ export function useGuiasState() {
       setError(null);
       clearGuiaDraft();
       const guia = await res.json();
-      if (!editingId) {
+      if (!editingId && !silent) {
         const totalB = validItems.reduce(
           (s: number, i: { bultos: number }) => s + (i.bultos || 0),
           0,
@@ -373,9 +377,13 @@ export function useGuiasState() {
           }),
         }).catch(() => {});
       }
-      resetForm();
-      loadGuias();
-      setView("list");
+      // En silent (auto-save durante edición) NO se resetea el form ni se
+      // navega al listado — el usuario sigue editando sin interrupciones.
+      if (!silent) {
+        resetForm();
+        loadGuias();
+        setView("list");
+      }
     } else {
       setError("Error al guardar. Verifica los datos.");
     }

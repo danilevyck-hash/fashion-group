@@ -1,5 +1,11 @@
 "use client";
 
+// Test manual de regresión — correr tras tocar GuiaForm o saveGuia:
+//   1. Abrir una guía existente (ej GT-042) en edición
+//   2. Click "+ Agregar fila" tres veces seguidas
+//   3. NO debe redirigir al listado /guias ni limpiar el form
+//   4. El auto-save silencioso dispara cada 1.5s sin perder el contexto
+//   5. Click "Guardar" final sí debe redirigir al listado
 import { useEffect, useRef, useState } from "react";
 import type { GuiaItem } from "./types";
 import AddNewInline from "./AddNewInline";
@@ -32,7 +38,7 @@ interface GuiaFormProps {
   onUpdateItem: (idx: number, field: keyof GuiaItem, value: string | number) => void;
   onAddRow: () => void;
   onRemoveRow: (idx: number) => void;
-  onSave: () => void;
+  onSave: (opts?: { silent?: boolean }) => void;
   onCancel: () => void;
   hasDraft?: boolean;
   draftTimeAgo?: string;
@@ -128,8 +134,9 @@ export default function GuiaForm({
       const hasItems = items.some(i => i.cliente && i.direccion && i.empresa && i.facturas && i.bultos > 0);
       const hasHeader = fecha.trim() && (transportista.trim() && transportista !== "__other__" || transportistaOtro.trim()) && entregadoPor.trim();
       if (hasItems && hasHeader && !autoSaveInFlight.current) {
+        console.log("[guia] autosave trigger", { items: items.length });
         autoSaveInFlight.current = true;
-        try { handleSave(); } finally { autoSaveInFlight.current = false; }
+        try { handleSave({ silent: true }); } finally { autoSaveInFlight.current = false; }
       }
     }, 1500);
     return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
@@ -145,9 +152,10 @@ export default function GuiaForm({
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty, saving]);
 
-  // Wrap onSave to track status
-  function handleSave() {
-    onSave();
+  // Wrap onSave to track status. `silent` propaga al handler del hook para
+  // que el auto-save NO haga resetForm() ni redirija al listado.
+  function handleSave(opts?: { silent?: boolean }) {
+    onSave(opts);
     setDirty(false);
     setLastSaved(new Date().toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit" }));
   }
@@ -169,7 +177,7 @@ export default function GuiaForm({
       ? "bg-black text-white px-4 py-2 rounded-md text-xs font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40"
       : "bg-black text-white px-6 py-3 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40";
     return (
-      <button onClick={handleSave} disabled={saving || !items.some(i => i.cliente)} className={cls}>
+      <button type="button" onClick={() => handleSave()} disabled={saving || !items.some(i => i.cliente)} className={cls}>
         {saving ? "Guardando..." : editingId ? "Guardar Cambios" : "Guardar Guía"}
       </button>
     );
@@ -331,7 +339,7 @@ export default function GuiaForm({
         </div>
 
         <div className="mt-3">
-          <button onClick={onAddRow} className="text-sm text-gray-400 hover:text-black transition">+ Agregar fila</button>
+          <button type="button" onClick={onAddRow} className="text-sm text-gray-400 hover:text-black transition">+ Agregar fila</button>
         </div>
       </div>
 
