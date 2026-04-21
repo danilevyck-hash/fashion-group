@@ -203,9 +203,30 @@ export async function cerrarProyecto(id: string): Promise<void> {
   const hoy = new Date().toISOString().slice(0, 10);
   const { error } = await supabaseServer
     .from("mk_proyectos")
-    .update({ estado: "cobrado", fecha_cierre: hoy })
+    .update({ estado: "por_cobrar", fecha_cierre: hoy })
     .eq("id", id);
   if (error) throw new Error(`cerrarProyecto: ${error.message}`);
+}
+
+export async function reabrirProyecto(id: string): Promise<void> {
+  if (!id) throw new Error("id requerido");
+  const { error } = await supabaseServer
+    .from("mk_proyectos")
+    .update({ estado: "abierto", fecha_cierre: null })
+    .eq("id", id);
+  if (error) throw new Error(`reabrirProyecto: ${error.message}`);
+}
+
+export async function setEstadoProyecto(
+  id: string,
+  estado: "abierto" | "por_cobrar" | "enviado" | "cobrado",
+): Promise<void> {
+  if (!id) throw new Error("id requerido");
+  const { error } = await supabaseServer
+    .from("mk_proyectos")
+    .update({ estado })
+    .eq("id", id);
+  if (error) throw new Error(`setEstadoProyecto: ${error.message}`);
 }
 
 export async function updateProyectoMarcas(
@@ -697,4 +718,99 @@ export async function limpiezaAnualAnulados(
   }
 
   return result;
+}
+
+// ============================================================================
+// Flujo de cierre/reapertura con auto-cobranzas
+// ============================================================================
+
+export async function generarCobranzasBorradorAlCerrar(
+  proyectoId: string,
+): Promise<MkCobranza[]> {
+  const { data: proyMarcas, error: pmError } = await supabaseServer
+    .from("mk_proyecto_marcas")
+    .select("marca_id, porcentaje")
+    .eq("proyecto_id", proyectoId);
+  if (pmError) throw new Error(`generarCobranzas[pm]: ${pmError.message}`);
+  if (!proyMarcas || proyMarcas.length === 0) return [];
+
+  const { data: facturas, error: fError } = await supabaseServer
+    .from("mk_facturas")
+    .select("subtotal")
+    .eq("proyecto_id", proyectoId)
+    .is("anulado_en", null);
+  if (fError) throw new Error(`generarCobranzas[f]: ${fError.message}`);
+
+  const subtotalTotal = (facturas ?? []).reduce(
+    (acc, r) => acc + Number((r as { subtotal: unknown }).subtotal ?? 0),
+    0,
+  );
+
+  const { data: existentes } = await supabaseServer
+    .from("mk_cobranzas")
+    .select("marca_id")
+    .eq("proyecto_id", proyectoId)
+    .is("anulado_en", null);
+  const marcasYaCobradas = new Set(
+    (existentes ?? []).map((r) => String((r as { marca_id: string }).marca_id)),
+  );
+
+  const creadas: MkCobranza[] = [];
+  for (const pm of proyMarcas) {
+    const marcaId = String((pm as { marca_id: string }).marca_id);
+    if (marcasYaCobradas.has(marcaId)) continue;
+    const pct = Number((pm as { porcentaje: number }).porcentaje);
+    const monto = round2((subtotalTotal * pct) / 100);
+    try {
+      const cb = await createCobranza({
+        proyectoId,
+        marcaId,
+        monto,
+      });
+      creadas.push(cb);
+    } catch (err) {
+      console.warn(
+        `generarCobranzasBorradorAlCerrar: fallo marca ${marcaId}`,
+        err,
+      );
+    }
+  }
+  return creadas;
+}
+
+export async function puedeReabrirProyecto(
+  proyectoId: string,
+): Promise<{ puede: boolean; razon?: string }> {
+  const { data, error } = await supabaseServer
+    .from("mk_cobranzas")
+    .select("estado")
+    .eq("proyecto_id", proyectoId)
+    .is("anulado_en", null);
+  if (error) throw new Error(`puedeReabrirProyecto: ${error.message}`);
+  const tieneEnviada = (data ?? []).some(
+    (r) =>
+      String((r as { estado: string }).estado) !== "borrador",
+  );
+  if (tieneEnviada) {
+    return {
+      puede: false,
+      razon: "Ya hay una cobranza enviada. Anula la cobranza primero.",
+    };
+  }
+  return { puede: true };
+}
+
+export async function eliminarCobranzasBorrador(
+  proyectoId: string,
+): Promise<number> {
+  const { data, error } = await supabaseServer
+    .from("mk_cobranzas")
+    .delete()
+    .eq("proyecto_id", proyectoId)
+    .eq("estado", "borrador")
+    .is("anulado_en", null)
+    .select("id");
+  if (error)
+    throw new Error(`eliminarCobranzasBorrador: ${error.message}`);
+  return (data ?? []).length;
 }

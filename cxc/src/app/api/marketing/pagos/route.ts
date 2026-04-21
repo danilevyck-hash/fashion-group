@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { createPago } from "@/lib/marketing/mutations";
+import { createPago, setEstadoProyecto } from "@/lib/marketing/mutations";
+import { getCobranzaById } from "@/lib/marketing/queries";
+import { supabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +42,24 @@ export async function POST(req: NextRequest) {
       comprobanteUrl: body.comprobanteUrl,
       notas: body.notas,
     });
+
+    const cobranza = await getCobranzaById(body.cobranzaId);
+    if (cobranza) {
+      const { data: hermanas } = await supabaseServer
+        .from("mk_cobranzas")
+        .select("estado")
+        .eq("proyecto_id", cobranza.proyecto_id)
+        .is("anulado_en", null);
+      const todasPagadas =
+        (hermanas ?? []).length > 0 &&
+        (hermanas ?? []).every(
+          (r) => String((r as { estado: string }).estado) === "pagada",
+        );
+      if (todasPagadas) {
+        await setEstadoProyecto(cobranza.proyecto_id, "cobrado");
+      }
+    }
+
     return NextResponse.json(pago);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Error interno";

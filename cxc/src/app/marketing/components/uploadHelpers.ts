@@ -6,6 +6,40 @@ interface UploadUrlResponse {
   path: string;
 }
 
+export async function pedirUploadUrl(args: {
+  file: File;
+  proyectoId?: string;
+  facturaId?: string;
+}): Promise<UploadUrlResponse> {
+  const res = await fetch("/api/marketing/adjuntos/upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      proyectoId: args.proyectoId,
+      facturaId: args.facturaId,
+      filename: args.file.name,
+      contentType: args.file.type,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => null);
+    throw new Error(err?.error ?? "No se pudo generar URL de subida");
+  }
+  return (await res.json()) as UploadUrlResponse;
+}
+
+export async function subirArchivoAStorage(
+  uploadUrl: string,
+  file: File,
+): Promise<void> {
+  const res = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  });
+  if (!res.ok) throw new Error("No se pudo subir el archivo");
+}
+
 interface UploadArgs {
   file: File;
   proyectoId?: string;

@@ -15,13 +15,15 @@ interface EstadoBadgeProps {
 // blue, emerald, amber, gray, red
 const PROYECTO_COLORS: Record<EstadoProyecto, string> = {
   abierto: "bg-blue-50 text-blue-700 border-blue-200",
-  listo_cobrar: "bg-amber-50 text-amber-700 border-amber-200",
+  por_cobrar: "bg-amber-50 text-amber-700 border-amber-200",
+  enviado: "bg-violet-50 text-violet-700 border-violet-200",
   cobrado: "bg-emerald-50 text-emerald-700 border-emerald-200",
 };
 
 const PROYECTO_LABELS: Record<EstadoProyecto, string> = {
   abierto: "Abierto",
-  listo_cobrar: "Listo para cobrar",
+  por_cobrar: "Por cobrar",
+  enviado: "Enviado",
   cobrado: "Cobrado",
 };
 

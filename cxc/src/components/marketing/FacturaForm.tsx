@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   MkFactura,
   ProyectoConMarcas,
@@ -11,7 +11,7 @@ import { PasoInstruccion } from "./PasoInstruccion";
 import { PdfUploader, UploadResult } from "./PdfUploader";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 
-interface FacturaFormValues {
+export interface FacturaFormValues {
   numeroFactura: string;
   fechaFactura: string;
   proveedor: string;
@@ -25,9 +25,16 @@ interface FacturaFormProps {
   initial?: Partial<MkFactura>;
   onSubmit: (data: FacturaFormValues, pdfFile?: File) => Promise<void>;
   onCancel?: () => void;
+  /**
+   * Si se pasa, se invoca cuando el usuario sube el PDF. Debe devolver el path
+   * dentro del bucket 'marketing' (o null en error). Con ese path, el form llama
+   * al endpoint de IA para pre-llenar campos.
+   */
+  onUploadPdfForIA?: (file: File) => Promise<string | null>;
 }
 
-// TODO(Fase 3): conectar a /api/marketing/autocomplete
+type ItbmsOption = "0" | "7";
+
 async function fetchProveedorSuggestions(_q: string): Promise<string[]> {
   return [];
 }
@@ -43,57 +50,111 @@ function isoHoy(): string {
   return `${y}-${m}-${day}`;
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+interface RespuestaIA {
+  numero_factura: string | null;
+  fecha_factura: string | null;
+  proveedor: string | null;
+  concepto: string | null;
+  subtotal: number | null;
+  itbms_pct: 0 | 7 | null;
+}
+
 export function FacturaForm({
   proyecto,
   initial,
   onSubmit,
   onCancel,
+  onUploadPdfForIA,
 }: FacturaFormProps) {
   const { toast } = useToast();
 
   const [numeroFactura, setNumeroFactura] = useState<string>(
-    initial?.numero_factura ?? ""
+    initial?.numero_factura ?? "",
   );
   const [fechaFactura, setFechaFactura] = useState<string>(
-    initial?.fecha_factura ?? isoHoy()
+    initial?.fecha_factura ?? isoHoy(),
   );
   const [proveedor, setProveedor] = useState<string>(initial?.proveedor ?? "");
   const [concepto, setConcepto] = useState<string>(initial?.concepto ?? "");
   const [subtotalStr, setSubtotalStr] = useState<string>(
-    initial?.subtotal != null ? String(initial.subtotal) : ""
+    initial?.subtotal != null ? String(initial.subtotal) : "",
   );
-  const [itbmsStr, setItbmsStr] = useState<string>(
-    initial?.itbms != null ? String(initial.itbms) : "0"
-  );
+  const [itbmsOption, setItbmsOption] = useState<ItbmsOption>(() => {
+    if (initial?.subtotal && initial?.itbms) {
+      const pct = (Number(initial.itbms) / Number(initial.subtotal)) * 100;
+      if (pct > 3.5) return "7";
+    }
+    return "0";
+  });
   const [pdfFile, setPdfFile] = useState<File | undefined>(undefined);
   const [pdfSubido, setPdfSubido] = useState(false);
+  const [leyendoIA, setLeyendoIA] = useState(false);
   const [enviando, setEnviando] = useState(false);
 
   const subtotal = Number(subtotalStr) || 0;
-  const itbms = Number(itbmsStr) || 0;
-  const total = subtotal + itbms;
+  const itbms = useMemo(
+    () => (itbmsOption === "7" ? round2(subtotal * 0.07) : 0),
+    [subtotal, itbmsOption],
+  );
+  const total = useMemo(() => round2(subtotal + itbms), [subtotal, itbms]);
 
-  const pasoDatos = useMemo(() => {
-    return (
-      numeroFactura.trim().length > 0 &&
-      fechaFactura.trim().length > 0 &&
-      proveedor.trim().length > 0 &&
-      concepto.trim().length > 0 &&
-      subtotal > 0
-    );
-  }, [numeroFactura, fechaFactura, proveedor, concepto, subtotal]);
+  const pasoDatos =
+    numeroFactura.trim().length > 0 &&
+    fechaFactura.trim().length > 0 &&
+    proveedor.trim().length > 0 &&
+    concepto.trim().length > 0 &&
+    subtotal > 0;
 
   const puedeGuardar = pasoDatos && !enviando;
 
-  // El PdfUploader recibe un onUpload que nos da la URL real. Para mantener
-  // el contrato "subir al guardar", capturamos el File y solo marcamos
-  // completado tras devolver el UploadResult.
+  const aplicarRespuestaIA = useCallback((data: RespuestaIA) => {
+    if (data.numero_factura) setNumeroFactura(data.numero_factura);
+    if (data.fecha_factura) setFechaFactura(data.fecha_factura);
+    if (data.proveedor) setProveedor(data.proveedor);
+    if (data.concepto) setConcepto(data.concepto);
+    if (data.subtotal !== null && Number.isFinite(data.subtotal)) {
+      setSubtotalStr(String(data.subtotal));
+    }
+    if (data.itbms_pct === 7) setItbmsOption("7");
+    else if (data.itbms_pct === 0) setItbmsOption("0");
+  }, []);
+
   const handlePdfUpload = async (file: File): Promise<UploadResult> => {
-    // Guardamos el file para que FacturaForm.onSubmit pueda pasarlo al caller.
-    // El caller real de onUpload decidirá si sube en vivo o difiere al submit.
     setPdfFile(file);
     setPdfSubido(true);
-    // Devolvemos un stub con el nombre real; el upload real pasa por onSubmit.
+
+    if (onUploadPdfForIA) {
+      setLeyendoIA(true);
+      try {
+        const path = await onUploadPdfForIA(file);
+        if (path) {
+          const res = await fetch("/api/marketing/ia/leer-factura", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ path }),
+          });
+          if (res.ok) {
+            const data = (await res.json()) as RespuestaIA;
+            aplicarRespuestaIA(data);
+            toast("Datos pre-llenados con IA. Revísalos.", "success");
+          } else {
+            toast(
+              "No se pudo leer la factura con IA. Llena los campos a mano.",
+              "warning",
+            );
+          }
+        }
+      } catch {
+        toast("Error leyendo con IA. Llena los campos a mano.", "warning");
+      } finally {
+        setLeyendoIA(false);
+      }
+    }
+
     return {
       url: "",
       nombreOriginal: file.name,
@@ -115,7 +176,7 @@ export function FacturaForm({
           subtotal,
           itbms,
         },
-        pdfFile
+        pdfFile,
       );
     } catch (err: unknown) {
       const message =
@@ -133,7 +194,11 @@ export function FacturaForm({
       <PasoInstruccion
         numero={1}
         titulo="Sube el PDF de la factura"
-        descripcion="Aceptamos solo PDF, máximo 10MB."
+        descripcion={
+          leyendoIA
+            ? "Leyendo factura con IA..."
+            : "Aceptamos solo PDF, máximo 10MB. La IA pre-llenará los campos."
+        }
         completado={pdfSubido}
       >
         <PdfUploader
@@ -142,12 +207,28 @@ export function FacturaForm({
           accept="application/pdf"
           maxSizeMb={10}
         />
+        {leyendoIA && (
+          <div className="mt-3 flex items-center gap-2 text-sm text-fuchsia-700">
+            <svg
+              className="animate-spin"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+            </svg>
+            Leyendo factura con IA...
+          </div>
+        )}
       </PasoInstruccion>
 
       <PasoInstruccion
         numero={2}
-        titulo="Llena los datos de la factura"
-        descripcion="Número, fecha, proveedor, concepto y montos."
+        titulo="Revisa o llena los datos de la factura"
+        descripcion="Edita lo que la IA no haya leído bien."
         completado={pasoDatos}
       >
         <div className="space-y-3">
@@ -222,21 +303,47 @@ export function FacturaForm({
               />
             </div>
             <div>
-              <label
-                htmlFor="factura-itbms"
+              <span
+                id="factura-itbms-label"
                 className="block text-sm text-gray-600 mb-1"
               >
                 ITBMS
-              </label>
-              <input
-                id="factura-itbms"
-                type="number"
-                min={0}
-                step="0.01"
-                value={itbmsStr}
-                onChange={(e) => setItbmsStr(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm tabular-nums focus:border-black focus:outline-none"
-              />
+              </span>
+              <div
+                role="radiogroup"
+                aria-labelledby="factura-itbms-label"
+                className="flex rounded-md border border-gray-300 overflow-hidden"
+              >
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={itbmsOption === "0"}
+                  onClick={() => setItbmsOption("0")}
+                  className={`flex-1 px-3 py-2 text-sm transition ${
+                    itbmsOption === "0"
+                      ? "bg-black text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  0%
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={itbmsOption === "7"}
+                  onClick={() => setItbmsOption("7")}
+                  className={`flex-1 px-3 py-2 text-sm transition border-l border-gray-300 ${
+                    itbmsOption === "7"
+                      ? "bg-black text-white"
+                      : "bg-white text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  7%
+                </button>
+              </div>
+              <div className="text-xs text-gray-500 mt-1 tabular-nums">
+                {formatearMonto(itbms)}
+              </div>
             </div>
             <div>
               <label
@@ -253,6 +360,9 @@ export function FacturaForm({
                 tabIndex={-1}
                 className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm tabular-nums text-gray-700"
               />
+              <div className="text-xs text-gray-400 mt-1">
+                Subtotal + ITBMS
+              </div>
             </div>
           </div>
         </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ToastSystem";
 import { FacturaCard, FacturaForm } from "@/components/marketing";
 import type {
@@ -9,7 +8,10 @@ import type {
   MkFactura,
   ProyectoConMarcas,
 } from "@/lib/marketing/types";
-import { subirAdjunto } from "./uploadHelpers";
+import {
+  pedirUploadUrl,
+  subirArchivoAStorage,
+} from "./uploadHelpers";
 
 interface FacturasSectionProps {
   proyecto: ProyectoConMarcas;
@@ -20,7 +22,6 @@ export default function FacturasSection({
   proyecto,
   onChange,
 }: FacturasSectionProps) {
-  const router = useRouter();
   const { toast } = useToast();
   const [facturas, setFacturas] = useState<FacturaConAdjuntos[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,22 +29,16 @@ export default function FacturasSection({
   const [anulando, setAnulando] = useState<FacturaConAdjuntos | null>(null);
   const [anulandoMotivo, setAnulandoMotivo] = useState("");
   const [anulandoLoading, setAnulandoLoading] = useState(false);
+  // Path del PDF pre-subido para IA (antes de tener facturaId)
+  const [pdfPathPreSubido, setPdfPathPreSubido] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      // Usamos el endpoint de proyecto para obtener facturas con adjuntos.
-      // No existe GET /api/marketing/facturas; cargamos vía /proyectos/[id]/facturas?
-      // Para mantener el contrato chico, reusamos getFacturasByProyecto a través del endpoint
-      // que agregamos a nivel de proyecto.
       const res = await fetch(
         `/api/marketing/proyectos/${proyecto.id}/facturas`,
+        { cache: "no-store" },
       );
-      if (res.status === 404) {
-        // Si por alguna razón el endpoint no existe, intenta leer desde la vista del proyecto.
-        setFacturas([]);
-        return;
-      }
       if (!res.ok) {
         const err = await res.json().catch(() => null);
         throw new Error(err?.error ?? "No se pudieron cargar las facturas");
@@ -63,6 +58,30 @@ export default function FacturasSection({
     cargar();
   }, [cargar]);
 
+  // Cuando el usuario sube el PDF, lo subimos a Storage bajo el path del
+  // proyecto (sin facturaId todavía) y devolvemos el path para que el form
+  // llame a la IA. Luego, al guardar, registramos el adjunto con el path ya
+  // conocido (evitamos doble upload).
+  const handleUploadPdfForIA = useCallback(
+    async (file: File): Promise<string | null> => {
+      try {
+        const { uploadUrl, path } = await pedirUploadUrl({
+          file,
+          proyectoId: proyecto.id,
+        });
+        await subirArchivoAStorage(uploadUrl, file);
+        setPdfPathPreSubido(path);
+        return path;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Error subiendo PDF";
+        toast(msg, "warning");
+        setPdfPathPreSubido(null);
+        return null;
+      }
+    },
+    [proyecto.id, toast],
+  );
+
   const handleCrear = async (
     data: {
       numeroFactura: string;
@@ -74,7 +93,6 @@ export default function FacturasSection({
     },
     pdfFile?: File,
   ) => {
-    // 1) Crear factura
     const res = await fetch("/api/marketing/facturas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -86,26 +104,55 @@ export default function FacturasSection({
     }
     const factura = (await res.json()) as MkFactura;
 
-    // 2) Si hay PDF, subirlo y registrarlo
-    if (pdfFile) {
+    // Si ya pre-subimos el PDF para IA, reusamos el path y solo registramos el adjunto.
+    // Si no hay pre-subido pero hay pdfFile, subimos ahora.
+    if (pdfPathPreSubido) {
       try {
-        await subirAdjunto({
-          file: pdfFile,
-          facturaId: factura.id,
-          tipo: "pdf_factura",
+        await fetch("/api/marketing/adjuntos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            facturaId: factura.id,
+            tipo: "pdf_factura",
+            url: pdfPathPreSubido,
+            nombreOriginal: pdfFile?.name,
+            sizeBytes: pdfFile?.size,
+          }),
         });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "Error al subir PDF";
+      } catch {
         toast(
-          `Factura guardada, pero no se pudo subir el PDF: ${msg}`,
+          "Factura guardada, pero no se registró el PDF. Súbelo de nuevo después.",
           "warning",
         );
+      }
+    } else if (pdfFile) {
+      try {
+        const { uploadUrl, path } = await pedirUploadUrl({
+          file: pdfFile,
+          facturaId: factura.id,
+        });
+        await subirArchivoAStorage(uploadUrl, pdfFile);
+        await fetch("/api/marketing/adjuntos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            facturaId: factura.id,
+            tipo: "pdf_factura",
+            url: path,
+            nombreOriginal: pdfFile.name,
+            sizeBytes: pdfFile.size,
+          }),
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Error subiendo PDF";
+        toast(`Factura guardada, pero ${msg.toLowerCase()}`, "warning");
       }
     }
 
     toast("Factura guardada", "success");
+    setPdfPathPreSubido(null);
     setShowForm(false);
-    cargar();
+    await cargar();
     onChange?.();
   };
 
@@ -128,7 +175,7 @@ export default function FacturasSection({
       toast("Factura anulada", "success");
       setAnulando(null);
       setAnulandoMotivo("");
-      cargar();
+      await cargar();
       onChange?.();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al anular";
@@ -153,7 +200,10 @@ export default function FacturasSection({
         {!showForm && (
           <button
             type="button"
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              setShowForm(true);
+              setPdfPathPreSubido(null);
+            }}
             className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition"
           >
             + Agregar factura
@@ -166,7 +216,11 @@ export default function FacturasSection({
           <FacturaForm
             proyecto={proyecto}
             onSubmit={handleCrear}
-            onCancel={() => setShowForm(false)}
+            onCancel={() => {
+              setShowForm(false);
+              setPdfPathPreSubido(null);
+            }}
+            onUploadPdfForIA={handleUploadPdfForIA}
           />
         </div>
       )}
@@ -193,11 +247,7 @@ export default function FacturasSection({
         <div className="grid grid-cols-1 gap-2">
           {facturas.map((f) => (
             <div key={f.id} className="relative group">
-              <FacturaCard
-                factura={f}
-                porcentajesMarcas={proyecto.marcas}
-                onClick={() => router.push(`/marketing/facturas/${f.id}`)}
-              />
+              <FacturaCard factura={f} porcentajesMarcas={proyecto.marcas} />
               {!f.anulado_en && (
                 <button
                   type="button"
@@ -216,10 +266,9 @@ export default function FacturasSection({
         </div>
       )}
 
-      {/* Modal anular factura */}
       {anulando && (
         <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center"
           onClick={() => !anulandoLoading && setAnulando(null)}
         >
           <div className="absolute inset-0 bg-black/40" />
@@ -270,7 +319,6 @@ export default function FacturasSection({
           </div>
         </div>
       )}
-
     </section>
   );
 }

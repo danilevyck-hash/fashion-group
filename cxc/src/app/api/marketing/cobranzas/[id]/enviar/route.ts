@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { marcarCobranzaEnviada } from "@/lib/marketing/mutations";
+import { marcarCobranzaEnviada, setEstadoProyecto } from "@/lib/marketing/mutations";
+import { getCobranzaById } from "@/lib/marketing/queries";
+import { supabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,18 @@ export async function POST(
 
   try {
     await marcarCobranzaEnviada(params.id, body.fechaEnvio);
+    const cobranza = await getCobranzaById(params.id);
+    if (cobranza) {
+      const { data: proy } = await supabaseServer
+        .from("mk_proyectos")
+        .select("estado")
+        .eq("id", cobranza.proyecto_id)
+        .maybeSingle();
+      const estadoActual = String((proy as { estado?: string } | null)?.estado ?? "");
+      if (estadoActual === "por_cobrar") {
+        await setEstadoProyecto(cobranza.proyecto_id, "enviado");
+      }
+    }
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Error interno";

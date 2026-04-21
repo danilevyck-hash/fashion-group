@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { cerrarProyecto } from "@/lib/marketing/mutations";
+import {
+  cerrarProyecto,
+  generarCobranzasBorradorAlCerrar,
+} from "@/lib/marketing/mutations";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +21,12 @@ export async function POST(
   }
   try {
     await cerrarProyecto(params.id);
-    return NextResponse.json({ ok: true });
+    const cobranzas = await generarCobranzasBorradorAlCerrar(params.id);
+    return NextResponse.json({
+      ok: true,
+      cobranzasCreadas: cobranzas.length,
+      cobranzas,
+    });
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "No se pudo cerrar el proyecto";

@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
     if (
       estadoParam &&
-      ["abierto", "listo_cobrar", "cobrado"].includes(estadoParam)
+      ["abierto", "por_cobrar", "enviado", "cobrado"].includes(estadoParam)
     ) {
       pq = pq.eq("estado", estadoParam as EstadoProyecto);
     }

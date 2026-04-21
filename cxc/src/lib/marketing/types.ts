@@ -15,7 +15,11 @@ export const EMPRESA_CODIGOS = [
 
 export type EmpresaCodigo = (typeof EMPRESA_CODIGOS)[number];
 
-export type EstadoProyecto = "abierto" | "listo_cobrar" | "cobrado";
+export type EstadoProyecto =
+  | "abierto"
+  | "por_cobrar"
+  | "enviado"
+  | "cobrado";
 
 export type EstadoCobranza =
   | "borrador"

@@ -14,7 +14,8 @@ const ANIOS = [ANIO_ACTUAL, ANIO_ACTUAL - 1, ANIO_ACTUAL - 2];
 const ESTADOS: Array<{ value: "todos" | EstadoProyecto; label: string }> = [
   { value: "todos", label: "Todos" },
   { value: "abierto", label: "Abierto" },
-  { value: "listo_cobrar", label: "Listo para cobrar" },
+  { value: "por_cobrar", label: "Por cobrar" },
+  { value: "enviado", label: "Enviado" },
   { value: "cobrado", label: "Cobrado" },
 ];
 
