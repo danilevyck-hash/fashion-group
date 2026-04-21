@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { createProyecto } from "@/lib/marketing/mutations";
+import { resumenFacturasVigentesBatch } from "@/lib/marketing/queries";
 import type {
   CreateProyectoInput,
   EstadoProyecto,
@@ -80,25 +81,8 @@ export async function GET(req: NextRequest) {
       marcasByProyecto.set(pid, arr);
     }
 
-    // Totales de facturas por proyecto
-    const { data: facturasData, error: facturasError } = await supabaseServer
-      .from("mk_facturas")
-      .select("proyecto_id, total")
-      .in("proyecto_id", ids)
-      .is("anulado_en", null);
-    if (facturasError) throw new Error(facturasError.message);
-
-    const totalByProyecto = new Map<string, { total: number; conteo: number }>();
-    for (const row of facturasData ?? []) {
-      const r = row as Record<string, unknown>;
-      const pid = String(r.proyecto_id);
-      const tot = Number(r.total ?? 0);
-      const prev = totalByProyecto.get(pid) ?? { total: 0, conteo: 0 };
-      totalByProyecto.set(pid, {
-        total: prev.total + tot,
-        conteo: prev.conteo + 1,
-      });
-    }
+    // Totales de facturas por proyecto (fuente única compartida con detalle)
+    const totalByProyecto = await resumenFacturasVigentesBatch(ids);
 
     // Conteo de fotos de proyecto
     const { data: fotosData, error: fotosError } = await supabaseServer
@@ -117,7 +101,8 @@ export async function GET(req: NextRequest) {
 
     let resultado: ProyectoListItem[] = proyectos.map((p) => {
       const marcas = marcasByProyecto.get(p.id) ?? [];
-      const tot = totalByProyecto.get(p.id) ?? { total: 0, conteo: 0 };
+      const tot =
+        totalByProyecto.get(p.id) ?? { total: 0, subtotal: 0, conteo: 0 };
       const fotos = fotosByProyecto.get(p.id) ?? 0;
       return {
         ...p,

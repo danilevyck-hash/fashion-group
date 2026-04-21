@@ -305,17 +305,55 @@ export async function getProyectoById(id: string): Promise<ProyectoConMarcas | n
 // ----------------------------------------------------------------------------
 // Facturas
 // ----------------------------------------------------------------------------
+/**
+ * Fuente única de verdad para "facturas vigentes de uno o más proyectos".
+ * Filtro: proyecto_id IN (ids) AND anulado_en IS NULL.
+ * No incluye adjuntos — el caller los carga aparte si los necesita.
+ */
+export async function listFacturasVigentesRaw(
+  proyectoIds: ReadonlyArray<string>
+): Promise<MkFactura[]> {
+  if (proyectoIds.length === 0) return [];
+  const { data, error } = await supabaseServer
+    .from("mk_facturas")
+    .select("*")
+    .in("proyecto_id", proyectoIds)
+    .is("anulado_en", null)
+    .order("fecha_factura", { ascending: false });
+  if (error) throw new Error(`listFacturasVigentesRaw: ${error.message}`);
+  return (data ?? []).map((r) => mapFactura(r as Record<string, unknown>));
+}
+
+export interface ResumenFacturasProyecto {
+  total: number;
+  subtotal: number;
+  conteo: number;
+}
+
+export async function resumenFacturasVigentesBatch(
+  proyectoIds: ReadonlyArray<string>
+): Promise<Map<string, ResumenFacturasProyecto>> {
+  const resumen = new Map<string, ResumenFacturasProyecto>();
+  const facturas = await listFacturasVigentesRaw(proyectoIds);
+  for (const f of facturas) {
+    const prev = resumen.get(f.proyecto_id) ?? {
+      total: 0,
+      subtotal: 0,
+      conteo: 0,
+    };
+    resumen.set(f.proyecto_id, {
+      total: prev.total + f.total,
+      subtotal: prev.subtotal + f.subtotal,
+      conteo: prev.conteo + 1,
+    });
+  }
+  return resumen;
+}
+
 export async function getFacturasByProyecto(
   proyectoId: string
 ): Promise<FacturaConAdjuntos[]> {
-  const { data: factData, error: factError } = await supabaseServer
-    .from("mk_facturas")
-    .select("*")
-    .eq("proyecto_id", proyectoId)
-    .is("anulado_en", null)
-    .order("fecha_factura", { ascending: false });
-  if (factError) throw new Error(`getFacturasByProyecto: ${factError.message}`);
-  const facturas = (factData ?? []).map((r) => mapFactura(r as Record<string, unknown>));
+  const facturas = await listFacturasVigentesRaw([proyectoId]);
   if (facturas.length === 0) return [];
 
   const ids = facturas.map((f) => f.id);
