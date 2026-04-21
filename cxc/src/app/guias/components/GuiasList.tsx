@@ -6,6 +6,7 @@ import type { Guia, GuiaItem } from "./types";
 import { clientesSummary } from "./constants";
 import { SkeletonTable, EmptyState, StatusBadge, AccordionContent, ScrollableTable, SwipeableRow } from "@/components/ui";
 import type { SwipeAction } from "@/components/ui";
+import OverflowMenu from "@/components/ui/OverflowMenu";
 import DespachoForm from "./DespachoForm";
 import { exportGuiasExcel } from "./excel-guias";
 import { groupByTimePeriod } from "@/lib/group-by-time";
@@ -349,6 +350,45 @@ export default function GuiasList({
                                 <div className="py-6 flex justify-center"><svg className="animate-spin h-5 w-5 text-gray-300" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
                               ) : expandedGuia ? (
                                 <>
+                                  {/* Acciones rápidas (header de la card expandida) */}
+                                  <div className="flex items-center justify-end gap-2 pt-3">
+                                    {canEdit && !isDispatched && (
+                                      <button
+                                        type="button"
+                                        onClick={() => onEdit(expandedGuia.id)}
+                                        className="inline-flex items-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-2 py-1.5 rounded hover:bg-gray-100 min-h-[36px]"
+                                      >
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M12 20h9" />
+                                          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+                                        </svg>
+                                        Editar
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => window.open(`/guias?id=${expandedGuia.id}`, '_blank')}
+                                      className="inline-flex items-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-2 py-1.5 rounded hover:bg-gray-100 min-h-[36px]"
+                                    >
+                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                                        <polyline points="6 9 6 2 18 2 18 9" />
+                                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                                        <rect x="6" y="14" width="12" height="8" />
+                                      </svg>
+                                      Imprimir
+                                    </button>
+                                    {canDelete && (
+                                      <OverflowMenu
+                                        items={[
+                                          {
+                                            label: "Eliminar guía",
+                                            onClick: () => onDelete(expandedGuia.id),
+                                            destructive: true,
+                                          },
+                                        ]}
+                                      />
+                                    )}
+                                  </div>
                                   {/* Items table */}
                                   <ScrollableTable minWidth={600} className="mt-4">
                                     <table className="w-full text-xs">
@@ -456,42 +496,21 @@ export default function GuiasList({
                                     />
                                   )}
 
-                                  {/* Action buttons */}
-                                  <div className="flex items-center gap-4 mt-6 pt-4 border-t border-gray-200">
-                                    {canEdit && !isDispatched && (
-                                      <button
-                                        onClick={() => onEdit(expandedGuia.id)}
-                                        className="text-xs text-gray-500 hover:text-black transition min-h-[44px] inline-flex items-center"
-                                      >
-                                        Editar
-                                      </button>
-                                    )}
-                                    <button
-                                      onClick={() => window.open(`/guias?id=${expandedGuia.id}`, '_blank')}
-                                      className="text-xs text-gray-500 hover:text-black transition min-h-[44px] inline-flex items-center"
-                                    >
-                                      Imprimir
-                                    </button>
-                                    {canReject && isDispatched && expandedGuia.estado !== "Rechazada" && (
-                                      rejectingId === expandedGuia.id ? (
+                                  {/* Rechazar (solo en despachadas no-rechazadas) — queda abajo porque
+                                      requiere flujo con input de motivo */}
+                                  {canReject && isDispatched && expandedGuia.estado !== "Rechazada" && (
+                                    <div className="mt-6 pt-4 border-t border-gray-200">
+                                      {rejectingId === expandedGuia.id ? (
                                         <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
                                           <input type="text" value={rejectMotivo} onChange={e => setRejectMotivo(e.target.value)} placeholder="Motivo de rechazo..." className="border-b border-gray-200 py-1 text-xs outline-none w-full max-w-[200px]" autoFocus />
-                                          <button onClick={() => { if (rejectMotivo.trim()) { onReject(expandedGuia.id, rejectMotivo.trim()); setRejectingId(null); setRejectMotivo(""); } }} disabled={!rejectMotivo.trim()} className="text-xs text-red-600 hover:text-red-800 transition disabled:opacity-40">Confirmar</button>
-                                          <button onClick={() => { setRejectingId(null); setRejectMotivo(""); }} className="text-xs text-gray-400 hover:text-black transition">Cancelar</button>
+                                          <button type="button" onClick={() => { if (rejectMotivo.trim()) { onReject(expandedGuia.id, rejectMotivo.trim()); setRejectingId(null); setRejectMotivo(""); } }} disabled={!rejectMotivo.trim()} className="text-xs text-red-600 hover:text-red-800 transition disabled:opacity-40">Confirmar</button>
+                                          <button type="button" onClick={() => { setRejectingId(null); setRejectMotivo(""); }} className="text-xs text-gray-400 hover:text-black transition">Cancelar</button>
                                         </div>
                                       ) : (
-                                        <button onClick={() => setRejectingId(expandedGuia.id)} className="text-xs text-amber-600 hover:text-red-600 transition">Rechazar/Devolver</button>
-                                      )
-                                    )}
-                                    {canDelete && (
-                                      <button
-                                        onClick={() => onDelete(expandedGuia.id)}
-                                        className="text-xs text-gray-400 hover:text-red-500 transition ml-auto"
-                                      >
-                                        Eliminar
-                                      </button>
-                                    )}
-                                  </div>
+                                        <button type="button" onClick={() => setRejectingId(expandedGuia.id)} className="text-xs text-amber-600 hover:text-red-600 transition">Rechazar/Devolver</button>
+                                      )}
+                                    </div>
+                                  )}
                                 </>
                               ) : null}
                             </div>
