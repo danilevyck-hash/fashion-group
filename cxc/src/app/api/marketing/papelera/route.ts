@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const items = await getAnulados();
-    return NextResponse.json({ items });
+    // Devuelve array directo (el cliente también acepta { items } por retrocompat).
+    return NextResponse.json(items);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Error interno";
     console.error("GET /api/marketing/papelera:", msg);

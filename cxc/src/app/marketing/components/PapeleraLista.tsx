@@ -52,12 +52,22 @@ export function PapeleraLista({ esAdmin }: PapeleraListaProps) {
     setLoading(true);
     try {
       const res = await fetch("/api/marketing/papelera", { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = (await res.json()) as { items: AnuladoItem[] };
-      setItems(json.items ?? []);
+      if (!res.ok) {
+        const body = await res.text();
+        throw new Error(`HTTP ${res.status}: ${body.slice(0, 120)}`);
+      }
+      const json = (await res.json()) as unknown;
+      // Acepta tanto { items: [...] } como [...] directo (defensivo).
+      const arr: AnuladoItem[] = Array.isArray(json)
+        ? (json as AnuladoItem[])
+        : Array.isArray((json as { items?: unknown }).items)
+          ? ((json as { items: AnuladoItem[] }).items)
+          : [];
+      setItems(arr);
     } catch (err) {
-      console.error("Error cargando papelera:", err);
-      toast("No se pudo cargar la papelera. Intenta de nuevo.", "error");
+      const msg = err instanceof Error ? err.message : "Error desconocido";
+      console.error("Error cargando papelera:", msg);
+      toast(`No se pudo cargar la papelera: ${msg}`, "error");
     } finally {
       setLoading(false);
     }
