@@ -88,11 +88,11 @@ export async function POST(req: NextRequest) {
 
           // 3. Fallback to hardcoded defaults if no role_permissions entry
           if (modules.length === 0) {
-            const ALL = ["cxc","guias","caja","directorio","reclamos","prestamos","ventas","upload","cheques","reebok","camisetas"];
+            const ALL = ["cxc","guias","caja","directorio","reclamos","prestamos","ventas","upload","cheques","reebok","camisetas","marketing","packing-lists","catalogos"];
             const DEFAULTS: Record<string, string[]> = {
               admin: ALL, director: ALL,
               contabilidad: ["prestamos","ventas"],
-              secretaria: ["upload","guias","caja","reclamos","cheques","directorio","packing-lists"],
+              secretaria: ["upload","guias","caja","reclamos","cheques","directorio","packing-lists","marketing"],
               vendedor: ["catalogos","reebok","cxc","directorio","camisetas","guias"],
               bodega: ["guias","packing-lists"],
               cliente: ["reebok"],
