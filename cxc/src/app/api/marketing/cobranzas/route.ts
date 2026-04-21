@@ -9,15 +9,14 @@ export const dynamic = "force-dynamic";
 const ESTADOS_VALIDOS: ReadonlyArray<EstadoCobranza> = [
   "borrador",
   "enviada",
-  "pagada_parcial",
-  "pagada",
+  "cobrada",
   "disputada",
 ];
 
 // ----------------------------------------------------------------------------
 // GET /api/marketing/cobranzas
 //   ?marca_id=...&proyecto_id=...&estado=...&desde=YYYY-MM-DD&hasta=YYYY-MM-DD
-// Devuelve lista con totales de pagos y joins con proyecto + marca.
+// Devuelve lista con joins con proyecto + marca.
 // ----------------------------------------------------------------------------
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria", "director"]);
@@ -52,40 +51,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await q;
     if (error) throw error;
 
-    const rows = data ?? [];
-    const ids = rows.map((r) => String((r as Record<string, unknown>).id));
-
-    // Agregado de pagos por cobranza
-    const totales = new Map<string, number>();
-    if (ids.length > 0) {
-      const { data: pagos, error: pagosErr } = await supabaseServer
-        .from("mk_pagos")
-        .select("cobranza_id, monto")
-        .in("cobranza_id", ids)
-        .is("anulado_en", null);
-      if (pagosErr) throw pagosErr;
-      for (const row of pagos ?? []) {
-        const r = row as Record<string, unknown>;
-        const cid = String(r.cobranza_id);
-        const m = Number(r.monto ?? 0);
-        totales.set(cid, (totales.get(cid) ?? 0) + m);
-      }
-    }
-
-    const out = rows.map((r) => {
-      const obj = r as Record<string, unknown>;
-      const id = String(obj.id);
-      const monto = Number(obj.monto ?? 0);
-      const totalPagado = Number((totales.get(id) ?? 0).toFixed(2));
-      const saldo = Number((monto - totalPagado).toFixed(2));
-      return {
-        ...obj,
-        total_pagado: totalPagado,
-        saldo,
-      };
-    });
-
-    return NextResponse.json(out);
+    return NextResponse.json(data ?? []);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Error interno";
     return NextResponse.json({ error: message }, { status: 500 });

@@ -161,6 +161,12 @@ export function PapeleraLista({ esAdmin }: PapeleraListaProps) {
 
   return (
     <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold text-gray-900">Papelera</h1>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Registros anulados. Puedes restaurarlos o dejar que la limpieza anual los elimine.
+        </p>
+      </div>
       {/* Filtros */}
       <div className="flex flex-wrap gap-2">
         {(["todos", "proyecto", "factura", "cobranza"] as FiltroTipo[]).map(

@@ -78,11 +78,7 @@ interface CobranzaMin {
   proyecto_id: string;
   marca_id: string;
   monto: number;
-}
-
-interface PagoMin {
-  cobranza_id: string;
-  monto: number;
+  estado: string;
 }
 
 async function cargarProyectosVigentes(
@@ -146,43 +142,26 @@ async function cargarFacturas(
   });
 }
 
-async function cargarCobranzasYPagos(
+async function cargarCobranzas(
   proyectoIds: ReadonlyArray<string>
-): Promise<{ cobranzas: CobranzaMin[]; pagos: PagoMin[] }> {
-  if (proyectoIds.length === 0) return { cobranzas: [], pagos: [] };
-  const { data: cbData, error: cbError } = await supabaseServer
+): Promise<CobranzaMin[]> {
+  if (proyectoIds.length === 0) return [];
+  const { data, error } = await supabaseServer
     .from("mk_cobranzas")
-    .select("id, proyecto_id, marca_id, monto")
+    .select("id, proyecto_id, marca_id, monto, estado")
     .in("proyecto_id", proyectoIds)
     .is("anulado_en", null);
-  if (cbError) throw new Error(`cargarCobranzasYPagos[cb]: ${cbError.message}`);
-  const cobranzas: CobranzaMin[] = (cbData ?? []).map((r) => {
+  if (error) throw new Error(`cargarCobranzas: ${error.message}`);
+  return (data ?? []).map((r) => {
     const x = r as Record<string, unknown>;
     return {
       id: String(x.id),
       proyecto_id: String(x.proyecto_id),
       marca_id: String(x.marca_id),
       monto: Number(x.monto ?? 0),
+      estado: String(x.estado ?? ""),
     };
   });
-  const cbIds = cobranzas.map((c) => c.id);
-  let pagos: PagoMin[] = [];
-  if (cbIds.length > 0) {
-    const { data: pagosData, error: pagosError } = await supabaseServer
-      .from("mk_pagos")
-      .select("cobranza_id, monto")
-      .in("cobranza_id", cbIds)
-      .is("anulado_en", null);
-    if (pagosError) throw new Error(`cargarCobranzasYPagos[pagos]: ${pagosError.message}`);
-    pagos = (pagosData ?? []).map((r) => {
-      const x = r as Record<string, unknown>;
-      return {
-        cobranza_id: String(x.cobranza_id),
-        monto: Number(x.monto ?? 0),
-      };
-    });
-  }
-  return { cobranzas, pagos };
 }
 
 // ----------------------------------------------------------------------------
@@ -198,10 +177,10 @@ export async function reportePorMarca(
   if (marcas.length === 0) return [];
 
   const proyectoIds = proyectos.map((p) => p.id);
-  const [proyMarcas, facturas, { cobranzas, pagos }] = await Promise.all([
+  const [proyMarcas, facturas, cobranzas] = await Promise.all([
     cargarProyMarcas(proyectoIds),
     cargarFacturas(proyectoIds),
-    cargarCobranzasYPagos(proyectoIds),
+    cargarCobranzas(proyectoIds),
   ]);
 
   // Total facturado por proyecto
@@ -218,15 +197,11 @@ export async function reportePorMarca(
     gastadoByMarca.set(pm.marca_id, (gastadoByMarca.get(pm.marca_id) ?? 0) + parte);
   }
 
-  // Cobrado por marca = suma de pagos de cobranzas de esa marca
-  const pagosByCobranza = new Map<string, number>();
-  for (const p of pagos) {
-    pagosByCobranza.set(p.cobranza_id, (pagosByCobranza.get(p.cobranza_id) ?? 0) + p.monto);
-  }
+  // Cobrado por marca = suma de montos de cobranzas en estado 'cobrada'
   const cobradoByMarca = new Map<string, number>();
   for (const cb of cobranzas) {
-    const pagado = pagosByCobranza.get(cb.id) ?? 0;
-    cobradoByMarca.set(cb.marca_id, (cobradoByMarca.get(cb.marca_id) ?? 0) + pagado);
+    if (cb.estado !== "cobrada") continue;
+    cobradoByMarca.set(cb.marca_id, (cobradoByMarca.get(cb.marca_id) ?? 0) + cb.monto);
   }
 
   return marcas.map((m) => {
@@ -312,10 +287,10 @@ export async function reportePorProyecto(
   if (proyectos.length === 0) return [];
 
   const proyectoIds = proyectos.map((p) => p.id);
-  const [proyMarcas, facturas, { cobranzas, pagos }] = await Promise.all([
+  const [proyMarcas, facturas, cobranzas] = await Promise.all([
     cargarProyMarcas(proyectoIds),
     cargarFacturas(proyectoIds),
-    cargarCobranzasYPagos(proyectoIds),
+    cargarCobranzas(proyectoIds),
   ]);
 
   // Si se filtra por marcaId, solo incluir proyectos que tengan esa marca
@@ -343,14 +318,14 @@ export async function reportePorProyecto(
     marcasByProy.set(pm.proyecto_id, arr);
   }
 
+  // Cobrado = suma de montos de cobranzas en estado 'cobrada' de este proyecto
   const cobradoByProy = new Map<string, number>();
-  const pagosByCobranza = new Map<string, number>();
-  for (const p of pagos) {
-    pagosByCobranza.set(p.cobranza_id, (pagosByCobranza.get(p.cobranza_id) ?? 0) + p.monto);
-  }
   for (const cb of cobranzas) {
-    const pagado = pagosByCobranza.get(cb.id) ?? 0;
-    cobradoByProy.set(cb.proyecto_id, (cobradoByProy.get(cb.proyecto_id) ?? 0) + pagado);
+    if (cb.estado !== "cobrada") continue;
+    cobradoByProy.set(
+      cb.proyecto_id,
+      (cobradoByProy.get(cb.proyecto_id) ?? 0) + cb.monto,
+    );
   }
 
   return proyectosFiltrados

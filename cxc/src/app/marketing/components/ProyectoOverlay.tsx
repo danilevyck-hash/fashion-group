@@ -7,6 +7,7 @@ import { EstadoBadge, MarcaBadge } from "@/components/marketing";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
 import type {
   FacturaConAdjuntos,
+  MkCobranza,
   MkMarca,
   ProyectoConMarcas,
 } from "@/lib/marketing/types";
@@ -25,6 +26,7 @@ interface Props {
   marca: MkMarca;
   onClose: () => void;
   onChange: () => void;
+  onNombreProyecto?: (nombre: string) => void;
 }
 
 export default function ProyectoOverlay({
@@ -32,10 +34,12 @@ export default function ProyectoOverlay({
   marca,
   onClose,
   onChange,
+  onNombreProyecto,
 }: Props) {
   const { toast } = useToast();
   const [proyecto, setProyecto] = useState<ProyectoConMarcas | null>(null);
   const [facturas, setFacturas] = useState<FacturaConAdjuntos[]>([]);
+  const [cobranzas, setCobranzas] = useState<MkCobranza[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("facturas");
   const [cerrando, setCerrando] = useState(false);
@@ -52,15 +56,31 @@ export default function ProyectoOverlay({
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const [pRes, fRes] = await Promise.all([
-        fetch(`/api/marketing/proyectos/${proyectoId}`),
-        fetch(`/api/marketing/proyectos/${proyectoId}/facturas`),
+      const [pRes, fRes, cRes] = await Promise.all([
+        fetch(`/api/marketing/proyectos/${proyectoId}`, { cache: "no-store" }),
+        fetch(`/api/marketing/proyectos/${proyectoId}/facturas`, {
+          cache: "no-store",
+        }),
+        fetch(
+          `/api/marketing/cobranzas?proyecto_id=${proyectoId}`,
+          { cache: "no-store" },
+        ),
       ]);
       if (!pRes.ok) throw new Error("Proyecto no encontrado");
       const p = (await pRes.json()) as ProyectoConMarcas;
       setProyecto(p);
+      if (onNombreProyecto) {
+        onNombreProyecto(p.nombre || p.tienda);
+      }
       if (fRes.ok) {
         setFacturas((await fRes.json()) as FacturaConAdjuntos[]);
+      }
+      if (cRes.ok) {
+        const raw = (await cRes.json()) as unknown;
+        const items: MkCobranza[] = Array.isArray(raw)
+          ? (raw as MkCobranza[])
+          : [];
+        setCobranzas(items);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al cargar";
@@ -69,7 +89,7 @@ export default function ProyectoOverlay({
     } finally {
       setLoading(false);
     }
-  }, [proyectoId, toast, onClose]);
+  }, [proyectoId, toast, onClose, onNombreProyecto]);
 
   useEffect(() => {
     cargar();
@@ -108,6 +128,25 @@ export default function ProyectoOverlay({
       conteo: vigentes.length,
     };
   }, [facturas]);
+
+  // Cobrable por marca: si hay cobranzas activas usa sus montos, si no calcula
+  // desde (total facturado × porcentaje) como estimación.
+  const cobrablePorMarca = useMemo(() => {
+    if (!proyecto) return [];
+    return proyecto.marcas.map((m) => {
+      const desdeCobranzas = cobranzas
+        .filter((c) => c.marca_id === m.marca.id && !c.anulado_en)
+        .reduce((acc, c) => acc + c.monto, 0);
+      const estimado = (totales.total * m.porcentaje) / 100;
+      const monto = desdeCobranzas > 0 ? desdeCobranzas : estimado;
+      return {
+        marca: m.marca,
+        porcentaje: m.porcentaje,
+        monto: Number(monto.toFixed(2)),
+        esEstimado: desdeCobranzas === 0,
+      };
+    });
+  }, [proyecto, cobranzas, totales.total]);
 
   const handleCerrar = async () => {
     if (!proyecto) return;
@@ -202,7 +241,7 @@ export default function ProyectoOverlay({
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center sm:justify-center">
       <div
-        className="relative w-full bg-white sm:max-w-3xl sm:rounded-lg rounded-t-2xl max-h-[95vh] overflow-y-auto border border-gray-200"
+        className="relative w-full bg-white sm:max-w-4xl lg:max-w-5xl sm:rounded-lg rounded-t-2xl max-h-[95vh] overflow-y-auto border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header sticky */}
@@ -273,6 +312,20 @@ export default function ProyectoOverlay({
                       ? ` · Cerrado: ${formatearFecha(proyecto.fecha_cierre)}`
                       : ""}
                   </div>
+                  {cobrablePorMarca.length > 0 && (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-sm">
+                      {cobrablePorMarca.map((c) => (
+                        <div key={c.marca.id} className="flex items-center gap-1.5">
+                          <span className="text-gray-500">
+                            Cobrable a {c.marca.nombre}:
+                          </span>
+                          <span className="font-mono tabular-nums font-semibold text-gray-900">
+                            {formatearMonto(c.monto)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <EstadoBadge

@@ -19,6 +19,14 @@ export function ReportesTabs() {
 
   return (
     <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold text-gray-900">
+          Reportes de gastos
+        </h1>
+        <p className="text-sm text-gray-500 mt-0.5">
+          Gastos compartidos por marca, tienda y proyecto.
+        </p>
+      </div>
       <div className="flex items-center gap-1 border-b border-gray-200">
         {TABS.map((t) => (
           <button

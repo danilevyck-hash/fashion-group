@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type {
-  CobranzaConPagos,
+  MkCobranza,
   ProyectoConMarcas,
   MkMarca,
   MkFactura,
@@ -13,7 +13,7 @@ import { PasoInstruccion } from "./PasoInstruccion";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 
 interface CobranzaPreviewProps {
-  cobranza: CobranzaConPagos;
+  cobranza: MkCobranza;
   proyecto: ProyectoConMarcas;
   marca: MkMarca;
   facturas: MkFactura[];

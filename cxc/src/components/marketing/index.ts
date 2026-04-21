@@ -14,4 +14,3 @@ export { ProyectoForm } from "./ProyectoForm";
 export { FacturaForm } from "./FacturaForm";
 export { CobranzaForm } from "./CobranzaForm";
 export { CobranzaPreview } from "./CobranzaPreview";
-export { PagoForm } from "./PagoForm";

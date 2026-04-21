@@ -24,6 +24,7 @@ export default function FotosSection({ proyectoId }: FotosSectionProps) {
     try {
       const res = await fetch(
         `/api/marketing/proyectos/${proyectoId}/fotos`,
+        { cache: "no-store" },
       );
       if (!res.ok) {
         const err = await res.json().catch(() => null);
@@ -50,8 +51,21 @@ export default function FotosSection({ proyectoId }: FotosSectionProps) {
       proyectoId,
       tipo: "foto_proyecto",
     });
-    // Recargar listado al terminar cada upload
-    cargar();
+    // Optimistic: agregar la foto al estado inmediatamente con URL firmada
+    setFotos((prev) => [
+      {
+        id: adj.id,
+        proyecto_id: proyectoId,
+        factura_id: null,
+        tipo: adj.tipo,
+        url: adj.url,
+        nombre_original: adj.nombre_original,
+        size_bytes: adj.size_bytes,
+        created_at: new Date().toISOString(),
+      } as MkAdjunto,
+      ...prev,
+    ]);
+    toast("Foto subida", "success");
     return {
       url: adj.url,
       nombreOriginal: adj.nombre_original ?? file.name,

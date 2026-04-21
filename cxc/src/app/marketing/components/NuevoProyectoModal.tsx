@@ -72,7 +72,7 @@ export default function NuevoProyectoModal({
     >
       <div className="absolute inset-0 bg-black/40" />
       <div
-        className="relative bg-white w-full sm:max-w-2xl sm:rounded-lg rounded-t-2xl max-h-[90vh] overflow-y-auto border border-gray-200"
+        className="relative bg-white w-full sm:max-w-4xl lg:max-w-5xl sm:rounded-lg rounded-t-2xl max-h-[90vh] overflow-y-auto border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">

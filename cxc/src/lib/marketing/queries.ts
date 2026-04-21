@@ -9,13 +9,11 @@ import type {
   MkProyecto,
   MkFactura,
   MkCobranza,
-  MkPago,
   MkAdjunto,
   MkProyectoMarca,
   ProyectoConMarcas,
   ProyectoResumen,
   FacturaConAdjuntos,
-  CobranzaConPagos,
   AnuladoItem,
   EstadoProyecto,
   MarcaConPorcentaje,
@@ -89,6 +87,7 @@ function mapCobranza(row: Record<string, unknown>): MkCobranza {
     proyecto_id: String(row.proyecto_id),
     marca_id: String(row.marca_id),
     fecha_envio: (row.fecha_envio as string | null) ?? null,
+    fecha_cobro: (row.fecha_cobro as string | null) ?? null,
     monto: Number(row.monto ?? 0),
     email_destino: (row.email_destino as string | null) ?? null,
     asunto: (row.asunto as string | null) ?? null,
@@ -99,20 +98,6 @@ function mapCobranza(row: Record<string, unknown>): MkCobranza {
     anulado_motivo: (row.anulado_motivo as string | null) ?? null,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
-  };
-}
-
-function mapPago(row: Record<string, unknown>): MkPago {
-  return {
-    id: String(row.id),
-    cobranza_id: String(row.cobranza_id),
-    fecha_pago: String(row.fecha_pago ?? ""),
-    monto: Number(row.monto ?? 0),
-    referencia: (row.referencia as string | null) ?? null,
-    comprobante_url: (row.comprobante_url as string | null) ?? null,
-    notas: (row.notas as string | null) ?? null,
-    anulado_en: (row.anulado_en as string | null) ?? null,
-    created_at: String(row.created_at ?? ""),
   };
 }
 
@@ -402,44 +387,18 @@ export async function getFacturaById(id: string): Promise<FacturaConAdjuntos | n
 // ----------------------------------------------------------------------------
 export async function getCobranzasByProyecto(
   proyectoId: string
-): Promise<CobranzaConPagos[]> {
-  const { data: cbData, error: cbError } = await supabaseServer
+): Promise<MkCobranza[]> {
+  const { data, error } = await supabaseServer
     .from("mk_cobranzas")
     .select("*")
     .eq("proyecto_id", proyectoId)
     .is("anulado_en", null)
     .order("created_at", { ascending: false });
-  if (cbError) throw new Error(`getCobranzasByProyecto: ${cbError.message}`);
-  const cobranzas = (cbData ?? []).map((r) => mapCobranza(r as Record<string, unknown>));
-  if (cobranzas.length === 0) return [];
-
-  const ids = cobranzas.map((c) => c.id);
-  const { data: pagosData, error: pagosError } = await supabaseServer
-    .from("mk_pagos")
-    .select("*")
-    .in("cobranza_id", ids)
-    .is("anulado_en", null);
-  if (pagosError) throw new Error(`getCobranzasByProyecto[pagos]: ${pagosError.message}`);
-
-  const pagosByCobranza = new Map<string, MkPago[]>();
-  for (const row of pagosData ?? []) {
-    const p = mapPago(row as Record<string, unknown>);
-    const arr = pagosByCobranza.get(p.cobranza_id) ?? [];
-    arr.push(p);
-    pagosByCobranza.set(p.cobranza_id, arr);
-  }
-
-  return cobranzas.map((c) => {
-    const pagos = pagosByCobranza.get(c.id) ?? [];
-    const totalPagado = Number(
-      pagos.reduce((acc, p) => acc + p.monto, 0).toFixed(2)
-    );
-    const saldo = Number((c.monto - totalPagado).toFixed(2));
-    return { ...c, pagos, total_pagado: totalPagado, saldo };
-  });
+  if (error) throw new Error(`getCobranzasByProyecto: ${error.message}`);
+  return (data ?? []).map((r) => mapCobranza(r as Record<string, unknown>));
 }
 
-export async function getCobranzaById(id: string): Promise<CobranzaConPagos | null> {
+export async function getCobranzaById(id: string): Promise<MkCobranza | null> {
   const { data, error } = await supabaseServer
     .from("mk_cobranzas")
     .select("*")
@@ -447,23 +406,11 @@ export async function getCobranzaById(id: string): Promise<CobranzaConPagos | nu
     .maybeSingle();
   if (error) throw new Error(`getCobranzaById: ${error.message}`);
   if (!data) return null;
-  const cobranza = mapCobranza(data as Record<string, unknown>);
-
-  const { data: pagosData, error: pagosError } = await supabaseServer
-    .from("mk_pagos")
-    .select("*")
-    .eq("cobranza_id", id)
-    .is("anulado_en", null)
-    .order("fecha_pago", { ascending: false });
-  if (pagosError) throw new Error(`getCobranzaById[pagos]: ${pagosError.message}`);
-  const pagos = (pagosData ?? []).map((r) => mapPago(r as Record<string, unknown>));
-  const totalPagado = Number(pagos.reduce((acc, p) => acc + p.monto, 0).toFixed(2));
-  const saldo = Number((cobranza.monto - totalPagado).toFixed(2));
-  return { ...cobranza, pagos, total_pagado: totalPagado, saldo };
+  return mapCobranza(data as Record<string, unknown>);
 }
 
 // ----------------------------------------------------------------------------
-// Adjuntos & pagos
+// Adjuntos
 // ----------------------------------------------------------------------------
 export async function getAdjuntosByProyecto(
   proyectoId: string
@@ -476,17 +423,6 @@ export async function getAdjuntosByProyecto(
     .order("created_at", { ascending: false });
   if (error) throw new Error(`getAdjuntosByProyecto: ${error.message}`);
   return (data ?? []).map((r) => mapAdjunto(r as Record<string, unknown>));
-}
-
-export async function getPagosByCobranza(cobranzaId: string): Promise<MkPago[]> {
-  const { data, error } = await supabaseServer
-    .from("mk_pagos")
-    .select("*")
-    .eq("cobranza_id", cobranzaId)
-    .is("anulado_en", null)
-    .order("fecha_pago", { ascending: false });
-  if (error) throw new Error(`getPagosByCobranza: ${error.message}`);
-  return (data ?? []).map((r) => mapPago(r as Record<string, unknown>));
 }
 
 // ----------------------------------------------------------------------------

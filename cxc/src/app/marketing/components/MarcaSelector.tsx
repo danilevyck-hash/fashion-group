@@ -37,10 +37,10 @@ async function cargarStats(marcaId: string): Promise<MarcaStats> {
 
   const pendiente = (cobranzas as Array<Record<string, unknown>>).reduce((acc, c) => {
     const monto = Number(c.monto ?? 0);
-    const totalPagado = Number(c.total_pagado ?? c.totalPagado ?? 0);
     const estado = String(c.estado ?? "");
-    if (estado === "pagada" || estado === "borrador") return acc;
-    return acc + Math.max(0, monto - totalPagado);
+    // Pendiente = cobranzas enviadas que aún no están cobradas
+    if (estado !== "enviada") return acc;
+    return acc + monto;
   }, 0);
 
   return {

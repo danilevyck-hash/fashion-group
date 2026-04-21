@@ -38,6 +38,9 @@ function MarketingPage() {
   const [marcasLoading, setMarcasLoading] = useState(true);
   const [showNuevoProyecto, setShowNuevoProyecto] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [nombreProyectoActual, setNombreProyectoActual] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancelado = false;
@@ -90,13 +93,37 @@ function MarketingPage() {
 
   const refrescar = () => setRefreshKey((k) => k + 1);
 
+  // Limpia el nombre del proyecto cargado al cerrar el overlay
+  useEffect(() => {
+    if (!proyectoParam) setNombreProyectoActual(null);
+  }, [proyectoParam]);
+
   if (!authChecked) return null;
 
   const mostrandoVistaExtra = vistaParam === "papelera" || vistaParam === "reportes";
 
+  const breadcrumbs: { label: string; onClick?: () => void }[] = [
+    { label: "Marketing", onClick: () => navegar({ marca: null, proyecto: null, vista: null }) },
+  ];
+  if (vistaParam === "papelera") {
+    breadcrumbs.push({ label: "Papelera" });
+  } else if (vistaParam === "reportes") {
+    breadcrumbs.push({ label: "Reportes" });
+  } else if (marcaActual) {
+    breadcrumbs.push({
+      label: marcaActual.nombre,
+      onClick: proyectoParam
+        ? () => navegar({ proyecto: null })
+        : undefined,
+    });
+    if (proyectoParam && nombreProyectoActual) {
+      breadcrumbs.push({ label: nombreProyectoActual });
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <AppHeader module="Marketing" />
+      <AppHeader module="Marketing" breadcrumbs={breadcrumbs} />
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         {mostrandoVistaExtra ? (
           <div className="space-y-4">
@@ -170,6 +197,7 @@ function MarketingPage() {
           marca={marcaActual}
           onClose={() => navegar({ proyecto: null })}
           onChange={refrescar}
+          onNombreProyecto={setNombreProyectoActual}
         />
       )}
 

@@ -15,7 +15,6 @@ import type {
   MkProyecto,
   MkFactura,
   MkCobranza,
-  MkPago,
   MkAdjunto,
   CreateProyectoInput,
   UpdateProyectoInput,
@@ -24,7 +23,6 @@ import type {
   CreateAdjuntoInput,
   CreateCobranzaInput,
   UpdateCobranzaInput,
-  CreatePagoInput,
   MarcaPorcentajeInput,
 } from "./types";
 
@@ -264,7 +262,10 @@ export async function createFactura(
   assertNoVacio(numero, "numeroFactura");
   const proveedor = tituloCase(input.proveedor);
   assertNoVacio(proveedor, "proveedor");
-  const concepto = oracionCase(input.concepto);
+  // Preservar capitalización del concepto: la IA extrae con mayúsculas correctas
+  // (nombres propios, marcas, tiendas) y el usuario puede escribir como prefiera.
+  // Solo normalizamos espacios en blanco.
+  const concepto = normalizarTexto(input.concepto);
   assertNoVacio(concepto, "concepto");
 
   const fecha = normalizarTexto(input.fechaFactura);
@@ -325,7 +326,7 @@ export async function updateFactura(
     payload.proveedor = p;
   }
   if (input.concepto !== undefined) {
-    const c = oracionCase(input.concepto);
+    const c = normalizarTexto(input.concepto);
     assertNoVacio(c, "concepto");
     payload.concepto = c;
   }
@@ -616,48 +617,16 @@ export async function restaurarCobranza(id: string): Promise<void> {
 }
 
 // ----------------------------------------------------------------------------
-// Pagos
+// Cobro (binario: Nota de Crédito)
 // ----------------------------------------------------------------------------
-export async function createPago(input: CreatePagoInput): Promise<MkPago> {
-  if (!input.cobranzaId) throw new Error("cobranzaId requerido");
-  const fecha = normalizarTexto(input.fechaPago);
-  assertNoVacio(fecha, "fechaPago");
-
-  const monto = round2(Number(input.monto ?? 0));
-  if (!Number.isFinite(monto) || monto <= 0) {
-    throw new Error("El monto debe ser mayor a 0");
-  }
-
-  // Validar que no exceda el saldo pendiente (solo pagos vigentes cuentan).
-  const cobranza = await getCobranzaById(input.cobranzaId);
-  if (!cobranza) throw new Error("Cobranza no existe");
-  if (cobranza.anulado_en) throw new Error("La cobranza está anulada");
-  if (monto > cobranza.saldo + 0.01) {
-    throw new Error(
-      `El pago ($${monto.toFixed(2)}) excede el saldo pendiente ($${cobranza.saldo.toFixed(2)})`
-    );
-  }
-
-  const payload = {
-    cobranza_id: input.cobranzaId,
-    fecha_pago: fecha,
-    monto,
-    referencia: input.referencia ? normalizarTexto(input.referencia) : null,
-    comprobante_url: input.comprobanteUrl
-      ? normalizarTexto(input.comprobanteUrl)
-      : null,
-    notas: input.notas ? oracionCase(input.notas) : null,
-  };
-
-  const { data, error } = await supabaseServer
-    .from("mk_pagos")
-    .insert(payload)
-    .select("*")
-    .single();
-  if (error || !data) {
-    throw new Error(`createPago: ${error?.message ?? "sin datos"}`);
-  }
-  return data as MkPago;
+export async function marcarCobranzaCobrada(id: string): Promise<void> {
+  if (!id) throw new Error("id requerido");
+  const hoy = new Date().toISOString().slice(0, 10);
+  const { error } = await supabaseServer
+    .from("mk_cobranzas")
+    .update({ estado: "cobrada", fecha_cobro: hoy })
+    .eq("id", id);
+  if (error) throw new Error(`marcarCobranzaCobrada: ${error.message}`);
 }
 
 // ----------------------------------------------------------------------------
@@ -736,13 +705,15 @@ export async function generarCobranzasBorradorAlCerrar(
 
   const { data: facturas, error: fError } = await supabaseServer
     .from("mk_facturas")
-    .select("subtotal")
+    .select("total")
     .eq("proyecto_id", proyectoId)
     .is("anulado_en", null);
   if (fError) throw new Error(`generarCobranzas[f]: ${fError.message}`);
 
-  const subtotalTotal = (facturas ?? []).reduce(
-    (acc, r) => acc + Number((r as { subtotal: unknown }).subtotal ?? 0),
+  // La cobranza es SIEMPRE sobre el total (subtotal + ITBMS). El usuario le cobra
+  // a la marca el monto completo pagado, incluyendo impuestos.
+  const totalFacturas = (facturas ?? []).reduce(
+    (acc, r) => acc + Number((r as { total: unknown }).total ?? 0),
     0,
   );
 
@@ -760,7 +731,7 @@ export async function generarCobranzasBorradorAlCerrar(
     const marcaId = String((pm as { marca_id: string }).marca_id);
     if (marcasYaCobradas.has(marcaId)) continue;
     const pct = Number((pm as { porcentaje: number }).porcentaje);
-    const monto = round2((subtotalTotal * pct) / 100);
+    const monto = round2((totalFacturas * pct) / 100);
     try {
       const cb = await createCobranza({
         proyectoId,

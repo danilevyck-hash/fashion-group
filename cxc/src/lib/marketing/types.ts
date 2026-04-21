@@ -24,8 +24,7 @@ export type EstadoProyecto =
 export type EstadoCobranza =
   | "borrador"
   | "enviada"
-  | "pagada_parcial"
-  | "pagada"
+  | "cobrada"
   | "disputada";
 
 export type TipoAdjunto =
@@ -101,6 +100,7 @@ export interface MkCobranza {
   proyecto_id: string;
   marca_id: string;
   fecha_envio: string | null;
+  fecha_cobro: string | null;
   monto: number;
   email_destino: string | null;
   asunto: string | null;
@@ -111,18 +111,6 @@ export interface MkCobranza {
   anulado_motivo: string | null;
   created_at: string;
   updated_at: string;
-}
-
-export interface MkPago {
-  id: string;
-  cobranza_id: string;
-  fecha_pago: string;
-  monto: number;
-  referencia: string | null;
-  comprobante_url: string | null;
-  notas: string | null;
-  anulado_en: string | null;
-  created_at: string;
 }
 
 // ----------------------------------------------------------------------------
@@ -142,11 +130,6 @@ export interface FacturaConAdjuntos extends MkFactura {
   adjuntos: MkAdjunto[];
 }
 
-export interface CobranzaConPagos extends MkCobranza {
-  pagos: MkPago[];
-  total_pagado: number;
-  saldo: number;
-}
 
 export interface ProyectoResumen extends MkProyecto {
   marcas: MarcaConPorcentaje[];
@@ -234,11 +217,3 @@ export interface UpdateCobranzaInput {
   estado?: EstadoCobranza;
 }
 
-export interface CreatePagoInput {
-  cobranzaId: string;
-  fechaPago: string;
-  monto: number;
-  referencia?: string;
-  comprobanteUrl?: string;
-  notas?: string;
-}

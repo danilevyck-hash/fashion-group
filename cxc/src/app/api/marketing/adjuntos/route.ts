@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { createAdjunto } from "@/lib/marketing/mutations";
+import { firmarAdjunto } from "@/lib/marketing/storage";
 import type { CreateAdjuntoInput } from "@/lib/marketing/types";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,9 @@ export async function POST(req: NextRequest) {
       nombreOriginal: body.nombreOriginal,
       sizeBytes: body.sizeBytes,
     });
-    return NextResponse.json(adjunto);
+    // Devolver con URL firmada lista para usar en <img>
+    const firmado = await firmarAdjunto(adjunto);
+    return NextResponse.json(firmado);
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "No se pudo registrar el adjunto";
