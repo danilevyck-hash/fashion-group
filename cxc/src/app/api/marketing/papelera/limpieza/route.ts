@@ -14,13 +14,12 @@ const ANIOS = 5;
 interface ConteoPorTabla {
   proyectos: number;
   facturas: number;
-  cobranzas: number;
 }
 
 async function contarElegibles(cutoffIso: string): Promise<ConteoPorTabla> {
-  const tablas = ["mk_proyectos", "mk_facturas", "mk_cobranzas"] as const;
-  const keys = ["proyectos", "facturas", "cobranzas"] as const;
-  const result: ConteoPorTabla = { proyectos: 0, facturas: 0, cobranzas: 0 };
+  const tablas = ["mk_proyectos", "mk_facturas"] as const;
+  const keys = ["proyectos", "facturas"] as const;
+  const result: ConteoPorTabla = { proyectos: 0, facturas: 0 };
   for (let i = 0; i < tablas.length; i++) {
     const { count, error } = await supabaseServer
       .from(tablas[i])
@@ -46,7 +45,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const conteo = await contarElegibles(cutoffIso());
-    const total = conteo.proyectos + conteo.facturas + conteo.cobranzas;
+    const total = conteo.proyectos + conteo.facturas;
     return NextResponse.json({ conteo, total, anios: ANIOS });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Error interno";
@@ -72,7 +71,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const eliminado = await limpiezaAnualAnulados(ANIOS);
-    const total = eliminado.proyectos + eliminado.facturas + eliminado.cobranzas;
+    const total = eliminado.proyectos + eliminado.facturas;
     return NextResponse.json({ eliminado, total, anios: ANIOS });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Error interno";

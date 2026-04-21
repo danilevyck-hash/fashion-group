@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   console.log(`[papelera] auth OK role=${auth.role} user=${auth.userName ?? "-"}`);
 
   try {
-    const [proyRes, factRes, cobRes] = await Promise.all([
+    const [proyRes, factRes] = await Promise.all([
       supabaseServer
         .from("mk_proyectos")
         .select("id, nombre, tienda, anulado_en, anulado_motivo")
@@ -34,19 +34,13 @@ export async function GET(req: NextRequest) {
         .select("id, numero_factura, proveedor, anulado_en, anulado_motivo")
         .not("anulado_en", "is", null)
         .order("anulado_en", { ascending: false }),
-      supabaseServer
-        .from("mk_cobranzas")
-        .select("id, numero, anulado_en, anulado_motivo")
-        .not("anulado_en", "is", null)
-        .order("anulado_en", { ascending: false }),
     ]);
 
     if (proyRes.error) throw new Error(`mk_proyectos: ${proyRes.error.message}`);
     if (factRes.error) throw new Error(`mk_facturas: ${factRes.error.message}`);
-    if (cobRes.error) throw new Error(`mk_cobranzas: ${cobRes.error.message}`);
 
     console.log(
-      `[papelera] raw counts proyectos=${proyRes.data?.length ?? 0} facturas=${factRes.data?.length ?? 0} cobranzas=${cobRes.data?.length ?? 0}`,
+      `[papelera] raw counts proyectos=${proyRes.data?.length ?? 0} facturas=${factRes.data?.length ?? 0}`,
     );
 
     const items: AnuladoItem[] = [];
@@ -66,16 +60,6 @@ export async function GET(req: NextRequest) {
         tipo: "factura",
         id: String(r.id),
         nombre: `${String(r.numero_factura ?? "")} — ${String(r.proveedor ?? "")}`.trim(),
-        anulado_en: String(r.anulado_en ?? ""),
-        anulado_motivo: (r.anulado_motivo as string | null) ?? null,
-      });
-    }
-    for (const row of cobRes.data ?? []) {
-      const r = row as Record<string, unknown>;
-      items.push({
-        tipo: "cobranza",
-        id: String(r.id),
-        nombre: String(r.numero ?? ""),
         anulado_en: String(r.anulado_en ?? ""),
         anulado_motivo: (r.anulado_motivo as string | null) ?? null,
       });

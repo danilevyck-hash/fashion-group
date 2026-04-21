@@ -6,22 +6,20 @@ import { ConfirmModal, ConfirmDeleteModal } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import type { AnuladoItem } from "@/lib/marketing/types";
 
-type FiltroTipo = "todos" | "proyecto" | "factura" | "cobranza";
+type FiltroTipo = "todos" | "proyecto" | "factura";
 
 const TIPO_LABEL: Record<AnuladoItem["tipo"], string> = {
   proyecto: "Proyecto",
   factura: "Factura",
-  cobranza: "Cobranza",
 };
 
 const TIPO_BADGE: Record<AnuladoItem["tipo"], string> = {
   proyecto: "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200",
   factura: "bg-blue-50 text-blue-700 border-blue-200",
-  cobranza: "bg-emerald-50 text-emerald-700 border-emerald-200",
 };
 
 interface PreviewLimpieza {
-  conteo: { proyectos: number; facturas: number; cobranzas: number };
+  conteo: { proyectos: number; facturas: number };
   total: number;
   anios: number;
 }
@@ -163,7 +161,6 @@ export function PapeleraLista({ esAdmin }: PapeleraListaProps) {
       todos: items.length,
       proyecto: 0,
       factura: 0,
-      cobranza: 0,
     };
     for (const it of items) c[it.tipo] += 1;
     return c;
@@ -179,7 +176,7 @@ export function PapeleraLista({ esAdmin }: PapeleraListaProps) {
       </div>
       {/* Filtros */}
       <div className="flex flex-wrap gap-2">
-        {(["todos", "proyecto", "factura", "cobranza"] as FiltroTipo[]).map(
+        {(["todos", "proyecto", "factura"] as FiltroTipo[]).map(
           (f) => (
             <button
               key={f}
@@ -194,9 +191,7 @@ export function PapeleraLista({ esAdmin }: PapeleraListaProps) {
                 ? "Todos"
                 : f === "proyecto"
                   ? "Proyectos"
-                  : f === "factura"
-                    ? "Facturas"
-                    : "Cobranzas"}{" "}
+                  : "Facturas"}{" "}
               <span
                 className={`ml-1 text-xs ${filtro === f ? "text-white/70" : "text-gray-400"}`}
               >
@@ -300,8 +295,7 @@ export function PapeleraLista({ esAdmin }: PapeleraListaProps) {
                 registros:{" "}
                 <span className="tabular-nums">
                   {preview.conteo.proyectos} proyectos,{" "}
-                  {preview.conteo.facturas} facturas,{" "}
-                  {preview.conteo.cobranzas} cobranzas
+                  {preview.conteo.facturas} facturas
                 </span>
                 .
               </p>

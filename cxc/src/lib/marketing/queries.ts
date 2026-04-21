@@ -8,7 +8,6 @@ import type {
   MkMarca,
   MkProyecto,
   MkFactura,
-  MkCobranza,
   MkAdjunto,
   MkProyectoMarca,
   ProyectoConMarcas,
@@ -41,6 +40,8 @@ function mapProyecto(row: Record<string, unknown>): MkProyecto {
     fecha_inicio: String(row.fecha_inicio ?? ""),
     fecha_cierre: (row.fecha_cierre as string | null) ?? null,
     estado: String(row.estado ?? "abierto") as EstadoProyecto,
+    fecha_enviado: (row.fecha_enviado as string | null) ?? null,
+    fecha_cobrado: (row.fecha_cobrado as string | null) ?? null,
     notas: (row.notas as string | null) ?? null,
     anulado_en: (row.anulado_en as string | null) ?? null,
     anulado_motivo: (row.anulado_motivo as string | null) ?? null,
@@ -77,27 +78,6 @@ function mapAdjunto(row: Record<string, unknown>): MkAdjunto {
     nombre_original: (row.nombre_original as string | null) ?? null,
     size_bytes: (row.size_bytes as number | null) ?? null,
     created_at: String(row.created_at ?? ""),
-  };
-}
-
-function mapCobranza(row: Record<string, unknown>): MkCobranza {
-  return {
-    id: String(row.id),
-    numero: String(row.numero ?? ""),
-    proyecto_id: String(row.proyecto_id),
-    marca_id: String(row.marca_id),
-    fecha_envio: (row.fecha_envio as string | null) ?? null,
-    fecha_cobro: (row.fecha_cobro as string | null) ?? null,
-    monto: Number(row.monto ?? 0),
-    email_destino: (row.email_destino as string | null) ?? null,
-    asunto: (row.asunto as string | null) ?? null,
-    cuerpo: (row.cuerpo as string | null) ?? null,
-    estado: String(row.estado ?? "borrador") as MkCobranza["estado"],
-    notas: (row.notas as string | null) ?? null,
-    anulado_en: (row.anulado_en as string | null) ?? null,
-    anulado_motivo: (row.anulado_motivo as string | null) ?? null,
-    created_at: String(row.created_at ?? ""),
-    updated_at: String(row.updated_at ?? ""),
   };
 }
 
@@ -383,33 +363,6 @@ export async function getFacturaById(id: string): Promise<FacturaConAdjuntos | n
 }
 
 // ----------------------------------------------------------------------------
-// Cobranzas
-// ----------------------------------------------------------------------------
-export async function getCobranzasByProyecto(
-  proyectoId: string
-): Promise<MkCobranza[]> {
-  const { data, error } = await supabaseServer
-    .from("mk_cobranzas")
-    .select("*")
-    .eq("proyecto_id", proyectoId)
-    .is("anulado_en", null)
-    .order("created_at", { ascending: false });
-  if (error) throw new Error(`getCobranzasByProyecto: ${error.message}`);
-  return (data ?? []).map((r) => mapCobranza(r as Record<string, unknown>));
-}
-
-export async function getCobranzaById(id: string): Promise<MkCobranza | null> {
-  const { data, error } = await supabaseServer
-    .from("mk_cobranzas")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw new Error(`getCobranzaById: ${error.message}`);
-  if (!data) return null;
-  return mapCobranza(data as Record<string, unknown>);
-}
-
-// ----------------------------------------------------------------------------
 // Adjuntos
 // ----------------------------------------------------------------------------
 export async function getAdjuntosByProyecto(
@@ -431,7 +384,7 @@ export async function getAdjuntosByProyecto(
 export async function getAnulados(): Promise<AnuladoItem[]> {
   const items: AnuladoItem[] = [];
 
-  const [{ data: proy, error: pErr }, { data: fact, error: fErr }, { data: cob, error: cErr }] =
+  const [{ data: proy, error: pErr }, { data: fact, error: fErr }] =
     await Promise.all([
       supabaseServer
         .from("mk_proyectos")
@@ -443,15 +396,9 @@ export async function getAnulados(): Promise<AnuladoItem[]> {
         .select("id, numero_factura, proveedor, anulado_en, anulado_motivo")
         .not("anulado_en", "is", null)
         .order("anulado_en", { ascending: false }),
-      supabaseServer
-        .from("mk_cobranzas")
-        .select("id, numero, anulado_en, anulado_motivo")
-        .not("anulado_en", "is", null)
-        .order("anulado_en", { ascending: false }),
     ]);
   if (pErr) throw new Error(`getAnulados[proyectos]: ${pErr.message}`);
   if (fErr) throw new Error(`getAnulados[facturas]: ${fErr.message}`);
-  if (cErr) throw new Error(`getAnulados[cobranzas]: ${cErr.message}`);
 
   for (const row of proy ?? []) {
     const r = row as Record<string, unknown>;
@@ -471,16 +418,6 @@ export async function getAnulados(): Promise<AnuladoItem[]> {
       tipo: "factura",
       id: String(r.id),
       nombre,
-      anulado_en: String(r.anulado_en ?? ""),
-      anulado_motivo: (r.anulado_motivo as string | null) ?? null,
-    });
-  }
-  for (const row of cob ?? []) {
-    const r = row as Record<string, unknown>;
-    items.push({
-      tipo: "cobranza",
-      id: String(r.id),
-      nombre: String(r.numero ?? ""),
       anulado_en: String(r.anulado_en ?? ""),
       anulado_motivo: (r.anulado_motivo as string | null) ?? null,
     });

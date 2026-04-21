@@ -6,7 +6,7 @@ import type { EstadoProyecto } from "@/lib/marketing/types";
 
 export const dynamic = "force-dynamic";
 
-const ESTADOS: ReadonlyArray<EstadoProyecto> = ["abierto", "por_cobrar", "enviado", "cobrado"];
+const ESTADOS: ReadonlyArray<EstadoProyecto> = ["abierto", "enviado", "cobrado"];
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria", "director"]);

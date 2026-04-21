@@ -3,12 +3,11 @@ import { requireRole } from "@/lib/requireRole";
 import {
   restaurarProyecto,
   restaurarFactura,
-  restaurarCobranza,
 } from "@/lib/marketing/mutations";
 
 export const dynamic = "force-dynamic";
 
-type TipoRestaurar = "proyecto" | "factura" | "cobranza";
+type TipoRestaurar = "proyecto" | "factura";
 
 interface RestaurarBody {
   tipo?: unknown;
@@ -16,7 +15,7 @@ interface RestaurarBody {
 }
 
 function esTipoValido(t: unknown): t is TipoRestaurar {
-  return t === "proyecto" || t === "factura" || t === "cobranza";
+  return t === "proyecto" || t === "factura";
 }
 
 export async function POST(req: NextRequest) {
@@ -41,8 +40,7 @@ export async function POST(req: NextRequest) {
 
   try {
     if (tipo === "proyecto") await restaurarProyecto(id);
-    else if (tipo === "factura") await restaurarFactura(id);
-    else await restaurarCobranza(id);
+    else await restaurarFactura(id);
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Error interno";

@@ -142,27 +142,72 @@ async function cargarFacturas(
   });
 }
 
+// Simula CobranzaMin[] derivándolo del estado del proyecto + mk_factura_marcas.
+// Marca estado="cobrada" si el proyecto está en 'cobrado'; "enviada" si está en
+// 'enviado' o 'abierto'. El caller solo diferencia "cobrada" vs otros.
 async function cargarCobranzas(
-  proyectoIds: ReadonlyArray<string>
+  proyectoIds: ReadonlyArray<string>,
+  proyectos: ReadonlyArray<ProyectoMin>,
 ): Promise<CobranzaMin[]> {
   if (proyectoIds.length === 0) return [];
-  const { data, error } = await supabaseServer
-    .from("mk_cobranzas")
-    .select("id, proyecto_id, marca_id, monto, estado")
-    .in("proyecto_id", proyectoIds)
-    .is("anulado_en", null);
-  if (error) throw new Error(`cargarCobranzas: ${error.message}`);
-  return (data ?? []).map((r) => {
-    const x = r as Record<string, unknown>;
-    return {
-      id: String(x.id),
-      proyecto_id: String(x.proyecto_id),
-      marca_id: String(x.marca_id),
-      monto: Number(x.monto ?? 0),
-      estado: String(x.estado ?? ""),
-    };
-  });
+  const estadoPorProy = new Map(
+    proyectos.map((p) => [p.id, p.estado as string]),
+  );
+
+  const [facturasRes, fmRes] = await Promise.all([
+    supabaseServer
+      .from("mk_facturas")
+      .select("id, proyecto_id, total")
+      .in("proyecto_id", proyectoIds)
+      .is("anulado_en", null),
+    // mk_factura_marcas no filtra por proyecto directo; lo joineamos via facturaIndex.
+    supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id, porcentaje"),
+  ]);
+  if (facturasRes.error) throw new Error(`cargarCobranzas[fact]: ${facturasRes.error.message}`);
+  if (fmRes.error) throw new Error(`cargarCobranzas[fm]: ${fmRes.error.message}`);
+
+  const facturas = (facturasRes.data ?? []) as Array<{
+    id: string;
+    proyecto_id: string;
+    total: number;
+  }>;
+  const factIndex = new Map<string, { proyectoId: string; total: number }>();
+  for (const f of facturas) {
+    factIndex.set(String(f.id), {
+      proyectoId: String(f.proyecto_id),
+      total: Number(f.total ?? 0),
+    });
+  }
+
+  // Agregado: por proyecto × marca, suma de (factura.total × %).
+  const byProyMarca = new Map<string, number>();
+  for (const r of (fmRes.data ?? []) as Array<{
+    factura_id: string;
+    marca_id: string;
+    porcentaje: number;
+  }>) {
+    const info = factIndex.get(String(r.factura_id));
+    if (!info) continue;
+    const key = `${info.proyectoId}::${r.marca_id}`;
+    const monto = (info.total * Number(r.porcentaje ?? 0)) / 100;
+    byProyMarca.set(key, (byProyMarca.get(key) ?? 0) + monto);
+  }
+
+  const items: CobranzaMin[] = [];
+  for (const [key, monto] of byProyMarca) {
+    const [proyectoId, marcaId] = key.split("::");
+    const est = estadoPorProy.get(proyectoId) ?? "abierto";
+    items.push({
+      id: key,
+      proyecto_id: proyectoId,
+      marca_id: marcaId,
+      monto: Number(monto.toFixed(2)),
+      estado: est === "cobrado" ? "cobrada" : "enviada",
+    });
+  }
+  return items;
 }
+
 
 // ----------------------------------------------------------------------------
 // Reporte por marca
@@ -180,7 +225,7 @@ export async function reportePorMarca(
   const [proyMarcas, facturas, cobranzas] = await Promise.all([
     cargarProyMarcas(proyectoIds),
     cargarFacturas(proyectoIds),
-    cargarCobranzas(proyectoIds),
+cargarCobranzas(proyectoIds, proyectos),
   ]);
 
   // Total facturado por proyecto
@@ -290,7 +335,7 @@ export async function reportePorProyecto(
   const [proyMarcas, facturas, cobranzas] = await Promise.all([
     cargarProyMarcas(proyectoIds),
     cargarFacturas(proyectoIds),
-    cargarCobranzas(proyectoIds),
+cargarCobranzas(proyectoIds, proyectos),
   ]);
 
   // Si se filtra por marcaId, solo incluir proyectos que tengan esa marca

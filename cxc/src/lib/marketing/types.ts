@@ -15,17 +15,7 @@ export const EMPRESA_CODIGOS = [
 
 export type EmpresaCodigo = (typeof EMPRESA_CODIGOS)[number];
 
-export type EstadoProyecto =
-  | "abierto"
-  | "por_cobrar"
-  | "enviado"
-  | "cobrado";
-
-export type EstadoCobranza =
-  | "borrador"
-  | "enviada"
-  | "cobrada"
-  | "disputada";
+export type EstadoProyecto = "abierto" | "enviado" | "cobrado";
 
 export type TipoAdjunto =
   | "pdf_factura"
@@ -53,6 +43,9 @@ export interface MkProyecto {
   fecha_inicio: string; // DATE ISO "YYYY-MM-DD"
   fecha_cierre: string | null;
   estado: EstadoProyecto;
+  // Timestamps de transición (migrados desde mk_cobranzas al refactor)
+  fecha_enviado: string | null;
+  fecha_cobrado: string | null;
   notas: string | null;
   anulado_en: string | null;
   anulado_motivo: string | null;
@@ -102,25 +95,6 @@ export interface MkAdjunto {
   created_at: string;
 }
 
-export interface MkCobranza {
-  id: string;
-  numero: string;
-  proyecto_id: string;
-  marca_id: string;
-  fecha_envio: string | null;
-  fecha_cobro: string | null;
-  monto: number;
-  email_destino: string | null;
-  asunto: string | null;
-  cuerpo: string | null;
-  estado: EstadoCobranza;
-  notas: string | null;
-  anulado_en: string | null;
-  anulado_motivo: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 // ----------------------------------------------------------------------------
 // Tipos compuestos (joins + agregados)
 // ----------------------------------------------------------------------------
@@ -148,7 +122,7 @@ export interface ProyectoResumen extends MkProyecto {
 }
 
 export interface AnuladoItem {
-  tipo: "proyecto" | "factura" | "cobranza";
+  tipo: "proyecto" | "factura";
   id: string;
   nombre: string;
   anulado_en: string;
@@ -204,24 +178,5 @@ export interface CreateAdjuntoInput {
   url: string;
   nombreOriginal?: string;
   sizeBytes?: number;
-}
-
-export interface CreateCobranzaInput {
-  proyectoId: string;
-  marcaId: string;
-  monto: number;
-  emailDestino?: string;
-  asunto?: string;
-  cuerpo?: string;
-  notas?: string;
-}
-
-export interface UpdateCobranzaInput {
-  monto?: number;
-  emailDestino?: string | null;
-  asunto?: string | null;
-  cuerpo?: string | null;
-  notas?: string | null;
-  estado?: EstadoCobranza;
 }
 

@@ -17,8 +17,9 @@ import ProyectoOverlay from "./components/ProyectoOverlay";
 import PapeleraLista from "./components/PapeleraLista";
 import ReportesTabs from "./components/ReportesTabs";
 import NuevoProyectoModal from "./components/NuevoProyectoModal";
+import HistorialView from "./components/HistorialView";
 
-type VistaExtra = "papelera" | "reportes" | null;
+type VistaExtra = "papelera" | "reportes" | "historial" | null;
 
 export default function MarketingPageWrapper() {
   return (
@@ -88,14 +89,18 @@ function MarketingPage() {
 
   if (!authChecked) return null;
 
-  const mostrandoVistaExtra = vistaParam === "papelera" || vistaParam === "reportes";
+  const mostrandoVistaExtra =
+    vistaParam === "papelera" ||
+    vistaParam === "reportes" ||
+    vistaParam === "historial";
 
-  // Breadcrumb: AppHeader ya renderiza "Inicio > Marketing".
   const breadcrumbs: { label: string; onClick?: () => void }[] = [];
   if (vistaParam === "papelera") {
     breadcrumbs.push({ label: "Papelera" });
   } else if (vistaParam === "reportes") {
     breadcrumbs.push({ label: "Reportes" });
+  } else if (vistaParam === "historial") {
+    breadcrumbs.push({ label: "Historial" });
   } else if (proyectoParam && nombreProyectoActual) {
     breadcrumbs.push({ label: nombreProyectoActual });
   }
@@ -115,6 +120,12 @@ function MarketingPage() {
             </button>
             {vistaParam === "papelera" ? (
               <PapeleraLista esAdmin={role === "admin"} />
+            ) : vistaParam === "historial" ? (
+              <HistorialView
+                marcas={marcas}
+                onOpenProyecto={(id) => navegar({ proyecto: id })}
+                refreshKey={refreshKey}
+              />
             ) : (
               <ReportesTabs />
             )}
@@ -126,6 +137,7 @@ function MarketingPage() {
             onNuevoProyecto={() => setShowNuevoProyecto(true)}
             onOpenPapelera={() => navegar({ vista: "papelera" })}
             onOpenReportes={() => navegar({ vista: "reportes" })}
+            onOpenHistorial={() => navegar({ vista: "historial" })}
             refreshKey={refreshKey}
           />
         )}

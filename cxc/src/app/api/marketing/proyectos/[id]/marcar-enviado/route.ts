@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import {
-  cerrarProyecto,
-  generarCobranzasBorradorAlCerrar,
-} from "@/lib/marketing/mutations";
+import { marcarProyectoEnviado } from "@/lib/marketing/mutations";
 
 export const dynamic = "force-dynamic";
 
@@ -20,17 +17,11 @@ export async function POST(
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
   try {
-    await cerrarProyecto(params.id);
-    const cobranzas = await generarCobranzasBorradorAlCerrar(params.id);
-    return NextResponse.json({
-      ok: true,
-      cobranzasCreadas: cobranzas.length,
-      cobranzas,
-    });
+    await marcarProyectoEnviado(params.id);
+    return NextResponse.json({ ok: true });
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "No se pudo cerrar el proyecto";
-    console.error("marketing/proyectos/[id]/cerrar POST:", message);
-    return NextResponse.json({ error: message }, { status: 400 });
+    const msg = err instanceof Error ? err.message : "Error interno";
+    console.error("POST marcar-enviado:", msg);
+    return NextResponse.json({ error: msg }, { status: 400 });
   }
 }
