@@ -83,22 +83,32 @@ export async function createProyecto(
   const tienda = tituloCase(input.tienda);
   assertNoVacio(tienda, "tienda");
 
-  validarSumaCien(input.marcas);
+  // Fase 2: marcas a nivel proyecto es opcional. Si vienen, se validan y se
+  // insertan en mk_proyecto_marcas (flow legacy). Si no, el proyecto se crea
+  // sin marcas y estas se asignan por factura en mk_factura_marcas.
+  const tieneMarcas = Array.isArray(input.marcas) && input.marcas.length > 0;
+  if (tieneMarcas) {
+    validarSumaCien(input.marcas);
+  }
 
-  // Resolver nombres de marcas para auto-generar nombre si no viene
-  const marcasCatalogo = await getMarcas();
-  const nombresMarcas = input.marcas
-    .map((m) => marcasCatalogo.find((cm) => cm.id === m.marcaId)?.nombre ?? "")
-    .filter((n) => n.length > 0);
-  if (nombresMarcas.length !== input.marcas.length) {
-    throw new Error("Alguna marca seleccionada no existe");
+  let nombresMarcas: string[] = [];
+  if (tieneMarcas) {
+    const marcasCatalogo = await getMarcas();
+    nombresMarcas = input.marcas
+      .map((m) => marcasCatalogo.find((cm) => cm.id === m.marcaId)?.nombre ?? "")
+      .filter((n) => n.length > 0);
+    if (nombresMarcas.length !== input.marcas.length) {
+      throw new Error("Alguna marca seleccionada no existe");
+    }
   }
 
   const nombreProvisto = tituloCase(input.nombre);
   const nombreFinal =
     nombreProvisto.length > 0
       ? nombreProvisto
-      : autoNombreProyecto(tienda, nombresMarcas, new Date());
+      : tieneMarcas
+        ? autoNombreProyecto(tienda, nombresMarcas, new Date())
+        : `${tienda} — ${fechaReferenciaEs(new Date())}`;
 
   const notas = oracionCase(input.notas);
 
@@ -118,21 +128,27 @@ export async function createProyecto(
   }
   const proyecto = data as MkProyecto;
 
-  // Insertar marcas. Si falla, rollback manual (eliminar el proyecto recién creado).
-  const pmPayload = input.marcas.map((m) => ({
-    proyecto_id: proyecto.id,
-    marca_id: m.marcaId,
-    porcentaje: round2(m.porcentaje),
-  }));
-  const { error: pmError } = await supabaseServer
-    .from("mk_proyecto_marcas")
-    .insert(pmPayload);
-  if (pmError) {
-    await supabaseServer.from("mk_proyectos").delete().eq("id", proyecto.id);
-    throw new Error(`createProyecto[marcas]: ${pmError.message}`);
+  if (tieneMarcas) {
+    const pmPayload = input.marcas.map((m) => ({
+      proyecto_id: proyecto.id,
+      marca_id: m.marcaId,
+      porcentaje: round2(m.porcentaje),
+    }));
+    const { error: pmError } = await supabaseServer
+      .from("mk_proyecto_marcas")
+      .insert(pmPayload);
+    if (pmError) {
+      await supabaseServer.from("mk_proyectos").delete().eq("id", proyecto.id);
+      throw new Error(`createProyecto[marcas]: ${pmError.message}`);
+    }
   }
 
   return proyecto;
+}
+
+function fechaReferenciaEs(d: Date): string {
+  const meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+  return `${meses[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 export async function updateProyecto(

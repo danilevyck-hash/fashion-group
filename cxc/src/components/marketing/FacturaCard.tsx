@@ -29,12 +29,13 @@ export function FacturaCard({
     onClick ? "hover:border-black cursor-pointer" : ""
   }`;
 
-  const desgloseCobrable = porcentajesMarcas
-    .map((m) => {
-      const cobrable = (factura.total * m.porcentaje) / 100;
-      return `${m.marca.nombre} ${m.porcentaje}%: ${formatearMonto(cobrable)}`;
-    })
-    .join(" · ");
+  // Tags por marca con inicial coloreada + % y cobrable
+  function colorParaMarca(codigo: string): string {
+    if (codigo === "TH") return "bg-red-50 text-red-700 border-red-200";
+    if (codigo === "CK") return "bg-gray-100 text-gray-800 border-gray-300";
+    if (codigo === "RBK") return "bg-blue-50 text-blue-700 border-blue-200";
+    return "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200";
+  }
 
   const body = (
     <div className="flex flex-col gap-2">
@@ -86,8 +87,27 @@ export function FacturaCard({
       </div>
 
       {porcentajesMarcas.length > 0 && !anulada && (
-        <div className="text-xs text-gray-500 border-t border-gray-100 pt-2">
-          {desgloseCobrable}
+        <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-2">
+          {porcentajesMarcas.map((m) => {
+            const cobrable = (factura.total * m.porcentaje) / 100;
+            const inicial = (m.marca.nombre || m.marca.codigo || "?")
+              .charAt(0)
+              .toUpperCase();
+            return (
+              <div
+                key={m.marca.id}
+                className={`inline-flex items-center gap-1.5 border rounded-md px-1.5 py-0.5 text-[11px] ${colorParaMarca(m.marca.codigo)}`}
+              >
+                <span className="font-semibold">[{inicial}]</span>
+                <span className="font-medium">{m.marca.nombre}</span>
+                <span className="tabular-nums opacity-70">{m.porcentaje}%</span>
+                <span className="text-gray-400">→</span>
+                <span className="font-mono tabular-nums font-semibold">
+                  {formatearMonto(cobrable)}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

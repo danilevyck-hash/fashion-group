@@ -134,17 +134,19 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = (await req.json()) as Partial<CreateProyectoInput>;
-    if (!body?.tienda || !Array.isArray(body.marcas)) {
+    if (!body?.tienda) {
       return NextResponse.json(
-        { error: "Faltan campos: tienda, marcas" },
+        { error: "Falta campo: tienda" },
         { status: 400 },
       );
     }
+    // Fase 2: marcas opcionales. Si no vienen, el proyecto se crea sin
+    // filas en mk_proyecto_marcas y las marcas se asignan por factura.
     const proyecto = await createProyecto({
       tienda: body.tienda,
       nombre: body.nombre,
       notas: body.notas,
-      marcas: body.marcas,
+      marcas: Array.isArray(body.marcas) ? body.marcas : [],
     });
     return NextResponse.json(proyecto);
   } catch (err) {

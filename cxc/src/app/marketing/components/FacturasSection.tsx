@@ -5,7 +5,10 @@ import { useToast } from "@/components/ToastSystem";
 import { FacturaCard, FacturaForm } from "@/components/marketing";
 import type {
   FacturaConAdjuntos,
+  MarcaConPorcentaje,
+  MarcaPorcentajeInput,
   MkFactura,
+  MkMarca,
   ProyectoConMarcas,
 } from "@/lib/marketing/types";
 import {
@@ -37,6 +40,13 @@ export default function FacturasSection({
   const [anulandoLoading, setAnulandoLoading] = useState(false);
   // Path del PDF pre-subido para IA (antes de tener facturaId)
   const [pdfPathPreSubido, setPdfPathPreSubido] = useState<string | null>(null);
+
+  // Fase 2: catálogo global de marcas + marcas-por-factura para cards
+  const [marcasCatalogo, setMarcasCatalogo] = useState<MkMarca[]>([]);
+  const [marcasByFactura, setMarcasByFactura] = useState<Record<string, MarcaConPorcentaje[]>>({});
+  // Edición de una factura específica
+  const [editando, setEditando] = useState<FacturaConAdjuntos | null>(null);
+  const [editandoMarcas, setEditandoMarcas] = useState<MarcaPorcentajeInput[] | null>(null);
 
   // Sincroniza cuando el parent pasa nuevas facturas (después de un onChange).
   useEffect(() => {
@@ -80,6 +90,52 @@ export default function FacturasSection({
     }
   }, [cargar, facturasIniciales]);
 
+  // Cargar catálogo global de marcas (Fase 2)
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/marketing/marcas", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as MkMarca[];
+        if (!cancelado) setMarcasCatalogo(Array.isArray(data) ? data : []);
+      } catch { /* */ }
+    })();
+    return () => { cancelado = true; };
+  }, []);
+
+  // Cargar marcas por factura en batch cuando cambia la lista (Fase 2)
+  const cargarMarcasPorFactura = useCallback(
+    async (facturaIds: string[]) => {
+      if (facturaIds.length === 0) return;
+      const entries = await Promise.all(
+        facturaIds.map(async (id) => {
+          try {
+            const res = await fetch(`/api/marketing/facturas/${id}/marcas`, {
+              cache: "no-store",
+            });
+            if (!res.ok) return [id, [] as MarcaConPorcentaje[]] as const;
+            const data = (await res.json()) as MarcaConPorcentaje[];
+            return [id, Array.isArray(data) ? data : []] as const;
+          } catch {
+            return [id, [] as MarcaConPorcentaje[]] as const;
+          }
+        }),
+      );
+      setMarcasByFactura((prev) => {
+        const next = { ...prev };
+        for (const [id, arr] of entries) next[id] = arr;
+        return next;
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const vigentes = facturas.filter((f) => !f.anulado_en).map((f) => f.id);
+    cargarMarcasPorFactura(vigentes);
+  }, [facturas, cargarMarcasPorFactura]);
+
   // Cuando el usuario sube el PDF, lo subimos a Storage bajo el path del
   // proyecto (sin facturaId todavía) y devolvemos el path para que el form
   // llame a la IA. Luego, al guardar, registramos el adjunto con el path ya
@@ -112,19 +168,43 @@ export default function FacturasSection({
       concepto: string;
       subtotal: number;
       itbms: number;
+      marcasSeleccionadas: MarcaPorcentajeInput[];
     },
     pdfFile?: File,
   ) => {
+    const { marcasSeleccionadas, ...payload } = data;
     const res = await fetch("/api/marketing/facturas", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ proyectoId: proyecto.id, ...data }),
+      body: JSON.stringify({ proyectoId: proyecto.id, ...payload }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => null);
       throw new Error(err?.error ?? "No se pudo guardar la factura");
     }
     const factura = (await res.json()) as MkFactura;
+
+    // Asignar marcas a nivel factura (Fase 2). Si falla, eliminar la factura
+    // recién creada para no dejar huérfana sin marcas.
+    try {
+      const mRes = await fetch(`/api/marketing/facturas/${factura.id}/marcas`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ marcas: marcasSeleccionadas }),
+      });
+      if (!mRes.ok) {
+        const err = await mRes.json().catch(() => null);
+        // Rollback best-effort
+        await fetch(`/api/marketing/facturas/${factura.id}/anular`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ motivo: "Rollback: fallo al asignar marcas" }),
+        }).catch(() => {});
+        throw new Error(err?.error ?? "No se pudieron asignar las marcas");
+      }
+    } catch (err) {
+      throw err;
+    }
 
     // Si ya pre-subimos el PDF para IA, reusamos el path y solo registramos el adjunto.
     // Si no hay pre-subido pero hay pdfFile, subimos ahora.
@@ -174,6 +254,73 @@ export default function FacturasSection({
     toast("Factura guardada", "success");
     setPdfPathPreSubido(null);
     setShowForm(false);
+    await cargar();
+    onChange?.();
+  };
+
+  const handleAbrirEdicion = useCallback(
+    async (factura: FacturaConAdjuntos) => {
+      setEditando(factura);
+      // Pre-cargar marcas actuales de esa factura
+      try {
+        const res = await fetch(`/api/marketing/facturas/${factura.id}/marcas`, {
+          cache: "no-store",
+        });
+        if (res.ok) {
+          const marcas = (await res.json()) as MarcaConPorcentaje[];
+          setEditandoMarcas(
+            marcas.map((m) => ({ marcaId: m.marca.id, porcentaje: m.porcentaje })),
+          );
+        } else {
+          setEditandoMarcas([]);
+        }
+      } catch {
+        setEditandoMarcas([]);
+      }
+    },
+    [],
+  );
+
+  const handleEditar = async (
+    data: {
+      numeroFactura: string;
+      fechaFactura: string;
+      proveedor: string;
+      concepto: string;
+      subtotal: number;
+      itbms: number;
+      marcasSeleccionadas: MarcaPorcentajeInput[];
+    },
+  ) => {
+    if (!editando) return;
+    const { marcasSeleccionadas, ...payload } = data;
+    const res = await fetch(`/api/marketing/facturas/${editando.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      throw new Error(err?.error ?? "No se pudo actualizar la factura");
+    }
+
+    // Actualizar marcas de la factura
+    const mRes = await fetch(
+      `/api/marketing/facturas/${editando.id}/marcas`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ marcas: marcasSeleccionadas }),
+      },
+    );
+    if (!mRes.ok) {
+      const err = await mRes.json().catch(() => null);
+      throw new Error(err?.error ?? "No se pudieron actualizar las marcas");
+    }
+
+    toast("Factura actualizada", "success");
+    setEditando(null);
+    setEditandoMarcas(null);
     await cargar();
     onChange?.();
   };
@@ -237,12 +384,38 @@ export default function FacturasSection({
         <div className="rounded-lg border border-gray-200 bg-white p-4">
           <FacturaForm
             proyecto={proyecto}
+            marcasCatalogo={marcasCatalogo}
             onSubmit={handleCrear}
             onCancel={() => {
               setShowForm(false);
               setPdfPathPreSubido(null);
             }}
             onUploadPdfForIA={handleUploadPdfForIA}
+          />
+        </div>
+      )}
+
+      {editando && editandoMarcas !== null && (
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gray-900">
+              Editar factura {editando.numero_factura}
+            </h3>
+            <button
+              type="button"
+              onClick={() => { setEditando(null); setEditandoMarcas(null); }}
+              className="text-xs text-gray-500 hover:text-black"
+            >
+              Cancelar
+            </button>
+          </div>
+          <FacturaForm
+            proyecto={proyecto}
+            marcasCatalogo={marcasCatalogo}
+            initial={editando}
+            initialMarcas={editandoMarcas}
+            onSubmit={handleEditar}
+            onCancel={() => { setEditando(null); setEditandoMarcas(null); }}
           />
         </div>
       )}
@@ -267,24 +440,39 @@ export default function FacturasSection({
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-2">
-          {facturas.map((f) => (
-            <div key={f.id} className="relative group">
-              <FacturaCard factura={f} porcentajesMarcas={proyecto.marcas} />
-              {!f.anulado_en && !readonly && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setAnulando(f);
-                    setAnulandoMotivo("");
-                  }}
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition text-[11px] text-red-600 hover:text-red-800 bg-white/80 backdrop-blur px-2 py-1 rounded"
-                >
-                  Anular
-                </button>
-              )}
-            </div>
-          ))}
+          {facturas.map((f) => {
+            const marcasDeEsta = marcasByFactura[f.id] ?? proyecto.marcas ?? [];
+            return (
+              <div key={f.id} className="relative group">
+                <FacturaCard factura={f} porcentajesMarcas={marcasDeEsta} />
+                {!f.anulado_en && !readonly && (
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAbrirEdicion(f);
+                      }}
+                      className="text-[11px] text-gray-600 hover:text-black bg-white/80 backdrop-blur px-2 py-1 rounded"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAnulando(f);
+                        setAnulandoMotivo("");
+                      }}
+                      className="text-[11px] text-red-600 hover:text-red-800 bg-white/80 backdrop-blur px-2 py-1 rounded"
+                    >
+                      Anular
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
