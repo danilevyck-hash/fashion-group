@@ -363,9 +363,9 @@ export default function PlantillasPage() {
           {GROUP_ORDER.map((g) => (
             <div key={g}>
               <div className="h-4 w-32 bg-gray-100 rounded animate-pulse mb-3" />
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className={`rounded-xl p-4 h-[108px] animate-pulse ${darkMode ? "bg-gray-900 border border-gray-800" : "bg-gray-50 border border-gray-100"}`} />
+                  <div key={i} className={`rounded-lg p-3 h-[72px] animate-pulse ${darkMode ? "bg-gray-900 border border-gray-800" : "bg-gray-50 border border-gray-100"}`} />
                 ))}
               </div>
             </div>
@@ -385,35 +385,37 @@ export default function PlantillasPage() {
                   <h2 className="text-sm font-semibold">{gl.title}</h2>
                   <p className="text-[11px] text-gray-400">{gl.description}</p>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                   {groupMods.map((mod) => (
                     <div
                       key={mod.key}
                       onClick={() => router.push(mod.href)}
-                      className={`relative border rounded-xl p-4 text-center transition-all duration-150 cursor-pointer select-none hover:shadow-md hover:scale-[1.02] ${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 hover:border-gray-300 bg-white"}`}
+                      className={`relative border rounded-lg p-3 transition-all duration-150 cursor-pointer select-none hover:shadow-sm hover:border-gray-400 flex items-center gap-3 ${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 bg-white"}`}
                     >
                       {(() => {
                         if (mod.key === "upload" && stats?.cxcStale) {
                           return (
-                            <span className="absolute top-2 right-2 bg-amber-500 text-white text-[8px] font-bold px-1.5 h-[18px] rounded-full flex items-center justify-center leading-none">
+                            <span className="absolute top-1.5 right-1.5 bg-amber-500 text-white text-[8px] font-bold px-1.5 h-[16px] rounded-full flex items-center justify-center leading-none">
                               Nuevo
                             </span>
                           );
                         }
                         if (mod.key === "reclamos" && stats && stats.reclamosPendientes > 0) {
                           return (
-                            <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center leading-none">
+                            <span className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[9px] font-bold min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center leading-none">
                               {stats.reclamosPendientes}
                             </span>
                           );
                         }
                         return null;
                       })()}
-                      <div className="flex items-center justify-center w-10 h-10 mx-auto text-gray-700 dark:text-gray-300">
+                      <div className="flex items-center justify-center w-8 h-8 shrink-0 text-gray-700 dark:text-gray-300">
                         {MODULE_ICONS[mod.key] || <span className="w-5 h-5 block" />}
                       </div>
-                      <div className="text-[13px] font-semibold leading-tight mt-2">{mod.label}</div>
-                      <div className={`text-[11px] mt-0.5 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>{mod.subtitle}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[13px] font-semibold leading-tight truncate">{mod.label}</div>
+                        <div className={`text-[11px] leading-tight mt-0.5 truncate ${darkMode ? "text-gray-500" : "text-gray-400"}`}>{mod.subtitle}</div>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -426,7 +428,7 @@ export default function PlantillasPage() {
         <DragDropContext onDragEnd={onDragEnd}>
           <Droppable droppableId="modules" direction="vertical">
             {(provided) => (
-              <div ref={provided.innerRef} {...provided.droppableProps} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              <div ref={provided.innerRef} {...provided.droppableProps} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
                 {visibleModules.map((mod, index) => (
                   <Draggable key={mod.key} draggableId={mod.key} index={index} isDragDisabled={!editMode}>
                     {(prov, snapshot) => (
@@ -435,35 +437,37 @@ export default function PlantillasPage() {
                         {...prov.draggableProps}
                         {...(editMode ? prov.dragHandleProps : {})}
                         onClick={() => { if (!editMode) router.push(mod.href); }}
-                        className={`relative border rounded-xl p-4 text-center transition-all duration-150 cursor-pointer select-none hover:shadow-md hover:scale-[1.02] ${
-                          snapshot.isDragging ? "border-gray-300 bg-white z-50 shadow-lg" : `${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 hover:border-gray-300 bg-white"}`
+                        className={`relative border rounded-lg p-3 transition-all duration-150 cursor-pointer select-none hover:shadow-sm hover:border-gray-400 flex items-center gap-3 ${
+                          snapshot.isDragging ? "border-gray-300 bg-white z-50 shadow-lg" : `${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 bg-white"}`
                         } ${editMode ? "cursor-grab active:cursor-grabbing" : ""}`}
                       >
                         {editMode && (
-                          <span className="absolute top-2 right-2 text-gray-300 text-xs">⠿</span>
+                          <span className="absolute top-1.5 right-1.5 text-gray-300 text-xs">⠿</span>
                         )}
                         {(() => {
                           if (mod.key === "upload" && stats?.cxcStale) {
                             return (
-                              <span className="absolute top-2 right-2 bg-amber-500 text-white text-[8px] font-bold px-1.5 h-[18px] rounded-full flex items-center justify-center leading-none">
+                              <span className="absolute top-1.5 right-1.5 bg-amber-500 text-white text-[8px] font-bold px-1.5 h-[16px] rounded-full flex items-center justify-center leading-none">
                                 Nuevo
                               </span>
                             );
                           }
                           if (mod.key === "reclamos" && stats && stats.reclamosPendientes > 0) {
                             return (
-                              <span className="absolute top-2 right-2 bg-red-500 text-white text-[9px] font-bold min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center leading-none">
+                              <span className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[9px] font-bold min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center leading-none">
                                 {stats.reclamosPendientes}
                               </span>
                             );
                           }
                           return null;
                         })()}
-                        <div className="flex items-center justify-center w-10 h-10 mx-auto text-gray-700 dark:text-gray-300">
+                        <div className="flex items-center justify-center w-8 h-8 shrink-0 text-gray-700 dark:text-gray-300">
                           {MODULE_ICONS[mod.key] || <span className="w-5 h-5 block" />}
                         </div>
-                        <div className="text-[13px] font-semibold leading-tight mt-2">{mod.label}</div>
-                        <div className={`text-[11px] mt-0.5 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>{mod.subtitle}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-[13px] font-semibold leading-tight truncate">{mod.label}</div>
+                          <div className={`text-[11px] leading-tight mt-0.5 truncate ${darkMode ? "text-gray-500" : "text-gray-400"}`}>{mod.subtitle}</div>
+                        </div>
                       </div>
                     )}
                   </Draggable>
