@@ -22,6 +22,8 @@ interface ProyectoListItem {
   estado: string;
   created_at: string;
   anulado_en: string | null;
+  fecha_enviado: string | null;
+  fecha_cobrado: string | null;
   facturas_count: number;
   fotos_count: number;
   marcas: Array<{ id: string; nombre: string; codigo: string }>;
@@ -247,7 +249,7 @@ export default function ProyectosHomeView({
                     </div>
                   )}
                 </div>
-                <EstadoBadge tipo="proyecto" estado={p.estado} />
+                <EstadoBadge estado={p.estado} />
               </div>
 
               <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
@@ -255,7 +257,15 @@ export default function ProyectosHomeView({
                   {p.facturas_count} {p.facturas_count === 1 ? "factura" : "facturas"} ·{" "}
                   {p.fotos_count} {p.fotos_count === 1 ? "foto" : "fotos"}
                 </span>
-                <span>Creado: {formatearFecha(p.created_at)}</span>
+                <span>
+                  {p.estado === "cobrado" && p.fecha_cobrado
+                    ? `Cobrado el ${formatearFecha(p.fecha_cobrado)}`
+                    : p.estado === "enviado" && p.fecha_enviado
+                      ? `Enviado el ${formatearFecha(p.fecha_enviado)}`
+                      : p.created_at
+                        ? `Creado: ${formatearFecha(p.created_at)}`
+                        : ""}
+                </span>
               </div>
 
               {p.marcas.length > 0 && (
