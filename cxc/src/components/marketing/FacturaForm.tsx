@@ -44,6 +44,16 @@ interface FacturaFormProps {
 type ItbmsOption = "0" | "7";
 type ModoMarca = "una" | "varias";
 
+interface DuplicadoItem {
+  id: string;
+  numero_factura: string;
+  proveedor: string;
+  total: number;
+  proyecto_id: string;
+  proyecto_nombre: string;
+  es_mismo_proyecto: boolean;
+}
+
 async function fetchProveedorSuggestions(_q: string): Promise<string[]> {
   return [];
 }
@@ -105,6 +115,14 @@ export function FacturaForm({
   const [pdfSubido, setPdfSubido] = useState(false);
   const [leyendoIA, setLeyendoIA] = useState(false);
   const [enviando, setEnviando] = useState(false);
+
+  // ── Detección de duplicados ──
+  const [duplicados, setDuplicados] = useState<DuplicadoItem[]>([]);
+  const [checkingDup, setCheckingDup] = useState(false);
+  const [showConfirmDup, setShowConfirmDup] = useState(false);
+  // ID de la factura que estamos editando — se excluye del match para no
+  // auto-reportarse como duplicado de sí misma.
+  const editandoId = initial?.id ?? null;
 
   // ── Marcas ──
   // Decidir modo inicial según initialMarcas / legacy del proyecto
@@ -186,6 +204,45 @@ export function FacturaForm({
 
   const puedeGuardar = pasoDatos && marcasValidas && !enviando;
 
+  // Check de duplicados con debounce 500ms. Se activa cuando cambian
+  // numero_factura o proveedor. Excluye la factura en edición actual.
+  useEffect(() => {
+    const num = numeroFactura.trim();
+    const prov = proveedor.trim();
+    if (!num || !prov) {
+      setDuplicados([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setCheckingDup(true);
+      try {
+        const qs = new URLSearchParams({
+          numero_factura: num,
+          proveedor: prov,
+          proyecto_id_actual: proyecto.id,
+        });
+        const res = await fetch(`/api/marketing/facturas/check-duplicate?${qs.toString()}`, {
+          cache: "no-store",
+        });
+        if (!res.ok) {
+          setDuplicados([]);
+          return;
+        }
+        const data = (await res.json()) as {
+          existe: boolean;
+          facturas: DuplicadoItem[];
+        };
+        const lista = (data.facturas ?? []).filter((f) => f.id !== editandoId);
+        setDuplicados(lista);
+      } catch {
+        setDuplicados([]);
+      } finally {
+        setCheckingDup(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [numeroFactura, proveedor, proyecto.id, editandoId]);
+
   const aplicarRespuestaIA = useCallback((data: RespuestaIA) => {
     if (data.numero_factura) setNumeroFactura(data.numero_factura);
     if (data.fecha_factura) setFechaFactura(data.fecha_factura);
@@ -237,9 +294,7 @@ export function FacturaForm({
     };
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!puedeGuardar) return;
+  const ejecutarGuardar = async () => {
     try {
       setEnviando(true);
       await onSubmit(
@@ -263,6 +318,16 @@ export function FacturaForm({
     } finally {
       setEnviando(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!puedeGuardar) return;
+    if (duplicados.length > 0) {
+      setShowConfirmDup(true);
+      return;
+    }
+    await ejecutarGuardar();
   };
 
   // ── UI helpers para marcas ──
@@ -474,6 +539,52 @@ export function FacturaForm({
         </div>
       </PasoInstruccion>
 
+      {duplicados.length > 0 && (
+        <div className="rounded-lg border-2 border-amber-300 bg-amber-50 p-4">
+          <div className="flex items-start gap-3">
+            <div className="shrink-0 mt-0.5 text-amber-600">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold text-amber-900 mb-1">
+                Esta factura ya existe en el sistema
+              </div>
+              <div className="text-xs text-amber-800 mb-2">
+                {numeroFactura} de &ldquo;{proveedor}&rdquo; ya está en:
+              </div>
+              <ul className="space-y-1 mb-2">
+                {duplicados.map((d) => (
+                  <li key={d.id} className="text-xs text-amber-900 flex items-center gap-2">
+                    <span className="text-amber-600">•</span>
+                    <span>
+                      Proyecto &ldquo;{d.proyecto_nombre}&rdquo;
+                      {d.es_mismo_proyecto ? (
+                        <span className="font-semibold"> (este mismo proyecto)</span>
+                      ) : null}
+                    </span>
+                    <a
+                      href={`/marketing?proyecto=${d.proyecto_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-amber-700 hover:text-amber-900 underline font-medium"
+                    >
+                      Ver →
+                    </a>
+                  </li>
+                ))}
+              </ul>
+              <div className="text-xs text-amber-800">
+                ¿Quieres continuar de todas formas? Puedes guardar igual.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <PasoInstruccion
         numero={3}
         titulo="¿A qué marca(s) aplica esta factura?"
@@ -631,7 +742,12 @@ export function FacturaForm({
         </div>
       </PasoInstruccion>
 
-      <div className="flex gap-2 justify-end">
+      <div className="flex items-center gap-2 justify-end">
+        {checkingDup && (
+          <span className="text-xs text-gray-400 mr-auto">
+            Verificando duplicados…
+          </span>
+        )}
         {onCancel && (
           <button
             type="button"
@@ -650,6 +766,49 @@ export function FacturaForm({
           {enviando ? "Guardando…" : "Guardar factura"}
         </button>
       </div>
+
+      {showConfirmDup && (
+        <div
+          className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center"
+          onClick={() => !enviando && setShowConfirmDup(false)}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold mb-1 text-gray-900">
+              ¿Guardar factura duplicada?
+            </h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Esta factura ({numeroFactura} de &ldquo;{proveedor}&rdquo;) ya existe en{" "}
+              {duplicados.length} {duplicados.length === 1 ? "proyecto" : "proyectos"}.
+              ¿Seguro que quieres guardar una factura duplicada?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowConfirmDup(false)}
+                disabled={enviando}
+                className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setShowConfirmDup(false);
+                  await ejecutarGuardar();
+                }}
+                disabled={enviando}
+                className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium bg-amber-600 text-white hover:bg-amber-700 active:scale-[0.97] disabled:opacity-50 transition"
+              >
+                {enviando ? "Guardando…" : "Sí, guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   );
 }
