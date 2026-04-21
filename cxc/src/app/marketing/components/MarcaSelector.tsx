@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * @deprecated Fase 3 del refactor — El home ya no es grid de marcas.
+ * Este componente dejó de renderizarse en /marketing/page.tsx.
+ * Se mantiene por si algún reporte futuro necesita el mismo layout.
+ * No agregar consumidores nuevos.
+ */
+
 import { useEffect, useState } from "react";
 import type { MkMarca } from "@/lib/marketing/types";
 import { MarcaBadge } from "@/components/marketing";

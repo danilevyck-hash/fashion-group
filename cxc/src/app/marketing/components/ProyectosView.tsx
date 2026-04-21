@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * @deprecated Fase 3 del refactor — La vista "proyectos de una marca"
+ * desapareció. El home ahora es lista de proyectos directa
+ * (ver ProyectosHomeView.tsx). No agregar consumidores nuevos.
+ */
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   EstadoProyecto,

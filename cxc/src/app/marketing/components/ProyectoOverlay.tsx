@@ -23,7 +23,9 @@ function esMarcaConocida(c: string): c is "TH" | "CK" | "RBK" {
 
 interface Props {
   proyectoId: string;
-  marca: MkMarca;
+  // Fase 3: la marca "contexto" ya no existe (home es lista de proyectos).
+  // Se mantiene opcional para compat.
+  marca?: MkMarca;
   onClose: () => void;
   onChange: () => void;
   onNombreProyecto?: (nombre: string) => void;
@@ -31,7 +33,6 @@ interface Props {
 
 export default function ProyectoOverlay({
   proyectoId,
-  marca,
   onClose,
   onChange,
   onNombreProyecto,

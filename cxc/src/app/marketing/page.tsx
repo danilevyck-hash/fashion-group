@@ -1,12 +1,18 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+// Fase 3: el home es lista de proyectos (sin vista intermedia de marca).
+// URL patterns:
+//   /marketing                      → home (lista de proyectos)
+//   /marketing?proyecto=<uuid>      → home + overlay del proyecto
+//   /marketing?vista=papelera       → papelera (reemplaza home)
+//   /marketing?vista=reportes       → reportes (reemplaza home)
+
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import type { MkMarca } from "@/lib/marketing/types";
-import MarcaSelector from "./components/MarcaSelector";
-import ProyectosView from "./components/ProyectosView";
+import ProyectosHomeView from "./components/ProyectosHomeView";
 import ProyectoOverlay from "./components/ProyectoOverlay";
 import PapeleraLista from "./components/PapeleraLista";
 import ReportesTabs from "./components/ReportesTabs";
@@ -30,12 +36,10 @@ function MarketingPage() {
     allowedRoles: ["admin", "secretaria", "director"],
   });
 
-  const marcaParam = searchParams.get("marca");
   const proyectoParam = searchParams.get("proyecto");
   const vistaParam = (searchParams.get("vista") as VistaExtra) ?? null;
 
   const [marcas, setMarcas] = useState<MkMarca[]>([]);
-  const [marcasLoading, setMarcasLoading] = useState(true);
   const [showNuevoProyecto, setShowNuevoProyecto] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [nombreProyectoActual, setNombreProyectoActual] = useState<string | null>(
@@ -45,16 +49,13 @@ function MarketingPage() {
   useEffect(() => {
     let cancelado = false;
     (async () => {
-      setMarcasLoading(true);
       try {
         const res = await fetch("/api/marketing/marcas");
-        if (!res.ok) throw new Error("No se pudieron cargar las marcas");
+        if (!res.ok) throw new Error();
         const data = (await res.json()) as MkMarca[];
         if (!cancelado) setMarcas(Array.isArray(data) ? data : []);
       } catch {
         if (!cancelado) setMarcas([]);
-      } finally {
-        if (!cancelado) setMarcasLoading(false);
       }
     })();
     return () => {
@@ -62,38 +63,25 @@ function MarketingPage() {
     };
   }, []);
 
-  const marcaActual = useMemo(
-    () => marcas.find((m) => m.codigo === marcaParam) ?? null,
-    [marcas, marcaParam],
-  );
-
   const navegar = useCallback(
-    (next: {
-      marca?: string | null;
-      proyecto?: string | null;
-      vista?: VistaExtra;
-    }) => {
+    (next: { proyecto?: string | null; vista?: VistaExtra }) => {
       const params = new URLSearchParams();
-      const nextMarca =
-        next.marca === undefined ? marcaParam : next.marca ?? null;
       const nextProyecto =
         next.proyecto === undefined ? proyectoParam : next.proyecto ?? null;
       const nextVista = next.vista === undefined ? vistaParam : next.vista;
       if (nextVista) {
         params.set("vista", nextVista);
-      } else {
-        if (nextMarca) params.set("marca", nextMarca);
-        if (nextProyecto) params.set("proyecto", nextProyecto);
+      } else if (nextProyecto) {
+        params.set("proyecto", nextProyecto);
       }
       const qs = params.toString();
       router.replace(qs ? `/marketing?${qs}` : "/marketing");
     },
-    [marcaParam, proyectoParam, vistaParam, router],
+    [proyectoParam, vistaParam, router],
   );
 
   const refrescar = () => setRefreshKey((k) => k + 1);
 
-  // Limpia el nombre del proyecto cargado al cerrar el overlay
   useEffect(() => {
     if (!proyectoParam) setNombreProyectoActual(null);
   }, [proyectoParam]);
@@ -102,23 +90,14 @@ function MarketingPage() {
 
   const mostrandoVistaExtra = vistaParam === "papelera" || vistaParam === "reportes";
 
-  // AppHeader ya renderiza "Inicio > Marketing" automáticamente. Acá solo
-  // agregamos los segmentos que vienen DESPUÉS de "Marketing".
+  // Breadcrumb: AppHeader ya renderiza "Inicio > Marketing".
   const breadcrumbs: { label: string; onClick?: () => void }[] = [];
   if (vistaParam === "papelera") {
     breadcrumbs.push({ label: "Papelera" });
   } else if (vistaParam === "reportes") {
     breadcrumbs.push({ label: "Reportes" });
-  } else if (marcaActual) {
-    breadcrumbs.push({
-      label: marcaActual.nombre,
-      onClick: proyectoParam
-        ? () => navegar({ proyecto: null })
-        : undefined,
-    });
-    if (proyectoParam && nombreProyectoActual) {
-      breadcrumbs.push({ label: nombreProyectoActual });
-    }
+  } else if (proyectoParam && nombreProyectoActual) {
+    breadcrumbs.push({ label: nombreProyectoActual });
   }
 
   return (
@@ -140,61 +119,21 @@ function MarketingPage() {
               <ReportesTabs />
             )}
           </div>
-        ) : !marcaActual ? (
-          <div className="space-y-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">
-                  Marketing
-                </h1>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  Gastos compartidos. Elige una marca para ver sus proyectos.
-                </p>
-              </div>
-              <div className="flex items-center gap-3 shrink-0 text-sm">
-                <button
-                  type="button"
-                  onClick={() => navegar({ vista: "reportes" })}
-                  className="text-gray-600 hover:text-black transition"
-                >
-                  Reportes
-                </button>
-                <span className="text-gray-300">·</span>
-                <button
-                  type="button"
-                  onClick={() => navegar({ vista: "papelera" })}
-                  className="text-gray-600 hover:text-black transition"
-                >
-                  Papelera
-                </button>
-              </div>
-            </div>
-            <MarcaSelector
-              marcas={marcas}
-              loading={marcasLoading}
-              onSelect={(m) =>
-                navegar({ marca: m.codigo, proyecto: null, vista: null })
-              }
-              refreshKey={refreshKey}
-            />
-          </div>
         ) : (
-          <ProyectosView
-            marca={marcaActual}
-            onBack={() => navegar({ marca: null, proyecto: null })}
+          <ProyectosHomeView
+            marcas={marcas}
             onOpenProyecto={(id) => navegar({ proyecto: id })}
+            onNuevoProyecto={() => setShowNuevoProyecto(true)}
             onOpenPapelera={() => navegar({ vista: "papelera" })}
             onOpenReportes={() => navegar({ vista: "reportes" })}
-            onNuevoProyecto={() => setShowNuevoProyecto(true)}
             refreshKey={refreshKey}
           />
         )}
       </main>
 
-      {proyectoParam && marcaActual && !mostrandoVistaExtra && (
+      {proyectoParam && !mostrandoVistaExtra && (
         <ProyectoOverlay
           proyectoId={proyectoParam}
-          marca={marcaActual}
           onClose={() => navegar({ proyecto: null })}
           onChange={refrescar}
           onNombreProyecto={setNombreProyectoActual}
@@ -204,7 +143,6 @@ function MarketingPage() {
       {showNuevoProyecto && (
         <NuevoProyectoModal
           marcas={marcas}
-          marcaPreseleccionada={marcaActual}
           onClose={() => setShowNuevoProyecto(false)}
           onCreated={(id) => {
             setShowNuevoProyecto(false);
