@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmModal } from "@/components/ui";
+import OverflowMenu from "@/components/ui/OverflowMenu";
 import { EstadoBadge, MarcaBadge } from "@/components/marketing";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
 import type {
@@ -52,6 +53,16 @@ export default function ProyectoOverlay({
   const [anularMotivo, setAnularMotivo] = useState("");
   const [anulando, setAnulando] = useState(false);
 
+  // Refs estables para callbacks del parent — evitan que el useEffect se
+  // re-dispare por cambios de referencia del parent (causaba race conditions
+  // donde fetchs se pisaban y el overlay terminaba con facturas vacías).
+  const onCloseRef = useRef(onClose);
+  const onNombreProyectoRef = useRef(onNombreProyecto);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+    onNombreProyectoRef.current = onNombreProyecto;
+  }, [onClose, onNombreProyecto]);
+
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
@@ -64,20 +75,18 @@ export default function ProyectoOverlay({
       if (!pRes.ok) throw new Error("Proyecto no encontrado");
       const p = (await pRes.json()) as ProyectoConMarcas;
       setProyecto(p);
-      if (onNombreProyecto) {
-        onNombreProyecto(p.nombre || p.tienda);
-      }
+      onNombreProyectoRef.current?.(p.nombre || p.tienda);
       if (fRes.ok) {
         setFacturas((await fRes.json()) as FacturaConAdjuntos[]);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al cargar";
       toast(msg, "error");
-      onClose();
+      onCloseRef.current();
     } finally {
       setLoading(false);
     }
-  }, [proyectoId, toast, onClose, onNombreProyecto]);
+  }, [proyectoId, toast]);
 
   useEffect(() => {
     cargar();
@@ -259,13 +268,19 @@ export default function ProyectoOverlay({
                     {reabriendo ? "Reabriendo…" : "Reabrir"}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setShowAnular(true)}
-                  className="rounded-md border border-red-200 bg-white text-red-700 px-3 py-1.5 text-xs hover:bg-red-50 transition"
-                >
-                  Anular
-                </button>
+                {/* Anular solo visible desde 'por_cobrar' en adelante: evita
+                    mostrar acción destructiva durante la creación. */}
+                {proyecto.estado !== "abierto" && (
+                  <OverflowMenu
+                    items={[
+                      {
+                        label: "Anular proyecto",
+                        onClick: () => setShowAnular(true),
+                        destructive: true,
+                      },
+                    ]}
+                  />
+                )}
               </div>
             )}
           </div>

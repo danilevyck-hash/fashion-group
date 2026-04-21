@@ -93,15 +93,12 @@ export function FotoUploader({
         );
       }, 200);
       try {
-        const result = await onUpload(item.file);
+        await onUpload(item.file);
         clearInterval(interval);
-        setItems((prev) =>
-          prev.map((it) =>
-            it.id === item.id
-              ? { ...it, status: "success", progress: 100, result }
-              : it
-          )
-        );
+        // Subida OK: quitar el preview del uploader (la foto ya aparece en el
+        // grid final del contenedor). Evita duplicación visual.
+        URL.revokeObjectURL(item.previewUrl);
+        setItems((prev) => prev.filter((it) => it.id !== item.id));
       } catch (err: unknown) {
         clearInterval(interval);
         const message =
