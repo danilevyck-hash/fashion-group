@@ -523,11 +523,11 @@ function UploadPageInner() {
     const displayRows = bodyRows.slice(0, 100);
     const hasMore = bodyRows.length > 100;
     return (
-      <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg w-full max-w-[950px] max-h-[85vh] flex flex-col">
+      <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-2 sm:p-4">
+        <div className="bg-white rounded-lg w-full max-w-full sm:max-w-[950px] max-h-[90vh] sm:max-h-[85vh] flex flex-col">
           {/* Header */}
-          <div className="px-6 pt-5 pb-4 border-b border-gray-200 flex-shrink-0">
-            <div className="flex items-center gap-2 mb-3 text-xs text-gray-400">
+          <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-gray-200 flex-shrink-0">
+            <div className="hidden sm:flex items-center gap-2 mb-3 text-xs text-gray-400">
               <span className="w-5 h-5 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center text-[10px] font-medium"><svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg></span>
               <span>Archivo seleccionado</span>
               <div className="w-4 h-px bg-gray-300" />
@@ -537,6 +537,8 @@ function UploadPageInner() {
               <span className="w-5 h-5 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center text-[10px] font-medium">3</span>
               <span>Confirmar</span>
             </div>
+            {/* Mobile: stepper compacto */}
+            <p className="sm:hidden text-[10px] uppercase tracking-wider text-gray-400 mb-2">Paso 2 de 3 · Revisa los datos</p>
             <div className="flex justify-between items-start">
               <div>
                 <p className="font-semibold text-[15px]">{title}</p>
@@ -552,10 +554,44 @@ function UploadPageInner() {
             {!formatError && summary && <div className="mt-3">{summary}</div>}
           </div>
 
-          {/* Scrollable table */}
+          {/* Scrollable data — tabla en desktop, cards en mobile */}
           {bodyRows.length > 0 && (
             <div className="flex-1 overflow-auto min-h-0">
-              <table className="w-full text-[11px] border-collapse">
+              {/* Mobile: lista de cards por fila */}
+              <div className="sm:hidden divide-y divide-gray-100">
+                {displayRows.map((row, ri) => (
+                  <div
+                    key={ri}
+                    className={`px-3 py-2.5 ${row.hasError ? "bg-red-50/60" : ri % 2 === 0 ? "bg-white" : "bg-gray-50/30"}`}
+                    title={row.tooltip}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-[10px] text-gray-300 tabular-nums">#{ri + 1}</span>
+                      <span className={`text-xs font-semibold truncate ${row.hasError ? "text-red-700" : "text-gray-800"}`}>
+                        {row.cells[0] || "—"}
+                      </span>
+                    </div>
+                    {row.cells.slice(1).map((c, ci) => {
+                      if (!c) return null;
+                      const label = headerRow[ci + 1] || "";
+                      return (
+                        <div key={ci} className="flex items-start justify-between gap-2 text-[11px]">
+                          <span className="text-gray-400 uppercase tracking-wider text-[9px] shrink-0 mt-0.5">{label}</span>
+                          <span className={`text-right break-words ${row.hasError ? "text-red-700" : "text-gray-700"}`}>{c}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+                {hasMore && (
+                  <div className="py-3 text-center text-xs text-gray-500 bg-amber-50">
+                    Mostrando 100 de {bodyRows.length} filas. Las demás se procesarán al confirmar.
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop: tabla */}
+              <table className="hidden sm:table w-full text-xs sm:text-[11px] border-collapse">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-gray-50 border-b border-gray-200">
                     <th className="text-left px-2 py-2 text-gray-400 font-semibold text-[10px] uppercase tracking-wider w-8">#</th>
@@ -586,19 +622,19 @@ function UploadPageInner() {
           )}
 
           {/* Actions */}
-          <div className="px-6 py-4 border-t border-gray-200 flex-shrink-0">
+          <div className="px-4 sm:px-6 py-3 sm:py-4 border-t border-gray-200 flex-shrink-0">
             {warning && <div className="mb-3">{warning}</div>}
-            <div className="flex gap-3 items-center">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center">
             <button onClick={onConfirm} disabled={confirmDisabled}
-              className="bg-black text-white px-8 py-3 rounded-md text-sm font-semibold hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+              className="bg-black text-white px-6 sm:px-8 py-3 rounded-md text-sm font-semibold hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[44px]">
               <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
               {confirmLabel}
             </button>
             <button onClick={onCancel}
-              className="border border-gray-300 px-5 py-3 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition">
+              className="border border-gray-300 px-5 py-3 rounded-md text-sm text-gray-600 hover:bg-gray-50 transition min-h-[44px]">
               Cancelar
             </button>
-            {!confirmDisabled && <span className="text-xs text-gray-400 ml-2">Paso 3: Confirma para completar la carga</span>}
+            {!confirmDisabled && <span className="hidden sm:inline text-xs text-gray-400 ml-2">Paso 3: Confirma para completar la carga</span>}
             </div>
           </div>
         </div>
@@ -666,7 +702,7 @@ function UploadPageInner() {
                 </ol>
               </div>
             </details>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
               {cxcCompanies.map((co) => (
                 <div key={co.key}
                   className={`border rounded-lg p-4 transition cursor-pointer relative ${dragOver === co.key ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"} ${uploading === co.key ? "opacity-60 pointer-events-none" : ""}`}
@@ -729,7 +765,7 @@ function UploadPageInner() {
                 <p className="mt-2 text-blue-500">Nota: Multifashion se carga semanalmente. Las demas empresas se cargan mensualmente.</p>
               </div>
             </details>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
               {UPLOAD_EMPRESAS.map((co) => (
                 <div key={co.key}
                   className={`border rounded-lg p-4 transition cursor-pointer relative ${dragOver === co.key ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"} ${ventasUploading === co.name ? "opacity-60 pointer-events-none" : ""}`}
