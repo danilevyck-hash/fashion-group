@@ -45,7 +45,6 @@ interface FacturaFormProps {
 }
 
 type ItbmsOption = "0" | "7";
-type ModoMarca = "una" | "varias";
 
 interface DuplicadoItem {
   id: string;
@@ -139,45 +138,20 @@ export function FacturaForm({
   const editandoId = initial?.id ?? null;
 
   // ── Marcas ──
-  // Decidir modo inicial según initialMarcas / legacy del proyecto
-  const marcasBase: MarcaPorcentajeInput[] = useMemo(() => {
+  // Regla 50/50: cada marca asignada a la factura cubre 50% (fijo, no editable).
+  // El usuario solo elige cuáles marcas aplican; el porcentaje se persiste como 50.
+  const marcasInicialesIds: string[] = useMemo(() => {
     if (initialMarcas && initialMarcas.length > 0) {
-      return initialMarcas.map((m) => ({
-        marcaId: m.marcaId,
-        porcentaje: m.porcentaje,
-      }));
+      return initialMarcas.map((m) => m.marcaId);
     }
-    // Proyectos viejos traen marcas en proyecto.marcas (legacy).
     if (proyecto.marcas && proyecto.marcas.length > 0) {
-      return proyecto.marcas.map((m) => ({
-        marcaId: m.marca.id,
-        porcentaje: m.porcentaje,
-      }));
+      return proyecto.marcas.map((m) => m.marca.id);
     }
     return [];
   }, [initialMarcas, proyecto.marcas]);
 
-  const modoInicial: ModoMarca =
-    marcasBase.length === 1 && Math.abs(marcasBase[0].porcentaje - 100) < 0.01
-      ? "una"
-      : marcasBase.length > 1
-        ? "varias"
-        : "una";
-
-  const [modoMarca, setModoMarca] = useState<ModoMarca>(modoInicial);
-  // Una sola marca: sin preselección según decisión del producto.
-  const [marcaUnica, setMarcaUnica] = useState<string>(
-    marcasBase.length === 1 ? marcasBase[0].marcaId : "",
-  );
-  const [marcasMulti, setMarcasMulti] = useState<MarcaPorcentajeInput[]>(
-    marcasBase.length > 1
-      ? marcasBase
-      : marcasBase.length === 1
-        ? [marcasBase[0], { marcaId: "", porcentaje: 0 }]
-        : [
-            { marcaId: "", porcentaje: 50 },
-            { marcaId: "", porcentaje: 50 },
-          ],
+  const [marcasSel, setMarcasSel] = useState<Set<string>>(
+    () => new Set(marcasInicialesIds),
   );
 
   const subtotal = Number(subtotalStr) || 0;
@@ -187,27 +161,26 @@ export function FacturaForm({
   );
   const total = useMemo(() => round2(subtotal + itbms), [subtotal, itbms]);
 
-  // Validación de marcas
-  const marcasPayload: MarcaPorcentajeInput[] = useMemo(() => {
-    if (modoMarca === "una") {
-      if (!marcaUnica) return [];
-      return [{ marcaId: marcaUnica, porcentaje: 100 }];
-    }
-    return marcasMulti.filter((m) => m.marcaId);
-  }, [modoMarca, marcaUnica, marcasMulti]);
-
-  const sumaPct = marcasPayload.reduce(
-    (acc, m) => acc + (Number(m.porcentaje) || 0),
-    0,
+  // Payload final: cada marca seleccionada con porcentaje fijo 50.
+  const marcasPayload: MarcaPorcentajeInput[] = useMemo(
+    () =>
+      Array.from(marcasSel).map((marcaId) => ({
+        marcaId,
+        porcentaje: 50,
+      })),
+    [marcasSel],
   );
-  const sumaOk = Math.abs(sumaPct - 100) < 0.01;
-  const marcasDuplicadas = useMemo(() => {
-    const ids = marcasPayload.map((m) => m.marcaId);
-    return new Set(ids).size !== ids.length;
-  }, [marcasPayload]);
 
-  const marcasValidas =
-    marcasPayload.length > 0 && sumaOk && !marcasDuplicadas;
+  const marcasValidas = marcasPayload.length > 0;
+
+  function toggleMarca(marcaId: string) {
+    setMarcasSel((prev) => {
+      const next = new Set(prev);
+      if (next.has(marcaId)) next.delete(marcaId);
+      else next.add(marcaId);
+      return next;
+    });
+  }
 
   const pasoDatos =
     numeroFactura.trim().length > 0 &&
@@ -343,36 +316,6 @@ export function FacturaForm({
       return;
     }
     await ejecutarGuardar();
-  };
-
-  // ── UI helpers para marcas ──
-  const agregarMarcaMulti = () => {
-    const usadas = new Set(marcasMulti.map((m) => m.marcaId).filter(Boolean));
-    const disponible = marcasCatalogo.find((m) => !usadas.has(m.id));
-    setMarcasMulti([
-      ...marcasMulti,
-      { marcaId: disponible?.id ?? "", porcentaje: 0 },
-    ]);
-  };
-  const quitarMarcaMulti = (idx: number) => {
-    if (marcasMulti.length <= 1) return;
-    setMarcasMulti(marcasMulti.filter((_, i) => i !== idx));
-  };
-  const actualizarMarcaMulti = (
-    idx: number,
-    campo: keyof MarcaPorcentajeInput,
-    valor: string,
-  ) => {
-    setMarcasMulti(
-      marcasMulti.map((m, i) => {
-        if (i !== idx) return m;
-        if (campo === "porcentaje") {
-          const n = Number(valor);
-          return { ...m, porcentaje: Number.isFinite(n) ? n : 0 };
-        }
-        return { ...m, marcaId: valor };
-      }),
-    );
   };
 
   return (
@@ -603,156 +546,52 @@ export function FacturaForm({
       <PasoInstruccion
         numero={3}
         titulo="¿A qué marca(s) aplica esta factura?"
-        descripcion="La cobranza a cada marca se calcula sobre el total (subtotal + ITBMS)."
+        descripcion="Cada marca seleccionada cubre 50% del total (regla fija). El resto lo asume Fashion Group."
         completado={marcasValidas}
       >
-        <div className="space-y-3">
-          {/* Toggle modo */}
-          <div className="flex flex-col gap-2">
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-              <input
-                type="radio"
-                name="mk-modo-marca"
-                checked={modoMarca === "una"}
-                onChange={() => setModoMarca("una")}
-                className="accent-black"
-              />
-              Una sola marca al 100%
-            </label>
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-              <input
-                type="radio"
-                name="mk-modo-marca"
-                checked={modoMarca === "varias"}
-                onChange={() => setModoMarca("varias")}
-                className="accent-black"
-              />
-              Dividir entre varias marcas
-            </label>
-          </div>
-
-          {modoMarca === "una" ? (
-            <div>
-              <label htmlFor="mk-una-marca" className="block text-xs text-gray-500 mb-1">
-                Marca
-              </label>
-              <select
-                id="mk-una-marca"
-                value={marcaUnica}
-                onChange={(e) => setMarcaUnica(e.target.value)}
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none bg-white"
-              >
-                <option value="">Elige una marca…</option>
-                {marcasCatalogo.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.nombre}
-                  </option>
-                ))}
-              </select>
-              {marcaUnica && total > 0 && (
-                <div className="mt-2 text-xs text-gray-500">
-                  Cobrable a {marcasCatalogo.find((m) => m.id === marcaUnica)?.nombre}: {" "}
-                  <span className="font-mono tabular-nums text-gray-900">{formatearMonto(total)}</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {marcasMulti.map((m, idx) => {
-                const cobrable = (total * Number(m.porcentaje || 0)) / 100;
-                const nombreMarca = marcasCatalogo.find((c) => c.id === m.marcaId)?.nombre;
-                return (
-                  <div key={idx} className="flex items-end gap-2">
-                    <div className="flex-1">
-                      <label
-                        htmlFor={`mk-multi-marca-${idx}`}
-                        className="block text-xs text-gray-500 mb-1"
-                      >
-                        Marca
-                      </label>
-                      <select
-                        id={`mk-multi-marca-${idx}`}
-                        value={m.marcaId}
-                        onChange={(e) => actualizarMarcaMulti(idx, "marcaId", e.target.value)}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none bg-white"
-                      >
-                        <option value="">Elige una marca…</option>
-                        {marcasCatalogo.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.nombre}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="w-20">
-                      <label
-                        htmlFor={`mk-multi-pct-${idx}`}
-                        className="block text-xs text-gray-500 mb-1"
-                      >
-                        %
-                      </label>
-                      <input
-                        id={`mk-multi-pct-${idx}`}
-                        type="number"
-                        min={0}
-                        max={100}
-                        step={1}
-                        value={m.porcentaje}
-                        onChange={(e) => actualizarMarcaMulti(idx, "porcentaje", e.target.value)}
-                        className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm tabular-nums focus:border-black focus:outline-none"
-                      />
-                    </div>
-                    <div className="w-24 pb-2">
-                      {nombreMarca && total > 0 ? (
-                        <div className="text-xs text-gray-500 text-right font-mono tabular-nums">
-                          {formatearMonto(cobrable)}
-                        </div>
-                      ) : null}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => quitarMarcaMulti(idx)}
-                      disabled={marcasMulti.length <= 1}
-                      aria-label="Quitar marca"
-                      className="rounded-md border border-gray-300 bg-white text-gray-600 w-10 h-10 flex items-center justify-center hover:bg-gray-50 disabled:opacity-40"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                        <line x1="5" y1="12" x2="19" y2="12" />
-                      </svg>
-                    </button>
-                  </div>
-                );
-              })}
-              <button
-                type="button"
-                onClick={agregarMarcaMulti}
-                disabled={marcasMulti.length >= marcasCatalogo.length}
-                className="text-sm text-gray-600 hover:text-black transition disabled:opacity-40"
-              >
-                + Agregar marca
-              </button>
-
-              <div
-                className={`text-xs font-medium tabular-nums mt-1 ${
-                  marcasDuplicadas
-                    ? "text-red-600"
-                    : sumaOk
-                      ? "text-emerald-700"
-                      : "text-red-600"
+        <div className="space-y-2">
+          {marcasCatalogo.map((m) => {
+            const checked = marcasSel.has(m.id);
+            const cobrable = total * 0.5;
+            return (
+              <label
+                key={m.id}
+                className={`flex items-center justify-between gap-3 px-3 py-2 rounded-md border cursor-pointer transition ${
+                  checked
+                    ? "border-black bg-gray-50"
+                    : "border-gray-200 hover:border-gray-300"
                 }`}
-                aria-live="polite"
               >
-                {marcasDuplicadas
-                  ? "✗ Marca duplicada"
-                  : sumaOk
-                    ? `Total: ${sumaPct}% ✓`
-                    : `Total: ${sumaPct}% ✗ ${
-                        sumaPct < 100
-                          ? `falta ${(100 - sumaPct).toFixed(0)}%`
-                          : `sobra ${(sumaPct - 100).toFixed(0)}%`
-                      }`}
-              </div>
-            </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleMarca(m.id)}
+                    className="accent-black w-4 h-4"
+                  />
+                  <span className="text-sm text-gray-800">{m.nombre}</span>
+                  <span className="text-[11px] text-gray-400">50%</span>
+                </div>
+                {checked && total > 0 && (
+                  <span className="text-xs font-mono tabular-nums text-gray-700">
+                    {formatearMonto(cobrable)}
+                  </span>
+                )}
+              </label>
+            );
+          })}
+          {marcasCatalogo.length === 0 && (
+            <p className="text-xs text-gray-500">
+              No hay marcas configuradas en el catálogo.
+            </p>
+          )}
+          {marcasSel.size === 0 && (
+            <p
+              className="text-xs text-red-600 mt-1"
+              aria-live="polite"
+            >
+              Selecciona al menos una marca.
+            </p>
           )}
         </div>
       </PasoInstruccion>

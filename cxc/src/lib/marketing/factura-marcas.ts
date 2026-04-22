@@ -1,22 +1,25 @@
 // ============================================================================
 // Marketing — helpers para % de marcas a nivel FACTURA (Fase 1 del refactor)
 // ============================================================================
-// Lee/escribe en la tabla mk_factura_marcas. NO modifica mk_proyecto_marcas,
-// que sigue siendo la fuente en producción hasta Fase 2+.
+// Lee/escribe en la tabla mk_factura_marcas.
 //
-// Reglas de negocio:
-//   - La suma de porcentajes por factura debe ser exactamente 100.
-//   - Cobrable por marca = factura.total × porcentaje / 100 (incluye ITBMS).
+// Reglas de negocio (vigentes desde la nueva regla 50/50):
+//   - Cada marca asignada a una factura cubre SIEMPRE 50% (regla fija, no
+//     editable). El resto se asume Fashion Group.
+//   - Cobrable por marca = factura.total × 50 / 100 = factura.total × 0.5.
+//   - El campo `porcentaje` se preserva en la DB para no romper consultas
+//     históricas, pero al escribir se fuerza 50.
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
 import type { MarcaConPorcentaje, MkMarca } from "./types";
 
-const EPSILON = 0.01;
+// Regla 50/50: cada marca asignada a una factura recibe siempre 50%.
+export const PORCENTAJE_MARCA_FIJO = 50;
 
 interface MarcaPorcentajeInput {
   marcaId: string;
-  porcentaje: number;
+  porcentaje?: number; // ignorado: siempre se persiste 50.
 }
 
 function mapMarca(row: Record<string, unknown>): MkMarca {
@@ -68,14 +71,13 @@ export async function getMarcasDeFactura(
 }
 
 /**
- * Reemplaza todas las marcas de una factura en una transacción lógica:
- *   1. Valida que suma de porcentajes == 100 y que no haya marcas duplicadas.
+ * Reemplaza todas las marcas de una factura.
+ *   1. Valida marcaIds únicas y >= 1 entrada.
  *   2. Borra filas existentes de mk_factura_marcas para esa factura.
- *   3. Inserta las nuevas filas.
+ *   3. Inserta las nuevas filas con porcentaje = PORCENTAJE_MARCA_FIJO (50).
  *
- * Si el insert falla, la factura queda sin marcas — el caller debe reintentar.
- * Supabase no soporta transacciones multi-statement desde JS; la ventana de
- * inconsistencia es milisegundos.
+ * Cualquier `porcentaje` que llegue en `marcas` se ignora — la regla 50/50
+ * es fija a nivel de negocio.
  */
 export async function setMarcasDeFactura(
   facturaId: string,
@@ -86,7 +88,7 @@ export async function setMarcasDeFactura(
     throw new Error("Debe especificar al menos una marca");
   }
 
-  // Validación: marcaIds únicas
+  // Validación: marcaIds únicas y no vacías
   const ids = new Set<string>();
   for (const m of marcas) {
     if (!m.marcaId) throw new Error("marcaId vacío en alguna entrada");
@@ -94,23 +96,6 @@ export async function setMarcasDeFactura(
       throw new Error(`Marca duplicada en el input: ${m.marcaId}`);
     }
     ids.add(m.marcaId);
-  }
-
-  // Validación: porcentajes dentro de rango (0, 100]
-  for (const m of marcas) {
-    if (!Number.isFinite(m.porcentaje) || m.porcentaje <= 0 || m.porcentaje > 100) {
-      throw new Error(
-        `Porcentaje inválido (${m.porcentaje}) para marca ${m.marcaId}`,
-      );
-    }
-  }
-
-  // Validación: suma == 100 (con tolerancia de centavos)
-  const suma = marcas.reduce((acc, m) => acc + Number(m.porcentaje), 0);
-  if (Math.abs(suma - 100) > EPSILON) {
-    throw new Error(
-      `La suma de porcentajes debe ser 100 (actual: ${round2(suma)})`,
-    );
   }
 
   // Borrar filas existentes
@@ -122,11 +107,11 @@ export async function setMarcasDeFactura(
     throw new Error(`setMarcasDeFactura[delete]: ${delError.message}`);
   }
 
-  // Insertar nuevas
+  // Insertar nuevas — porcentaje siempre 50, ignoramos el input.
   const payload = marcas.map((m) => ({
     factura_id: facturaId,
     marca_id: m.marcaId,
-    porcentaje: round2(m.porcentaje),
+    porcentaje: PORCENTAJE_MARCA_FIJO,
   }));
   const { error: insError } = await supabaseServer
     .from("mk_factura_marcas")

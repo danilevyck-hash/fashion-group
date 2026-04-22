@@ -120,18 +120,21 @@ function mesEjecucion(isoString: string | null): string {
 }
 
 // ----------------------------------------------------------------------------
-// Excel maestro — 1 hoja plana, 1 fila por factura, fila TOTALES al final.
-// Diseño compacto inspirado en el Excel de referencia que usa Daniel.
+// Excel maestro — 1 hoja plana, 1 fila por factura, fila TOTALES con SUM().
 //
 // Columnas fijas:
-//   1. Mes ejecución   (formato "abril 2026" desde fecha_enviado)
+//   1. Mes ejecución   (formato "abril 2026" desde fecha_enviado / created_at)
 //   2. Cliente         (proyecto.tienda)
 //   3. Proveedor       (factura.proveedor)
 //   4. Detalle         (proyecto.nombre)
 //   5. Monto factura dólares (factura.total)
-// Columnas dinámicas (solo marcas asignadas al proyecto):
-//   - Cobrable [Marca]  (total × porcentaje / 100)
+// Columnas dinámicas (marcas asignadas al proyecto, en orden alfabético):
+//   - Cobrable [Marca]  (total × 0.5 — regla 50/50)
 // Última columna: Comentarios (vacía).
+//
+// Estilo: Arial 10/11, header fondo #1F1F1F texto blanco, bordes #BFBFBF,
+// formato moneda $#,##0.00 en montos, alineación texto izq / monto der,
+// freeze pane en fila 2.
 // ----------------------------------------------------------------------------
 function generarRespaldoExcel(
   proyecto: MkProyecto,
@@ -141,13 +144,18 @@ function generarRespaldoExcel(
   const mes = mesEjecucion(proyecto.fecha_enviado ?? proyecto.created_at ?? null);
   const detalle = proyecto.nombre ?? proyecto.tienda ?? "";
 
+  // Marcas en orden alfabético (estable entre descargas).
+  const marcasOrden = [...marcasDelProyecto].sort((a, b) =>
+    a.nombre.localeCompare(b.nombre, "es"),
+  );
+
   const header: string[] = [
     "Mes ejecución",
     "Cliente",
     "Proveedor",
     "Detalle",
     "Monto factura dólares",
-    ...marcasDelProyecto.map((m) => `Cobrable ${m.nombre}`),
+    ...marcasOrden.map((m) => `Cobrable ${m.nombre}`),
     "Comentarios",
   ];
 
@@ -160,71 +168,116 @@ function generarRespaldoExcel(
       detalle,
       round2(f.total),
     ];
-    for (const marca of marcasDelProyecto) {
-      const mm = f.marcas.find((m) => m.marca.id === marca.id);
-      row.push(mm ? round2((f.total * mm.porcentaje) / 100) : 0);
+    for (const marca of marcasOrden) {
+      const aplica = f.marcas.some((m) => m.marca.id === marca.id);
+      row.push(aplica ? round2(f.total * 0.5) : 0);
     }
     row.push(""); // Comentarios
     return row;
   });
 
-  // Fila TOTALES — label en columna "Proveedor" (índice 2),
-  // sumas en "Monto factura dólares" (índice 4) y cada Cobrable.
-  const sumCol = (idx: number): number =>
-    round2(rows.reduce((acc, r) => acc + (Number(r[idx]) || 0), 0));
-
-  const totalesRow: Celda[] = [
-    "",          // Mes ejecución
-    "",          // Cliente
-    "TOTALES",   // Proveedor
-    "",          // Detalle
-    sumCol(4),   // Monto factura dólares
+  // Construimos la matriz primero con valores numéricos para fila TOTALES,
+  // luego inyectamos fórmulas SUM(...) reales en esas celdas.
+  const placeholderTotales: Celda[] = [
+    "", "", "TOTALES", "", 0,
+    ...marcasOrden.map(() => 0),
+    "",
   ];
-  for (let i = 0; i < marcasDelProyecto.length; i++) {
-    totalesRow.push(sumCol(5 + i)); // cada Cobrable
-  }
-  totalesRow.push(""); // Comentarios
-
-  const aoa: Celda[][] = [header, ...rows, totalesRow];
+  const aoa: Celda[][] = [header, ...rows, placeholderTotales];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-  // Estilo: header y totales en negrita; bordes finos en todas las celdas.
   const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
-  const borderThin = { style: "thin", color: { rgb: "000000" } };
+  const lastDataRow = 1 + rows.length; // 1-indexed: fila después del header
+  const totalesRowIdx = range.e.r; // 0-indexed
+  const numMontoCol = 4; // Monto factura dólares
+  const cobrableCols: number[] = marcasOrden.map((_, i) => 5 + i);
+
+  // Inyectar fórmulas SUM en la fila TOTALES.
+  function colLetter(idx: number): string {
+    return XLSX.utils.encode_col(idx);
+  }
+  function setFormulaSum(colIdx: number) {
+    if (rows.length === 0) return;
+    const addr = XLSX.utils.encode_cell({ r: totalesRowIdx, c: colIdx });
+    const letter = colLetter(colIdx);
+    const formula = `SUM(${letter}2:${letter}${lastDataRow})`;
+    (ws as Record<string, unknown>)[addr] = { t: "n", f: formula };
+  }
+  setFormulaSum(numMontoCol);
+  for (const c of cobrableCols) setFormulaSum(c);
+
+  // ── Estilos ──
+  const borderThin = { style: "thin", color: { rgb: "BFBFBF" } };
   const borders = {
     top: borderThin,
     bottom: borderThin,
     left: borderThin,
     right: borderThin,
   };
+  const moneyFmt = "$#,##0.00";
 
-  for (let row = range.s.r; row <= range.e.r; row++) {
-    for (let col = range.s.c; col <= range.e.c; col++) {
-      const addr = XLSX.utils.encode_cell({ r: row, c: col });
+  // Texto: alineación izquierda. Montos: derecha.
+  const isMontoCol = (c: number): boolean =>
+    c === numMontoCol || cobrableCols.includes(c);
+
+  for (let r = range.s.r; r <= range.e.r; r++) {
+    for (let c = range.s.c; c <= range.e.c; c++) {
+      const addr = XLSX.utils.encode_cell({ r, c });
       const cell = (ws as Record<string, unknown>)[addr] as
-        | { v?: unknown; s?: unknown; t?: unknown }
+        | { v?: unknown; s?: unknown; t?: unknown; f?: unknown; z?: string }
         | undefined;
       if (!cell) continue;
-      const esHeader = row === 0;
-      const esTotales = row === range.e.r;
-      cell.s = {
-        font: { bold: esHeader || esTotales, sz: 10 },
-        alignment: { vertical: "center", wrapText: true },
-        border: borders,
+
+      const esHeader = r === 0;
+      const esTotales = r === totalesRowIdx;
+      const esMonto = isMontoCol(c);
+
+      const baseFont = {
+        name: "Arial",
+        sz: esHeader ? 11 : 10,
+        bold: esHeader || esTotales,
+        color: esHeader ? { rgb: "FFFFFF" } : { rgb: "000000" },
       };
+
+      const fill = esHeader
+        ? { patternType: "solid", fgColor: { rgb: "1F1F1F" } }
+        : esTotales
+          ? { patternType: "solid", fgColor: { rgb: "EFEFEF" } }
+          : undefined;
+
+      cell.s = {
+        font: baseFont,
+        alignment: {
+          vertical: "center",
+          horizontal: esMonto && !esHeader ? "right" : "left",
+          wrapText: true,
+        },
+        border: borders,
+        ...(fill ? { fill } : {}),
+      };
+
+      if (esMonto && !esHeader) {
+        cell.z = moneyFmt;
+      }
     }
   }
 
-  // Anchos: caben cómodamente en pantalla incluso con 2-3 marcas.
+  // Anchos de columna razonables.
   ws["!cols"] = [
     { wch: 16 }, // Mes ejecución
-    { wch: 20 }, // Cliente
-    { wch: 24 }, // Proveedor
-    { wch: 24 }, // Detalle
-    { wch: 16 }, // Monto factura dólares
-    ...marcasDelProyecto.map(() => ({ wch: 16 })), // Cobrable [Marca]
-    { wch: 24 }, // Comentarios
+    { wch: 22 }, // Cliente
+    { wch: 26 }, // Proveedor
+    { wch: 30 }, // Detalle
+    { wch: 18 }, // Monto factura dólares
+    ...marcasOrden.map(() => ({ wch: 18 })), // Cobrable [Marca]
+    { wch: 22 }, // Comentarios
   ];
+
+  // Freeze pane: header siempre visible al hacer scroll.
+  ws["!freeze"] = { xSplit: 0, ySplit: 1 } as unknown as Record<
+    string,
+    unknown
+  >;
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Facturas");

@@ -52,22 +52,22 @@ function autoNombreProyecto(
   return `${tiendaTitulo} · ${marcasStr} · ${mesCap} ${anio}`;
 }
 
-function validarSumaCien(marcas: ReadonlyArray<MarcaPorcentajeInput>): void {
+// Regla de negocio 50/50: cada marca asignada cubre 50% fijo, no editable.
+// Ya no validamos suma=100; un proyecto/factura puede tener 1+ marcas y cada
+// una pesa 50%. El resto se asume Fashion Group.
+const PORCENTAJE_MARCA_FIJO = 50;
+
+function validarMarcasUnicas(marcas: ReadonlyArray<MarcaPorcentajeInput>): void {
   if (!Array.isArray(marcas) || marcas.length === 0) {
-    throw new Error("Debes asignar al menos una marca al proyecto");
+    throw new Error("Debes asignar al menos una marca");
   }
-  const suma = marcas.reduce((acc, m) => acc + Number(m.porcentaje ?? 0), 0);
-  const diff = Math.abs(suma - 100);
-  if (diff > 0.01) {
-    throw new Error(
-      `La suma de porcentajes debe ser 100% (actual: ${suma.toFixed(2)}%)`
-    );
-  }
+  const ids = new Set<string>();
   for (const m of marcas) {
     if (!m.marcaId) throw new Error("marcaId requerido");
-    if (typeof m.porcentaje !== "number" || m.porcentaje <= 0 || m.porcentaje > 100) {
-      throw new Error("porcentaje debe estar entre 0 y 100");
+    if (ids.has(m.marcaId)) {
+      throw new Error(`Marca duplicada: ${m.marcaId}`);
     }
+    ids.add(m.marcaId);
   }
 }
 
@@ -85,7 +85,7 @@ export async function createProyecto(
   // sin marcas y estas se asignan por factura en mk_factura_marcas.
   const tieneMarcas = Array.isArray(input.marcas) && input.marcas.length > 0;
   if (tieneMarcas) {
-    validarSumaCien(input.marcas);
+    validarMarcasUnicas(input.marcas);
   }
 
   let nombresMarcas: string[] = [];
@@ -129,7 +129,7 @@ export async function createProyecto(
     const pmPayload = input.marcas.map((m) => ({
       proyecto_id: proyecto.id,
       marca_id: m.marcaId,
-      porcentaje: round2(m.porcentaje),
+      porcentaje: PORCENTAJE_MARCA_FIJO,
     }));
     const { error: pmError } = await supabaseServer
       .from("mk_proyecto_marcas")
@@ -301,7 +301,7 @@ export async function updateProyectoMarcas(
   marcas: ReadonlyArray<MarcaPorcentajeInput>
 ): Promise<void> {
   if (!proyectoId) throw new Error("proyectoId requerido");
-  validarSumaCien(marcas);
+  validarMarcasUnicas(marcas);
 
   const { error: delError } = await supabaseServer
     .from("mk_proyecto_marcas")
@@ -312,7 +312,7 @@ export async function updateProyectoMarcas(
   const payload = marcas.map((m) => ({
     proyecto_id: proyectoId,
     marca_id: m.marcaId,
-    porcentaje: round2(m.porcentaje),
+    porcentaje: PORCENTAJE_MARCA_FIJO,
   }));
   const { error: insError } = await supabaseServer
     .from("mk_proyecto_marcas")
