@@ -82,7 +82,15 @@ function clearSessionAndRedirect(req: NextRequest, pathname: string): NextRespon
 }
 
 export async function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const { pathname, searchParams } = req.nextUrl;
+
+  // Legacy URL redirects — preserve bookmarks from WhatsApp / email.
+  // Ejecutar ANTES del auth check para que el redirect funcione sin sesión
+  // (middleware igual redirigirá a login en el destino si hace falta).
+  if (pathname === "/guias" && searchParams.get("id")) {
+    const id = searchParams.get("id")!;
+    return NextResponse.redirect(new URL(`/guias/${id}/imprimir`, req.url));
+  }
 
   // Allow public paths
   if (PUBLIC_PATHS.includes(pathname)) return NextResponse.next();

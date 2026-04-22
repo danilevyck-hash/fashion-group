@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import type { Guia } from "./types";
 import PrintDocument from "./PrintDocument";
 
@@ -10,15 +9,10 @@ interface GuiaDetailProps {
 }
 
 export default function GuiaDetail({ guia, onBack }: GuiaDetailProps) {
-  const router = useRouter();
-  function handleBack() {
-    router.replace("/guias");
-    onBack();
-  }
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       <div className="flex items-center gap-4 mb-8 no-print">
-        <button onClick={handleBack} className="text-sm text-gray-400 hover:text-black transition">
+        <button onClick={onBack} className="text-sm text-gray-400 hover:text-black transition">
           ← Guías
         </button>
         <button

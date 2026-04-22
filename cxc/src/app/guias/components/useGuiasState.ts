@@ -5,17 +5,11 @@
 // edición, vista (form/list/print) ni editingId — todo eso se resolvió al
 // mover el form a rutas dedicadas.
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
-import type { Guia, View } from "./types";
+import { useState, useCallback } from "react";
+import type { Guia } from "./types";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
 
 export function useGuiasState() {
-  const router = useRouter();
-  // 'view' queda para soportar solo dos ramas: list y print (vista de
-  // impresión inline vía ?id= en la URL). El form se fue a rutas dedicadas.
-  const [view, _setView] = useState<View>("list");
-
   const [guias, setGuias] = useState<Guia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,9 +43,6 @@ export function useGuiasState() {
     _setPendingFirma2(v);
     try { if (expandedId) { if (v) localStorage.setItem(`guia_firma_${expandedId}_entregador`, v); else localStorage.removeItem(`guia_firma_${expandedId}_entregador`); } } catch { /* */ }
   }
-
-  // Print state
-  const [printGuia, setPrintGuia] = useState<Guia | null>(null);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -135,28 +126,6 @@ export function useGuiasState() {
     loadGuias();
   }
 
-  async function openPrint(id: string) {
-    try {
-      const res = await fetch(`/api/guias/${id}`);
-      if (res.ok) {
-        const g = await res.json();
-        setPrintGuia(g);
-        _setView("print");
-        router.replace(`/guias?id=${id}`);
-      } else {
-        showToast("Error al cargar guía");
-      }
-    } catch {
-      showToast("Error al cargar guía");
-    }
-  }
-
-  function closePrint() {
-    setPrintGuia(null);
-    _setView("list");
-    router.replace("/guias");
-  }
-
   async function confirmarDespacho(firma1: string, firma2: string) {
     if (!expandedGuia) return;
     setBSaving(true);
@@ -217,11 +186,7 @@ export function useGuiasState() {
     }
   }
 
-  // Back-compat: algunos consumidores hacen s._setView("list") al navegar atrás.
-  useEffect(() => { /* noop */ }, []);
-
   return {
-    view, _setView,
     guias, loading, error,
     search, setSearch,
     showPending, setShowPending,
@@ -234,7 +199,6 @@ export function useGuiasState() {
     bSaving,
     pendingFirma1, setPendingFirma1,
     pendingFirma2, setPendingFirma2,
-    printGuia, setPrintGuia, openPrint, closePrint,
     toast, showToast,
     loadGuias,
     confirmDeleteId, setConfirmDeleteId,

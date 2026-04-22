@@ -8,7 +8,6 @@ import { Toast, PullToRefresh } from "@/components/ui";
 import { useGuiasState } from "./components/useGuiasState";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import GuiasList from "./components/GuiasList";
-import GuiaDetail from "./components/GuiaDetail";
 
 function GuiaDeleteModal({
   open,
@@ -93,46 +92,9 @@ export default function GuiasPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authChecked]);
 
-  useEffect(() => {
-    function onPopState() {
-      const params = new URLSearchParams(window.location.search);
-      const id = params.get("id");
-      if (id) {
-        s.openPrint(id);
-      } else {
-        s._setView("list");
-        s.setPrintGuia(null);
-      }
-    }
-    window.addEventListener("popstate", onPopState);
-    const params = new URLSearchParams(window.location.search);
-    const urlId = params.get("id");
-    if (urlId && authChecked) s.openPrint(urlId);
-    return () => window.removeEventListener("popstate", onPopState);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authChecked]);
-
   if (!authChecked) return null;
 
-  // ── PRINT VIEW ── (mismo patrón anterior)
-  if (s.view === "print" && s.printGuia) {
-    return (
-      <div>
-        <div className="print:hidden">
-          <AppHeader
-            module="Guías de Transporte"
-            breadcrumbs={[{ label: `GT-${String(s.printGuia.numero).padStart(3, "0")}` }, { label: "Imprimir" }]}
-          />
-        </div>
-        <GuiaDetail
-          guia={s.printGuia}
-          onBack={() => { s.loadGuias(); s._setView("list"); }}
-        />
-      </div>
-    );
-  }
-
-  // ── LIST VIEW ── (única vista en /guias; crear/editar están en rutas dedicadas)
+  // ── LIST VIEW ── (única vista en /guias; crear/editar/imprimir están en rutas dedicadas)
   return (
     <PullToRefresh onRefresh={s.loadGuias}>
       <div>
@@ -169,7 +131,7 @@ export default function GuiasPage() {
           onFirma1Change={s.setPendingFirma1}
           onFirma2Change={s.setPendingFirma2}
           onEdit={(id) => router.push(`/guias/${id}/editar`)}
-          onPrint={s.openPrint}
+          onPrint={(id) => router.push(`/guias/${id}/imprimir`)}
           onDelete={s.requestDeleteGuia}
           onReject={s.rejectGuia}
           readOnly={guiasReadonly}
