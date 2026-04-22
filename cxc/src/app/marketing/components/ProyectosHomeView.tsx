@@ -10,6 +10,7 @@ import { EstadoBadge } from "@/components/marketing";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmModal } from "@/components/ui";
+import OverflowMenu from "@/components/ui/OverflowMenu";
 
 type FiltroEstado =
   | "activos"
@@ -91,6 +92,11 @@ export default function ProyectosHomeView({
   >(null);
   const [accionLoading, setAccionLoading] = useState(false);
   const [zipLoadingId, setZipLoadingId] = useState<string | null>(null);
+  const [anularPendiente, setAnularPendiente] = useState<
+    { id: string; nombre: string } | null
+  >(null);
+  const [anularMotivo, setAnularMotivo] = useState("");
+  const [anulando, setAnulando] = useState(false);
 
   // Debounce de búsqueda
   useEffect(() => {
@@ -186,6 +192,33 @@ export default function ProyectosHomeView({
       );
     } finally {
       setZipLoadingId(null);
+    }
+  };
+
+  const ejecutarAnular = async () => {
+    if (!anularPendiente || !anularMotivo.trim()) return;
+    setAnulando(true);
+    try {
+      const res = await fetch(
+        `/api/marketing/proyectos/${anularPendiente.id}/anular`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ motivo: anularMotivo.trim() }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error ?? "No se pudo anular");
+      }
+      toast("Proyecto anulado", "success");
+      setAnularPendiente(null);
+      setAnularMotivo("");
+      cargar();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Error al anular", "error");
+    } finally {
+      setAnulando(false);
     }
   };
 
@@ -478,6 +511,26 @@ export default function ProyectosHomeView({
                   >
                     {zipLoadingId === p.id ? "Descargando…" : "Descargar ZIP"}
                   </button>
+                  <div
+                    className="ml-auto"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <OverflowMenu
+                      items={[
+                        {
+                          label: "Anular proyecto",
+                          onClick: () => {
+                            setAnularPendiente({
+                              id: p.id,
+                              nombre: p.nombre || p.tienda,
+                            });
+                            setAnularMotivo("");
+                          },
+                          destructive: true,
+                        },
+                      ]}
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -494,6 +547,57 @@ export default function ProyectosHomeView({
         confirmLabel={labelConfirm}
         loading={accionLoading}
       />
+
+      {anularPendiente && (
+        <div
+          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center"
+          onClick={() => !anulando && setAnularPendiente(null)}
+        >
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold mb-1">Anular proyecto</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Vas a anular &ldquo;{anularPendiente.nombre}&rdquo;. Podrás
+              restaurarlo desde Papelera.
+            </p>
+            <label
+              htmlFor="mk-motivo-anular-card"
+              className="block text-sm text-gray-600 mb-1"
+            >
+              Motivo<span className="text-red-500 ml-0.5">*</span>
+            </label>
+            <textarea
+              id="mk-motivo-anular-card"
+              rows={3}
+              value={anularMotivo}
+              onChange={(e) => setAnularMotivo(e.target.value)}
+              placeholder="Explica por qué se anula"
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none mb-4"
+            />
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={ejecutarAnular}
+                disabled={anulando || anularMotivo.trim().length === 0}
+                className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] disabled:opacity-50 transition"
+              >
+                {anulando ? "Anulando…" : "Anular proyecto"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAnularPendiente(null)}
+                disabled={anulando}
+                className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

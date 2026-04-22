@@ -2,9 +2,9 @@
 
 // Fase 4: overlay simplificado con workflow abierto → enviado → cobrado.
 // Tabs: Facturas, Fotos. Sin "Cobrar" tab ni cobranzas como entidad.
-// Las acciones de workflow (marcar enviado/cobrado, reabrir, descargar ZIP)
-// viven en cada card del listado de proyectos. Aquí en el modal solo dejamos
-// "Descargar ZIP" (conveniencia) y "Anular" (vía OverflowMenu).
+// El modal solo edita datos del proyecto. TODAS las acciones de workflow
+// (marcar enviado/cobrado, reabrir, descargar ZIP, anular) viven en las
+// cards del listado.
 
 import {
   useCallback,
@@ -14,7 +14,6 @@ import {
   useState,
 } from "react";
 import { useToast } from "@/components/ToastSystem";
-import OverflowMenu from "@/components/ui/OverflowMenu";
 import { EstadoBadge, MarcaBadge } from "@/components/marketing";
 import {
   formatearFecha,
@@ -53,14 +52,6 @@ export default function ProyectoOverlay({
   const [facturas, setFacturas] = useState<FacturaConAdjuntos[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("facturas");
-
-  // Anular (única transición que vive en el modal — el resto vive en las cards)
-  const [showAnular, setShowAnular] = useState(false);
-  const [anularMotivo, setAnularMotivo] = useState("");
-  const [anulando, setAnulando] = useState(false);
-
-  // Descarga ZIP
-  const [descargando, setDescargando] = useState(false);
 
   // Refs estables para callbacks del parent
   const onCloseRef = useRef(onClose);
@@ -128,59 +119,6 @@ export default function ProyectoOverlay({
     });
   }, [proyecto, totales.total]);
 
-  const handleAnular = async () => {
-    if (!proyecto || !anularMotivo.trim()) return;
-    setAnulando(true);
-    try {
-      const res = await fetch(
-        `/api/marketing/proyectos/${proyecto.id}/anular`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ motivo: anularMotivo.trim() }),
-        },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo anular");
-      }
-      toast("Proyecto anulado", "success");
-      onChange();
-      onClose();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error";
-      toast(msg, "error");
-    } finally {
-      setAnulando(false);
-    }
-  };
-
-  const handleDescargarZip = async () => {
-    if (!proyecto) return;
-    setDescargando(true);
-    try {
-      const res = await fetch(
-        `/api/marketing/proyectos/${proyecto.id}/datos-zip`,
-        { cache: "no-store" },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo preparar el ZIP");
-      }
-      const data = await res.json();
-      const { generarZipProyecto } = await import(
-        "@/lib/marketing/generar-zip"
-      );
-      await generarZipProyecto(data);
-      toast("ZIP descargado", "success");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error descargando ZIP";
-      toast(msg, "error");
-    } finally {
-      setDescargando(false);
-    }
-  };
-
   if (loading || !proyecto) {
     return (
       <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center sm:justify-center">
@@ -195,21 +133,7 @@ export default function ProyectoOverlay({
   }
 
   const esCobrado = proyecto.estado === "cobrado";
-  const esEnviado = proyecto.estado === "enviado";
   const puedeEditar = !esCobrado && !proyecto.anulado_en;
-
-  const overflowItems: Array<{
-    label: string;
-    onClick: () => void;
-    destructive?: boolean;
-  }> = [];
-  if (!esCobrado && !proyecto.anulado_en) {
-    overflowItems.push({
-      label: "Anular proyecto",
-      onClick: () => setShowAnular(true),
-      destructive: true,
-    });
-  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center sm:justify-center">
@@ -217,28 +141,27 @@ export default function ProyectoOverlay({
         className="relative w-full bg-white sm:max-w-4xl lg:max-w-5xl sm:rounded-lg rounded-t-2xl max-h-[95vh] overflow-y-auto border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header sticky con acciones */}
+        {/* Header sticky — solo navegación + título + estado.
+            Las acciones de workflow viven en las cards del listado. */}
         <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 z-10">
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="text-sm text-gray-600 hover:text-black transition"
+              className="text-sm text-gray-600 hover:text-black transition shrink-0"
             >
               ← Listo
             </button>
-            <div className="flex items-center gap-2">
-              {(esEnviado || esCobrado) && (
-                <button
-                  type="button"
-                  onClick={handleDescargarZip}
-                  disabled={descargando}
-                  className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50 transition"
-                >
-                  {descargando ? "Descargando…" : "Descargar ZIP"}
-                </button>
+            <div className="flex-1 min-w-0 flex items-center gap-2">
+              <span className="text-sm font-medium text-gray-800 truncate">
+                {proyecto.nombre || proyecto.tienda}
+              </span>
+              <EstadoBadge estado={proyecto.estado} />
+              {proyecto.anulado_en && (
+                <span className="text-[10px] px-2 py-0.5 rounded bg-red-50 text-red-700 font-medium shrink-0">
+                  Anulado
+                </span>
               )}
-              {overflowItems.length > 0 && <OverflowMenu items={overflowItems} />}
             </div>
           </div>
         </div>
@@ -415,56 +338,6 @@ export default function ProyectoOverlay({
             />
           )}
         </div>
-
-        {showAnular && (
-          <div
-            className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center"
-            onClick={() => !anulando && setShowAnular(false)}
-          >
-            <div className="absolute inset-0 bg-black/40" />
-            <div
-              className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 className="text-base font-semibold mb-1">Anular proyecto</h3>
-              <p className="text-sm text-gray-500 mb-4">
-                Podrás restaurarlo desde Papelera.
-              </p>
-              <label
-                htmlFor="mk-motivo-anular-proy"
-                className="block text-sm text-gray-600 mb-1"
-              >
-                Motivo<span className="text-red-500 ml-0.5">*</span>
-              </label>
-              <textarea
-                id="mk-motivo-anular-proy"
-                rows={3}
-                value={anularMotivo}
-                onChange={(e) => setAnularMotivo(e.target.value)}
-                placeholder="Explica por qué se anula"
-                className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none mb-4"
-              />
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={handleAnular}
-                  disabled={anulando || anularMotivo.trim().length === 0}
-                  className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] disabled:opacity-50 transition"
-                >
-                  {anulando ? "Anulando…" : "Anular proyecto"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAnular(false)}
-                  disabled={anulando}
-                  className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
