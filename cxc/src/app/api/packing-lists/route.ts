@@ -37,6 +37,7 @@ async function saveSinglePL(
   totalBultos: number,
   totalPiezas: number,
   plItems: PLIndexRow[],
+  parserMetadata?: Record<string, unknown>,
 ): Promise<{ id: string } | { error: string }> {
   const pl_header = {
     numero_pl: numeroPL,
@@ -58,6 +59,7 @@ async function saveSinglePL(
   const { data, error } = await supabaseServer.rpc("save_packing_list", {
     pl_header,
     pl_items_payload,
+    pl_parser_metadata: parserMetadata ?? {},
   });
 
   if (error) {
@@ -85,6 +87,7 @@ export async function POST(req: NextRequest) {
       const result = await saveSinglePL(
         pl.numeroPL, pl.empresa, pl.fechaEntrega,
         pl.totalBultos, pl.totalPiezas, plItems,
+        pl.parserMetadata,
       );
       if ("error" in result) {
         results.push({ numeroPL: pl.numeroPL, error: result.error });

@@ -9,12 +9,19 @@ import { fmtDate } from "@/lib/format";
 import {
   parseMultiplePackingLists,
   buildIndex,
-  validateParsedPL,
   type ParsedPackingList,
   type PLIndexRow,
-  type PLValidationError,
   type RawLine,
 } from "@/lib/parse-packing-list";
+import {
+  type PLPreviewItem,
+  makePreviewItem,
+  applyPdfTotal,
+  applyClaudeResult,
+  setItemQty,
+  fetchClaudeFallback,
+  buildParserMetadata,
+} from "./preview-helpers";
 
 /** Convierte el nombre de empresa tal como está en DB a display legible.
  *  "VISTANA INTERNACIONAL PANAMA" → "Vistana"
@@ -50,6 +57,48 @@ interface PLRecord {
   created_at: string;
 }
 
+/** Badge editable de distribución por bulto. Click → input → blur guarda. */
+function EditableDistBadge({
+  bultoId, pcs, disabled, onChange,
+}: { bultoId: string; pcs: number; disabled: boolean; onChange: (n: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(pcs));
+  useEffect(() => { if (!editing) setValue(String(pcs)); }, [pcs, editing]);
+
+  if (editing && !disabled) {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] bg-white border border-indigo-400">
+        <span className="font-mono text-gray-500">{bultoId}:</span>
+        <input
+          type="number"
+          autoFocus
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={() => {
+            const n = parseInt(value, 10);
+            if (!isNaN(n) && n >= 0 && n !== pcs) onChange(n);
+            setEditing(false);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            if (e.key === "Escape") { setValue(String(pcs)); setEditing(false); }
+          }}
+          className="w-12 text-[11px] px-1 py-0 outline-none tabular-nums"
+        />
+      </span>
+    );
+  }
+  return (
+    <span
+      onClick={() => { if (!disabled) setEditing(true); }}
+      title={disabled ? undefined : "Click para editar"}
+      className={`inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600 tabular-nums ${disabled ? "" : "cursor-pointer hover:bg-indigo-50 hover:text-indigo-700"}`}
+    >
+      ({bultoId}: {pcs})
+    </span>
+  );
+}
+
 export default function PackingListsPage() {
   const { authChecked, role } = useAuth({
     moduleKey: "packing-lists",
@@ -60,13 +109,7 @@ export default function PackingListsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const collapseInitRef = useRef(false);
 
-  // Multi-PL preview item
-  interface PLPreviewItem {
-    parsed: ParsedPackingList;
-    index: PLIndexRow[];
-    errors: PLValidationError[];
-    existsInDB: boolean;
-  }
+  // PLPreviewItem tipo movido a preview-helpers.ts
 
   // State
   const [plList, setPlList] = useState<PLRecord[]>([]);
@@ -86,8 +129,12 @@ export default function PackingListsPage() {
   const [downloading, setDownloading] = useState(false);
   const [collapsedDays, setCollapsedDays] = useState<Set<string>>(new Set());
 
-  // Cualquier PL con errores de validación bloquea el guardado
-  const hasPreviewErrors = previewItems.some(i => i.errors.length > 0);
+  // PLs "guardables" = sin errores (o con errores resueltos vía override/Claude)
+  const saveablePreviewItems = useMemo(
+    () => previewItems.filter(i => i.errors.length === 0),
+    [previewItems],
+  );
+  const blockedPreviewItems = previewItems.length - saveablePreviewItems.length;
 
   const canEdit = role === "admin" || role === "secretaria";
 
@@ -218,6 +265,9 @@ export default function PackingListsPage() {
             index: indexRows,
             errors: [],
             existsInDB: true,
+            adjustments: {},
+            fallbackErrors: {},
+            fallbackInFlight: null,
           };
         })
       );
@@ -323,12 +373,7 @@ export default function PackingListsPage() {
       const existingNums = new Set(plList.map(p => p.numero_pl));
       const items: PLPreviewItem[] = parsedList
         .filter(p => p.bultos.length > 0) // skip empty sections
-        .map(parsed => ({
-          parsed,
-          index: buildIndex(parsed),
-          errors: validateParsedPL(parsed),
-          existsInDB: existingNums.has(parsed.numeroPL),
-        }));
+        .map(parsed => makePreviewItem(parsed, existingNums.has(parsed.numeroPL)));
 
       setPreviewItems(items);
       setExpandedPreview(null);
@@ -352,12 +397,58 @@ export default function PackingListsPage() {
     e.target.value = "";
   }
 
-  // Save all PLs (batch)
+  // ── Override manual / fallback Claude (Nivel 2 + Nivel 3) ──────────
+  function updatePreviewItem(numeroPL: string, update: (item: PLPreviewItem) => PLPreviewItem) {
+    setPreviewItems(prev => prev.map(i => i.parsed.numeroPL === numeroPL ? update(i) : i));
+  }
+
+  function handleApplyPdfTotal(numeroPL: string, bultoId: string) {
+    updatePreviewItem(numeroPL, item => applyPdfTotal(item, bultoId));
+  }
+
+  function handleSetItemQty(numeroPL: string, bultoId: string, estilo: string, newQty: number) {
+    updatePreviewItem(numeroPL, item => setItemQty(item, bultoId, estilo, newQty));
+  }
+
+  async function handleClaudeFallback(numeroPL: string, bultoId: string) {
+    const target = previewItems.find(i => i.parsed.numeroPL === numeroPL);
+    if (!target) return;
+    const bulto = target.parsed.bultos.find(b => b.id === bultoId);
+    if (!bulto) return;
+    const rawText = bulto.rawText || "";
+    if (!rawText) {
+      updatePreviewItem(numeroPL, item => ({
+        ...item,
+        fallbackErrors: { ...item.fallbackErrors, [bultoId]: "Sin texto crudo del bulto (reparsea el PDF)" },
+      }));
+      return;
+    }
+    updatePreviewItem(numeroPL, item => ({ ...item, fallbackInFlight: bultoId, fallbackErrors: { ...item.fallbackErrors, [bultoId]: "" } }));
+    try {
+      const estilos = await fetchClaudeFallback(rawText, bulto.totalPiezas);
+      updatePreviewItem(numeroPL, item => ({
+        ...applyClaudeResult(item, bultoId, estilos),
+        fallbackInFlight: null,
+      }));
+      setToast(`Bulto ${bultoId} resuelto con IA (${estilos.length} estilos)`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error desconocido";
+      updatePreviewItem(numeroPL, item => ({
+        ...item,
+        fallbackInFlight: null,
+        fallbackErrors: { ...item.fallbackErrors, [bultoId]: msg },
+      }));
+    }
+  }
+
+  // Save all saveable PLs (batch). Solo envía los PLs sin errores de validación;
+  // los bloqueados permanecen en preview para que el operador los edite o
+  // descarte manualmente. Cada PL escribe su propio parser_metadata.
   async function saveAllPLs() {
-    if (previewItems.length === 0) return;
+    if (saveablePreviewItems.length === 0) return;
     setUploading(true);
     try {
-      const packingLists = previewItems.map(item => ({
+      const packingLists = saveablePreviewItems.map(item => ({
         numeroPL: item.parsed.numeroPL,
         empresa: item.parsed.empresa,
         fechaEntrega: item.parsed.fechaEntrega,
@@ -365,6 +456,7 @@ export default function PackingListsPage() {
         totalPiezas: item.parsed.totalPiezas,
         totalEstilos: item.index.length,
         indexRows: item.index,
+        parserMetadata: buildParserMetadata(item),
       }));
 
       const res = await fetch("/api/packing-lists", {
@@ -375,7 +467,7 @@ export default function PackingListsPage() {
 
       if (res.ok) {
         const data = await res.json();
-        const justSaved = [...previewItems];
+        const justSaved = [...saveablePreviewItems];
         setSavedItems(justSaved);
         setSelectedForDownload(new Set(justSaved.map(i => i.parsed.numeroPL)));
         // Comparar totales del preview vs lo que quedó guardado en DB
@@ -394,7 +486,9 @@ export default function PackingListsPage() {
           }
         }
         setSaveMismatchWarning(mismatches);
-        setPreviewItems([]);
+        // Los PLs guardados desaparecen del preview; bloqueados permanecen
+        const savedNumeros = new Set(justSaved.map(i => i.parsed.numeroPL));
+        setPreviewItems(prev => prev.filter(i => !savedNumeros.has(i.parsed.numeroPL)));
         const saved = data.totalSaved || 0;
         const failed = data.totalFailed || 0;
         if (failed > 0) {
@@ -706,11 +800,15 @@ export default function PackingListsPage() {
               <div className="flex gap-2">
                 <button
                   onClick={saveAllPLs}
-                  disabled={uploading || hasPreviewErrors}
-                  title={hasPreviewErrors ? "Corrige los errores antes de guardar" : undefined}
+                  disabled={uploading || saveablePreviewItems.length === 0}
+                  title={saveablePreviewItems.length === 0 ? "Ningún PL está listo para guardar — resuelve los errores" : blockedPreviewItems > 0 ? `${blockedPreviewItems} PL${blockedPreviewItems !== 1 ? "s" : ""} con errores no se guardarán` : undefined}
                   className="px-5 py-2.5 bg-teal-600 text-white text-sm font-medium rounded-md hover:bg-teal-700 active:scale-[0.97] transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
                 >
-                  {uploading ? "Guardando..." : `Guardar ${previewItems.length} PL${previewItems.length !== 1 ? "s" : ""}`}
+                  {uploading
+                    ? "Guardando..."
+                    : blockedPreviewItems > 0
+                      ? `Guardar ${saveablePreviewItems.length} de ${previewItems.length} PLs`
+                      : `Guardar ${previewItems.length} PL${previewItems.length !== 1 ? "s" : ""}`}
                 </button>
                 <button
                   onClick={() => setPreviewItems([])}
@@ -757,15 +855,56 @@ export default function PackingListsPage() {
                   {/* Expandable detail */}
                   {isOpen && (
                     <div className="px-4 py-3 border-t border-gray-200 space-y-3">
-                      {/* Validation */}
+                      {/* Validation + botones de resolución */}
                       {hasErrors && (
                         <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                          <p className="text-xs font-semibold text-red-700 mb-1">Errores de validacion ({item.errors.length} bultos no cuadran)</p>
-                          <div className="text-xs text-red-600 space-y-0.5">
-                            {item.errors.map(e => (
-                              <p key={e.bultoId}>Bulto {e.bultoId}: PDF dice {e.pdfTotal} piezas, parser calculo {e.parserTotal} (dif: {e.diff})</p>
-                            ))}
+                          <p className="text-xs font-semibold text-red-700 mb-2">Bultos que no cuadran ({item.errors.length})</p>
+                          <div className="space-y-2">
+                            {item.errors.map(e => {
+                              const isLoading = item.fallbackInFlight === e.bultoId;
+                              const fallbackErr = item.fallbackErrors?.[e.bultoId];
+                              return (
+                                <div key={e.bultoId} className="bg-white border border-red-100 rounded p-2">
+                                  <p className="text-xs text-red-700">
+                                    Bulto <span className="font-mono font-bold">{e.bultoId}</span>: PDF dice {e.pdfTotal} piezas, parser calculó {e.parserTotal} (dif: {e.diff})
+                                  </p>
+                                  {fallbackErr && (
+                                    <p className="text-[11px] text-red-500 mt-1">IA: {fallbackErr}</p>
+                                  )}
+                                  <div className="flex gap-2 mt-2">
+                                    <button
+                                      onClick={() => handleApplyPdfTotal(item.parsed.numeroPL, e.bultoId)}
+                                      className="text-[11px] px-2.5 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 transition"
+                                    >
+                                      Usar total del PDF ({e.pdfTotal})
+                                    </button>
+                                    <button
+                                      onClick={() => handleClaudeFallback(item.parsed.numeroPL, e.bultoId)}
+                                      disabled={isLoading}
+                                      className="text-[11px] px-2.5 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition disabled:opacity-50"
+                                    >
+                                      {isLoading ? "Consultando IA..." : "Resolver con IA"}
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
+                          <p className="text-[11px] text-red-500 mt-2">
+                            &quot;Usar total del PDF&quot;: confía en el total del PDF y colapsa a 1 item. &quot;Resolver con IA&quot;: manda el texto del bulto a Claude y reconstruye el desglose por estilo.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Resumen de ajustes aplicados */}
+                      {Object.keys(item.adjustments).length > 0 && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 text-xs">
+                          <span className="font-semibold text-amber-800">Ajustes aplicados:</span>{" "}
+                          {Object.entries(item.adjustments).map(([bid, src], i, arr) => (
+                            <span key={bid} className="text-amber-700">
+                              {bid} ({src === "pdf_total" ? "total PDF" : src === "claude" ? "IA" : "manual"}){i < arr.length - 1 ? ", " : ""}
+                            </span>
+                          ))}
                         </div>
                       )}
                       {/* Estilos table */}
@@ -789,7 +928,13 @@ export default function PackingListsPage() {
                                   <td className="px-3 py-1.5 text-xs">
                                     <div className="flex flex-wrap gap-1">
                                       {Object.entries(row.distribution).map(([bultoId, pcs]) => (
-                                        <span key={bultoId} className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600">({bultoId}: {pcs})</span>
+                                        <EditableDistBadge
+                                          key={bultoId}
+                                          bultoId={bultoId}
+                                          pcs={pcs}
+                                          disabled={!canEdit}
+                                          onChange={(newPcs) => handleSetItemQty(item.parsed.numeroPL, bultoId, row.estilo, newPcs)}
+                                        />
                                       ))}
                                     </div>
                                   </td>

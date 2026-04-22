@@ -33,6 +33,7 @@ export interface PLBulto {
   items: PLBultoItem[];
   totalPiezas: number;
   sizeColumns: string[];  // e.g. ["S","M","L","XL","XX","32","34"]
+  rawText?: string;       // texto crudo del bulto (header + líneas), usado para fallback Claude
 }
 
 export interface ParsedPackingList {
@@ -347,6 +348,7 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
   let dimXPos = -1;    // X position of the "Dim" column header (start of size zone)
   let currentEstilo = "";
   let currentProducto = "";
+  let currentBultoBuffer: string[] = [];
 
   function saveBulto() {
     if (currentBultoId) {
@@ -355,6 +357,7 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
         items: Array.from(currentItemMap.values()),
         totalPiezas: currentBultoTotalPiezas,
         sizeColumns: currentSizeInfo.columns,
+        rawText: currentBultoBuffer.join("\n"),
       });
     }
   }
@@ -384,11 +387,15 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
       dimXPos = -1;
       currentEstilo = "";
       currentProducto = "";
+      currentBultoBuffer = [line];
       continue;
     }
 
     // Not inside a bulto yet
     if (!currentBultoId) continue;
+
+    // Acumular texto crudo del bulto para posible fallback Claude
+    currentBultoBuffer.push(line);
 
     // Detect "Total piezas" on a separate line (fallback)
     if (!currentBultoTotalPiezas) {
