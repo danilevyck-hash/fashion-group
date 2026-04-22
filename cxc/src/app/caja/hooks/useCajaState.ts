@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { CajaPeriodo, CajaGasto, CajaResponsable, View } from "../components/types";
 
 function normalizeStr(s: string): string {
@@ -10,6 +11,7 @@ function normalizeStr(s: string): string {
 }
 
 export function useCajaState(urlId: string, initialView: View) {
+  const router = useRouter();
   const [view, _setView] = useState<View>(initialView);
   const [pendingDeleteGasto, setPendingDeleteGasto] = useState<CajaGasto | null>(null);
   const [pendingRestoreGasto, setPendingRestoreGasto] = useState<CajaGasto | null>(null);
@@ -17,9 +19,9 @@ export function useCajaState(urlId: string, initialView: View) {
   function setView(v: View, id?: string) {
     _setView(v);
     if (v === "list") {
-      window.history.pushState(null, "", "/caja");
+      router.replace("/caja");
     } else if (id) {
-      window.history.pushState(null, "", `/caja?view=${v}&id=${id}`);
+      router.replace(`/caja?view=${v}&id=${id}`);
     }
   }
 

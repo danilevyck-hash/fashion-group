@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import type { PLIndexRow } from "@/lib/parse-packing-list";
@@ -27,6 +27,7 @@ export default function PackingListDetailPage() {
   });
 
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
 
   const [pl, setPl] = useState<PLDetail | null>(null);
@@ -393,7 +394,7 @@ export default function PackingListDetailPage() {
         <AppHeader
           module="Packing Lists"
           breadcrumbs={[
-            { label: "Historial", onClick: () => window.history.back() },
+            { label: "Historial", onClick: () => router.push("/packing-lists") },
             { label: `PL #${pl.numero_pl || "—"}` },
           ]}
         />

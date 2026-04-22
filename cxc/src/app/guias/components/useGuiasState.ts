@@ -6,10 +6,12 @@
 // mover el form a rutas dedicadas.
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import type { Guia, View } from "./types";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
 
 export function useGuiasState() {
+  const router = useRouter();
   // 'view' queda para soportar solo dos ramas: list y print (vista de
   // impresión inline vía ?id= en la URL). El form se fue a rutas dedicadas.
   const [view, _setView] = useState<View>("list");
@@ -140,13 +142,19 @@ export function useGuiasState() {
         const g = await res.json();
         setPrintGuia(g);
         _setView("print");
-        window.history.pushState({ guiaId: id }, "", `/guias?id=${id}`);
+        router.replace(`/guias?id=${id}`);
       } else {
         showToast("Error al cargar guía");
       }
     } catch {
       showToast("Error al cargar guía");
     }
+  }
+
+  function closePrint() {
+    setPrintGuia(null);
+    _setView("list");
+    router.replace("/guias");
   }
 
   async function confirmarDespacho(firma1: string, firma2: string) {
@@ -226,7 +234,7 @@ export function useGuiasState() {
     bSaving,
     pendingFirma1, setPendingFirma1,
     pendingFirma2, setPendingFirma2,
-    printGuia, setPrintGuia, openPrint,
+    printGuia, setPrintGuia, openPrint, closePrint,
     toast, showToast,
     loadGuias,
     confirmDeleteId, setConfirmDeleteId,

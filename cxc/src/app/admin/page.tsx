@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { fmt } from "@/lib/format";
@@ -128,10 +129,19 @@ function buildVendorMsg(vendorName: string, companyName: string, brand: string, 
 // ── Main Component ───────────────────────────────────────
 
 export default function AdminDashboard() {
+  return (
+    <Suspense>
+      <AdminDashboardInner />
+    </Suspense>
+  );
+}
+
+function AdminDashboardInner() {
   const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "director", "vendedor"] });
   const { clients, uploads, contactLog, loading, loadError, loadData, setContactLog } = useAdminData();
   usePersistedScroll("cxc", !loading && clients.length > 0);
-  const [search, setSearch] = useState("");
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get("search") || "");
   const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
 
   // Per-user empresa restriction (e.g. Edwin only sees Vistana International)

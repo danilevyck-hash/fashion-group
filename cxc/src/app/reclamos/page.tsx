@@ -88,10 +88,10 @@ function ReclamosPage() {
 
   function setView(v: RView, id?: string) {
     _setView(v);
-    if (v === "list") window.history.pushState(null, "", "/reclamos");
-    else if (v === "form" && id) window.history.pushState(null, "", `/reclamos?view=form&id=${id}`);
-    else if (v === "form") window.history.pushState(null, "", "/reclamos?view=form");
-    else if (v === "detail" && id) window.history.pushState(null, "", `/reclamos?view=detail&id=${id}`);
+    if (v === "list") router.replace("/reclamos");
+    else if (v === "form" && id) router.replace(`/reclamos?view=form&id=${id}`);
+    else if (v === "form") router.replace("/reclamos?view=form");
+    else if (v === "detail" && id) router.replace(`/reclamos?view=detail&id=${id}`);
   }
 
   const loadDetail = useCallback(async (id: string) => {
