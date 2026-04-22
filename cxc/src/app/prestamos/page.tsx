@@ -614,8 +614,8 @@ export default function PrestamosPage() {
 
       {/* ── Modal: New/Edit Employee ── */}
       {showEmpModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
             <h2 className="font-medium mb-4">{editingEmp ? "Editar Empleado" : "Nuevo Empleado"}</h2>
             <div className="space-y-4">
               <div>
@@ -651,8 +651,8 @@ export default function PrestamosPage() {
 
       {/* ── Modal: New Movement ── */}
       {showMovModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
             {movStep === "employee" && !mEmpleadoId ? (<>
               <h2 className="font-medium mb-4">Seleccionar Empleado</h2>
               <div className="space-y-1 max-h-80 overflow-y-auto">
