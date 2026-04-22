@@ -61,32 +61,22 @@ export async function POST(req: NextRequest) {
           : password.toLowerCase() === user.password.toLowerCase();
 
         if (match) {
-          // 1. Check per-user module overrides (fg_user_modules)
+          // Módulos por rol — fuente única: role_permissions.
+          // (Antes consultábamos fg_user_modules per-user, pero el sistema migró a
+          // permisos por rol; filas residuales en fg_user_modules overrideaban
+          // role_permissions y bloqueaban módulos legítimos. /api/admin/users
+          // ya documenta esto. Si role_permissions no responde, fallback a
+          // defaults hardcoded.)
           let modules: string[] = [];
           try {
-            const { data: userMods } = await supabaseServer
-              .from("fg_user_modules")
-              .select("module_key")
-              .eq("user_id", user.id)
-              .eq("enabled", true);
-            if (userMods && userMods.length > 0) {
-              modules = userMods.map((m: { module_key: string }) => m.module_key);
-            }
-          } catch { /* table may not exist */ }
+            const { data: rolePerm } = await supabaseServer
+              .from("role_permissions")
+              .select("modulos")
+              .eq("role", user.role)
+              .single();
+            if (rolePerm?.modulos) modules = rolePerm.modulos;
+          } catch { /* use defaults below if table missing */ }
 
-          // 2. Fall back to role_permissions
-          if (modules.length === 0) {
-            try {
-              const { data: rolePerm } = await supabaseServer
-                .from("role_permissions")
-                .select("modulos")
-                .eq("role", user.role)
-                .single();
-              if (rolePerm?.modulos) modules = rolePerm.modulos;
-            } catch { /* use defaults below if table missing */ }
-          }
-
-          // 3. Fallback to hardcoded defaults if no role_permissions entry
           if (modules.length === 0) {
             const ALL = ["cxc","guias","caja","directorio","reclamos","prestamos","ventas","upload","cheques","reebok","camisetas","marketing","packing-lists","catalogos"];
             const DEFAULTS: Record<string, string[]> = {

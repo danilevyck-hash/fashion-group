@@ -14,6 +14,8 @@ interface RolePermission {
   activo: boolean;
 }
 
+// Lista visible en el panel de admin para asignar permisos por rol.
+// Debe coincidir con ALL_MODULES de src/lib/modules.ts.
 const MODULES = [
   { key: "cxc", label: "CXC (Cuentas por Cobrar)" },
   { key: "guias", label: "Guías de Transporte" },
@@ -26,6 +28,9 @@ const MODULES = [
   { key: "upload", label: "Carga de Archivos" },
   { key: "reebok", label: "Catálogo Reebok" },
   { key: "camisetas", label: "Camisetas Selección" },
+  { key: "marketing", label: "Marketing (gastos compartidos)" },
+  { key: "packing-lists", label: "Packing Lists" },
+  { key: "catalogos", label: "Catálogos (Reebok, Joybees)" },
 ];
 
 const ROLE_LABELS: Record<string, string> = {
