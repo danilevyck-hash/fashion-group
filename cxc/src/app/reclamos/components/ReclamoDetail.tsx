@@ -561,8 +561,8 @@ export default function ReclamoDetail({
 
       {/* Aplicada modal */}
       {showAplicadaModal && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={() => setShowAplicadaModal(false)}>
-          <div className="bg-white rounded-lg p-8 max-w-sm w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center p-4" onClick={() => setShowAplicadaModal(false)}>
+          <div className="bg-white rounded-lg p-8 max-w-sm w-full max-h-[90vh] overflow-y-auto shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-base font-semibold mb-1">Aplicar Nota de Crédito</h3>
             <p className="text-sm text-gray-400 mb-6">Registra los datos de la nota de crédito recibida.</p>
             <div className="space-y-4 mb-6">
