@@ -124,6 +124,7 @@ function MarketingPage() {
               <HistorialView
                 marcas={marcas}
                 onOpenProyecto={(id) => navegar({ proyecto: id })}
+                onChange={refrescar}
                 refreshKey={refreshKey}
               />
             ) : (

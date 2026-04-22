@@ -42,8 +42,7 @@ export async function GET(req: NextRequest) {
           .select(
             "id, nombre, tienda, estado, created_at, anulado_en, fecha_enviado, fecha_cobrado",
           )
-          .is("anulado_en", null)
-          .order("created_at", { ascending: false });
+          .is("anulado_en", null);
         if (filtroEstado === "activos") {
           q = q.in("estado", ACTIVOS as unknown as string[]);
         } else if (filtroEstado === "historial") {
@@ -58,6 +57,15 @@ export async function GET(req: NextRequest) {
         if (busqueda.length > 0) {
           const esc = busqueda.replace(/[%_]/g, (m) => `\\${m}`);
           q = q.or(`nombre.ilike.%${esc}%,tienda.ilike.%${esc}%`);
+        }
+        // Historial ordena por fecha_cobrado DESC (lo más reciente arriba).
+        // Resto del módulo ordena por created_at DESC.
+        if (filtroEstado === "historial") {
+          q = q
+            .order("fecha_cobrado", { ascending: false, nullsFirst: false })
+            .order("created_at", { ascending: false });
+        } else {
+          q = q.order("created_at", { ascending: false });
         }
         return q;
       })(),
@@ -164,13 +172,14 @@ export async function GET(req: NextRequest) {
       cobrableFactByProyMarca.set(pid, inner);
     }
 
-    // Por cobrar: siempre SUM(factura.total × %) desde mk_factura_marcas.
-    //             Si proyecto.estado === 'cobrado' → 0 (ya cobrado).
-    function porCobrarDeProy(
-      p: { id: string; estado: string },
+    // Desglose SUM(factura.total × %) desde mk_factura_marcas, sin filtrar
+    // por estado. Lo usamos para dos cosas distintas:
+    //   - por_cobrar_*: pendiente de cobrar (proyectos NO cobrados).
+    //   - cobrado_*: monto ya cobrado (proyectos en estado 'cobrado').
+    function desgloseDeProy(
+      pid: string,
     ): { total: number; desglose: Array<{ marcaId: string; monto: number }> } {
-      if (p.estado === "cobrado") return { total: 0, desglose: [] };
-      const inner = cobrableFactByProyMarca.get(p.id);
+      const inner = cobrableFactByProyMarca.get(pid);
       const desglose: Array<{ marcaId: string; monto: number }> = [];
       let total = 0;
       if (inner) {
@@ -203,8 +212,8 @@ export async function GET(req: NextRequest) {
           .filter((x): x is { id: string; nombre: string; codigo: string } => !!x)
           .map((m) => ({ id: m.id, nombre: m.nombre, codigo: m.codigo }));
 
-        const pc = porCobrarDeProy(p);
-        const porCobrarDesglose = pc.desglose.map((d) => {
+        const desg = desgloseDeProy(pid);
+        const desgloseConNombres = desg.desglose.map((d) => {
           const m = marcaById.get(d.marcaId);
           return {
             marca_id: d.marcaId,
@@ -212,6 +221,7 @@ export async function GET(req: NextRequest) {
             monto: d.monto,
           };
         });
+        const esCobrado = p.estado === "cobrado";
 
         return {
           id: pid,
@@ -225,8 +235,12 @@ export async function GET(req: NextRequest) {
           facturas_count: facturasCountByProy.get(pid) ?? 0,
           fotos_count: fotosCountByProy.get(pid) ?? 0,
           marcas: marcasArr,
-          por_cobrar_total: pc.total,
-          por_cobrar_por_marca: porCobrarDesglose,
+          // Activos: desglose de pendiente; cobrados: 0 (ya cobrado).
+          por_cobrar_total: esCobrado ? 0 : desg.total,
+          por_cobrar_por_marca: esCobrado ? [] : desgloseConNombres,
+          // Historial: monto ya cobrado por marca (mismo cálculo, semántica distinta).
+          cobrado_total: esCobrado ? desg.total : 0,
+          cobrado_por_marca: esCobrado ? desgloseConNombres : [],
         };
       });
 
