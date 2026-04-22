@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { MkMarca } from "@/lib/marketing/types";
-import { BotonDescargarZip, EstadoBadge } from "@/components/marketing";
+import { EstadoBadge } from "@/components/marketing";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmModal } from "@/components/ui";
@@ -334,176 +334,230 @@ export default function ProyectosHomeView({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-2">
-          {proyectos.map((p) => (
-            <div
-              key={p.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => onOpenProyecto(p.id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onOpenProyecto(p.id);
-                }
-              }}
-              className="text-left rounded-lg border border-gray-200 bg-white p-4 hover:border-black transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black/20"
-            >
-              <div className="flex items-start justify-between gap-3 mb-1">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-gray-900 truncate">
-                    {p.nombre || p.tienda}
-                  </div>
-                  {p.nombre && p.tienda && p.tienda !== p.nombre && (
-                    <div className="text-xs text-gray-500">
-                      Tienda: {p.tienda}
-                    </div>
-                  )}
-                </div>
-                <EstadoBadge estado={p.estado} />
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                <span>
-                  {p.facturas_count} {p.facturas_count === 1 ? "factura" : "facturas"} ·{" "}
-                  {p.fotos_count} {p.fotos_count === 1 ? "foto" : "fotos"}
-                </span>
-                <span>
-                  {p.estado === "cobrado" && p.fecha_cobrado
-                    ? `Cobrado el ${formatearFecha(p.fecha_cobrado)}`
+        <div className="rounded-[10px] border border-[#e5e5e5] overflow-hidden bg-white">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr className="text-[11px] uppercase tracking-wider text-gray-500">
+                <th className="text-left font-medium px-[18px] py-2.5">Proyecto</th>
+                <th className="text-left font-medium px-[18px] py-2.5 w-[120px]">
+                  Estado
+                </th>
+                <th className="text-left font-medium px-[18px] py-2.5 w-[120px] hidden md:table-cell">
+                  Marcas
+                </th>
+                <th className="text-right font-medium px-[18px] py-2.5 w-[140px]">
+                  Por cobrar
+                </th>
+                <th className="text-left font-medium px-[18px] py-2.5 w-[110px] hidden md:table-cell">
+                  Fecha
+                </th>
+                <th className="text-right font-medium px-[18px] py-2.5 w-[180px]">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {proyectos.map((p) => {
+                const nombreVis = p.nombre || p.tienda;
+                const fechaLabel =
+                  p.estado === "cobrado" && p.fecha_cobrado
+                    ? { label: "Cobrado", iso: p.fecha_cobrado }
                     : p.estado === "enviado" && p.fecha_enviado
-                      ? `Enviado el ${formatearFecha(p.fecha_enviado)}`
-                      : p.created_at
-                        ? `Creado: ${formatearFecha(p.created_at)}`
-                        : ""}
-                </span>
-              </div>
+                      ? { label: "Enviado", iso: p.fecha_enviado }
+                      : { label: "Creado", iso: p.created_at };
 
-              {p.marcas.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-gray-100">
-                  <span className="text-xs text-gray-500">Marcas:</span>
-                  {p.marcas.map((m) => (
-                    <span
-                      key={m.id}
-                      className={`inline-flex items-center gap-1 border rounded-md px-1.5 py-0.5 text-[11px] font-medium ${colorParaMarca(m.codigo)}`}
-                      title={m.nombre}
-                    >
-                      <span className="font-semibold">[{inicial(m.nombre)}]</span>
-                      {m.nombre}
-                    </span>
-                  ))}
-                </div>
-              )}
+                const desgloseTooltip = p.por_cobrar_por_marca.length > 0
+                  ? p.por_cobrar_por_marca
+                      .map((d) => `${d.marca_nombre}: ${formatearMonto(d.monto)}`)
+                      .join("\n")
+                  : undefined;
 
-              <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between gap-2 text-xs">
-                {p.facturas_count === 0 ? (
-                  <span className="text-gray-400 italic">Sin facturas todavía</span>
-                ) : p.por_cobrar_total === 0 ? (
-                  <span className="text-emerald-700 font-medium">Todo cobrado</span>
-                ) : (
-                  <>
-                    <span className="text-gray-500">
-                      Por cobrar:{" "}
-                      <span className="font-mono tabular-nums font-semibold text-gray-900">
-                        {formatearMonto(p.por_cobrar_total)}
-                      </span>
-                    </span>
-                    {p.por_cobrar_por_marca.length > 1 && (
-                      <span className="text-gray-500 text-[11px]">
-                        (
-                        {p.por_cobrar_por_marca
-                          .map(
-                            (d) =>
-                              `${d.marca_nombre} ${formatearMonto(d.monto)}`,
-                          )
-                          .join(" + ")}
-                        )
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {!p.anulado_en && (
-                <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-2">
-                  {p.estado === "abierto" && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAccionPendiente({
-                          id: p.id,
-                          nombre: p.nombre || p.tienda,
-                          tipo: "enviado",
-                        });
-                      }}
-                      className="text-xs rounded-md bg-black text-white px-3 py-1.5 active:scale-[0.97] transition"
-                    >
-                      Marcar como enviado
-                    </button>
-                  )}
-                  {p.estado === "enviado" && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAccionPendiente({
-                          id: p.id,
-                          nombre: p.nombre || p.tienda,
-                          tipo: "cobrado",
-                        });
-                      }}
-                      className="text-xs rounded-md bg-black text-white px-3 py-1.5 active:scale-[0.97] transition"
-                    >
-                      Marcar como cobrado
-                    </button>
-                  )}
-                  {p.estado === "cobrado" && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setAccionPendiente({
-                          id: p.id,
-                          nombre: p.nombre || p.tienda,
-                          tipo: "reabrir",
-                        });
-                      }}
-                      className="text-xs rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-1.5 hover:bg-gray-50 active:scale-[0.97] transition"
-                    >
-                      Reabrir
-                    </button>
-                  )}
-                  <span onClick={(e) => e.stopPropagation()}>
-                    <BotonDescargarZip
-                      estado={zipEstados[p.id]}
-                      onClick={() => descargarZip(p.id)}
-                    />
-                  </span>
-                  <div
-                    className="ml-auto"
-                    onClick={(e) => e.stopPropagation()}
+                return (
+                  <tr
+                    key={p.id}
+                    onClick={() => onOpenProyecto(p.id)}
+                    className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
                   >
-                    <OverflowMenu
-                      items={[
-                        {
-                          label: "Anular proyecto",
-                          onClick: () => {
-                            setAnularPendiente({
-                              id: p.id,
-                              nombre: p.nombre || p.tienda,
-                            });
-                            setAnularMotivo("");
-                          },
-                          destructive: true,
-                        },
-                      ]}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+                    {/* Proyecto */}
+                    <td className="px-[18px] py-3 align-middle">
+                      <div className="font-semibold text-gray-900 truncate">
+                        {nombreVis}
+                      </div>
+                      <div className="text-[12px] text-gray-500 truncate">
+                        {p.tienda && p.tienda !== nombreVis ? `${p.tienda} · ` : ""}
+                        {p.facturas_count}{" "}
+                        {p.facturas_count === 1 ? "factura" : "facturas"} ·{" "}
+                        {p.fotos_count}{" "}
+                        {p.fotos_count === 1 ? "foto" : "fotos"}
+                      </div>
+                    </td>
+                    {/* Estado */}
+                    <td className="px-[18px] py-3 align-middle">
+                      <EstadoBadge estado={p.estado} />
+                    </td>
+                    {/* Marcas */}
+                    <td className="px-[18px] py-3 align-middle hidden md:table-cell">
+                      {p.marcas.length === 0 ? (
+                        <span className="text-gray-300 text-xs">—</span>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          {p.marcas.map((m) => (
+                            <span
+                              key={m.id}
+                              title={m.nombre}
+                              className={`inline-flex items-center justify-center w-6 h-6 rounded-md border text-[11px] font-bold ${colorParaMarca(m.codigo)}`}
+                            >
+                              {inicial(m.nombre)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    {/* Por cobrar */}
+                    <td
+                      className="px-[18px] py-3 align-middle text-right tabular-nums"
+                      title={desgloseTooltip}
+                    >
+                      {p.facturas_count === 0 ? (
+                        <span className="text-gray-300 text-xs">—</span>
+                      ) : p.por_cobrar_total === 0 ? (
+                        <span className="text-emerald-700 font-medium text-xs">
+                          Todo cobrado
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-gray-900">
+                          {formatearMonto(p.por_cobrar_total)}
+                        </span>
+                      )}
+                    </td>
+                    {/* Fecha */}
+                    <td className="px-[18px] py-3 align-middle text-[12px] text-gray-500 hidden md:table-cell">
+                      <div>{formatearFecha(fechaLabel.iso)}</div>
+                      <div className="text-[11px] text-gray-400">
+                        {fechaLabel.label}
+                      </div>
+                    </td>
+                    {/* Acciones */}
+                    <td
+                      className="px-[18px] py-3 align-middle"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-end gap-1.5">
+                        {!p.anulado_en && p.estado === "abierto" && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAccionPendiente({
+                                id: p.id,
+                                nombre: nombreVis,
+                                tipo: "enviado",
+                              })
+                            }
+                            className="hidden md:inline-flex text-xs rounded-md bg-black text-white px-3 py-1.5 active:scale-[0.97] transition"
+                          >
+                            Enviar
+                          </button>
+                        )}
+                        {!p.anulado_en && p.estado === "enviado" && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAccionPendiente({
+                                id: p.id,
+                                nombre: nombreVis,
+                                tipo: "cobrado",
+                              })
+                            }
+                            className="hidden md:inline-flex text-xs rounded-md bg-black text-white px-3 py-1.5 active:scale-[0.97] transition"
+                          >
+                            Cobrar
+                          </button>
+                        )}
+                        {!p.anulado_en && p.estado === "cobrado" && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAccionPendiente({
+                                id: p.id,
+                                nombre: nombreVis,
+                                tipo: "reabrir",
+                              })
+                            }
+                            className="hidden md:inline-flex text-xs rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-1.5 hover:bg-gray-50 active:scale-[0.97] transition"
+                          >
+                            Reabrir
+                          </button>
+                        )}
+                        {!p.anulado_en && (
+                          <OverflowMenu
+                            items={[
+                              ...(p.estado === "abierto"
+                                ? [
+                                    {
+                                      label: "Marcar como enviado",
+                                      onClick: () =>
+                                        setAccionPendiente({
+                                          id: p.id,
+                                          nombre: nombreVis,
+                                          tipo: "enviado" as const,
+                                        }),
+                                    },
+                                  ]
+                                : []),
+                              ...(p.estado === "enviado"
+                                ? [
+                                    {
+                                      label: "Marcar como cobrado",
+                                      onClick: () =>
+                                        setAccionPendiente({
+                                          id: p.id,
+                                          nombre: nombreVis,
+                                          tipo: "cobrado" as const,
+                                        }),
+                                    },
+                                  ]
+                                : []),
+                              ...(p.estado === "cobrado"
+                                ? [
+                                    {
+                                      label: "Reabrir",
+                                      onClick: () =>
+                                        setAccionPendiente({
+                                          id: p.id,
+                                          nombre: nombreVis,
+                                          tipo: "reabrir" as const,
+                                        }),
+                                    },
+                                  ]
+                                : []),
+                              {
+                                label: "Descargar ZIP",
+                                onClick: () => descargarZip(p.id),
+                                disabled:
+                                  zipEstados[p.id]?.tipo === "trabajando" ||
+                                  zipEstados[p.id]?.tipo === "exito",
+                              },
+                              {
+                                label: "Anular proyecto",
+                                onClick: () => {
+                                  setAnularPendiente({
+                                    id: p.id,
+                                    nombre: nombreVis,
+                                  });
+                                  setAnularMotivo("");
+                                },
+                                destructive: true,
+                              },
+                            ]}
+                          />
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 

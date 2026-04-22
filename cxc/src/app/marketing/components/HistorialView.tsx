@@ -9,7 +9,7 @@ import type { MkMarca } from "@/lib/marketing/types";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmModal } from "@/components/ui";
-import { BotonDescargarZip } from "@/components/marketing";
+import OverflowMenu from "@/components/ui/OverflowMenu";
 import { useDescargarZip } from "@/lib/marketing/useDescargarZip";
 
 interface ProyectoListItem {
@@ -170,111 +170,131 @@ export default function HistorialView({
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-2">
-          {proyectos.map((p) => (
-            <div
-              key={p.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => onOpenProyecto(p.id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
-                  e.preventDefault();
-                  onOpenProyecto(p.id);
-                }
-              }}
-              className="text-left rounded-lg border border-gray-200 bg-white p-4 hover:border-black transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black/20"
-            >
-              <div className="flex items-start justify-between gap-3 mb-1">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-gray-900 truncate">
-                    {p.nombre || p.tienda}
-                  </div>
-                  {p.nombre && p.tienda && p.tienda !== p.nombre && (
-                    <div className="text-xs text-gray-500">
-                      Tienda: {p.tienda}
-                    </div>
-                  )}
-                </div>
-                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs px-2 py-0.5 font-medium shrink-0">
-                  Cobrado
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-                <span>
-                  {p.facturas_count} {p.facturas_count === 1 ? "factura" : "facturas"} ·{" "}
-                  {p.fotos_count} {p.fotos_count === 1 ? "foto" : "fotos"}
-                </span>
-                {p.fecha_cobrado && (
-                  <span className="text-emerald-700">
-                    Cobrado el {formatearFecha(p.fecha_cobrado)}
-                  </span>
-                )}
-              </div>
-
-              {p.marcas.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-gray-100">
-                  <span className="text-xs text-gray-500">Marcas:</span>
-                  {p.marcas.map((m) => (
-                    <span
-                      key={m.id}
-                      className={`inline-flex items-center gap-1 border rounded-md px-1.5 py-0.5 text-[11px] font-medium ${colorParaMarca(m.codigo)}`}
-                      title={m.nombre}
+        <div className="rounded-[10px] border border-[#e5e5e5] overflow-hidden bg-white">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr className="text-[11px] uppercase tracking-wider text-gray-500">
+                <th className="text-left font-medium px-[18px] py-2.5">Proyecto</th>
+                <th className="text-left font-medium px-[18px] py-2.5 w-[120px] hidden md:table-cell">
+                  Marcas
+                </th>
+                <th className="text-right font-medium px-[18px] py-2.5 w-[150px]">
+                  Total cobrado
+                </th>
+                <th className="text-left font-medium px-[18px] py-2.5 w-[110px] hidden md:table-cell">
+                  Cobrado el
+                </th>
+                <th className="text-right font-medium px-[18px] py-2.5 w-[170px]">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {proyectos.map((p) => {
+                const nombreVis = p.nombre || p.tienda;
+                const desgloseTooltip = p.cobrado_por_marca.length > 0
+                  ? p.cobrado_por_marca
+                      .map((d) => `${d.marca_nombre}: ${formatearMonto(d.monto)}`)
+                      .join("\n")
+                  : undefined;
+                return (
+                  <tr
+                    key={p.id}
+                    onClick={() => onOpenProyecto(p.id)}
+                    className="border-t border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+                  >
+                    {/* Proyecto */}
+                    <td className="px-[18px] py-3 align-middle">
+                      <div className="font-semibold text-gray-900 truncate">
+                        {nombreVis}
+                      </div>
+                      <div className="text-[12px] text-gray-500 truncate">
+                        {p.tienda && p.tienda !== nombreVis ? `${p.tienda} · ` : ""}
+                        {p.facturas_count}{" "}
+                        {p.facturas_count === 1 ? "factura" : "facturas"} ·{" "}
+                        {p.fotos_count}{" "}
+                        {p.fotos_count === 1 ? "foto" : "fotos"}
+                      </div>
+                    </td>
+                    {/* Marcas */}
+                    <td className="px-[18px] py-3 align-middle hidden md:table-cell">
+                      {p.marcas.length === 0 ? (
+                        <span className="text-gray-300 text-xs">—</span>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          {p.marcas.map((m) => (
+                            <span
+                              key={m.id}
+                              title={m.nombre}
+                              className={`inline-flex items-center justify-center w-6 h-6 rounded-md border text-[11px] font-bold ${colorParaMarca(m.codigo)}`}
+                            >
+                              {inicial(m.nombre)}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    {/* Total cobrado */}
+                    <td
+                      className="px-[18px] py-3 align-middle text-right tabular-nums"
+                      title={desgloseTooltip}
                     >
-                      <span className="font-semibold">[{inicial(m.nombre)}]</span>
-                      {m.nombre}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {p.cobrado_total > 0 && (
-                <div className="mt-2 pt-2 border-t border-gray-100 flex items-center justify-between gap-2 text-xs">
-                  <span className="text-gray-500">
-                    Total cobrado:{" "}
-                    <span className="font-mono tabular-nums font-semibold text-gray-900">
-                      {formatearMonto(p.cobrado_total)}
-                    </span>
-                  </span>
-                  {p.cobrado_por_marca.length > 1 && (
-                    <span className="text-gray-500 text-[11px]">
-                      (
-                      {p.cobrado_por_marca
-                        .map(
-                          (d) =>
-                            `${d.marca_nombre} ${formatearMonto(d.monto)}`,
-                        )
-                        .join(" + ")}
-                      )
-                    </span>
-                  )}
-                </div>
-              )}
-
-              <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setReabrirPendiente({
-                      id: p.id,
-                      nombre: p.nombre || p.tienda,
-                    });
-                  }}
-                  className="text-xs rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-1.5 hover:bg-gray-50 active:scale-[0.97] transition"
-                >
-                  Reabrir
-                </button>
-                <span onClick={(e) => e.stopPropagation()}>
-                  <BotonDescargarZip
-                    estado={zipEstados[p.id]}
-                    onClick={() => descargarZip(p.id)}
-                  />
-                </span>
-              </div>
-            </div>
-          ))}
+                      {p.cobrado_total > 0 ? (
+                        <span className="font-semibold text-gray-900">
+                          {formatearMonto(p.cobrado_total)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 text-xs">—</span>
+                      )}
+                    </td>
+                    {/* Cobrado el */}
+                    <td className="px-[18px] py-3 align-middle text-[12px] text-gray-500 hidden md:table-cell">
+                      {p.fecha_cobrado ? formatearFecha(p.fecha_cobrado) : "—"}
+                    </td>
+                    {/* Acciones */}
+                    <td
+                      className="px-[18px] py-3 align-middle"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setReabrirPendiente({
+                              id: p.id,
+                              nombre: nombreVis,
+                            })
+                          }
+                          className="hidden md:inline-flex text-xs rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-1.5 hover:bg-gray-50 active:scale-[0.97] transition"
+                        >
+                          Reabrir
+                        </button>
+                        <OverflowMenu
+                          items={[
+                            {
+                              label: "Reabrir",
+                              onClick: () =>
+                                setReabrirPendiente({
+                                  id: p.id,
+                                  nombre: nombreVis,
+                                }),
+                            },
+                            {
+                              label: "Descargar ZIP",
+                              onClick: () => descargarZip(p.id),
+                              disabled:
+                                zipEstados[p.id]?.tipo === "trabajando" ||
+                                zipEstados[p.id]?.tipo === "exito",
+                            },
+                          ]}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 

@@ -347,26 +347,30 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
           </p>
         </div>
       ) : (
-        <div className="rounded-lg border border-gray-200 overflow-hidden">
+        <div className="rounded-[10px] border border-[#e5e5e5] overflow-hidden bg-white">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600">
-              <tr>
-                <th className="px-3 py-2 w-10">
+            <thead className="bg-gray-50">
+              <tr className="text-[11px] uppercase tracking-wider text-gray-500">
+                <th className="px-[18px] py-2.5 w-10">
                   <input
                     type="checkbox"
                     checked={allVisibleSelected}
                     onChange={toggleAllVisible}
                     className="accent-black w-3.5 h-3.5"
                     title="Seleccionar todos"
+                    aria-label="Seleccionar todos"
                   />
                 </th>
-                <th className="text-left font-medium px-4 py-2 w-24">Tipo</th>
-                <th className="text-left font-medium px-4 py-2">Nombre</th>
-                <th className="text-left font-medium px-4 py-2 w-32">
-                  Anulado
+                <th className="text-left font-medium px-[18px] py-2.5">
+                  Registro
                 </th>
-                <th className="text-left font-medium px-4 py-2">Motivo</th>
-                <th className="text-right font-medium px-4 py-2 w-56">
+                <th className="text-left font-medium px-[18px] py-2.5 w-[120px] hidden md:table-cell">
+                  Anulado el
+                </th>
+                <th className="text-left font-medium px-[18px] py-2.5 hidden md:table-cell">
+                  Motivo
+                </th>
+                <th className="text-right font-medium px-[18px] py-2.5 w-[180px]">
                   Acciones
                 </th>
               </tr>
@@ -378,43 +382,68 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
                 return (
                   <tr
                     key={k}
-                    className="border-t border-gray-100 hover:bg-gray-50"
+                    className="border-t border-gray-100 hover:bg-gray-50 transition-colors"
                   >
-                    <td className="px-3 py-3">
+                    <td className="px-[18px] py-3 align-middle">
                       <input
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggleOne(item)}
                         className="accent-black w-3.5 h-3.5"
+                        aria-label={`Seleccionar ${item.nombre}`}
                       />
                     </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex items-center rounded-full border text-xs px-2 py-0.5 font-medium ${TIPO_BADGE[item.tipo]}`}
-                      >
-                        {TIPO_LABEL[item.tipo]}
-                      </span>
+                    {/* Registro: tipo badge + nombre */}
+                    <td className="px-[18px] py-3 align-middle">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className={`inline-flex items-center rounded-full border text-[10px] px-1.5 py-0.5 font-medium uppercase tracking-wider shrink-0 ${TIPO_BADGE[item.tipo]}`}
+                        >
+                          {TIPO_LABEL[item.tipo]}
+                        </span>
+                        <span className="text-gray-900 font-medium truncate">
+                          {item.nombre}
+                        </span>
+                      </div>
+                      {/* En mobile, motivo y fecha colapsan aquí debajo */}
+                      <div className="md:hidden text-[11px] text-gray-500 mt-1 truncate">
+                        Anulado {fmtDate(item.anulado_en.slice(0, 10))}
+                        {item.anulado_motivo
+                          ? ` · ${item.anulado_motivo}`
+                          : ""}
+                      </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-900">{item.nombre}</td>
+                    {/* Anulado el */}
                     <td
-                      className="px-4 py-3 text-gray-600 tabular-nums"
+                      className="px-[18px] py-3 align-middle text-[12px] text-gray-500 tabular-nums hidden md:table-cell"
                       title={item.anulado_en}
                     >
                       {fmtDate(item.anulado_en.slice(0, 10))}
                     </td>
-                    <td className="px-4 py-3 text-gray-600">
-                      {item.anulado_motivo || (
+                    {/* Motivo */}
+                    <td className="px-[18px] py-3 align-middle text-[12px] text-gray-600 hidden md:table-cell">
+                      {item.anulado_motivo ? (
+                        <span
+                          className="block max-w-[260px] truncate"
+                          title={item.anulado_motivo}
+                        >
+                          {item.anulado_motivo}
+                        </span>
+                      ) : (
                         <span className="text-gray-300">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="inline-flex gap-2">
+                    {/* Acciones */}
+                    <td className="px-[18px] py-3 align-middle text-right">
+                      <div className="inline-flex gap-1.5">
                         <button
                           onClick={() => setConfirmRestaurar(item)}
                           disabled={restaurando === item.id}
                           className="px-3 py-1.5 rounded-md text-xs font-medium border border-gray-200 bg-white hover:bg-gray-50 active:scale-[0.97] disabled:opacity-50"
                         >
-                          {restaurando === item.id ? "Restaurando..." : "Restaurar"}
+                          {restaurando === item.id
+                            ? "Restaurando..."
+                            : "Restaurar"}
                         </button>
                         {esAdmin && (
                           <button
