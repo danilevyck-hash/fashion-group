@@ -214,6 +214,17 @@ export default function VentasDashboard() {
   const router = useRouter();
   const { authChecked, role } = useAuth({ moduleKey: "ventas", allowedRoles: ["admin", "director", "contabilidad"] });
 
+  // Reactive viewport detection — reemplaza el check hardcoded de innerWidth < 640
+  const [isNarrow, setIsNarrow] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const update = () => setIsNarrow(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+
   useEffect(() => {
     if (authChecked && role === "secretaria") {
       showToast("Tu rol permite cargar datos pero no ver el dashboard");
@@ -624,7 +635,7 @@ export default function VentasDashboard() {
         {!loading && hasData && (
           <div className="mb-6 border border-gray-200 rounded-lg p-3 sm:p-4 print:hidden">
             <p className="text-xs uppercase tracking-wide text-gray-500 mb-3">Ventas mensuales {año}</p>
-            <ResponsiveContainer width="100%" height={typeof window !== "undefined" && window.innerWidth < 640 ? 160 : 220}>
+            <ResponsiveContainer width="100%" height={isNarrow ? 160 : 220}>
               <BarChart data={chartData} barCategoryGap="20%">
                 <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false}
@@ -713,13 +724,13 @@ export default function VentasDashboard() {
             </div>
 
             {loading ? <SkeletonTable rows={9} cols={vista === "quarter" ? 7 : 15} /> : (
-              <div className="overflow-x-auto mb-6 border border-gray-200 rounded-lg">
-                <table className="w-full text-xs">
+              <div className="overflow-x-auto -mx-3 sm:mx-0 mb-6 border border-gray-200 rounded-lg">
+                <table className="w-full text-xs min-w-[900px]">
                   <thead className="sticky top-0 bg-white z-10">
                     <tr className="border-b border-gray-200 bg-white">
                       <th className="text-left px-3 py-2 font-medium text-gray-500 sticky left-0 bg-white z-20 min-w-[140px]">Empresa</th>
                       {table.periods.map(p => (
-                        <th key={p} className="text-right px-2 py-2 font-medium text-gray-500 whitespace-nowrap">{p}</th>
+                        <th key={p} className="text-right px-2 py-2 font-medium text-gray-500 whitespace-nowrap hidden sm:table-cell">{p}</th>
                       ))}
                       <th className="text-right px-3 py-2 font-medium text-gray-500">Total</th>
                       <th className="text-right px-3 py-2 font-medium text-gray-500">Margen%</th>
@@ -746,7 +757,7 @@ export default function VentasDashboard() {
                             const grow = v > 0 && prev > 0 && v > prev * 1.1;
                             const cellBg = drop ? "bg-red-50" : grow ? "bg-green-50" : "";
                             return (
-                              <td key={i} className={`text-right px-2 py-2 tabular-nums ${cell.isZero ? "text-gray-300" : "text-gray-600"} ${cellBg}`}>
+                              <td key={i} className={`text-right px-2 py-2 tabular-nums hidden sm:table-cell ${cell.isZero ? "text-gray-300" : "text-gray-600"} ${cellBg}`}>
                                 {cell.text}
                               </td>
                             );
@@ -778,7 +789,7 @@ export default function VentasDashboard() {
                       {(resumenMode === "ventas" ? table.totalValues : table.totalUtilValues).map((v, i) => {
                         const cell = fmtCell(v);
                         return (
-                          <td key={i} className={`text-right px-2 py-2 tabular-nums ${cell.isZero ? "text-gray-300" : ""}`}>
+                          <td key={i} className={`text-right px-2 py-2 tabular-nums hidden sm:table-cell ${cell.isZero ? "text-gray-300" : ""}`}>
                             {cell.isZero ? "—" : fmtK(v)}
                           </td>
                         );
@@ -841,15 +852,14 @@ export default function VentasDashboard() {
             {/* Client Table */}
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Top clientes por ventas</p>
             <div className="relative overflow-x-auto border border-gray-200 rounded-lg mb-6 -mx-3 sm:mx-0">
-              <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-white to-transparent z-20 sm:hidden" />
-              <table className="w-full text-xs min-w-[600px]">
+              <table className="w-full text-xs min-w-[500px]">
                 <thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 bg-white">
                   <th className="text-left px-3 py-2 min-h-[44px] cursor-pointer" onClick={() => toggleClientSort("ventas")}>Cliente {clientSort === "ventas" ? (clientSortDir === "desc" ? "↓" : "↑") : ""}</th>
                   <th className="text-right px-3 py-2 min-h-[44px] cursor-pointer whitespace-nowrap" onClick={() => toggleClientSort("ventas")}>Ventas {clientSort === "ventas" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
                   <th className="text-right px-3 py-2 min-h-[44px] cursor-pointer whitespace-nowrap" onClick={() => toggleClientSort("utilidad")}>Utilidad {clientSort === "utilidad" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
                   <th className="text-right px-3 py-2 min-h-[44px] cursor-pointer whitespace-nowrap" onClick={() => toggleClientSort("margen")}>Margen% {clientSort === "margen" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
-                  <th className="text-right px-3 py-2 min-h-[44px] cursor-pointer whitespace-nowrap" onClick={() => toggleClientSort("pct")}>% Total {clientSort === "pct" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
-                  <th className="text-right px-3 py-2 min-h-[44px] cursor-pointer whitespace-nowrap" onClick={() => toggleClientSort("fecha")}>Ultima Compra {clientSort === "fecha" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
+                  <th className="text-right px-3 py-2 min-h-[44px] cursor-pointer whitespace-nowrap hidden sm:table-cell" onClick={() => toggleClientSort("pct")}>% Total {clientSort === "pct" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
+                  <th className="text-right px-3 py-2 min-h-[44px] cursor-pointer whitespace-nowrap hidden sm:table-cell" onClick={() => toggleClientSort("fecha")}>Ultima Compra {clientSort === "fecha" ? (clientSortDir === "desc" ? "↓" : "↑") : "↕"}</th>
                 </tr></thead>
                 <tbody>
                   {displayClients.map(c => {
@@ -870,8 +880,8 @@ export default function VentasDashboard() {
                         <td className="text-right px-3 py-2.5 tabular-nums min-h-[44px]">{fmtK(c.subtotal)}</td>
                         <td className="text-right px-3 py-2.5 tabular-nums min-h-[44px]">{fmtK(c.utilidad)}</td>
                         <td className={`text-right px-3 py-2.5 tabular-nums min-h-[44px] ${margen < 15 ? "text-red-600" : ""}`}>{margen.toFixed(1)}%</td>
-                        <td className="text-right px-3 py-2.5 tabular-nums text-gray-500 min-h-[44px]">{pctStr}%</td>
-                        <td className={`text-right px-3 py-2.5 min-h-[44px] ${isInactive ? "text-red-500" : "text-gray-500"}`}>{lastCompra}</td>
+                        <td className="text-right px-3 py-2.5 tabular-nums text-gray-500 min-h-[44px] hidden sm:table-cell">{pctStr}%</td>
+                        <td className={`text-right px-3 py-2.5 min-h-[44px] hidden sm:table-cell ${isInactive ? "text-red-500" : "text-gray-500"}`}>{lastCompra}</td>
                       </tr>,
                       expanded && c.empresas.map(e => (
                         <tr key={`${c.cliente}-${e.empresa}`} className="bg-gray-50/30">
@@ -879,8 +889,8 @@ export default function VentasDashboard() {
                           <td className="text-right px-3 py-1.5 tabular-nums text-gray-500 text-xs">{fmtK(e.subtotal)}</td>
                           <td className="text-right px-3 py-1.5 tabular-nums text-gray-500 text-xs">{fmtK(e.utilidad)}</td>
                           <td className="text-right px-3 py-1.5 tabular-nums text-gray-500 text-xs">{e.subtotal ? ((e.utilidad / e.subtotal) * 100).toFixed(1) : 0}%</td>
-                          <td></td>
-                          <td className="text-right px-3 py-1.5 text-gray-500 text-xs">{e.lastFecha ? new Date(e.lastFecha).toLocaleDateString("es-PA", { month: "short", year: "numeric" }).replace(".", "") : "—"}</td>
+                          <td className="hidden sm:table-cell"></td>
+                          <td className="text-right px-3 py-1.5 text-gray-500 text-xs hidden sm:table-cell">{e.lastFecha ? new Date(e.lastFecha).toLocaleDateString("es-PA", { month: "short", year: "numeric" }).replace(".", "") : "—"}</td>
                         </tr>
                       )),
                     ];
