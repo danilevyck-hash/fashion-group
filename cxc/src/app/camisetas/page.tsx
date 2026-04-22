@@ -473,18 +473,16 @@ export default function CamisetasPage() {
               </div>
 
               {/* Collapsible detailed matrix */}
-              <div className="sm:hidden bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-500 mb-4">
-                Vista Resumen no disponible en móvil. Usa la pestaña <button onClick={() => setTab("cliente")} className="font-medium text-black underline">Por Cliente</button>.
-              </div>
-              <div className="hidden sm:block">
+              <div>
                 <button onClick={() => setShowMatrix(!showMatrix)} className="text-sm text-gray-400 hover:text-black transition flex items-center gap-1.5 mb-3">
                   <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${showMatrix ? "rotate-90" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                   Matriz de pedidos
                   <span className="text-[10px] text-gray-300 font-normal ml-1">productos vs clientes</span>
                 </button>
                 {showMatrix && (
-                  <div className="overflow-x-auto -mx-6 px-6">
-                    <p className="text-[10px] text-gray-400 mb-3">Haz click en cualquier celda para editar</p>
+                  <div className="overflow-x-auto -mx-3 sm:-mx-6 px-3 sm:px-6">
+                    <p className="text-[10px] text-gray-400 mb-3 sm:hidden">Desliza horizontalmente para ver todas las columnas</p>
+                    <p className="text-[10px] text-gray-400 mb-3 hidden sm:block">Haz click en cualquier celda para editar</p>
                     <table className="text-xs w-max min-w-full border-collapse">
                       <thead className="sticky top-0 bg-white z-10">
                         <tr>
@@ -719,8 +717,8 @@ export default function CamisetasPage() {
                 const barColor = disp < 0 ? "bg-red-500" : disp < comp * 0.2 ? "bg-amber-400" : "bg-gray-900";
 
                 return (
-                  <div key={prod.id} className={`flex items-center py-3 border-b border-gray-200 gap-4 ${disp < 0 ? "border-l-4 border-l-red-400 pl-2 bg-red-50/30" : ""}`}>
-                    <div className="flex items-center gap-2 w-48 flex-shrink-0">
+                  <div key={prod.id} className={`flex flex-col sm:flex-row sm:items-center py-3 border-b border-gray-200 gap-2 sm:gap-4 ${disp < 0 ? "border-l-4 border-l-red-400 pl-2 bg-red-50/30" : ""}`}>
+                    <div className="flex items-center gap-2 w-full sm:w-48 sm:flex-shrink-0">
                       <span className="inline-block w-2 h-2 rounded-full flex-shrink-0" style={{ background: COLOR_MAP[prod.color] || "#ccc" }} />
                       <div>
                         <span className="text-sm">{prod.nombre}</span>
@@ -728,25 +726,25 @@ export default function CamisetasPage() {
                         {!isVendedor && <div className="text-[10px] text-gray-600">${fmt(prod.precio_panama)} · RRP ${fmt(prod.rrp)}</div>}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-1">
-                      <div className="w-32 h-1 bg-gray-200 rounded-full overflow-hidden flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-1 w-full sm:w-auto">
+                      <div className="flex-1 sm:flex-initial sm:w-32 h-1 bg-gray-200 rounded-full overflow-hidden">
                         <div className={`h-full ${barColor} rounded-full`} style={{ width: `${pct}%` }} />
                       </div>
-                      <span className="text-[10px] text-gray-400 tabular-nums w-16">{ped}/{comp} paq</span>
+                      <span className="text-[10px] text-gray-400 tabular-nums w-16 flex-shrink-0 text-right sm:text-left">{ped}/{comp} paq</span>
                     </div>
                     {editingStock && (
-                      <div className="flex items-center gap-1 w-28 flex-shrink-0">
+                      <div className="flex items-center gap-1 w-full sm:w-28 sm:flex-shrink-0">
                         <input type="number" min={0} value={stockEdits[prod.id] ?? prod.stock_comprado}
                           inputMode="numeric"
                           onChange={e => setStockEdits(prev => ({ ...prev, [prod.id]: parseInt(e.target.value) || 0 }))}
-                          className="w-20 text-center border border-gray-200 rounded py-2 text-xs outline-none focus:border-black tabular-nums min-h-[44px]" />
-                        <span className="text-[10px] text-gray-400">pzas</span>
+                          className="w-full sm:w-20 text-center border border-gray-200 rounded py-2 text-xs outline-none focus:border-black tabular-nums min-h-[44px]" />
+                        <span className="text-[10px] text-gray-400 shrink-0">pzas</span>
                       </div>
                     )}
-                    <div className="text-right w-24 flex-shrink-0">
+                    <div className="text-right w-full sm:w-24 sm:flex-shrink-0">
                       <span className={`text-sm font-medium tabular-nums ${disp < 0 ? "text-red-600" : "text-black"}`}>{disp}</span>
                       <span className="text-xs text-gray-400 ml-1">disponibles</span>
-                      {disp < 0 && <span className="text-[10px] text-red-500 block">⚠ −{Math.abs(disp)} paq</span>}
+                      {disp < 0 && <span className="text-[10px] text-red-500 block sm:inline sm:ml-1">⚠ −{Math.abs(disp)} paq</span>}
                     </div>
                   </div>
                 );
