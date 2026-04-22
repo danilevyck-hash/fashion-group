@@ -9,3 +9,6 @@ node_modules/
 
 # Build cache
 tsconfig.tsbuildinfo
+
+# Scripts de análisis: outputs puntuales, no versionados
+scripts/output/

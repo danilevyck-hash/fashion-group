@@ -3,6 +3,16 @@
 /*  Pure TypeScript — no React, no DOM, no external deps.             */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Version del algoritmo de parsing. Bumpea con cualquier cambio en cómo
+ * se extraen bultos/estilos/qty. Se persiste en packing_lists.parser_metadata
+ * al guardar para que cada PL histórico diga con qué parser se procesó.
+ *
+ * 2.0.0 — Fusión de dígito huérfano en Qty line (fix para Qty ≥ 100 que el
+ *         PDF parte en dos líneas por ancho de columna de 2 dígitos).
+ */
+export const PARSER_VERSION = "2.0.0";
+
 // ── Raw line types (from PDF extraction with X positions) ───────────
 
 export interface RawLineItem { x: number; str: string; }
@@ -276,6 +286,44 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
       if (/\bQty\b/i.test(next)) break;
     }
   }
+  // ── Qty wrap fuse ──────────────────────────────────────────────────
+  // Cuando un estilo tiene Qty total ≥ 100 en un solo bulto, el PDF parte
+  // el número en dos líneas porque la columna Qty solo soporta 2 dígitos
+  // de ancho. Ej:
+  //   "15 30 10 30 15 10"   ← 6 columnas, última es Qty=100 truncada a "10"
+  //   "0"                   ← el dígito huérfano
+  // Aquí fusionamos el dígito huérfano al último número de la línea previa
+  // ("15 30 10 30 15 100"). Si la fusión es incorrecta en algún edge case,
+  // el validador de totales por bulto lo detecta y el bulto cae al fallback.
+  for (let i = 0; i < cleanLines.length - 1; i++) {
+    const line = cleanLines[i].trim();
+    if (!line) continue;
+    if (!isNumberLine(line)) continue;
+    // siguiente línea no vacía
+    let j = i + 1;
+    while (j < cleanLines.length && !cleanLines[j].trim()) j++;
+    if (j >= cleanLines.length) continue;
+    const next = cleanLines[j].trim();
+    if (!/^\d$/.test(next)) continue;
+    // concatenar dígito al último número de la línea previa
+    const tokens = line.split(/\s+/);
+    tokens[tokens.length - 1] = tokens[tokens.length - 1] + next;
+    cleanLines[i] = tokens.join(" ");
+    if (rawLines) {
+      const rawI = rawLines[cleanToRawIndex[i]];
+      if (rawI) {
+        for (let k = rawI.items.length - 1; k >= 0; k--) {
+          if (/^\d+$/.test(rawI.items[k].str.trim())) {
+            rawI.items[k] = { ...rawI.items[k], str: rawI.items[k].str.trim() + next };
+            break;
+          }
+        }
+        rawI.text = cleanLines[i];
+      }
+    }
+    cleanLines[j] = ""; // el huérfano deja de existir
+  }
+
   // Helper: get rawLine by cleanLines index via direct index mapping
   function getRawLine(cleanLineIdx: number): RawLine | undefined {
     if (!rawLines || cleanLineIdx < 0 || cleanLineIdx >= cleanToRawIndex.length) return undefined;
