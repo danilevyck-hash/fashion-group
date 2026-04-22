@@ -49,19 +49,32 @@ function ChequeMoreMenu({ cheque, ve, role, onRebotado, onDelete, onRedepositar 
   onRebotado: () => void; onDelete: () => void; onRedepositar?: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(true);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const isPending = ve === "pendiente" || ve === "vencido";
   const isRebotado = ve === "rebotado";
   const isDep = ve === "depositado";
   // State machine: only show valid actions. Depositados no se pueden eliminar (data histórica).
   const canDelete = role === "admin" && !isDep;
   const hasActions = isPending || (isRebotado && onRedepositar) || canDelete;
+
+  // Flip: si el trigger está cerca del borde derecho, abre el dropdown hacia la izquierda
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const dropdownWidth = 180; // min-w-[160px] + margen
+    const spaceRight = window.innerWidth - rect.right;
+    // Si no hay espacio a la derecha para que el dropdown respete right-0, voltear a left-0
+    setAlignRight(spaceRight >= dropdownWidth - rect.width || rect.left < dropdownWidth);
+  }, [open]);
+
   if (!hasActions) return null;
   return (
     <div className="relative">
-      <button onClick={() => setOpen(!open)} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] px-1">&#x22EF;</button>
+      <button ref={triggerRef} onClick={() => setOpen(!open)} className="text-sm text-gray-400 hover:text-black transition min-h-[44px] px-1">&#x22EF;</button>
       {open && (<>
         <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg z-20 py-1 min-w-[160px]">
+        <div className={`absolute top-full mt-1 bg-white border border-gray-200 rounded-lg z-20 py-1 min-w-[160px] max-w-[90vw] ${alignRight ? "right-0" : "left-0"}`}>
           {isPending && (
             <button onClick={() => { onRebotado(); setOpen(false); }} title="Cheque devuelto por el banco" className="block w-full text-left px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 transition min-h-[44px]">Marcar como rebotado (devuelto)</button>
           )}
@@ -649,19 +662,19 @@ function ChequesPage() {
       {vencenHoy.length > 0 && (
         <button
           onClick={() => setFilter("vencen_hoy")}
-          className="w-full mb-3 flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm font-medium hover:bg-red-100 transition text-left"
+          className="w-full mb-3 flex items-start sm:items-center gap-2 sm:gap-3 bg-red-50 border border-red-200 text-red-700 rounded-lg px-3 sm:px-4 py-3 text-sm font-medium hover:bg-red-100 transition text-left"
         >
-          <span className="flex-shrink-0 w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          {vencenHoy.length} cheque{vencenHoy.length > 1 ? "s" : ""} vence{vencenHoy.length > 1 ? "n" : ""} hoy — ${fmt(totalVencenHoy)} total
+          <span className="flex-shrink-0 w-2 h-2 rounded-full bg-red-500 animate-pulse mt-1.5 sm:mt-0" />
+          <span>{vencenHoy.length} cheque{vencenHoy.length > 1 ? "s" : ""} vence{vencenHoy.length > 1 ? "n" : ""} hoy — ${fmt(totalVencenHoy)} total</span>
         </button>
       )}
       {vencenSemana.length > 0 && filter !== "vencen_hoy" && (
         <button
           onClick={() => setFilter("vencen_semana")}
-          className="w-full mb-3 flex items-center gap-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-4 py-3 text-sm font-medium hover:bg-amber-100 transition text-left"
+          className="w-full mb-3 flex items-start sm:items-center gap-2 sm:gap-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-lg px-3 sm:px-4 py-3 text-sm font-medium hover:bg-amber-100 transition text-left"
         >
-          <span className="flex-shrink-0 w-2 h-2 rounded-full bg-amber-500" />
-          {vencenSemana.length} cheque{vencenSemana.length > 1 ? "s" : ""} vence{vencenSemana.length > 1 ? "n" : ""} esta semana
+          <span className="flex-shrink-0 w-2 h-2 rounded-full bg-amber-500 mt-1.5 sm:mt-0" />
+          <span>{vencenSemana.length} cheque{vencenSemana.length > 1 ? "s" : ""} vence{vencenSemana.length > 1 ? "n" : ""} esta semana</span>
         </button>
       )}
 
@@ -870,8 +883,8 @@ function ChequesPage() {
       </div>
 
       {/* Filter tabs + search — CAMBIO 40 search by cliente */}
-      {viewMode === "lista" && <div className="flex flex-wrap items-center gap-4 mb-6">
-        <div className="flex gap-4 flex-wrap">
+      {viewMode === "lista" && <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 sm:gap-4 mb-6">
+        <div className="flex gap-3 sm:gap-4 overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap">
           {([
             ["pendiente", "Pendientes", pendientes.length, "Cheques pendientes de depositar", true],
             ["depositado", "Depositados", depositados.length, "Cheques ya depositados en el banco", true],
@@ -882,18 +895,18 @@ function ChequesPage() {
             .map(([key, label, count, tooltip]) => (
               <button key={key} onClick={() => setFilter(key)}
                 title={tooltip}
-                className={`text-sm transition ${filter === key ? "font-medium text-black" : "text-gray-400 hover:text-black"}`}>
+                className={`text-sm transition flex-shrink-0 whitespace-nowrap ${filter === key ? "font-medium text-black" : "text-gray-400 hover:text-black"}`}>
                 {label} <span className="text-xs text-gray-300 ml-1">{count}</span>
               </button>
             ))}
         </div>
-        <div className="ml-auto">
+        <div className="sm:ml-auto w-full sm:w-auto">
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar cheque o cliente..."
-            className="text-sm border border-gray-200 rounded-full px-4 py-1.5 outline-none focus:border-black transition w-full max-w-xs"
+            className="text-sm border border-gray-200 rounded-full px-4 py-1.5 outline-none focus:border-black transition w-full sm:max-w-xs"
           />
         </div>
       </div>}
