@@ -169,6 +169,7 @@ export default function FacturasSection({
       subtotal: number;
       itbms: number;
       marcasSeleccionadas: MarcaPorcentajeInput[];
+      permitirDuplicado?: boolean;
     },
     pdfFile?: File,
   ) => {
@@ -490,7 +491,7 @@ export default function FacturasSection({
               Anular factura {anulando.numero_factura}
             </h3>
             <p className="text-sm text-gray-500 mb-4">
-              Se marcará como anulada. Podrás restaurarla desde Papelera.
+              Se marcará como anulada. Podrás restaurarla desde Anulados.
             </p>
             <label
               htmlFor="motivo-anular"

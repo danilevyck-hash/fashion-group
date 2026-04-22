@@ -29,6 +29,9 @@ export interface FacturaFormValues {
   subtotal: number;
   itbms: number;
   marcasSeleccionadas: MarcaPorcentajeInput[];
+  // El usuario confirmó que aunque haya duplicado quiere guardar igual.
+  // Se loguea en activity_logs para auditoría.
+  permitirDuplicado?: boolean;
 }
 
 interface FacturaFormProps {
@@ -51,7 +54,18 @@ interface DuplicadoItem {
   total: number;
   proyecto_id: string;
   proyecto_nombre: string;
+  created_at: string | null;
+  fecha_factura: string | null;
   es_mismo_proyecto: boolean;
+}
+
+function fmtFechaCorta(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso.length === 10 ? `${iso}T12:00:00` : iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const dia = String(d.getDate()).padStart(2, "0");
+  const mes = String(d.getMonth() + 1).padStart(2, "0");
+  return `${dia}/${mes}/${d.getFullYear()}`;
 }
 
 async function fetchProveedorSuggestions(_q: string): Promise<string[]> {
@@ -294,7 +308,7 @@ export function FacturaForm({
     };
   };
 
-  const ejecutarGuardar = async () => {
+  const ejecutarGuardar = async (permitirDuplicado = false) => {
     try {
       setEnviando(true);
       await onSubmit(
@@ -306,6 +320,7 @@ export function FacturaForm({
           subtotal,
           itbms,
           marcasSeleccionadas: marcasPayload,
+          permitirDuplicado,
         },
         pdfFile,
       );
@@ -774,16 +789,41 @@ export function FacturaForm({
         >
           <div className="absolute inset-0 bg-black/40" />
           <div
-            className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200"
+            className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-md w-full mx-0 sm:mx-4 border border-gray-200"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-base font-semibold mb-1 text-gray-900">
+            <h3 className="text-base font-semibold mb-2 text-gray-900">
               ¿Guardar factura duplicada?
             </h3>
-            <p className="text-sm text-gray-500 mb-4">
-              Esta factura ({numeroFactura} de &ldquo;{proveedor}&rdquo;) ya existe en{" "}
-              {duplicados.length} {duplicados.length === 1 ? "proyecto" : "proyectos"}.
-              ¿Seguro que quieres guardar una factura duplicada?
+            <p className="text-sm text-gray-600 mb-3">
+              Ya existe una factura con número{" "}
+              <strong>{numeroFactura}</strong> del proveedor{" "}
+              <strong>&ldquo;{proveedor}&rdquo;</strong>:
+            </p>
+            <ul className="space-y-1.5 mb-4 text-sm">
+              {duplicados.map((d) => {
+                const fecha = fmtFechaCorta(d.created_at);
+                return (
+                  <li
+                    key={d.id}
+                    className="rounded-md border border-amber-200 bg-amber-50/60 px-3 py-2 text-amber-900"
+                  >
+                    Proyecto &ldquo;{d.proyecto_nombre}&rdquo;
+                    {d.es_mismo_proyecto && (
+                      <span className="font-semibold"> (este mismo)</span>
+                    )}
+                    {fecha && (
+                      <span className="text-amber-700">
+                        {" "}
+                        — creada el {fecha}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="text-xs text-gray-500 mb-4">
+              Esta acción quedará registrada en el log de actividad.
             </p>
             <div className="flex gap-3">
               <button
@@ -798,12 +838,12 @@ export function FacturaForm({
                 type="button"
                 onClick={async () => {
                   setShowConfirmDup(false);
-                  await ejecutarGuardar();
+                  await ejecutarGuardar(true);
                 }}
                 disabled={enviando}
                 className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium bg-amber-600 text-white hover:bg-amber-700 active:scale-[0.97] disabled:opacity-50 transition"
               >
-                {enviando ? "Guardando…" : "Sí, guardar"}
+                {enviando ? "Guardando…" : "Continuar de todos modos"}
               </button>
             </div>
           </div>

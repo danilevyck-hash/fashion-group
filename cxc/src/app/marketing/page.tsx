@@ -4,8 +4,11 @@
 // URL patterns:
 //   /marketing                      → home (lista de proyectos)
 //   /marketing?proyecto=<uuid>      → home + overlay del proyecto
-//   /marketing?vista=papelera       → papelera (reemplaza home)
+//   /marketing?vista=anulados       → anulados (reemplaza home)
 //   /marketing?vista=reportes       → reportes (reemplaza home)
+//   /marketing?vista=historial      → historial (reemplaza home)
+//
+// Legacy: /marketing?vista=papelera redirige a ?vista=anulados.
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -14,12 +17,12 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import type { MkMarca } from "@/lib/marketing/types";
 import ProyectosHomeView from "./components/ProyectosHomeView";
 import ProyectoOverlay from "./components/ProyectoOverlay";
-import PapeleraLista from "./components/PapeleraLista";
+import AnuladosLista from "./components/AnuladosLista";
 import ReportesTabs from "./components/ReportesTabs";
 import NuevoProyectoModal from "./components/NuevoProyectoModal";
 import HistorialView from "./components/HistorialView";
 
-type VistaExtra = "papelera" | "reportes" | "historial" | null;
+type VistaExtra = "anulados" | "reportes" | "historial" | null;
 
 export default function MarketingPageWrapper() {
   return (
@@ -38,7 +41,17 @@ function MarketingPage() {
   });
 
   const proyectoParam = searchParams.get("proyecto");
-  const vistaParam = (searchParams.get("vista") as VistaExtra) ?? null;
+  const vistaRaw = searchParams.get("vista");
+  // Compatibilidad: la vista legacy "papelera" se trata internamente como
+  // "anulados". Más abajo redirigimos la URL para que quede limpia.
+  const vistaParam: VistaExtra =
+    vistaRaw === "papelera"
+      ? "anulados"
+      : vistaRaw === "anulados" ||
+          vistaRaw === "reportes" ||
+          vistaRaw === "historial"
+        ? (vistaRaw as VistaExtra)
+        : null;
 
   const [marcas, setMarcas] = useState<MkMarca[]>([]);
   const [showNuevoProyecto, setShowNuevoProyecto] = useState(false);
@@ -87,16 +100,25 @@ function MarketingPage() {
     if (!proyectoParam) setNombreProyectoActual(null);
   }, [proyectoParam]);
 
+  // Redirect URL legacy ?vista=papelera → ?vista=anulados.
+  useEffect(() => {
+    if (vistaRaw === "papelera") {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set("vista", "anulados");
+      router.replace(`/marketing?${params.toString()}`);
+    }
+  }, [vistaRaw, searchParams, router]);
+
   if (!authChecked) return null;
 
   const mostrandoVistaExtra =
-    vistaParam === "papelera" ||
+    vistaParam === "anulados" ||
     vistaParam === "reportes" ||
     vistaParam === "historial";
 
   const breadcrumbs: { label: string; onClick?: () => void }[] = [];
-  if (vistaParam === "papelera") {
-    breadcrumbs.push({ label: "Papelera" });
+  if (vistaParam === "anulados") {
+    breadcrumbs.push({ label: "Anulados" });
   } else if (vistaParam === "reportes") {
     breadcrumbs.push({ label: "Reportes" });
   } else if (vistaParam === "historial") {
@@ -113,13 +135,13 @@ function MarketingPage() {
           <div className="space-y-4">
             <button
               type="button"
-              onClick={() => navegar({ vista: null })}
+              onClick={() => router.push("/marketing")}
               className="text-sm text-gray-600 hover:text-black transition inline-flex items-center gap-1"
             >
               ← Volver
             </button>
-            {vistaParam === "papelera" ? (
-              <PapeleraLista esAdmin={role === "admin"} />
+            {vistaParam === "anulados" ? (
+              <AnuladosLista esAdmin={role === "admin"} />
             ) : vistaParam === "historial" ? (
               <HistorialView
                 marcas={marcas}
@@ -136,7 +158,7 @@ function MarketingPage() {
             marcas={marcas}
             onOpenProyecto={(id) => navegar({ proyecto: id })}
             onNuevoProyecto={() => setShowNuevoProyecto(true)}
-            onOpenPapelera={() => navegar({ vista: "papelera" })}
+            onOpenAnulados={() => navegar({ vista: "anulados" })}
             onOpenReportes={() => navegar({ vista: "reportes" })}
             onOpenHistorial={() => navegar({ vista: "historial" })}
             refreshKey={refreshKey}

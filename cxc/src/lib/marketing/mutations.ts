@@ -196,17 +196,53 @@ export async function updateProyecto(
   return data as MkProyecto;
 }
 
+// Prefijo que marca una factura como anulada por cascada del proyecto.
+// Permite distinguirla de una factura anulada manualmente para que al
+// restaurar el proyecto se restauren también esas facturas (y no las que
+// el usuario anuló a mano).
+const CASCADA_PREFIX = "[Proyecto anulado]";
+
 export async function anularProyecto(id: string, motivo: string): Promise<void> {
+  // 1. Soft delete del proyecto.
   await anulacionSoftDelete("mk_proyectos", id, motivo);
+
+  // 2. Cascada: anular facturas vivas del proyecto con motivo prefijado.
+  const motivoFactura = `${CASCADA_PREFIX} ${normalizarTexto(motivo)}`.trim();
+  const { error: factErr } = await supabaseServer
+    .from("mk_facturas")
+    .update({
+      anulado_en: new Date().toISOString(),
+      anulado_motivo: motivoFactura,
+    })
+    .eq("proyecto_id", id)
+    .is("anulado_en", null);
+  if (factErr) {
+    throw new Error(`anularProyecto[facturas cascada]: ${factErr.message}`);
+  }
 }
 
 export async function restaurarProyecto(id: string): Promise<void> {
   if (!id) throw new Error("id requerido");
+
+  // 1. Restaurar el proyecto.
   const { error } = await supabaseServer
     .from("mk_proyectos")
     .update({ anulado_en: null, anulado_motivo: null })
     .eq("id", id);
   if (error) throw new Error(`restaurarProyecto: ${error.message}`);
+
+  // 2. Restaurar SOLO las facturas que fueron anuladas por la cascada
+  //    (motivo prefijado con CASCADA_PREFIX). Las facturas anuladas a mano
+  //    quedan como están — el usuario las restaurará individualmente si quiere.
+  const { error: factErr } = await supabaseServer
+    .from("mk_facturas")
+    .update({ anulado_en: null, anulado_motivo: null })
+    .eq("proyecto_id", id)
+    .not("anulado_en", "is", null)
+    .like("anulado_motivo", `${CASCADA_PREFIX}%`);
+  if (factErr) {
+    throw new Error(`restaurarProyecto[facturas cascada]: ${factErr.message}`);
+  }
 }
 
 // Transiciones de estado (workflow nuevo: abierto → enviado → cobrado)
@@ -496,6 +532,117 @@ export async function anulacionSoftDelete(
     })
     .eq("id", id);
   if (error) throw new Error(`anulacionSoftDelete[${tabla}]: ${error.message}`);
+}
+
+/**
+ * Hard delete de un proyecto anulado: borra el proyecto y sus dependencias
+ * (mk_factura_marcas, mk_proyecto_marcas, mk_facturas, mk_adjuntos).
+ * Valida que el proyecto esté anulado antes de borrar — nunca borra activos.
+ */
+export async function eliminarProyectoPermanente(id: string): Promise<void> {
+  if (!id) throw new Error("id requerido");
+
+  // Validar que esté anulado.
+  const { data: row, error: readErr } = await supabaseServer
+    .from("mk_proyectos")
+    .select("id, anulado_en")
+    .eq("id", id)
+    .maybeSingle();
+  if (readErr) throw new Error(`eliminarProyectoPermanente[read]: ${readErr.message}`);
+  if (!row) throw new Error("Proyecto no encontrado");
+  if (!(row as { anulado_en: string | null }).anulado_en) {
+    throw new Error("Solo se pueden eliminar proyectos previamente anulados");
+  }
+
+  // Reunir IDs de facturas del proyecto para borrar mk_factura_marcas y adjuntos hijos.
+  const { data: factRows, error: factErr } = await supabaseServer
+    .from("mk_facturas")
+    .select("id")
+    .eq("proyecto_id", id);
+  if (factErr) throw new Error(`eliminarProyectoPermanente[facturas read]: ${factErr.message}`);
+  const facturaIds = (factRows ?? []).map((r) => String((r as { id: string }).id));
+
+  // Borrar mk_factura_marcas y adjuntos de las facturas (si hay facturas).
+  if (facturaIds.length > 0) {
+    const { error: fmErr } = await supabaseServer
+      .from("mk_factura_marcas")
+      .delete()
+      .in("factura_id", facturaIds);
+    if (fmErr) throw new Error(`eliminarProyectoPermanente[factura_marcas]: ${fmErr.message}`);
+
+    const { error: adjFactErr } = await supabaseServer
+      .from("mk_adjuntos")
+      .delete()
+      .in("factura_id", facturaIds);
+    if (adjFactErr) throw new Error(`eliminarProyectoPermanente[adjuntos factura]: ${adjFactErr.message}`);
+  }
+
+  // Adjuntos del proyecto (fotos).
+  const { error: adjProyErr } = await supabaseServer
+    .from("mk_adjuntos")
+    .delete()
+    .eq("proyecto_id", id);
+  if (adjProyErr) throw new Error(`eliminarProyectoPermanente[adjuntos proyecto]: ${adjProyErr.message}`);
+
+  // mk_proyecto_marcas.
+  const { error: pmErr } = await supabaseServer
+    .from("mk_proyecto_marcas")
+    .delete()
+    .eq("proyecto_id", id);
+  if (pmErr) throw new Error(`eliminarProyectoPermanente[proyecto_marcas]: ${pmErr.message}`);
+
+  // Facturas.
+  if (facturaIds.length > 0) {
+    const { error: delFactErr } = await supabaseServer
+      .from("mk_facturas")
+      .delete()
+      .in("id", facturaIds);
+    if (delFactErr) throw new Error(`eliminarProyectoPermanente[facturas delete]: ${delFactErr.message}`);
+  }
+
+  // Proyecto.
+  const { error: delErr } = await supabaseServer
+    .from("mk_proyectos")
+    .delete()
+    .eq("id", id);
+  if (delErr) throw new Error(`eliminarProyectoPermanente[proyecto delete]: ${delErr.message}`);
+}
+
+/**
+ * Hard delete de una factura anulada: borra la factura y sus dependencias
+ * (mk_factura_marcas, mk_adjuntos). Valida que la factura esté anulada.
+ */
+export async function eliminarFacturaPermanente(id: string): Promise<void> {
+  if (!id) throw new Error("id requerido");
+
+  const { data: row, error: readErr } = await supabaseServer
+    .from("mk_facturas")
+    .select("id, anulado_en")
+    .eq("id", id)
+    .maybeSingle();
+  if (readErr) throw new Error(`eliminarFacturaPermanente[read]: ${readErr.message}`);
+  if (!row) throw new Error("Factura no encontrada");
+  if (!(row as { anulado_en: string | null }).anulado_en) {
+    throw new Error("Solo se pueden eliminar facturas previamente anuladas");
+  }
+
+  const { error: fmErr } = await supabaseServer
+    .from("mk_factura_marcas")
+    .delete()
+    .eq("factura_id", id);
+  if (fmErr) throw new Error(`eliminarFacturaPermanente[factura_marcas]: ${fmErr.message}`);
+
+  const { error: adjErr } = await supabaseServer
+    .from("mk_adjuntos")
+    .delete()
+    .eq("factura_id", id);
+  if (adjErr) throw new Error(`eliminarFacturaPermanente[adjuntos]: ${adjErr.message}`);
+
+  const { error: delErr } = await supabaseServer
+    .from("mk_facturas")
+    .delete()
+    .eq("id", id);
+  if (delErr) throw new Error(`eliminarFacturaPermanente[delete]: ${delErr.message}`);
 }
 
 /**

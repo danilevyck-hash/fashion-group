@@ -4,11 +4,11 @@
 // Estructura del ZIP:
 //   <Proyecto>.zip
 //     ├── respaldo.xlsx                 (1 hoja, 1 fila por factura)
-//     ├── <Marca>/
-//     │     └── facturas/<numero>.pdf   (copias de PDFs originales)
+//     ├── <Marca>/<numero>.pdf          (PDFs directo dentro de la carpeta de marca)
 //     └── fotos/                        (fotos del proyecto)
 //
 // Nota: ya no se genera "cobranza-<marca>.pdf" — simplificación pedida.
+// Tampoco hay subcarpeta "facturas/" dentro de la marca — los PDFs van directo.
 // ============================================================================
 
 import XLSX from "xlsx-js-style";
@@ -273,9 +273,6 @@ export async function generarZipProyecto(
     );
     if (facturasDeMarca.length === 0) continue;
 
-    const facturasFolder = folder.folder("facturas");
-    if (!facturasFolder) continue;
-
     for (const f of facturasDeMarca) {
       const adjs = adjuntosByFactura.get(f.id) ?? [];
       const pdfs = adjs.filter((a) => a.tipo === "pdf_factura");
@@ -283,7 +280,7 @@ export async function generarZipProyecto(
         try {
           const fallback = `${sanitizar(f.numero_factura)}.pdf`;
           const { blob, filename } = await resolverAdjunto(a, fallback);
-          facturasFolder.file(filename, blob);
+          folder.file(filename, blob);
         } catch (err) {
           const razon = err instanceof Error ? err.message : "desconocido";
           console.warn(`[zip] factura adjunto ${a.id} skip: ${razon}`);

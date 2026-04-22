@@ -42,7 +42,7 @@ interface Props {
   marcas: MkMarca[];
   onOpenProyecto: (id: string) => void;
   onNuevoProyecto: () => void;
-  onOpenPapelera: () => void;
+  onOpenAnulados: () => void;
   onOpenReportes: () => void;
   onOpenHistorial: () => void;
   refreshKey: number;
@@ -70,7 +70,7 @@ export default function ProyectosHomeView({
   marcas,
   onOpenProyecto,
   onNuevoProyecto,
-  onOpenPapelera,
+  onOpenAnulados,
   onOpenReportes,
   onOpenHistorial,
   refreshKey,
@@ -274,10 +274,10 @@ export default function ProyectosHomeView({
           <span className="text-gray-300">·</span>
           <button
             type="button"
-            onClick={onOpenPapelera}
+            onClick={onOpenAnulados}
             className="text-gray-600 hover:text-black transition"
           >
-            Papelera
+            Anulados
           </button>
           <button
             type="button"
@@ -561,7 +561,7 @@ export default function ProyectosHomeView({
             <h3 className="text-base font-semibold mb-1">Anular proyecto</h3>
             <p className="text-sm text-gray-500 mb-4">
               Vas a anular &ldquo;{anularPendiente.nombre}&rdquo;. Podrás
-              restaurarlo desde Papelera.
+              restaurarlo desde Anulados.
             </p>
             <label
               htmlFor="mk-motivo-anular-card"

@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await supabaseServer
       .from("mk_facturas")
       .select(
-        "id, numero_factura, proveedor, total, proyecto_id, proyecto:mk_proyectos(id, nombre, tienda)",
+        "id, numero_factura, proveedor, total, proyecto_id, created_at, fecha_factura, proyecto:mk_proyectos(id, nombre, tienda)",
       )
       .eq("numero_factura", numeroFactura)
       .ilike("proveedor", proveedor)
@@ -42,6 +42,8 @@ export async function GET(req: NextRequest) {
       proveedor: string;
       total: number;
       proyecto_id: string;
+      created_at: string | null;
+      fecha_factura: string | null;
       proyecto:
         | { id: string; nombre: string | null; tienda: string | null }
         | Array<{ id: string; nombre: string | null; tienda: string | null }>
@@ -60,6 +62,8 @@ export async function GET(req: NextRequest) {
         total: Number(r.total ?? 0),
         proyecto_id: String(r.proyecto_id),
         proyecto_nombre: proyectoNombre,
+        created_at: r.created_at ? String(r.created_at) : null,
+        fecha_factura: r.fecha_factura ? String(r.fecha_factura) : null,
         es_mismo_proyecto: proyectoIdActual
           ? String(r.proyecto_id) === proyectoIdActual
           : false,
