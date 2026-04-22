@@ -97,30 +97,34 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </button>
         </div>
-        {/* Breadcrumb bar único — desktop only, siempre visible. hideBreadcrumbBar queda como escape hatch. */}
-        {!hideBreadcrumbBar && (
-          <div className="hidden sm:flex flex-wrap px-6 py-1 text-[11px] text-gray-400 items-center gap-1">
-            <button onClick={() => router.push("/home")} className="hover:text-gray-700 transition">Inicio</button>
-            <span>›</span>
-            <span className={breadcrumbs?.length ? "" : "text-gray-500"}>
-              {breadcrumbs?.length ? (
-                <button onClick={() => router.push(pathname.split("/").slice(0, 2).join("/"))} className="hover:text-gray-700 transition">{module}</button>
-              ) : (
-                module
-              )}
-            </span>
-            {breadcrumbs?.map((b, i) => (
-              <span key={i} className="flex items-center gap-1">
-                <span>›</span>
-                {b.onClick ? (
-                  <button onClick={b.onClick} className="hover:text-gray-700 transition">{b.label}</button>
-                ) : (
-                  <span className="text-gray-500">{b.label}</span>
-                )}
-              </span>
-            ))}
-          </div>
-        )}
+        {/* Breadcrumb bar único — desktop only, siempre visible. hideBreadcrumbBar queda como escape hatch.
+            Todos los segmentos excepto el último son clicables. El último (página actual) es texto plano. */}
+        {!hideBreadcrumbBar && (() => {
+          const moduleBaseHref = pathname.split("/").slice(0, 2).join("/") || "/home";
+          const segments: { label: string; onClick?: () => void }[] = [
+            { label: "Inicio", onClick: () => router.push("/home") },
+            { label: module, onClick: () => router.push(moduleBaseHref) },
+            ...(breadcrumbs ?? []).map(b => ({ label: b.label, onClick: b.onClick })),
+          ];
+          const lastIndex = segments.length - 1;
+          return (
+            <div className="hidden sm:flex flex-wrap px-6 py-1 text-[11px] text-gray-400 items-center gap-1">
+              {segments.map((seg, i) => {
+                const isLast = i === lastIndex;
+                return (
+                  <span key={i} className="flex items-center gap-1">
+                    {i > 0 && <span>›</span>}
+                    {isLast || !seg.onClick ? (
+                      <span className="text-gray-600 font-medium cursor-default">{seg.label}</span>
+                    ) : (
+                      <button onClick={seg.onClick} className="hover:text-gray-700 hover:underline transition cursor-pointer">{seg.label}</button>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+          );
+        })()}
       </div>
 
       {/* Mobile search overlay */}
