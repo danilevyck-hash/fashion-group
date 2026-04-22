@@ -6,11 +6,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { MkMarca } from "@/lib/marketing/types";
-import { EstadoBadge } from "@/components/marketing";
+import { BotonDescargarZip, EstadoBadge } from "@/components/marketing";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmModal } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
+import { useDescargarZip } from "@/lib/marketing/useDescargarZip";
 
 type FiltroEstado =
   | "activos"
@@ -91,7 +92,7 @@ export default function ProyectosHomeView({
     | null
   >(null);
   const [accionLoading, setAccionLoading] = useState(false);
-  const [zipLoadingId, setZipLoadingId] = useState<string | null>(null);
+  const { estados: zipEstados, descargar: descargarZip } = useDescargarZip();
   const [anularPendiente, setAnularPendiente] = useState<
     { id: string; nombre: string } | null
   >(null);
@@ -165,33 +166,6 @@ export default function ProyectosHomeView({
       toast(err instanceof Error ? err.message : "Error", "error");
     } finally {
       setAccionLoading(false);
-    }
-  };
-
-  const descargarZip = async (id: string) => {
-    setZipLoadingId(id);
-    try {
-      const res = await fetch(
-        `/api/marketing/proyectos/${id}/datos-zip`,
-        { cache: "no-store" },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo preparar el ZIP");
-      }
-      const data = await res.json();
-      const { generarZipProyecto } = await import(
-        "@/lib/marketing/generar-zip"
-      );
-      await generarZipProyecto(data);
-      toast("ZIP descargado", "success");
-    } catch (err) {
-      toast(
-        err instanceof Error ? err.message : "Error descargando ZIP",
-        "error",
-      );
-    } finally {
-      setZipLoadingId(null);
     }
   };
 
@@ -500,17 +474,12 @@ export default function ProyectosHomeView({
                       Reabrir
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      descargarZip(p.id);
-                    }}
-                    disabled={zipLoadingId === p.id}
-                    className="text-xs rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50 active:scale-[0.97] transition"
-                  >
-                    {zipLoadingId === p.id ? "Descargando…" : "Descargar ZIP"}
-                  </button>
+                  <span onClick={(e) => e.stopPropagation()}>
+                    <BotonDescargarZip
+                      estado={zipEstados[p.id]}
+                      onClick={() => descargarZip(p.id)}
+                    />
+                  </span>
                   <div
                     className="ml-auto"
                     onClick={(e) => e.stopPropagation()}

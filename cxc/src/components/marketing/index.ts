@@ -12,3 +12,4 @@ export { ProyectoCard } from "./ProyectoCard";
 export { FacturaCard } from "./FacturaCard";
 export { ProyectoForm } from "./ProyectoForm";
 export { FacturaForm } from "./FacturaForm";
+export { BotonDescargarZip } from "./BotonDescargarZip";

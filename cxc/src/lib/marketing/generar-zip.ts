@@ -291,17 +291,32 @@ function generarRespaldoExcel(
 // ----------------------------------------------------------------------------
 // Ensamblador principal
 // ----------------------------------------------------------------------------
+
+export type EtapaZip =
+  | "Descargando facturas..."
+  | "Procesando fotos..."
+  | "Generando Excel..."
+  | "Comprimiendo archivo...";
+
+export interface GenerarZipOptions {
+  onEtapa?: (etapa: EtapaZip) => void;
+}
+
+// Pequeño yield al event loop para que React repinte el UI con la nueva etapa
+// antes de bloquearse en el siguiente await pesado.
+function yieldUI(): Promise<void> {
+  return new Promise((r) => setTimeout(r, 0));
+}
+
 export async function generarZipProyecto(
   datos: DatosZipProyecto,
+  opts: GenerarZipOptions = {},
 ): Promise<void> {
   const { proyecto, facturas, adjuntosFacturas, fotosProyecto, marcasInvolucradas } = datos;
+  const { onEtapa } = opts;
   const vigentes = facturas.filter((f) => !f.anulado_en);
   const zip = new JSZip();
   const errores: Array<{ id: string; tipo: string; razon: string }> = [];
-
-  // Excel maestro
-  const excelBlob = generarRespaldoExcel(proyecto, vigentes, marcasInvolucradas);
-  zip.file("respaldo.xlsx", excelBlob);
 
   // Índice de adjuntos de factura por facturaId
   const adjuntosByFactura = new Map<string, MkAdjunto[]>();
@@ -312,7 +327,10 @@ export async function generarZipProyecto(
     adjuntosByFactura.set(a.factura_id, arr);
   }
 
-  // Una carpeta por marca, con los PDFs originales de sus facturas.
+  // ── Etapa 1: descargar PDFs de facturas ──────────────────────────────────
+  onEtapa?.("Descargando facturas...");
+  await yieldUI();
+
   for (const marca of marcasInvolucradas) {
     const slug = sanitizar(marca.nombre);
     const folder = zip.folder(slug);
@@ -344,8 +362,11 @@ export async function generarZipProyecto(
     }
   }
 
-  // Fotos del proyecto
+  // ── Etapa 2: procesar fotos del proyecto ─────────────────────────────────
   if (fotosProyecto.length > 0) {
+    onEtapa?.("Procesando fotos...");
+    await yieldUI();
+
     const fotosFolder = zip.folder("fotos");
     if (fotosFolder) {
       for (let i = 0; i < fotosProyecto.length; i++) {
@@ -371,6 +392,12 @@ export async function generarZipProyecto(
     }
   }
 
+  // ── Etapa 3: generar Excel maestro ───────────────────────────────────────
+  onEtapa?.("Generando Excel...");
+  await yieldUI();
+  const excelBlob = generarRespaldoExcel(proyecto, vigentes, marcasInvolucradas);
+  zip.file("respaldo.xlsx", excelBlob);
+
   if (errores.length > 0) {
     const lineas = [
       "Algunos adjuntos no se pudieron empaquetar en este ZIP.",
@@ -382,6 +409,9 @@ export async function generarZipProyecto(
     zip.file("README_errores.txt", lineas.join("\n"));
   }
 
+  // ── Etapa 4: comprimir ZIP final ─────────────────────────────────────────
+  onEtapa?.("Comprimiendo archivo...");
+  await yieldUI();
   const blob = await zip.generateAsync({ type: "blob" });
   const nombre = sanitizar(proyecto.nombre ?? proyecto.tienda ?? "proyecto");
   saveAs(blob, `${nombre}.zip`);
