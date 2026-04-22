@@ -65,14 +65,14 @@ export default function KpiCards({ roleClients, riskFilter, onRiskFilterChange }
   ];
 
   return (
-    <div className="grid grid-cols-4 gap-2 mb-4">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
       {cards.map((card) => {
         const isActive = riskFilter === card.key;
         return (
           <button
             key={card.key}
             onClick={() => onRiskFilterChange(card.key)}
-            className={`rounded-lg px-3 py-2.5 text-left transition-all ${
+            className={`rounded-lg px-2 sm:px-3 py-2 sm:py-2.5 text-left transition-all ${
               isActive
                 ? `border-2 ${card.activeColor} bg-white`
                 : "border border-gray-200 bg-white hover:bg-gray-50"

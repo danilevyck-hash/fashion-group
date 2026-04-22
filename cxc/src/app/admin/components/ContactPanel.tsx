@@ -129,7 +129,7 @@ export default function ContactPanel({
           {actionsMenuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setActionsMenuOpen(false); }} />
-              <div className="absolute left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[180px] py-1" onClick={(e) => e.stopPropagation()} role="menu">
+              <div className="absolute left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-20 min-w-[150px] max-w-[90vw] max-h-[60vh] overflow-y-auto py-1" onClick={(e) => e.stopPropagation()} role="menu">
                 <button
                   onClick={(e) => { e.stopPropagation(); setActionsMenuOpen(false); onOpenEmail(client); }}
                   className="w-full text-left px-3 py-2 text-xs text-gray-700 hover:bg-gray-50 flex items-center gap-2"
