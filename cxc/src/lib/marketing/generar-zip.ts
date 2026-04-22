@@ -127,7 +127,10 @@ function generarPdfMarca(
   const w = doc.internal.pageSize.getWidth();
   let y = 12;
 
-  doc.addImage(FG_LOGO_BASE64, "PNG", 12, y, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
+  // FG_LOGO_BASE64 es JPEG (empieza con /9j/). Pasar "PNG" hacía que jsPDF
+  // tirara "wrong PNG signature" + el browser hacía GET data:image/jpeg;...
+  // → ERR_INVALID_URL. Confirmado: todos los demás módulos usan "JPEG".
+  doc.addImage(FG_LOGO_BASE64, "JPEG", 12, y, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
   y += FG_LOGO_HEIGHT + 4;
   doc.setFontSize(14).setFont("helvetica", "bold");
   doc.text(`Cobranza — ${marca.nombre}`, 12, y);
