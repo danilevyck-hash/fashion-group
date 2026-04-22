@@ -136,9 +136,15 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
             {fotos.map((f) => {
               const conError = fotosConError.has(f.id);
+              const urlLower = (f.url ?? "").toLowerCase();
+              const nombreLower = (f.nombre_original ?? "").toLowerCase();
               const esHeic =
-                (f.nombre_original ?? "").toLowerCase().endsWith(".heic") ||
-                (f.url ?? "").toLowerCase().includes(".heic");
+                nombreLower.endsWith(".heic") ||
+                urlLower.includes(".heic") ||
+                urlLower.startsWith("data:image/heic");
+              // Fotos legacy pueden venir como data URL (data:image/...).
+              // El <img> las renderiza nativamente; solo cae al fallback si
+              // el onError se dispara (data corrupta).
               return (
               <div
                 key={f.id}

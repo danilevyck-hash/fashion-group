@@ -35,6 +35,66 @@ const fetchFile: FetchFile = async (url) => {
   return res.blob();
 };
 
+// Decodifica una data URL (data:<mime>;base64,<payload>) a Blob.
+// Si el formato está corrupto tira Error — el caller decide si skippear.
+function dataUrlABlob(dataUrl: string): { blob: Blob; mime: string; ext: string } {
+  const idx = dataUrl.indexOf(",");
+  if (!dataUrl.toLowerCase().startsWith("data:") || idx < 0) {
+    throw new Error("data URL malformada");
+  }
+  const meta = dataUrl.slice(5, idx); // después de "data:"
+  const payload = dataUrl.slice(idx + 1);
+  const mime = (meta.split(";")[0] || "application/octet-stream").trim();
+  const esBase64 = /;base64/i.test(meta);
+  let buffer: ArrayBuffer;
+  if (esBase64) {
+    const bin = atob(payload.replace(/\s+/g, ""));
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    buffer = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer;
+  } else {
+    const decoded = decodeURIComponent(payload);
+    const bytes = new TextEncoder().encode(decoded);
+    buffer = bytes.buffer.slice(
+      bytes.byteOffset,
+      bytes.byteOffset + bytes.byteLength,
+    ) as ArrayBuffer;
+  }
+  const extMap: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "image/webp": "webp",
+    "image/heic": "heic",
+    "application/pdf": "pdf",
+  };
+  const ext = extMap[mime.toLowerCase()] ?? mime.split("/")[1] ?? "bin";
+  return { blob: new Blob([buffer], { type: mime }), mime, ext };
+}
+
+// Devuelve { blob, nombreArchivo } para cualquier adjunto, sea Storage o data URL.
+async function resolverAdjunto(
+  adj: MkAdjunto,
+  fallbackName: string,
+): Promise<{ blob: Blob; filename: string }> {
+  const url = adj.url ?? "";
+  if (url.toLowerCase().startsWith("data:")) {
+    const { blob, ext } = dataUrlABlob(url);
+    const baseNombre = adj.nombre_original
+      ? sanitizar(adj.nombre_original.replace(/\.[^.]+$/, ""))
+      : `legacy_${adj.id}`;
+    const tieneExt = /\.[^.\\/]+$/.test(baseNombre);
+    const filename = tieneExt ? baseNombre : `${baseNombre}.${ext}`;
+    return { blob, filename };
+  }
+  const blob = await fetchFile(url);
+  return { blob, filename: fallbackName };
+}
+
 interface FacturaConMarcas extends MkFactura {
   marcas: MarcaConPorcentaje[];
 }
@@ -209,6 +269,7 @@ export async function generarZipProyecto(
   const { proyecto, facturas, adjuntosFacturas, fotosProyecto, marcasInvolucradas } = datos;
   const vigentes = facturas.filter((f) => !f.anulado_en);
   const zip = new JSZip();
+  const errores: Array<{ id: string; tipo: string; razon: string }> = [];
 
   // Excel maestro
   const excelBlob = generarRespaldoExcel(proyecto, vigentes, marcasInvolucradas);
@@ -237,7 +298,7 @@ export async function generarZipProyecto(
       const pdf = generarPdfMarca(proyecto, marca, facturasDeMarca);
       folder.file(`cobranza-${slug.toLowerCase()}.pdf`, pdf);
 
-      // Copias de facturas originales (PDFs de Storage)
+      // Copias de facturas originales (Storage o data URL legacy)
       const facturasFolder = folder.folder("facturas");
       if (facturasFolder) {
         for (const f of facturasDeMarca) {
@@ -245,11 +306,19 @@ export async function generarZipProyecto(
           const pdfs = adjs.filter((a) => a.tipo === "pdf_factura");
           for (const a of pdfs) {
             try {
-              const blob = await fetchFile(a.url);
-              const filename = `${sanitizar(f.numero_factura)}.pdf`;
+              const fallback = `${sanitizar(f.numero_factura)}.pdf`;
+              const { blob, filename } = await resolverAdjunto(a, fallback);
               facturasFolder.file(filename, blob);
-            } catch {
-              /* ignorar fallas puntuales de descarga */
+            } catch (err) {
+              const razon = err instanceof Error ? err.message : "desconocido";
+              console.warn(
+                `[zip] factura adjunto ${a.id} skip: ${razon}`,
+              );
+              errores.push({
+                id: a.id,
+                tipo: `pdf_factura (${f.numero_factura})`,
+                razon,
+              });
             }
           }
         }
@@ -264,17 +333,40 @@ export async function generarZipProyecto(
       for (let i = 0; i < fotosProyecto.length; i++) {
         const foto = fotosProyecto[i];
         try {
-          const blob = await fetchFile(foto.url);
           const ext = foto.nombre_original?.split(".").pop() ?? "jpg";
           const base = foto.nombre_original
             ? sanitizar(foto.nombre_original.replace(/\.[^.]+$/, ""))
             : `foto-${i + 1}`;
-          fotosFolder.file(`${base}.${ext}`, blob);
-        } catch {
-          /* ignorar */
+          const fallback = `${base}.${ext}`;
+          const { blob, filename } = await resolverAdjunto(foto, fallback);
+          fotosFolder.file(filename, blob);
+        } catch (err) {
+          const razon = err instanceof Error ? err.message : "desconocido";
+          console.warn(`[zip] foto ${foto.id} skip: ${razon}`);
+          errores.push({
+            id: foto.id,
+            tipo: `foto_proyecto${foto.nombre_original ? ` (${foto.nombre_original})` : ""}`,
+            razon,
+          });
         }
       }
     }
+  }
+
+  // Si hubo adjuntos saltados, dejar README para el usuario.
+  if (errores.length > 0) {
+    const lineas = [
+      "Algunos adjuntos no se pudieron empaquetar en este ZIP.",
+      "El resto del contenido (facturas PDF, Excel, y demás fotos) está OK.",
+      "",
+      "Adjuntos saltados:",
+      ...errores.map((e) => `  • [${e.tipo}] id=${e.id} — ${e.razon}`),
+      "",
+      "Si un adjunto aparece aquí repetidamente, probablemente está guardado",
+      "en un formato legacy (data URL en mk_adjuntos.url) con data corrupta",
+      "o falta el archivo en Storage. Reporta el id al equipo.",
+    ];
+    zip.file("README_errores.txt", lineas.join("\n"));
   }
 
   const blob = await zip.generateAsync({ type: "blob" });
