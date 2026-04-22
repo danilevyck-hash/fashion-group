@@ -2,10 +2,9 @@
 
 // Fase 4: overlay simplificado con workflow abierto → enviado → cobrado.
 // Tabs: Facturas, Fotos. Sin "Cobrar" tab ni cobranzas como entidad.
-// Acciones arriba según estado:
-//   abierto  → [Marcar como enviado] + [···] (Anular)
-//   enviado  → [Marcar como cobrado] + [Descargar ZIP] + [···] (Reabrir, Anular)
-//   cobrado  → [Descargar ZIP] + [···] (Reabrir). Tabs read-only.
+// Las acciones de workflow (marcar enviado/cobrado, reabrir, descargar ZIP)
+// viven en cada card del listado de proyectos. Aquí en el modal solo dejamos
+// "Descargar ZIP" (conveniencia) y "Anular" (vía OverflowMenu).
 
 import {
   useCallback,
@@ -15,7 +14,6 @@ import {
   useState,
 } from "react";
 import { useToast } from "@/components/ToastSystem";
-import { ConfirmModal } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import { EstadoBadge, MarcaBadge } from "@/components/marketing";
 import {
@@ -56,13 +54,7 @@ export default function ProyectoOverlay({
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("facturas");
 
-  // Confirmaciones de transición
-  const [showEnviar, setShowEnviar] = useState(false);
-  const [enviando, setEnviando] = useState(false);
-  const [showCobrar, setShowCobrar] = useState(false);
-  const [cobrando, setCobrando] = useState(false);
-  const [showReabrir, setShowReabrir] = useState(false);
-  const [reabriendo, setReabriendo] = useState(false);
+  // Anular (única transición que vive en el modal — el resto vive en las cards)
   const [showAnular, setShowAnular] = useState(false);
   const [anularMotivo, setAnularMotivo] = useState("");
   const [anulando, setAnulando] = useState(false);
@@ -136,80 +128,6 @@ export default function ProyectoOverlay({
     });
   }, [proyecto, totales.total]);
 
-  const handleMarcarEnviado = async () => {
-    if (!proyecto) return;
-    setEnviando(true);
-    try {
-      const res = await fetch(
-        `/api/marketing/proyectos/${proyecto.id}/marcar-enviado`,
-        { method: "POST" },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo marcar como enviado");
-      }
-      toast("Proyecto marcado como enviado", "success");
-      setShowEnviar(false);
-      await cargar();
-      onChange();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error";
-      toast(msg, "error");
-    } finally {
-      setEnviando(false);
-    }
-  };
-
-  const handleMarcarCobrado = async () => {
-    if (!proyecto) return;
-    setCobrando(true);
-    try {
-      const res = await fetch(
-        `/api/marketing/proyectos/${proyecto.id}/marcar-cobrado`,
-        { method: "POST" },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo marcar como cobrado");
-      }
-      toast("Proyecto archivado como cobrado", "success");
-      setShowCobrar(false);
-      await cargar();
-      onChange();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error";
-      toast(msg, "error");
-    } finally {
-      setCobrando(false);
-    }
-  };
-
-  const handleReabrir = async () => {
-    if (!proyecto) return;
-    setReabriendo(true);
-    try {
-      const res = await fetch(
-        `/api/marketing/proyectos/${proyecto.id}/reabrir`,
-        { method: "POST" },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo reabrir");
-      }
-      const data = (await res.json()) as { destino: string };
-      toast(`Proyecto reabierto a ${data.destino}`, "success");
-      setShowReabrir(false);
-      setTab("facturas");
-      await cargar();
-      onChange();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error";
-      toast(msg, "error");
-    } finally {
-      setReabriendo(false);
-    }
-  };
-
   const handleAnular = async () => {
     if (!proyecto || !anularMotivo.trim()) return;
     setAnulando(true);
@@ -278,7 +196,6 @@ export default function ProyectoOverlay({
 
   const esCobrado = proyecto.estado === "cobrado";
   const esEnviado = proyecto.estado === "enviado";
-  const esAbierto = proyecto.estado === "abierto";
   const puedeEditar = !esCobrado && !proyecto.anulado_en;
 
   const overflowItems: Array<{
@@ -286,12 +203,6 @@ export default function ProyectoOverlay({
     onClick: () => void;
     destructive?: boolean;
   }> = [];
-  if (esEnviado || esCobrado) {
-    overflowItems.push({
-      label: esCobrado ? "Reabrir (vuelve a Enviado)" : "Reabrir (vuelve a Abierto)",
-      onClick: () => setShowReabrir(true),
-    });
-  }
   if (!esCobrado && !proyecto.anulado_en) {
     overflowItems.push({
       label: "Anular proyecto",
@@ -317,35 +228,7 @@ export default function ProyectoOverlay({
               ← Listo
             </button>
             <div className="flex items-center gap-2">
-              {esAbierto && (
-                <button
-                  type="button"
-                  onClick={() => setShowEnviar(true)}
-                  className="rounded-md bg-black text-white px-3 py-1.5 text-xs active:scale-[0.97] transition"
-                >
-                  Marcar como enviado
-                </button>
-              )}
-              {esEnviado && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setShowCobrar(true)}
-                    className="rounded-md bg-black text-white px-3 py-1.5 text-xs active:scale-[0.97] transition"
-                  >
-                    Marcar como cobrado
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleDescargarZip}
-                    disabled={descargando}
-                    className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-1.5 text-xs hover:bg-gray-50 disabled:opacity-50 transition"
-                  >
-                    {descargando ? "Descargando…" : "Descargar ZIP"}
-                  </button>
-                </>
-              )}
-              {esCobrado && (
+              {(esEnviado || esCobrado) && (
                 <button
                   type="button"
                   onClick={handleDescargarZip}
@@ -532,41 +415,6 @@ export default function ProyectoOverlay({
             />
           )}
         </div>
-
-        {/* Confirmación Enviar */}
-        <ConfirmModal
-          open={showEnviar}
-          onClose={() => !enviando && setShowEnviar(false)}
-          onConfirm={handleMarcarEnviado}
-          title="Marcar como enviado"
-          message="¿Confirmas que ya enviaste este proyecto al proveedor?"
-          confirmLabel="Marcar enviado"
-          loading={enviando}
-        />
-
-        {/* Confirmación Cobrar */}
-        <ConfirmModal
-          open={showCobrar}
-          onClose={() => !cobrando && setShowCobrar(false)}
-          onConfirm={handleMarcarCobrado}
-          title="Marcar como cobrado"
-          message="¿Confirmas que ya recibiste el pago/NC del proveedor? El proyecto pasará al historial."
-          confirmLabel="Marcar cobrado"
-          loading={cobrando}
-        />
-
-        {/* Confirmación Reabrir */}
-        <ConfirmModal
-          open={showReabrir}
-          onClose={() => !reabriendo && setShowReabrir(false)}
-          onConfirm={handleReabrir}
-          title="Reabrir proyecto"
-          message={`¿Seguro que quieres reabrir? El proyecto volverá a estado ${
-            esCobrado ? "Enviado" : "Abierto"
-          }.`}
-          confirmLabel="Reabrir"
-          loading={reabriendo}
-        />
 
         {showAnular && (
           <div

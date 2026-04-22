@@ -3,22 +3,17 @@
 // ============================================================================
 // Estructura del ZIP:
 //   <Proyecto>.zip
-//     ├── respaldo.xlsx                 (todas las facturas con splits)
+//     ├── respaldo.xlsx                 (1 hoja, 1 fila por factura)
 //     ├── <Marca>/
-//     │     ├── cobranza-<marca>.pdf    (PDF consolidado de esa marca)
 //     │     └── facturas/<numero>.pdf   (copias de PDFs originales)
 //     └── fotos/                        (fotos del proyecto)
 //
-// Este reemplaza el flujo previo que dependía de mk_cobranzas.
+// Nota: ya no se genera "cobranza-<marca>.pdf" — simplificación pedida.
 // ============================================================================
 
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
 import XLSX from "xlsx-js-style";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
-import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
-import { formatearMonto, formatearFecha } from "./normalizar";
 import type {
   MarcaConPorcentaje,
   MkAdjunto,
@@ -35,14 +30,12 @@ const fetchFile: FetchFile = async (url) => {
   return res.blob();
 };
 
-// Decodifica una data URL (data:<mime>;base64,<payload>) a Blob.
-// Si el formato está corrupto tira Error — el caller decide si skippear.
 function dataUrlABlob(dataUrl: string): { blob: Blob; mime: string; ext: string } {
   const idx = dataUrl.indexOf(",");
   if (!dataUrl.toLowerCase().startsWith("data:") || idx < 0) {
     throw new Error("data URL malformada");
   }
-  const meta = dataUrl.slice(5, idx); // después de "data:"
+  const meta = dataUrl.slice(5, idx);
   const payload = dataUrl.slice(idx + 1);
   const mime = (meta.split(";")[0] || "application/octet-stream").trim();
   const esBase64 = /;base64/i.test(meta);
@@ -76,7 +69,6 @@ function dataUrlABlob(dataUrl: string): { blob: Blob; mime: string; ext: string 
   return { blob: new Blob([buffer], { type: mime }), mime, ext };
 }
 
-// Devuelve { blob, nombreArchivo } para cualquier adjunto, sea Storage o data URL.
 async function resolverAdjunto(
   adj: MkAdjunto,
   fallbackName: string,
@@ -115,147 +107,130 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
-// ----------------------------------------------------------------------------
-// PDF consolidado por marca
-// ----------------------------------------------------------------------------
-function generarPdfMarca(
-  proyecto: MkProyecto,
-  marca: MkMarca,
-  facturas: FacturaConMarcas[],
-): Blob {
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const w = doc.internal.pageSize.getWidth();
-  let y = 12;
-
-  // FG_LOGO_BASE64 es JPEG (empieza con /9j/). Pasar "PNG" hacía que jsPDF
-  // tirara "wrong PNG signature" + el browser hacía GET data:image/jpeg;...
-  // → ERR_INVALID_URL. Confirmado: todos los demás módulos usan "JPEG".
-  doc.addImage(FG_LOGO_BASE64, "JPEG", 12, y, FG_LOGO_WIDTH, FG_LOGO_HEIGHT);
-  y += FG_LOGO_HEIGHT + 4;
-  doc.setFontSize(14).setFont("helvetica", "bold");
-  doc.text(`Cobranza — ${marca.nombre}`, 12, y);
-  y += 6;
-  doc.setFontSize(10).setFont("helvetica", "normal");
-  doc.text(`Proyecto: ${proyecto.nombre ?? proyecto.tienda}`, 12, y);
-  y += 5;
-  doc.text(`Tienda: ${proyecto.tienda}`, 12, y);
-  y += 5;
-  doc.text(`Fecha: ${formatearFecha(new Date())}`, 12, y);
-  y += 8;
-
-  // Tabla de facturas: Nº | Fecha | Proveedor | Concepto | Total | % | Cobrable
-  const rows = facturas
-    .map((f) => {
-      const mm = f.marcas.find((m) => m.marca.id === marca.id);
-      if (!mm) return null;
-      const cobrable = round2((f.total * mm.porcentaje) / 100);
-      return [
-        f.numero_factura,
-        formatearFecha(f.fecha_factura),
-        f.proveedor,
-        f.concepto,
-        formatearMonto(f.total),
-        `${mm.porcentaje}%`,
-        formatearMonto(cobrable),
-      ];
-    })
-    .filter((r): r is string[] => r !== null);
-
-  const totalCobrable = rows.reduce((acc, r) => {
-    const n = Number(r[6].replace(/[^0-9.-]/g, ""));
-    return acc + (Number.isFinite(n) ? n : 0);
-  }, 0);
-
-  autoTable(doc, {
-    startY: y,
-    head: [["Nº Factura", "Fecha", "Proveedor", "Concepto", "Total", "%", "Cobrable"]],
-    body: rows,
-    foot: [["", "", "", "", "", "Total", formatearMonto(totalCobrable)]],
-    headStyles: { fillColor: [31, 41, 55], textColor: 255 },
-    footStyles: { fillColor: [243, 244, 246], textColor: 0, fontStyle: "bold" },
-    styles: { fontSize: 8, cellPadding: 2 },
-    columnStyles: {
-      4: { halign: "right" },
-      5: { halign: "right" },
-      6: { halign: "right" },
-    },
-    margin: { left: 12, right: 12 },
-  });
-
-  return doc.output("blob");
+// Formato "abril 2026" en español desde una fecha ISO.
+function mesEjecucion(isoString: string | null): string {
+  if (!isoString) return "";
+  const d = new Date(isoString);
+  if (Number.isNaN(d.getTime())) return "";
+  const meses = [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+  ];
+  return `${meses[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 // ----------------------------------------------------------------------------
-// Excel maestro de respaldo
+// Excel maestro — 1 hoja, 1 fila por factura, fila TOTALES al final
 // ----------------------------------------------------------------------------
 function generarRespaldoExcel(
   proyecto: MkProyecto,
   facturas: FacturaConMarcas[],
-  marcasInvolucradas: MkMarca[],
+  marcasDelProyecto: MkMarca[],
 ): Blob {
-  // Hoja 1: resumen
-  const resumenRows: (string | number)[][] = [
-    ["Proyecto", proyecto.nombre ?? proyecto.tienda],
-    ["Tienda", proyecto.tienda],
-    ["Estado", proyecto.estado],
-    [
-      "Fecha enviado",
-      proyecto.fecha_enviado ? formatearFecha(proyecto.fecha_enviado) : "—",
-    ],
-    [
-      "Fecha cobrado",
-      proyecto.fecha_cobrado ? formatearFecha(proyecto.fecha_cobrado) : "—",
-    ],
-    [],
-    ["Totales por marca"],
-    ["Marca", "Cobrable"],
-  ];
-  for (const marca of marcasInvolucradas) {
-    const suma = facturas.reduce((acc, f) => {
-      const mm = f.marcas.find((m) => m.marca.id === marca.id);
-      if (!mm) return acc;
-      return acc + (f.total * mm.porcentaje) / 100;
-    }, 0);
-    resumenRows.push([marca.nombre, round2(suma)]);
-  }
+  const mes = mesEjecucion(proyecto.fecha_enviado ?? proyecto.created_at ?? null);
+  const nombreProy = proyecto.nombre ?? proyecto.tienda ?? "";
 
-  // Hoja 2: detalle por factura con split por marca
-  const detalleHeader = [
-    "Nº Factura",
-    "Fecha",
+  // Columnas fijas + dinámicas por marca + comentarios al final
+  const header: string[] = [
+    "Mes ejecución",
+    "Proyecto",
+    "Tienda",
     "Proveedor",
-    "Concepto",
+    "Factura N°",
+    "Detalle",
     "Subtotal",
     "ITBMS",
     "Total",
-    ...marcasInvolucradas.flatMap((m) => [`% ${m.nombre}`, `Cobrable ${m.nombre}`]),
+    ...marcasDelProyecto.flatMap((m) => [`% ${m.nombre}`, `Cobrable ${m.nombre}`]),
+    "Comentarios",
   ];
-  const detalleRows = facturas.map((f) => {
-    const base: (string | number)[] = [
-      f.numero_factura,
-      formatearFecha(f.fecha_factura),
+
+  // Body
+  type Celda = string | number;
+  const rows: Celda[][] = facturas.map((f) => {
+    const row: Celda[] = [
+      mes,
+      nombreProy,
+      proyecto.tienda,
       f.proveedor,
-      f.concepto,
-      f.subtotal,
-      f.itbms,
-      f.total,
+      f.numero_factura,
+      nombreProy, // Detalle = mismo que Proyecto, confirmado por Daniel
+      round2(f.subtotal),
+      round2(f.itbms),
+      round2(f.total),
     ];
-    for (const marca of marcasInvolucradas) {
+    for (const marca of marcasDelProyecto) {
       const mm = f.marcas.find((m) => m.marca.id === marca.id);
       if (!mm) {
-        base.push(0, 0);
+        row.push(0, 0);
       } else {
-        base.push(mm.porcentaje, round2((f.total * mm.porcentaje) / 100));
+        row.push(mm.porcentaje, round2((f.total * mm.porcentaje) / 100));
       }
     }
-    return base;
+    row.push(""); // Comentarios vacío
+    return row;
   });
 
+  // Fila TOTALES
+  const sumCol = (idx: number): number =>
+    round2(rows.reduce((acc, r) => acc + (Number(r[idx]) || 0), 0));
+  const totalesRow: Celda[] = [
+    "", "",
+    "",
+    "TOTALES", // en columna Proveedor
+    "", "",
+    sumCol(6), // Subtotal
+    sumCol(7), // ITBMS
+    sumCol(8), // Total
+  ];
+  for (let i = 0; i < marcasDelProyecto.length; i++) {
+    const pctIdx = 9 + i * 2;
+    const cobIdx = 10 + i * 2;
+    totalesRow.push("");       // % — vacío
+    totalesRow.push(sumCol(cobIdx));
+  }
+  totalesRow.push("");
+
+  const aoa: Celda[][] = [header, ...rows, totalesRow];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Estilo: header bold + bordes simples. Bordes también en filas de datos.
+  const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
+  const borderThin = { style: "thin", color: { rgb: "000000" } };
+  const borders = { top: borderThin, bottom: borderThin, left: borderThin, right: borderThin };
+
+  for (let row = range.s.r; row <= range.e.r; row++) {
+    for (let col = range.s.c; col <= range.e.c; col++) {
+      const addr = XLSX.utils.encode_cell({ r: row, c: col });
+      const cell = (ws as Record<string, unknown>)[addr] as
+        | { v?: unknown; s?: unknown; t?: unknown }
+        | undefined;
+      if (!cell) continue;
+      const esHeader = row === 0;
+      const esTotales = row === range.e.r;
+      cell.s = {
+        font: { bold: esHeader || esTotales, sz: 10 },
+        alignment: { vertical: "center", wrapText: true },
+        border: borders,
+      };
+    }
+  }
+
+  // Anchos aproximados
+  ws["!cols"] = [
+    { wch: 16 }, // Mes ejecución
+    { wch: 24 }, // Proyecto
+    { wch: 16 }, // Tienda
+    { wch: 24 }, // Proveedor
+    { wch: 14 }, // Factura N°
+    { wch: 24 }, // Detalle
+    { wch: 12 }, { wch: 12 }, { wch: 12 }, // Subtotal/ITBMS/Total
+    ...marcasDelProyecto.flatMap(() => [{ wch: 10 }, { wch: 14 }]),
+    { wch: 24 }, // Comentarios
+  ];
+
   const wb = XLSX.utils.book_new();
-  const wsResumen = XLSX.utils.aoa_to_sheet(resumenRows);
-  const wsDetalle = XLSX.utils.aoa_to_sheet([detalleHeader, ...detalleRows]);
-  XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
-  XLSX.utils.book_append_sheet(wb, wsDetalle, "Facturas");
+  XLSX.utils.book_append_sheet(wb, ws, "Facturas");
 
   const arrayBuffer = XLSX.write(wb, { type: "array", bookType: "xlsx" });
   return new Blob([arrayBuffer], {
@@ -287,43 +262,36 @@ export async function generarZipProyecto(
     adjuntosByFactura.set(a.factura_id, arr);
   }
 
-  // Una carpeta por marca
+  // Una carpeta por marca, con los PDFs originales de sus facturas.
   for (const marca of marcasInvolucradas) {
     const slug = sanitizar(marca.nombre);
     const folder = zip.folder(slug);
     if (!folder) continue;
 
-    // PDF consolidado
     const facturasDeMarca = vigentes.filter((f) =>
       f.marcas.some((m) => m.marca.id === marca.id),
     );
-    if (facturasDeMarca.length > 0) {
-      const pdf = generarPdfMarca(proyecto, marca, facturasDeMarca);
-      folder.file(`cobranza-${slug.toLowerCase()}.pdf`, pdf);
+    if (facturasDeMarca.length === 0) continue;
 
-      // Copias de facturas originales (Storage o data URL legacy)
-      const facturasFolder = folder.folder("facturas");
-      if (facturasFolder) {
-        for (const f of facturasDeMarca) {
-          const adjs = adjuntosByFactura.get(f.id) ?? [];
-          const pdfs = adjs.filter((a) => a.tipo === "pdf_factura");
-          for (const a of pdfs) {
-            try {
-              const fallback = `${sanitizar(f.numero_factura)}.pdf`;
-              const { blob, filename } = await resolverAdjunto(a, fallback);
-              facturasFolder.file(filename, blob);
-            } catch (err) {
-              const razon = err instanceof Error ? err.message : "desconocido";
-              console.warn(
-                `[zip] factura adjunto ${a.id} skip: ${razon}`,
-              );
-              errores.push({
-                id: a.id,
-                tipo: `pdf_factura (${f.numero_factura})`,
-                razon,
-              });
-            }
-          }
+    const facturasFolder = folder.folder("facturas");
+    if (!facturasFolder) continue;
+
+    for (const f of facturasDeMarca) {
+      const adjs = adjuntosByFactura.get(f.id) ?? [];
+      const pdfs = adjs.filter((a) => a.tipo === "pdf_factura");
+      for (const a of pdfs) {
+        try {
+          const fallback = `${sanitizar(f.numero_factura)}.pdf`;
+          const { blob, filename } = await resolverAdjunto(a, fallback);
+          facturasFolder.file(filename, blob);
+        } catch (err) {
+          const razon = err instanceof Error ? err.message : "desconocido";
+          console.warn(`[zip] factura adjunto ${a.id} skip: ${razon}`);
+          errores.push({
+            id: a.id,
+            tipo: `pdf_factura (${f.numero_factura})`,
+            razon,
+          });
         }
       }
     }
@@ -356,18 +324,13 @@ export async function generarZipProyecto(
     }
   }
 
-  // Si hubo adjuntos saltados, dejar README para el usuario.
   if (errores.length > 0) {
     const lineas = [
       "Algunos adjuntos no se pudieron empaquetar en este ZIP.",
-      "El resto del contenido (facturas PDF, Excel, y demás fotos) está OK.",
+      "El resto del contenido (Excel y demás archivos) está OK.",
       "",
       "Adjuntos saltados:",
       ...errores.map((e) => `  • [${e.tipo}] id=${e.id} — ${e.razon}`),
-      "",
-      "Si un adjunto aparece aquí repetidamente, probablemente está guardado",
-      "en un formato legacy (data URL en mk_adjuntos.url) con data corrupta",
-      "o falta el archivo en Storage. Reporta el id al equipo.",
     ];
     zip.file("README_errores.txt", lineas.join("\n"));
   }

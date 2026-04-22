@@ -4,10 +4,12 @@
 // de marcas). Filtros: búsqueda por texto, pill de estado (Activos default),
 // y dropdown de marca. Marcas se derivan de mk_factura_marcas.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { MkMarca } from "@/lib/marketing/types";
 import { EstadoBadge } from "@/components/marketing";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
+import { useToast } from "@/components/ToastSystem";
+import { ConfirmModal } from "@/components/ui";
 
 type FiltroEstado =
   | "activos"
@@ -72,12 +74,23 @@ export default function ProyectosHomeView({
   onOpenHistorial,
   refreshKey,
 }: Props) {
+  const { toast } = useToast();
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("activos");
   const [marcaIdFiltro, setMarcaIdFiltro] = useState<string>("");
   const [busqueda, setBusqueda] = useState<string>("");
   const [busquedaDebounced, setBusquedaDebounced] = useState<string>("");
   const [proyectos, setProyectos] = useState<ProyectoListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [accionPendiente, setAccionPendiente] = useState<
+    | {
+        id: string;
+        nombre: string;
+        tipo: "enviado" | "cobrado" | "reabrir";
+      }
+    | null
+  >(null);
+  const [accionLoading, setAccionLoading] = useState(false);
+  const [zipLoadingId, setZipLoadingId] = useState<string | null>(null);
 
   // Debounce de búsqueda
   useEffect(() => {
@@ -114,6 +127,90 @@ export default function ProyectosHomeView({
   // si filtroEstado==='todos' sin filtros extra; si no, omitimos contadores
   // exactos y mostramos solo la lista filtrada.
   const conteoActual = proyectos.length;
+
+  const ejecutarTransicion = async () => {
+    if (!accionPendiente) return;
+    setAccionLoading(true);
+    try {
+      const endpoint =
+        accionPendiente.tipo === "enviado"
+          ? "marcar-enviado"
+          : accionPendiente.tipo === "cobrado"
+            ? "marcar-cobrado"
+            : "reabrir";
+      const res = await fetch(
+        `/api/marketing/proyectos/${accionPendiente.id}/${endpoint}`,
+        { method: "POST" },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error ?? "No se pudo aplicar la acción");
+      }
+      const msg =
+        accionPendiente.tipo === "enviado"
+          ? "Proyecto marcado como enviado"
+          : accionPendiente.tipo === "cobrado"
+            ? "Proyecto archivado como cobrado"
+            : "Proyecto reabierto";
+      toast(msg, "success");
+      setAccionPendiente(null);
+      cargar();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Error", "error");
+    } finally {
+      setAccionLoading(false);
+    }
+  };
+
+  const descargarZip = async (id: string) => {
+    setZipLoadingId(id);
+    try {
+      const res = await fetch(
+        `/api/marketing/proyectos/${id}/datos-zip`,
+        { cache: "no-store" },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error ?? "No se pudo preparar el ZIP");
+      }
+      const data = await res.json();
+      const { generarZipProyecto } = await import(
+        "@/lib/marketing/generar-zip"
+      );
+      await generarZipProyecto(data);
+      toast("ZIP descargado", "success");
+    } catch (err) {
+      toast(
+        err instanceof Error ? err.message : "Error descargando ZIP",
+        "error",
+      );
+    } finally {
+      setZipLoadingId(null);
+    }
+  };
+
+  const tituloConfirm =
+    accionPendiente?.tipo === "enviado"
+      ? "Marcar como enviado"
+      : accionPendiente?.tipo === "cobrado"
+        ? "Marcar como cobrado"
+        : "Reabrir proyecto";
+
+  const mensajeConfirm =
+    accionPendiente?.tipo === "enviado"
+      ? `¿Confirmas que ya enviaste "${accionPendiente.nombre}" al proveedor?`
+      : accionPendiente?.tipo === "cobrado"
+        ? `¿Confirmas que ya recibiste el pago/NC de "${accionPendiente.nombre}"? Pasará al historial.`
+        : accionPendiente
+          ? `"${accionPendiente.nombre}" volverá a estado Enviado.`
+          : "";
+
+  const labelConfirm =
+    accionPendiente?.tipo === "enviado"
+      ? "Marcar enviado"
+      : accionPendiente?.tipo === "cobrado"
+        ? "Marcar cobrado"
+        : "Reabrir";
 
   return (
     <div className="space-y-4">
@@ -232,11 +329,18 @@ export default function ProyectosHomeView({
       ) : (
         <div className="grid grid-cols-1 gap-2">
           {proyectos.map((p) => (
-            <button
+            <div
               key={p.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               onClick={() => onOpenProyecto(p.id)}
-              className="text-left rounded-lg border border-gray-200 bg-white p-4 hover:border-black transition"
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onOpenProyecto(p.id);
+                }
+              }}
+              className="text-left rounded-lg border border-gray-200 bg-white p-4 hover:border-black transition cursor-pointer focus:outline-none focus:ring-2 focus:ring-black/20"
             >
               <div className="flex items-start justify-between gap-3 mb-1">
                 <div className="min-w-0">
@@ -312,10 +416,84 @@ export default function ProyectosHomeView({
                   </>
                 )}
               </div>
-            </button>
+
+              {!p.anulado_en && (
+                <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-2">
+                  {p.estado === "abierto" && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAccionPendiente({
+                          id: p.id,
+                          nombre: p.nombre || p.tienda,
+                          tipo: "enviado",
+                        });
+                      }}
+                      className="text-xs rounded-md bg-black text-white px-3 py-1.5 active:scale-[0.97] transition"
+                    >
+                      Marcar como enviado
+                    </button>
+                  )}
+                  {p.estado === "enviado" && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAccionPendiente({
+                          id: p.id,
+                          nombre: p.nombre || p.tienda,
+                          tipo: "cobrado",
+                        });
+                      }}
+                      className="text-xs rounded-md bg-black text-white px-3 py-1.5 active:scale-[0.97] transition"
+                    >
+                      Marcar como cobrado
+                    </button>
+                  )}
+                  {p.estado === "cobrado" && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAccionPendiente({
+                          id: p.id,
+                          nombre: p.nombre || p.tienda,
+                          tipo: "reabrir",
+                        });
+                      }}
+                      className="text-xs rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-1.5 hover:bg-gray-50 active:scale-[0.97] transition"
+                    >
+                      Reabrir
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      descargarZip(p.id);
+                    }}
+                    disabled={zipLoadingId === p.id}
+                    className="text-xs rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-1.5 hover:bg-gray-50 disabled:opacity-50 active:scale-[0.97] transition"
+                  >
+                    {zipLoadingId === p.id ? "Descargando…" : "Descargar ZIP"}
+                  </button>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
+
+      <ConfirmModal
+        open={!!accionPendiente}
+        onClose={() => !accionLoading && setAccionPendiente(null)}
+        onConfirm={ejecutarTransicion}
+        title={tituloConfirm}
+        message={mensajeConfirm}
+        confirmLabel={labelConfirm}
+        loading={accionLoading}
+      />
     </div>
   );
 }
