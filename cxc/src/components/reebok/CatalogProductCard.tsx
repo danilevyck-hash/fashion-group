@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import Image from "next/image";
 import { Product } from "@/components/reebok/supabase";
 import { getBultoSize } from "@/lib/reebok-bulto";
 
@@ -120,14 +119,15 @@ export default function CatalogProductCard({
                   </button>
                 </div>
               ) : (
-                <Image
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
                   key={imageStatus}
                   src={product.image_url}
                   alt={product.name}
                   width={300}
                   height={300}
-                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-                  className="object-contain p-3"
+                  loading="lazy"
+                  className="w-full h-full object-contain p-3"
                   onLoad={() => setImageStatus("loaded")}
                   onError={() => setImageStatus("error")}
                 />
@@ -160,17 +160,12 @@ export default function CatalogProductCard({
             </div>
           )}
 
-          {/* Available sizes */}
-          {product._sizes.length > 0 && (
+          {/* SKU / código */}
+          {product.sku && (
             <div className="flex flex-wrap gap-1 mt-2">
-              {product._sizes.slice(0, 8).map(s => (
-                <span key={s} className="text-[10px] bg-[#F5F0E8] text-[#1A2656]/50 px-1.5 py-0.5 rounded font-medium">
-                  {s}
-                </span>
-              ))}
-              {product._sizes.length > 8 && (
-                <span className="text-[10px] text-[#1A2656]/30 px-1 py-0.5">+{product._sizes.length - 8}</span>
-              )}
+              <span className="text-[10px] bg-[#F5F0E8] text-[#1A2656]/50 px-1.5 py-0.5 rounded font-medium tabular-nums">
+                {product.sku}
+              </span>
             </div>
           )}
 
