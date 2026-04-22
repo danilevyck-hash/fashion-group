@@ -229,7 +229,7 @@ export default function ProyectosHomeView({
             Gastos compartidos a marcas
           </p>
         </div>
-        <div className="flex items-center gap-3 shrink-0 text-sm">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0">
           <button
             type="button"
             onClick={onOpenHistorial}
@@ -256,7 +256,7 @@ export default function ProyectosHomeView({
           <button
             type="button"
             onClick={onNuevoProyecto}
-            className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition ml-2"
+            className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition ml-auto sm:ml-2"
           >
             + Nuevo proyecto
           </button>
