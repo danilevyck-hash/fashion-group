@@ -375,7 +375,7 @@ export default function DirectorioPage() {
             <>
               {(role === "admin" || role === "secretaria") && (
               <>
-              <button onClick={() => importRef.current?.click()} title="Formato: CSV separado por ; (punto y coma). Columnas: Nombre, Empresa, Teléfono, Celular, Correo, Contacto, Notas" className="text-sm text-gray-600 hover:text-black border border-gray-300 hover:border-gray-400 px-4 py-2.5 sm:py-2 rounded-md transition inline-flex items-center gap-1.5 min-h-[44px]">
+              <button onClick={() => importRef.current?.click()} title="Formato: CSV separado por ; (punto y coma). Columnas: Nombre, Empresa, Teléfono, Celular, Correo, Contacto, Notas" className="text-sm text-gray-600 hover:text-black border border-gray-300 hover:border-gray-400 px-4 py-2.5 sm:py-2 rounded-md transition inline-flex items-center justify-center gap-1.5 min-h-[44px]">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 Importar
               </button>
@@ -491,7 +491,7 @@ export default function DirectorioPage() {
               onFocus={() => setEmpresaDropdownOpen(true)}
               onBlur={() => setTimeout(() => setEmpresaDropdownOpen(false), 200)}
               placeholder="Filtrar empresa..."
-              className="border-b border-gray-200 py-2 pl-6 text-sm outline-none focus:border-black bg-transparent w-44"
+              className="border-b border-gray-200 py-2 pl-6 text-sm outline-none focus:border-black bg-transparent w-full sm:w-44"
             />
             {empresaFilter && (
               <button
@@ -749,7 +749,7 @@ export default function DirectorioPage() {
                 </div>
 
                 {/* Quick action buttons */}
-                <div className="grid grid-cols-3 gap-3 mb-6">
+                <div className="grid grid-cols-3 gap-2.5 mb-6">
                   {mc.whatsapp ? (
                     <a
                       href={`https://wa.me/${mc.whatsapp.replace(/[^0-9]/g, "")}`}
