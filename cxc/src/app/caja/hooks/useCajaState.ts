@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { CajaPeriodo, CajaGasto, CajaResponsable, View } from "../components/types";
+import { CajaPeriodo, CajaGasto, CajaResponsable } from "../components/types";
 
 function normalizeStr(s: string): string {
   const t = s.trim();
@@ -10,20 +9,13 @@ function normalizeStr(s: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
 }
 
-export function useCajaState(urlId: string, initialView: View) {
-  const router = useRouter();
-  const [view, _setView] = useState<View>(initialView);
+interface UseCajaOptions {
+  onPeriodoDeleted?: (id: string) => void;
+}
+
+export function useCajaState(opts?: UseCajaOptions) {
   const [pendingDeleteGasto, setPendingDeleteGasto] = useState<CajaGasto | null>(null);
   const [pendingRestoreGasto, setPendingRestoreGasto] = useState<CajaGasto | null>(null);
-
-  function setView(v: View, id?: string) {
-    _setView(v);
-    if (v === "list") {
-      router.replace("/caja");
-    } else if (id) {
-      router.replace(`/caja?view=${v}&id=${id}`);
-    }
-  }
 
   const [periodos, setPeriodos] = useState<CajaPeriodo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,49 +76,26 @@ export function useCajaState(urlId: string, initialView: View) {
         setResponsablesCatalog(Array.isArray(data) ? data : []);
       })
       .catch(() => { console.error('Failed to load responsables'); });
-  }, []);
+  }, [loadPeriodos]);
 
-  async function loadDetail(id: string) {
+  const loadDetail = useCallback(async (id: string) => {
     const res = await fetch(`/api/caja/periodos/${id}?include_deleted=1`);
     if (res.ok) {
       const data = await res.json();
       const gastos = data.caja_gastos || [];
       data.total_gastado = gastos.reduce((s: number, g: CajaGasto) => s + (g.total || 0), 0);
       setCurrent(data);
-      setView("detail", id);
     }
-  }
-
-  useEffect(() => {
-    function onPopState() {
-      const params = new URLSearchParams(window.location.search);
-      const v = (params.get("view") as View) || "list";
-      const id = params.get("id") || "";
-      _setView(v);
-      if (id && v !== "list") {
-        loadDetail(id);
-      } else {
-        setCurrent(null);
-      }
-    }
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
   }, []);
-
-  useEffect(() => {
-    if (urlId && (initialView === "detail" || initialView === "print")) {
-      loadDetail(urlId).then(() => { if (initialView === "print") _setView("print"); });
-    }
-  }, [urlId]);
 
   function createPeriodo() {
     setFondoInput("200");
     setShowNewPeriodoModal(true);
   }
 
-  async function confirmCreatePeriodo() {
+  async function confirmCreatePeriodo(): Promise<string | null> {
     const fondo = parseFloat(fondoInput);
-    if (isNaN(fondo) || fondo <= 0) return;
+    if (isNaN(fondo) || fondo <= 0) return null;
     setShowNewPeriodoModal(false);
     setError(null);
     try {
@@ -138,9 +107,10 @@ export function useCajaState(urlId: string, initialView: View) {
       if (!res.ok) throw new Error();
       const p = await res.json();
       loadPeriodos();
-      await loadDetail(p.id);
+      return p.id as string;
     } catch {
       setError("Error al crear período");
+      return null;
     }
   }
 
@@ -160,7 +130,7 @@ export function useCajaState(urlId: string, initialView: View) {
         setError(backendMsg || "Error al cerrar periodo");
         return;
       }
-      await loadDetail(id);
+      if (current?.id === id) await loadDetail(id);
       loadPeriodos();
     } catch {
       setError("Error al cerrar periodo");
@@ -178,7 +148,8 @@ export function useCajaState(urlId: string, initialView: View) {
     const res = await fetch(`/api/caja/periodos/${id}`, { method: "DELETE" });
     if (res.ok) {
       loadPeriodos();
-      if (current?.id === id) { setCurrent(null); setView("list", undefined); }
+      if (current?.id === id) setCurrent(null);
+      opts?.onPeriodoDeleted?.(id);
     } else {
       setError("Error al eliminar período");
     }
@@ -306,7 +277,6 @@ export function useCajaState(urlId: string, initialView: View) {
   }
 
   return {
-    view, setView, _setView,
     periodos, loading, current, setCurrent, error,
     allCategorias,
     showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,

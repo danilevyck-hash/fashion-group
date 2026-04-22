@@ -91,6 +91,16 @@ export async function middleware(req: NextRequest) {
     const id = searchParams.get("id")!;
     return NextResponse.redirect(new URL(`/guias/${id}/imprimir`, req.url));
   }
+  if (pathname === "/caja") {
+    const view = searchParams.get("view");
+    const id = searchParams.get("id");
+    if (view === "detail" && id) {
+      return NextResponse.redirect(new URL(`/caja/${id}`, req.url));
+    }
+    if (view === "print" && id) {
+      return NextResponse.redirect(new URL(`/caja/${id}/imprimir`, req.url));
+    }
+  }
 
   // Allow public paths
   if (PUBLIC_PATHS.includes(pathname)) return NextResponse.next();
