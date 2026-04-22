@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
 import { ESTADOS, daysSince, calcSub, buildReclamosPdfHtml, openPdfWindow, FACTOR_TOTAL, estadoLabel } from "./constants";
@@ -134,13 +135,15 @@ export default function EmpresaList({
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
-      {/* Breadcrumbs */}
-      <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
-        <button onClick={onBack} className="hover:text-black transition">Reclamos</button>
-        <span className="text-gray-300">/</span>
-        <span className="text-gray-600 font-medium">{activeEmpresa}</span>
-      </nav>
+    <div>
+      <AppHeader
+        module="Reclamos a Proveedores"
+        breadcrumbs={[{ label: activeEmpresa }]}
+      />
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
+      <div className="mb-4">
+        <button onClick={onBack} className="text-sm text-gray-400 hover:text-black transition">← Reclamos</button>
+      </div>
 
       <div className="flex items-end justify-between mb-6 sm:mb-8 flex-wrap gap-4">
         <div>
@@ -307,6 +310,7 @@ export default function EmpresaList({
         </div>
       )}
       <Toast message={toast} />
+      </div>
     </div>
   );
 }

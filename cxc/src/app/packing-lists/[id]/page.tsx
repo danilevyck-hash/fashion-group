@@ -394,7 +394,6 @@ export default function PackingListDetailPage() {
         <AppHeader
           module="Packing Lists"
           breadcrumbs={[
-            { label: "Historial", onClick: () => router.push("/packing-lists") },
             { label: `PL #${pl.numero_pl || "—"}` },
           ]}
         />

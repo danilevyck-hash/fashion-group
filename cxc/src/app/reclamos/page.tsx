@@ -86,12 +86,25 @@ function ReclamosPage() {
     clearReclamoDraft();
   }
 
+  function buildUrl(v: RView, id: string | null | undefined, empresa: string | null): string {
+    const params = new URLSearchParams();
+    if (empresa) params.set("empresa", empresa);
+    if (v === "form") { params.set("view", "form"); if (id) params.set("id", id); }
+    else if (v === "detail" && id) { params.set("view", "detail"); params.set("id", id); }
+    const qs = params.toString();
+    return qs ? `/reclamos?${qs}` : "/reclamos";
+  }
+
   function setView(v: RView, id?: string) {
     _setView(v);
-    if (v === "list") router.replace("/reclamos");
-    else if (v === "form" && id) router.replace(`/reclamos?view=form&id=${id}`);
-    else if (v === "form") router.replace("/reclamos?view=form");
-    else if (v === "detail" && id) router.replace(`/reclamos?view=detail&id=${id}`);
+    router.replace(buildUrl(v, id, activeEmpresa));
+  }
+
+  function changeEmpresa(empresa: string | null, opts?: { view?: RView; id?: string | null }) {
+    setActiveEmpresa(empresa);
+    const v = opts?.view ?? view;
+    const id = opts?.id ?? (v === "detail" ? current?.id : null);
+    router.replace(buildUrl(v, id, empresa));
   }
 
   const loadDetail = useCallback(async (id: string) => {
@@ -272,8 +285,8 @@ function ReclamosPage() {
             pendientes={pendientes}
             alertas={alertas}
             onNewReclamo={() => { resetForm(); setView("form"); }}
-            onSelectEmpresa={(empresa) => { setActiveEmpresa(empresa); setSearch(""); setFilterEstado("all"); }}
-            onLoadDetail={(id, empresa) => { setActiveEmpresa(empresa); loadDetail(id); }}
+            onSelectEmpresa={(empresa) => { changeEmpresa(empresa); setSearch(""); setFilterEstado("all"); }}
+            onLoadDetail={(id, empresa) => { changeEmpresa(empresa, { view: "detail", id }); loadDetail(id); }}
           />
           {deleteModal}
         </PullToRefresh>
@@ -299,7 +312,7 @@ function ReclamosPage() {
           setSortCol={setSortCol}
           sortDir={sortDir}
           setSortDir={setSortDir}
-          onBack={() => setActiveEmpresa(null)}
+          onBack={() => changeEmpresa(null)}
           onNewReclamo={() => { resetForm(); setFEmpresa(activeEmpresa); setView("form"); }}
           onLoadDetail={(id) => loadDetail(id)}
           onDeleteReclamo={(id) => requestDeleteReclamo(id)}
@@ -369,6 +382,8 @@ function ReclamosPage() {
         addingEditMotivo={addingEditMotivo} setAddingEditMotivo={setAddingEditMotivo}
         newMotivoText={newMotivoText} setNewMotivoText={setNewMotivoText}
         onBack={() => { setCurrent(null); setView("list"); }}
+        onBackToEmpresa={() => { setCurrent(null); changeEmpresa(activeEmpresa, { view: "list", id: null }); }}
+        onBackToReclamos={() => { setCurrent(null); changeEmpresa(null, { view: "list", id: null }); }}
         onAddNota={addNota}
         onChangeEstado={changeEstado}
         onDeleteReclamo={requestDeleteReclamo}

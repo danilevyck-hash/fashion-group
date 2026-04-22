@@ -137,14 +137,29 @@ function CajaPage() {
       )}
 
       {view === "print" && current && (
-        <PrintView
-          current={current}
-          onBack={() => setView("detail", current.id)}
-        />
+        <div>
+          <div className="print:hidden">
+            <AppHeader
+              module="Caja Menuda"
+              breadcrumbs={[
+                { label: `Período N°${current.numero}`, onClick: () => setView("detail", current.id) },
+                { label: "Imprimir" },
+              ]}
+            />
+          </div>
+          <PrintView
+            current={current}
+            onBack={() => setView("detail", current.id)}
+          />
+        </div>
       )}
 
       {view === "detail" && current && (
         <div>
+          <AppHeader
+            module="Caja Menuda"
+            breadcrumbs={[{ label: `Período N°${current.numero}` }]}
+          />
           <PeriodoDetailHeader
             current={current}
             totalGastado={detailTotalGastado}

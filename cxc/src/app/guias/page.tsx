@@ -117,10 +117,18 @@ export default function GuiasPage() {
   // ── PRINT VIEW ── (mismo patrón anterior)
   if (s.view === "print" && s.printGuia) {
     return (
-      <GuiaDetail
-        guia={s.printGuia}
-        onBack={() => { s.loadGuias(); s._setView("list"); }}
-      />
+      <div>
+        <div className="print:hidden">
+          <AppHeader
+            module="Guías de Transporte"
+            breadcrumbs={[{ label: `GT-${String(s.printGuia.numero).padStart(3, "0")}` }, { label: "Imprimir" }]}
+          />
+        </div>
+        <GuiaDetail
+          guia={s.printGuia}
+          onBack={() => { s.loadGuias(); s._setView("list"); }}
+        />
+      </div>
     );
   }
 

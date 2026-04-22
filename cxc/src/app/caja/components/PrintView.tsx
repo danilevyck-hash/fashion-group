@@ -22,7 +22,7 @@ export default function PrintView({ current, onBack }: Props) {
           onClick={onBack}
           className="text-sm text-gray-400 hover:text-black transition"
         >
-          ← Volver
+          ← Período N°{current.numero}
         </button>
         <button
           onClick={() => window.print()}

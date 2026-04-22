@@ -193,7 +193,7 @@ export default function ReportePage() {
         )}
 
         <div className="mt-6">
-          <button onClick={() => router.push("/prestamos")} className="border border-gray-200 px-5 py-2 rounded-md text-sm hover:border-gray-400 transition">← Volver a Préstamos</button>
+          <button onClick={() => router.push("/prestamos")} className="border border-gray-200 px-5 py-2 rounded-md text-sm hover:border-gray-400 transition">← Colaboradores</button>
         </div>
       </div>
     </div>

@@ -351,7 +351,10 @@ export default function CamisetasPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <AppHeader module="Camisetas" />
+      <AppHeader
+        module="Camisetas"
+        breadcrumbs={selectedClient ? [{ label: clientes.find(c => c.id === selectedClient)?.nombre || "Cliente" }] : undefined}
+      />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
 
         {/* Title + Actions */}

@@ -138,7 +138,7 @@ function MarketingPage() {
               onClick={() => router.push("/marketing")}
               className="text-sm text-gray-600 hover:text-black transition inline-flex items-center gap-1"
             >
-              ← Volver
+              ← Proyectos
             </button>
             {vistaParam === "anulados" ? (
               <AnuladosLista esAdmin={role === "admin"} />

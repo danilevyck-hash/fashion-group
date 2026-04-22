@@ -33,7 +33,7 @@ export default function EmpleadoHeader({ empleado, saldo, onEdit, onToggleArchiv
         {!empleado.activo && (
           <button onClick={onToggleArchive} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Reactivar</button>
         )}
-        <button onClick={onBack} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">Volver</button>
+        <button onClick={onBack} className="border border-gray-200 px-4 py-2 rounded-md text-sm hover:border-gray-400 transition">← Colaboradores</button>
       </div>
     </div>
   );

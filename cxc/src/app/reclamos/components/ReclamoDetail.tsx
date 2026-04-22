@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useMemo } from "react";
+import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox, ScrollableTable } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
@@ -57,6 +58,8 @@ interface Props {
   newMotivoText: string;
   setNewMotivoText: (v: string) => void;
   onBack: () => void;
+  onBackToEmpresa?: () => void;
+  onBackToReclamos?: () => void;
   onAddNota: () => void;
   onChangeEstado: (e: string) => void;
   onDeleteReclamo: (id: string) => void;
@@ -77,7 +80,8 @@ export default function ReclamoDetail({
   showDeleteConfirm, setShowDeleteConfirm, showAplicadaModal, setShowAplicadaModal,
   aplicadaNc, setAplicadaNc, aplicadaMonto, setAplicadaMonto, toast,
   customMotivos, setCustomMotivos, addingEditMotivo, setAddingEditMotivo,
-  newMotivoText, setNewMotivoText, onBack, onAddNota, onChangeEstado,
+  newMotivoText, setNewMotivoText, onBack, onBackToEmpresa, onBackToReclamos,
+  onAddNota, onChangeEstado,
   onDeleteReclamo, onSaveEdit, onUploadFoto, onDeleteFoto, onAplicadaConfirm,
   showToast,
 }: Props) {
@@ -166,15 +170,24 @@ export default function ReclamoDetail({
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
-      {/* Breadcrumbs */}
-      <nav className="flex items-center gap-1.5 text-xs text-gray-400 mb-4">
-        <button onClick={onBack} className="hover:text-black transition">Reclamos</button>
-        <span className="text-gray-300">/</span>
-        <span className="hover:text-black transition cursor-default">{current.empresa}</span>
-        <span className="text-gray-300">/</span>
-        <span className="text-gray-600 font-medium">{current.nro_reclamo}</span>
-      </nav>
+    <div>
+      <AppHeader
+        module="Reclamos a Proveedores"
+        breadcrumbs={[
+          { label: current.empresa, onClick: onBackToEmpresa ?? onBack },
+          { label: current.nro_reclamo || "Reclamo" },
+        ]}
+      />
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
+      <div className="mb-4">
+        <button onClick={onBackToEmpresa ?? onBack} className="text-sm text-gray-400 hover:text-black transition">← {current.empresa}</button>
+        {onBackToReclamos && (
+          <>
+            <span className="text-gray-300 mx-2">·</span>
+            <button onClick={onBackToReclamos} className="text-sm text-gray-400 hover:text-black transition">Todos los reclamos</button>
+          </>
+        )}
+      </div>
 
       <div className="flex items-start justify-between mb-4">
         <div>
@@ -582,6 +595,7 @@ export default function ReclamoDetail({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
