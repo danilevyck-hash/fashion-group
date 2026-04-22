@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "rea
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast, ConfirmModal } from "@/components/ui";
+import { Toast, ConfirmModal, ScrollableTable } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import {
   parseMultiplePackingLists,
@@ -642,9 +642,9 @@ export default function PackingListsPage() {
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all ${
+            className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all min-h-[140px] flex items-center justify-center active:scale-[0.99] ${
               dragOver
-                ? "border-teal-500 bg-teal-50"
+                ? "border-teal-500 bg-teal-50 scale-[1.01]"
                 : "border-gray-300 hover:border-teal-400 hover:bg-gray-50"
             }`}
           >
@@ -975,7 +975,7 @@ export default function PackingListsPage() {
                 </button>
               </div>
             <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <div className="overflow-x-auto">
+              <ScrollableTable minWidth={700} className="mx-0">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
@@ -1089,7 +1089,7 @@ export default function PackingListsPage() {
                     })}
                   </tbody>
                 </table>
-              </div>
+              </ScrollableTable>
             </div>
             </>
           )}

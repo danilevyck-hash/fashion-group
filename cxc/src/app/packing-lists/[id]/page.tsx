@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import type { PLIndexRow } from "@/lib/parse-packing-list";
+import { ScrollableTable } from "@/components/ui";
 
 interface PLDetail {
   id: string;
@@ -509,7 +510,7 @@ export default function PackingListDetailPage() {
         {/* Distribución completa por estilo */}
         {filteredGroups.length > 0 ? (
           <div className="border border-gray-200 rounded-lg overflow-hidden">
-            <div className="overflow-x-auto">
+            <ScrollableTable minWidth={700} className="mx-0">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-[#1e3a5f] text-white">
@@ -526,7 +527,7 @@ export default function PackingListDetailPage() {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollableTable>
           </div>
         ) : (
           <div className="border border-gray-200 rounded-lg">
