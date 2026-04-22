@@ -240,7 +240,7 @@ export default function PlantillasPage() {
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <FGLogo variant="horizontal" theme="light" size={30} />
-          <span className={`text-lg font-light ${darkMode ? "text-gray-100" : "text-gray-800"}`}>{getGreeting()}{displayName ? `, ${displayName}` : ""}</span>
+          <span className={`text-lg font-light truncate max-w-[180px] sm:max-w-none ${darkMode ? "text-gray-100" : "text-gray-800"}`}>{getGreeting()}{displayName ? `, ${displayName}` : ""}</span>
         </div>
         <div className="flex items-center gap-3">
           <button onClick={() => { const next = !darkMode; setDarkMode(next); if (next) { document.documentElement.classList.add("dark"); localStorage.setItem("fg_dark_mode", "1"); } else { document.documentElement.classList.remove("dark"); localStorage.setItem("fg_dark_mode", "0"); } }} className="text-sm text-gray-400 hover:text-black transition px-1">{darkMode ? "☀" : "◑"}</button>
@@ -256,13 +256,13 @@ export default function PlantillasPage() {
       {/* KPI Cards — admin and director only */}
       {(role === "admin" || role === "director") && (
         statsLoading ? (
-          <div className="grid grid-cols-3 gap-2 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-6">
             {[1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-gray-50 border border-gray-200 animate-pulse" />)}
           </div>
         ) : stats ? (
           <div className="mb-6">
           {statsCached && <p className="text-xs text-amber-600 mb-1">(datos cacheados)</p>}
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {/* Ventas del mes — click to toggle */}
             <div
               onClick={() => setShowFinancials(!showFinancials)}
@@ -363,7 +363,7 @@ export default function PlantillasPage() {
           {GROUP_ORDER.map((g) => (
             <div key={g}>
               <div className="h-4 w-32 bg-gray-100 rounded animate-pulse mb-3" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1.5 sm:gap-2">
                 {[1, 2, 3, 4].map((i) => (
                   <div key={i} className={`rounded-lg p-3 h-[72px] animate-pulse ${darkMode ? "bg-gray-900 border border-gray-800" : "bg-gray-50 border border-gray-100"}`} />
                 ))}
@@ -385,12 +385,12 @@ export default function PlantillasPage() {
                   <h2 className="text-sm font-semibold">{gl.title}</h2>
                   <p className="text-[11px] text-gray-400">{gl.description}</p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1.5 sm:gap-2">
                   {groupMods.map((mod) => (
                     <div
                       key={mod.key}
                       onClick={() => router.push(mod.href)}
-                      className={`relative border rounded-lg p-3 transition-all duration-150 cursor-pointer select-none hover:shadow-sm hover:border-gray-400 flex items-center gap-3 ${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 bg-white"}`}
+                      className={`relative border rounded-lg p-2.5 sm:p-3 transition-all duration-150 cursor-pointer select-none hover:shadow-sm hover:border-gray-400 flex items-center gap-3 ${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 bg-white"}`}
                     >
                       {(() => {
                         if (mod.key === "upload" && stats?.cxcStale) {
@@ -437,7 +437,7 @@ export default function PlantillasPage() {
                         {...prov.draggableProps}
                         {...(editMode ? prov.dragHandleProps : {})}
                         onClick={() => { if (!editMode) router.push(mod.href); }}
-                        className={`relative border rounded-lg p-3 transition-all duration-150 cursor-pointer select-none hover:shadow-sm hover:border-gray-400 flex items-center gap-3 ${
+                        className={`relative border rounded-lg p-2.5 sm:p-3 transition-all duration-150 cursor-pointer select-none hover:shadow-sm hover:border-gray-400 flex items-center gap-3 ${
                           snapshot.isDragging ? "border-gray-300 bg-white z-50 shadow-lg" : `${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 bg-white"}`
                         } ${editMode ? "cursor-grab active:cursor-grabbing" : ""}`}
                       >
