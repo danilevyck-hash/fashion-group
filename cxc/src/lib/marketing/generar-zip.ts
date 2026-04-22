@@ -120,7 +120,18 @@ function mesEjecucion(isoString: string | null): string {
 }
 
 // ----------------------------------------------------------------------------
-// Excel maestro — 1 hoja, 1 fila por factura, fila TOTALES al final
+// Excel maestro — 1 hoja plana, 1 fila por factura, fila TOTALES al final.
+// Diseño compacto inspirado en el Excel de referencia que usa Daniel.
+//
+// Columnas fijas:
+//   1. Mes ejecución   (formato "abril 2026" desde fecha_enviado)
+//   2. Cliente         (proyecto.tienda)
+//   3. Proveedor       (factura.proveedor)
+//   4. Detalle         (proyecto.nombre)
+//   5. Monto factura dólares (factura.total)
+// Columnas dinámicas (solo marcas asignadas al proyecto):
+//   - Cobrable [Marca]  (total × porcentaje / 100)
+// Última columna: Comentarios (vacía).
 // ----------------------------------------------------------------------------
 function generarRespaldoExcel(
   proyecto: MkProyecto,
@@ -128,76 +139,64 @@ function generarRespaldoExcel(
   marcasDelProyecto: MkMarca[],
 ): Blob {
   const mes = mesEjecucion(proyecto.fecha_enviado ?? proyecto.created_at ?? null);
-  const nombreProy = proyecto.nombre ?? proyecto.tienda ?? "";
+  const detalle = proyecto.nombre ?? proyecto.tienda ?? "";
 
-  // Columnas fijas + dinámicas por marca + comentarios al final
   const header: string[] = [
     "Mes ejecución",
-    "Proyecto",
-    "Tienda",
+    "Cliente",
     "Proveedor",
-    "Factura N°",
     "Detalle",
-    "Subtotal",
-    "ITBMS",
-    "Total",
-    ...marcasDelProyecto.flatMap((m) => [`% ${m.nombre}`, `Cobrable ${m.nombre}`]),
+    "Monto factura dólares",
+    ...marcasDelProyecto.map((m) => `Cobrable ${m.nombre}`),
     "Comentarios",
   ];
 
-  // Body
   type Celda = string | number;
   const rows: Celda[][] = facturas.map((f) => {
     const row: Celda[] = [
       mes,
-      nombreProy,
       proyecto.tienda,
       f.proveedor,
-      f.numero_factura,
-      nombreProy, // Detalle = mismo que Proyecto, confirmado por Daniel
-      round2(f.subtotal),
-      round2(f.itbms),
+      detalle,
       round2(f.total),
     ];
     for (const marca of marcasDelProyecto) {
       const mm = f.marcas.find((m) => m.marca.id === marca.id);
-      if (!mm) {
-        row.push(0, 0);
-      } else {
-        row.push(mm.porcentaje, round2((f.total * mm.porcentaje) / 100));
-      }
+      row.push(mm ? round2((f.total * mm.porcentaje) / 100) : 0);
     }
-    row.push(""); // Comentarios vacío
+    row.push(""); // Comentarios
     return row;
   });
 
-  // Fila TOTALES
+  // Fila TOTALES — label en columna "Proveedor" (índice 2),
+  // sumas en "Monto factura dólares" (índice 4) y cada Cobrable.
   const sumCol = (idx: number): number =>
     round2(rows.reduce((acc, r) => acc + (Number(r[idx]) || 0), 0));
+
   const totalesRow: Celda[] = [
-    "", "",
-    "",
-    "TOTALES", // en columna Proveedor
-    "", "",
-    sumCol(6), // Subtotal
-    sumCol(7), // ITBMS
-    sumCol(8), // Total
+    "",          // Mes ejecución
+    "",          // Cliente
+    "TOTALES",   // Proveedor
+    "",          // Detalle
+    sumCol(4),   // Monto factura dólares
   ];
   for (let i = 0; i < marcasDelProyecto.length; i++) {
-    const pctIdx = 9 + i * 2;
-    const cobIdx = 10 + i * 2;
-    totalesRow.push("");       // % — vacío
-    totalesRow.push(sumCol(cobIdx));
+    totalesRow.push(sumCol(5 + i)); // cada Cobrable
   }
-  totalesRow.push("");
+  totalesRow.push(""); // Comentarios
 
   const aoa: Celda[][] = [header, ...rows, totalesRow];
   const ws = XLSX.utils.aoa_to_sheet(aoa);
 
-  // Estilo: header bold + bordes simples. Bordes también en filas de datos.
+  // Estilo: header y totales en negrita; bordes finos en todas las celdas.
   const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
   const borderThin = { style: "thin", color: { rgb: "000000" } };
-  const borders = { top: borderThin, bottom: borderThin, left: borderThin, right: borderThin };
+  const borders = {
+    top: borderThin,
+    bottom: borderThin,
+    left: borderThin,
+    right: borderThin,
+  };
 
   for (let row = range.s.r; row <= range.e.r; row++) {
     for (let col = range.s.c; col <= range.e.c; col++) {
@@ -216,16 +215,14 @@ function generarRespaldoExcel(
     }
   }
 
-  // Anchos aproximados
+  // Anchos: caben cómodamente en pantalla incluso con 2-3 marcas.
   ws["!cols"] = [
     { wch: 16 }, // Mes ejecución
-    { wch: 24 }, // Proyecto
-    { wch: 16 }, // Tienda
+    { wch: 20 }, // Cliente
     { wch: 24 }, // Proveedor
-    { wch: 14 }, // Factura N°
     { wch: 24 }, // Detalle
-    { wch: 12 }, { wch: 12 }, { wch: 12 }, // Subtotal/ITBMS/Total
-    ...marcasDelProyecto.flatMap(() => [{ wch: 10 }, { wch: 14 }]),
+    { wch: 16 }, // Monto factura dólares
+    ...marcasDelProyecto.map(() => ({ wch: 16 })), // Cobrable [Marca]
     { wch: 24 }, // Comentarios
   ];
 
