@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { GuiaItem } from "./types";
 import AddNewInline from "./AddNewInline";
+import { ScrollableTable } from "@/components/ui";
 
 interface GuiaFormProps {
   editingId: string | null;
@@ -280,8 +281,7 @@ export default function GuiaForm({
           <p className="text-red-500 text-xs mb-3">Agrega al menos un envío con todos los campos completos.</p>
         )}
 
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
-        <div className="min-w-[800px] px-4 sm:px-0">
+        <ScrollableTable minWidth={800}>
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-white z-10">
             <tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-400">
@@ -335,8 +335,7 @@ export default function GuiaForm({
             ))}
           </tbody>
         </table>
-        </div>
-        </div>
+        </ScrollableTable>
 
         <div className="mt-3">
           <button type="button" onClick={onAddRow} className="text-sm text-gray-400 hover:text-black transition">+ Agregar fila</button>

@@ -37,7 +37,7 @@ function GuiaDeleteModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-      <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
+      <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-base font-semibold mb-1">Eliminar guía {guiaNumero ? `GT-${String(guiaNumero).padStart(3, "0")}` : ""}</h3>
         <p className="text-sm text-gray-500 mb-4">
           Esta acción no se puede deshacer. Para confirmar, escribe <span className="font-semibold text-black">ELIMINAR</span>
