@@ -1,8 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
-import { FacturaCard, FacturaForm } from "@/components/marketing";
+import {
+  BorradorFacturaCard,
+  FacturaCard,
+  FacturaForm,
+} from "@/components/marketing";
 import type {
   FacturaConAdjuntos,
   MarcaConPorcentaje,
@@ -15,6 +19,7 @@ import {
   pedirUploadUrl,
   subirArchivoAStorage,
 } from "./uploadHelpers";
+import { useBulkUploadFacturas } from "@/lib/marketing/useBulkUploadFacturas";
 
 interface FacturasSectionProps {
   proyecto: ProyectoConMarcas;
@@ -47,6 +52,11 @@ export default function FacturasSection({
   // Edición de una factura específica
   const [editando, setEditando] = useState<FacturaConAdjuntos | null>(null);
   const [editandoMarcas, setEditandoMarcas] = useState<MarcaPorcentajeInput[] | null>(null);
+
+  // Multi-upload (bulk)
+  const bulk = useBulkUploadFacturas({ proyectoId: proyecto.id });
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragActivo, setDragActivo] = useState(false);
 
   // Sincroniza cuando el parent pasa nuevas facturas (después de un onChange).
   useEffect(() => {
@@ -355,6 +365,56 @@ export default function FacturasSection({
     }
   };
 
+  // ── Drop / file picker handlers para multi-upload ─────────────────────
+  const aceptarArchivos = useCallback(
+    async (files: FileList | File[] | null) => {
+      if (!files) return;
+      const arr = Array.from(files);
+      if (arr.length === 0) return;
+      await bulk.agregarArchivos(arr);
+    },
+    [bulk],
+  );
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragActivo(false);
+    if (readonly) return;
+    aceptarArchivos(e.dataTransfer?.files ?? null);
+  };
+
+  const handleGuardarBulk = async () => {
+    try {
+      const r = await bulk.guardarTodas();
+      if (r.exitosas > 0 && r.errores === 0) {
+        toast(
+          `${r.exitosas} factura${r.exitosas === 1 ? "" : "s"} guardada${
+            r.exitosas === 1 ? "" : "s"
+          }`,
+          "success",
+        );
+      } else if (r.exitosas > 0 && r.errores > 0) {
+        toast(
+          `${r.exitosas} guardada${r.exitosas === 1 ? "" : "s"} · ${r.errores} con error`,
+          "warning",
+        );
+      } else if (r.errores > 0) {
+        toast(
+          `${r.errores} factura${r.errores === 1 ? "" : "s"} con error — revisa los mensajes`,
+          "error",
+        );
+      }
+      if (r.exitosas > 0) {
+        await cargar();
+        onChange?.();
+      }
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Error guardando facturas";
+      toast(msg, "error");
+    }
+  };
+
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -380,6 +440,120 @@ export default function FacturasSection({
           </button>
         )}
       </div>
+
+      {/* Drop zone multi-upload */}
+      {!readonly && (
+        <div>
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragActivo(true);
+            }}
+            onDragLeave={() => setDragActivo(false)}
+            onDrop={handleDrop}
+            onClick={() => fileInputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
+            className={`rounded-lg border-2 border-dashed p-4 text-center cursor-pointer transition ${
+              dragActivo
+                ? "border-black bg-gray-50"
+                : "border-gray-300 hover:border-gray-400 hover:bg-gray-50"
+            }`}
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf,.pdf"
+              multiple
+              onChange={(e) => {
+                aceptarArchivos(e.target.files);
+                e.target.value = "";
+              }}
+              className="hidden"
+            />
+            <div className="text-sm text-gray-700 font-medium">
+              📤 Subir facturas (varias a la vez)
+            </div>
+            <div className="text-xs text-gray-500 mt-0.5">
+              Arrastra PDFs aquí o haz clic para seleccionarlos. La IA leerá
+              cada uno automáticamente.
+            </div>
+            {bulk.progress.enProceso && (
+              <div className="text-xs text-gray-600 mt-2 inline-flex items-center gap-1.5">
+                <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round">
+                  <path d="M12 2a10 10 0 0 1 10 10" />
+                </svg>
+                Procesando {bulk.progress.procesados} de{" "}
+                {bulk.progress.totalArchivos}…
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Borradores en edición */}
+      {bulk.borradores.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between sticky top-0 bg-white py-2 z-10 border-b border-gray-100">
+            <div className="text-xs text-gray-600">
+              <span className="font-semibold tabular-nums">
+                {bulk.borradores.length}
+              </span>{" "}
+              factura{bulk.borradores.length === 1 ? "" : "s"} sin guardar
+              {bulk.cardsIncompletas.length > 0 && (
+                <span className="text-amber-700 ml-1">
+                  · {bulk.cardsIncompletas.length} incompleta
+                  {bulk.cardsIncompletas.length === 1 ? "" : "s"}
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={bulk.limpiarTodo}
+                disabled={bulk.guardando}
+                className="text-xs text-gray-500 hover:text-gray-800 underline disabled:opacity-40"
+              >
+                Descartar todas
+              </button>
+              <button
+                type="button"
+                onClick={handleGuardarBulk}
+                disabled={!bulk.puedeGuardar}
+                title={
+                  bulk.cardsIncompletas.length > 0
+                    ? `Revisa las ${bulk.cardsIncompletas.length} factura${
+                        bulk.cardsIncompletas.length === 1 ? "" : "s"
+                      } incompleta${bulk.cardsIncompletas.length === 1 ? "" : "s"}`
+                    : undefined
+                }
+                className="rounded-md bg-black text-white px-3 py-1.5 text-xs font-medium active:scale-[0.97] transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {bulk.guardando
+                  ? "Guardando…"
+                  : `Guardar ${bulk.borradores.length} factura${
+                      bulk.borradores.length === 1 ? "" : "s"
+                    }`}
+              </button>
+            </div>
+          </div>
+          {bulk.borradores.map((b) => (
+            <BorradorFacturaCard
+              key={b.cardId}
+              borrador={b}
+              marcasCatalogo={marcasCatalogo}
+              onChange={bulk.updateCard}
+              onDescartar={bulk.descartar}
+            />
+          ))}
+        </div>
+      )}
 
       {showForm && (
         <div className="rounded-lg border border-gray-200 bg-white p-4">

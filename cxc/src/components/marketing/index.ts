@@ -13,3 +13,8 @@ export { FacturaCard } from "./FacturaCard";
 export { ProyectoForm } from "./ProyectoForm";
 export { FacturaForm } from "./FacturaForm";
 export { BotonDescargarZip } from "./BotonDescargarZip";
+export { BorradorFacturaCard } from "./BorradorFacturaCard";
+export type {
+  BorradorFactura,
+  EstadoBorrador,
+} from "./BorradorFacturaCard";
