@@ -62,6 +62,9 @@ export async function GET(req: NextRequest) {
       const r = row as Record<string, unknown>;
       const marcaRow = r.marca as Record<string, unknown> | null;
       if (!marcaRow) continue;
+      const tipoRaw = String(marcaRow.tipo ?? "externa");
+      const tipo: "externa" | "interna" =
+        tipoRaw === "interna" ? "interna" : "externa";
       const item: MarcaConPorcentaje = {
         marca: {
           id: String(marcaRow.id),
@@ -70,6 +73,7 @@ export async function GET(req: NextRequest) {
           empresa_codigo: String(
             marcaRow.empresa_codigo ?? "",
           ) as MarcaConPorcentaje["marca"]["empresa_codigo"],
+          tipo,
           activo: Boolean(marcaRow.activo ?? true),
           created_at: String(marcaRow.created_at ?? ""),
         },

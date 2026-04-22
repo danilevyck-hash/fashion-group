@@ -31,11 +31,11 @@ export async function GET(req: NextRequest) {
   const busqueda = (url.searchParams.get("busqueda") ?? "").trim();
 
   try {
-    // 1. Cargar marcas (catálogo completo para nombres y colores)
+    // 1. Cargar marcas (catálogo completo para nombres, colores y tipo)
     const [marcasRes, proyectosRes] = await Promise.all([
       supabaseServer
         .from("mk_marcas")
-        .select("id, nombre, codigo"),
+        .select("*"),
       (() => {
         let q = supabaseServer
           .from("mk_proyectos")
@@ -43,7 +43,9 @@ export async function GET(req: NextRequest) {
             "id, nombre, tienda, estado, created_at, anulado_en, fecha_enviado, fecha_cobrado",
           )
           .is("anulado_en", null);
-        if (filtroEstado === "activos") {
+        if (filtroEstado === "activos" || filtroEstado === "joybees") {
+          // Tab Joybees comparte el universo de activos (abierto/enviado).
+          // El filtro interno/externo se aplica después vía passTipo().
           q = q.in("estado", ACTIVOS as unknown as string[]);
         } else if (filtroEstado === "historial") {
           q = q.eq("estado", "cobrado");
@@ -74,11 +76,18 @@ export async function GET(req: NextRequest) {
     if (marcasRes.error) throw new Error(`marcas: ${marcasRes.error.message}`);
     if (proyectosRes.error) throw new Error(`proyectos: ${proyectosRes.error.message}`);
 
-    const marcas = (marcasRes.data ?? []) as Array<{
-      id: string;
-      nombre: string;
-      codigo: string;
-    }>;
+    const marcas = ((marcasRes.data ?? []) as Array<Record<string, unknown>>)
+      .map((m) => {
+        const tipoRaw = String(m.tipo ?? "externa");
+        const tipo: "externa" | "interna" =
+          tipoRaw === "interna" ? "interna" : "externa";
+        return {
+          id: String(m.id),
+          nombre: String(m.nombre ?? ""),
+          codigo: String(m.codigo ?? ""),
+          tipo,
+        };
+      });
     const marcaById = new Map(marcas.map((m) => [String(m.id), m]));
 
     const proyectos = (proyectosRes.data ?? []) as Array<{
@@ -201,16 +210,45 @@ export async function GET(req: NextRequest) {
       return !!set && set.has(marcaIdFiltro);
     };
 
+    // Split interno/externo: un proyecto se considera "interno" si TODAS sus
+    // marcas asignadas son internas. "externo" si al menos una es externa
+    // (pero por la regla de exclusividad nunca se mezclan). Sin marcas aún
+    // asignadas = tratado como externo por default (tab Activos).
+    function proyectoEsInterno(pid: string): boolean {
+      const set = marcasByProy.get(pid);
+      if (!set || set.size === 0) return false;
+      for (const mid of set) {
+        const m = marcaById.get(mid);
+        if (!m || m.tipo !== "interna") return false;
+      }
+      return true;
+    }
+
+    const esVistaJoybees = filtroEstado === "joybees";
+    const passTipo = (pid: string): boolean => {
+      const interno = proyectoEsInterno(pid);
+      return esVistaJoybees ? interno : !interno;
+    };
+
     const resultado = proyectos
       .filter((p) => passMarca(String(p.id)))
+      .filter((p) => passTipo(String(p.id)))
       .map((p) => {
         const pid = String(p.id);
         const marcasSet = marcasByProy.get(pid) ?? new Set<string>();
 
         const marcasArr = Array.from(marcasSet)
           .map((mid) => marcaById.get(mid))
-          .filter((x): x is { id: string; nombre: string; codigo: string } => !!x)
-          .map((m) => ({ id: m.id, nombre: m.nombre, codigo: m.codigo }));
+          .filter(
+            (x): x is { id: string; nombre: string; codigo: string; tipo: "externa" | "interna" } =>
+              !!x,
+          )
+          .map((m) => ({
+            id: m.id,
+            nombre: m.nombre,
+            codigo: m.codigo,
+            tipo: m.tipo,
+          }));
 
         const desg = desgloseDeProy(pid);
         const desgloseConNombres = desg.desglose.map((d) => {

@@ -17,7 +17,8 @@ type FiltroEstado =
   | "activos"
   | "todos"
   | "abierto"
-  | "enviado";
+  | "enviado"
+  | "joybees";
 
 interface ProyectoListItem {
   id: string;
@@ -30,7 +31,12 @@ interface ProyectoListItem {
   fecha_cobrado: string | null;
   facturas_count: number;
   fotos_count: number;
-  marcas: Array<{ id: string; nombre: string; codigo: string }>;
+  marcas: Array<{
+    id: string;
+    nombre: string;
+    codigo: string;
+    tipo?: "externa" | "interna";
+  }>;
   por_cobrar_total: number;
   por_cobrar_por_marca: Array<{
     marca_id: string;
@@ -54,13 +60,25 @@ const PILLS: Array<{ key: FiltroEstado; label: string }> = [
   { key: "todos", label: "Todos" },
   { key: "abierto", label: "Abiertos" },
   { key: "enviado", label: "Enviados" },
+  { key: "joybees", label: "Joybees" },
 ];
 
 function colorParaMarca(codigo: string): string {
   if (codigo === "TH") return "bg-red-50 text-red-700 border-red-200";
   if (codigo === "CK") return "bg-gray-100 text-gray-800 border-gray-300";
   if (codigo === "RBK") return "bg-blue-50 text-blue-700 border-blue-200";
+  if (codigo === "J") return "bg-emerald-50 text-emerald-700 border-emerald-200";
   return "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200";
+}
+
+function tooltipParaMarca(m: {
+  nombre: string;
+  tipo?: "externa" | "interna";
+}): string {
+  if (m.tipo === "interna") {
+    return `${m.nombre} · Marca interna — Fashion Group absorbe 100%`;
+  }
+  return m.nombre;
 }
 
 function inicial(s: string): string {
@@ -404,7 +422,7 @@ export default function ProyectosHomeView({
                           {p.marcas.map((m) => (
                             <span
                               key={m.id}
-                              title={m.nombre}
+                              title={tooltipParaMarca(m)}
                               className={`inline-flex items-center justify-center w-6 h-6 rounded-md border text-[11px] font-bold ${colorParaMarca(m.codigo)}`}
                             >
                               {inicial(m.nombre)}

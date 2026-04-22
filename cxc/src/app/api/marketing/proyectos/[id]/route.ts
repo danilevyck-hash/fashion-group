@@ -4,6 +4,7 @@ import {
   getProyectoById,
   getFacturasByProyecto,
 } from "@/lib/marketing/queries";
+import { getMarcasDeFactura } from "@/lib/marketing/factura-marcas";
 import { updateProyecto } from "@/lib/marketing/mutations";
 import { firmarAdjuntos } from "@/lib/marketing/storage";
 import type { UpdateProyectoInput } from "@/lib/marketing/types";
@@ -38,6 +39,7 @@ export async function GET(
       facturasRaw.map(async (f) => ({
         ...f,
         adjuntos: await firmarAdjuntos(f.adjuntos ?? []),
+        marcas: await getMarcasDeFactura(f.id),
       })),
     );
     return NextResponse.json({ ...proyecto, facturas });

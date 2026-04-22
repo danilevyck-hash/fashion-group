@@ -17,6 +17,12 @@ export type EmpresaCodigo = (typeof EMPRESA_CODIGOS)[number];
 
 export type EstadoProyecto = "abierto" | "enviado" | "cobrado";
 
+// Tipo de marca:
+//   'externa' — hay contraparte (Tommy, Calvin, Reebok) con quien compartir 50/50.
+//   'interna' — Fashion Group absorbe 100% del gasto (ej: Joybees).
+// Las marcas internas no se mezclan con externas en un mismo proyecto/factura.
+export type TipoMarca = "externa" | "interna";
+
 export type TipoAdjunto =
   | "pdf_factura"
   | "foto_proyecto"
@@ -32,6 +38,7 @@ export interface MkMarca {
   nombre: string;
   codigo: string;
   empresa_codigo: EmpresaCodigo;
+  tipo: TipoMarca; // Default 'externa' si la columna aún no existe en DB.
   activo: boolean;
   created_at: string;
 }

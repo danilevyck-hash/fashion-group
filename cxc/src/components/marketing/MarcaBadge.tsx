@@ -1,6 +1,6 @@
 "use client";
 
-type MarcaCodigo = "TH" | "CK" | "RBK";
+type MarcaCodigo = "TH" | "CK" | "RBK" | "J";
 type Size = "sm" | "md";
 
 interface MarcaBadgeProps {
@@ -12,6 +12,8 @@ const MARCA_STYLES: Record<MarcaCodigo, { bg: string; text: string; label: strin
   TH: { bg: "bg-blue-600", text: "text-white", label: "Tommy" },
   CK: { bg: "bg-black", text: "text-white", label: "Calvin" },
   RBK: { bg: "bg-red-600", text: "text-white", label: "Reebok" },
+  // Joybees — marca interna del grupo. Verde emerald para distinguir.
+  J: { bg: "bg-emerald-600", text: "text-white", label: "Joybees" },
 };
 
 const SIZES: Record<Size, string> = {

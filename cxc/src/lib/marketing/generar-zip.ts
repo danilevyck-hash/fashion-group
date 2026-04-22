@@ -129,7 +129,8 @@ function mesEjecucion(isoString: string | null): string {
 //   4. Detalle         (proyecto.nombre)
 //   5. Monto factura dólares (factura.total)
 // Columnas dinámicas (marcas asignadas al proyecto, en orden alfabético):
-//   - Cobrable [Marca]  (total × 0.5 — regla 50/50)
+//   - Cobrable [Marca]  (total × porcentaje/100, donde porcentaje viene de la
+//     asignación factura-marca: 50 para externas, 100 para internas/Joybees).
 // Última columna: Comentarios (vacía).
 //
 // Estilo: Arial 10/11, header fondo #1F1F1F texto blanco, bordes #BFBFBF,
@@ -169,8 +170,14 @@ function generarRespaldoExcel(
       round2(f.total),
     ];
     for (const marca of marcasOrden) {
-      const aplica = f.marcas.some((m) => m.marca.id === marca.id);
-      row.push(aplica ? round2(f.total * 0.5) : 0);
+      const asignacion = f.marcas.find((m) => m.marca.id === marca.id);
+      if (!asignacion) {
+        row.push(0);
+        continue;
+      }
+      // porcentaje viene de mk_factura_marcas: 50 para externa, 100 para interna (Joybees).
+      const pct = Number(asignacion.porcentaje ?? 50);
+      row.push(round2((f.total * pct) / 100));
     }
     row.push(""); // Comentarios
     return row;

@@ -1,36 +1,138 @@
 // ============================================================================
-// Marketing — helpers para % de marcas a nivel FACTURA (Fase 1 del refactor)
+// Marketing — helpers para % de marcas a nivel FACTURA
 // ============================================================================
 // Lee/escribe en la tabla mk_factura_marcas.
 //
-// Reglas de negocio (vigentes desde la nueva regla 50/50):
-//   - Cada marca asignada a una factura cubre SIEMPRE 50% (regla fija, no
-//     editable). El resto se asume Fashion Group.
-//   - Cobrable por marca = factura.total × 50 / 100 = factura.total × 0.5.
-//   - El campo `porcentaje` se preserva en la DB para no romper consultas
-//     históricas, pero al escribir se fuerza 50.
+// Reglas de negocio:
+//   - Marcas EXTERNAS (Tommy, Calvin, Reebok): cada marca asignada cubre 50%.
+//     Fashion Group absorbe el otro 50%.
+//   - Marcas INTERNAS (Joybees): Fashion Group absorbe el 100% del gasto.
+//     No hay contraparte con quien compartir; se persiste porcentaje=100.
+//   - EXCLUSIVIDAD: una factura no puede mezclar marcas internas con externas.
+//     Y dentro de un proyecto, todas sus facturas deben ser del mismo tipo.
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
-import type { MarcaConPorcentaje, MkMarca } from "./types";
+import type { MarcaConPorcentaje, MkMarca, TipoMarca } from "./types";
 
-// Regla 50/50: cada marca asignada a una factura recibe siempre 50%.
+// Legacy: se mantiene para importaciones antiguas. El valor real se decide
+// según el tipo de marca (50 externa, 100 interna).
 export const PORCENTAJE_MARCA_FIJO = 50;
+
+function porcentajeParaTipo(tipo: TipoMarca): number {
+  return tipo === "interna" ? 100 : 50;
+}
 
 interface MarcaPorcentajeInput {
   marcaId: string;
-  porcentaje?: number; // ignorado: siempre se persiste 50.
+  porcentaje?: number; // ignorado: el valor real se deriva del tipo de marca.
 }
 
 function mapMarca(row: Record<string, unknown>): MkMarca {
+  const tipoRaw = String(row.tipo ?? "externa");
+  const tipo: MkMarca["tipo"] = tipoRaw === "interna" ? "interna" : "externa";
   return {
     id: String(row.id),
     nombre: String(row.nombre ?? ""),
     codigo: String(row.codigo ?? ""),
     empresa_codigo: String(row.empresa_codigo ?? "") as MkMarca["empresa_codigo"],
+    tipo,
     activo: Boolean(row.activo ?? true),
     created_at: String(row.created_at ?? ""),
   };
+}
+
+// Trae tipo + id para un conjunto de marca_ids, defaulting 'externa'.
+async function tiposDeMarcas(
+  marcaIds: ReadonlyArray<string>,
+): Promise<Map<string, TipoMarca>> {
+  if (marcaIds.length === 0) return new Map();
+  const { data, error } = await supabaseServer
+    .from("mk_marcas")
+    .select("*")
+    .in("id", marcaIds);
+  if (error) {
+    throw new Error(`tiposDeMarcas: ${error.message}`);
+  }
+  const out = new Map<string, TipoMarca>();
+  for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+    const tipoRaw = String(row.tipo ?? "externa");
+    const tipo: TipoMarca = tipoRaw === "interna" ? "interna" : "externa";
+    out.set(String(row.id), tipo);
+  }
+  return out;
+}
+
+// Valida que todas las marcas sean del mismo tipo (todas externas o todas internas).
+function validarMismoTipo(
+  marcaIds: ReadonlyArray<string>,
+  tipos: Map<string, TipoMarca>,
+): TipoMarca {
+  const setTipos = new Set<TipoMarca>();
+  for (const id of marcaIds) {
+    setTipos.add(tipos.get(id) ?? "externa");
+  }
+  if (setTipos.size > 1) {
+    throw new Error(
+      "Joybees no se puede mezclar con otras marcas en el mismo proyecto.",
+    );
+  }
+  return setTipos.values().next().value ?? "externa";
+}
+
+// Valida que el proyecto de la factura no tenga facturas de otro tipo.
+// Excluye la factura actual (cuando es edición).
+async function validarTipoCoherenteConProyecto(
+  facturaId: string,
+  tipoNuevo: TipoMarca,
+): Promise<void> {
+  // Ubicar proyecto_id de la factura actual.
+  const { data: fRow, error: fErr } = await supabaseServer
+    .from("mk_facturas")
+    .select("proyecto_id")
+    .eq("id", facturaId)
+    .maybeSingle();
+  if (fErr) throw new Error(`validarTipoCoherenteConProyecto: ${fErr.message}`);
+  if (!fRow) return;
+  const proyectoId = String((fRow as { proyecto_id: string }).proyecto_id);
+
+  // Otras facturas vigentes del mismo proyecto (excluye la actual).
+  const { data: siblingsRows, error: sErr } = await supabaseServer
+    .from("mk_facturas")
+    .select("id")
+    .eq("proyecto_id", proyectoId)
+    .is("anulado_en", null)
+    .neq("id", facturaId);
+  if (sErr) throw new Error(`validarTipoCoherenteConProyecto[siblings]: ${sErr.message}`);
+  const siblingIds = ((siblingsRows ?? []) as Array<{ id: string }>).map(
+    (r) => String(r.id),
+  );
+  if (siblingIds.length === 0) return;
+
+  // Marcas ya asignadas a esas facturas vigentes.
+  const { data: fmRows, error: fmErr } = await supabaseServer
+    .from("mk_factura_marcas")
+    .select("marca_id")
+    .in("factura_id", siblingIds);
+  if (fmErr) throw new Error(`validarTipoCoherenteConProyecto[fm]: ${fmErr.message}`);
+  const otrosMarcaIds = Array.from(
+    new Set(
+      ((fmRows ?? []) as Array<{ marca_id: string }>).map((r) =>
+        String(r.marca_id),
+      ),
+    ),
+  );
+  if (otrosMarcaIds.length === 0) return;
+
+  const tipos = await tiposDeMarcas(otrosMarcaIds);
+  for (const id of otrosMarcaIds) {
+    const t = tipos.get(id) ?? "externa";
+    if (t !== tipoNuevo) {
+      throw new Error(
+        "Joybees no se puede mezclar con otras marcas en el mismo proyecto.",
+      );
+    }
+  }
 }
 
 function round2(n: number): number {
@@ -39,7 +141,7 @@ function round2(n: number): number {
 
 /**
  * Lee las marcas con su porcentaje para una factura.
- * Ordena por porcentaje descendente.
+ * Ordena por porcentaje descendente. Cada marca incluye `tipo` (externa/interna).
  */
 export async function getMarcasDeFactura(
   facturaId: string,
@@ -71,13 +173,18 @@ export async function getMarcasDeFactura(
 }
 
 /**
- * Reemplaza todas las marcas de una factura.
- *   1. Valida marcaIds únicas y >= 1 entrada.
- *   2. Borra filas existentes de mk_factura_marcas para esa factura.
- *   3. Inserta las nuevas filas con porcentaje = PORCENTAJE_MARCA_FIJO (50).
+ * Reemplaza todas las marcas de una factura. Aplica:
+ *   1. Validación: marcaIds únicas y >= 1.
+ *   2. Validación: todas las marcas deben ser del mismo tipo (externa/interna).
+ *      Internas (Joybees) no se mezclan con externas.
+ *   3. Validación: el tipo elegido debe ser coherente con el resto de facturas
+ *      vigentes del proyecto (no se puede meter Joybees a un proyecto que ya
+ *      tiene facturas externas, ni viceversa).
+ *   4. Borra filas previas en mk_factura_marcas.
+ *   5. Inserta nuevas con porcentaje = 50 si externa, 100 si interna.
  *
- * Cualquier `porcentaje` que llegue en `marcas` se ignora — la regla 50/50
- * es fija a nivel de negocio.
+ * Cualquier `porcentaje` en el input se ignora — el valor real se deriva del
+ * tipo de marca.
  */
 export async function setMarcasDeFactura(
   facturaId: string,
@@ -97,6 +204,13 @@ export async function setMarcasDeFactura(
     }
     ids.add(m.marcaId);
   }
+  const marcaIds = Array.from(ids);
+
+  // Validación de tipos: todas las marcas del mismo tipo + coherencia con
+  // el resto de facturas del proyecto.
+  const tipos = await tiposDeMarcas(marcaIds);
+  const tipoNuevo = validarMismoTipo(marcaIds, tipos);
+  await validarTipoCoherenteConProyecto(facturaId, tipoNuevo);
 
   // Borrar filas existentes
   const { error: delError } = await supabaseServer
@@ -107,11 +221,11 @@ export async function setMarcasDeFactura(
     throw new Error(`setMarcasDeFactura[delete]: ${delError.message}`);
   }
 
-  // Insertar nuevas — porcentaje siempre 50, ignoramos el input.
+  // Insertar nuevas — porcentaje depende del tipo de cada marca.
   const payload = marcas.map((m) => ({
     factura_id: facturaId,
     marca_id: m.marcaId,
-    porcentaje: PORCENTAJE_MARCA_FIJO,
+    porcentaje: porcentajeParaTipo(tipos.get(m.marcaId) ?? "externa"),
   }));
   const { error: insError } = await supabaseServer
     .from("mk_factura_marcas")

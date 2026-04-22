@@ -286,43 +286,75 @@ export function BorradorFacturaCard({
         </span>
       </div>
 
-      {/* Marcas (checkboxes 50/50) */}
+      {/* Marcas — externas 50%, internas (Joybees) 100%. No se pueden mezclar. */}
       <div>
         <div className="text-xs text-gray-500 mb-1">
-          Marcas que aplican (50% c/u)
+          Marcas que aplican
           <span className="text-red-500 ml-0.5">*</span>
+          <span className="text-gray-400 ml-2">
+            Externas 50% · Internas 100%
+          </span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-          {marcasCatalogo.map((m) => {
-            const checked = borrador.marcaIds.includes(m.id);
-            const cobrable = total * 0.5;
-            return (
-              <label
-                key={m.id}
-                className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md border cursor-pointer transition text-sm ${
-                  checked
-                    ? "border-black bg-white"
-                    : "border-gray-200 bg-white hover:border-gray-300"
-                } ${estaProcesando ? "opacity-60" : ""}`}
-              >
-                <span className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleMarca(m.id)}
-                    disabled={estaProcesando}
-                    className="accent-black w-3.5 h-3.5"
-                  />
-                  <span className="text-gray-800">{m.nombre}</span>
-                </span>
-                {checked && total > 0 && (
-                  <span className="text-xs font-mono tabular-nums text-gray-700">
-                    {formatearMonto(cobrable)}
+          {(() => {
+            const selTipos = new Set<"externa" | "interna">();
+            for (const id of borrador.marcaIds) {
+              const m = marcasCatalogo.find((x) => x.id === id);
+              if (m) selTipos.add(m.tipo ?? "externa");
+            }
+            const tipoActivo = selTipos.size === 1
+              ? Array.from(selTipos)[0]
+              : null;
+
+            return marcasCatalogo.map((m) => {
+              const checked = borrador.marcaIds.includes(m.id);
+              const tipoMarca = m.tipo ?? "externa";
+              const pct = tipoMarca === "interna" ? 1 : 0.5;
+              const cobrable = total * pct;
+              const deshabilitada =
+                tipoActivo !== null && tipoActivo !== tipoMarca;
+              return (
+                <label
+                  key={m.id}
+                  title={
+                    deshabilitada
+                      ? "Joybees no se puede mezclar con otras marcas en el mismo proyecto"
+                      : tipoMarca === "interna"
+                        ? "Marca interna · Fashion Group absorbe 100%"
+                        : undefined
+                  }
+                  className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md border transition text-sm ${
+                    deshabilitada
+                      ? "border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed"
+                      : checked
+                        ? "border-black bg-white cursor-pointer"
+                        : "border-gray-200 bg-white hover:border-gray-300 cursor-pointer"
+                  } ${estaProcesando ? "opacity-60" : ""}`}
+                >
+                  <span className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleMarca(m.id)}
+                      disabled={estaProcesando || deshabilitada}
+                      className="accent-black w-3.5 h-3.5 disabled:cursor-not-allowed"
+                    />
+                    <span className="text-gray-800">{m.nombre}</span>
+                    {tipoMarca === "interna" && (
+                      <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                        Interna
+                      </span>
+                    )}
                   </span>
-                )}
-              </label>
-            );
-          })}
+                  {checked && total > 0 && (
+                    <span className="text-xs font-mono tabular-nums text-gray-700">
+                      {formatearMonto(cobrable)}
+                    </span>
+                  )}
+                </label>
+              );
+            });
+          })()}
         </div>
         {borrador.marcaIds.length === 0 && (
           <p className="text-[11px] text-red-600 mt-1">

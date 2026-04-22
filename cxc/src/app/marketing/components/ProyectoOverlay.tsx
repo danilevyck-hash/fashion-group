@@ -21,16 +21,21 @@ import {
 } from "@/lib/marketing/normalizar";
 import type {
   FacturaConAdjuntos,
+  MarcaConPorcentaje,
   MkMarca,
   ProyectoConMarcas,
 } from "@/lib/marketing/types";
+
+interface FacturaConAdjuntosYMarcas extends FacturaConAdjuntos {
+  marcas?: MarcaConPorcentaje[];
+}
 import FacturasSection from "./FacturasSection";
 import FotosSection from "./FotosSection";
 
 type Tab = "facturas" | "fotos";
 
-function esMarcaConocida(c: string): c is "TH" | "CK" | "RBK" {
-  return c === "TH" || c === "CK" || c === "RBK";
+function esMarcaConocida(c: string): c is "TH" | "CK" | "RBK" | "J" {
+  return c === "TH" || c === "CK" || c === "RBK" || c === "J";
 }
 
 interface Props {
@@ -49,7 +54,7 @@ export default function ProyectoOverlay({
 }: Props) {
   const { toast } = useToast();
   const [proyecto, setProyecto] = useState<ProyectoConMarcas | null>(null);
-  const [facturas, setFacturas] = useState<FacturaConAdjuntos[]>([]);
+  const [facturas, setFacturas] = useState<FacturaConAdjuntosYMarcas[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("facturas");
 
@@ -72,7 +77,7 @@ export default function ProyectoOverlay({
         throw new Error(err?.error ?? "Proyecto no encontrado");
       }
       const body = (await pRes.json()) as ProyectoConMarcas & {
-        facturas?: FacturaConAdjuntos[];
+        facturas?: FacturaConAdjuntosYMarcas[];
       };
       setProyecto(body);
       onNombreProyectoRef.current?.(body.nombre || body.tienda);
@@ -101,13 +106,44 @@ export default function ProyectoOverlay({
     };
   }, [facturas]);
 
-  // Por cobrar por marca = SUM(factura.total × %) leyendo las marcas de cada
-  // factura (mk_factura_marcas). El backend ya devuelve proyecto.marcas como
-  // legacy (mk_proyecto_marcas); si no hay, calculamos desde facturas.adjuntos
-  // ya trae factura_marcas en el payload de /proyectos/[id]. Dado que ese
-  // endpoint no incluye marcas por factura, solo mostramos legacy si existe.
+  // Por cobrar por marca = SUM(factura.total × porcentaje) leyendo las marcas
+  // asignadas a cada factura (mk_factura_marcas). Porcentaje = 50 para marcas
+  // externas, 100 para internas (Joybees absorbe 100%).
+  // Fallback a proyecto.marcas (mk_proyecto_marcas, legacy) si no hay facturas
+  // con marcas asignadas todavía.
   const cobrablePorMarca = useMemo(() => {
     if (!proyecto) return [];
+    const vigentes = facturas.filter((f) => !f.anulado_en);
+
+    // Agrega montos desde mk_factura_marcas (flow nuevo).
+    const byMarcaId = new Map<
+      string,
+      { marca: MarcaConPorcentaje["marca"]; porcentaje: number; monto: number }
+    >();
+    for (const f of vigentes) {
+      for (const m of f.marcas ?? []) {
+        const pct = Number(m.porcentaje ?? 50);
+        const monto = (Number(f.total) * pct) / 100;
+        const prev = byMarcaId.get(m.marca.id);
+        if (prev) {
+          byMarcaId.set(m.marca.id, {
+            ...prev,
+            monto: prev.monto + monto,
+          });
+        } else {
+          byMarcaId.set(m.marca.id, { marca: m.marca, porcentaje: pct, monto });
+        }
+      }
+    }
+
+    if (byMarcaId.size > 0) {
+      return Array.from(byMarcaId.values()).map((v) => ({
+        ...v,
+        monto: Number(v.monto.toFixed(2)),
+      }));
+    }
+
+    // Fallback legacy (mk_proyecto_marcas).
     if (!proyecto.marcas || proyecto.marcas.length === 0) return [];
     return proyecto.marcas.map((m) => {
       const monto = (totales.total * m.porcentaje) / 100;
@@ -117,7 +153,7 @@ export default function ProyectoOverlay({
         monto: Number(monto.toFixed(2)),
       };
     });
-  }, [proyecto, totales.total]);
+  }, [proyecto, facturas, totales.total]);
 
   if (loading || !proyecto) {
     return (

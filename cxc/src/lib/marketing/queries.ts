@@ -22,11 +22,14 @@ import type {
 // Helpers internos de mapeo (no exportados)
 // ----------------------------------------------------------------------------
 function mapMarca(row: Record<string, unknown>): MkMarca {
+  const tipoRaw = String(row.tipo ?? "externa");
+  const tipo: MkMarca["tipo"] = tipoRaw === "interna" ? "interna" : "externa";
   return {
     id: String(row.id),
     nombre: String(row.nombre ?? ""),
     codigo: String(row.codigo ?? ""),
     empresa_codigo: String(row.empresa_codigo ?? "") as MkMarca["empresa_codigo"],
+    tipo,
     activo: Boolean(row.activo ?? true),
     created_at: String(row.created_at ?? ""),
   };
