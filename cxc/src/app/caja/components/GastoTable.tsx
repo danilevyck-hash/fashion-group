@@ -38,7 +38,7 @@ function Chip({
   return (
     <button
       onClick={onClick}
-      className={`whitespace-nowrap px-3 py-1.5 rounded-full border text-xs font-medium transition ${
+      className={`snap-start shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full border text-xs font-medium transition ${
         active
           ? "bg-black text-white border-black"
           : "bg-white text-gray-700 border-gray-200 hover:border-gray-400"
@@ -144,7 +144,7 @@ export default function GastoTable({
 
       {/* Category chips */}
       {gastos.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-2 mb-4 -mx-4 px-4 sm:mx-0 sm:px-0">
           <Chip
             label="Todas"
             amount={grandTotal}
