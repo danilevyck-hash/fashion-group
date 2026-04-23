@@ -7,6 +7,11 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import type { PLIndexRow } from "@/lib/parse-packing-list";
 import { ScrollableTable } from "@/components/ui";
 
+interface BultoOrderEntry {
+  id: string;
+  label: string;
+}
+
 interface PLDetail {
   id: string;
   numero_pl: string;
@@ -18,6 +23,11 @@ interface PLDetail {
   bulto_muestra: string | null;
   index_rows: PLIndexRow[];
   created_at: string;
+  parser_metadata?: {
+    parser_version?: string;
+    bulto_order?: BultoOrderEntry[];
+    [k: string]: unknown;
+  };
 }
 
 export default function PackingListDetailPage() {
@@ -90,7 +100,43 @@ export default function PackingListDetailPage() {
     return groups;
   }, [pl]);
 
-  // Build bulto groups for "Vista para muestras"
+  // Numeración secuencial 1..N en ORDEN FÍSICO del PDF. Bodega trabaja el PL
+  // impreso bulto por bulto; si reordenamos, B1 del sistema ≠ B1 del PDF.
+  // PARSER_VERSION ≥ 2.1.0 escribe parser_metadata.bulto_order con el orden
+  // original. Fallback para PLs viejos sin metadata: sort por id numérico.
+  const { bultoNumberMap, bultoLabelMap } = useMemo(() => {
+    const numMap = new Map<string, number>();
+    const labelMap = new Map<string, string>();
+    if (!pl?.index_rows) return { bultoNumberMap: numMap, bultoLabelMap: labelMap };
+
+    const ids = new Set<string>();
+    for (const row of pl.index_rows) {
+      for (const bId of Object.keys(row.distribution)) ids.add(bId);
+    }
+
+    const storedOrder = pl.parser_metadata?.bulto_order;
+    if (Array.isArray(storedOrder) && storedOrder.length > 0) {
+      let seq = 1;
+      for (const entry of storedOrder) {
+        if (!ids.has(entry.id)) continue;
+        numMap.set(entry.id, seq++);
+        labelMap.set(entry.id, entry.label || entry.id);
+      }
+      for (const bId of ids) if (!numMap.has(bId)) {
+        numMap.set(bId, seq++);
+        labelMap.set(bId, bId);
+      }
+    } else {
+      [...ids].sort((a, b) => parseInt(a) - parseInt(b)).forEach((id, i) => {
+        numMap.set(id, i + 1);
+        labelMap.set(id, id);
+      });
+    }
+    return { bultoNumberMap: numMap, bultoLabelMap: labelMap };
+  }, [pl]);
+
+  // Bulto groups for "Vista para muestras" — ordenado por la numeración física,
+  // no por parseInt(id).
   const bultoGroups = useMemo(() => {
     if (!pl?.index_rows) return [];
     const map = new Map<string, { estilo: string; producto: string; isOS: boolean }[]>();
@@ -102,22 +148,12 @@ export default function PackingListDetailPage() {
     for (const styles of map.values()) {
       styles.sort((a, b) => a.estilo.localeCompare(b.estilo));
     }
-    return [...map.entries()].sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
-  }, [pl]);
-
-  // Numeración secuencial 1..N de bultos, en orden canónico (por id numérico ascendente).
-  // "Bulto 3 (ID: 1316856)" en vez de solo "Bulto 1316856".
-  const bultoNumberMap = useMemo(() => {
-    const map = new Map<string, number>();
-    if (!pl?.index_rows) return map;
-    const ids = new Set<string>();
-    for (const row of pl.index_rows) {
-      for (const bId of Object.keys(row.distribution)) ids.add(bId);
-    }
-    const sorted = [...ids].sort((a, b) => parseInt(a) - parseInt(b));
-    sorted.forEach((id, i) => map.set(id, i + 1));
-    return map;
-  }, [pl]);
+    return [...map.entries()].sort((a, b) => {
+      const na = bultoNumberMap.get(a[0]) ?? Number.MAX_SAFE_INTEGER;
+      const nb = bultoNumberMap.get(b[0]) ?? Number.MAX_SAFE_INTEGER;
+      return na - nb;
+    });
+  }, [pl, bultoNumberMap]);
 
   // Filter groups by search query
   const filteredGroups = useMemo(() => {
@@ -200,7 +236,11 @@ export default function PackingListDetailPage() {
     for (const styles of pdfBultoGroups.values()) {
       styles.sort((a, b) => a.estilo.localeCompare(b.estilo));
     }
-    const sortedBultos = [...pdfBultoGroups.entries()].sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+    const sortedBultos = [...pdfBultoGroups.entries()].sort((a, b) => {
+      const na = bultoNumberMap.get(a[0]) ?? Number.MAX_SAFE_INTEGER;
+      const nb = bultoNumberMap.get(b[0]) ?? Number.MAX_SAFE_INTEGER;
+      return na - nb;
+    });
 
     if (sortedBultos.length > 0) {
       // Section header
@@ -232,8 +272,10 @@ export default function PackingListDetailPage() {
         doc.setFontSize(10);
         doc.setFont("helvetica", "bold");
         doc.setTextColor(30, 40, 60);
+        const bultoSeq = bultoNumberMap.get(bultoId) ?? "?";
+        const bultoLabel = bultoLabelMap.get(bultoId) || bultoId;
         doc.text(
-          safe(`Bulto ${bultoNumberMap.get(bultoId) ?? "?"}  -  ${styles.length} muestra${styles.length > 1 ? "s" : ""}`),
+          safe(`B${bultoSeq} (${bultoLabel})  -  ${styles.length} muestra${styles.length > 1 ? "s" : ""}`),
           marginLeft + checkboxSize + 2,
           currentY
         );
@@ -304,7 +346,7 @@ export default function PackingListDetailPage() {
         ]);
         for (const row of group.rows) {
           const distParts = Object.entries(row.distribution)
-            .sort(([a], [b]) => parseInt(a) - parseInt(b))
+            .sort(([a], [b]) => (bultoNumberMap.get(a) ?? Number.MAX_SAFE_INTEGER) - (bultoNumberMap.get(b) ?? Number.MAX_SAFE_INTEGER))
             .map(([bId, pcs]) => `(B${bultoNumberMap.get(bId) ?? "?"}: ${pcs})`);
           tableBody.push([safe(row.estilo), String(row.totalPcs), distParts.join("  ")]);
         }
@@ -470,7 +512,9 @@ export default function PackingListDetailPage() {
                     <div className="flex items-center gap-2 mb-1">
                       <div className="w-3 h-3 border border-gray-400 rounded-sm flex-shrink-0" />
                       <span className="text-sm font-bold text-gray-700">
-                        Bulto {bultoNumberMap.get(bultoId) ?? "?"} · {styles.length} muestra{styles.length > 1 ? "s" : ""}
+                        B{bultoNumberMap.get(bultoId) ?? "?"}{" "}
+                        <span className="font-normal text-gray-500">({bultoLabelMap.get(bultoId) || bultoId})</span>
+                        {" · "}{styles.length} muestra{styles.length > 1 ? "s" : ""}
                       </span>
                     </div>
                     <div className="ml-5 space-y-0.5">
@@ -523,7 +567,13 @@ export default function PackingListDetailPage() {
                 </thead>
                 <tbody>
                   {filteredGroups.map((group, gi) => (
-                    <GroupRows key={gi} group={group} rowOffset={gi} bultoNumberMap={bultoNumberMap} />
+                    <GroupRows
+                      key={gi}
+                      group={group}
+                      rowOffset={gi}
+                      bultoNumberMap={bultoNumberMap}
+                      bultoLabelMap={bultoLabelMap}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -548,10 +598,12 @@ function GroupRows({
   group,
   rowOffset,
   bultoNumberMap,
+  bultoLabelMap,
 }: {
   group: { producto: string; rows: PLIndexRow[] };
   rowOffset: number;
   bultoNumberMap: Map<string, number>;
+  bultoLabelMap: Map<string, string>;
 }) {
   return (
     <>
@@ -573,16 +625,17 @@ function GroupRows({
           <td className="px-3 py-1.5 text-xs">
             <div className="flex flex-wrap gap-1">
               {Object.entries(row.distribution)
-                .sort(([a], [b]) => parseInt(a) - parseInt(b))
+                .sort(([a], [b]) => (bultoNumberMap.get(a) ?? Number.MAX_SAFE_INTEGER) - (bultoNumberMap.get(b) ?? Number.MAX_SAFE_INTEGER))
                 .map(([bultoId, pcs]) => {
                   const n = bultoNumberMap.get(bultoId) ?? "?";
+                  const label = bultoLabelMap.get(bultoId) || bultoId;
                   return (
                     <span
                       key={bultoId}
-                      title={`Bulto ${n}`}
+                      title={`B${n} (${label})`}
                       className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600"
                     >
-                      (Bulto {n}: {pcs})
+                      (B{n}: {pcs})
                     </span>
                   );
                 })}

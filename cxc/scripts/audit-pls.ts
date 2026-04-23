@@ -51,6 +51,17 @@ const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
+interface BultoOrderEntry { id: string; label: string }
+
+interface ParserMetadata {
+  parser_version?: string;
+  bulto_order?: BultoOrderEntry[];
+  needs_review?: boolean;
+  needs_review_flags?: { code: string; bultoId?: string; estilo?: string; detail: string }[];
+  fallback_claude_usado?: boolean;
+  [k: string]: unknown;
+}
+
 interface PLRow {
   id: string;
   numero_pl: string;
@@ -59,6 +70,7 @@ interface PLRow {
   total_bultos: number;
   total_piezas: number;
   total_estilos: number;
+  parser_metadata: ParserMetadata | null;
   created_at: string;
 }
 
@@ -68,6 +80,8 @@ interface PLItem {
   producto: string;
   total_pcs: number;
   bultos: Record<string, number> | null;
+  bulto_muestra: string | null;
+  is_os: boolean | null;
 }
 
 interface AuditRow {
@@ -80,6 +94,10 @@ interface AuditRow {
   total_calculado: number;
   diferencia: number;
   bultos_sospechosos: string; // lista de bulto IDs cuyo total por item no cuadra
+  parser_version: string;
+  needs_review: string;     // "yes" | "no" | "" (no metadata)
+  review_flags: string;     // codes agregados, pipe-separated
+  invariantes_post: string; // chequeos post-facto que corremos sobre DB
   created_at: string;
 }
 
@@ -114,7 +132,7 @@ async function fetchAllPLs(): Promise<PLRow[]> {
   while (true) {
     const { data, error } = await supabase
       .from("packing_lists")
-      .select("id, numero_pl, empresa, fecha_entrega, total_bultos, total_piezas, total_estilos, created_at")
+      .select("id, numero_pl, empresa, fecha_entrega, total_bultos, total_piezas, total_estilos, parser_metadata, created_at")
       .order("created_at", { ascending: false })
       .range(from, from + pageSize - 1);
     if (error) throw error;
@@ -133,7 +151,7 @@ async function fetchItemsByPl(plIds: string[]): Promise<Map<string, PLItem[]>> {
     const chunk = plIds.slice(i, i + chunkSize);
     const { data, error } = await supabase
       .from("pl_items")
-      .select("pl_id, estilo, producto, total_pcs, bultos")
+      .select("pl_id, estilo, producto, total_pcs, bultos, bulto_muestra, is_os")
       .in("pl_id", chunk);
     if (error) throw error;
     for (const item of data ?? []) {
@@ -149,10 +167,6 @@ function computeAuditForPl(pl: PLRow, items: PLItem[]): AuditRow {
   const totalCalculado = items.reduce((s, it) => s + (it.total_pcs || 0), 0);
   const diferencia = pl.total_piezas - totalCalculado;
 
-  // Sospechosos: agrupar bultos por id y verificar si la suma del bulto cuadra
-  // con algún delta significativo. No tenemos total por bulto en DB (solo la
-  // distribución dentro de pl_items.bultos jsonb), así que listamos bulto IDs
-  // únicos y marcamos solo cuando hay desbalance global.
   const bultoIds = new Set<string>();
   for (const it of items) {
     if (it.bultos && typeof it.bultos === "object") {
@@ -162,6 +176,59 @@ function computeAuditForPl(pl: PLRow, items: PLItem[]): AuditRow {
   const bultos_sospechosos = diferencia !== 0
     ? Array.from(bultoIds).sort().join(";")
     : "";
+
+  // ── Metadata escrita por el parser al guardar ────────────────────────
+  const meta = pl.parser_metadata ?? {};
+  const parser_version = (meta.parser_version as string) || "(legacy)";
+  const saveTimeReview = meta.needs_review === true;
+  const saveFlagCodes = Array.isArray(meta.needs_review_flags)
+    ? [...new Set(meta.needs_review_flags.map(f => f.code))].join("|")
+    : "";
+
+  // ── Invariantes post-facto sobre DB (sin necesidad del PDF) ──────────
+  // Reproducen lo que checkSaveTimeInvariants valida al guardar, con la
+  // información disponible post-hoc. PLs guardados pre-2.1.0 no tienen
+  // parser_metadata.bulto_order ni needs_review, así que estos chequeos
+  // son la única señal retroactiva.
+  const postChecks: string[] = [];
+  // a) Suma distribución por SKU === total_pcs (ya se trackea via diferencia
+  //    global, pero lo hacemos granular por SKU).
+  for (const it of items) {
+    if (!it.bultos) continue;
+    const distSum = Object.values(it.bultos).reduce((s, n) => s + (n || 0), 0);
+    if (distSum !== (it.total_pcs || 0)) {
+      postChecks.push(`sku_dist(${it.estilo})`);
+      break; // 1 ejemplo basta para flaguear el PL
+    }
+  }
+  // c) Muestra consistente: si hay bulto_muestra != null y no is_os, ese
+  //    bulto debe aparecer en pl_items.bultos del mismo SKU (el SKU tiene
+  //    que estar ahí). No podemos validar M>0/32>0 retro sin el PDF.
+  for (const it of items) {
+    if (!it.bulto_muestra) continue;
+    if (it.is_os) continue;
+    if (!it.bultos || !(it.bulto_muestra in it.bultos)) {
+      postChecks.push(`muestra_orfana(${it.estilo})`);
+      break;
+    }
+  }
+  // d) Orden: si hay parser_metadata.bulto_order, debe cubrir todos los
+  //    bulto IDs que aparecen en la distribución.
+  if (Array.isArray(meta.bulto_order)) {
+    const orderIds = new Set(meta.bulto_order.map(e => e.id));
+    for (const bid of bultoIds) {
+      if (!orderIds.has(bid)) {
+        postChecks.push(`order_gap(${bid})`);
+        break;
+      }
+    }
+  } else if (parser_version !== "(legacy)" && parser_version >= "2.1.0") {
+    // Post-2.1.0 SIN bulto_order: anomalía.
+    postChecks.push("order_missing");
+  }
+
+  const hasPostFail = postChecks.length > 0;
+  const needsReview = saveTimeReview || hasPostFail || diferencia !== 0;
 
   return {
     pl_id: pl.id,
@@ -173,6 +240,10 @@ function computeAuditForPl(pl: PLRow, items: PLItem[]): AuditRow {
     total_calculado: totalCalculado,
     diferencia,
     bultos_sospechosos,
+    parser_version,
+    needs_review: needsReview ? "yes" : "no",
+    review_flags: saveFlagCodes,
+    invariantes_post: postChecks.join(";"),
     created_at: pl.created_at,
   };
 }
@@ -188,11 +259,17 @@ function writeCsv(rows: AuditRow[], path: string) {
     "total_calculado",
     "diferencia",
     "bultos_sospechosos",
+    "parser_version",
+    "needs_review",
+    "review_flags",
+    "invariantes_post",
     "created_at",
   ].join(",");
   const body = rows.map(r => [
     r.pl_id, r.numero_pl, r.fecha, r.empresa, r.departamento,
-    r.total_pdf, r.total_calculado, r.diferencia, r.bultos_sospechosos, r.created_at,
+    r.total_pdf, r.total_calculado, r.diferencia, r.bultos_sospechosos,
+    r.parser_version, r.needs_review, r.review_flags, r.invariantes_post,
+    r.created_at,
   ].map(escapeCsv).join(",")).join("\n");
   writeFileSync(path, header + "\n" + body + "\n", "utf-8");
 }
@@ -262,6 +339,7 @@ async function main() {
   }
 
   const mismatches = rows.filter(r => r.diferencia !== 0);
+  const needsReview = rows.filter(r => r.needs_review === "yes");
   rows.sort((a, b) => Math.abs(b.diferencia) - Math.abs(a.diferencia));
   writeCsv(rows, csvPath);
   console.log(`[audit] CSV → ${csvPath}`);
@@ -281,10 +359,25 @@ async function main() {
   console.log(`== Resumen ${label} ==`);
   console.log(`Total PLs:          ${pls.length}`);
   console.log(`Con diferencia:     ${mismatches.length}`);
+  console.log(`Necesitan revisión: ${needsReview.length} (flags al guardar o invariantes post)`);
   console.log(`Magnitud promedio:  ${avg} piezas (|dif|)`);
   console.log(`Magnitud total:     ${totalDiff} piezas (|dif| sumadas)`);
   console.log("");
-  console.log(`Peores 3:`);
+  // Distribución por versión de parser
+  const byVersion = new Map<string, number>();
+  for (const r of rows) byVersion.set(r.parser_version, (byVersion.get(r.parser_version) || 0) + 1);
+  console.log(`Por parser_version:`);
+  for (const [v, n] of [...byVersion.entries()].sort()) console.log(`  ${v}: ${n} PLs`);
+  console.log("");
+  if (needsReview.length > 0) {
+    console.log(`PLs flagged (primeros 10):`);
+    for (const r of needsReview.slice(0, 10)) {
+      const reasons = [r.review_flags, r.invariantes_post].filter(Boolean).join(" + ");
+      console.log(`  ${r.numero_pl} (${r.empresa}, ${r.fecha}): ${reasons || "dif=" + r.diferencia}`);
+    }
+    console.log("");
+  }
+  console.log(`Peores 3 por diferencia:`);
   const worst3 = [...mismatches].sort((a, b) => Math.abs(b.diferencia) - Math.abs(a.diferencia)).slice(0, 3);
   for (const r of worst3) {
     console.log(`  ${r.numero_pl} (${r.empresa}, ${r.fecha}): PDF=${r.total_pdf}, calc=${r.total_calculado}, dif=${r.diferencia}`);

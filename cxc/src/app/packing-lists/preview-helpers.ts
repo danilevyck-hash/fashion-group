@@ -10,6 +10,7 @@
 import {
   buildIndex,
   validateParsedPL,
+  checkSaveTimeInvariants,
   PARSER_VERSION,
   type ParsedPackingList,
   type PLIndexRow,
@@ -151,6 +152,14 @@ export function buildParserMetadata(item: PLPreviewItem): Record<string, unknown
   const ajustados = Object.entries(item.adjustments);
   const manualBultos = ajustados.filter(([, src]) => src === "manual_qty" || src === "pdf_total").map(([id]) => id);
   const claudeBultos = ajustados.filter(([, src]) => src === "claude").map(([id]) => id);
+  // Orden físico del PDF. Bodega trabaja el PL impreso bulto por bulto y si
+  // el sistema renumera B1, B2, ... por id numérico ascendente, el B1 del
+  // sistema ≠ B1 del PDF y sacan la muestra equivocada. bulto_order preserva
+  // el orden de aparición para que el frontend lo respete.
+  const bultoOrder = item.parsed.bultos.map(b => ({ id: b.id, label: b.rawId || b.id }));
+  // Invariantes al momento de guardar — cualquier fallo marca needs_review
+  // para que el audit script lo liste y bodega/secretaria lo revise manual.
+  const reviewFlags = checkSaveTimeInvariants(item.parsed, item.index);
   return {
     parser_version: PARSER_VERSION,
     ajustado_manualmente: manualBultos.length > 0,
@@ -160,6 +169,9 @@ export function buildParserMetadata(item: PLPreviewItem): Record<string, unknown
     bultos_resueltos_nivel_1: bultosTotales - manualBultos.length - claudeBultos.length,
     bultos_resueltos_nivel_3: claudeBultos.length,
     bultos_requirieron_manual: manualBultos.length,
+    bulto_order: bultoOrder,
+    needs_review: reviewFlags.length > 0,
+    needs_review_flags: reviewFlags,
   };
 }
 

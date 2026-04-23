@@ -1,0 +1,5774 @@
+{
+  "parser_version": "2.1.0",
+  "total_pls": 20,
+  "pls": [
+    {
+      "numero_pl": "80163225",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 1,
+      "total_piezas": 24,
+      "bulto_order": [
+        {
+          "id": "547727",
+          "label": "OCPA547727"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "547727",
+          "label": "OCPA547727",
+          "total_piezas": 24,
+          "size_columns": [
+            "32",
+            "34",
+            "40"
+          ],
+          "items": [
+            {
+              "estilo": "WW0WW46111YCF",
+              "producto": "CAMISA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163226",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 1,
+      "total_piezas": 29,
+      "bulto_order": [
+        {
+          "id": "547726",
+          "label": "OCPA547726"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "547726",
+          "label": "OCPA547726",
+          "total_piezas": 29,
+          "size_columns": [
+            "S",
+            "M",
+            "XL",
+            "XX"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM03309XLD",
+              "producto": "VESTIDO DE BAÑO",
+              "qty": 9,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "UM0UM03474BDS",
+              "producto": "VESTIDO DE BAÑO",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "UM0UM03474XLD",
+              "producto": "VESTIDO DE BAÑO",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "UM0UM03474YCF",
+              "producto": "VESTIDO DE BAÑO",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163227",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 2,
+      "total_piezas": 52,
+      "bulto_order": [
+        {
+          "id": "548215",
+          "label": "OCPA548215"
+        },
+        {
+          "id": "548222",
+          "label": "OCPA548222"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "548215",
+          "label": "OCPA548215",
+          "total_piezas": 44,
+          "size_columns": [
+            "S",
+            "M",
+            "L",
+            "XL"
+          ],
+          "items": [
+            {
+              "estilo": "09T4144001",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 23,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "09T4144608",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 21,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548222",
+          "label": "OCPA548222",
+          "total_piezas": 8,
+          "size_columns": [
+            "M",
+            "L"
+          ],
+          "items": [
+            {
+              "estilo": "09T4144001",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 4,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "09T4144608",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163228",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 2,
+      "total_piezas": 48,
+      "bulto_order": [
+        {
+          "id": "669988",
+          "label": "IBPA669988"
+        },
+        {
+          "id": "669989",
+          "label": "IBPA669989"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "669988",
+          "label": "IBPA669988",
+          "total_piezas": 24,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "TVM221NS04001",
+              "producto": "MEDIAS",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "669989",
+          "label": "IBPA669989",
+          "total_piezas": 24,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "TVM221NS04001",
+              "producto": "MEDIAS",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163229",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 5,
+      "total_piezas": 36,
+      "bulto_order": [
+        {
+          "id": "4198492",
+          "label": "996171174198492"
+        },
+        {
+          "id": "547728",
+          "label": "OCPA547728"
+        },
+        {
+          "id": "547729",
+          "label": "OCPA547729"
+        },
+        {
+          "id": "547730",
+          "label": "OCPA547730"
+        },
+        {
+          "id": "547731",
+          "label": "OCPA547731"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "4198492",
+          "label": "996171174198492",
+          "total_piezas": 8,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW06280GC9",
+              "producto": "BOLSO",
+              "qty": 8,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547728",
+          "label": "OCPA547728",
+          "total_piezas": 4,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW06277GC9",
+              "producto": "CARTERA",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547729",
+          "label": "OCPA547729",
+          "total_piezas": 8,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW06277GC9",
+              "producto": "CARTERA",
+              "qty": 8,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547730",
+          "label": "OCPA547730",
+          "total_piezas": 4,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW06280GC9",
+              "producto": "BOLSO",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547731",
+          "label": "OCPA547731",
+          "total_piezas": 12,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW06278GC9",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163232",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 1,
+      "total_piezas": 42,
+      "bulto_order": [
+        {
+          "id": "547732",
+          "label": "OCPA547732"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "547732",
+          "label": "OCPA547732",
+          "total_piezas": 42,
+          "size_columns": [
+            "30"
+          ],
+          "items": [
+            {
+              "estilo": "DM0DM229811A5",
+              "producto": "PANTALON CORTO JEANS",
+              "qty": 42,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163233",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 1,
+      "total_piezas": 48,
+      "bulto_order": [
+        {
+          "id": "548457",
+          "label": "OCPA548457"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "548457",
+          "label": "OCPA548457",
+          "total_piezas": 48,
+          "size_columns": [
+            "26",
+            "27",
+            "28",
+            "29",
+            "30",
+            "31",
+            "32"
+          ],
+          "items": [
+            {
+              "estilo": "DW0DW226921A5",
+              "producto": "PANTALON JEANS CORTO",
+              "qty": 48,
+              "has_m": false,
+              "has_32": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163234",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 7,
+      "total_piezas": 534,
+      "bulto_order": [
+        {
+          "id": "547960",
+          "label": "OCPA547960"
+        },
+        {
+          "id": "547961",
+          "label": "OCPA547961"
+        },
+        {
+          "id": "547962",
+          "label": "OCPA547962"
+        },
+        {
+          "id": "547963",
+          "label": "OCPA547963"
+        },
+        {
+          "id": "547991",
+          "label": "OCPA547991"
+        },
+        {
+          "id": "547992",
+          "label": "OCPA547992"
+        },
+        {
+          "id": "547993",
+          "label": "OCPA547993"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "547960",
+          "label": "OCPA547960",
+          "total_piezas": 32,
+          "size_columns": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL"
+          ],
+          "items": [
+            {
+              "estilo": "WW0WW48704TJX",
+              "producto": "CAMISETA",
+              "qty": 32,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547961",
+          "label": "OCPA547961",
+          "total_piezas": 116,
+          "size_columns": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL"
+          ],
+          "items": [
+            {
+              "estilo": "WW0WW49245SN",
+              "producto": "CAMISETA",
+              "qty": 48,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "WW0WW496260X6",
+              "producto": "CAMISETA",
+              "qty": 32,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "WW0WW496260E6",
+              "producto": "CAMISETA",
+              "qty": 32,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "WW0WW49245TP",
+              "producto": "CAMISETA",
+              "qty": 4,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547962",
+          "label": "OCPA547962",
+          "total_piezas": 104,
+          "size_columns": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL"
+          ],
+          "items": [
+            {
+              "estilo": "WW0WW49637BD",
+              "producto": "PANTALÓN CORTO",
+              "qty": 24,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "WW0WW496370F6",
+              "producto": "PANTALÓN CORTO",
+              "qty": 24,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "WW0WW48704YBL",
+              "producto": "CAMISETA",
+              "qty": 32,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "WW0WW48704L91",
+              "producto": "CAMISETA",
+              "qty": 20,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "WW0WW4868104K",
+              "producto": "CAMISA",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547963",
+          "label": "OCPA547963",
+          "total_piezas": 78,
+          "size_columns": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL",
+            "4",
+            "6"
+          ],
+          "items": [
+            {
+              "estilo": "WW0WW5061602F",
+              "producto": "PANTALON",
+              "qty": 18,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "WW0WW4868104K",
+              "producto": "CAMISA",
+              "qty": 24,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "WW0WW489030Y9",
+              "producto": "CAMISA",
+              "qty": 24,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "WW0WW48704L91",
+              "producto": "CAMISETA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547991",
+          "label": "OCPA547991",
+          "total_piezas": 30,
+          "size_columns": [
+            "8",
+            "10",
+            "12"
+          ],
+          "items": [
+            {
+              "estilo": "WW0WW5061602F",
+              "producto": "PANTALON",
+              "qty": 30,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547992",
+          "label": "OCPA547992",
+          "total_piezas": 49,
+          "size_columns": [
+            "M",
+            "L",
+            "XL",
+            "26",
+            "27",
+            "28",
+            "29",
+            "30",
+            "31",
+            "32"
+          ],
+          "items": [
+            {
+              "estilo": "WW0WW48712C1",
+              "producto": "CAMISETA",
+              "qty": 16,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "WW0WW450101BJ",
+              "producto": "PANTALON JEANS",
+              "qty": 33,
+              "has_m": false,
+              "has_32": true
+            }
+          ]
+        },
+        {
+          "id": "547993",
+          "label": "OCPA547993",
+          "total_piezas": 125,
+          "size_columns": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL"
+          ],
+          "items": [
+            {
+              "estilo": "WW0WW49245TP",
+              "producto": "CAMISETA",
+              "qty": 44,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "WW0WW49245C1",
+              "producto": "CAMISETA",
+              "qty": 48,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "WW0WW48925BD",
+              "producto": "CAMISA",
+              "qty": 24,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "WW0WW48712C1",
+              "producto": "CAMISETA",
+              "qty": 9,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163235",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 1,
+      "total_piezas": 48,
+      "bulto_order": [
+        {
+          "id": "548216",
+          "label": "OCPA548216"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "548216",
+          "label": "OCPA548216",
+          "total_piezas": 48,
+          "size_columns": [
+            "S",
+            "M",
+            "L",
+            "XL",
+            "XX"
+          ],
+          "items": [
+            {
+              "estilo": "MW0MW430870QY",
+              "producto": "CAMISA M/C",
+              "qty": 48,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163236",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 8,
+      "total_piezas": 360,
+      "bulto_order": [
+        {
+          "id": "547964",
+          "label": "OCPA547964"
+        },
+        {
+          "id": "547984",
+          "label": "OCPA547984"
+        },
+        {
+          "id": "547985",
+          "label": "OCPA547985"
+        },
+        {
+          "id": "547986",
+          "label": "OCPA547986"
+        },
+        {
+          "id": "547987",
+          "label": "OCPA547987"
+        },
+        {
+          "id": "547988",
+          "label": "OCPA547988"
+        },
+        {
+          "id": "547989",
+          "label": "OCPA547989"
+        },
+        {
+          "id": "547990",
+          "label": "OCPA547990"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "547964",
+          "label": "OCPA547964",
+          "total_piezas": 54,
+          "size_columns": [
+            "30",
+            "32",
+            "33",
+            "34",
+            "36",
+            "38",
+            "40"
+          ],
+          "items": [
+            {
+              "estilo": "MW0MW42354Z00",
+              "producto": "PANTALÓN CORTO",
+              "qty": 24,
+              "has_m": false,
+              "has_32": true
+            },
+            {
+              "estilo": "MW0MW42354PR2",
+              "producto": "PANTALÓN CORTO",
+              "qty": 30,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547984",
+          "label": "OCPA547984",
+          "total_piezas": 46,
+          "size_columns": [
+            "S",
+            "M",
+            "L",
+            "XL",
+            "XX"
+          ],
+          "items": [
+            {
+              "estilo": "MW0MW424300QJ",
+              "producto": "CAMISA M/L",
+              "qty": 10,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "MW0MW424490A4",
+              "producto": "CAMISA M/C",
+              "qty": 32,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "MW0MW424490AA",
+              "producto": "CAMISA M/C",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547985",
+          "label": "OCPA547985",
+          "total_piezas": 28,
+          "size_columns": [
+            "S",
+            "M",
+            "L",
+            "XX"
+          ],
+          "items": [
+            {
+              "estilo": "MW0MW424490AA",
+              "producto": "CAMISA M/C",
+              "qty": 28,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547986",
+          "label": "OCPA547986",
+          "total_piezas": 36,
+          "size_columns": [
+            "32",
+            "33",
+            "34",
+            "36",
+            "38",
+            "40"
+          ],
+          "items": [
+            {
+              "estilo": "MW0MW425581A7",
+              "producto": "PANTALON CORTO",
+              "qty": 36,
+              "has_m": false,
+              "has_32": true
+            }
+          ]
+        },
+        {
+          "id": "547987",
+          "label": "OCPA547987",
+          "total_piezas": 44,
+          "size_columns": [
+            "S",
+            "M",
+            "L",
+            "XL",
+            "XX",
+            "30",
+            "32"
+          ],
+          "items": [
+            {
+              "estilo": "MW0MW431400GY",
+              "producto": "CAMISA M/C",
+              "qty": 16,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "MW0MW425581A7",
+              "producto": "PANTALON CORTO",
+              "qty": 6,
+              "has_m": false,
+              "has_32": true
+            },
+            {
+              "estilo": "MW0MW424300QJ",
+              "producto": "CAMISA M/L",
+              "qty": 22,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547988",
+          "label": "OCPA547988",
+          "total_piezas": 57,
+          "size_columns": [
+            "S",
+            "M",
+            "L",
+            "XL",
+            "XX",
+            "38",
+            "40"
+          ],
+          "items": [
+            {
+              "estilo": "MW0MW431400K4",
+              "producto": "CAMISA M/C",
+              "qty": 32,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "MW0MW431400GY",
+              "producto": "CAMISA M/C",
+              "qty": 16,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "MW0MW42354MSX",
+              "producto": "PANTALÓN CORTO",
+              "qty": 9,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547989",
+          "label": "OCPA547989",
+          "total_piezas": 51,
+          "size_columns": [
+            "30",
+            "32",
+            "33",
+            "34",
+            "36",
+            "38",
+            "40"
+          ],
+          "items": [
+            {
+              "estilo": "MW0MW42354MSX",
+              "producto": "PANTALÓN CORTO",
+              "qty": 33,
+              "has_m": false,
+              "has_32": true
+            },
+            {
+              "estilo": "MW0MW42354Z00",
+              "producto": "PANTALÓN CORTO",
+              "qty": 18,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547990",
+          "label": "OCPA547990",
+          "total_piezas": 44,
+          "size_columns": [
+            "S",
+            "M",
+            "L",
+            "XL",
+            "XX",
+            "30",
+            "32",
+            "33"
+          ],
+          "items": [
+            {
+              "estilo": "MW0MW42285YBR",
+              "producto": "CAMISA M/C",
+              "qty": 32,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "MW0MW42354PR2",
+              "producto": "PANTALÓN CORTO",
+              "qty": 12,
+              "has_m": false,
+              "has_32": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163237",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 2,
+      "total_piezas": 288,
+      "bulto_order": [
+        {
+          "id": "548420",
+          "label": "OCPA548420"
+        },
+        {
+          "id": "548421",
+          "label": "OCPA548421"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "548420",
+          "label": "OCPA548420",
+          "total_piezas": 144,
+          "size_columns": [
+            "S",
+            "M",
+            "L",
+            "XL",
+            "XX"
+          ],
+          "items": [
+            {
+              "estilo": "MW0MW43066YBL",
+              "producto": "CAMISETA M/C",
+              "qty": 48,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "MW0MW43066CSR",
+              "producto": "CAMISETA M/C",
+              "qty": 48,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "MW0MW43066L3W",
+              "producto": "CAMISETA M/C",
+              "qty": 48,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548421",
+          "label": "OCPA548421",
+          "total_piezas": 144,
+          "size_columns": [
+            "S",
+            "M",
+            "L",
+            "XL",
+            "XX"
+          ],
+          "items": [
+            {
+              "estilo": "MW0MW43066SCX",
+              "producto": "CAMISETA M/C",
+              "qty": 48,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "MW0MW43066DCC",
+              "producto": "CAMISETA M/C",
+              "qty": 48,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "MW0MW43066BDS",
+              "producto": "CAMISETA M/C",
+              "qty": 48,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163238",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 16,
+      "total_piezas": 1342,
+      "bulto_order": [
+        {
+          "id": "547642",
+          "label": "OCPA547642"
+        },
+        {
+          "id": "547644",
+          "label": "OCPA547644"
+        },
+        {
+          "id": "547653",
+          "label": "OCPA547653"
+        },
+        {
+          "id": "547654",
+          "label": "OCPA547654"
+        },
+        {
+          "id": "547655",
+          "label": "OCPA547655"
+        },
+        {
+          "id": "547657",
+          "label": "OCPA547657"
+        },
+        {
+          "id": "547658",
+          "label": "OCPA547658"
+        },
+        {
+          "id": "547659",
+          "label": "OCPA547659"
+        },
+        {
+          "id": "548451",
+          "label": "OCPA548451"
+        },
+        {
+          "id": "548452",
+          "label": "OCPA548452"
+        },
+        {
+          "id": "548453",
+          "label": "OCPA548453"
+        },
+        {
+          "id": "548455",
+          "label": "OCPA548455"
+        },
+        {
+          "id": "548459",
+          "label": "OCPA548459"
+        },
+        {
+          "id": "548548",
+          "label": "OCPA548548"
+        },
+        {
+          "id": "551919",
+          "label": "OCPA551919"
+        },
+        {
+          "id": "551920",
+          "label": "OCPA551920"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "547642",
+          "label": "OCPA547642",
+          "total_piezas": 149,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14099TH9",
+              "producto": "GORRA",
+              "qty": 36,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14099GXR",
+              "producto": "GORRA",
+              "qty": 36,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14099DBZ",
+              "producto": "GORRA",
+              "qty": 35,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14099ACC",
+              "producto": "GORRA",
+              "qty": 18,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM12035ACI",
+              "producto": "GORRA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547644",
+          "label": "OCPA547644",
+          "total_piezas": 96,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM12035GX9",
+              "producto": "GORRA",
+              "qty": 48,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM12035C3G",
+              "producto": "GORRA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM12035ACI",
+              "producto": "GORRA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547653",
+          "label": "OCPA547653",
+          "total_piezas": 50,
+          "size_columns": [
+            "90",
+            "95",
+            "100",
+            "105"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14066GB6",
+              "producto": "CORREA",
+              "qty": 50,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547654",
+          "label": "OCPA547654",
+          "total_piezas": 64,
+          "size_columns": [
+            "90",
+            "95",
+            "100",
+            "105"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM13536GVI",
+              "producto": "CORREA",
+              "qty": 14,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14066BDS",
+              "producto": "CORREA",
+              "qty": 50,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547655",
+          "label": "OCPA547655",
+          "total_piezas": 62,
+          "size_columns": [
+            "90",
+            "95",
+            "100",
+            "105"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM13536GVI",
+              "producto": "CORREA",
+              "qty": 36,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM13536BDS",
+              "producto": "CORREA",
+              "qty": 26,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547657",
+          "label": "OCPA547657",
+          "total_piezas": 96,
+          "size_columns": [
+            "90",
+            "95",
+            "100",
+            "105"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM13014GB8",
+              "producto": "CORREA",
+              "qty": 36,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM13014BDS",
+              "producto": "CORREA",
+              "qty": 36,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM13536BDS",
+              "producto": "CORREA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547658",
+          "label": "OCPA547658",
+          "total_piezas": 78,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14119ACI",
+              "producto": "GORRA",
+              "qty": 48,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14119BDS",
+              "producto": "GORRA",
+              "qty": 30,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547659",
+          "label": "OCPA547659",
+          "total_piezas": 114,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM12035YCF",
+              "producto": "GORRA",
+              "qty": 42,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM12035XLG",
+              "producto": "GORRA",
+              "qty": 48,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM12035C3G",
+              "producto": "GORRA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548451",
+          "label": "OCPA548451",
+          "total_piezas": 78,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14099XIT",
+              "producto": "GORRA",
+              "qty": 18,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14099TH9",
+              "producto": "GORRA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14119DW6",
+              "producto": "GORRA",
+              "qty": 48,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548452",
+          "label": "OCPA548452",
+          "total_piezas": 91,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14099ZHU",
+              "producto": "GORRA",
+              "qty": 48,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14099XIT",
+              "producto": "GORRA",
+              "qty": 30,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14099DBZ",
+              "producto": "GORRA",
+              "qty": 13,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548453",
+          "label": "OCPA548453",
+          "total_piezas": 66,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14119BDS",
+              "producto": "GORRA",
+              "qty": 18,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14119L9G",
+              "producto": "GORRA",
+              "qty": 48,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548455",
+          "label": "OCPA548455",
+          "total_piezas": 113,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM13008C1Y",
+              "producto": "GORRA",
+              "qty": 29,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM13008TZO",
+              "producto": "GORRA",
+              "qty": 36,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14099GXR",
+              "producto": "GORRA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14099ACC",
+              "producto": "GORRA",
+              "qty": 30,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "E367895041910",
+              "producto": "GORRA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548459",
+          "label": "OCPA548459",
+          "total_piezas": 102,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM13008ACI",
+              "producto": "GORRA",
+              "qty": 42,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM13008L70",
+              "producto": "GORRA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM13008SFO",
+              "producto": "GORRA",
+              "qty": 48,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548548",
+          "label": "OCPA548548",
+          "total_piezas": 83,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "E367895041910",
+              "producto": "GORRA",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM13008TZO",
+              "producto": "GORRA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM13008L70",
+              "producto": "GORRA",
+              "qty": 36,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM13008C1Y",
+              "producto": "GORRA",
+              "qty": 19,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM13008ACI",
+              "producto": "GORRA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM12035YCF",
+              "producto": "GORRA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "551919",
+          "label": "OCPA551919",
+          "total_piezas": 26,
+          "size_columns": [
+            "100",
+            "105"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM13688GUE",
+              "producto": "CORREA",
+              "qty": 26,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "551920",
+          "label": "OCPA551920",
+          "total_piezas": 74,
+          "size_columns": [
+            "90",
+            "95",
+            "100",
+            "105"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM13688BDS",
+              "producto": "CORREA",
+              "qty": 50,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM13688GUE",
+              "producto": "CORREA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163239",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 2,
+      "total_piezas": 252,
+      "bulto_order": [
+        {
+          "id": "548416",
+          "label": "OCPA548416"
+        },
+        {
+          "id": "548417",
+          "label": "OCPA548417"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "548416",
+          "label": "OCPA548416",
+          "total_piezas": 108,
+          "size_columns": [
+            "75",
+            "80",
+            "85",
+            "90",
+            "95"
+          ],
+          "items": [
+            {
+              "estilo": "AW0AW17246BDS",
+              "producto": "CORREA",
+              "qty": 36,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AW0AW17246GB8",
+              "producto": "CORREA",
+              "qty": 36,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AW0AW18651GB8",
+              "producto": "CORREA",
+              "qty": 36,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548417",
+          "label": "OCPA548417",
+          "total_piezas": 144,
+          "size_columns": [
+            "80",
+            "85",
+            "90",
+            "95"
+          ],
+          "items": [
+            {
+              "estilo": "AW0AW18651BDS",
+              "producto": "CORREA",
+              "qty": 36,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AW0AW18568BDS",
+              "producto": "CORREA",
+              "qty": 36,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AW0AW17496BDS",
+              "producto": "CORREA",
+              "qty": 36,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AW0AW17496AEO",
+              "producto": "CORREA",
+              "qty": 36,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163240",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 8,
+      "total_piezas": 480,
+      "bulto_order": [
+        {
+          "id": "2405839",
+          "label": "167220652405839"
+        },
+        {
+          "id": "2405860",
+          "label": "167220652405860"
+        },
+        {
+          "id": "2814907",
+          "label": "167220652814907"
+        },
+        {
+          "id": "2814921",
+          "label": "167220652814921"
+        },
+        {
+          "id": "547733",
+          "label": "OCPA547733"
+        },
+        {
+          "id": "547734",
+          "label": "OCPA547734"
+        },
+        {
+          "id": "547735",
+          "label": "OCPA547735"
+        },
+        {
+          "id": "547736",
+          "label": "OCPA547736"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "2405839",
+          "label": "167220652405839",
+          "total_piezas": 24,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AW0AW17781RBC",
+              "producto": "GORRA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "2405860",
+          "label": "167220652405860",
+          "total_piezas": 12,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AW0AW17781XLG",
+              "producto": "GORRA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "2814907",
+          "label": "167220652814907",
+          "total_piezas": 20,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AW0AW18338YBL",
+              "producto": "GORRA PARA DAMAS",
+              "qty": 20,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "2814921",
+          "label": "167220652814921",
+          "total_piezas": 48,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AW0AW18338TOR",
+              "producto": "GORRA PARA DAMAS",
+              "qty": 48,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547733",
+          "label": "OCPA547733",
+          "total_piezas": 71,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AW0AW18338ACI",
+              "producto": "GORRA PARA DAMAS",
+              "qty": 20,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AW0AW17781XLG",
+              "producto": "GORRA",
+              "qty": 27,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AW0AW17781RBC",
+              "producto": "GORRA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547734",
+          "label": "OCPA547734",
+          "total_piezas": 96,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AW0AW17781TQN",
+              "producto": "GORRA",
+              "qty": 48,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AW0AW17781YCF",
+              "producto": "GORRA",
+              "qty": 39,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AW0AW17781XLG",
+              "producto": "GORRA",
+              "qty": 9,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547735",
+          "label": "OCPA547735",
+          "total_piezas": 95,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AW0AW17781YCF",
+              "producto": "GORRA",
+              "qty": 9,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AW0AW18328ACI",
+              "producto": "GORRA",
+              "qty": 38,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AW0AW18328C1Y",
+              "producto": "GORRA",
+              "qty": 48,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547736",
+          "label": "OCPA547736",
+          "total_piezas": 114,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AW0AW18338C30",
+              "producto": "GORRA PARA DAMAS",
+              "qty": 48,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AW0AW18338ACI",
+              "producto": "GORRA PARA DAMAS",
+              "qty": 28,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AW0AW18338YBL",
+              "producto": "GORRA PARA DAMAS",
+              "qty": 28,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AW0AW18328ACI",
+              "producto": "GORRA",
+              "qty": 10,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163241",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 29,
+      "total_piezas": 781,
+      "bulto_order": [
+        {
+          "id": "3826575",
+          "label": "167220643826575"
+        },
+        {
+          "id": "3835898",
+          "label": "167220643835898"
+        },
+        {
+          "id": "3835904",
+          "label": "167220643835904"
+        },
+        {
+          "id": "3835911",
+          "label": "167220643835911"
+        },
+        {
+          "id": "3835928",
+          "label": "167220643835928"
+        },
+        {
+          "id": "8812573",
+          "label": "167220648812573"
+        },
+        {
+          "id": "8812634",
+          "label": "167220648812634"
+        },
+        {
+          "id": "8812696",
+          "label": "167220648812696"
+        },
+        {
+          "id": "8812771",
+          "label": "167220648812771"
+        },
+        {
+          "id": "8812788",
+          "label": "167220648812788"
+        },
+        {
+          "id": "8812795",
+          "label": "167220648812795"
+        },
+        {
+          "id": "8821667",
+          "label": "167220648821667"
+        },
+        {
+          "id": "9266894",
+          "label": "167220649266894"
+        },
+        {
+          "id": "9266900",
+          "label": "167220649266900"
+        },
+        {
+          "id": "1563110",
+          "label": "167220651563110"
+        },
+        {
+          "id": "1563127",
+          "label": "167220651563127"
+        },
+        {
+          "id": "3468437",
+          "label": "167220653468437"
+        },
+        {
+          "id": "3468444",
+          "label": "167220653468444"
+        },
+        {
+          "id": "3468451",
+          "label": "167220653468451"
+        },
+        {
+          "id": "3468468",
+          "label": "167220653468468"
+        },
+        {
+          "id": "3468499",
+          "label": "167220653468499"
+        },
+        {
+          "id": "3468505",
+          "label": "167220653468505"
+        },
+        {
+          "id": "4277069",
+          "label": "167220654277069"
+        },
+        {
+          "id": "4277076",
+          "label": "167220654277076"
+        },
+        {
+          "id": "4277090",
+          "label": "167220654277090"
+        },
+        {
+          "id": "538314",
+          "label": "OCPA538314"
+        },
+        {
+          "id": "548291",
+          "label": "OCPA548291"
+        },
+        {
+          "id": "548292",
+          "label": "OCPA548292"
+        },
+        {
+          "id": "548294",
+          "label": "OCPA548294"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "3826575",
+          "label": "167220643826575",
+          "total_piezas": 30,
+          "size_columns": [
+            "M"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037630R8",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 30,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3835898",
+          "label": "167220643835898",
+          "total_piezas": 30,
+          "size_columns": [
+            "S",
+            "L"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM038780UI",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 30,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3835904",
+          "label": "167220643835904",
+          "total_piezas": 30,
+          "size_columns": [
+            "M"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM038780UI",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 30,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3835911",
+          "label": "167220643835911",
+          "total_piezas": 39,
+          "size_columns": [
+            "S",
+            "M",
+            "L"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM038780V1",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 30,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "UM0UM037610UG",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 9,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3835928",
+          "label": "167220643835928",
+          "total_piezas": 30,
+          "size_columns": [
+            "M"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM038780V1",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 30,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "8812573",
+          "label": "167220648812573",
+          "total_piezas": 20,
+          "size_columns": [
+            "L"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM038740SW",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 20,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "8812634",
+          "label": "167220648812634",
+          "total_piezas": 30,
+          "size_columns": [
+            "M"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM038740SW",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 30,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "8812696",
+          "label": "167220648812696",
+          "total_piezas": 10,
+          "size_columns": [
+            "S"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM038740SW",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 10,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "8812771",
+          "label": "167220648812771",
+          "total_piezas": 20,
+          "size_columns": [
+            "L"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM038740YZ",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 20,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "8812788",
+          "label": "167220648812788",
+          "total_piezas": 30,
+          "size_columns": [
+            "M"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM038740YZ",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 30,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "8812795",
+          "label": "167220648812795",
+          "total_piezas": 10,
+          "size_columns": [
+            "S"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM038740YZ",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 10,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "8821667",
+          "label": "167220648821667",
+          "total_piezas": 27,
+          "size_columns": [
+            "M"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM038800WE",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 27,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "9266894",
+          "label": "167220649266894",
+          "total_piezas": 27,
+          "size_columns": [
+            "M"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037610UF",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 27,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "9266900",
+          "label": "167220649266900",
+          "total_piezas": 20,
+          "size_columns": [
+            "L"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037610UF",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 20,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "1563110",
+          "label": "167220651563110",
+          "total_piezas": 27,
+          "size_columns": [
+            "M"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037640UM",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 27,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "1563127",
+          "label": "167220651563127",
+          "total_piezas": 20,
+          "size_columns": [
+            "L"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037640UM",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 20,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3468437",
+          "label": "167220653468437",
+          "total_piezas": 20,
+          "size_columns": [
+            "L"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037560R8",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 20,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3468444",
+          "label": "167220653468444",
+          "total_piezas": 20,
+          "size_columns": [
+            "M"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037560R8",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 20,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3468451",
+          "label": "167220653468451",
+          "total_piezas": 20,
+          "size_columns": [
+            "L"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037560SJ",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 20,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3468468",
+          "label": "167220653468468",
+          "total_piezas": 20,
+          "size_columns": [
+            "M"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037560SJ",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 20,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3468499",
+          "label": "167220653468499",
+          "total_piezas": 10,
+          "size_columns": [
+            "M"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037560SJ",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 10,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3468505",
+          "label": "167220653468505",
+          "total_piezas": 10,
+          "size_columns": [
+            "S"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037560SJ",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 10,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "4277069",
+          "label": "167220654277069",
+          "total_piezas": 27,
+          "size_columns": [
+            "M"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037660V2",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 27,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "4277076",
+          "label": "167220654277076",
+          "total_piezas": 20,
+          "size_columns": [
+            "L"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037660V2",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 20,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "4277090",
+          "label": "167220654277090",
+          "total_piezas": 10,
+          "size_columns": [
+            "S"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037660V2",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 10,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "538314",
+          "label": "OCPA538314",
+          "total_piezas": 75,
+          "size_columns": [
+            "S",
+            "M"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037660V2",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 3,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "UM0UM037640UM",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 13,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "UM0UM037560R8",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 20,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "UM0UM037610UG",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 26,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "UM0UM037610UF",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 13,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548291",
+          "label": "OCPA548291",
+          "total_piezas": 51,
+          "size_columns": [
+            "S",
+            "M",
+            "L"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM037630UK",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 18,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "UM0UM037630R8",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 30,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "UM0UM037610UG",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 3,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548292",
+          "label": "OCPA548292",
+          "total_piezas": 50,
+          "size_columns": [
+            "S",
+            "M",
+            "L"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM038800WE",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 28,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "UM0UM037610UG",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 22,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548294",
+          "label": "OCPA548294",
+          "total_piezas": 48,
+          "size_columns": [
+            "S",
+            "M",
+            "L"
+          ],
+          "items": [
+            {
+              "estilo": "UM0UM038800WE",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 5,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "UM0UM037630UK",
+              "producto": "CALZONCILLO BOXER",
+              "qty": 43,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163242",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 14,
+      "total_piezas": 181,
+      "bulto_order": [
+        {
+          "id": "2337723",
+          "label": "167220632337723"
+        },
+        {
+          "id": "2337761",
+          "label": "167220632337761"
+        },
+        {
+          "id": "9570376",
+          "label": "167220639570376"
+        },
+        {
+          "id": "1955291",
+          "label": "167220641955291"
+        },
+        {
+          "id": "1955314",
+          "label": "167220641955314"
+        },
+        {
+          "id": "1955406",
+          "label": "167220641955406"
+        },
+        {
+          "id": "1956861",
+          "label": "167220641956861"
+        },
+        {
+          "id": "1956946",
+          "label": "167220641956946"
+        },
+        {
+          "id": "7950771",
+          "label": "167220647950771"
+        },
+        {
+          "id": "551928",
+          "label": "OCPA551928"
+        },
+        {
+          "id": "551929",
+          "label": "OCPA551929"
+        },
+        {
+          "id": "551930",
+          "label": "OCPA551930"
+        },
+        {
+          "id": "551931",
+          "label": "OCPA551931"
+        },
+        {
+          "id": "551932",
+          "label": "OCPA551932"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "2337723",
+          "label": "167220632337723",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14171BDS",
+              "producto": "CANGURERA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "2337761",
+          "label": "167220632337761",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14171BDS",
+              "producto": "CANGURERA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "9570376",
+          "label": "167220639570376",
+          "total_piezas": 5,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14155BDS",
+              "producto": "MOCHILA",
+              "qty": 5,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "1955291",
+          "label": "167220641955291",
+          "total_piezas": 2,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14290BDS",
+              "producto": "MOCHILA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "1955314",
+          "label": "167220641955314",
+          "total_piezas": 2,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14290BDS",
+              "producto": "MOCHILA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "1955406",
+          "label": "167220641955406",
+          "total_piezas": 1,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14290BDS",
+              "producto": "MOCHILA",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "1956861",
+          "label": "167220641956861",
+          "total_piezas": 1,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14291BDS",
+              "producto": "CANGURERA",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "1956946",
+          "label": "167220641956946",
+          "total_piezas": 9,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14292BDS",
+              "producto": "BOLSO DEPORTIVO",
+              "qty": 9,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "7950771",
+          "label": "167220647950771",
+          "total_piezas": 5,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14093BDS",
+              "producto": "MOCHILA",
+              "qty": 5,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "551928",
+          "label": "OCPA551928",
+          "total_piezas": 36,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14153BDS",
+              "producto": "BOLSO VIAJERO",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14156BDS",
+              "producto": "BOLSO DEPORTIVO",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14290BDS",
+              "producto": "MOCHILA",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM13710C1G",
+              "producto": "BOLSO DEPORTIVO",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14280AEP",
+              "producto": "BOLSO",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14211AEP",
+              "producto": "BOLSO",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "551929",
+          "label": "OCPA551929",
+          "total_piezas": 26,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14161BDS",
+              "producto": "BILLETERA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14191BDS",
+              "producto": "BOLSO DEPORTIVO",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14156BDS",
+              "producto": "BOLSO DEPORTIVO",
+              "qty": 8,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "551930",
+          "label": "OCPA551930",
+          "total_piezas": 25,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14223C1G",
+              "producto": "BOLSO DEPORTIVO",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14168BDS",
+              "producto": "BOLSO DEPORTIVO",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14159BDS",
+              "producto": "CANGURERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14155BDS",
+              "producto": "MOCHILA",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "551931",
+          "label": "OCPA551931",
+          "total_piezas": 37,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM13701C1G",
+              "producto": "CANGURERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14291BDS",
+              "producto": "CANGURERA",
+              "qty": 11,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14292BDS",
+              "producto": "BOLSO DEPORTIVO",
+              "qty": 3,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM13710C1G",
+              "producto": "BOLSO DEPORTIVO",
+              "qty": 11,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "551932",
+          "label": "OCPA551932",
+          "total_piezas": 20,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "AM0AM14168BDS",
+              "producto": "BOLSO DEPORTIVO",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14095BDS",
+              "producto": "BOLSO DEPORTIVO",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "AM0AM14093BDS",
+              "producto": "MOCHILA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163243",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 90,
+      "total_piezas": 1337,
+      "bulto_order": [
+        {
+          "id": "9993591",
+          "label": "996171199993591"
+        },
+        {
+          "id": "9993614",
+          "label": "996171199993614"
+        },
+        {
+          "id": "9993645",
+          "label": "996171199993645"
+        },
+        {
+          "id": "9993652",
+          "label": "996171199993652"
+        },
+        {
+          "id": "9996820",
+          "label": "996171199996820"
+        },
+        {
+          "id": "26645",
+          "label": "996171200026645"
+        },
+        {
+          "id": "26720",
+          "label": "996171200026720"
+        },
+        {
+          "id": "32615",
+          "label": "996171200032615"
+        },
+        {
+          "id": "32646",
+          "label": "996171200032646"
+        },
+        {
+          "id": "32677",
+          "label": "996171200032677"
+        },
+        {
+          "id": "32745",
+          "label": "996171200032745"
+        },
+        {
+          "id": "2410312",
+          "label": "996171202410312"
+        },
+        {
+          "id": "2410367",
+          "label": "996171202410367"
+        },
+        {
+          "id": "2410459",
+          "label": "996171202410459"
+        },
+        {
+          "id": "2410503",
+          "label": "996171202410503"
+        },
+        {
+          "id": "2410558",
+          "label": "996171202410558"
+        },
+        {
+          "id": "2410589",
+          "label": "996171202410589"
+        },
+        {
+          "id": "3230728",
+          "label": "996171203230728"
+        },
+        {
+          "id": "3230742",
+          "label": "996171203230742"
+        },
+        {
+          "id": "3230773",
+          "label": "996171203230773"
+        },
+        {
+          "id": "3235099",
+          "label": "996171203235099"
+        },
+        {
+          "id": "3413251",
+          "label": "996171203413251"
+        },
+        {
+          "id": "3413268",
+          "label": "996171203413268"
+        },
+        {
+          "id": "3413282",
+          "label": "996171203413282"
+        },
+        {
+          "id": "3413305",
+          "label": "996171203413305"
+        },
+        {
+          "id": "3413312",
+          "label": "996171203413312"
+        },
+        {
+          "id": "3413329",
+          "label": "996171203413329"
+        },
+        {
+          "id": "3413473",
+          "label": "996171203413473"
+        },
+        {
+          "id": "3413480",
+          "label": "996171203413480"
+        },
+        {
+          "id": "3413527",
+          "label": "996171203413527"
+        },
+        {
+          "id": "3413534",
+          "label": "996171203413534"
+        },
+        {
+          "id": "3414050",
+          "label": "996171203414050"
+        },
+        {
+          "id": "3414081",
+          "label": "996171203414081"
+        },
+        {
+          "id": "3414104",
+          "label": "996171203414104"
+        },
+        {
+          "id": "3414135",
+          "label": "996171203414135"
+        },
+        {
+          "id": "3414180",
+          "label": "996171203414180"
+        },
+        {
+          "id": "3414265",
+          "label": "996171203414265"
+        },
+        {
+          "id": "3414289",
+          "label": "996171203414289"
+        },
+        {
+          "id": "6419755",
+          "label": "996171206419755"
+        },
+        {
+          "id": "6419762",
+          "label": "996171206419762"
+        },
+        {
+          "id": "6419809",
+          "label": "996171206419809"
+        },
+        {
+          "id": "6419816",
+          "label": "996171206419816"
+        },
+        {
+          "id": "6423646",
+          "label": "996171206423646"
+        },
+        {
+          "id": "6423660",
+          "label": "996171206423660"
+        },
+        {
+          "id": "6423806",
+          "label": "996171206423806"
+        },
+        {
+          "id": "6423813",
+          "label": "996171206423813"
+        },
+        {
+          "id": "6438015",
+          "label": "996171206438015"
+        },
+        {
+          "id": "6536957",
+          "label": "996171206536957"
+        },
+        {
+          "id": "6547830",
+          "label": "996171206547830"
+        },
+        {
+          "id": "6547861",
+          "label": "996171206547861"
+        },
+        {
+          "id": "6547885",
+          "label": "996171206547885"
+        },
+        {
+          "id": "6547946",
+          "label": "996171206547946"
+        },
+        {
+          "id": "6561102",
+          "label": "996171206561102"
+        },
+        {
+          "id": "6561126",
+          "label": "996171206561126"
+        },
+        {
+          "id": "6561294",
+          "label": "996171206561294"
+        },
+        {
+          "id": "4703365",
+          "label": "996171214703365"
+        },
+        {
+          "id": "4703396",
+          "label": "996171214703396"
+        },
+        {
+          "id": "4727194",
+          "label": "996171214727194"
+        },
+        {
+          "id": "548190",
+          "label": "OCPA548190"
+        },
+        {
+          "id": "548191",
+          "label": "OCPA548191"
+        },
+        {
+          "id": "548192",
+          "label": "OCPA548192"
+        },
+        {
+          "id": "548193",
+          "label": "OCPA548193"
+        },
+        {
+          "id": "548194",
+          "label": "OCPA548194"
+        },
+        {
+          "id": "548195",
+          "label": "OCPA548195"
+        },
+        {
+          "id": "548196",
+          "label": "OCPA548196"
+        },
+        {
+          "id": "548197",
+          "label": "OCPA548197"
+        },
+        {
+          "id": "548198",
+          "label": "OCPA548198"
+        },
+        {
+          "id": "548199",
+          "label": "OCPA548199"
+        },
+        {
+          "id": "548200",
+          "label": "OCPA548200"
+        },
+        {
+          "id": "548208",
+          "label": "OCPA548208"
+        },
+        {
+          "id": "548209",
+          "label": "OCPA548209"
+        },
+        {
+          "id": "548210",
+          "label": "OCPA548210"
+        },
+        {
+          "id": "548211",
+          "label": "OCPA548211"
+        },
+        {
+          "id": "548212",
+          "label": "OCPA548212"
+        },
+        {
+          "id": "548213",
+          "label": "OCPA548213"
+        },
+        {
+          "id": "548276",
+          "label": "OCPA548276"
+        },
+        {
+          "id": "548277",
+          "label": "OCPA548277"
+        },
+        {
+          "id": "548278",
+          "label": "OCPA548278"
+        },
+        {
+          "id": "548279",
+          "label": "OCPA548279"
+        },
+        {
+          "id": "548280",
+          "label": "OCPA548280"
+        },
+        {
+          "id": "548281",
+          "label": "OCPA548281"
+        },
+        {
+          "id": "548282",
+          "label": "OCPA548282"
+        },
+        {
+          "id": "548283",
+          "label": "OCPA548283"
+        },
+        {
+          "id": "548284",
+          "label": "OCPA548284"
+        },
+        {
+          "id": "548285",
+          "label": "OCPA548285"
+        },
+        {
+          "id": "548286",
+          "label": "OCPA548286"
+        },
+        {
+          "id": "548287",
+          "label": "OCPA548287"
+        },
+        {
+          "id": "548288",
+          "label": "OCPA548288"
+        },
+        {
+          "id": "548289",
+          "label": "OCPA548289"
+        },
+        {
+          "id": "548290",
+          "label": "OCPA548290"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "9993591",
+          "label": "996171199993591",
+          "total_piezas": 12,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07256GC9",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "9993614",
+          "label": "996171199993614",
+          "total_piezas": 12,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072570HL",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "9993645",
+          "label": "996171199993645",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072570HL",
+              "producto": "CARTERA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "9993652",
+          "label": "996171199993652",
+          "total_piezas": 12,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072570YG",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "9996820",
+          "label": "996171199996820",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072600YG",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "26645",
+          "label": "996171200026645",
+          "total_piezas": 12,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072660G1",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "26720",
+          "label": "996171200026720",
+          "total_piezas": 12,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072660I5",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "32615",
+          "label": "996171200032615",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072890G1",
+              "producto": "MOCHILA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "32646",
+          "label": "996171200032646",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072890G1",
+              "producto": "MOCHILA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "32677",
+          "label": "996171200032677",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072890GJ",
+              "producto": "MOCHILA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "32745",
+          "label": "996171200032745",
+          "total_piezas": 4,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072890GJ",
+              "producto": "MOCHILA",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "2410312",
+          "label": "996171202410312",
+          "total_piezas": 8,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW0731101U",
+              "producto": "CARTERA",
+              "qty": 8,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "2410367",
+          "label": "996171202410367",
+          "total_piezas": 8,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW0731101V",
+              "producto": "CARTERA",
+              "qty": 8,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "2410459",
+          "label": "996171202410459",
+          "total_piezas": 4,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW0731201U",
+              "producto": "CARTERA",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "2410503",
+          "label": "996171202410503",
+          "total_piezas": 2,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW0731201U",
+              "producto": "CARTERA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "2410558",
+          "label": "996171202410558",
+          "total_piezas": 4,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW0731201V",
+              "producto": "CARTERA",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "2410589",
+          "label": "996171202410589",
+          "total_piezas": 2,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW0731201V",
+              "producto": "CARTERA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3230728",
+          "label": "996171203230728",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07162062",
+              "producto": "MOCHILA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3230742",
+          "label": "996171203230742",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07162062",
+              "producto": "MOCHILA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3230773",
+          "label": "996171203230773",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071620YK",
+              "producto": "MOCHILA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3235099",
+          "label": "996171203235099",
+          "total_piezas": 2,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07214RBL",
+              "producto": "CARTERA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3413251",
+          "label": "996171203413251",
+          "total_piezas": 8,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07164062",
+              "producto": "CARTERA",
+              "qty": 8,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3413268",
+          "label": "996171203413268",
+          "total_piezas": 8,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07164062",
+              "producto": "CARTERA",
+              "qty": 8,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3413282",
+          "label": "996171203413282",
+          "total_piezas": 1,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07164062",
+              "producto": "CARTERA",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3413305",
+          "label": "996171203413305",
+          "total_piezas": 8,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071640YK",
+              "producto": "CARTERA",
+              "qty": 8,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3413312",
+          "label": "996171203413312",
+          "total_piezas": 8,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071640YK",
+              "producto": "CARTERA",
+              "qty": 8,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3413329",
+          "label": "996171203413329",
+          "total_piezas": 1,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071640YK",
+              "producto": "CARTERA",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3413473",
+          "label": "996171203413473",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07208BEH",
+              "producto": "MOCHILA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3413480",
+          "label": "996171203413480",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07208BEH",
+              "producto": "MOCHILA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3413527",
+          "label": "996171203413527",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07208CIK",
+              "producto": "MOCHILA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3413534",
+          "label": "996171203413534",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07208CIK",
+              "producto": "MOCHILA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3414050",
+          "label": "996171203414050",
+          "total_piezas": 16,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07220AEF",
+              "producto": "CARTERA",
+              "qty": 16,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3414081",
+          "label": "996171203414081",
+          "total_piezas": 2,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07220AEF",
+              "producto": "CARTERA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3414104",
+          "label": "996171203414104",
+          "total_piezas": 15,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07220BEH",
+              "producto": "CARTERA",
+              "qty": 15,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3414135",
+          "label": "996171203414135",
+          "total_piezas": 16,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07220CIK",
+              "producto": "CARTERA",
+              "qty": 16,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3414180",
+          "label": "996171203414180",
+          "total_piezas": 16,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07220RBL",
+              "producto": "CARTERA",
+              "qty": 16,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3414265",
+          "label": "996171203414265",
+          "total_piezas": 15,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07220TJQ",
+              "producto": "CARTERA",
+              "qty": 15,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "3414289",
+          "label": "996171203414289",
+          "total_piezas": 16,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07220ZHO",
+              "producto": "CARTERA",
+              "qty": 16,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6419755",
+          "label": "996171206419755",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07129BEH",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6419762",
+          "label": "996171206419762",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07129BEH",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6419809",
+          "label": "996171206419809",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07129RBL",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6419816",
+          "label": "996171206419816",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07129RBL",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6423646",
+          "label": "996171206423646",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071300GA",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6423660",
+          "label": "996171206423660",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071300GA",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6423806",
+          "label": "996171206423806",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071300G1",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6423813",
+          "label": "996171206423813",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071300G1",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6438015",
+          "label": "996171206438015",
+          "total_piezas": 11,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07139BEH",
+              "producto": "CARTERAS",
+              "qty": 11,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6536957",
+          "label": "996171206536957",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071420GA",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6547830",
+          "label": "996171206547830",
+          "total_piezas": 4,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07143BEH",
+              "producto": "CARTERAS",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6547861",
+          "label": "996171206547861",
+          "total_piezas": 2,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07143BEH",
+              "producto": "CARTERAS",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6547885",
+          "label": "996171206547885",
+          "total_piezas": 4,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07143RBL",
+              "producto": "CARTERAS",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6547946",
+          "label": "996171206547946",
+          "total_piezas": 2,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07143RBL",
+              "producto": "CARTERAS",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6561102",
+          "label": "996171206561102",
+          "total_piezas": 4,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071440GA",
+              "producto": "CARTERAS",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6561126",
+          "label": "996171206561126",
+          "total_piezas": 2,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071440GA",
+              "producto": "CARTERAS",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "6561294",
+          "label": "996171206561294",
+          "total_piezas": 4,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071440G1",
+              "producto": "CARTERAS",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "4703365",
+          "label": "996171214703365",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072090GE",
+              "producto": "MOCHILA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "4703396",
+          "label": "996171214703396",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072090GE",
+              "producto": "MOCHILA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "4727194",
+          "label": "996171214727194",
+          "total_piezas": 16,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072210GE",
+              "producto": "CARTERA",
+              "qty": 16,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548190",
+          "label": "OCPA548190",
+          "total_piezas": 32,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW0730701V",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW0730801U",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW0730801V",
+              "producto": "CARTERA",
+              "qty": 8,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548191",
+          "label": "OCPA548191",
+          "total_piezas": 26,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072890GJ",
+              "producto": "MOCHILA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "69JA667UB1",
+              "producto": "CARTERAS",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW0730701U",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548192",
+          "label": "OCPA548192",
+          "total_piezas": 18,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW0722801S",
+              "producto": "CARTERAS",
+              "qty": 8,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072280G9",
+              "producto": "CARTERAS",
+              "qty": 10,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548193",
+          "label": "OCPA548193",
+          "total_piezas": 34,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072660GJ",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07761CIK",
+              "producto": "CARTERA",
+              "qty": 10,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07761BEH",
+              "producto": "CARTERA",
+              "qty": 8,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW0730801V",
+              "producto": "CARTERA",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548194",
+          "label": "OCPA548194",
+          "total_piezas": 16,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW0722801S",
+              "producto": "CARTERAS",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072280GO",
+              "producto": "CARTERAS",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548195",
+          "label": "OCPA548195",
+          "total_piezas": 12,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072210GA",
+              "producto": "CARTERA",
+              "qty": 11,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07139BEH",
+              "producto": "CARTERAS",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548196",
+          "label": "OCPA548196",
+          "total_piezas": 12,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW076570G9",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW076570GN",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548197",
+          "label": "OCPA548197",
+          "total_piezas": 26,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072570YG",
+              "producto": "CARTERA",
+              "qty": 3,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072290G9",
+              "producto": "CARTERAS",
+              "qty": 11,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW0722901S",
+              "producto": "CARTERAS",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548198",
+          "label": "OCPA548198",
+          "total_piezas": 9,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW076570GN",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07259BEH",
+              "producto": "CARTERAS",
+              "qty": 3,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548199",
+          "label": "OCPA548199",
+          "total_piezas": 73,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072290GO",
+              "producto": "CARTERAS",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072350YG",
+              "producto": "BILLETERAS PARA DAMAS",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07234GC9",
+              "producto": "BILLETERAS PARA DAMAS",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072290G9",
+              "producto": "CARTERAS",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07234BEH",
+              "producto": "BILLETERAS PARA DAMAS",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548200",
+          "label": "OCPA548200",
+          "total_piezas": 6,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07259BEH",
+              "producto": "CARTERAS",
+              "qty": 3,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072570YG",
+              "producto": "CARTERA",
+              "qty": 3,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548208",
+          "label": "OCPA548208",
+          "total_piezas": 5,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07259GC9",
+              "producto": "CARTERAS",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07256GC9",
+              "producto": "CARTERA",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548209",
+          "label": "OCPA548209",
+          "total_piezas": 14,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072210GA",
+              "producto": "CARTERA",
+              "qty": 7,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07220CIK",
+              "producto": "CARTERA",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072210GE",
+              "producto": "CARTERA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07218RBL",
+              "producto": "CARTERA",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548210",
+          "label": "OCPA548210",
+          "total_piezas": 20,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07259GC9",
+              "producto": "CARTERAS",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07241BEH",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07241GC9",
+              "producto": "CARTERAS",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548211",
+          "label": "OCPA548211",
+          "total_piezas": 12,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07220BEH",
+              "producto": "CARTERA",
+              "qty": 3,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07218RBL",
+              "producto": "CARTERA",
+              "qty": 8,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07220CIK",
+              "producto": "CARTERA",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548212",
+          "label": "OCPA548212",
+          "total_piezas": 25,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07220RBL",
+              "producto": "CARTERA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072420YG",
+              "producto": "CARTERAS",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07241BEH",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07220ZHO",
+              "producto": "CARTERA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07220TJQ",
+              "producto": "CARTERA",
+              "qty": 3,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548213",
+          "label": "OCPA548213",
+          "total_piezas": 11,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07256GC9",
+              "producto": "CARTERA",
+              "qty": 5,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW076570G9",
+              "producto": "CARTERAS",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548276",
+          "label": "OCPA548276",
+          "total_piezas": 116,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072110ZR",
+              "producto": "BILLETERA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07210BEH",
+              "producto": "BILLETERA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07210CIK",
+              "producto": "BILLETERA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072110GE",
+              "producto": "BILLETERA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072800GA",
+              "producto": "BILLETERA",
+              "qty": 20,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548277",
+          "label": "OCPA548277",
+          "total_piezas": 124,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072800GA",
+              "producto": "BILLETERA",
+              "qty": 28,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072800GJ",
+              "producto": "BILLETERA",
+              "qty": 48,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072800I5",
+              "producto": "BILLETERA",
+              "qty": 48,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548278",
+          "label": "OCPA548278",
+          "total_piezas": 14,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07167062",
+              "producto": "CARTERA",
+              "qty": 9,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW071670YK",
+              "producto": "CARTERA",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW0731101V",
+              "producto": "CARTERA",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548279",
+          "label": "OCPA548279",
+          "total_piezas": 83,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW0731101U",
+              "producto": "CARTERA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW071340G1",
+              "producto": "BILLETERA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW071340GA",
+              "producto": "BILLETERA",
+              "qty": 21,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072650GF",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07133BEH",
+              "producto": "BILLETERA",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548280",
+          "label": "OCPA548280",
+          "total_piezas": 14,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW0731101V",
+              "producto": "CARTERA",
+              "qty": 6,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW0731101U",
+              "producto": "CARTERA",
+              "qty": 8,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548281",
+          "label": "OCPA548281",
+          "total_piezas": 15,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071670YK",
+              "producto": "CARTERA",
+              "qty": 11,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07167062",
+              "producto": "CARTERA",
+              "qty": 3,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07164062",
+              "producto": "CARTERA",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548282",
+          "label": "OCPA548282",
+          "total_piezas": 8,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071420GA",
+              "producto": "CARTERAS",
+              "qty": 3,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW071620YK",
+              "producto": "MOCHILA",
+              "qty": 4,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072190GE",
+              "producto": "CARTERA",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548283",
+          "label": "OCPA548283",
+          "total_piezas": 25,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071640YK",
+              "producto": "CARTERA",
+              "qty": 1,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072150GA",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072150GE",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548284",
+          "label": "OCPA548284",
+          "total_piezas": 7,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW071620YK",
+              "producto": "MOCHILA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW071440G1",
+              "producto": "CARTERAS",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW071420GA",
+              "producto": "CARTERAS",
+              "qty": 3,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548285",
+          "label": "OCPA548285",
+          "total_piezas": 32,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07214BEH",
+              "producto": "CARTERA",
+              "qty": 10,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07214CIK",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07214RBL",
+              "producto": "CARTERA",
+              "qty": 10,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548286",
+          "label": "OCPA548286",
+          "total_piezas": 13,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07214BEH",
+              "producto": "CARTERA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072190GE",
+              "producto": "CARTERA",
+              "qty": 11,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548287",
+          "label": "OCPA548287",
+          "total_piezas": 36,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW072660GF",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072660GA",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072650GA",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548288",
+          "label": "OCPA548288",
+          "total_piezas": 64,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07761CIK",
+              "producto": "CARTERA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW07761RBL",
+              "producto": "CARTERA",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072280G9",
+              "producto": "CARTERAS",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072270G9",
+              "producto": "BILLETERAS PARA DAMAS",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "XW072270GO",
+              "producto": "BILLETERAS PARA DAMAS",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548289",
+          "label": "OCPA548289",
+          "total_piezas": 12,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "69JA6670HN",
+              "producto": "CARTERAS",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548290",
+          "label": "OCPA548290",
+          "total_piezas": 12,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "XW07234GC9",
+              "producto": "BILLETERAS PARA DAMAS",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163244",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 5,
+      "total_piezas": 480,
+      "bulto_order": [
+        {
+          "id": "7910378",
+          "label": "996171227910378"
+        },
+        {
+          "id": "547980",
+          "label": "OCPA547980"
+        },
+        {
+          "id": "547981",
+          "label": "OCPA547981"
+        },
+        {
+          "id": "547982",
+          "label": "OCPA547982"
+        },
+        {
+          "id": "547983",
+          "label": "OCPA547983"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "7910378",
+          "label": "996171227910378",
+          "total_piezas": 45,
+          "size_columns": [
+            "S",
+            "XL"
+          ],
+          "items": [
+            {
+              "estilo": "76J4887AB3",
+              "producto": "CAMISETA",
+              "qty": 45,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547980",
+          "label": "OCPA547980",
+          "total_piezas": 105,
+          "size_columns": [
+            "XS",
+            "M",
+            "L"
+          ],
+          "items": [
+            {
+              "estilo": "76J4883CSY",
+              "producto": "CAMISETA",
+              "qty": 20,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "76J4887CYS",
+              "producto": "CAMISETA",
+              "qty": 55,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "76J4887AB3",
+              "producto": "CAMISETA",
+              "qty": 30,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547981",
+          "label": "OCPA547981",
+          "total_piezas": 110,
+          "size_columns": [
+            "XS",
+            "S",
+            "M",
+            "XL"
+          ],
+          "items": [
+            {
+              "estilo": "76J4887CYS",
+              "producto": "CAMISETA",
+              "qty": 65,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "76J4887AB3",
+              "producto": "CAMISETA",
+              "qty": 45,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547982",
+          "label": "OCPA547982",
+          "total_piezas": 105,
+          "size_columns": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL"
+          ],
+          "items": [
+            {
+              "estilo": "76J4883CSY",
+              "producto": "CAMISETA",
+              "qty": 100,
+              "has_m": true,
+              "has_32": false
+            },
+            {
+              "estilo": "76J4883TIB",
+              "producto": "CAMISETA",
+              "qty": 5,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "547983",
+          "label": "OCPA547983",
+          "total_piezas": 115,
+          "size_columns": [
+            "XS",
+            "S",
+            "M",
+            "L",
+            "XL"
+          ],
+          "items": [
+            {
+              "estilo": "76J4883TIB",
+              "producto": "CAMISETA",
+              "qty": 115,
+              "has_m": true,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163247",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 5,
+      "total_piezas": 119,
+      "bulto_order": [
+        {
+          "id": "669987",
+          "label": "IBPA669987"
+        },
+        {
+          "id": "669993",
+          "label": "IBPA669993"
+        },
+        {
+          "id": "720186",
+          "label": "IBPA720186"
+        },
+        {
+          "id": "720187",
+          "label": "IBPA720187"
+        },
+        {
+          "id": "548217",
+          "label": "OCPA548217"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "669987",
+          "label": "IBPA669987",
+          "total_piezas": 24,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "TVM221NS04001",
+              "producto": "MEDIAS",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "669993",
+          "label": "IBPA669993",
+          "total_piezas": 24,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "TVM221NS04001",
+              "producto": "MEDIAS",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "720186",
+          "label": "IBPA720186",
+          "total_piezas": 24,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "TVM233NS02001",
+              "producto": "MEDIAS",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "720187",
+          "label": "IBPA720187",
+          "total_piezas": 24,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "TVM233NS02001",
+              "producto": "MEDIAS",
+              "qty": 24,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        },
+        {
+          "id": "548217",
+          "label": "OCPA548217",
+          "total_piezas": 23,
+          "size_columns": [
+            "OS"
+          ],
+          "items": [
+            {
+              "estilo": "TVM221NS04001",
+              "producto": "MEDIAS",
+              "qty": 12,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "TVM233NS02001",
+              "producto": "MEDIAS",
+              "qty": 11,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "numero_pl": "80163250",
+      "empresa": "FASHION WEAR",
+      "fecha_entrega": "2026-04-16",
+      "total_bultos": 1,
+      "total_piezas": 18,
+      "bulto_order": [
+        {
+          "id": "548458",
+          "label": "OCPA548458"
+        }
+      ],
+      "bultos": [
+        {
+          "id": "548458",
+          "label": "OCPA548458",
+          "total_piezas": 18,
+          "size_columns": [
+            "S",
+            "XL"
+          ],
+          "items": [
+            {
+              "estilo": "MW0MW23445DW5",
+              "producto": "CAMISA",
+              "qty": 16,
+              "has_m": false,
+              "has_32": false
+            },
+            {
+              "estilo": "MW0MW26865GWJ",
+              "producto": "CAMISA",
+              "qty": 2,
+              "has_m": false,
+              "has_32": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

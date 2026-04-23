@@ -10,8 +10,11 @@
  *
  * 2.0.0 — Fusión de dígito huérfano en Qty line (fix para Qty ≥ 100 que el
  *         PDF parte en dos líneas por ancho de columna de 2 dígitos).
+ * 2.1.0 — Preserva rawId físico del bulto (OCPA547980, 996171227910378) junto
+ *         al id numérico interno, y expone orden de aparición del PDF para
+ *         que bodega trabaje el PL físico sin reordenamientos.
  */
-export const PARSER_VERSION = "2.0.0";
+export const PARSER_VERSION = "2.1.0";
 
 // ── Raw line types (from PDF extraction with X positions) ───────────
 
@@ -29,7 +32,8 @@ export interface PLBultoItem {
 }
 
 export interface PLBulto {
-  id: string;
+  id: string;             // id numérico interno (último bloque de dígitos), clave en pl_items.bultos
+  rawId: string;          // label físico tal como aparece en el PDF (ej "OCPA547980", "996171227910378")
   items: PLBultoItem[];
   totalPiezas: number;
   sizeColumns: string[];  // e.g. ["S","M","L","XL","XX","32","34"]
@@ -124,6 +128,22 @@ function extractBultoId(raw: string): string {
   const digits = raw.replace(/^(OCPA|IBPA)/i, "");
   const last7 = digits.slice(-7);
   return String(parseInt(last7, 10));
+}
+
+/** Label físico del bulto para mostrar al operador: conserva prefijo OCPA/IBPA
+ * + id numérico sin ceros a la izquierda (ej "OCPA200000000547980" → "OCPA547980"),
+ * o — si es puramente numérico como 996171227910378 — devuelve el número tal
+ * cual aparece en el PDF. Bodega trabaja contra este rótulo, no contra el
+ * id numérico truncado que usamos como clave interna. */
+function extractBultoRawId(raw: string): string {
+  const prefixMatch = raw.match(/^(OCPA|IBPA)/i);
+  if (prefixMatch) {
+    const digits = raw.slice(prefixMatch[0].length);
+    const last7 = digits.slice(-7);
+    const numeric = String(parseInt(last7, 10));
+    return `${prefixMatch[0].toUpperCase()}${numeric}`;
+  }
+  return raw;
 }
 
 /** Style code: mixed letters+digits, 6+ chars */
@@ -339,6 +359,7 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
   const bultos: PLBulto[] = [];
 
   let currentBultoId = "";
+  let currentBultoRawId = "";
   let currentBultoTotalPiezas = 0;
   let currentItemMap = new Map<string, PLBultoItem>();
   let currentSizeInfo = { columns: [] as string[], mIndex: -1, dim32Index: -1, hasOS: false };
@@ -354,6 +375,7 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
     if (currentBultoId) {
       bultos.push({
         id: currentBultoId,
+        rawId: currentBultoRawId || currentBultoId,
         items: Array.from(currentItemMap.values()),
         totalPiezas: currentBultoTotalPiezas,
         sizeColumns: currentSizeInfo.columns,
@@ -376,6 +398,7 @@ export function parsePackingListText(text: string, rawLines?: RawLine[]): Parsed
       const idMatch = line.match(/Bulto No\.\s*(\S+)/i);
       const rawId = idMatch ? idMatch[1] : "";
       currentBultoId = extractBultoId(rawId);
+      currentBultoRawId = extractBultoRawId(rawId);
       // Total piezas is often on the same line as "Bulto No. OCPA..."
       const piezasOnLine = line.match(/Total piezas:\s*(\d+)/i);
       currentBultoTotalPiezas = piezasOnLine ? parseInt(piezasOnLine[1], 10) : 0;
@@ -598,6 +621,116 @@ export function validateParsedPL(parsed: ParsedPackingList): PLValidationError[]
     }
   }
   return errors;
+}
+
+// ── Save-time invariants ────────────────────────────────────────────
+// Corren al guardar un PL recién parseado. Cualquiera que falle marca el PL
+// como needs_review en parser_metadata para que el audit script lo liste.
+
+export interface PLReviewFlag {
+  code: "bulto_total_mismatch" | "sku_distribution_mismatch" | "muestra_size_inconsistent" | "bulto_order_coverage";
+  bultoId?: string;
+  estilo?: string;
+  detail: string;
+}
+
+/** Ejecuta los 4 invariantes de integridad sobre un PL ya parseado + indexado.
+ *
+ * (a) Suma distribución por SKU === total SKU (pl_items.total_pcs)
+ * (b) Suma piezas por bulto físico === bulto.totalPiezas del PDF
+ * (c) Para cada SKU con muestra (no is_os): el bulto muestra tiene hasM
+ *     (apparel) o has32 (jeans). Si el SKU es is_os, no hay restricción.
+ * (d) bulto_order cubre exactamente los ids que aparecen en la distribución.
+ *
+ * Devuelve lista de flags. Array vacío = todo OK.
+ */
+export function checkSaveTimeInvariants(
+  parsed: ParsedPackingList,
+  index: PLIndexRow[],
+): PLReviewFlag[] {
+  const flags: PLReviewFlag[] = [];
+
+  // (b) suma por bulto
+  for (const b of parsed.bultos) {
+    const sum = b.items.reduce((s, i) => s + i.qty, 0);
+    if (sum !== b.totalPiezas) {
+      flags.push({
+        code: "bulto_total_mismatch",
+        bultoId: b.id,
+        detail: `Bulto ${b.id}: PDF header=${b.totalPiezas}, suma items=${sum}, diff=${b.totalPiezas - sum}`,
+      });
+    }
+  }
+
+  // (a) suma distribución por SKU
+  for (const row of index) {
+    const distSum = Object.values(row.distribution).reduce((s, n) => s + n, 0);
+    if (distSum !== row.totalPcs) {
+      flags.push({
+        code: "sku_distribution_mismatch",
+        estilo: row.estilo,
+        detail: `SKU ${row.estilo}: total=${row.totalPcs}, suma distribución=${distSum}, diff=${row.totalPcs - distSum}`,
+      });
+    }
+  }
+
+  // (c) muestra ↔ talla correcta. Construimos un lookup (estilo, bultoId) → item
+  // para evitar O(n²).
+  const itemByKey = new Map<string, PLBultoItem>();
+  for (const b of parsed.bultos) {
+    for (const it of b.items) {
+      itemByKey.set(`${it.estilo}||${b.id}`, it);
+    }
+  }
+  for (const row of index) {
+    if (row.isOS) continue; // SKU marcado -OS: no requiere M/32
+    if (!row.bultoMuestra) continue;
+    const item = itemByKey.get(`${row.estilo}||${row.bultoMuestra}`);
+    if (!item) {
+      flags.push({
+        code: "muestra_size_inconsistent",
+        estilo: row.estilo,
+        bultoId: row.bultoMuestra,
+        detail: `SKU ${row.estilo}: bulto muestra ${row.bultoMuestra} no contiene al SKU`,
+      });
+      continue;
+    }
+    if (!item.hasM && !item.has32) {
+      flags.push({
+        code: "muestra_size_inconsistent",
+        estilo: row.estilo,
+        bultoId: row.bultoMuestra,
+        detail: `SKU ${row.estilo}: bulto muestra ${row.bultoMuestra} no tiene ni M ni 32 (pero el SKU no está marcado -OS)`,
+      });
+    }
+  }
+
+  // (d) bulto_order completo
+  const idsInDist = new Set<string>();
+  for (const row of index) {
+    for (const id of Object.keys(row.distribution)) idsInDist.add(id);
+  }
+  const idsInOrder = new Set(parsed.bultos.map(b => b.id));
+  for (const id of idsInDist) {
+    if (!idsInOrder.has(id)) {
+      flags.push({
+        code: "bulto_order_coverage",
+        bultoId: id,
+        detail: `Bulto ${id} aparece en distribución pero no en bulto_order`,
+      });
+    }
+  }
+  for (const id of idsInOrder) {
+    if (!idsInDist.has(id)) {
+      flags.push({
+        code: "bulto_order_coverage",
+        bultoId: id,
+        detail: `Bulto ${id} está en bulto_order pero no tiene items (ningún SKU lo distribuye)`,
+      });
+    }
+  }
+
+  return flags;
 }
 
 // ── Index builder ────────────────────────────────────────────────────

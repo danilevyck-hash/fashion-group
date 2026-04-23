@@ -565,18 +565,30 @@ export default function PackingListsPage() {
         bultoGroupsMap.get(row.bultoMuestra)!.push({ estilo: row.estilo, producto: row.producto, isOS: row.isOS || false });
       }
       for (const styles of bultoGroupsMap.values()) styles.sort((a, b) => a.estilo.localeCompare(b.estilo));
-      const sortedBultos = [...bultoGroupsMap.entries()].sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
 
-      // Numeración secuencial 1..N por PL (todos los bultos distintos de este PL,
-      // incluye los que no tienen muestra). Orden canónico por id numérico ascendente.
+      // Numeración secuencial 1..N en orden físico del PDF. El preview viene
+      // directo del parser así que `pl.bultos` ya está en ese orden.
       const allBultoIdsThisPL = new Set<string>();
       for (const row of index) {
         for (const bId of Object.keys(row.distribution)) allBultoIdsThisPL.add(bId);
       }
       const bultoNumberMap = new Map<string, number>();
-      [...allBultoIdsThisPL]
-        .sort((a, b) => parseInt(a) - parseInt(b))
-        .forEach((bId, i) => bultoNumberMap.set(bId, i + 1));
+      const bultoLabelMap = new Map<string, string>();
+      let seq = 1;
+      for (const b of pl.bultos) {
+        if (!allBultoIdsThisPL.has(b.id)) continue;
+        bultoNumberMap.set(b.id, seq++);
+        bultoLabelMap.set(b.id, b.rawId || b.id);
+      }
+      for (const bId of allBultoIdsThisPL) if (!bultoNumberMap.has(bId)) {
+        bultoNumberMap.set(bId, seq++);
+        bultoLabelMap.set(bId, bId);
+      }
+      const sortedBultos = [...bultoGroupsMap.entries()].sort((a, b) => {
+        const na = bultoNumberMap.get(a[0]) ?? Number.MAX_SAFE_INTEGER;
+        const nb = bultoNumberMap.get(b[0]) ?? Number.MAX_SAFE_INTEGER;
+        return na - nb;
+      });
 
       if (sortedBultos.length > 0) {
         doc.setFontSize(11);
@@ -602,7 +614,11 @@ export default function PackingListsPage() {
           doc.setFontSize(10);
           doc.setFont("helvetica", "bold");
           doc.setTextColor(30, 40, 60);
-          doc.text(safe(`Bulto ${bultoNumberMap.get(bultoId) ?? "?"}  -  ${styles.length} muestra${styles.length > 1 ? "s" : ""}`), marginLeft + checkboxSize + 2, currentY);
+          doc.text(
+            safe(`B${bultoNumberMap.get(bultoId) ?? "?"} (${bultoLabelMap.get(bultoId) || bultoId})  -  ${styles.length} muestra${styles.length > 1 ? "s" : ""}`),
+            marginLeft + checkboxSize + 2,
+            currentY,
+          );
           currentY += lineHeight + 0.5;
 
           for (const style of styles) {
@@ -661,7 +677,7 @@ export default function PackingListsPage() {
           tableBody.push([{ content: safe(group.producto || "SIN PRODUCTO"), colSpan: 3, styles: { fillColor: [210, 215, 225], fontStyle: "bold", fontSize: 9, textColor: [30, 40, 60] } }]);
           for (const row of group.rows) {
             const distParts = Object.entries(row.distribution)
-              .sort(([a], [b]) => parseInt(a) - parseInt(b))
+              .sort(([a], [b]) => (bultoNumberMap.get(a) ?? Number.MAX_SAFE_INTEGER) - (bultoNumberMap.get(b) ?? Number.MAX_SAFE_INTEGER))
               .map(([bId, pcs]) => `(B${bultoNumberMap.get(bId) ?? "?"}: ${pcs})`);
             tableBody.push([safe(row.estilo), String(row.totalPcs), distParts.join("  ")]);
           }
