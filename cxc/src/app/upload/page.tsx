@@ -22,6 +22,7 @@ const UPLOAD_EMPRESAS = [
   { key: "active_wear", name: "Active Wear", brand: "Reebok Apparel" },
   { key: "joystep", name: "Joystep", brand: "Joystep" },
   { key: "confecciones_boston", name: "Confecciones Boston", brand: "Boston" },
+  { key: "american_classic", name: "Multifashion", brand: "American Classics" },
 ] as const;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -428,7 +429,7 @@ function UploadPageInner() {
         const res = await fetch("/api/ventas/check-duplicates", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ empresa: empresaName, n_sistemas: nSistemas.filter(Boolean) }),
+          body: JSON.stringify({ empresa: empresaKey, n_sistemas: nSistemas.filter(Boolean) }),
         });
         if (res.ok) {
           const { existing } = await res.json();
@@ -456,13 +457,13 @@ function UploadPageInner() {
 
   async function handleVentasUpload() {
     if (!ventasPreview) return;
-    const { empresaName, file } = ventasPreview;
+    const { empresaKey, empresaName, file } = ventasPreview;
     setVentasPreview(null);
     setVentasUploading(empresaName);
     setMessage(null);
     try {
       const form = new FormData();
-      form.append("empresa", empresaName);
+      form.append("empresa", empresaKey);
       form.append("file", file);
       const res = await fetch("/api/ventas/upload", { method: "POST", body: form });
       const json = await res.json();
