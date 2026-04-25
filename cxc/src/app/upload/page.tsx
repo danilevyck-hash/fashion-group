@@ -444,7 +444,7 @@ function UploadPageInner() {
           duplicateCount++;
         }
         if (row.errors.length > 0) errorCount++;
-        else validCount++;
+        else if (!row.isDuplicate) validCount++;
       }
 
       setVentasPreview({ empresaKey, empresaName, rows: parsedRows, validCount, errorCount, duplicateCount, formatError: "", file });
