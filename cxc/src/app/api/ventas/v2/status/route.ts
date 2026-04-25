@@ -4,43 +4,41 @@ import { supabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
+interface StatusRow {
+  empresa: string;
+  last_fecha: string | null;
+  last_uploaded: string | null;
+  total_count: number;
+}
+
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]); if (auth instanceof NextResponse) return auth;
-  // Get latest fecha per empresa from ventas_raw
-  // Paginate to ensure all empresas are covered
-  const latest: Record<string, { date: string; label: string; count: number }> = {};
-  let offset = 0;
-  const PAGE = 1000;
+  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  if (auth instanceof NextResponse) return auth;
 
-  while (true) {
-    const { data, error } = await supabaseServer
-      .from("ventas_raw")
-      .select("empresa, fecha, uploaded_at")
-      .order("fecha", { ascending: false })
-      .range(offset, offset + PAGE - 1);
+  const { data, error } = await supabaseServer.rpc("ventas_status_summary");
 
-    if (error) {
-      console.error("[ventas/v2/status]", error.code, error.message);
-      break;
-    }
-
-    for (const row of data ?? []) {
-      if (!latest[row.empresa]) {
-        const d = new Date(row.fecha);
-        const mes = d.toLocaleDateString("es-PA", { month: "short" });
-        const año = d.getFullYear();
-        latest[row.empresa] = {
-          date: row.uploaded_at || row.fecha,
-          label: `${mes} ${año}`,
-          count: 0,
-        };
-      }
-      latest[row.empresa].count++;
-    }
-
-    if (!data || data.length < PAGE) break;
-    offset += PAGE;
+  if (error) {
+    console.error("[ventas/v2/status]", error.code, error.message);
+    return NextResponse.json(
+      { error: "Error al cargar status de ventas", detail: error.message },
+      { status: 500 },
+    );
   }
 
-  return NextResponse.json(latest);
+  const rows = (data ?? []) as StatusRow[];
+  const result: Record<string, { date: string; label: string; count: number }> = {};
+
+  for (const row of rows) {
+    const fechaStr = row.last_fecha ?? "";
+    const d = fechaStr ? new Date(fechaStr) : null;
+    const mes = d ? d.toLocaleDateString("es-PA", { month: "short", timeZone: "America/Panama" }).replace(".", "") : "";
+    const año = d ? d.getFullYear() : "";
+    result[row.empresa] = {
+      date: row.last_uploaded || row.last_fecha || "",
+      label: d ? `${mes} ${año}` : "",
+      count: Number(row.total_count) || 0,
+    };
+  }
+
+  return NextResponse.json(result);
 }
