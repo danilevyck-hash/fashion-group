@@ -479,16 +479,20 @@ function UploadPageInner() {
 
   // ── Status indicator ──────────────────────────────────────────────────────
 
-  function formatPeriod(dateStr: string, count?: number) {
-    const d = new Date(dateStr);
-    const mes = d.toLocaleDateString("es-PA", { month: "short", timeZone: "America/Panama" }).replace(".", "");
-    const ano = d.getFullYear();
-    const dia = d.toLocaleDateString("es-PA", { day: "numeric", month: "short", timeZone: "America/Panama" }).replace(".", "");
-    const hora = d.toLocaleTimeString("es-PA", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "America/Panama" }).toLowerCase();
-    const parts = [`${mes} ${ano}`];
-    if (count) parts.push(`${count.toLocaleString()} reg.`);
-    parts.push(`${dia} ${hora}`);
-    return parts.join(" · ");
+  // Formatea timestamp ISO a "DD-mmm-YYYY" en TZ Panama (sin shifts UTC)
+  function fmtFechaCorta(iso: string | null | undefined): string {
+    if (!iso) return "Sin datos";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "Sin datos";
+    const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+    // en-CA con TZ Panama da "YYYY-MM-DD"
+    const ymd = new Intl.DateTimeFormat("en-CA", {
+      year: "numeric", month: "2-digit", day: "2-digit", timeZone: "America/Panama",
+    }).format(d);
+    const [yyyy, mm, dd] = ymd.split("-");
+    const idx = parseInt(mm, 10) - 1;
+    if (!yyyy || !dd || idx < 0 || idx > 11) return "Sin datos";
+    return `${dd}-${MESES[idx]}-${yyyy}`;
   }
 
   function getStatusIndicator(key: string, type: "cxc" | "ventas") {
@@ -496,7 +500,7 @@ function UploadPageInner() {
       const up = cxcUploads[key];
       if (!up) return <div className="flex items-center gap-1.5 text-xs text-gray-400"><span className="opacity-50">&#9898;</span> Sin datos</div>;
       const days = (Date.now() - new Date(up.uploaded_at).getTime()) / 86400000;
-      const detail = formatPeriod(up.uploaded_at, up.row_count);
+      const detail = fmtFechaCorta(up.uploaded_at);
       if (days > 14) return <div className="flex items-center gap-1.5 text-xs text-red-600"><span>&#128308;</span> Atrasado &middot; {detail}</div>;
       if (days > 7) return <div className="flex items-center gap-1.5 text-xs text-amber-600"><span>&#9888;&#65039;</span> Pendiente &middot; {detail}</div>;
       return <div className="flex items-center gap-1.5 text-xs text-green-600"><span>&#9989;</span> Al dia &middot; {detail}</div>;
