@@ -26,17 +26,24 @@ export async function GET(req: NextRequest) {
   }
 
   const rows = (data ?? []) as StatusRow[];
-  const result: Record<string, { date: string; label: string; count: number }> = {};
+  const result: Record<string, { date: string; label: string }> = {};
+
+  // Mes corto manual para evitar shifts de timezone al parsear "YYYY-MM-DD"
+  const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
   for (const row of rows) {
     const fechaStr = row.last_fecha ?? "";
-    const d = fechaStr ? new Date(fechaStr) : null;
-    const mes = d ? d.toLocaleDateString("es-PA", { month: "short", timeZone: "America/Panama" }).replace(".", "") : "";
-    const año = d ? d.getFullYear() : "";
+    let label = "Sin datos";
+    if (fechaStr) {
+      const [yyyy, mm, dd] = fechaStr.split("-");
+      const mesIdx = parseInt(mm, 10) - 1;
+      if (yyyy && dd && mesIdx >= 0 && mesIdx < 12) {
+        label = `${dd}-${MESES[mesIdx]}-${yyyy}`;
+      }
+    }
     result[row.empresa] = {
       date: row.last_uploaded || row.last_fecha || "",
-      label: d ? `${mes} ${año}` : "",
-      count: Number(row.total_count) || 0,
+      label,
     };
   }
 
