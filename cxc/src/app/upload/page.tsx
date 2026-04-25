@@ -277,59 +277,48 @@ function UploadPageInner() {
           if (/^Mas\s+de/i.test(nombre)) return false;
           if (/^Total$/i.test(nombre)) return false;
           return true;
-        });
+        })
+        .map((r) => ({
+          codigo: r["CODIGO"] || "",
+          nombre: r["NOMBRE"] || "",
+          nombre_normalized: resolveAlias(normalizeName(r["NOMBRE"] || "")),
+          correo: r["CORREO"] || "",
+          telefono: r["TELEFONO"] || "",
+          celular: r["CELULAR"] || "",
+          contacto: r["CONTACTO"] || "",
+          pais: r["PAIS"] || "",
+          provincia: r["PROVINCIA"] || "",
+          distrito: r["DISTRITO"] || "",
+          corregimiento: r["CORREGIMIENTO"] || "",
+          limite_credito: parseNum(r["LIMITE CREDITO"]),
+          limite_morosidad: parseNum(r["LIMITE MOROSIDAD"]),
+          d0_30: parseNum(r["0-30"]),
+          d31_60: parseNum(r["31-60"]),
+          d61_90: parseNum(r["61-90"]),
+          d91_120: parseNum(r["91-120"]),
+          d121_180: parseNum(r["121-180"]),
+          d181_270: parseNum(r["181-270"]),
+          d271_365: parseNum(r["271-365"]),
+          mas_365: parseNum(r["Mas de 365"]),
+          total: parseNum(r["TOTAL"]),
+        }));
 
-      // Safe batch_id swap
-      const { data: upload, error: uploadErr } = await supabase.from("cxc_uploads").insert({ company_key: companyKey, filename: theFile.name, row_count: rows.length }).select().single();
-      if (uploadErr) throw uploadErr;
-      const newUploadId = upload.id;
-
-      const batchSize = 500;
-      let insertedCount = 0;
-      try {
-        for (let i = 0; i < rows.length; i += batchSize) {
-          setUploadProgress(`Subiendo lote ${Math.floor(i/batchSize)+1} de ${Math.ceil(rows.length/batchSize)}...`);
-          const batch = rows.slice(i, i + batchSize).map((r) => ({
-            upload_id: newUploadId, company_key: companyKey,
-            codigo: r["CODIGO"] || "", nombre: r["NOMBRE"] || "",
-            nombre_normalized: resolveAlias(normalizeName(r["NOMBRE"] || "")),
-            correo: r["CORREO"] || "", telefono: r["TELEFONO"] || "",
-            celular: r["CELULAR"] || "", contacto: r["CONTACTO"] || "",
-            pais: r["PAIS"] || "", provincia: r["PROVINCIA"] || "",
-            distrito: r["DISTRITO"] || "", corregimiento: r["CORREGIMIENTO"] || "",
-            limite_credito: parseNum(r["LIMITE CREDITO"]), limite_morosidad: parseNum(r["LIMITE MOROSIDAD"]),
-            d0_30: parseNum(r["0-30"]), d31_60: parseNum(r["31-60"]),
-            d61_90: parseNum(r["61-90"]), d91_120: parseNum(r["91-120"]),
-            d121_180: parseNum(r["121-180"]), d181_270: parseNum(r["181-270"]),
-            d271_365: parseNum(r["271-365"]), mas_365: parseNum(r["Mas de 365"]),
-            total: parseNum(r["TOTAL"]),
-          }));
-          const { error: insertErr } = await supabase.from("cxc_rows").insert(batch);
-          if (insertErr) throw insertErr;
-          insertedCount += batch.length;
-        }
-      } catch (insertError) {
-        setUploadProgress(null);
-        await supabase.from("cxc_rows").delete().eq("upload_id", newUploadId);
-        await supabase.from("cxc_uploads").delete().eq("id", newUploadId);
-        throw new Error(`Insert fallo en fila ${insertedCount + 1}. Datos anteriores preservados. ${insertError instanceof Error ? insertError.message : ""}`);
-      }
+      setUploadProgress(`Subiendo ${rows.length.toLocaleString()} registros...`);
+      const res = await fetch("/api/cxc/upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ companyKey, filename: theFile.name, rows }),
+      });
       setUploadProgress(null);
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Error al cargar");
 
-      const { count } = await supabase.from("cxc_rows").select("id", { count: "exact", head: true }).eq("upload_id", newUploadId);
-      const countMismatch = count !== rows.length;
-
-      await supabase.from("cxc_rows").delete().eq("company_key", companyKey).neq("upload_id", newUploadId);
-      logActivityClient({ action: "cxc_upload", module: "upload", details: { companyKey, filename: theFile.name, rowCount: rows.length, actualCount: count } });
-      if (countMismatch) {
-        setMessage({ text: `${theFile.name}: Verificacion — se esperaban ${rows.length} filas, se insertaron ${count}. Los datos fueron guardados — verifica manualmente.`, type: "err" });
-      } else {
-        const prevCount = cxcUploads[companyKey]?.row_count;
-        const companyName = cxcCompanies.find(c => c.key === companyKey)?.name || companyKey;
-        const diff = prevCount != null ? (rows.length - prevCount) : null;
-        const diffText = diff != null && diff !== 0 ? ` (${diff > 0 ? "+" : ""}${diff} vs. carga anterior)` : "";
-        setMessage({ text: `${companyName}: ${rows.length} registros cargados correctamente${diffText}`, type: "ok" });
-      }
+      const insertedCount: number = json.count ?? 0;
+      const prevCount = cxcUploads[companyKey]?.row_count;
+      const companyName = cxcCompanies.find(c => c.key === companyKey)?.name || companyKey;
+      const diff = prevCount != null ? (insertedCount - prevCount) : null;
+      const diffText = diff != null && diff !== 0 ? ` (${diff > 0 ? "+" : ""}${diff} vs. carga anterior)` : "";
+      setMessage({ text: `${companyName}: ${insertedCount.toLocaleString()} registros cargados correctamente${diffText}`, type: "ok" });
       loadCxcUploads();
     } catch (err: unknown) {
       setMessage({ text: err instanceof Error ? err.message : "Error desconocido", type: "err" });
