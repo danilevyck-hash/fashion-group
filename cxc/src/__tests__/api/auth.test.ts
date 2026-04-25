@@ -64,26 +64,4 @@ describe("POST /api/auth", () => {
     expect(json.error).toBe("Contraseña incorrecta");
   });
 
-  it("returns 401 for env var passwords (role-based login retired in Sprint 1E)", async () => {
-    // ADMIN_PASSWORD used to grant admin access via a shared role password.
-    // It must no longer work — every login goes through fg_users now.
-    process.env.ADMIN_PASSWORD = "secret123";
-
-    mockFrom.mockImplementation((table: string) => {
-      if (table === "fg_users") {
-        return {
-          select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockResolvedValue({ data: [], error: null }),
-          }),
-        };
-      }
-      return mockSupabaseChain(null);
-    });
-
-    const req = makeRequest({ password: "secret123" });
-    const res = await POST(req);
-    expect(res.status).toBe(401);
-
-    delete process.env.ADMIN_PASSWORD;
-  });
 });

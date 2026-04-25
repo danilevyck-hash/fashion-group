@@ -77,13 +77,6 @@ export default function UsuariosPage() {
   const [deactivateTarget, setDeactivateTarget] = useState<{id: string, name: string, active: boolean} | null>(null);
   const currentUserId = typeof window !== "undefined" ? sessionStorage.getItem("fg_user_id") : null;
 
-  // Password management
-  const [passwords, setPasswords] = useState<Record<string, { password: string; updated_at: string }>>({});
-  const [showPwModal, setShowPwModal] = useState<string | null>(null);
-  const [newPw, setNewPw] = useState("");
-  const [showPw, setShowPw] = useState<Record<string, boolean>>({});
-  const [savingPw, setSavingPw] = useState(false);
-
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   const loadRoles = useCallback(async () => {
@@ -94,18 +87,6 @@ export default function UsuariosPage() {
       if (res.ok) setRoles(await res.json());
     } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setLoading(false);
-  }, []);
-
-  const loadPasswords = useCallback(async () => {
-    try {
-      const res = await fetch("/api/admin/passwords");
-      if (res.ok) {
-        const data = await res.json();
-        const map: Record<string, { password: string; updated_at: string }> = {};
-        (data || []).forEach((p: { role: string; password: string; updated_at: string }) => { map[p.role] = p; });
-        setPasswords(map);
-      }
-    } catch { showToast("Error al cargar contraseñas"); }
   }, []);
 
   const loadSessions = useCallback(async () => {
@@ -127,7 +108,7 @@ export default function UsuariosPage() {
     setLoadingUsers(false);
   }, []);
 
-  useEffect(() => { if (authChecked) { loadRoles(); loadPasswords(); loadFgUsers(); loadSessions(); } }, [authChecked, loadRoles, loadPasswords, loadFgUsers, loadSessions]);
+  useEffect(() => { if (authChecked) { loadRoles(); loadFgUsers(); loadSessions(); } }, [authChecked, loadRoles, loadFgUsers, loadSessions]);
 
   if (!authChecked) return null;
 
@@ -178,24 +159,6 @@ export default function UsuariosPage() {
     } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     setSaving(null);
     setShowDeactivate(null);
-  }
-
-  async function savePassword(role: string) {
-    if (!newPw.trim()) { showToast("La contraseña no puede estar vacía"); return; }
-    setSavingPw(true);
-    try {
-      const res = await fetch("/api/admin/passwords", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, password: newPw.trim() }),
-      });
-      if (res.ok) {
-        setPasswords(prev => ({ ...prev, [role]: { password: newPw.trim(), updated_at: new Date().toISOString() } }));
-        showToast("Contraseña actualizada");
-        setShowPwModal(null); setNewPw("");
-      } else { showToast("Error al guardar"); }
-    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
-    setSavingPw(false);
   }
 
   function exportUsersExcel() {
@@ -567,28 +530,6 @@ export default function UsuariosPage() {
                         <p className="text-xs text-gray-400 mt-2">El rol admin siempre tiene acceso a todos los módulos</p>
                       )}
 
-                      {/* Password management */}
-                      <div className="mt-4 bg-gray-50 rounded-lg px-3 py-2.5 flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500">Contraseña:</span>
-                          {passwords[r.role] ? (
-                            <span className="text-xs font-mono bg-gray-200 px-1.5 py-0.5 rounded">
-                              {showPw[r.role] ? passwords[r.role].password : "••••••••"}
-                            </span>
-                          ) : (
-                            <span className="text-xs text-gray-400 italic">Solo en env var</span>
-                          )}
-                          {passwords[r.role] && (
-                            <button onClick={() => setShowPw(prev => ({ ...prev, [r.role]: !prev[r.role] }))} className="text-[10px] text-gray-400 hover:text-gray-600 min-w-[44px] min-h-[44px] inline-flex items-center justify-center">
-                              {showPw[r.role] ? "ocultar" : "ver"}
-                            </button>
-                          )}
-                        </div>
-                        <button onClick={() => { setShowPwModal(r.role); setNewPw(passwords[r.role]?.password || ""); }} className="text-xs text-blue-600 hover:underline">
-                          {passwords[r.role] ? "Cambiar" : "Configurar"}
-                        </button>
-                      </div>
-
                       {/* Danger zone — deactivate (not for admin) */}
                       {!isAdmin && (
                         <div className="mt-4 border border-red-200 bg-red-50/50 rounded-lg px-4 py-3">
@@ -615,26 +556,6 @@ export default function UsuariosPage() {
         )}
 
       </div>
-
-      {/* Password modal */}
-      {showPwModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
-            <h2 className="font-medium mb-4">Contraseña — {ROLE_LABELS[showPwModal] || showPwModal}</h2>
-            <div>
-              <label className="text-[11px] text-gray-400 uppercase block mb-1">Nueva contraseña</label>
-              <input type="text" value={newPw} onChange={e => setNewPw(e.target.value)} placeholder="Ingresa la contraseña"
-                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition font-mono" autoFocus />
-            </div>
-            <div className="flex gap-2 mt-6">
-              <button onClick={() => { setShowPwModal(null); setNewPw(""); }} className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
-              <button onClick={() => savePassword(showPwModal)} disabled={savingPw} className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50">
-                {savingPw ? "Guardando..." : "Guardar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Deactivate confirmation modal */}
       {showDeactivate && (

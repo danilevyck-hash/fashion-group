@@ -78,14 +78,13 @@ export async function POST(req: NextRequest) {
           } catch { /* use defaults below if table missing */ }
 
           if (modules.length === 0) {
-            const ALL = ["cxc","guias","caja","directorio","reclamos","prestamos","ventas","upload","cheques","reebok","camisetas","marketing","packing-lists","catalogos"];
+            const ALL = ["cxc","guias","caja","directorio","reclamos","prestamos","ventas","upload","cheques","reebok","catalogo_reebok","camisetas","marketing","packing-lists","catalogos"];
             const DEFAULTS: Record<string, string[]> = {
               admin: ALL, director: ALL,
-              contabilidad: ["prestamos","ventas"],
-              secretaria: ["upload","guias","caja","reclamos","cheques","directorio","packing-lists","marketing"],
+              contabilidad: ["prestamos"],
+              secretaria: ["upload","guias","caja","reclamos","cheques","directorio","packing-lists","marketing","catalogos"],
               vendedor: ["catalogos","reebok","cxc","directorio","camisetas","guias"],
               bodega: ["guias","packing-lists"],
-              cliente: ["reebok"],
             };
             modules = DEFAULTS[user.role] || [];
           }

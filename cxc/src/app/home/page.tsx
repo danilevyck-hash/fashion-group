@@ -25,7 +25,6 @@ const MODULE_ICONS: Record<string, React.ReactNode> = {
   catalogos: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
   "packing-lists": <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/><path d="M13 13h4"/><path d="M13 17h4"/></svg>,
   camisetas: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 00-1.18 5.53L8 10l-3.46-1A10 10 0 002.06 13h4.19L8 16.54 6.54 20.5a10 10 0 003.22 1.36L12 18l2.24 3.86a10 10 0 003.22-1.36L16 16.54 17.75 13h4.19a10 10 0 00-2.48-4L16 10l-2.82-2.47A10 10 0 0012 2z"/></svg>,
-  usuarios: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>,
   marketing: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l18-8v18L3 13z"/><path d="M11 19a3 3 0 01-6 0v-6"/><path d="M18 8v8"/></svg>,
 };
 
@@ -43,7 +42,6 @@ const ALL_MODULES = [
   { key: "marketing", label: "Marketing", subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)", href: "/marketing", roles: ["admin", "secretaria", "director"], group: "dia" as const },
   { key: "catalogos", label: "Catálogos", subtitle: "Reebok, Joybees", href: "/catalogos", roles: ["admin", "vendedor", "cliente", "secretaria"], group: "catalogo" as const },
   { key: "camisetas", label: "Camisetas Selección", subtitle: "Pedidos y stock", href: "/camisetas", roles: ["admin", "vendedor"], group: "catalogo" as const },
-  { key: "usuarios", label: "Usuarios", subtitle: "Crear usuarios y asignar permisos", href: "/admin/usuarios", roles: ["admin"], group: "admin" as const },
 ];
 
 function getGreeting() {

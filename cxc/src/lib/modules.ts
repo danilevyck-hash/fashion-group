@@ -20,7 +20,6 @@ import {
   Megaphone,
   BookOpen,
   Shirt,
-  UserCog,
   type LucideIcon,
 } from "lucide-react";
 
@@ -50,7 +49,6 @@ export const ALL_MODULES: AppModule[] = [
   { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas",       href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria", "director"],                             group: "dia" },
   { key: "catalogos",     label: "Catálogos",           subtitle: "Reebok, Joybees",                   href: "/catalogos",      icon: BookOpen,         roles: ["admin", "vendedor", "cliente", "secretaria"],                  group: "catalogo" },
   { key: "camisetas",     label: "Camisetas Selección", subtitle: "Pedidos y stock",                   href: "/camisetas",      icon: Shirt,            roles: ["admin", "vendedor"],                                           group: "catalogo" },
-  { key: "usuarios",      label: "Usuarios",            subtitle: "Crear y asignar permisos",          href: "/admin/usuarios", icon: UserCog,          roles: ["admin"],                                                       group: "admin" },
 ];
 
 /** Filtra módulos visibles para un rol. Si hay fgModules (permisos custom),

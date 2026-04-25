@@ -785,23 +785,6 @@ export type Database = {
       }
 
       // ─── ROLES / AUTH ────────────────────────────────────────────────────────
-      role_passwords: {
-        Row: {
-          role: string
-          password: string
-          updated_at: string | null
-        }
-        Insert: {
-          role: string
-          password: string
-          updated_at?: string | null
-        }
-        Update: {
-          role?: string
-          password?: string
-          updated_at?: string | null
-        }
-      }
       role_permissions: {
         Row: {
           id: string
@@ -1073,26 +1056,6 @@ export type Database = {
           created_at?: string | null
           updated_at?: string | null
           is_owner?: boolean
-        }
-      }
-      fg_user_modules: {
-        Row: {
-          id: string
-          user_id: string | null
-          module_key: string
-          enabled: boolean | null
-        }
-        Insert: {
-          id?: string
-          user_id?: string | null
-          module_key: string
-          enabled?: boolean | null
-        }
-        Update: {
-          id?: string
-          user_id?: string | null
-          module_key?: string
-          enabled?: boolean | null
         }
       }
       fg_user_module_order: {

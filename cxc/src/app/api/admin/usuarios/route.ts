@@ -4,30 +4,28 @@ import { requireAuth } from "@/lib/require-auth";
 
 // All system roles
 const SYSTEM_ROLES = [
-  { key: "admin", label: "Administrador", password_env: "ADMIN_PASSWORD" },
-  { key: "director", label: "Director", password_env: "DIRECTOR_PASSWORD" },
-  { key: "contabilidad", label: "Contabilidad", password_env: "CONTABILIDAD_PASSWORD" },
-  { key: "secretaria", label: "Secretaria", password_env: "UPLOAD_PASSWORD" },
-  { key: "bodega", label: "Bodega", password_env: "BODEGA_PASSWORD" },
-  { key: "vendedor", label: "Vendedor", password_env: "VENDEDOR_PASSWORD" },
-  { key: "cliente", label: "Cliente", password_env: "CLIENTE_PASSWORD" },
+  { key: "admin", label: "Administrador" },
+  { key: "director", label: "Director" },
+  { key: "contabilidad", label: "Contabilidad" },
+  { key: "secretaria", label: "Secretaria" },
+  { key: "bodega", label: "Bodega" },
+  { key: "vendedor", label: "Vendedor" },
 ];
 
 // All modules in the system — debe coincidir con ALL_MODULES de src/lib/modules.ts
 const ALL_MODULES = [
   "cxc", "guias", "caja", "directorio", "reclamos", "prestamos", "ventas",
-  "upload", "cheques", "reebok", "camisetas", "marketing", "packing-lists", "catalogos",
+  "upload", "cheques", "reebok", "catalogo_reebok", "camisetas", "marketing", "packing-lists", "catalogos",
 ];
 
 // Default module access per role — debe coincidir con DEFAULTS de /api/auth/route.ts
 const DEFAULT_MODULES: Record<string, string[]> = {
   admin: ALL_MODULES,
   director: ALL_MODULES,
-  contabilidad: ["prestamos", "ventas"],
-  secretaria: ["upload", "guias", "caja", "reclamos", "cheques", "directorio", "packing-lists", "marketing"],
+  contabilidad: ["prestamos"],
+  secretaria: ["upload", "guias", "caja", "reclamos", "cheques", "directorio", "packing-lists", "marketing", "catalogos"],
   bodega: ["guias", "packing-lists"],
   vendedor: ["catalogos", "reebok", "cxc", "directorio", "camisetas", "guias"],
-  cliente: ["reebok"],
 };
 
 export const dynamic = "force-dynamic";
