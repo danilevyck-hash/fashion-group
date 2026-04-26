@@ -237,6 +237,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Archivo demasiado grande (máx 10MB)" }, { status: 400 });
     }
 
+    // Archive original file to Storage para audit trail (mismo patrón que CxC).
+    // No bloqueante: si falla, log warning y seguimos procesando.
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const archivePath = `ventas-uploads/${empresa}/${today}_${safeName}`;
+      const { error: archErr } = await supabaseServer.storage
+        .from("backups")
+        .upload(archivePath, file, { upsert: true });
+      if (archErr) {
+        console.warn("[ventas/upload] archive failed (non-blocking):", archErr.message);
+      }
+    } catch (archEx) {
+      console.warn("[ventas/upload] archive exception (non-blocking):", archEx);
+    }
+
     const fileName = file.name.toLowerCase();
     const isExcel = fileName.endsWith(".xlsx") || fileName.endsWith(".xls");
 
