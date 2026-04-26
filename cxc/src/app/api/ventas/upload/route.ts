@@ -27,6 +27,18 @@ interface RawRow {
   pct_utilidad: number | null;
 }
 
+interface FilteredCounts {
+  zeroSubtotal: number;  // subtotal=0 y utilidad=0
+  subtotalLow: number;   // |subtotal| < $1
+  invalidTipo: number;   // no es Factura/NC/ND
+  invalidDate: number;   // fecha no parseable
+}
+
+interface ParseResult {
+  rows: RawRow[];
+  filtered: FilteredCounts;
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -56,7 +68,7 @@ const VALID_TIPOS = new Set(["Factura", "Nota de Crédito", "Nota de Débito"]);
 
 // ─── CSV parser ───────────────────────────────────────────────────────────────
 
-function parseCSV(text: string, empresa: string): RawRow[] {
+function parseCSV(text: string, empresa: string): ParseResult {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) {
     throw new Error("No se encontraron filas válidas. Verifica que el archivo tenga datos.");
@@ -77,6 +89,7 @@ function parseCSV(text: string, empresa: string): RawRow[] {
 
   const headers = lines[headerIdx].split(";").map((h) => h.trim().toUpperCase());
   const rows: RawRow[] = [];
+  const filtered: FilteredCounts = { zeroSubtotal: 0, subtotalLow: 0, invalidTipo: 0, invalidDate: 0 };
 
   for (let i = headerIdx + 1; i < lines.length; i++) {
     const cols = lines[i].split(";");
@@ -84,15 +97,15 @@ function parseCSV(text: string, empresa: string): RawRow[] {
 
     const subtotal = toNum(get("SUBTOTAL"));
     const utilidad = toNum(get("UTILIDAD"));
-    if (subtotal === 0 && utilidad === 0) continue;
-    if (Math.abs(subtotal) < 1.00) continue;
+    if (subtotal === 0 && utilidad === 0) { filtered.zeroSubtotal++; continue; }
+    if (Math.abs(subtotal) < 1.00) { filtered.subtotalLow++; continue; }
 
     const tipo = normTipo(get("TIPO"));
-    if (!VALID_TIPOS.has(tipo)) continue;
+    if (!VALID_TIPOS.has(tipo)) { filtered.invalidTipo++; continue; }
 
     const fechaRaw = get("FECHA");
     const fechaISO = parseFecha(fechaRaw);
-    if (!fechaISO) continue;
+    if (!fechaISO) { filtered.invalidDate++; continue; }
 
     const dateObj = new Date(fechaISO);
     const mes = dateObj.getMonth() + 1;
@@ -120,12 +133,12 @@ function parseCSV(text: string, empresa: string): RawRow[] {
     });
   }
 
-  return rows;
+  return { rows, filtered };
 }
 
 // ─── Excel parser ─────────────────────────────────────────────────────────────
 
-function parseExcel(buffer: ArrayBuffer, empresa: string): RawRow[] {
+function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
   const wb = XLSX.read(buffer, { type: "array", cellDates: false });
   const ws = wb.Sheets[wb.SheetNames[0]];
   // Use raw: false so numbers are formatted strings; header:1 gives array-of-arrays
@@ -145,6 +158,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): RawRow[] {
 
   const headers = (raw[headerIdx] as string[]).map((h) => String(h).trim().toUpperCase());
   const rows: RawRow[] = [];
+  const filtered: FilteredCounts = { zeroSubtotal: 0, subtotalLow: 0, invalidTipo: 0, invalidDate: 0 };
 
   for (let i = headerIdx + 1; i < raw.length; i++) {
     const cols = raw[i] as unknown[];
@@ -153,15 +167,15 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): RawRow[] {
 
     const subtotal = getNum("SUBTOTAL");
     const utilidad = getNum("UTILIDAD");
-    if (subtotal === 0 && utilidad === 0) continue;
-    if (Math.abs(subtotal) < 1.00) continue;
+    if (subtotal === 0 && utilidad === 0) { filtered.zeroSubtotal++; continue; }
+    if (Math.abs(subtotal) < 1.00) { filtered.subtotalLow++; continue; }
 
     const tipo = normTipo(get("TIPO"));
-    if (!VALID_TIPOS.has(tipo)) continue;
+    if (!VALID_TIPOS.has(tipo)) { filtered.invalidTipo++; continue; }
 
     const fechaRaw = get("FECHA");
     const fechaISO = parseFecha(fechaRaw);
-    if (!fechaISO) continue;
+    if (!fechaISO) { filtered.invalidDate++; continue; }
 
     const dateObj = new Date(fechaISO);
     const mes = dateObj.getMonth() + 1;
@@ -194,7 +208,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): RawRow[] {
     });
   }
 
-  return rows;
+  return { rows, filtered };
 }
 
 // ─── Route ────────────────────────────────────────────────────────────────────
@@ -208,6 +222,7 @@ export async function POST(req: NextRequest) {
 
   let empresa: string;
   let rows: RawRow[];
+  let filtered: FilteredCounts;
 
   try {
     const form = await req.formData();
@@ -227,7 +242,7 @@ export async function POST(req: NextRequest) {
 
     if (isExcel) {
       const buffer = await file.arrayBuffer();
-      rows = parseExcel(buffer, empresa);
+      ({ rows, filtered } = parseExcel(buffer, empresa));
     } else {
       // Decode CSV: try UTF-8 first, fall back to latin-1 if replacement chars found
       const buffer = await file.arrayBuffer();
@@ -240,7 +255,7 @@ export async function POST(req: NextRequest) {
       if (hadEncodingIssue && text.includes("\uFFFD")) {
         throw new Error("El archivo tiene caracteres especiales. Guárdalo como UTF-8 e intenta de nuevo.");
       }
-      rows = parseCSV(text, empresa);
+      ({ rows, filtered } = parseCSV(text, empresa));
     }
   } catch (err) {
     console.error("[ventas/upload] parse error", err);
@@ -267,7 +282,7 @@ export async function POST(req: NextRequest) {
     inserted += batch.length;
   }
 
-  await logActivity(session?.role || "unknown", "ventas_upload", "ventas", { empresa, rowCount: inserted }, session?.userName);
+  await logActivity(session?.role || "unknown", "ventas_upload", "ventas", { empresa, rowCount: inserted, filtered }, session?.userName);
 
-  return NextResponse.json({ ok: true, count: inserted });
+  return NextResponse.json({ ok: true, count: inserted, filtered });
 }

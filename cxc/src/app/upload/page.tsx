@@ -457,7 +457,18 @@ function UploadPageInner() {
       const res = await fetch("/api/ventas/upload", { method: "POST", body: form });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Error al cargar");
-      setMessage({ text: `${file.name}: ${json.count} registros cargados para ${empresaName}`, type: "ok" });
+      const filtered = json.filtered as { zeroSubtotal: number; subtotalLow: number; invalidTipo: number; invalidDate: number } | undefined;
+      const totalDescartadas = filtered ? filtered.zeroSubtotal + filtered.subtotalLow + filtered.invalidTipo + filtered.invalidDate : 0;
+      let mensaje = `${file.name}: ${json.count} registros cargados para ${empresaName}`;
+      if (totalDescartadas > 0 && filtered) {
+        const breakdown: string[] = [];
+        if (filtered.subtotalLow > 0) breakdown.push(`${filtered.subtotalLow} subtotal bajo`);
+        if (filtered.zeroSubtotal > 0) breakdown.push(`${filtered.zeroSubtotal} en cero`);
+        if (filtered.invalidTipo > 0) breakdown.push(`${filtered.invalidTipo} tipo inválido`);
+        if (filtered.invalidDate > 0) breakdown.push(`${filtered.invalidDate} fecha inválida`);
+        mensaje += `, ${totalDescartadas} descartadas (${breakdown.join(", ")})`;
+      }
+      setMessage({ text: mensaje, type: "ok" });
       await loadVentasStatus();
     } catch (err: unknown) {
       setMessage({ text: err instanceof Error ? err.message : "Error desconocido", type: "err" });
