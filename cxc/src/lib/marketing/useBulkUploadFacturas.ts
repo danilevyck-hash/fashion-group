@@ -15,6 +15,7 @@ import { useCallback, useRef, useState } from "react";
 import { pedirUploadUrl, subirArchivoAStorage } from "@/app/marketing/components/uploadHelpers";
 import type {
   BorradorFactura,
+  DuplicadoItem,
   EstadoBorrador,
 } from "@/components/marketing/BorradorFacturaCard";
 
@@ -55,6 +56,9 @@ function borradorVacio(file: File): BorradorFactura {
     subtotalStr: "",
     itbmsOption: "0",
     marcaIds: [],
+    duplicados: [],
+    verificandoDuplicado: false,
+    permitirDuplicado: false,
   };
 }
 
@@ -98,6 +102,8 @@ export function useBulkUploadFacturas({ proyectoId }: UseArgs) {
   const [guardando, setGuardando] = useState(false);
   // Lock anti-doble-procesamiento del mismo File por dropear varias veces.
   const procesandoRef = useRef(false);
+  // Debounce timers por card para verificación de duplicados.
+  const dupTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // ── Helpers de mutación de state ────────────────────────────────────────
   const upsertBorrador = useCallback((cardId: string, patch: Partial<BorradorFactura>) => {
@@ -105,6 +111,57 @@ export function useBulkUploadFacturas({ proyectoId }: UseArgs) {
       prev.map((b) => (b.cardId === cardId ? { ...b, ...patch } : b)),
     );
   }, []);
+
+  // Verifica duplicado contra el backend para un par (numero, proveedor).
+  // Resetea permitirDuplicado al re-verificar (el user debe re-confirmar
+  // si cambió cualquiera de los dos campos).
+  const verificarDuplicado = useCallback(
+    async (cardId: string, numero: string, proveedor: string) => {
+      const num = numero.trim();
+      const prov = proveedor.trim();
+      if (!num || !prov) {
+        upsertBorrador(cardId, { duplicados: [], verificandoDuplicado: false });
+        return;
+      }
+      upsertBorrador(cardId, { verificandoDuplicado: true });
+      try {
+        const qs = new URLSearchParams({
+          numero_factura: num,
+          proveedor: prov,
+          proyecto_id_actual: proyectoId,
+        });
+        const res = await fetch(
+          `/api/marketing/facturas/check-duplicate?${qs.toString()}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) {
+          upsertBorrador(cardId, { duplicados: [], verificandoDuplicado: false });
+          return;
+        }
+        const data = (await res.json()) as { facturas: DuplicadoItem[] };
+        upsertBorrador(cardId, {
+          duplicados: data.facturas ?? [],
+          verificandoDuplicado: false,
+          permitirDuplicado: false,
+        });
+      } catch {
+        upsertBorrador(cardId, { duplicados: [], verificandoDuplicado: false });
+      }
+    },
+    [proyectoId, upsertBorrador],
+  );
+
+  // Programa una verificación de duplicado con debounce de 500ms para una card.
+  const programarVerificacionDup = useCallback(
+    (cardId: string, numero: string, proveedor: string) => {
+      const existing = dupTimersRef.current[cardId];
+      if (existing) clearTimeout(existing);
+      dupTimersRef.current[cardId] = setTimeout(() => {
+        verificarDuplicado(cardId, numero, proveedor);
+      }, 500);
+    },
+    [verificarDuplicado],
+  );
 
   const updateCard = useCallback(
     (cardId: string, patch: Partial<BorradorFactura>) => {
@@ -115,11 +172,27 @@ export function useBulkUploadFacturas({ proyectoId }: UseArgs) {
           if (b.cardId !== cardId) return b;
           const nextEstado: EstadoBorrador =
             b.estado.tipo === "error" ? { tipo: "editando" } : b.estado;
-          return { ...b, ...patch, estado: nextEstado };
+          const merged = { ...b, ...patch, estado: nextEstado };
+          // Si cambian numero o proveedor, re-disparar verificación.
+          const numChanged =
+            patch.numeroFactura !== undefined && patch.numeroFactura !== b.numeroFactura;
+          const provChanged =
+            patch.proveedor !== undefined && patch.proveedor !== b.proveedor;
+          if (numChanged || provChanged) {
+            programarVerificacionDup(cardId, merged.numeroFactura, merged.proveedor);
+          }
+          return merged;
         }),
       );
     },
-    [],
+    [programarVerificacionDup],
+  );
+
+  const setPermitirDuplicado = useCallback(
+    (cardId: string, valor: boolean) => {
+      upsertBorrador(cardId, { permitirDuplicado: valor });
+    },
+    [upsertBorrador],
   );
 
   const descartar = useCallback((cardId: string) => {
@@ -162,6 +235,11 @@ export function useBulkUploadFacturas({ proyectoId }: UseArgs) {
           b.cardId === borrador.cardId ? aplicarOCR(b, ia) : b,
         ),
       );
+      // Tras OCR, disparar verificación de duplicado si se obtuvieron
+      // numero_factura y proveedor del PDF.
+      if (ia.numero_factura && ia.proveedor) {
+        programarVerificacionDup(borrador.cardId, ia.numero_factura, ia.proveedor);
+      }
     } catch (err) {
       console.warn(
         `bulk-upload[${file.name}]:`,
@@ -227,6 +305,9 @@ export function useBulkUploadFacturas({ proyectoId }: UseArgs) {
 
   const cardsListas = borradores.filter(esValida);
   const cardsIncompletas = borradores.filter((b) => !esValida(b));
+  const borradoresConDuplicadoSinConfirmar = borradores.filter(
+    (b) => b.duplicados.length > 0 && !b.permitirDuplicado,
+  );
   const puedeGuardar =
     !guardando &&
     !progress.enProceso &&
@@ -263,7 +344,10 @@ export function useBulkUploadFacturas({ proyectoId }: UseArgs) {
           subtotal: round2(sub),
           itbms,
           marcaIds: b.marcaIds,
-          permitirDuplicado: true, // bulk siempre acepta duplicados (el UI los advierte inline)
+          // Solo permite duplicado si el user lo confirmó explícitamente.
+          // Caller debe verificar `borradoresConDuplicadoSinConfirmar` antes
+          // de invocar guardarTodas — si hay alguno, el backend rechaza.
+          permitirDuplicado: b.permitirDuplicado === true,
           pdfPath: b.pdfPath ?? undefined,
           pdfNombre: b.pdfNombre,
           pdfSize: b.pdfSize ?? undefined,
@@ -331,11 +415,13 @@ export function useBulkUploadFacturas({ proyectoId }: UseArgs) {
     puedeGuardar,
     cardsListas,
     cardsIncompletas,
+    borradoresConDuplicadoSinConfirmar,
     agregarArchivos,
     updateCard,
     descartar,
     limpiarTodo,
     guardarTodas,
+    setPermitirDuplicado,
   };
 }
 

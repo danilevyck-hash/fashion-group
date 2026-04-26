@@ -57,6 +57,8 @@ export default function FacturasSection({
   const bulk = useBulkUploadFacturas({ proyectoId: proyecto.id });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActivo, setDragActivo] = useState(false);
+  // Confirmación global cuando hay borradores con duplicados sin aprobar
+  const [confirmDup, setConfirmDup] = useState(false);
 
   // Sincroniza cuando el parent pasa nuevas facturas (después de un onChange).
   useEffect(() => {
@@ -383,7 +385,7 @@ export default function FacturasSection({
     aceptarArchivos(e.dataTransfer?.files ?? null);
   };
 
-  const handleGuardarBulk = async () => {
+  const ejecutarGuardarBulk = async () => {
     try {
       const r = await bulk.guardarTodas();
       if (r.exitosas > 0 && r.errores === 0) {
@@ -413,6 +415,25 @@ export default function FacturasSection({
         err instanceof Error ? err.message : "Error guardando facturas";
       toast(msg, "error");
     }
+  };
+
+  const handleGuardarBulk = async () => {
+    // Si hay borradores con duplicado sin confirmar, abrir modal global.
+    if (bulk.borradoresConDuplicadoSinConfirmar.length > 0) {
+      setConfirmDup(true);
+      return;
+    }
+    await ejecutarGuardarBulk();
+  };
+
+  const confirmarDuplicadosYGuardar = async () => {
+    bulk.borradoresConDuplicadoSinConfirmar.forEach((b) => {
+      bulk.setPermitirDuplicado(b.cardId, true);
+    });
+    setConfirmDup(false);
+    // Pequeño delay para que el state propague antes de leer en guardarTodas
+    await new Promise((r) => setTimeout(r, 0));
+    await ejecutarGuardarBulk();
   };
 
   return (
@@ -696,6 +717,52 @@ export default function FacturasSection({
                 type="button"
                 onClick={() => setAnulando(null)}
                 disabled={anulandoLoading}
+                className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmación de duplicados (bulk) */}
+      {confirmDup && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-2xl">
+            <h3 className="text-base font-semibold mb-1">
+              ¿Guardar facturas duplicadas?
+            </h3>
+            <p className="text-sm text-gray-600 mb-3">
+              {bulk.borradoresConDuplicadoSinConfirmar.length} factura
+              {bulk.borradoresConDuplicadoSinConfirmar.length === 1 ? "" : "s"} ya
+              {bulk.borradoresConDuplicadoSinConfirmar.length === 1 ? " existe" : " existen"} en
+              el sistema. Si confirmas, se guardarán igual y quedarán en el log de auditoría.
+            </p>
+            <ul className="max-h-48 overflow-auto space-y-1 mb-4 text-xs text-gray-700">
+              {bulk.borradoresConDuplicadoSinConfirmar.map((b) => (
+                <li key={b.cardId} className="rounded border border-amber-200 bg-amber-50 px-2 py-1.5">
+                  <span className="font-medium">{b.numeroFactura}</span> · {b.proveedor}
+                  <span className="text-gray-500">
+                    {" "}— ya existe en{" "}
+                    {b.duplicados
+                      .map((d) => `"${d.proyecto_nombre}"${d.es_mismo_proyecto ? " (este mismo)" : ""}`)
+                      .join(", ")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={confirmarDuplicadosYGuardar}
+                className="flex-1 rounded-md bg-black text-white px-4 py-2.5 text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition"
+              >
+                Sí, guardar de todos modos
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDup(false)}
                 className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition"
               >
                 Cancelar

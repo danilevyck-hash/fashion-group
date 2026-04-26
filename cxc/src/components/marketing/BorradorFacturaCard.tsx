@@ -5,7 +5,7 @@
 // Reusa la regla 50/50 fija: el usuario elige qué marcas aplican mediante
 // checkboxes — el porcentaje se persiste como 50 en el backend.
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { MkMarca } from "@/lib/marketing/types";
 
 export type EstadoBorrador =
@@ -14,6 +14,18 @@ export type EstadoBorrador =
   | { tipo: "editando" }            // Listo para editar
   | { tipo: "guardando" }           // En tránsito al backend bulk
   | { tipo: "error"; razon: string }; // El bulk respondió con error para esta card
+
+export interface DuplicadoItem {
+  id: string;
+  numero_factura: string;
+  proveedor: string;
+  total: number;
+  proyecto_id: string;
+  proyecto_nombre: string;
+  created_at: string | null;
+  fecha_factura: string | null;
+  es_mismo_proyecto: boolean;
+}
 
 export interface BorradorFactura {
   cardId: string;
@@ -29,6 +41,10 @@ export interface BorradorFactura {
   subtotalStr: string;
   itbmsOption: "0" | "7";
   marcaIds: string[]; // ids seleccionados (regla 50/50)
+  // Detección de duplicados
+  duplicados: DuplicadoItem[];
+  verificandoDuplicado: boolean;
+  permitirDuplicado: boolean; // user confirmó guardar pese a duplicado
 }
 
 interface Props {
@@ -66,44 +82,9 @@ export function BorradorFacturaCard({
     borrador.estado.tipo === "ocr-pendiente" ||
     borrador.estado.tipo === "guardando";
 
-  // ── Detección de duplicados (igual flujo que FacturaForm single) ──
-  interface Duplicado {
-    id: string;
-    proyecto_nombre: string;
-    es_mismo_proyecto: boolean;
-    created_at: string | null;
-  }
-  const [duplicados, setDuplicados] = useState<Duplicado[]>([]);
-
-  useEffect(() => {
-    const num = borrador.numeroFactura.trim();
-    const prov = borrador.proveedor.trim();
-    if (!num || !prov) {
-      setDuplicados([]);
-      return;
-    }
-    const t = setTimeout(async () => {
-      try {
-        const qs = new URLSearchParams({
-          numero_factura: num,
-          proveedor: prov,
-        });
-        const res = await fetch(
-          `/api/marketing/facturas/check-duplicate?${qs.toString()}`,
-          { cache: "no-store" },
-        );
-        if (!res.ok) {
-          setDuplicados([]);
-          return;
-        }
-        const data = (await res.json()) as { facturas: Duplicado[] };
-        setDuplicados(data.facturas ?? []);
-      } catch {
-        setDuplicados([]);
-      }
-    }, 500);
-    return () => clearTimeout(t);
-  }, [borrador.numeroFactura, borrador.proveedor]);
+  // Detección de duplicados — el hook useBulkUploadFacturas hace el fetch y
+  // alimenta borrador.duplicados. El card solo renderiza el warning.
+  const duplicados = borrador.duplicados;
 
   function toggleMarca(marcaId: string) {
     const set = new Set(borrador.marcaIds);
@@ -365,16 +346,25 @@ export function BorradorFacturaCard({
 
       {/* Warning duplicados */}
       {duplicados.length > 0 && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          ⚠ Ya existe esta factura ({borrador.numeroFactura} de &ldquo;
-          {borrador.proveedor}&rdquo;) en{" "}
+        <div
+          className={`rounded-md border px-3 py-2 text-xs ${
+            borrador.permitirDuplicado
+              ? "border-gray-300 bg-gray-50 text-gray-700"
+              : "border-amber-300 bg-amber-50 text-amber-900"
+          }`}
+        >
+          {borrador.permitirDuplicado ? "✓" : "⚠"} Ya existe esta factura (
+          {borrador.numeroFactura} de &ldquo;{borrador.proveedor}&rdquo;) en{" "}
           {duplicados
             .map(
               (d) =>
                 `"${d.proyecto_nombre}"${d.es_mismo_proyecto ? " (este mismo)" : ""}`,
             )
             .join(", ")}
-          . Al guardar, se permitirá el duplicado y quedará en el log.
+          .
+          {borrador.permitirDuplicado
+            ? " Confirmaste guardar igual."
+            : " Confirma al guardar para registrarla de todos modos."}
         </div>
       )}
     </div>
