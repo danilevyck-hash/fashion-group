@@ -65,19 +65,10 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
       proyectoId,
       tipo: "foto_proyecto",
     });
-    setFotos((prev) => [
-      {
-        id: adj.id,
-        proyecto_id: proyectoId,
-        factura_id: null,
-        tipo: adj.tipo,
-        url: adj.url,
-        nombre_original: adj.nombre_original,
-        size_bytes: adj.size_bytes,
-        created_at: new Date().toISOString(),
-      } as MkAdjunto,
-      ...prev,
-    ]);
+    // Re-fetch del servidor en lugar de optimistic state update.
+    // La signed URL recién firmada puede no estar propagada en CDN — al
+    // recargar lista, el endpoint vuelve a firmar con archivo ya disponible.
+    await cargar();
     toast("Foto subida", "success");
     return {
       url: adj.url,
