@@ -10,6 +10,7 @@ import {
   emailLower,
   normalizarTexto,
 } from "./normalizar";
+import { esPathStorage } from "./storage";
 import { getMarcas } from "./queries";
 import type {
   MkProyecto,
@@ -178,6 +179,13 @@ export async function updateProyecto(
   }
   if (input.estado !== undefined) {
     payload.estado = input.estado;
+  }
+  if (input.fecha_inicio !== undefined) {
+    const f = normalizarTexto(input.fecha_inicio);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(f)) {
+      throw new Error("fecha_inicio debe tener formato YYYY-MM-DD");
+    }
+    payload.fecha_inicio = f;
   }
 
   if (Object.keys(payload).length === 0) {
@@ -643,6 +651,276 @@ export async function eliminarFacturaPermanente(id: string): Promise<void> {
     .delete()
     .eq("id", id);
   if (delErr) throw new Error(`eliminarFacturaPermanente[delete]: ${delErr.message}`);
+}
+
+// ----------------------------------------------------------------------------
+// Bulk update reparto a nivel proyecto
+// ----------------------------------------------------------------------------
+// Reemplaza el reparto de marcas para TODAS las facturas vigentes del proyecto
+// + actualiza mk_proyecto_marcas (legacy/fallback). Best-effort secuencial:
+// si una escritura falla a mitad, las anteriores quedan aplicadas y el caller
+// debe loguear el estado para reconciliación manual.
+//
+// Reglas de tipo (alineadas con factura-marcas.ts):
+//   - Todas las marcas deben ser del mismo tipo (externa o interna).
+//   - Externa → porcentaje = 50. Interna → 100.
+//   - Cualquier `porcentaje` en input se ignora.
+// ----------------------------------------------------------------------------
+export async function actualizarRepartoProyecto(
+  proyectoId: string,
+  marcas: ReadonlyArray<MarcaPorcentajeInput>,
+): Promise<void> {
+  if (!proyectoId) throw new Error("proyectoId requerido");
+  validarMarcasUnicas(marcas);
+
+  const marcaIds = marcas.map((m) => m.marcaId);
+  const { data: marcasRows, error: mErr } = await supabaseServer
+    .from("mk_marcas")
+    .select("id, tipo")
+    .in("id", marcaIds);
+  if (mErr) {
+    throw new Error(`actualizarRepartoProyecto[marcas read]: ${mErr.message}`);
+  }
+  const tipoById = new Map<string, "externa" | "interna">();
+  for (const r of (marcasRows ?? []) as Array<Record<string, unknown>>) {
+    const t = String(r.tipo ?? "externa") === "interna" ? "interna" : "externa";
+    tipoById.set(String(r.id), t);
+  }
+  if (tipoById.size !== marcaIds.length) {
+    throw new Error("Alguna marca seleccionada no existe");
+  }
+  const tiposSet = new Set(Array.from(tipoById.values()));
+  if (tiposSet.size > 1) {
+    throw new Error(
+      "Joybees no se puede mezclar con otras marcas en el mismo proyecto.",
+    );
+  }
+
+  // Listar facturas vigentes del proyecto.
+  const { data: factRows, error: factErr } = await supabaseServer
+    .from("mk_facturas")
+    .select("id")
+    .eq("proyecto_id", proyectoId)
+    .is("anulado_en", null);
+  if (factErr) {
+    throw new Error(`actualizarRepartoProyecto[facturas]: ${factErr.message}`);
+  }
+  const facturaIds = (factRows ?? []).map((r) =>
+    String((r as { id: string }).id),
+  );
+
+  // 1. Borrar mk_factura_marcas de las facturas vigentes (bulk).
+  if (facturaIds.length > 0) {
+    const { error: delFmErr } = await supabaseServer
+      .from("mk_factura_marcas")
+      .delete()
+      .in("factura_id", facturaIds);
+    if (delFmErr) {
+      throw new Error(
+        `actualizarRepartoProyecto[delete factura_marcas]: ${delFmErr.message}`,
+      );
+    }
+
+    // 2. Insertar nuevas filas (factura × marca).
+    const fmPayload = facturaIds.flatMap((fid) =>
+      marcaIds.map((mid) => ({
+        factura_id: fid,
+        marca_id: mid,
+        porcentaje: tipoById.get(mid) === "interna" ? 100 : 50,
+      })),
+    );
+    if (fmPayload.length > 0) {
+      const { error: insFmErr } = await supabaseServer
+        .from("mk_factura_marcas")
+        .insert(fmPayload);
+      if (insFmErr) {
+        throw new Error(
+          `actualizarRepartoProyecto[insert factura_marcas]: ${insFmErr.message}`,
+        );
+      }
+    }
+  }
+
+  // 3. Actualizar mk_proyecto_marcas (legacy/fallback).
+  const { error: delPmErr } = await supabaseServer
+    .from("mk_proyecto_marcas")
+    .delete()
+    .eq("proyecto_id", proyectoId);
+  if (delPmErr) {
+    throw new Error(
+      `actualizarRepartoProyecto[delete proyecto_marcas]: ${delPmErr.message}`,
+    );
+  }
+  const pmPayload = marcaIds.map((mid) => ({
+    proyecto_id: proyectoId,
+    marca_id: mid,
+    porcentaje: tipoById.get(mid) === "interna" ? 100 : 50,
+  }));
+  if (pmPayload.length > 0) {
+    const { error: insPmErr } = await supabaseServer
+      .from("mk_proyecto_marcas")
+      .insert(pmPayload);
+    if (insPmErr) {
+      throw new Error(
+        `actualizarRepartoProyecto[insert proyecto_marcas]: ${insPmErr.message}`,
+      );
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Hard delete definitivo (sin requerir anulado previo) + cleanup de Storage
+// ----------------------------------------------------------------------------
+// Lista paths de Storage (PDFs y fotos), los borra del bucket 'marketing',
+// luego DELETE FROM la fila padre — el ON DELETE CASCADE limpia hijos en DB.
+// Best-effort en Storage: si remove() falla, seguimos borrando filas.
+
+function extraerPathDesdeUrlFirmada(url: string): string | null {
+  const marker = "/marketing/";
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  const resto = url.slice(idx + marker.length);
+  const sinQuery = resto.split("?")[0];
+  return sinQuery.length > 0 ? sinQuery : null;
+}
+
+function pathDeAdjunto(url: string): string | null {
+  if (!url) return null;
+  return esPathStorage(url) ? url : extraerPathDesdeUrlFirmada(url);
+}
+
+async function borrarStorageBestEffort(paths: ReadonlyArray<string>): Promise<void> {
+  if (paths.length === 0) return;
+  const { error } = await supabaseServer.storage
+    .from("marketing")
+    .remove([...paths]);
+  if (error) {
+    console.warn("[delete definitivo] storage warning:", error.message);
+  }
+}
+
+/**
+ * Elimina un proyecto definitivamente: borra Storage (fotos + PDFs+fotos de
+ * facturas) y luego DELETE FROM mk_proyectos. ON DELETE CASCADE limpia
+ * mk_proyecto_marcas, mk_facturas, mk_factura_marcas, mk_adjuntos.
+ *
+ * NO requiere que el proyecto esté anulado.
+ */
+export async function eliminarProyectoDefinitivo(id: string): Promise<void> {
+  if (!id) throw new Error("id requerido");
+
+  // Verificar que existe.
+  const { data: proyRow, error: proyErr } = await supabaseServer
+    .from("mk_proyectos")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+  if (proyErr) {
+    throw new Error(`eliminarProyectoDefinitivo[read]: ${proyErr.message}`);
+  }
+  if (!proyRow) throw new Error("Proyecto no encontrado");
+
+  // Recolectar paths de Storage: fotos del proyecto + adjuntos de cada factura.
+  const { data: factRows, error: factErr } = await supabaseServer
+    .from("mk_facturas")
+    .select("id")
+    .eq("proyecto_id", id);
+  if (factErr) {
+    throw new Error(
+      `eliminarProyectoDefinitivo[facturas read]: ${factErr.message}`,
+    );
+  }
+  const facturaIds = (factRows ?? []).map((r) =>
+    String((r as { id: string }).id),
+  );
+
+  const paths: string[] = [];
+
+  const { data: adjProy, error: adjProyErr } = await supabaseServer
+    .from("mk_adjuntos")
+    .select("url")
+    .eq("proyecto_id", id);
+  if (adjProyErr) {
+    throw new Error(
+      `eliminarProyectoDefinitivo[adj proyecto]: ${adjProyErr.message}`,
+    );
+  }
+  for (const r of (adjProy ?? []) as Array<{ url: string }>) {
+    const p = pathDeAdjunto(String(r.url));
+    if (p) paths.push(p);
+  }
+
+  if (facturaIds.length > 0) {
+    const { data: adjFact, error: adjFactErr } = await supabaseServer
+      .from("mk_adjuntos")
+      .select("url")
+      .in("factura_id", facturaIds);
+    if (adjFactErr) {
+      throw new Error(
+        `eliminarProyectoDefinitivo[adj factura]: ${adjFactErr.message}`,
+      );
+    }
+    for (const r of (adjFact ?? []) as Array<{ url: string }>) {
+      const p = pathDeAdjunto(String(r.url));
+      if (p) paths.push(p);
+    }
+  }
+
+  await borrarStorageBestEffort(paths);
+
+  // DELETE en proyecto: cascade limpia mk_proyecto_marcas, mk_facturas,
+  // mk_factura_marcas, mk_adjuntos.
+  const { error: delErr } = await supabaseServer
+    .from("mk_proyectos")
+    .delete()
+    .eq("id", id);
+  if (delErr) {
+    throw new Error(`eliminarProyectoDefinitivo[delete]: ${delErr.message}`);
+  }
+}
+
+/**
+ * Elimina una factura definitivamente: borra Storage (PDF + fotos de factura)
+ * y luego DELETE FROM mk_facturas. ON DELETE CASCADE limpia mk_factura_marcas
+ * y mk_adjuntos.
+ *
+ * NO requiere que la factura esté anulada.
+ */
+export async function eliminarFacturaDefinitiva(id: string): Promise<void> {
+  if (!id) throw new Error("id requerido");
+
+  const { data: factRow, error: readErr } = await supabaseServer
+    .from("mk_facturas")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+  if (readErr) {
+    throw new Error(`eliminarFacturaDefinitiva[read]: ${readErr.message}`);
+  }
+  if (!factRow) throw new Error("Factura no encontrada");
+
+  const { data: adjRows, error: adjErr } = await supabaseServer
+    .from("mk_adjuntos")
+    .select("url")
+    .eq("factura_id", id);
+  if (adjErr) {
+    throw new Error(`eliminarFacturaDefinitiva[adjuntos]: ${adjErr.message}`);
+  }
+  const paths: string[] = [];
+  for (const r of (adjRows ?? []) as Array<{ url: string }>) {
+    const p = pathDeAdjunto(String(r.url));
+    if (p) paths.push(p);
+  }
+
+  await borrarStorageBestEffort(paths);
+
+  const { error: delErr } = await supabaseServer
+    .from("mk_facturas")
+    .delete()
+    .eq("id", id);
+  if (delErr) {
+    throw new Error(`eliminarFacturaDefinitiva[delete]: ${delErr.message}`);
+  }
 }
 
 /**

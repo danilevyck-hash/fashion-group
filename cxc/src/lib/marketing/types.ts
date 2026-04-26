@@ -155,6 +155,7 @@ export interface CreateProyectoInput {
 export interface UpdateProyectoInput {
   tienda?: string;
   nombre?: string | null;
+  fecha_inicio?: string; // "YYYY-MM-DD"
   notas?: string | null;
   estado?: EstadoProyecto;
 }

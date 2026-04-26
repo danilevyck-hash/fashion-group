@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
+import { ConfirmDeleteModal } from "@/components/ui";
 import {
   BorradorFacturaCard,
   FacturaCard,
@@ -59,6 +60,14 @@ export default function FacturasSection({
   const [dragActivo, setDragActivo] = useState(false);
   // Confirmación global cuando hay borradores con duplicados sin aprobar
   const [confirmDup, setConfirmDup] = useState(false);
+  // Eliminar definitivamente (solo admin)
+  const [eliminando, setEliminando] = useState<FacturaConAdjuntos | null>(null);
+  const [eliminandoLoading, setEliminandoLoading] = useState(false);
+  const [role, setRole] = useState<string>("");
+  useEffect(() => {
+    setRole(sessionStorage.getItem("cxc_role") ?? "");
+  }, []);
+  const esAdmin = role === "admin";
 
   // Sincroniza cuando el parent pasa nuevas facturas (después de un onChange).
   useEffect(() => {
@@ -336,6 +345,29 @@ export default function FacturasSection({
     setEditandoMarcas(null);
     await cargar();
     onChange?.();
+  };
+
+  const handleEliminarDefinitivo = async () => {
+    if (!eliminando) return;
+    setEliminandoLoading(true);
+    try {
+      const res = await fetch(`/api/marketing/facturas/${eliminando.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error ?? "No se pudo eliminar la factura");
+      }
+      toast("Factura eliminada", "success");
+      setEliminando(null);
+      await cargar();
+      onChange?.();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error al eliminar";
+      toast(msg, "error");
+    } finally {
+      setEliminandoLoading(false);
+    }
   };
 
   const handleAnular = async () => {
@@ -664,6 +696,19 @@ export default function FacturasSection({
                     >
                       Anular
                     </button>
+                    {esAdmin && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEliminando(f);
+                        }}
+                        className="text-[11px] text-red-700 hover:text-red-900 bg-white/80 backdrop-blur px-2 py-1 rounded font-medium"
+                        title="Eliminar definitivamente (irreversible)"
+                      >
+                        Eliminar
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -725,6 +770,19 @@ export default function FacturasSection({
           </div>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        open={eliminando !== null}
+        title={
+          eliminando
+            ? `Eliminar factura ${eliminando.numero_factura}`
+            : "Eliminar factura"
+        }
+        description="Se borrarán la factura, sus marcas asignadas y el PDF en Storage. Esta acción NO se puede deshacer."
+        onConfirm={handleEliminarDefinitivo}
+        onCancel={() => setEliminando(null)}
+        loading={eliminandoLoading}
+      />
 
       {/* Modal de confirmación de duplicados (bulk) */}
       {confirmDup && (

@@ -5,7 +5,7 @@ import { useToast } from "@/components/ToastSystem";
 import { FotoUploader } from "@/components/marketing";
 import type { MkAdjunto } from "@/lib/marketing/types";
 import type { UploadResult } from "@/components/marketing";
-import { FotoLightbox } from "@/components/ui";
+import { ConfirmModal, FotoLightbox } from "@/components/ui";
 import { subirAdjunto } from "./uploadHelpers";
 
 interface FotosSectionProps {
@@ -21,6 +21,7 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
   const [fotosConError, setFotosConError] = useState<Set<string>>(new Set());
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [eliminando, setEliminando] = useState<string | null>(null);
+  const [confirmar, setConfirmar] = useState<MkAdjunto | null>(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -184,7 +185,7 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
                 {!readonly && (
                   <button
                     type="button"
-                    onClick={() => eliminar(f.id)}
+                    onClick={() => setConfirmar(f)}
                     disabled={eliminando === f.id}
                     aria-label="Eliminar foto"
                     className="absolute top-1 right-1 bg-white/90 rounded-full w-6 h-6 flex items-center justify-center text-red-600 opacity-0 group-hover:opacity-100 transition disabled:opacity-50"
@@ -230,6 +231,22 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
           multiple
         />
       )}
+
+      <ConfirmModal
+        open={confirmar !== null}
+        onClose={() => setConfirmar(null)}
+        onConfirm={async () => {
+          if (!confirmar) return;
+          const id = confirmar.id;
+          setConfirmar(null);
+          await eliminar(id);
+        }}
+        title="¿Eliminar foto?"
+        message="Se borrará la foto del proyecto y del Storage. No se puede deshacer."
+        confirmLabel="Eliminar"
+        destructive
+        loading={eliminando !== null}
+      />
 
       <FotoLightbox src={lightbox} onClose={() => setLightbox(null)} />
     </section>

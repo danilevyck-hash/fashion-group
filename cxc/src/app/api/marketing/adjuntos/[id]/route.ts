@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 import { deleteAdjunto } from "@/lib/marketing/mutations";
 import { esPathStorage } from "@/lib/marketing/storage";
+import { logAudit } from "@/lib/marketing/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,7 @@ export async function DELETE(
     // Lookup para borrar también el objeto físico en Storage si aplica
     const { data: row, error: lookupError } = await supabaseServer
       .from("mk_adjuntos")
-      .select("id, url")
+      .select("*")
       .eq("id", params.id)
       .maybeSingle();
     if (lookupError) throw new Error(lookupError.message);
@@ -61,6 +62,16 @@ export async function DELETE(
     }
 
     await deleteAdjunto(params.id);
+
+    await logAudit({
+      action: "delete_definitivo",
+      entityType: "mk_adjuntos",
+      entityId: params.id,
+      userRole: auth.role,
+      userName: auth.userName,
+      before: row,
+    });
+
     return NextResponse.json({ ok: true });
   } catch (err) {
     const message =

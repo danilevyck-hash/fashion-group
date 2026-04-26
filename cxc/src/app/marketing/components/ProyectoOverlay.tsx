@@ -14,6 +14,7 @@ import {
   useState,
 } from "react";
 import { useToast } from "@/components/ToastSystem";
+import { ConfirmTypeNameModal } from "@/components/ui";
 import { EstadoBadge, MarcaBadge } from "@/components/marketing";
 import {
   formatearFecha,
@@ -31,6 +32,7 @@ interface FacturaConAdjuntosYMarcas extends FacturaConAdjuntos {
 }
 import FacturasSection from "./FacturasSection";
 import FotosSection from "./FotosSection";
+import EditarProyectoModal from "./EditarProyectoModal";
 
 type Tab = "facturas" | "fotos";
 
@@ -57,6 +59,28 @@ export default function ProyectoOverlay({
   const [facturas, setFacturas] = useState<FacturaConAdjuntosYMarcas[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("facturas");
+  const [marcasCatalogo, setMarcasCatalogo] = useState<MkMarca[]>([]);
+  const [editando, setEditando] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
+  const [eliminandoLoading, setEliminandoLoading] = useState(false);
+  const [role, setRole] = useState<string>("");
+
+  useEffect(() => {
+    setRole(sessionStorage.getItem("cxc_role") ?? "");
+  }, []);
+
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/marketing/marcas", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as MkMarca[];
+        if (!cancelado) setMarcasCatalogo(Array.isArray(data) ? data : []);
+      } catch { /* */ }
+    })();
+    return () => { cancelado = true; };
+  }, []);
 
   // Refs estables para callbacks del parent
   const onCloseRef = useRef(onClose);
@@ -169,7 +193,29 @@ export default function ProyectoOverlay({
   }
 
   const esCobrado = proyecto.estado === "cobrado";
-  const puedeEditar = !esCobrado && !proyecto.anulado_en;
+  const esAdmin = role === "admin";
+
+  const handleEliminar = async () => {
+    setEliminandoLoading(true);
+    try {
+      const res = await fetch(`/api/marketing/proyectos/${proyecto.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error ?? "No se pudo eliminar");
+      }
+      toast("Proyecto eliminado", "success");
+      setEliminando(false);
+      onChange();
+      onClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error al eliminar";
+      toast(msg, "error");
+    } finally {
+      setEliminandoLoading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center sm:justify-center">
@@ -255,6 +301,24 @@ export default function ProyectoOverlay({
                     Anulado
                   </span>
                 )}
+                <div className="flex gap-1.5 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditando(true)}
+                    className="text-[11px] px-2 py-1 rounded border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
+                  >
+                    Editar
+                  </button>
+                  {esAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => setEliminando(true)}
+                      className="text-[11px] px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition"
+                    >
+                      Eliminar
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -364,17 +428,38 @@ export default function ProyectoOverlay({
                 cargar();
                 onChange();
               }}
-              readonly={!puedeEditar}
+              readonly={false}
             />
           )}
           {tab === "fotos" && (
             <FotosSection
               proyectoId={proyecto.id}
-              readonly={!puedeEditar}
+              readonly={false}
             />
           )}
         </div>
       </div>
+
+      <EditarProyectoModal
+        open={editando}
+        proyecto={proyecto}
+        marcasCatalogo={marcasCatalogo}
+        onClose={() => setEditando(false)}
+        onSaved={() => {
+          cargar();
+          onChange();
+        }}
+      />
+
+      <ConfirmTypeNameModal
+        open={eliminando}
+        title="Eliminar proyecto definitivamente"
+        description="Se borrarán el proyecto, sus facturas, fotos y archivos en Storage. Esta acción NO se puede deshacer."
+        expectedName={proyecto.nombre || proyecto.tienda}
+        onCancel={() => setEliminando(false)}
+        onConfirm={handleEliminar}
+        loading={eliminandoLoading}
+      />
     </div>
   );
 }

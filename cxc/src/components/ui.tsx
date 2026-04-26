@@ -234,6 +234,82 @@ export function ConfirmDeleteModal({
   );
 }
 
+// ── ESTÉTICA 7c2: Confirm Type Name Modal ──
+// Doble confirmación: el usuario debe escribir el nombre exacto del recurso
+// para habilitar el botón. Para borrado IRREVERSIBLE.
+export function ConfirmTypeNameModal({
+  open,
+  title,
+  description,
+  expectedName,
+  inputLabel = "Escribe el nombre para confirmar",
+  confirmLabel = "Eliminar definitivamente",
+  onConfirm,
+  onCancel,
+  loading = false,
+}: {
+  open: boolean;
+  title: string;
+  description: string;
+  expectedName: string;
+  inputLabel?: string;
+  confirmLabel?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+  loading?: boolean;
+}) {
+  const [typed, setTyped] = useState("");
+
+  useEffect(() => {
+    if (open) setTyped("");
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onCancel(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onCancel]);
+
+  if (!open) return null;
+
+  const matches = typed.trim() === expectedName.trim();
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onCancel}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-semibold mb-1">{title}</h3>
+        <p className="text-sm text-gray-500 mb-4">{description}</p>
+        <label className="block text-xs text-gray-500 mb-1">
+          {inputLabel}: <span className="font-mono font-semibold text-gray-800">{expectedName}</span>
+        </label>
+        <input
+          type="text"
+          value={typed}
+          onChange={(e) => setTyped(e.target.value)}
+          disabled={loading}
+          autoFocus
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none mb-4 font-mono disabled:opacity-50"
+          placeholder={expectedName}
+        />
+        <div className="flex gap-3">
+          <button
+            onClick={onConfirm}
+            disabled={!matches || loading}
+            className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium transition-all bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+          >
+            {loading ? "Eliminando..." : confirmLabel}
+          </button>
+          <button onClick={onCancel} disabled={loading} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 active:bg-gray-100 transition-all disabled:opacity-50 min-h-[44px]">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── ESTÉTICA 7d: Foto Lightbox ──
 export function FotoLightbox({ src, onClose }: { src: string | null; onClose: () => void }) {
   useEffect(() => {
