@@ -227,11 +227,20 @@ export default function PeriodoList({
               if (p.estado === "cerrado" && role === "admin") {
                 items.push({ label: "Eliminar", onClick: () => onDeletePeriodo(p.id), destructive: true });
               }
+              const stop = (e: React.MouseEvent) => e.stopPropagation();
               return (
                 <div
                   key={p.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => onLoadDetail(p.id)}
-                  className="grid items-center cursor-pointer transition-colors"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      onLoadDetail(p.id);
+                    }
+                  }}
+                  className="caja-row grid items-center cursor-pointer"
                   style={{
                     gridTemplateColumns:
                       "56px 1fr 1fr 110px 120px 120px 120px 130px",
@@ -242,12 +251,6 @@ export default function PeriodoList({
                     minHeight: 56,
                     fontSize: 13,
                   }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.background = "var(--caja-bg-page)")
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.background = "")
-                  }
                 >
                   <div
                     className="caja-display-sm px-4"
@@ -295,56 +298,61 @@ export default function PeriodoList({
                   >
                     ${fmt(saldo)}
                   </div>
-                  <div
-                    className="px-4 flex items-center justify-end gap-1.5"
-                    onClick={(e) => e.stopPropagation()}
-                  >
+                  <div className="px-4 flex items-center justify-end gap-1.5">
                     <button
-                      onClick={() => onPrintPeriodo(p.id)}
+                      onClick={(e) => { stop(e); onPrintPeriodo(p.id); }}
                       title="Imprimir"
-                      className="text-xs px-2 h-7 rounded-md transition-colors"
+                      className="caja-row-action text-xs px-2 h-7 rounded-md"
                       style={{
                         color: "var(--caja-fg-muted)",
                         border: "1px solid transparent",
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.color = "var(--caja-fg-strong)";
-                        e.currentTarget.style.borderColor = "var(--caja-border-subtle)";
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.color = "var(--caja-fg-muted)";
-                        e.currentTarget.style.borderColor = "transparent";
+                        background: "transparent",
                       }}
                     >
                       Imprimir
                     </button>
                     {p.estado === "abierto" && (
                       <button
-                        onClick={() => onClosePeriodo(p.id)}
+                        onClick={(e) => { stop(e); onClosePeriodo(p.id); }}
                         title="Cerrar período"
-                        className="text-xs px-2 h-7 rounded-md transition-colors"
+                        className="caja-row-action text-xs px-2 h-7 rounded-md"
                         style={{
                           color: "var(--caja-fg-muted)",
                           border: "1px solid transparent",
-                        }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.color = "var(--caja-fg-strong)";
-                          e.currentTarget.style.borderColor = "var(--caja-border-subtle)";
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.color = "var(--caja-fg-muted)";
-                          e.currentTarget.style.borderColor = "transparent";
+                          background: "transparent",
                         }}
                       >
                         Cerrar
                       </button>
                     )}
-                    {items.length > 0 && <OverflowMenu items={items} />}
+                    {items.length > 0 && (
+                      <span onClick={stop}>
+                        <OverflowMenu items={items} />
+                      </span>
+                    )}
                   </div>
                 </div>
               );
             })}
           </div>
+          <style jsx>{`
+            :global(.caja-row) {
+              transition: background-color 120ms ease;
+            }
+            :global(.caja-row:hover) {
+              background: var(--caja-bg-page);
+            }
+            :global(.caja-row:focus-visible) {
+              outline: none;
+              background: var(--caja-bg-page);
+              box-shadow: inset 0 0 0 2px var(--caja-accent);
+            }
+            :global(.caja-row-action):hover {
+              color: var(--caja-fg-strong) !important;
+              border-color: var(--caja-border-subtle) !important;
+              background: #fff !important;
+            }
+          `}</style>
 
           <div
             className="mt-3 text-xs flex items-center gap-1.5"
