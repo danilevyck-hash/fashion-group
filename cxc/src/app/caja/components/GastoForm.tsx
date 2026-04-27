@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { fmt } from "@/lib/format";
+import { ReactNode, useState } from "react";
 import { CajaResponsable } from "./types";
 
 export interface GastoFormValues {
@@ -47,11 +46,248 @@ interface Props {
   setNewCatName: (v: string) => void;
 }
 
-/**
- * Full-width vertical gasto form. Renders only the fields — the parent
- * (currently /caja/[periodoId]/nuevo) owns the save/cancel buttons and
- * the Fondo/Gastado/Saldo summary (shown in the sticky header).
- */
+/* ---------- Layout primitives ---------- */
+
+function Section({ eyebrow, children, last = false }: { eyebrow: string; children: ReactNode; last?: boolean }) {
+  return (
+    <div style={{ marginBottom: last ? 0 : 40 }}>
+      <div
+        className="pb-2 mb-4"
+        style={{ borderBottom: "1px solid var(--caja-stone-200)" }}
+      >
+        <div className="caja-eyebrow">{eyebrow}</div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  required,
+  hint,
+  children,
+}: {
+  label: string;
+  required?: boolean;
+  hint?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <label
+        style={{
+          fontSize: 12,
+          fontWeight: 500,
+          color: "var(--caja-fg-default)",
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+        }}
+      >
+        {label}
+        {required && (
+          <span style={{ color: "var(--caja-danger)" }}>*</span>
+        )}
+      </label>
+      {children}
+      {hint && (
+        <div
+          className="text-[11px] mt-0.5 leading-snug"
+          style={{ color: "var(--caja-fg-muted)" }}
+        >
+          {hint}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TextInput({
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  ariaLabel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  type?: "text" | "date";
+  ariaLabel?: string;
+}) {
+  const [focus, setFocus] = useState(false);
+  return (
+    <input
+      type={type}
+      value={value}
+      aria-label={ariaLabel}
+      onChange={(e) => onChange(e.target.value)}
+      onFocus={() => setFocus(true)}
+      onBlur={() => setFocus(false)}
+      placeholder={placeholder}
+      style={{
+        width: "100%",
+        height: 36,
+        padding: "0 10px",
+        fontFamily: type === "date" ? "var(--caja-font-mono)" : "var(--caja-font-sans)",
+        fontSize: 13,
+        color: "var(--caja-fg-strong)",
+        background: "#fff",
+        outline: "none",
+        borderRadius: 6,
+        border: `1px solid ${focus ? "var(--caja-accent)" : "var(--caja-border-default)"}`,
+        boxShadow: focus ? "var(--caja-focus-shadow)" : "none",
+        transition: "border-color 120ms ease, box-shadow 120ms ease",
+      }}
+    />
+  );
+}
+
+function SelectInput({
+  value,
+  onChange,
+  children,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  children: ReactNode;
+}) {
+  const [focus, setFocus] = useState(false);
+  return (
+    <div style={{ position: "relative", width: "100%" }}>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setFocus(true)}
+        onBlur={() => setFocus(false)}
+        style={{
+          width: "100%",
+          height: 36,
+          padding: "0 32px 0 10px",
+          fontFamily: "var(--caja-font-sans)",
+          fontSize: 13,
+          color: "var(--caja-fg-strong)",
+          background: "#fff",
+          outline: "none",
+          borderRadius: 6,
+          border: `1px solid ${focus ? "var(--caja-accent)" : "var(--caja-border-default)"}`,
+          boxShadow: focus ? "var(--caja-focus-shadow)" : "none",
+          appearance: "none",
+          WebkitAppearance: "none",
+          transition: "border-color 120ms ease, box-shadow 120ms ease",
+        }}
+      >
+        {children}
+      </select>
+      <svg
+        width="14"
+        height="14"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{
+          position: "absolute",
+          right: 10,
+          top: "50%",
+          transform: "translateY(-50%)",
+          color: "var(--caja-fg-muted)",
+          pointerEvents: "none",
+        }}
+      >
+        <polyline points="6 9 12 15 18 9" />
+      </svg>
+    </div>
+  );
+}
+
+function MoneyInputFlat({
+  value,
+  onChange,
+  placeholder,
+  readOnly,
+  highlight,
+  ariaLabel,
+}: {
+  value: string;
+  onChange?: (v: string) => void;
+  placeholder?: string;
+  readOnly?: boolean;
+  highlight?: boolean;
+  ariaLabel?: string;
+}) {
+  const [focus, setFocus] = useState(false);
+  const border = focus
+    ? "var(--caja-accent)"
+    : highlight
+      ? "var(--caja-accent)"
+      : "var(--caja-border-default)";
+  const bg = highlight ? "var(--caja-accent-soft)" : "#fff";
+  const color = highlight ? "var(--caja-teal-900)" : "var(--caja-fg-strong)";
+  const prefixColor = highlight
+    ? "var(--caja-teal-800)"
+    : "var(--caja-fg-muted)";
+  return (
+    <div style={{ position: "relative", width: "100%", height: 48 }}>
+      <span
+        style={{
+          position: "absolute",
+          left: 12,
+          top: 0,
+          bottom: 0,
+          display: "flex",
+          alignItems: "center",
+          color: prefixColor,
+          fontSize: 14,
+          fontWeight: highlight ? 600 : 400,
+          fontFamily: "var(--caja-font-mono)",
+          pointerEvents: "none",
+        }}
+      >
+        $
+      </span>
+      <input
+        value={value}
+        readOnly={readOnly}
+        aria-label={ariaLabel}
+        onChange={(e) =>
+          !readOnly && onChange?.(e.target.value.replace(/[^0-9.]/g, ""))
+        }
+        onFocus={() => !readOnly && setFocus(true)}
+        onBlur={() => !readOnly && setFocus(false)}
+        placeholder={placeholder}
+        inputMode="decimal"
+        tabIndex={readOnly ? -1 : 0}
+        style={{
+          boxSizing: "border-box",
+          width: "100%",
+          height: 48,
+          margin: 0,
+          background: bg,
+          borderRadius: 6,
+          padding: "0 14px 0 26px",
+          fontFamily: "var(--caja-font-mono)",
+          fontSize: 14,
+          color,
+          outline: "none",
+          textAlign: "right",
+          fontWeight: highlight ? 600 : 500,
+          cursor: readOnly ? "default" : "text",
+          display: "block",
+          border: `1px solid ${border}`,
+          boxShadow: focus ? "var(--caja-focus-shadow)" : "none",
+          transition: "border-color 120ms ease, box-shadow 120ms ease",
+        }}
+      />
+    </div>
+  );
+}
+
+/* ---------- Form ---------- */
+
 export default function GastoForm({
   values,
   setters,
@@ -79,90 +315,138 @@ export default function GastoForm({
 
   const [catError, setCatError] = useState<string | null>(null);
 
-  const inputBase =
-    "w-full border-b border-gray-200 py-2.5 text-base outline-none bg-transparent focus:border-black transition";
-  const selectBase = `${inputBase} appearance-none pr-6`;
-  const labelBase = "text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2 block";
+  // Live ITBMS amount derived from the percent + subtotal.
+  const itbmsAmount = Math.round(subtotalNum * (parseFloat(gItbmsPct) / 100) * 100) / 100;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <label className={labelBase}>Fecha</label>
-        <input
-          type="date"
-          value={gFecha}
-          onChange={(e) => setGFecha(e.target.value)}
-          className={inputBase}
-        />
-      </div>
-
-      <div>
-        <label className={labelBase}>
-          Descripción <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          value={gDescripcion}
-          onChange={(e) => setGDescripcion(e.target.value)}
-          placeholder="Qué se compró"
-          className={inputBase}
-        />
-      </div>
-
-      <div>
-        <label className={labelBase}>
-          Proveedor <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          value={gProveedor}
-          onChange={(e) => setGProveedor(e.target.value)}
-          placeholder="Dónde se compró"
-          className={inputBase}
-        />
-      </div>
-
-      <div>
-        <label className={labelBase}>N° Factura (opcional)</label>
-        <input
-          type="text"
-          value={gNroFactura}
-          onChange={(e) => setGNroFactura(e.target.value)}
-          placeholder="Ej: 01234"
-          className={inputBase}
-        />
-      </div>
-
-      <div>
-        <label className={labelBase}>
-          Categoría <span className="text-red-500">*</span>
-        </label>
-        <select
-          value={gCategoria}
-          onChange={(e) => setGCategoria(e.target.value)}
-          className={selectBase}
+    <div>
+      {/* Comprobante */}
+      <Section eyebrow="Comprobante">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "180px 1fr",
+            gap: 24,
+          }}
+          className="caja-grid-comprobante"
         >
-          {categorias.length === 0 && <option value="">—</option>}
-          {categorias.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
+          <Field label="Fecha" required>
+            <TextInput type="date" value={gFecha} onChange={setGFecha} ariaLabel="Fecha" />
+          </Field>
+          <Field label="Descripción" required>
+            <TextInput
+              value={gDescripcion}
+              onChange={setGDescripcion}
+              placeholder="¿En qué se gastó?"
+              ariaLabel="Descripción"
+            />
+          </Field>
+        </div>
+      </Section>
+
+      {/* Origen del gasto */}
+      <Section eyebrow="Origen del gasto">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 180px",
+            gap: 24,
+          }}
+          className="caja-grid-origen"
+        >
+          <Field label="Proveedor" required>
+            <TextInput
+              value={gProveedor}
+              onChange={setGProveedor}
+              placeholder="Nombre del proveedor"
+              ariaLabel="Proveedor"
+            />
+          </Field>
+          <Field label="Nº de factura" hint="Opcional">
+            <TextInput
+              value={gNroFactura}
+              onChange={setGNroFactura}
+              placeholder="—"
+              ariaLabel="Nº de factura"
+            />
+          </Field>
+        </div>
+      </Section>
+
+      {/* Clasificación */}
+      <Section eyebrow="Clasificación">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 24,
+          }}
+          className="caja-grid-clasif"
+        >
+          <Field label="Responsable" required>
+            <SelectInput value={gResponsableId} onChange={setGResponsableId}>
+              <option value="">—</option>
+              {responsablesCatalog.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nombre}
+                </option>
+              ))}
+            </SelectInput>
+          </Field>
+          <Field label="Categoría" required>
+            <SelectInput value={gCategoria} onChange={setGCategoria}>
+              {categorias.length === 0 && <option value="">—</option>}
+              {categorias.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </SelectInput>
+          </Field>
+        </div>
         {isOwner && (
-          <>
+          <div style={{ marginTop: 12 }}>
             <button
-              onClick={() => { setCatError(null); setShowManageCat(!showManageCat); }}
-              className="text-xs text-gray-500 hover:text-black mt-2 inline-flex items-center gap-1 border border-gray-200 rounded px-2 py-1 hover:border-gray-400 transition"
-              title="Gestionar categorias"
+              onClick={() => {
+                setCatError(null);
+                setShowManageCat(!showManageCat);
+              }}
+              type="button"
+              className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors"
+              style={{
+                color: "var(--caja-fg-muted)",
+                border: "1px solid var(--caja-border-subtle)",
+                background: "#fff",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = "var(--caja-fg-strong)";
+                e.currentTarget.style.borderColor = "var(--caja-border-default)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = "var(--caja-fg-muted)";
+                e.currentTarget.style.borderColor = "var(--caja-border-subtle)";
+              }}
+              title="Gestionar categorías"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
               Gestionar categorías
             </button>
             {showManageCat && (
-              <div className="mt-3 p-3 bg-gray-50 rounded text-sm space-y-2">
+              <div
+                className="mt-3 p-3 rounded text-sm space-y-2"
+                style={{
+                  background: "var(--caja-stone-50)",
+                  border: "1px solid var(--caja-border-subtle)",
+                }}
+              >
                 {categorias.map((c) => (
                   <div key={c} className="flex items-center justify-between py-1">
-                    <span>{c}</span>
+                    <span style={{ color: "var(--caja-fg-default)" }}>{c}</span>
                     <button
+                      type="button"
                       onClick={async () => {
                         setCatError(null);
                         const res = await fetch("/api/caja/categorias", {
@@ -172,12 +456,19 @@ export default function GastoForm({
                         });
                         if (!res.ok) {
                           const payload = await res.json().catch(() => null);
-                          setCatError(payload && typeof payload.error === "string" ? payload.error : "No se pudo eliminar la categoría.");
+                          setCatError(
+                            payload && typeof payload.error === "string"
+                              ? payload.error
+                              : "No se pudo eliminar la categoría.",
+                          );
                           return;
                         }
                         setCategorias(categorias.filter((x) => x !== c));
                       }}
-                      className="text-gray-300 hover:text-red-500 text-sm ml-3"
+                      className="text-sm ml-3 transition-colors"
+                      style={{ color: "var(--caja-fg-subtle)" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--caja-danger)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--caja-fg-subtle)")}
                     >
                       ×
                     </button>
@@ -189,9 +480,11 @@ export default function GastoForm({
                     value={newCatName}
                     onChange={(e) => setNewCatName(e.target.value)}
                     placeholder="Nueva categoría"
-                    className="flex-1 border-b border-gray-200 py-1 text-sm outline-none"
+                    className="flex-1 py-1 text-sm outline-none bg-transparent"
+                    style={{ borderBottom: "1px solid var(--caja-border-default)" }}
                   />
                   <button
+                    type="button"
                     onClick={async () => {
                       setCatError(null);
                       const normalized = normalizeStr(newCatName);
@@ -203,75 +496,138 @@ export default function GastoForm({
                       });
                       if (!res.ok) {
                         const payload = await res.json().catch(() => null);
-                        setCatError(payload && typeof payload.error === "string" ? payload.error : "No se pudo crear la categoría.");
+                        setCatError(
+                          payload && typeof payload.error === "string"
+                            ? payload.error
+                            : "No se pudo crear la categoría.",
+                        );
                         return;
                       }
                       setCategorias([...categorias, normalized]);
                       setNewCatName("");
                     }}
-                    className="text-sm text-gray-500 hover:text-black"
+                    className="text-sm transition-colors"
+                    style={{ color: "var(--caja-fg-muted)" }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--caja-accent)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--caja-fg-muted)")}
                   >
                     ＋
                   </button>
                 </div>
-                {catError && <p className="text-xs text-red-600">{catError}</p>}
+                {catError && (
+                  <p
+                    className="text-xs"
+                    style={{ color: "var(--caja-danger-onSoft)" }}
+                  >
+                    {catError}
+                  </p>
+                )}
               </div>
             )}
-          </>
+          </div>
         )}
-      </div>
+      </Section>
 
-      <div>
-        <label className={labelBase}>
-          Responsable <span className="text-red-500">*</span>
-        </label>
-        <select
-          value={gResponsableId}
-          onChange={(e) => setGResponsableId(e.target.value)}
-          className={selectBase}
+      {/* Montos (USD) */}
+      <Section eyebrow="Montos (USD)" last>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 16,
+          }}
+          className="caja-grid-montos"
         >
-          <option value="">—</option>
-          {responsablesCatalog.map((r) => (
-            <option key={r.id} value={r.id}>{r.nombre}</option>
-          ))}
-        </select>
-      </div>
+          {/* Subtotal */}
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: 12,
+                fontWeight: 500,
+                color: "var(--caja-fg-default)",
+                marginBottom: 6,
+              }}
+            >
+              Subtotal <span style={{ color: "var(--caja-danger)" }}>*</span>
+            </label>
+            <MoneyInputFlat
+              value={gSubtotal}
+              onChange={setGSubtotal}
+              placeholder="0.00"
+              ariaLabel="Subtotal"
+            />
+            {gSubtotal && subtotalNum <= 0 && (
+              <p
+                className="text-[11px] mt-1"
+                style={{ color: "var(--caja-danger-onSoft)" }}
+              >
+                El monto debe ser mayor a $0
+              </p>
+            )}
+          </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label className={labelBase}>
-            Sub-total <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="number"
-            step="0.01"
-            inputMode="decimal"
-            value={gSubtotal}
-            onChange={(e) => setGSubtotal(e.target.value)}
-            placeholder="0.00"
-            className={inputBase}
-          />
-          {gSubtotal && subtotalNum <= 0 && (
-            <p className="text-[11px] text-red-500 mt-1">El monto debe ser mayor a $0</p>
-          )}
-        </div>
-        <div>
-          <label className={labelBase}>ITBMS</label>
-          <select
-            value={gItbmsPct}
-            onChange={(e) => setGItbmsPct(e.target.value)}
-            className={selectBase}
-          >
-            <option value="0">0%</option>
-            <option value="7">7%</option>
-          </select>
-        </div>
-      </div>
+          {/* ITBMS */}
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: 12,
+                fontWeight: 500,
+                color: "var(--caja-fg-default)",
+                marginBottom: 6,
+              }}
+            >
+              ITBMS
+            </label>
+            <SelectInput value={gItbmsPct} onChange={setGItbmsPct}>
+              <option value="0">0%</option>
+              <option value="7">7%</option>
+            </SelectInput>
+            <div
+              className="text-[11px] mt-1.5 leading-snug"
+              style={{ color: "var(--caja-fg-muted)" }}
+            >
+              Calculado al {gItbmsPct}% del subtotal:{" "}
+              <span className="caja-mono">${itbmsAmount.toFixed(2)}</span>
+            </div>
+          </div>
 
-      <div className="flex items-baseline justify-between border-t border-gray-200 pt-4">
-        <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Total</span>
-        <span className="text-lg font-semibold tabular-nums">${fmt(totalNum)}</span>
-      </div>
+          {/* Total */}
+          <div>
+            <label
+              style={{
+                display: "block",
+                fontSize: 12,
+                fontWeight: 500,
+                color: "var(--caja-fg-default)",
+                marginBottom: 6,
+              }}
+            >
+              Total
+            </label>
+            <MoneyInputFlat
+              value={totalNum > 0 ? totalNum.toFixed(2) : ""}
+              placeholder="0.00"
+              readOnly
+              highlight
+              ariaLabel="Total"
+            />
+          </div>
+        </div>
+      </Section>
+
+      {/* Stack form rows on small screens */}
+      <style jsx>{`
+        @media (max-width: 640px) {
+          :global(.caja-grid-comprobante),
+          :global(.caja-grid-origen),
+          :global(.caja-grid-clasif),
+          :global(.caja-grid-montos) {
+            grid-template-columns: 1fr !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }

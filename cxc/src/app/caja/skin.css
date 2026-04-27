@@ -1,0 +1,135 @@
+/* ============================================================
+   CAJA MENUDA — Editorial premium skin
+   Stone neutrals + Teal accent + Playfair / Inter / Geist Mono.
+   Scoped under .skin-caja so it doesn't leak into other modules.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Geist+Mono:wght@400;500&display=swap');
+
+.skin-caja {
+  /* Type families */
+  --caja-font-display: 'Playfair Display', 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+  --caja-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --caja-font-mono: 'Geist Mono', 'SF Mono', ui-monospace, 'Cascadia Mono', Menlo, monospace;
+
+  /* Stone neutrals */
+  --caja-stone-50:  #FAFAF9;
+  --caja-stone-100: #F5F5F4;
+  --caja-stone-200: #E7E5E4;
+  --caja-stone-300: #D6D3D1;
+  --caja-stone-400: #A8A29E;
+  --caja-stone-500: #78716C;
+  --caja-stone-600: #57534E;
+  --caja-stone-700: #44403C;
+  --caja-stone-800: #292524;
+  --caja-stone-900: #1C1917;
+  --caja-stone-950: #0C0A09;
+
+  --caja-fg-strong:  var(--caja-stone-950);
+  --caja-fg-default: var(--caja-stone-700);
+  --caja-fg-muted:   var(--caja-stone-500);
+  --caja-fg-subtle:  var(--caja-stone-400);
+
+  --caja-bg-page:    var(--caja-stone-50);
+  --caja-bg-surface: #FFFFFF;
+  --caja-bg-raised:  var(--caja-stone-100);
+  --caja-bg-sunken:  var(--caja-stone-200);
+
+  --caja-border-subtle:  var(--caja-stone-200);
+  --caja-border-default: var(--caja-stone-300);
+  --caja-border-strong:  var(--caja-stone-400);
+
+  /* Teal accent */
+  --caja-teal-50:  #F0FDFA;
+  --caja-teal-100: #CCFBF1;
+  --caja-teal-500: #14B8A6;
+  --caja-teal-600: #0D9488;
+  --caja-teal-700: #0F766E;
+  --caja-teal-800: #115E59;
+  --caja-teal-900: #134E4A;
+
+  --caja-accent:        var(--caja-teal-700);
+  --caja-accent-hover:  var(--caja-teal-800);
+  --caja-accent-soft:   var(--caja-teal-50);
+  --caja-accent-onSoft: var(--caja-teal-800);
+  --caja-focus-shadow:  0 0 0 3px rgba(15, 118, 110, 0.18);
+
+  /* Semantic tones */
+  --caja-success:        #059669;
+  --caja-success-soft:   #ECFDF5;
+  --caja-success-onSoft: #047857;
+  --caja-success-border: #A7F3D0;
+
+  --caja-warning:        #F59E0B;
+  --caja-warning-soft:   #FFFBEB;
+  --caja-warning-onSoft: #B45309;
+  --caja-warning-border: #FDE68A;
+
+  --caja-danger:        #DC2626;
+  --caja-danger-soft:   #FEF2F2;
+  --caja-danger-onSoft: #B91C1C;
+  --caja-danger-border: #FECACA;
+
+  background: var(--caja-bg-page);
+  color: var(--caja-fg-default);
+  font-family: var(--caja-font-sans);
+}
+
+/* Display headings (Playfair) — used sparingly */
+.skin-caja .caja-display {
+  font-family: var(--caja-font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--caja-fg-strong);
+  line-height: 1.1;
+}
+.skin-caja .caja-display-sm {
+  font-family: var(--caja-font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--caja-fg-strong);
+  line-height: 1.2;
+}
+
+/* Eyebrow / section label */
+.skin-caja .caja-eyebrow {
+  font-family: var(--caja-font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--caja-fg-muted);
+}
+
+/* Numbers, money, dates */
+.skin-caja .caja-mono {
+  font-family: var(--caja-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum', 'zero';
+}
+
+.skin-caja .caja-money {
+  font-family: var(--caja-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--caja-fg-default);
+}
+.skin-caja .caja-money-strong {
+  color: var(--caja-fg-strong);
+  font-weight: 600;
+}
+
+/* Focus ring — teal */
+.skin-caja :focus-visible {
+  outline: none;
+  box-shadow: var(--caja-focus-shadow);
+  border-color: var(--caja-accent) !important;
+}
+
+.skin-caja ::selection { background: rgba(15, 118, 110, 0.18); color: var(--caja-fg-strong); }
+
+/* Animations used by the modal */
+@keyframes cajaFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cajaSlideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.skin-caja .caja-fade-in { animation: cajaFadeIn 180ms cubic-bezier(0.22, 1, 0.36, 1); }
+.skin-caja .caja-slide-up { animation: cajaSlideUp 220ms cubic-bezier(0.22, 1, 0.36, 1); }

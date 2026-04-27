@@ -14,6 +14,7 @@ import DeletedGastosModal from "../components/DeletedGastosModal";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
 import { useState } from "react";
+import "../skin.css";
 
 export default function PeriodoDetailPage() {
   const router = useRouter();
@@ -88,38 +89,51 @@ export default function PeriodoDetailPage() {
         module="Caja Menuda"
         breadcrumbs={[{ label: `Período N°${current.numero}` }]}
       />
-      <PeriodoDetailHeader
-        current={current}
-        totalGastado={detailTotalGastado}
-        saldo={detailSaldo}
-        pctUsed={detailPctUsed}
-        onBack={() => router.push("/caja")}
-        onClosePeriodo={detailIsOpen ? () => requestClosePeriodo(current.id) : undefined}
-        onPrint={() => router.push(`/caja/${current.id}/imprimir`)}
-        onExportExcel={exportExcel}
-        onAprobarReposicion={aprobarReposicion}
-        deletedCount={(current.deleted_gastos || []).length}
-        onViewDeleted={() => setShowDeletedModal(true)}
-      />
-
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-6 pb-12">
-        {cajaSuggestion && <SuggestionCard suggestion={cajaSuggestion} onDismiss={dismissCaja} />}
-
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-
-        <GastoTable
-          gastos={detailGastos}
-          isOpen={!!detailIsOpen}
-          categorias={allCategorias}
-          responsables={allResponsables}
-          editingGastoId={editingGastoId}
-          editGasto={editGasto}
-          setEditingGastoId={setEditingGastoId}
-          setEditGasto={setEditGasto}
-          onSaveEdit={saveEditGasto}
-          onDeleteGasto={requestDeleteGasto}
-          nuevoHref={detailIsOpen ? `/caja/${current.id}/nuevo` : undefined}
+      <div className="skin-caja min-h-screen">
+        <PeriodoDetailHeader
+          current={current}
+          totalGastado={detailTotalGastado}
+          saldo={detailSaldo}
+          pctUsed={detailPctUsed}
+          onBack={() => router.push("/caja")}
+          onClosePeriodo={detailIsOpen ? () => requestClosePeriodo(current.id) : undefined}
+          onPrint={() => router.push(`/caja/${current.id}/imprimir`)}
+          onExportExcel={exportExcel}
+          onAprobarReposicion={aprobarReposicion}
+          deletedCount={(current.deleted_gastos || []).length}
+          onViewDeleted={() => setShowDeletedModal(true)}
         />
+
+        <div className="max-w-6xl mx-auto px-5 sm:px-9 pt-6 pb-14">
+          {cajaSuggestion && <SuggestionCard suggestion={cajaSuggestion} onDismiss={dismissCaja} />}
+
+          {error && (
+            <p
+              className="text-sm mb-4 px-3 py-2 rounded-md"
+              style={{
+                color: "var(--caja-danger-onSoft)",
+                background: "var(--caja-danger-soft)",
+                border: "1px solid var(--caja-danger-border)",
+              }}
+            >
+              {error}
+            </p>
+          )}
+
+          <GastoTable
+            gastos={detailGastos}
+            isOpen={!!detailIsOpen}
+            categorias={allCategorias}
+            responsables={allResponsables}
+            editingGastoId={editingGastoId}
+            editGasto={editGasto}
+            setEditingGastoId={setEditingGastoId}
+            setEditGasto={setEditGasto}
+            onSaveEdit={saveEditGasto}
+            onDeleteGasto={requestDeleteGasto}
+            nuevoHref={detailIsOpen ? `/caja/${current.id}/nuevo` : undefined}
+          />
+        </div>
       </div>
 
       <DeletedGastosModal

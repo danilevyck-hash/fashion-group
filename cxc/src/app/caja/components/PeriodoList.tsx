@@ -2,7 +2,7 @@
 
 import { fmt, fmtDate } from "@/lib/format";
 import { CajaPeriodo } from "./types";
-import { SkeletonTable, EmptyState, StatusBadge, ScrollableTable } from "@/components/ui";
+import { SkeletonTable, EmptyState } from "@/components/ui";
 import OverflowMenu, { OverflowMenuItem } from "@/components/ui/OverflowMenu";
 
 interface Props {
@@ -18,6 +18,48 @@ interface Props {
   onDeletePeriodo: (id: string) => void;
 }
 
+function PlusIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+function StatusPill({ estado }: { estado: string }) {
+  if (estado === "abierto") {
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full"
+        style={{
+          background: "var(--caja-success-soft)",
+          color: "var(--caja-success-onSoft)",
+          border: "1px solid var(--caja-success-border)",
+        }}
+      >
+        <span
+          className="inline-block w-1.5 h-1.5 rounded-full"
+          style={{ background: "var(--caja-success)" }}
+        />
+        Abierto
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full"
+      style={{
+        background: "var(--caja-stone-100)",
+        color: "var(--caja-stone-600)",
+        border: "1px solid var(--caja-stone-200)",
+      }}
+    >
+      Cerrado
+    </span>
+  );
+}
+
 export default function PeriodoList({
   periodos,
   loading,
@@ -31,25 +73,45 @@ export default function PeriodoList({
   onDeletePeriodo,
 }: Props) {
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-      <div className="flex items-end justify-between mb-10">
-        <div>
-          <h1 className="text-xl font-light tracking-tight">Caja Menuda</h1>
-          <p className="text-sm text-gray-400 mt-1">
-            Cada periodo representa un ciclo de caja menuda. Crea uno nuevo cuando se reponga el fondo.
+    <div className="max-w-6xl mx-auto px-5 sm:px-9 py-8 sm:py-10">
+      <div className="flex items-end justify-between gap-6 mb-7 sm:mb-10">
+        <div className="max-w-xl">
+          <h1
+            className="caja-display"
+            style={{ fontSize: "clamp(28px, 4vw, 38px)", margin: 0 }}
+          >
+            Caja Menuda
+          </h1>
+          <p
+            className="mt-2 text-sm"
+            style={{ color: "var(--caja-fg-muted)", maxWidth: 520 }}
+          >
+            Cada período representa un ciclo del fondo fijo de gastos. Crea uno nuevo cuando se reponga el fondo.
           </p>
         </div>
         {!hasOpenPeriod && (
           <button
             onClick={onCreatePeriodo}
-            className="text-sm bg-black text-white px-6 py-3 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all"
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 h-9 rounded-md transition-transform active:scale-[0.97]"
+            style={{ background: "var(--caja-accent)", color: "#fff" }}
           >
-            Nuevo Período
+            <PlusIcon /> Nuevo período
           </button>
         )}
       </div>
 
-      {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+      {error && (
+        <p
+          className="text-sm mb-4 px-3 py-2 rounded-md"
+          style={{
+            color: "var(--caja-danger-onSoft)",
+            background: "var(--caja-danger-soft)",
+            border: "1px solid var(--caja-danger-border)",
+          }}
+        >
+          {error}
+        </p>
+      )}
 
       {loading ? (
         <SkeletonTable rows={5} cols={4} />
@@ -57,7 +119,7 @@ export default function PeriodoList({
         <EmptyState
           title="No hay períodos registrados"
           subtitle="Crea un nuevo período de caja menuda"
-          actionLabel="+ Nuevo Período"
+          actionLabel="+ Nuevo período"
           onAction={onCreatePeriodo}
         />
       ) : (
@@ -79,25 +141,51 @@ export default function PeriodoList({
                 <div
                   key={p.id}
                   onClick={() => onLoadDetail(p.id)}
-                  className="border border-gray-200 rounded-lg p-4 active:bg-gray-50 transition cursor-pointer"
+                  className="rounded-lg p-4 active:scale-[0.99] transition cursor-pointer"
+                  style={{
+                    background: "var(--caja-bg-surface)",
+                    border: "1px solid var(--caja-border-subtle)",
+                  }}
                 >
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-sm font-semibold">Período {p.numero}</span>
-                      <StatusBadge estado={p.estado} />
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span
+                        className="caja-display-sm"
+                        style={{ fontSize: 18, color: "var(--caja-fg-strong)" }}
+                      >
+                        Nº {p.numero}
+                      </span>
+                      <StatusPill estado={p.estado} />
                     </div>
                     <div className="-my-2 -mr-2" onClick={(e) => e.stopPropagation()}>
                       <OverflowMenu items={items} />
                     </div>
                   </div>
-                  <p className="text-[11px] text-gray-400 mb-2">
+                  <p
+                    className="caja-mono text-[11px] mb-3"
+                    style={{ color: "var(--caja-fg-muted)" }}
+                  >
                     {fmtDate(p.fecha_apertura)}
-                    {p.fecha_cierre ? ` — ${fmtDate(p.fecha_cierre)}` : " — en curso"}
+                    {p.fecha_cierre ? ` — ${fmtDate(p.fecha_cierre)}` : " · en curso"}
                   </p>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-500">Fondo <span className="tabular-nums text-gray-700">${fmt(p.fondo_inicial)}</span></span>
-                    <span className="text-gray-500">Gastado <span className="tabular-nums text-gray-700">${fmt(p.total_gastado)}</span></span>
-                    <span className={`font-semibold tabular-nums ${saldo < 0 ? "text-red-600" : "text-gray-900"}`}>
+                    <span style={{ color: "var(--caja-fg-muted)" }}>
+                      Fondo{" "}
+                      <span className="caja-money caja-money-strong">${fmt(p.fondo_inicial)}</span>
+                    </span>
+                    <span style={{ color: "var(--caja-fg-muted)" }}>
+                      Gastado{" "}
+                      <span className="caja-money">${fmt(p.total_gastado)}</span>
+                    </span>
+                    <span
+                      className="caja-money caja-money-strong"
+                      style={{
+                        color:
+                          saldo < 0
+                            ? "var(--caja-danger)"
+                            : "var(--caja-fg-strong)",
+                      }}
+                    >
                       ${fmt(saldo)}
                     </span>
                   </div>
@@ -107,96 +195,163 @@ export default function PeriodoList({
           </div>
 
           {/* Desktop table */}
-          <div className="hidden md:block">
-            <ScrollableTable minWidth={600}>
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-white z-10">
-                  <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
-                    <th className="text-left py-3 px-4 font-normal">N°</th>
-                    <th className="text-left py-3 px-4 font-normal">Apertura</th>
-                    <th className="text-left py-3 px-4 font-normal">Cierre</th>
-                    <th className="text-left py-3 px-4 font-normal">Estado</th>
-                    <th className="text-right py-3 px-4 font-normal">Fondo</th>
-                    <th className="text-right py-3 px-4 font-normal">Gastado</th>
-                    <th className="text-right py-3 px-4 font-normal">Saldo</th>
-                    <th className="text-right py-3 px-4 font-normal"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {periodos.map((p) => {
-                    const saldo = p.fondo_inicial - p.total_gastado;
-                    return (
-                      <tr
-                        key={p.id}
-                        onClick={() => onLoadDetail(p.id)}
-                        className="border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
+          <div
+            className="hidden md:block overflow-hidden"
+            style={{
+              background: "var(--caja-bg-surface)",
+              border: "1px solid var(--caja-border-subtle)",
+              borderRadius: 8,
+            }}
+          >
+            <div
+              className="grid items-center caja-eyebrow"
+              style={{
+                gridTemplateColumns:
+                  "56px 1fr 1fr 110px 120px 120px 120px 130px",
+                background: "var(--caja-stone-100)",
+                borderBottom: "1px solid var(--caja-border-subtle)",
+              }}
+            >
+              <div className="px-4 py-2.5">Nº</div>
+              <div className="px-4 py-2.5">Apertura</div>
+              <div className="px-4 py-2.5">Cierre</div>
+              <div className="px-4 py-2.5">Estado</div>
+              <div className="px-4 py-2.5 text-right">Fondo</div>
+              <div className="px-4 py-2.5 text-right">Gastado</div>
+              <div className="px-4 py-2.5 text-right">Saldo</div>
+              <div className="px-4 py-2.5 text-right">Acciones</div>
+            </div>
+            {periodos.map((p, i) => {
+              const saldo = p.fondo_inicial - p.total_gastado;
+              const items: OverflowMenuItem[] = [];
+              if (p.estado === "cerrado" && role === "admin") {
+                items.push({ label: "Eliminar", onClick: () => onDeletePeriodo(p.id), destructive: true });
+              }
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => onLoadDetail(p.id)}
+                  className="grid items-center cursor-pointer transition-colors"
+                  style={{
+                    gridTemplateColumns:
+                      "56px 1fr 1fr 110px 120px 120px 120px 130px",
+                    borderBottom:
+                      i < periodos.length - 1
+                        ? "1px solid var(--caja-stone-100)"
+                        : 0,
+                    minHeight: 56,
+                    fontSize: 13,
+                  }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background = "var(--caja-bg-page)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = "")
+                  }
+                >
+                  <div
+                    className="caja-display-sm px-4"
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 600,
+                      color: "var(--caja-fg-strong)",
+                    }}
+                  >
+                    {p.numero}
+                  </div>
+                  <div
+                    className="caja-mono px-4"
+                    style={{ color: "var(--caja-fg-default)" }}
+                  >
+                    {fmtDate(p.fecha_apertura)}
+                  </div>
+                  <div
+                    className="caja-mono px-4"
+                    style={{
+                      color: p.fecha_cierre
+                        ? "var(--caja-fg-default)"
+                        : "var(--caja-fg-subtle)",
+                    }}
+                  >
+                    {p.fecha_cierre ? fmtDate(p.fecha_cierre) : "—"}
+                  </div>
+                  <div className="px-4">
+                    <StatusPill estado={p.estado} />
+                  </div>
+                  <div className="caja-money caja-money-strong px-4 text-right">
+                    ${fmt(p.fondo_inicial)}
+                  </div>
+                  <div className="caja-money px-4 text-right">
+                    ${fmt(p.total_gastado)}
+                  </div>
+                  <div
+                    className="caja-money caja-money-strong px-4 text-right"
+                    style={{
+                      color:
+                        saldo < 0
+                          ? "var(--caja-danger)"
+                          : "var(--caja-fg-strong)",
+                    }}
+                  >
+                    ${fmt(saldo)}
+                  </div>
+                  <div
+                    className="px-4 flex items-center justify-end gap-1.5"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => onPrintPeriodo(p.id)}
+                      title="Imprimir"
+                      className="text-xs px-2 h-7 rounded-md transition-colors"
+                      style={{
+                        color: "var(--caja-fg-muted)",
+                        border: "1px solid transparent",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = "var(--caja-fg-strong)";
+                        e.currentTarget.style.borderColor = "var(--caja-border-subtle)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = "var(--caja-fg-muted)";
+                        e.currentTarget.style.borderColor = "transparent";
+                      }}
+                    >
+                      Imprimir
+                    </button>
+                    {p.estado === "abierto" && (
+                      <button
+                        onClick={() => onClosePeriodo(p.id)}
+                        title="Cerrar período"
+                        className="text-xs px-2 h-7 rounded-md transition-colors"
+                        style={{
+                          color: "var(--caja-fg-muted)",
+                          border: "1px solid transparent",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.color = "var(--caja-fg-strong)";
+                          e.currentTarget.style.borderColor = "var(--caja-border-subtle)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.color = "var(--caja-fg-muted)";
+                          e.currentTarget.style.borderColor = "transparent";
+                        }}
                       >
-                        <td className="py-3 px-4 font-medium">{p.numero}</td>
-                        <td className="py-3 px-4 text-gray-500">
-                          {fmtDate(p.fecha_apertura)}
-                        </td>
-                        <td className="py-3 px-4 text-gray-500">
-                          {p.fecha_cierre ? fmtDate(p.fecha_cierre) : "—"}
-                        </td>
-                        <td className="py-3 px-4">
-                          <StatusBadge estado={p.estado} />
-                        </td>
-                        <td className="py-3 px-4 text-right tabular-nums text-gray-400">
-                          ${fmt(p.fondo_inicial)}
-                        </td>
-                        <td className="py-3 px-4 text-right tabular-nums">
-                          ${fmt(p.total_gastado)}
-                        </td>
-                        <td
-                          className={`py-3 px-4 text-right tabular-nums font-medium ${saldo < 0 ? "text-red-600" : ""}`}
-                        >
-                          ${fmt(saldo)}
-                        </td>
-                        <td
-                          className="py-3 px-4 text-right flex items-center justify-end gap-2"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            onClick={() => onPrintPeriodo(p.id)}
-                            className="text-sm text-gray-500 hover:text-black transition"
-                          >
-                            Imprimir
-                          </button>
-                          {p.estado === "abierto" && (
-                            <>
-                              <span className="text-gray-200">·</span>
-                              <button
-                                onClick={() => onClosePeriodo(p.id)}
-                                className="text-sm text-gray-500 hover:text-black transition"
-                              >
-                                Cerrar
-                              </button>
-                            </>
-                          )}
-                          {p.estado === "cerrado" && role === "admin" && (
-                            <>
-                              <span className="text-gray-200">·</span>
-                              <button
-                                onClick={() => onDeletePeriodo(p.id)}
-                                className="text-sm text-gray-300 hover:text-red-500 transition"
-                              >
-                                Eliminar
-                              </button>
-                            </>
-                          )}
-                          <button
-                            onClick={() => onLoadDetail(p.id)}
-                            className="text-gray-300 hover:text-black ml-2 transition"
-                          >
-                            ›
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </ScrollableTable>
+                        Cerrar
+                      </button>
+                    )}
+                    {items.length > 0 && <OverflowMenu items={items} />}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div
+            className="mt-3 text-xs flex items-center gap-1.5"
+            style={{ color: "var(--caja-fg-muted)" }}
+          >
+            Mostrando {periodos.length}{" "}
+            {periodos.length === 1 ? "período" : "períodos"}
           </div>
         </>
       )}
