@@ -380,12 +380,26 @@ function InventoryZone({ label, empresa, notInCSVLabel, result, onResult, onErro
   const fileRef = useRef<HTMLInputElement>(null)
 
   const processCSV = useCallback(async (file: File) => {
-    if (!file.name.endsWith('.csv')) return
+    const lower = file.name.toLowerCase()
+    const isExcel = lower.endsWith('.xlsx') || lower.endsWith('.xls')
+    const isCsv = lower.endsWith('.csv') || lower.endsWith('.txt')
+    if (!isExcel && !isCsv) { onError('Archivo no soportado. Usa .csv, .xlsx o .xls'); return }
     setProcessing(true)
     try {
-      const text = new TextDecoder('latin1').decode(await file.arrayBuffer())
+      let text: string
+      if (isExcel) {
+        const XLSX = (await import('xlsx-js-style')).default
+        const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: 'array' })
+        const ws = wb.Sheets[wb.SheetNames[0]]
+        text = XLSX.utils.sheet_to_csv(ws, { FS: ';' })
+      } else {
+        const buf = await file.arrayBuffer()
+        let utf = new TextDecoder('utf-8').decode(buf)
+        if (utf.includes('�')) utf = new TextDecoder('latin1').decode(buf)
+        text = utf
+      }
       const lines = text.split(/\r?\n/).filter(l => l.trim())
-      if (lines.length < 2) { setProcessing(false); return }
+      if (lines.length < 2) { onError('El archivo está vacío'); setProcessing(false); return }
 
       const header = lines[0].split(';').map(h => h.trim().replace(/"/g, ''))
       const codigoIdx = header.findIndex(h => normalizeHeader(h) === 'CODIGO')
@@ -422,9 +436,9 @@ function InventoryZone({ label, empresa, notInCSVLabel, result, onResult, onErro
         <div onDragOver={e => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={handleDrop}
           onClick={() => fileRef.current?.click()}
           className={`border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-colors ${dragging ? 'border-reebok-red bg-red-50' : 'border-gray-300 hover:border-gray-400'}`}>
-          <p className="text-sm font-medium">Subir CSV — {label}</p>
-          <p className="text-xs text-gray-400">.csv</p>
-          <input ref={fileRef} type="file" accept=".csv" onChange={e => { if (e.target.files?.[0]) processCSV(e.target.files[0]); e.target.value = '' }} className="hidden" />
+          <p className="text-sm font-medium">Subir archivo — {label}</p>
+          <p className="text-xs text-gray-400">.csv, .xlsx o .xls</p>
+          <input ref={fileRef} type="file" accept=".csv,.txt,.xlsx,.xls" onChange={e => { if (e.target.files?.[0]) processCSV(e.target.files[0]); e.target.value = '' }} className="hidden" />
         </div>
       )}
       {result && (
