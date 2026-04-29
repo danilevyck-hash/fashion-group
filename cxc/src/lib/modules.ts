@@ -1,7 +1,8 @@
 // Catálogo único de módulos de la app. Fuente de verdad para:
-//   - /home (grid de tarjetas con drag-drop + orden por rol)
+//   - /home (4 cards de grupos)
+//   - Páginas de grupo (/operaciones, /reportes, /catalogos, /sistema)
 //   - AppHeader (drawer mobile)
-//   - Sidebar (desktop persistente)
+//   - Sidebar (desktop persistente, 5 items: Inicio + 4 grupos)
 //
 // Mantener sincronizado con src/app/api/auth/route.ts (permisos por rol)
 // y src/middleware.ts (protección de rutas).
@@ -20,10 +21,14 @@ import {
   Megaphone,
   BookOpen,
   Shirt,
+  Users,
+  Briefcase,
+  BarChart3,
+  Settings,
   type LucideIcon,
 } from "lucide-react";
 
-export type ModuleGroup = "dia" | "consulta" | "catalogo" | "admin";
+export type ModuleGroup = "operaciones" | "reportes" | "catalogos" | "sistema";
 
 export interface AppModule {
   key: string;
@@ -35,20 +40,42 @@ export interface AppModule {
   group: ModuleGroup;
 }
 
+export interface AppGroup {
+  key: ModuleGroup;
+  label: string;
+  href: string;
+  icon: LucideIcon;
+}
+
+export const GROUPS: AppGroup[] = [
+  { key: "operaciones", label: "Operaciones", href: "/operaciones", icon: Briefcase },
+  { key: "reportes",    label: "Reportes",    href: "/reportes",    icon: BarChart3 },
+  { key: "catalogos",   label: "Catálogos",   href: "/catalogos",   icon: BookOpen },
+  { key: "sistema",     label: "Sistema",     href: "/sistema",     icon: Settings },
+];
+
 export const ALL_MODULES: AppModule[] = [
-  { key: "cxc",           label: "Cuentas por Cobrar",  subtitle: "Quién debe, cuánto y desde cuándo", href: "/admin",          icon: CircleDollarSign, roles: ["admin", "director", "vendedor"],                               group: "dia" },
-  { key: "upload",        label: "Actualizar Datos",    subtitle: "Subir archivos de Switch Soft",     href: "/upload",         icon: RefreshCw,        roles: ["admin", "director", "secretaria"],                             group: "dia" },
-  { key: "guias",         label: "Guías de Despacho",   subtitle: "Crear y rastrear envíos",           href: "/guias",          icon: Truck,            roles: ["admin", "secretaria", "bodega", "director", "vendedor"],       group: "dia" },
-  { key: "caja",          label: "Caja Menuda",         subtitle: "Registrar gastos del día a día",    href: "/caja",           icon: Wallet,           roles: ["admin", "director", "secretaria"],                             group: "consulta" },
-  { key: "directorio",    label: "Directorio",          subtitle: "Clientes y contactos",              href: "/directorio",     icon: Contact,          roles: ["admin", "director", "secretaria", "vendedor"],                 group: "consulta" },
-  { key: "cheques",       label: "Cheques",             subtitle: "Control de cheques por cobrar",     href: "/cheques",        icon: FileText,         roles: ["admin", "secretaria", "director"],                             group: "dia" },
-  { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones de empleados", href: "/prestamos",   icon: HandCoins,        roles: ["admin", "director", "contabilidad"],                           group: "consulta" },
-  { key: "reclamos",      label: "Reclamos",            subtitle: "Reportar y dar seguimiento",        href: "/reclamos",       icon: AlertTriangle,    roles: ["admin", "secretaria", "director"],                             group: "dia" },
-  { key: "packing-lists", label: "Packing Lists",       subtitle: "Índices de bultos por estilo",      href: "/packing-lists",  icon: ClipboardList,    roles: ["admin", "director", "secretaria", "bodega"],                   group: "dia" },
-  { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",   href: "/ventas",         icon: TrendingUp,       roles: ["admin", "director"],                                           group: "consulta" },
-  { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)", href: "/marketing", icon: Megaphone,    roles: ["admin", "secretaria", "director"],                             group: "dia" },
-  { key: "catalogos",     label: "Catálogos",           subtitle: "Reebok, Joybees",                   href: "/catalogos",      icon: BookOpen,         roles: ["admin", "director", "secretaria", "vendedor", "bodega"],       group: "catalogo" },
-  { key: "camisetas",     label: "Camisetas Selección", subtitle: "Pedidos y stock",                   href: "/camisetas",      icon: Shirt,            roles: ["admin", "director", "vendedor"],                               group: "catalogo" },
+  // Operaciones
+  { key: "guias",         label: "Guías de Despacho",   subtitle: "Crear y rastrear envíos",                            href: "/guias",          icon: Truck,            roles: ["admin", "secretaria", "bodega", "director", "vendedor"],       group: "operaciones" },
+  { key: "cheques",       label: "Cheques",             subtitle: "Control de cheques por cobrar",                      href: "/cheques",        icon: FileText,         roles: ["admin", "secretaria", "director"],                             group: "operaciones" },
+  { key: "reclamos",      label: "Reclamos",            subtitle: "Reportar y dar seguimiento",                         href: "/reclamos",       icon: AlertTriangle,    roles: ["admin", "secretaria", "director"],                             group: "operaciones" },
+  { key: "packing-lists", label: "Packing Lists",       subtitle: "Índices de bultos por estilo",                       href: "/packing-lists",  icon: ClipboardList,    roles: ["admin", "director", "secretaria", "bodega"],                   group: "operaciones" },
+  { key: "caja",          label: "Caja Menuda",         subtitle: "Registrar gastos del día a día",                     href: "/caja",           icon: Wallet,           roles: ["admin", "director", "secretaria"],                             group: "operaciones" },
+
+  // Reportes
+  { key: "cxc",           label: "Cuentas por Cobrar",  subtitle: "Quién debe, cuánto y desde cuándo",                  href: "/admin",          icon: CircleDollarSign, roles: ["admin", "director", "vendedor"],                               group: "reportes" },
+  { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",                    href: "/ventas",         icon: TrendingUp,       roles: ["admin", "director"],                                           group: "reportes" },
+  { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)",href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria", "director"],                             group: "reportes" },
+  { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones de empleados",               href: "/prestamos",      icon: HandCoins,        roles: ["admin", "director", "contabilidad"],                           group: "reportes" },
+  { key: "directorio",    label: "Directorio",          subtitle: "Clientes y contactos",                               href: "/directorio",     icon: Contact,          roles: ["admin", "director", "secretaria", "vendedor"],                 group: "reportes" },
+
+  // Catálogos
+  { key: "catalogos",     label: "Catálogos",           subtitle: "Reebok, Joybees",                                    href: "/catalogos/marcas",icon: BookOpen,        roles: ["admin", "director", "secretaria", "vendedor", "bodega"],       group: "catalogos" },
+  { key: "camisetas",     label: "Camisetas Selección", subtitle: "Pedidos y stock",                                    href: "/camisetas",      icon: Shirt,            roles: ["admin", "director", "vendedor"],                               group: "catalogos" },
+
+  // Sistema
+  { key: "upload",        label: "Actualizar Datos",    subtitle: "Subir archivos de Switch Soft",                      href: "/upload",         icon: RefreshCw,        roles: ["admin", "director", "secretaria"],                             group: "sistema" },
+  { key: "usuarios",      label: "Usuarios",            subtitle: "Gestión de usuarios y permisos",                     href: "/admin/usuarios", icon: Users,            roles: ["admin"],                                                       group: "sistema" },
 ];
 
 /** Lista de keys de todos los módulos del sistema. */
@@ -73,10 +100,23 @@ export function getVisibleModules(role: string, fgModules?: string[] | null): Ap
   return ALL_MODULES.filter(m => m.roles.includes(role));
 }
 
-export const GROUP_ORDER: ModuleGroup[] = ["dia", "consulta", "catalogo", "admin"];
+/** Filtra los grupos visibles: solo aparecen los grupos que tienen al menos
+ *  un módulo visible para el rol. */
+export function getVisibleGroups(role: string, fgModules?: string[] | null): AppGroup[] {
+  const visible = getVisibleModules(role, fgModules);
+  const seen = new Set(visible.map(m => m.group));
+  return GROUPS.filter(g => seen.has(g.key));
+}
+
+/** Módulos visibles dentro de un grupo dado. */
+export function getModulesInGroup(group: ModuleGroup, role: string, fgModules?: string[] | null): AppModule[] {
+  return getVisibleModules(role, fgModules).filter(m => m.group === group);
+}
+
+export const GROUP_ORDER: ModuleGroup[] = ["operaciones", "reportes", "catalogos", "sistema"];
 export const GROUP_LABELS: Record<ModuleGroup, { title: string; description: string }> = {
-  dia:      { title: "Día a día",             description: "Lo que usas todos los días" },
-  consulta: { title: "Consultas y reportes",  description: "Información cuando la necesites" },
-  catalogo: { title: "Catálogos",             description: "Productos y pedidos" },
-  admin:    { title: "Administración",        description: "Configuración del sistema" },
+  operaciones: { title: "Operaciones", description: "Lo que usas todos los días" },
+  reportes:    { title: "Reportes",    description: "Información cuando la necesites" },
+  catalogos:   { title: "Catálogos",   description: "Productos y pedidos" },
+  sistema:     { title: "Sistema",     description: "Configuración y administración" },
 };
