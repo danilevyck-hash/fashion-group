@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal } from "@/components/ui";
+import { ALL_MODULES } from "@/lib/modules";
 import XLSX from "xlsx-js-style";
 
 interface RolePermission {
@@ -15,23 +16,8 @@ interface RolePermission {
 }
 
 // Lista visible en el panel de admin para asignar permisos por rol.
-// Debe coincidir con ALL_MODULES de src/lib/modules.ts.
-const MODULES = [
-  { key: "cxc", label: "CXC (Cuentas por Cobrar)" },
-  { key: "guias", label: "Guías de Transporte" },
-  { key: "caja", label: "Caja Menuda" },
-  { key: "directorio", label: "Directorio de Clientes" },
-  { key: "reclamos", label: "Reclamos a Proveedores" },
-  { key: "prestamos", label: "Préstamos a Colaboradores" },
-  { key: "ventas", label: "Ventas Mensuales" },
-  { key: "cheques", label: "Cheques Posfechados" },
-  { key: "upload", label: "Carga de Archivos" },
-  { key: "reebok", label: "Catálogo Reebok" },
-  { key: "camisetas", label: "Camisetas Selección" },
-  { key: "marketing", label: "Marketing (gastos compartidos)" },
-  { key: "packing-lists", label: "Packing Lists" },
-  { key: "catalogos", label: "Catálogos (Reebok, Joybees)" },
-];
+// Derivada de ALL_MODULES (src/lib/modules.ts) — fuente única de verdad.
+const MODULES = ALL_MODULES.map(m => ({ key: m.key, label: m.label }));
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Administrador",

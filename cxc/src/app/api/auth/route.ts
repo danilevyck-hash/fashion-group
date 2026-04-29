@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
+import { getDefaultModulesForRole } from "@/lib/modules";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 
@@ -81,15 +82,7 @@ export async function POST(req: NextRequest) {
           } catch { /* use defaults below if table missing */ }
 
           if (modules.length === 0) {
-            const ALL = ["cxc","guias","caja","directorio","reclamos","prestamos","ventas","upload","cheques","reebok","camisetas","marketing","packing-lists","catalogos"];
-            const DEFAULTS: Record<string, string[]> = {
-              admin: ALL, director: ALL,
-              contabilidad: ["prestamos"],
-              secretaria: ["upload","guias","caja","reclamos","cheques","directorio","packing-lists","marketing","catalogos"],
-              vendedor: ["catalogos","reebok","cxc","directorio","camisetas","guias"],
-              bodega: ["guias","packing-lists"],
-            };
-            modules = DEFAULTS[user.role] || [];
+            modules = getDefaultModulesForRole(user.role);
           }
 
           // Per-user config (empresa restrictions, readonly flags)
