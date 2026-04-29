@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { getBultoSize } from "@/lib/joybees-bulto";
 
 export interface JoybeesProduct {
   id: string;
@@ -17,7 +18,7 @@ export interface JoybeesProduct {
   created_at: string;
 }
 
-const BULTO_SIZE = 12;
+const BULTO_SIZE = getBultoSize();
 
 interface JoybeesProductCardProps {
   product: JoybeesProduct;

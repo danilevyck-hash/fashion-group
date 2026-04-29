@@ -496,35 +496,46 @@ function ImportSection({
     showToast("Plantilla descargada");
   }
 
-  function handleFile(file: File) {
+  async function handleFile(file: File) {
     setImportResult(null);
     setParsed(null);
     setPreview(null);
     setValidationErrors([]);
     setValidationWarnings([]);
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        const existingSkus = new Set(companyProducts.map((p) => p.sku).filter(Boolean) as string[]);
-        const result = validateCsvImport(text, existingSkus);
+    try {
+      const lower = file.name.toLowerCase();
+      const isExcel = lower.endsWith(".xlsx") || lower.endsWith(".xls");
+      let text: string;
 
-        setValidationErrors(result.errors);
-        setValidationWarnings(result.warnings);
-
-        if (result.rows.length > 0) {
-          setParsed(result.rows);
-        }
-
-        if (result.errors.length === 0 && result.summary) {
-          setPreview({ updated: result.summary.update, created: result.summary.create, zeroed: result.summary.zero });
-        }
-      } catch {
-        showToast("Error al leer el archivo");
+      if (isExcel) {
+        const XLSX = (await import("xlsx-js-style")).default;
+        const wb = XLSX.read(new Uint8Array(await file.arrayBuffer()), { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        text = XLSX.utils.sheet_to_csv(ws);
+      } else {
+        const buf = await file.arrayBuffer();
+        let utf = new TextDecoder("utf-8").decode(buf);
+        if (utf.includes("�")) utf = new TextDecoder("latin1").decode(buf);
+        text = utf;
       }
-    };
-    reader.readAsText(file);
+
+      const existingSkus = new Set(companyProducts.map((p) => p.sku).filter(Boolean) as string[]);
+      const result = validateCsvImport(text, existingSkus);
+
+      setValidationErrors(result.errors);
+      setValidationWarnings(result.warnings);
+
+      if (result.rows.length > 0) {
+        setParsed(result.rows);
+      }
+
+      if (result.errors.length === 0 && result.summary) {
+        setPreview({ updated: result.summary.update, created: result.summary.create, zeroed: result.summary.zero });
+      }
+    } catch {
+      showToast("Error al leer el archivo");
+    }
   }
 
   async function handleConfirmImport() {
@@ -591,7 +602,7 @@ function ImportSection({
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
         </svg>
         <p className="text-sm text-gray-500">Subir archivo {title}</p>
-        <p className="text-xs text-gray-400 mt-1">Arrastra un .csv o haz click</p>
+        <p className="text-xs text-gray-400 mt-1">Arrastra un .csv, .xlsx o .xls — o haz click</p>
       </div>
       <input
         ref={fileRef}

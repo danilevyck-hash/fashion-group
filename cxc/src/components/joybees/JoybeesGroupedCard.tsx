@@ -3,14 +3,17 @@
 import { useState, useEffect, useRef } from "react";
 import { JoybeesProduct } from "./JoybeesProductCard";
 import { GroupedProduct } from "./groupByModel";
+import { getBultoSize } from "@/lib/joybees-bulto";
+import BultosBadge from "@/components/shared/BultosBadge";
 
-const BULTO_SIZE = 12;
+const BULTO_SIZE = getBultoSize();
 
 interface JoybeesGroupedCardProps {
   group: GroupedProduct;
   cartMap: Map<string, number>;
   onQtyChange: (productId: string, qty: number, product: JoybeesProduct) => void;
   disabled?: boolean;
+  showBultos?: boolean;
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -31,8 +34,9 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export default function JoybeesGroupedCard({
-  group, cartMap, onQtyChange, disabled,
+  group, cartMap, onQtyChange, disabled, showBultos,
 }: JoybeesGroupedCardProps) {
+  const groupStock = group.variants.reduce((s, v) => s + (v.product.stock || 0), 0);
   const [imageStatus, setImageStatus] = useState<"loading" | "loaded" | "error">("loading");
   const [showLightbox, setShowLightbox] = useState(false);
 
@@ -183,10 +187,13 @@ export default function JoybeesGroupedCard({
                   </span>
                   <span className="text-[10px] text-[#404041]/40">/unidad</span>
                 </div>
-                <div className="flex items-baseline gap-1.5 mt-0.5">
-                  <span className="text-[11px] text-[#404041]/50 font-medium">Bulto de {BULTO_SIZE}</span>
-                  <span className="text-[11px] text-[#404041]/30">&middot;</span>
-                  <span className="text-[11px] text-[#404041]/50 font-semibold tabular-nums">${bultoTotal.toFixed(2)}/bulto</span>
+                <div className="flex items-baseline justify-between gap-1.5 mt-0.5">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-[11px] text-[#404041]/50 font-medium">Bulto de {BULTO_SIZE}</span>
+                    <span className="text-[11px] text-[#404041]/30">&middot;</span>
+                    <span className="text-[11px] text-[#404041]/50 font-semibold tabular-nums">${bultoTotal.toFixed(2)}/bulto</span>
+                  </div>
+                  {showBultos && <BultosBadge stock={groupStock} bultoSize={BULTO_SIZE} />}
                 </div>
               </>
             )}

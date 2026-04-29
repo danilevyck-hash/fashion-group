@@ -36,20 +36,32 @@ export interface AppModule {
 }
 
 export const ALL_MODULES: AppModule[] = [
-  { key: "cxc",           label: "Cuentas por Cobrar",  subtitle: "Quién debe, cuánto y desde cuándo", href: "/admin",          icon: CircleDollarSign, roles: ["admin", "secretaria", "director", "vendedor"],                 group: "dia" },
-  { key: "upload",        label: "Actualizar Datos",    subtitle: "Subir archivos de Switch Soft",     href: "/upload",         icon: RefreshCw,        roles: ["admin", "secretaria"],                                         group: "dia" },
+  { key: "cxc",           label: "Cuentas por Cobrar",  subtitle: "Quién debe, cuánto y desde cuándo", href: "/admin",          icon: CircleDollarSign, roles: ["admin", "director", "vendedor"],                               group: "dia" },
+  { key: "upload",        label: "Actualizar Datos",    subtitle: "Subir archivos de Switch Soft",     href: "/upload",         icon: RefreshCw,        roles: ["admin", "director", "secretaria"],                             group: "dia" },
   { key: "guias",         label: "Guías de Despacho",   subtitle: "Crear y rastrear envíos",           href: "/guias",          icon: Truck,            roles: ["admin", "secretaria", "bodega", "director", "vendedor"],       group: "dia" },
-  { key: "caja",          label: "Caja Menuda",         subtitle: "Registrar gastos del día a día",    href: "/caja",           icon: Wallet,           roles: ["admin", "secretaria"],                                         group: "consulta" },
-  { key: "directorio",    label: "Directorio",          subtitle: "Clientes y contactos",              href: "/directorio",     icon: Contact,          roles: ["admin", "secretaria", "director", "contabilidad", "vendedor"], group: "consulta" },
+  { key: "caja",          label: "Caja Menuda",         subtitle: "Registrar gastos del día a día",    href: "/caja",           icon: Wallet,           roles: ["admin", "director", "secretaria"],                             group: "consulta" },
+  { key: "directorio",    label: "Directorio",          subtitle: "Clientes y contactos",              href: "/directorio",     icon: Contact,          roles: ["admin", "director", "secretaria", "vendedor"],                 group: "consulta" },
   { key: "cheques",       label: "Cheques",             subtitle: "Control de cheques por cobrar",     href: "/cheques",        icon: FileText,         roles: ["admin", "secretaria", "director"],                             group: "dia" },
-  { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones",           href: "/prestamos",      icon: HandCoins,        roles: ["admin", "contabilidad"],                                       group: "consulta" },
+  { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones de empleados", href: "/prestamos",   icon: HandCoins,        roles: ["admin", "director", "contabilidad"],                           group: "consulta" },
   { key: "reclamos",      label: "Reclamos",            subtitle: "Reportar y dar seguimiento",        href: "/reclamos",       icon: AlertTriangle,    roles: ["admin", "secretaria", "director"],                             group: "dia" },
-  { key: "packing-lists", label: "Packing Lists",       subtitle: "Índices de bultos por estilo",      href: "/packing-lists",  icon: ClipboardList,    roles: ["admin", "secretaria", "bodega", "director", "vendedor"],       group: "dia" },
-  { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",   href: "/ventas",         icon: TrendingUp,       roles: ["admin", "director", "contabilidad"],                           group: "consulta" },
-  { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas",       href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria", "director"],                             group: "dia" },
-  { key: "catalogos",     label: "Catálogos",           subtitle: "Reebok, Joybees",                   href: "/catalogos",      icon: BookOpen,         roles: ["admin", "vendedor", "cliente", "secretaria"],                  group: "catalogo" },
-  { key: "camisetas",     label: "Camisetas Selección", subtitle: "Pedidos y stock",                   href: "/camisetas",      icon: Shirt,            roles: ["admin", "vendedor"],                                           group: "catalogo" },
+  { key: "packing-lists", label: "Packing Lists",       subtitle: "Índices de bultos por estilo",      href: "/packing-lists",  icon: ClipboardList,    roles: ["admin", "director", "secretaria", "bodega"],                   group: "dia" },
+  { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",   href: "/ventas",         icon: TrendingUp,       roles: ["admin", "director"],                                           group: "consulta" },
+  { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)", href: "/marketing", icon: Megaphone,    roles: ["admin", "secretaria", "director"],                             group: "dia" },
+  { key: "catalogos",     label: "Catálogos",           subtitle: "Reebok, Joybees",                   href: "/catalogos",      icon: BookOpen,         roles: ["admin", "director", "secretaria", "vendedor", "bodega"],       group: "catalogo" },
+  { key: "camisetas",     label: "Camisetas Selección", subtitle: "Pedidos y stock",                   href: "/camisetas",      icon: Shirt,            roles: ["admin", "director", "vendedor"],                               group: "catalogo" },
 ];
+
+/** Lista de keys de todos los módulos del sistema. */
+export const ALL_MODULE_KEYS: string[] = ALL_MODULES.map(m => m.key);
+
+/** Devuelve los módulos por defecto para un rol, derivado de `roles[]` por módulo.
+ *  Admin recibe todo. Para otros roles, retorna las keys de los módulos cuyo
+ *  `roles[]` incluye ese rol. Esta es la única fuente de verdad para defaults
+ *  cuando role_permissions no responde. */
+export function getDefaultModulesForRole(role: string): string[] {
+  if (role === "admin") return ALL_MODULE_KEYS;
+  return ALL_MODULES.filter(m => m.roles.includes(role)).map(m => m.key);
+}
 
 /** Filtra módulos visibles para un rol. Si hay fgModules (permisos custom),
  *  prevalece sobre el default por rol. */

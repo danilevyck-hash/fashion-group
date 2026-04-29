@@ -7,6 +7,7 @@ import { Modal, ConfirmModal } from "@/components/ui";
 
 import { useCajaState } from "./hooks/useCajaState";
 import PeriodoList from "./components/PeriodoList";
+import "./skin.css";
 
 export default function CajaPage() {
   const router = useRouter();
@@ -37,18 +38,20 @@ export default function CajaPage() {
   return (
     <div>
       <AppHeader module="Caja Menuda" />
-      <PeriodoList
-        periodos={periodos}
-        loading={loading}
-        error={error}
-        hasOpenPeriod={hasOpenPeriod}
-        role={role}
-        onCreatePeriodo={createPeriodo}
-        onLoadDetail={(id) => router.push(`/caja/${id}`)}
-        onPrintPeriodo={(id) => router.push(`/caja/${id}/imprimir`)}
-        onClosePeriodo={requestClosePeriodo}
-        onDeletePeriodo={requestDeletePeriodo}
-      />
+      <div className="skin-caja min-h-screen">
+        <PeriodoList
+          periodos={periodos}
+          loading={loading}
+          error={error}
+          hasOpenPeriod={hasOpenPeriod}
+          role={role}
+          onCreatePeriodo={createPeriodo}
+          onLoadDetail={(id) => router.push(`/caja/${id}`)}
+          onPrintPeriodo={(id) => router.push(`/caja/${id}/imprimir`)}
+          onClosePeriodo={requestClosePeriodo}
+          onDeletePeriodo={requestDeletePeriodo}
+        />
+      </div>
       <Modal
         open={showNewPeriodoModal}
         onClose={() => setShowNewPeriodoModal(false)}

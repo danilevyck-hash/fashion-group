@@ -5,7 +5,7 @@ import { requireRole } from '@/lib/requireRole'
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ['admin', 'secretaria', 'upload'])
+  const auth = requireRole(req, ['admin', 'secretaria'])
   if (auth instanceof NextResponse) return auth
   const formData = await req.formData()
   const file = formData.get('file') as File

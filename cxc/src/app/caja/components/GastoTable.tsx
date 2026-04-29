@@ -24,6 +24,44 @@ interface Props {
   nuevoHref?: string;
 }
 
+/* Curated dot colors per common category — fall back to stone-400 for the rest. */
+const CAT_COLORS: Record<string, string> = {
+  "Alimentación": "#0E7490", // cyan-700
+  "Alimentacion": "#0E7490",
+  "Transporte": "#0F766E", // teal-700
+  "Otros": "#78716C", // stone-500
+  "Sin categoría": "#A8A29E", // stone-400
+  "Varios": "#78716C",
+};
+function catColor(cat: string | undefined | null) {
+  if (!cat) return "#A8A29E";
+  return CAT_COLORS[cat] ?? "#78716C";
+}
+
+function CategoryDot({ categoria }: { categoria: string }) {
+  return (
+    <span
+      className="inline-flex items-center gap-2 text-[12.5px]"
+      style={{ color: "var(--caja-fg-default)" }}
+    >
+      <span
+        className="inline-block rounded-full"
+        style={{ width: 6, height: 6, background: catColor(categoria) }}
+      />
+      {categoria}
+    </span>
+  );
+}
+
+function PlusIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
 function Chip({
   label,
   amount,
@@ -38,14 +76,23 @@ function Chip({
   return (
     <button
       onClick={onClick}
-      className={`snap-start shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full border text-xs font-medium transition ${
-        active
-          ? "bg-black text-white border-black"
-          : "bg-white text-gray-700 border-gray-200 hover:border-gray-400"
-      }`}
+      className="snap-start shrink-0 inline-flex items-center gap-2 whitespace-nowrap px-3 py-1.5 rounded-full text-[12px] font-medium transition-all"
+      style={{
+        background: active ? "var(--caja-stone-950)" : "#fff",
+        color: active ? "#fff" : "var(--caja-fg-default)",
+        border: `1px solid ${active ? "var(--caja-stone-950)" : "var(--caja-border-default)"}`,
+        fontFamily: "var(--caja-font-sans)",
+      }}
     >
-      {label}{" "}
-      <span className={`tabular-nums ${active ? "opacity-80" : "text-gray-500"}`}>
+      <span>{label}</span>
+      <span
+        className="caja-mono"
+        style={{
+          fontSize: 11,
+          color: active ? "rgba(255,255,255,0.7)" : "var(--caja-fg-muted)",
+          fontWeight: 400,
+        }}
+      >
         ${fmt(amount)}
       </span>
     </button>
@@ -120,31 +167,41 @@ export default function GastoTable({
 
   // Desktop column count (excluding actions/⋯).
   const dataCols = 6 + (showFiscal ? 2 : 0); // Fecha, Desc, Prov, Resp, Cat, (Sub, ITBMS,) Total
-  const totalColSpan = 5 + (showFiscal ? 0 : 0); // first 5 cols before Total break
+  const totalColSpan = 5; // first 5 cols before Sub/ITBMS/Total break
 
   return (
-    <div className="mb-10">
-      <div className="flex items-center justify-between mb-4">
-        <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400">
-          Gastos
+    <div className="mb-10 mt-8">
+      <div className="flex items-end justify-between mb-3.5 gap-4">
+        <div>
+          <h2
+            className="caja-display-sm"
+            style={{ fontSize: 22, color: "var(--caja-fg-strong)", margin: 0 }}
+          >
+            Gastos
+          </h2>
+          <p
+            className="text-xs mt-1"
+            style={{ color: "var(--caja-fg-muted)" }}
+          >
+            {gastos.length} {gastos.length === 1 ? "registro" : "registros"} ·
+            {" "}
+            <span className="caja-mono">${fmt(grandTotal)}</span> total
+          </p>
         </div>
         {nuevoHref && (
           <Link
             href={nuevoHref}
-            className="bg-black text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-1.5"
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 h-9 rounded-md transition-transform active:scale-[0.97]"
+            style={{ background: "var(--caja-accent)", color: "#fff" }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            Nuevo gasto
+            <PlusIcon /> Nuevo gasto
           </Link>
         )}
       </div>
 
       {/* Category chips */}
       {gastos.length > 0 && (
-        <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-2 mb-4 -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-2 mb-3.5 -mx-5 px-5 sm:mx-0 sm:px-0">
           <Chip
             label="Todas"
             amount={grandTotal}
@@ -175,13 +232,20 @@ export default function GastoTable({
             {sortedGastos.map((g) => (
               <div
                 key={g.id}
-                className={`border border-gray-200 rounded-lg p-4 ${recentlyAddedIds.has(g.id) ? "new-row-highlight" : ""}`}
+                className={`rounded-lg p-4 ${recentlyAddedIds.has(g.id) ? "new-row-highlight" : ""}`}
+                style={{
+                  background: "var(--caja-bg-surface)",
+                  border: "1px solid var(--caja-border-subtle)",
+                }}
               >
                 <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <p className="text-sm font-semibold truncate flex-1">
+                  <p
+                    className="text-sm font-medium truncate flex-1"
+                    style={{ color: "var(--caja-fg-strong)" }}
+                  >
                     {g.descripcion || g.nombre || "—"}
                   </p>
-                  <p className="text-sm font-semibold tabular-nums whitespace-nowrap">
+                  <p className="caja-money caja-money-strong text-sm whitespace-nowrap">
                     ${fmt(g.total)}
                   </p>
                   {isOpen && (
@@ -190,45 +254,68 @@ export default function GastoTable({
                     </div>
                   )}
                 </div>
-                <p className="text-xs text-gray-500 mb-0.5">
-                  {g.categoria || "Varios"}
-                  {g.responsable && ` · ${g.responsable}`}
-                </p>
-                <p className="text-[11px] text-gray-400">
+                <div className="mb-1">
+                  <CategoryDot categoria={g.categoria || "Varios"} />
+                  {g.responsable && (
+                    <span className="text-xs ml-2" style={{ color: "var(--caja-fg-muted)" }}>
+                      · {g.responsable}
+                    </span>
+                  )}
+                </div>
+                <p
+                  className="text-[11px] caja-mono"
+                  style={{ color: "var(--caja-fg-subtle)" }}
+                >
                   {fmtDate(g.fecha)}
                   {g.proveedor && ` · ${g.proveedor}`}
                 </p>
               </div>
             ))}
-            <div className="border-t border-gray-300 pt-3 flex items-center justify-between">
-              <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">
-                Total
+            <div
+              className="pt-3 flex items-center justify-between"
+              style={{ borderTop: "1px solid var(--caja-border-default)" }}
+            >
+              <span className="caja-eyebrow">Total</span>
+              <span className="caja-money caja-money-strong text-sm">
+                ${fmt(totalGastado)}
               </span>
-              <span className="text-sm font-semibold tabular-nums">${fmt(totalGastado)}</span>
             </div>
           </>
         )}
       </div>
 
       {/* Desktop table */}
-      <div className="hidden md:block">
+      <div
+        className="hidden md:block overflow-hidden"
+        style={{
+          background: "var(--caja-bg-surface)",
+          border: "1px solid var(--caja-border-subtle)",
+          borderRadius: 8,
+        }}
+      >
         <ScrollableTable minWidth={700}>
           <table className="w-full text-sm">
-            <thead className="sticky top-0 bg-white z-10">
-              <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
-                <th className="text-left py-3 px-4 font-normal">Fecha</th>
-                <th className="text-left py-3 px-4 font-normal">Descripción</th>
-                <th className="text-left py-3 px-4 font-normal">Proveedor</th>
-                <th className="text-left py-3 px-4 font-normal">Responsable</th>
-                <th className="text-left py-3 px-4 font-normal">Categoría</th>
+            <thead>
+              <tr
+                className="caja-eyebrow"
+                style={{
+                  background: "var(--caja-stone-100)",
+                  borderBottom: "1px solid var(--caja-border-subtle)",
+                }}
+              >
+                <th className="text-left py-2.5 px-4 font-medium">Fecha</th>
+                <th className="text-left py-2.5 px-4 font-medium">Descripción</th>
+                <th className="text-left py-2.5 px-4 font-medium">Proveedor</th>
+                <th className="text-left py-2.5 px-4 font-medium">Responsable</th>
+                <th className="text-left py-2.5 px-4 font-medium">Categoría</th>
                 {showFiscal && (
                   <>
-                    <th className="text-right py-3 px-4 font-normal">Sub-total</th>
-                    <th className="text-right py-3 px-4 font-normal">ITBMS</th>
+                    <th className="text-right py-2.5 px-4 font-medium">Sub-total</th>
+                    <th className="text-right py-2.5 px-4 font-medium">ITBMS</th>
                   </>
                 )}
-                <th className="text-right py-3 px-4 font-normal">Total</th>
-                {isOpen && <th className="w-10 py-3 px-2 font-normal"></th>}
+                <th className="text-right py-2.5 px-4 font-medium">Total</th>
+                {isOpen && <th className="w-10 py-2.5 px-2 font-medium" />}
               </tr>
             </thead>
             <tbody>
@@ -243,74 +330,85 @@ export default function GastoTable({
                 </tr>
               ) : (
                 <>
-                  {sortedGastos.map((g) =>
+                  {sortedGastos.map((g, idx) =>
                     editingGastoId === g.id ? (
-                      <tr key={g.id} className="border-b border-gray-200 bg-gray-50">
-                        <td className="py-2 pr-1">
+                      <tr
+                        key={g.id}
+                        style={{
+                          borderBottom: idx < sortedGastos.length - 1 ? "1px solid var(--caja-stone-100)" : 0,
+                          background: "var(--caja-bg-page)",
+                        }}
+                      >
+                        <td className="py-2 pr-1 px-4">
                           <input
                             type="date"
                             value={editGasto.fecha || ""}
                             onChange={(e) => setEditGasto({ ...editGasto, fecha: e.target.value })}
-                            className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"
+                            className="w-full caja-mono py-1 text-xs outline-none bg-transparent"
+                            style={{ borderBottom: "1px solid var(--caja-border-default)" }}
                           />
                         </td>
-                        <td className="py-2 pr-1">
+                        <td className="py-2 pr-1 px-4">
                           <input
                             type="text"
                             value={editGasto.descripcion || ""}
                             onChange={(e) => setEditGasto({ ...editGasto, descripcion: e.target.value })}
-                            className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"
+                            className="w-full py-1 text-xs outline-none bg-transparent"
+                            style={{ borderBottom: "1px solid var(--caja-border-default)" }}
                           />
                         </td>
-                        <td className="py-2 pr-1">
+                        <td className="py-2 pr-1 px-4">
                           <input
                             type="text"
                             value={editGasto.proveedor || ""}
                             onChange={(e) => setEditGasto({ ...editGasto, proveedor: e.target.value })}
-                            className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"
+                            className="w-full py-1 text-xs outline-none bg-transparent"
+                            style={{ borderBottom: "1px solid var(--caja-border-default)" }}
                           />
                         </td>
-                        <td className="py-2 pr-1">
+                        <td className="py-2 pr-1 px-4">
                           <AutocompleteInput
                             value={editGasto.responsable || ""}
                             onChange={(v) => setEditGasto({ ...editGasto, responsable: v })}
                             options={responsables}
                             placeholder="Responsable"
-                            className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"
+                            className="w-full py-1 text-xs outline-none bg-transparent"
                           />
                         </td>
-                        <td className="py-2 pr-1">
+                        <td className="py-2 pr-1 px-4">
                           <AutocompleteInput
                             value={editGasto.categoria || "Varios"}
                             onChange={(v) => setEditGasto({ ...editGasto, categoria: v })}
                             options={categorias}
                             placeholder="Categoría"
-                            className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent"
+                            className="w-full py-1 text-xs outline-none bg-transparent"
                           />
                         </td>
                         {showFiscal && (
                           <>
-                            <td className="py-2 pr-1">
+                            <td className="py-2 pr-1 px-4">
                               <input
                                 type="number"
                                 step="0.01"
                                 value={editGasto.subtotal ?? ""}
                                 onChange={(e) => setEditGasto({ ...editGasto, subtotal: parseFloat(e.target.value) || 0 })}
-                                className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent text-right"
+                                className="w-full caja-mono py-1 text-xs outline-none bg-transparent text-right"
+                                style={{ borderBottom: "1px solid var(--caja-border-default)" }}
                               />
                             </td>
-                            <td className="py-2 pr-1">
+                            <td className="py-2 pr-1 px-4">
                               <input
                                 type="number"
                                 step="0.01"
                                 value={editGasto.itbms ?? ""}
                                 onChange={(e) => setEditGasto({ ...editGasto, itbms: parseFloat(e.target.value) || 0 })}
-                                className="w-full border-b border-gray-200 py-1 text-xs outline-none bg-transparent text-right"
+                                className="w-full caja-mono py-1 text-xs outline-none bg-transparent text-right"
+                                style={{ borderBottom: "1px solid var(--caja-border-default)" }}
                               />
                             </td>
                           </>
                         )}
-                        <td className="py-2 text-right tabular-nums text-xs font-medium">
+                        <td className="py-2 px-4 text-right caja-money caja-money-strong text-xs">
                           $
                           {fmt(
                             (parseFloat(String(editGasto.subtotal)) || 0) +
@@ -319,10 +417,18 @@ export default function GastoTable({
                         </td>
                         {isOpen && (
                           <td className="py-2 px-2 text-right text-xs whitespace-nowrap">
-                            <button onClick={onSaveEdit} className="text-gray-500 hover:text-black mr-2">
+                            <button
+                              onClick={onSaveEdit}
+                              className="mr-2 transition-colors"
+                              style={{ color: "var(--caja-accent)" }}
+                            >
                               Guardar
                             </button>
-                            <button onClick={() => setEditingGastoId(null)} className="text-gray-300 hover:text-black">
+                            <button
+                              onClick={() => setEditingGastoId(null)}
+                              className="transition-colors"
+                              style={{ color: "var(--caja-fg-subtle)" }}
+                            >
                               ×
                             </button>
                           </td>
@@ -331,25 +437,59 @@ export default function GastoTable({
                     ) : (
                       <tr
                         key={g.id}
-                        className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${recentlyAddedIds.has(g.id) ? "new-row-highlight" : ""}`}
+                        className={`transition-colors ${recentlyAddedIds.has(g.id) ? "new-row-highlight" : ""}`}
+                        style={{
+                          borderBottom: idx < sortedGastos.length - 1 ? "1px solid var(--caja-stone-100)" : 0,
+                          minHeight: 52,
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--caja-bg-page)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "")}
                       >
-                        <td className="py-3 px-4 text-gray-500">{fmtDate(g.fecha)}</td>
-                        <td className="py-3 px-4">{g.descripcion || g.nombre}</td>
-                        <td className="py-3 px-4 text-gray-500">
+                        <td
+                          className="py-3 px-4 caja-mono"
+                          style={{ color: "var(--caja-fg-default)" }}
+                        >
+                          {fmtDate(g.fecha)}
+                        </td>
+                        <td
+                          className="py-3 px-4"
+                          style={{ color: "var(--caja-fg-strong)" }}
+                        >
+                          {g.descripcion || g.nombre}
+                        </td>
+                        <td className="py-3 px-4" style={{ color: "var(--caja-fg-default)" }}>
                           {g.proveedor || "—"}
                           {g.nro_factura && (
-                            <div className="text-[11px] text-gray-400">#{g.nro_factura}</div>
+                            <div
+                              className="caja-mono text-[11px] mt-0.5"
+                              style={{ color: "var(--caja-fg-subtle)" }}
+                            >
+                              #{g.nro_factura}
+                            </div>
                           )}
                         </td>
-                        <td className="py-3 px-4 text-gray-500">{g.responsable || "—"}</td>
-                        <td className="py-3 px-4 text-gray-500">{g.categoria || "Varios"}</td>
+                        <td className="py-3 px-4" style={{ color: "var(--caja-fg-default)" }}>
+                          {g.responsable || "—"}
+                        </td>
+                        <td className="py-3 px-4">
+                          <CategoryDot categoria={g.categoria || "Varios"} />
+                        </td>
                         {showFiscal && (
                           <>
-                            <td className="py-3 px-4 text-right tabular-nums">${fmt(g.subtotal)}</td>
-                            <td className="py-3 px-4 text-right tabular-nums text-gray-500">${fmt(g.itbms)}</td>
+                            <td className="py-3 px-4 text-right caja-money">
+                              ${fmt(g.subtotal)}
+                            </td>
+                            <td
+                              className="py-3 px-4 text-right caja-money"
+                              style={{ color: "var(--caja-fg-muted)" }}
+                            >
+                              ${fmt(g.itbms)}
+                            </td>
                           </>
                         )}
-                        <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(g.total)}</td>
+                        <td className="py-3 px-4 text-right caja-money caja-money-strong">
+                          ${fmt(g.total)}
+                        </td>
                         {isOpen && (
                           <td className="py-2 px-2 text-right">
                             <OverflowMenu items={rowMenuItems(g)} />
@@ -359,20 +499,26 @@ export default function GastoTable({
                     ),
                   )}
                   {/* Totals row */}
-                  <tr className="border-t border-gray-300">
+                  <tr style={{ borderTop: "1px solid var(--caja-border-default)" }}>
                     <td
                       colSpan={totalColSpan}
-                      className="py-3 px-4 text-right text-[11px] uppercase tracking-[0.05em] text-gray-400"
+                      className="py-3 px-4 text-right caja-eyebrow"
                     >
                       Total
                     </td>
                     {showFiscal && (
                       <>
-                        <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(totalSubtotal)}</td>
-                        <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(totalItbms)}</td>
+                        <td className="py-3 px-4 text-right caja-money caja-money-strong">
+                          ${fmt(totalSubtotal)}
+                        </td>
+                        <td className="py-3 px-4 text-right caja-money caja-money-strong">
+                          ${fmt(totalItbms)}
+                        </td>
                       </>
                     )}
-                    <td className="py-3 px-4 text-right tabular-nums font-semibold">${fmt(totalGastado)}</td>
+                    <td className="py-3 px-4 text-right caja-money caja-money-strong">
+                      ${fmt(totalGastado)}
+                    </td>
                     {isOpen && <td />}
                   </tr>
                 </>
@@ -380,22 +526,20 @@ export default function GastoTable({
             </tbody>
           </table>
         </ScrollableTable>
-        {gastos.length > 0 && (
-          <p className="sm:hidden text-[10px] text-gray-400 mt-2 text-center">
-            Desliza &rarr; para ver más columnas
-          </p>
-        )}
       </div>
 
       {/* Fiscal toggle */}
       {gastos.length > 0 && (
         <div className="mt-4 flex items-center justify-end">
-          <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer select-none">
+          <label
+            className="flex items-center gap-2 text-xs cursor-pointer select-none"
+            style={{ color: "var(--caja-fg-muted)" }}
+          >
             <input
               type="checkbox"
               checked={showFiscal}
               onChange={(e) => setShowFiscal(e.target.checked)}
-              className="accent-black"
+              style={{ accentColor: "var(--caja-accent)" }}
             />
             Ver desglose fiscal (Sub-total + ITBMS)
           </label>

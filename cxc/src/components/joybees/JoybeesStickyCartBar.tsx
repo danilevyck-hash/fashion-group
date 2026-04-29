@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { JoybeesProduct } from "./JoybeesProductCard";
+import { getBultoSize } from "@/lib/joybees-bulto";
 
-const BULTO_SIZE = 12;
+const BULTO_SIZE = getBultoSize();
 
 interface CartItem {
   product_id: string;

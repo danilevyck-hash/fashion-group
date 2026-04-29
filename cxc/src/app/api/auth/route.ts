@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
+import { getDefaultModulesForRole } from "@/lib/modules";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
 
   const { password } = await req.json();
 
-  // 1. Check fg_users table (supports both hashed and plaintext during migration)
+  // 1. Check fg_users table (bcrypt hash required)
   try {
     const { data: users } = await supabaseServer
       .from("fg_users")
@@ -56,9 +57,12 @@ export async function POST(req: NextRequest) {
 
     if (users) {
       for (const user of users) {
-        const match = isHash(user.password)
-          ? (await bcrypt.compare(password, user.password) || await bcrypt.compare(password.toLowerCase(), user.password))
-          : password.toLowerCase() === user.password.toLowerCase();
+        if (!isHash(user.password)) {
+          console.warn(`[auth] User "${user.name}" has non-bcrypt password — login skipped. Re-hash required.`);
+          continue;
+        }
+        const match = await bcrypt.compare(password, user.password)
+          || await bcrypt.compare(password.toLowerCase(), user.password);
 
         if (match) {
           // Módulos por rol — fuente única: role_permissions.
@@ -78,15 +82,7 @@ export async function POST(req: NextRequest) {
           } catch { /* use defaults below if table missing */ }
 
           if (modules.length === 0) {
-            const ALL = ["cxc","guias","caja","directorio","reclamos","prestamos","ventas","upload","cheques","reebok","catalogo_reebok","camisetas","marketing","packing-lists","catalogos"];
-            const DEFAULTS: Record<string, string[]> = {
-              admin: ALL, director: ALL,
-              contabilidad: ["prestamos"],
-              secretaria: ["upload","guias","caja","reclamos","cheques","directorio","packing-lists","marketing","catalogos"],
-              vendedor: ["catalogos","reebok","cxc","directorio","camisetas","guias"],
-              bodega: ["guias","packing-lists"],
-            };
-            modules = DEFAULTS[user.role] || [];
+            modules = getDefaultModulesForRole(user.role);
           }
 
           // Per-user config (empresa restrictions, readonly flags)

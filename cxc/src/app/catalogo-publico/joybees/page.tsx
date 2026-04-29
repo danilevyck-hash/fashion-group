@@ -9,8 +9,9 @@ import JoybeesFilters from "@/components/joybees/JoybeesFilters";
 import JoybeesGroupedCard from "@/components/joybees/JoybeesGroupedCard";
 import JoybeesStickyCartBar from "@/components/joybees/JoybeesStickyCartBar";
 import { groupByModel, getDisplaySection, DisplaySection, SECTION_ORDER, SECTION_LABELS, GroupedProduct } from "@/components/joybees/groupByModel";
+import { getBultoSize } from "@/lib/joybees-bulto";
 
-const BULTO_SIZE = 12;
+const BULTO_SIZE = getBultoSize();
 
 interface CartItem {
   product_id: string;

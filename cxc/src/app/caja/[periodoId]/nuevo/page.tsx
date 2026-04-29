@@ -8,6 +8,7 @@ import AppHeader from "@/components/AppHeader";
 import PeriodoDetailHeader from "../../components/PeriodoDetailHeader";
 import GastoForm, { normalizeStr } from "../../components/GastoForm";
 import { CajaPeriodo, CajaResponsable } from "../../components/types";
+import "../../skin.css";
 
 export default function NuevoGastoPageWrapper() {
   return (
@@ -217,79 +218,184 @@ function NuevoGastoPage() {
   return (
     <div>
       <AppHeader module="Caja Menuda" breadcrumbs={headerBreadcrumbs} />
-      <PeriodoDetailHeader
-        current={periodo}
-        totalGastado={totalGastado}
-        saldo={saldo}
-        pctUsed={pctUsed}
-        onBack={backToDetail}
-      />
-
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-4 pb-24">
-        <button
-          onClick={backToDetail}
-          className="text-sm text-gray-400 hover:text-black transition mb-6 block"
-        >
-          ← Cancelar
-        </button>
-
-        <h2 className="text-lg font-medium mb-6">Agregar gasto</h2>
-
-        {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-
-        <GastoForm
-          values={formValues}
-          setters={formSetters}
-          subtotalNum={subtotalNum}
-          totalNum={totalNum}
-          categorias={categorias}
-          responsablesCatalog={responsablesCatalog}
-          showManageCat={showManageCat}
-          newCatName={newCatName}
-          isOwner={isOwner}
-          setCategorias={setCategorias}
-          setShowManageCat={setShowManageCat}
-          setNewCatName={setNewCatName}
+      <div className="skin-caja min-h-screen">
+        <PeriodoDetailHeader
+          current={periodo}
+          totalGastado={totalGastado}
+          saldo={saldo}
+          pctUsed={pctUsed}
+          onBack={backToDetail}
         />
 
-        <div className="flex flex-col sm:flex-row gap-3 mt-10">
+        <div className="max-w-3xl mx-auto px-5 sm:px-9 pt-6 pb-28">
           <button
-            onClick={() => save({ andNew: false })}
-            disabled={!canSave}
-            className="flex-1 bg-black text-white px-6 py-3 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 min-h-[48px]"
+            onClick={backToDetail}
+            className="inline-flex items-center gap-1 text-xs mb-5 transition-colors"
+            style={{ color: "var(--caja-fg-muted)" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--caja-fg-strong)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--caja-fg-muted)")}
           >
-            {addingGasto ? "Guardando..." : "Guardar gasto"}
+            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            Cancelar
           </button>
-          <button
-            onClick={() => save({ andNew: true })}
-            disabled={!canSave}
-            className="flex-1 border border-gray-200 text-gray-700 px-6 py-3 rounded-md text-sm hover:border-gray-400 hover:bg-gray-50 active:bg-gray-100 transition-all disabled:opacity-40 min-h-[48px]"
+
+          <div
+            className="rounded-xl"
+            style={{
+              background: "var(--caja-bg-surface)",
+              border: "1px solid var(--caja-border-subtle)",
+            }}
           >
-            Guardar y nuevo
-          </button>
+            <div
+              className="px-6 py-5 sm:px-7 sm:py-5"
+              style={{ borderBottom: "1px solid var(--caja-border-subtle)" }}
+            >
+              <div className="caja-eyebrow mb-1.5">
+                Período Nº {periodo.numero} · Caja Menuda
+              </div>
+              <h2
+                className="caja-display-sm"
+                style={{ fontSize: 24, margin: 0 }}
+              >
+                Nuevo gasto
+              </h2>
+              <p
+                className="text-sm mt-1.5"
+                style={{ color: "var(--caja-fg-muted)" }}
+              >
+                Registra un comprobante del fondo fijo. Los campos con * son obligatorios.
+              </p>
+            </div>
+
+            <div className="px-6 py-7 sm:px-7 sm:py-7">
+              {error && (
+                <p
+                  className="text-sm mb-4 px-3 py-2 rounded-md"
+                  style={{
+                    color: "var(--caja-danger-onSoft)",
+                    background: "var(--caja-danger-soft)",
+                    border: "1px solid var(--caja-danger-border)",
+                  }}
+                >
+                  {error}
+                </p>
+              )}
+
+              <GastoForm
+                values={formValues}
+                setters={formSetters}
+                subtotalNum={subtotalNum}
+                totalNum={totalNum}
+                categorias={categorias}
+                responsablesCatalog={responsablesCatalog}
+                showManageCat={showManageCat}
+                newCatName={newCatName}
+                isOwner={isOwner}
+                setCategorias={setCategorias}
+                setShowManageCat={setShowManageCat}
+                setNewCatName={setNewCatName}
+              />
+            </div>
+
+            <div
+              className="px-6 py-4 sm:px-7 flex flex-col-reverse sm:flex-row sm:justify-between sm:items-center gap-3"
+              style={{
+                background: "var(--caja-bg-page)",
+                borderTop: "1px solid var(--caja-border-subtle)",
+                borderBottomLeftRadius: 12,
+                borderBottomRightRadius: 12,
+              }}
+            >
+              <div
+                className="text-xs"
+                style={{ color: "var(--caja-fg-muted)" }}
+              >
+                {canSave ? (
+                  <>
+                    Total a registrar:{" "}
+                    <span
+                      className="caja-mono caja-money-strong"
+                      style={{ color: "var(--caja-fg-strong)", fontWeight: 600 }}
+                    >
+                      ${fmt(totalNum)}
+                    </span>
+                  </>
+                ) : (
+                  "Completa los campos obligatorios."
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={backToDetail}
+                  className="text-sm font-medium px-3.5 h-9 rounded-md transition-colors"
+                  style={{
+                    background: "#fff",
+                    color: "var(--caja-fg-default)",
+                    border: "1px solid var(--caja-border-default)",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--caja-bg-page)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => save({ andNew: true })}
+                  disabled={!canSave}
+                  className="text-sm font-medium px-3.5 h-9 rounded-md transition-colors disabled:opacity-40"
+                  style={{
+                    background: "#fff",
+                    color: "var(--caja-fg-default)",
+                    border: "1px solid var(--caja-border-default)",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (canSave) e.currentTarget.style.background = "var(--caja-bg-page)";
+                  }}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "#fff")}
+                >
+                  Guardar y nuevo
+                </button>
+                <button
+                  onClick={() => save({ andNew: false })}
+                  disabled={!canSave}
+                  className="text-sm font-medium px-3.5 h-9 rounded-md transition-transform active:scale-[0.97] disabled:opacity-40"
+                  style={{ background: "var(--caja-accent)", color: "#fff" }}
+                >
+                  {addingGasto ? "Guardando..." : "Guardar gasto"}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
       {pendingNeg && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" onClick={cancelNeg}>
-          <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-medium mb-3">¿Continuar con saldo negativo?</h3>
-            <p className="text-sm text-gray-800 mb-2">
-              Este gasto deja el fondo en <strong>${fmt(pendingNeg.saldoFuturo)}</strong> (fondo ${fmt(pendingNeg.fondo)}, gastos ${fmt(pendingNeg.gastado)}, nuevo ${fmt(pendingNeg.nuevo)}).
+          <div className="skin-caja bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4" style={{ border: "1px solid var(--caja-border-default)" }} onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-medium mb-3" style={{ color: "var(--caja-fg-strong)" }}>¿Continuar con saldo negativo?</h3>
+            <p className="text-sm mb-2" style={{ color: "var(--caja-fg-default)" }}>
+              Este gasto deja el fondo en <strong className="caja-mono">${fmt(pendingNeg.saldoFuturo)}</strong> (fondo <span className="caja-mono">${fmt(pendingNeg.fondo)}</span>, gastos <span className="caja-mono">${fmt(pendingNeg.gastado)}</span>, nuevo <span className="caja-mono">${fmt(pendingNeg.nuevo)}</span>).
             </p>
-            <p className="text-xs text-gray-500 mb-6">
+            <p className="text-xs mb-6" style={{ color: "var(--caja-fg-muted)" }}>
               Considera solicitar reabastecimiento antes de seguir gastando.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={confirmNeg}
-                className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium bg-red-600 text-white hover:bg-red-700 active:scale-[0.97] transition-all min-h-[44px]"
+                className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium text-white active:scale-[0.97] transition-all min-h-[44px]"
+                style={{ background: "var(--caja-danger)" }}
               >
                 Sí, guardar igual
               </button>
               <button
                 onClick={cancelNeg}
-                className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 active:bg-gray-100 transition-all min-h-[44px]"
+                className="flex-1 px-4 py-2.5 rounded-md text-sm transition-all min-h-[44px]"
+                style={{
+                  background: "#fff",
+                  color: "var(--caja-fg-default)",
+                  border: "1px solid var(--caja-border-default)",
+                }}
               >
                 Cancelar
               </button>

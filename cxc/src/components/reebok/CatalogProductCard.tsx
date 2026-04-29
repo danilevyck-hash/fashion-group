@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Product } from "@/components/reebok/supabase";
 import { getBultoSize } from "@/lib/reebok-bulto";
+import BultosBadge from "@/components/shared/BultosBadge";
 
 const COLOR_DOT_MAP: Record<string, string> = {
   black: "#000", negro: "#000", white: "#fff", blanco: "#fff",
@@ -183,10 +184,13 @@ export default function CatalogProductCard({
               )}
             </div>
             {product.price != null && (
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-[11px] text-[#1A2656]/50 font-medium">Bulto de {bultoSize}</span>
-                <span className="text-[11px] text-[#1A2656]/30">&middot;</span>
-                <span className="text-[11px] text-[#1A2656]/50 font-semibold tabular-nums">${bultoTotal.toFixed(2)}/bulto</span>
+              <div className="flex items-baseline justify-between gap-1.5 mt-0.5">
+                <div className="flex items-baseline gap-1.5">
+                  <span className="text-[11px] text-[#1A2656]/50 font-medium">Bulto de {bultoSize}</span>
+                  <span className="text-[11px] text-[#1A2656]/30">&middot;</span>
+                  <span className="text-[11px] text-[#1A2656]/50 font-semibold tabular-nums">${bultoTotal.toFixed(2)}/bulto</span>
+                </div>
+                {showBultos && <BultosBadge stock={product._stock} bultoSize={bultoSize} />}
               </div>
             )}
           </div>
