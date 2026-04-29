@@ -19,17 +19,6 @@ interface RolePermission {
 // Derivada de ALL_MODULES (src/lib/modules.ts) — fuente única de verdad.
 const MODULES = ALL_MODULES.map(m => ({ key: m.key, label: m.label }));
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: "Administrador",
-  director: "Director",
-  contabilidad: "Contabilidad",
-  upload: "Secretaria",
-  vendedor: "Vendedor",
-  bodega: "Bodega",
-  secretaria: "Secretaria",
-  cliente: "Cliente",
-};
-
 export default function UsuariosPage() {
   const router = useRouter();
   const { authChecked } = useAuth({ moduleKey: "admin", allowedRoles: ["admin"] });
@@ -38,9 +27,6 @@ export default function UsuariosPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
   const [expandedRole, setExpandedRole] = useState<string | null>(null);
-
-  // Danger zone
-  const [showDeactivate, setShowDeactivate] = useState<string | null>(null);
 
   // Sessions
   interface Session { id: string; user_name: string; user_role: string; ip_address: string | null; last_seen: string; created_at: string; revoked: boolean; }
@@ -124,29 +110,6 @@ export default function UsuariosPage() {
     setSaving(null);
   }
 
-  async function toggleActivo(role: string) {
-    const roleData = roles.find(r => r.role === role);
-    if (!roleData) return;
-
-    const newActivo = !roleData.activo;
-    setSaving(role);
-    try {
-      const res = await fetch("/api/admin/usuarios", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role, modulos: roleData.modulos, activo: newActivo }),
-      });
-      if (res.ok) {
-        setRoles(prev => prev.map(r => r.role === role ? { ...r, activo: newActivo } : r));
-        showToast(newActivo ? "Rol reactivado" : "Rol desactivado");
-      } else {
-        showToast("Error al guardar");
-      }
-    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
-    setSaving(null);
-    setShowDeactivate(null);
-  }
-
   function exportUsersExcel() {
     const rows: string[][] = [["FASHION GROUP \u2014 Usuarios del Sistema"], [], ["Nombre", "Rol", "Empresa", "Estado"]];
     for (const u of fgUsers) {
@@ -195,12 +158,6 @@ export default function UsuariosPage() {
     } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
     loadFgUsers();
   }
-  // Helper: get modules for a role from loaded roles data
-  function getModulesForRole(roleName: string): string[] {
-    const r = roles.find(r => r.role === roleName);
-    return r ? r.modulos : [];
-  }
-
   async function revokeSession(sessionId: string) {
     setRevokingSession(sessionId);
     try {
@@ -251,7 +208,7 @@ export default function UsuariosPage() {
       <div className="max-w-5xl mx-auto px-6 py-8">
         <div className="mb-6">
           <h1 className="text-xl font-semibold">Usuarios y Permisos</h1>
-          <p className="text-sm text-gray-400 mt-1">Control de acceso por rol — cada rol usa una contraseña compartida</p>
+          <p className="text-sm text-gray-400 mt-1">Gestión de usuarios y permisos por rol</p>
         </div>
 
         {/* ══ NEW: fg_users section ══ */}
@@ -332,7 +289,6 @@ export default function UsuariosPage() {
                     <option value="vendedor">vendedor — Catálogo y CXC</option>
                     <option value="contabilidad">contabilidad — Préstamos y ventas</option>
                     <option value="bodega">bodega — Despacho de guías</option>
-                    <option value="cliente">cliente — Catálogo Reebok</option>
                   </select>
                   {editUserId === currentUserId && uRole !== "admin" && (
                     <p className="text-xs text-amber-600 mt-1">¡Cuidado! Cambiar tu propio rol te quitará acceso de administrador.</p>
@@ -342,23 +298,7 @@ export default function UsuariosPage() {
                   <label className="text-[11px] text-gray-400 uppercase block mb-1">Empresa (opcional)</label>
                   <input value={uCompany} onChange={e => setUCompany(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
                 </div>
-                <div>
-                  <label className="text-[11px] text-gray-400 uppercase block mb-1">Módulos del rol {ROLE_LABELS[uRole] || uRole}</label>
-                  <div className="grid grid-cols-2 gap-1 mt-1">
-                    {MODULES.map(m => {
-                      const has = uRole === "admin" || getModulesForRole(uRole).includes(m.key);
-                      return (
-                        <div key={m.key} className={`flex items-center gap-2 px-2 py-1.5 rounded text-xs ${has ? "bg-green-50 text-green-700" : "text-gray-300"}`}>
-                          <span className={`w-3.5 h-3.5 rounded flex items-center justify-center text-[10px] ${has ? "bg-green-600 text-white" : "bg-gray-100"}`}>
-                            {has ? "✓" : ""}
-                          </span>
-                          {m.label}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="text-[10px] text-gray-400 mt-2">Los módulos se configuran en Roles y Permisos</p>
-                </div>
+                <p className="text-[11px] text-gray-400 pt-1">Los permisos se configuran en la sección &ldquo;Roles y Permisos&rdquo; abajo.</p>
               </div>
               <div className="flex gap-2 mt-6">
                 <button onClick={() => setShowUserModal(false)} className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
@@ -440,8 +380,7 @@ export default function UsuariosPage() {
         <hr className="mb-8 border-gray-200" />
 
         <h2 className="text-sm font-medium uppercase tracking-wide text-gray-400 mb-4">Roles y Permisos</h2>
-        <p className="text-xs text-gray-400 mb-1">Los módulos configurados aquí determinan el acceso de todos los usuarios con ese rol.</p>
-        <p className="text-xs text-gray-400 mt-1 mb-6">Las contraseñas de rol son compartidas por todos los usuarios del mismo rol. Las contraseñas de usuario (arriba) son individuales y tienen prioridad al iniciar sesión.</p>
+        <p className="text-xs text-gray-400 mb-6">Configura qué módulos puede ver cada rol del sistema. Los cambios afectan a todos los usuarios con ese rol.</p>
 
         {loading ? (
           <div className="py-20 flex justify-center"><svg className="animate-spin h-6 w-6 text-gray-300" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
@@ -451,7 +390,7 @@ export default function UsuariosPage() {
               const isExpanded = expandedRole === r.role;
               const isAdmin = r.role === "admin";
               return (
-                <div key={r.role} className={`border rounded-lg overflow-hidden transition ${!r.activo ? "opacity-50 border-gray-200" : "border-gray-200"}`}>
+                <div key={r.role} className="border border-gray-200 rounded-lg overflow-hidden transition">
                   {/* Role header */}
                   <button
                     onClick={() => setExpandedRole(isExpanded ? null : r.role)}
@@ -463,7 +402,6 @@ export default function UsuariosPage() {
                         r.role === "director" ? "bg-gray-700" :
                         r.role === "contabilidad" ? "bg-blue-600" :
                         r.role === "vendedor" ? "bg-emerald-600" :
-                        r.role === "cliente" ? "bg-orange-500" :
                         "bg-gray-400"
                       }`}>
                         {r.label[0]}
@@ -474,7 +412,6 @@ export default function UsuariosPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      {!r.activo && <span className="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded-full">Desactivado</span>}
                       <span className="text-xs text-gray-400">{r.modulos.length} módulo{r.modulos.length !== 1 ? "s" : ""}</span>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}><polyline points="6 9 12 15 18 9"/></svg>
                     </div>
@@ -483,55 +420,41 @@ export default function UsuariosPage() {
                   {/* Expanded content */}
                   {isExpanded && (
                     <div className="px-5 pb-5 border-t border-gray-200">
-                      {/* Module checkboxes */}
-                      <div className="mt-4 mb-2 flex items-center justify-between">
-                        <span className="text-xs text-gray-400 uppercase tracking-wide">Módulos con acceso</span>
-                        {!isAdmin && (
-                          <button onClick={() => selectAll(r.role)} className="text-xs text-blue-600 hover:underline">
-                            {MODULES.every(m => r.modulos.includes(m.key)) ? "Desmarcar todos" : "Seleccionar todos"}
-                          </button>
-                        )}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {MODULES.map((mod) => {
-                          const checked = r.modulos.includes(mod.key);
-                          const disabled = isAdmin || saving === r.role;
-                          return (
-                            <label key={mod.key} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition ${
-                              disabled ? "opacity-60 cursor-not-allowed" : checked ? "bg-green-50" : "hover:bg-gray-50"
-                            }`}>
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                disabled={disabled}
-                                onChange={() => toggleModule(r.role, mod.key)}
-                                className="accent-black w-4 h-4"
-                              />
-                              <span className="text-sm">{mod.label}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                      {isAdmin && (
-                        <p className="text-xs text-gray-400 mt-2">El rol admin siempre tiene acceso a todos los módulos</p>
-                      )}
-
-                      {/* Danger zone — deactivate (not for admin) */}
-                      {!isAdmin && (
-                        <div className="mt-4 border border-red-200 bg-red-50/50 rounded-lg px-4 py-3">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <div className="text-xs font-medium text-red-700">{r.activo ? "Desactivar Rol" : "Reactivar Rol"}</div>
-                              <div className="text-[10px] text-red-400">{r.activo ? "La contraseña dejará de funcionar" : "Reactivar acceso para este rol"}</div>
-                            </div>
-                            <button
-                              onClick={() => r.activo ? setShowDeactivate(r.role) : toggleActivo(r.role)}
-                              className={`px-3 py-1.5 text-xs rounded-full transition ${r.activo ? "bg-red-600 text-white hover:bg-red-700" : "bg-green-600 text-white hover:bg-green-700"}`}
-                            >
-                              {r.activo ? "Desactivar" : "Reactivar"}
+                      {isAdmin ? (
+                        <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+                          <p className="text-sm text-gray-700">
+                            El rol <strong>Administrador</strong> tiene acceso completo a todos los módulos del sistema. Esta configuración no se puede modificar.
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="mt-4 mb-2 flex items-center justify-between">
+                            <span className="text-xs text-gray-400 uppercase tracking-wide">Módulos con acceso</span>
+                            <button onClick={() => selectAll(r.role)} className="text-xs text-blue-600 hover:underline">
+                              {MODULES.every(m => r.modulos.includes(m.key)) ? "Desmarcar todos" : "Seleccionar todos"}
                             </button>
                           </div>
-                        </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                            {MODULES.map((mod) => {
+                              const checked = r.modulos.includes(mod.key);
+                              const disabled = saving === r.role;
+                              return (
+                                <label key={mod.key} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition ${
+                                  disabled ? "opacity-60 cursor-not-allowed" : checked ? "bg-green-50" : "hover:bg-gray-50"
+                                }`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={disabled}
+                                    onChange={() => toggleModule(r.role, mod.key)}
+                                    className="accent-black w-4 h-4"
+                                  />
+                                  <span className="text-sm">{mod.label}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
@@ -542,22 +465,6 @@ export default function UsuariosPage() {
         )}
 
       </div>
-
-      {/* Deactivate confirmation modal */}
-      {showDeactivate && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
-            <h2 className="font-medium mb-2 text-red-700">Desactivar Rol</h2>
-            <p className="text-sm text-gray-500 mb-4">
-              ¿Desactivar el rol <strong>{ROLE_LABELS[showDeactivate] || showDeactivate}</strong>? Los usuarios con esta contraseña no podrán acceder al sistema.
-            </p>
-            <div className="flex gap-2">
-              <button onClick={() => setShowDeactivate(null)} className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
-              <button onClick={() => toggleActivo(showDeactivate)} className="flex-1 py-2 bg-red-600 text-white rounded-full text-sm hover:bg-red-700 transition">Desactivar</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <ConfirmModal
         open={!!deactivateTarget}
