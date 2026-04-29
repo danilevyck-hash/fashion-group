@@ -2,6 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback, ReactNode, createContext, useContext } from "react";
 
+export { Avatar } from "./ui/Avatar";
+export type { AvatarProps } from "./ui/Avatar";
+export { Chip } from "./ui/Chip";
+export type { ChipProps } from "./ui/Chip";
+
 // ── ESTÉTICA 5: Skeleton Loaders ──
 export function SkeletonTable({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
   return (
