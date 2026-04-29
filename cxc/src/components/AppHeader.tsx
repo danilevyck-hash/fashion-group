@@ -5,7 +5,7 @@ import FGLogo from "@/components/FGLogo";
 import SearchBar from "@/components/SearchBar";
 import NotificationCenter from "@/components/NotificationCenter";
 import { getModuleColor } from "@/lib/moduleColors";
-import { ALL_MODULES, getVisibleModules } from "@/lib/modules";
+import { ALL_MODULES, getVisibleGroups } from "@/lib/modules";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin", secretaria: "Secretaria", bodega: "Bodega",
@@ -36,7 +36,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
     } catch { /* ignore */ }
   }, []);
 
-  const visibleNav = userRole ? getVisibleModules(userRole, fgModules) : [];
+  const visibleNav = userRole ? getVisibleGroups(userRole, fgModules) : [];
 
   function handleLogout() {
     fetch("/api/auth", { method: "DELETE" }).catch(() => {});
@@ -163,14 +163,14 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
                 </svg>
                 Inicio
               </button>
-              {visibleNav.map(m => {
-                const active = pathname.startsWith(m.href);
-                const Icon = m.icon;
+              {visibleNav.map(g => {
+                const active = pathname === g.href || pathname.startsWith(g.href + "/");
+                const Icon = g.icon;
                 return (
-                  <button key={m.key} onClick={() => { router.push(m.href); setDrawerOpen(false); }}
+                  <button key={g.key} onClick={() => { router.push(g.href); setDrawerOpen(false); }}
                     className={`w-full flex items-center gap-3 px-5 py-3 text-sm transition-all ${active ? "bg-gray-50 text-black font-medium" : "text-gray-600 hover:bg-gray-50 active:bg-gray-100"}`}>
                     <Icon size={16} strokeWidth={1.5} />
-                    {m.label}
+                    {g.label}
                   </button>
                 );
               })}

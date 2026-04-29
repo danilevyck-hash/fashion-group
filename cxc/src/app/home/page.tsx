@@ -1,33 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
-import ReportExport from "./components/ReportExport";
-import ActivityLog from "./components/ActivityLog";
 import SearchBar from "@/components/SearchBar";
-import { useBadges } from "@/lib/hooks/useBadges";
-import { cacheSet, cacheGet, CACHE_KEYS } from "@/lib/offlineCache";
-import { useOnline } from "@/lib/OnlineContext";
-import { ALL_MODULES, GROUP_LABELS, GROUP_ORDER } from "@/lib/modules";
-
-// SVG icon components for a premium internal-tool feel
-const MODULE_ICONS: Record<string, React.ReactNode> = {
-  cxc: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 9h20"/><path d="M10 9v12"/></svg>,
-  upload: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>,
-  guias: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5a2 2 0 01-2 2h-1"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/><path d="M8 16H16"/></svg>,
-  caja: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>,
-  directorio: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>,
-  cheques: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 15l3 3 5-6"/><line x1="6" y1="9" x2="18" y2="9"/></svg>,
-  prestamos: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 15H7a4 4 0 00-4 4v2"/><path d="M21 11l-3 3-3-3"/><path d="M18 8v6"/><circle cx="9" cy="7" r="4"/></svg>,
-  reclamos: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
-  ventas: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>,
-  catalogos: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
-  "packing-lists": <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/><path d="M13 13h4"/><path d="M13 17h4"/></svg>,
-  camisetas: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 00-1.18 5.53L8 10l-3.46-1A10 10 0 002.06 13h4.19L8 16.54 6.54 20.5a10 10 0 003.22 1.36L12 18l2.24 3.86a10 10 0 003.22-1.36L16 16.54 17.75 13h4.19a10 10 0 00-2.48-4L16 10l-2.82-2.47A10 10 0 0012 2z"/></svg>,
-  marketing: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l18-8v18L3 13z"/><path d="M11 19a3 3 0 01-6 0v-6"/><path d="M18 8v8"/></svg>,
-};
+import { ALL_MODULES, getVisibleGroups, getVisibleModules } from "@/lib/modules";
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -36,42 +13,13 @@ function getGreeting() {
   return "Buenas noches";
 }
 
-function getDateLabel() {
-  const d = new Date();
-  const dias = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
-  const meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
-  return `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`;
-}
-
-export default function PlantillasPage() {
+export default function HomePage() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
   const [role, setRole] = useState("");
   const [userName, setUserName] = useState("");
-  const [userId, setUserId] = useState("");
   const [fgModules, setFgModules] = useState<string[] | null>(null);
-  // Inicializar sincrónicamente desde localStorage si existe — evita layout
-  // shift en la primera render para usuarios con orden custom guardado.
-  const [moduleOrder, setModuleOrder] = useState<string[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const r = sessionStorage.getItem("cxc_role") || "";
-      const saved = localStorage.getItem(`module_order_${r}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch { /* ignore */ }
-    return [];
-  });
-  const [orderLoaded, setOrderLoaded] = useState(false);
-  const [editMode, setEditMode] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
-  const [showActivity, setShowActivity] = useState(false);
-  const badges = useBadges();
-  const isOnline = useOnline();
-  const [statsCached, setStatsCached] = useState(false);
-  const [showFinancials, setShowFinancials] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -80,379 +28,114 @@ export default function PlantillasPage() {
     if (r === "cliente") { router.push("/catalogo/reebok"); return; }
     setRole(r);
     setUserName(sessionStorage.getItem("fg_user_name") || "");
-    setUserId(sessionStorage.getItem("fg_user_id") || "");
     const isDark = localStorage.getItem("fg_dark_mode") === "1";
     setDarkMode(isDark);
     if (isDark) document.documentElement.classList.add("dark");
     else document.documentElement.classList.remove("dark");
 
-    // Load modules from new system
     try {
       const mods = sessionStorage.getItem("fg_modules");
       if (mods) setFgModules(JSON.parse(mods));
-    } catch { console.error('Failed to parse fg_modules'); }
+    } catch { /* ignore */ }
 
     setAuthChecked(true);
   }, [router]);
 
-  // Load saved module order (DB wins sobre localStorage inicial)
-  const loadOrder = useCallback(async () => {
-    const uid = sessionStorage.getItem("fg_user_id");
-    if (uid) {
-      try {
-        const res = await fetch(`/api/user/module-order?userId=${uid}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.module_order?.length) setModuleOrder(data.module_order);
-        }
-      } catch { console.error('Failed to load module order'); }
-    }
-    // Sin userId: ya leímos localStorage en el initializer del useState.
-    setOrderLoaded(true);
-  }, []);
-
-  // Home stats for alerts + KPIs
-  interface HomeStats {
-    vencenHoy: number; vencenEstaSemana: number; prestamosPendientes: number;
-    reclamosViejos: number; reclamosPendientes: number; reclamosResueltosEsteMes: number;
-    cxcStale: boolean; lastUpload: string | null;
-    ventasMes: number; ventasMesLabel?: string; ventasPrev: number;
-    cxcTotal: number; cxcVencida: number;
-    chequesTotalPendiente: number;
-    guiasPendientes: number;
-  }
-  const [stats, setStats] = useState<HomeStats | null>(null);
-  const [statsLoading, setStatsLoading] = useState(true);
-
-  const loadStats = useCallback(async () => {
-    try {
-      const res = await fetch("/api/home-stats");
-      if (res.ok) {
-        const data = await res.json();
-        setStats(data);
-        setStatsCached(false);
-        cacheSet(CACHE_KEYS.HOME_STATS, data);
-      }
-    } catch {
-      const cached = cacheGet<HomeStats>(CACHE_KEYS.HOME_STATS);
-      if (cached) {
-        setStats(cached);
-        setStatsCached(true);
-      }
-    }
-    setStatsLoading(false);
-  }, []);
-
-  // Auto-redirect if user has only 1 module (e.g., Bodega → Guías)
+  // Auto-redirect si user tiene 1 solo modulo (ej: Bodega → Guías)
   useEffect(() => {
     if (!authChecked || !role) return;
-    const isAdm = role === "admin" || role === "director";
-    if (isAdm) return;
+    if (role === "admin" || role === "director") return;
 
-    let keys: string[] = [];
-    if (fgModules && fgModules.length > 0) {
-      keys = fgModules;
-    } else {
-      keys = ALL_MODULES.filter(m => m.roles.includes(role)).map(m => m.key);
-    }
-
-    if (keys.length === 1) {
-      const mod = ALL_MODULES.find(m => m.key === keys[0]);
-      if (mod) { router.push(mod.href); return; }
+    const visible = getVisibleModules(role, fgModules);
+    if (visible.length === 1) {
+      router.push(visible[0].href);
     }
   }, [authChecked, role, fgModules, router]);
 
-  useEffect(() => { if (authChecked) { loadOrder(); loadStats(); } }, [authChecked, loadOrder, loadStats]);
-
-  // Determine visible modules
-  const isAdmin = role === "admin";
-  const visibleKeys = new Set<string>();
-
-  if (isAdmin) {
-    ALL_MODULES.forEach(m => visibleKeys.add(m.key));
-  } else if (fgModules) {
-    // New system: use fg_modules from session
-    fgModules.forEach(k => visibleKeys.add(k));
-  } else {
-    // Legacy: use role-based defaults
-    ALL_MODULES.forEach(m => { if (m.roles.includes(role)) visibleKeys.add(m.key); });
-  }
-
-  // Build ordered list
-  const orderedKeys = [...moduleOrder.filter(k => visibleKeys.has(k))];
-  visibleKeys.forEach(k => { if (!orderedKeys.includes(k)) orderedKeys.push(k); });
-  const visibleModules = orderedKeys.map(k => ALL_MODULES.find(m => m.key === k)!).filter(Boolean);
-
-  // Drag end
-  function onDragEnd(result: DropResult) {
-    if (!result.destination) return;
-    const items = [...orderedKeys];
-    const [moved] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, moved);
-    setModuleOrder(items);
-  }
-
-  async function saveOrder() {
-    setEditMode(false);
-    if (userId) {
-      await fetch("/api/user/module-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, moduleOrder }),
-      });
-    } else {
-      localStorage.setItem(`module_order_${role}`, JSON.stringify(moduleOrder));
-    }
-  }
-
+  const visibleGroups = role ? getVisibleGroups(role, fgModules) : [];
   const displayName = userName || "";
 
+  if (!authChecked) return null;
+
   return (
-    <div className={`min-h-screen ${darkMode ? "bg-gray-950 text-gray-100" : ""}`}>
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
-          <FGLogo variant="horizontal" theme="light" size={30} />
-          <span className={`text-lg font-light truncate max-w-[180px] sm:max-w-none ${darkMode ? "text-gray-100" : "text-gray-800"}`}>{getGreeting()}{displayName ? `, ${displayName}` : ""}</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <button onClick={() => { const next = !darkMode; setDarkMode(next); if (next) { document.documentElement.classList.add("dark"); localStorage.setItem("fg_dark_mode", "1"); } else { document.documentElement.classList.remove("dark"); localStorage.setItem("fg_dark_mode", "0"); } }} className="text-sm text-gray-400 hover:text-black transition px-1">{darkMode ? "☀" : "◑"}</button>
-          <button onClick={() => { sessionStorage.clear(); router.push("/"); }} className="text-sm text-gray-400 hover:text-black transition">Salir</button>
-        </div>
-      </div>
-
-      {/* Global Search — admin, secretaria, director */}
-      {["admin", "secretaria", "director"].includes(role) && (
-        <SearchBar darkMode={darkMode} />
-      )}
-
-      {/* KPI Cards — admin and director only */}
-      {(role === "admin" || role === "director") && (
-        statsLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-6">
-            {[1,2,3].map(i => <div key={i} className="h-20 rounded-lg bg-gray-50 border border-gray-200 animate-pulse" />)}
+    <div className={`min-h-screen ${darkMode ? "bg-gray-950 text-gray-100" : "bg-white"}`}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <FGLogo variant="horizontal" theme="light" size={30} />
+            <span className={`text-lg font-light truncate max-w-[180px] sm:max-w-none ${darkMode ? "text-gray-100" : "text-gray-800"}`}>
+              {getGreeting()}{displayName ? `, ${displayName}` : ""}
+            </span>
           </div>
-        ) : stats ? (
-          <div className="mb-6">
-          {statsCached && <p className="text-xs text-amber-600 mb-1">(datos cacheados)</p>}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {/* Ventas del mes — click to toggle */}
-            <div
-              onClick={() => setShowFinancials(!showFinancials)}
-              className={`rounded-lg p-3 border cursor-pointer transition ${darkMode ? "border-gray-800 bg-gray-900 hover:border-gray-600" : "border-gray-200 bg-white hover:border-gray-300"}`}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                const next = !darkMode;
+                setDarkMode(next);
+                if (next) { document.documentElement.classList.add("dark"); localStorage.setItem("fg_dark_mode", "1"); }
+                else { document.documentElement.classList.remove("dark"); localStorage.setItem("fg_dark_mode", "0"); }
+              }}
+              className="text-sm text-gray-400 hover:text-black transition px-1"
             >
-              <p className="text-xs uppercase tracking-wider text-gray-500">Ventas del mes{stats.ventasMesLabel ? ` (${stats.ventasMesLabel})` : ""}</p>
-              {showFinancials ? (
-                <>
-                  <p className="text-lg font-semibold tabular-nums mt-0.5">${stats.ventasMes > 0 ? (stats.ventasMes / 1000).toFixed(0) + "K" : "—"}</p>
-                  <p className={`text-xs mt-1 ${stats.ventasPrev > 0 && stats.ventasMes >= stats.ventasPrev ? "text-green-600" : stats.ventasPrev > 0 ? "text-red-500" : "text-gray-400"}`}>
-                    {stats.ventasPrev > 0 ? (() => {
-                      const pct = ((stats.ventasMes - stats.ventasPrev) / stats.ventasPrev * 100);
-                      return `vs $${(stats.ventasPrev / 1000).toFixed(0)}K prev (${pct >= 0 ? "+" : ""}${pct.toFixed(0)}%)`;
-                    })() : "—"}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <p className={`text-lg font-semibold tabular-nums mt-0.5 ${darkMode ? "text-gray-600" : "text-gray-300"}`}>••••</p>
-                  <p className={`text-xs mt-1 ${darkMode ? "text-gray-600" : "text-gray-300"}`}>Toca para ver</p>
-                </>
-              )}
-            </div>
-            {/* CxC — click to toggle (shared state) */}
-            <div
-              onClick={() => setShowFinancials(!showFinancials)}
-              className={`rounded-lg p-3 border cursor-pointer transition ${darkMode ? "border-gray-800 bg-gray-900 hover:border-gray-600" : "border-gray-200 bg-white hover:border-gray-300"}`}
+              {darkMode ? "☀" : "◑"}
+            </button>
+            <button
+              onClick={() => { sessionStorage.clear(); router.push("/"); }}
+              className="text-sm text-gray-400 hover:text-black transition"
             >
-              <p className="text-xs uppercase tracking-wider text-gray-500">Cuentas por Cobrar</p>
-              {showFinancials ? (
-                <>
-                  <p className="text-lg font-semibold tabular-nums mt-0.5">${stats.cxcTotal > 0 ? (stats.cxcTotal / 1000).toFixed(0) + "K" : "—"}</p>
-                  {stats.cxcVencida > 0
-                    ? <p className="text-xs text-red-500 mt-1">${(stats.cxcVencida / 1000).toFixed(0)}K vencida</p>
-                    : <p className="text-xs text-green-600 mt-1">Sin vencidos</p>}
-                </>
-              ) : (
-                <>
-                  <p className={`text-lg font-semibold tabular-nums mt-0.5 ${darkMode ? "text-gray-600" : "text-gray-300"}`}>••••</p>
-                  <p className={`text-xs mt-1 ${darkMode ? "text-gray-600" : "text-gray-300"}`}>Toca para ver</p>
-                </>
-              )}
-            </div>
-            {/* Reclamos — always visible */}
-            <div className={`rounded-lg p-3 border ${darkMode ? "border-gray-800 bg-gray-900" : "border-gray-200 bg-white"}`}>
-              <p className="text-xs uppercase tracking-wider text-gray-500">Reclamos</p>
-              <p className="text-lg font-semibold tabular-nums mt-0.5">{stats.reclamosPendientes}</p>
-              <div className="flex items-center gap-2 mt-1">
-                {stats.reclamosViejos > 0 && <span className="text-xs text-red-500">{stats.reclamosViejos} +45d</span>}
-                {stats.reclamosResueltosEsteMes > 0 && <span className="text-xs text-green-600">{stats.reclamosResueltosEsteMes} resueltos</span>}
-                {stats.reclamosViejos === 0 && stats.reclamosResueltosEsteMes === 0 && <span className="text-xs text-gray-300">—</span>}
-              </div>
-            </div>
+              Salir
+            </button>
           </div>
-          </div>
-        ) : null
-      )}
-
-      {/* Export Reports — admin and director */}
-      {(role === "admin" || role === "director") && stats && !statsLoading && <ReportExport stats={stats} darkMode={darkMode} />}
-
-      {/* Activity Log toggle — admin only */}
-      {isAdmin && (
-        <div className="mb-6">
-          <button
-            onClick={() => setShowActivity(!showActivity)}
-            className={`flex items-center gap-2 text-xs px-4 py-2 rounded-md border transition ${
-              showActivity
-                ? darkMode ? "bg-gray-800 border-gray-600 text-white" : "bg-gray-900 text-white border-gray-900"
-                : darkMode ? "border-gray-700 text-gray-400 hover:text-gray-200" : "border-gray-200 text-gray-500 hover:text-gray-800"
-            }`}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/></svg>
-            Actividad
-          </button>
-          {showActivity && (
-            <div className="mt-4">
-              <ActivityLog darkMode={darkMode} />
-            </div>
-          )}
         </div>
-      )}
 
-      {/* Alerts and Pending Actions removed — info shown as module badges instead */}
-
-      {/* Edit toggle */}
-      <div className="flex justify-end mb-2">
-        {editMode ? (
-          <button onClick={saveOrder} className="text-[11px] bg-black text-white px-3 py-1 rounded-md hover:bg-gray-800 transition">Guardar</button>
-        ) : (
-          <button onClick={() => setEditMode(true)} className="text-[11px] text-gray-400 hover:text-black transition">Editar orden</button>
+        {/* Global Search — admin, secretaria, director */}
+        {["admin", "secretaria", "director"].includes(role) && (
+          <SearchBar darkMode={darkMode} />
         )}
-      </div>
 
-      {/* Skeleton mientras no tenemos orden cargado — evita layout shift */}
-      {!orderLoaded ? (
-        <div className="space-y-6">
-          {GROUP_ORDER.map((g) => (
-            <div key={g}>
-              <div className="h-4 w-32 bg-gray-100 rounded animate-pulse mb-3" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1.5 sm:gap-2">
-                {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className={`rounded-lg p-3 h-[72px] animate-pulse ${darkMode ? "bg-gray-900 border border-gray-800" : "bg-gray-50 border border-gray-100"}`} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : /* Module grid — grouped when not editing, flat when editing */
-      !editMode ? (
-        // Grouped view
-        <div className="space-y-6">
-          {GROUP_ORDER.map(groupKey => {
-            const groupMods = visibleModules.filter(m => (m as typeof m & { group: string }).group === groupKey);
-            if (groupMods.length === 0) return null;
-            const gl = GROUP_LABELS[groupKey];
+        {/* Group cards — 4 max, una por grupo visible */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          {visibleGroups.map((g) => {
+            const Icon = g.icon;
+            const moduleCount = ALL_MODULES.filter(m => m.group === g.key && (
+              role === "admin" ||
+              (fgModules && fgModules.includes(m.key)) ||
+              (!fgModules && m.roles.includes(role))
+            )).length;
             return (
-              <div key={groupKey}>
-                <div className="mb-2">
-                  <h2 className="text-sm font-semibold">{gl.title}</h2>
-                  <p className="text-[11px] text-gray-400">{gl.description}</p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-1.5 sm:gap-2">
-                  {groupMods.map((mod) => (
-                    <div
-                      key={mod.key}
-                      onClick={() => router.push(mod.href)}
-                      className={`relative border rounded-lg p-2.5 sm:p-3 transition-all duration-150 cursor-pointer select-none hover:shadow-sm hover:border-gray-400 flex items-center gap-3 ${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 bg-white"}`}
-                    >
-                      {(() => {
-                        if (mod.key === "upload" && stats?.cxcStale) {
-                          return (
-                            <span className="absolute top-1.5 right-1.5 bg-amber-500 text-white text-[8px] font-bold px-1.5 h-[16px] rounded-full flex items-center justify-center leading-none">
-                              Nuevo
-                            </span>
-                          );
-                        }
-                        if (mod.key === "reclamos" && stats && stats.reclamosPendientes > 0) {
-                          return (
-                            <span className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[9px] font-bold min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center leading-none">
-                              {stats.reclamosPendientes}
-                            </span>
-                          );
-                        }
-                        return null;
-                      })()}
-                      <div className="flex items-center justify-center w-8 h-8 shrink-0 text-gray-700 dark:text-gray-300">
-                        {MODULE_ICONS[mod.key] || <span className="w-5 h-5 block" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[13px] font-semibold leading-tight truncate">{mod.label}</div>
-                        <div className={`text-[11px] leading-tight mt-0.5 truncate ${darkMode ? "text-gray-500" : "text-gray-400"}`}>{mod.subtitle}</div>
-                      </div>
+              <button
+                key={g.key}
+                onClick={() => router.push(g.href)}
+                className={`text-left rounded-lg p-5 sm:p-6 border transition-all duration-150 hover:shadow-sm ${
+                  darkMode
+                    ? "border-gray-800 bg-gray-900 hover:border-gray-600"
+                    : "border-gray-200 bg-white hover:border-gray-400"
+                }`}
+              >
+                <div className="flex items-center gap-4">
+                  <div className={`flex items-center justify-center w-12 h-12 rounded-lg shrink-0 ${
+                    darkMode ? "bg-gray-800 text-gray-300" : "bg-gray-50 text-gray-700"
+                  }`}>
+                    <Icon size={22} strokeWidth={1.5} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className={`text-base font-semibold leading-tight ${darkMode ? "text-gray-100" : "text-gray-900"}`}>
+                      {g.label}
                     </div>
-                  ))}
+                    <div className={`text-xs mt-1 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
+                      {moduleCount} {moduleCount === 1 ? "módulo" : "módulos"}
+                    </div>
+                  </div>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={darkMode ? "text-gray-600" : "text-gray-300"}>
+                    <path d="M9 18l6-6-6-6"/>
+                  </svg>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
-      ) : (
-        // Flat grid with drag-drop
-        <DragDropContext onDragEnd={onDragEnd}>
-          <Droppable droppableId="modules" direction="vertical">
-            {(provided) => (
-              <div ref={provided.innerRef} {...provided.droppableProps} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-                {visibleModules.map((mod, index) => (
-                  <Draggable key={mod.key} draggableId={mod.key} index={index} isDragDisabled={!editMode}>
-                    {(prov, snapshot) => (
-                      <div
-                        ref={prov.innerRef}
-                        {...prov.draggableProps}
-                        {...(editMode ? prov.dragHandleProps : {})}
-                        onClick={() => { if (!editMode) router.push(mod.href); }}
-                        className={`relative border rounded-lg p-2.5 sm:p-3 transition-all duration-150 cursor-pointer select-none hover:shadow-sm hover:border-gray-400 flex items-center gap-3 ${
-                          snapshot.isDragging ? "border-gray-300 bg-white z-50 shadow-lg" : `${darkMode ? "border-gray-800 hover:border-gray-600 bg-gray-900" : "border-gray-200 bg-white"}`
-                        } ${editMode ? "cursor-grab active:cursor-grabbing" : ""}`}
-                      >
-                        {editMode && (
-                          <span className="absolute top-1.5 right-1.5 text-gray-300 text-xs">⠿</span>
-                        )}
-                        {(() => {
-                          if (mod.key === "upload" && stats?.cxcStale) {
-                            return (
-                              <span className="absolute top-1.5 right-1.5 bg-amber-500 text-white text-[8px] font-bold px-1.5 h-[16px] rounded-full flex items-center justify-center leading-none">
-                                Nuevo
-                              </span>
-                            );
-                          }
-                          if (mod.key === "reclamos" && stats && stats.reclamosPendientes > 0) {
-                            return (
-                              <span className="absolute top-1.5 right-1.5 bg-red-500 text-white text-[9px] font-bold min-w-[16px] h-[16px] px-1 rounded-full flex items-center justify-center leading-none">
-                                {stats.reclamosPendientes}
-                              </span>
-                            );
-                          }
-                          return null;
-                        })()}
-                        <div className="flex items-center justify-center w-8 h-8 shrink-0 text-gray-700 dark:text-gray-300">
-                          {MODULE_ICONS[mod.key] || <span className="w-5 h-5 block" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-[13px] font-semibold leading-tight truncate">{mod.label}</div>
-                          <div className={`text-[11px] leading-tight mt-0.5 truncate ${darkMode ? "text-gray-500" : "text-gray-400"}`}>{mod.subtitle}</div>
-                        </div>
-                      </div>
-                    )}
-                  </Draggable>
-                ))}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
-      )}
-    </div>
+      </div>
     </div>
   );
 }

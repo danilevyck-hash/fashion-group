@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 import { Home } from "lucide-react";
-import { getVisibleModules } from "@/lib/modules";
+import { ALL_MODULES, getVisibleGroups } from "@/lib/modules";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin", secretaria: "Secretaria", bodega: "Bodega",
@@ -44,6 +44,19 @@ function useCollapsedSync(): boolean {
   return collapsed;
 }
 
+/** Devuelve la key del grupo activo para una pathname dada, o null si estamos en /home u otra ruta neutra. */
+function activeGroupForPath(pathname: string): string | null {
+  if (!pathname || pathname === "/home" || pathname === "/") return null;
+  // Match directo a la página de grupo
+  const direct = ["/operaciones", "/reportes", "/catalogos", "/sistema"].find(
+    g => pathname === g || pathname.startsWith(g + "/")
+  );
+  if (direct) return direct.slice(1);
+  // Match via el href del módulo: si pathname empieza con el href de un módulo, retornar su grupo
+  const mod = ALL_MODULES.find(m => pathname.startsWith(m.href));
+  return mod ? mod.group : null;
+}
+
 export default function Sidebar() {
   const pathname = usePathname() || "";
   const router = useRouter();
@@ -68,7 +81,7 @@ export default function Sidebar() {
   if (pathname === "/" || PUBLIC_PATH_PREFIXES.some(p => pathname.startsWith(p))) return null;
   if (!userRole) return null;
 
-  const visibleModules = getVisibleModules(userRole, fgModules);
+  const visibleGroups = getVisibleGroups(userRole, fgModules);
 
   function handleLogout() {
     fetch("/api/auth", { method: "DELETE" }).catch(() => {});
@@ -78,6 +91,7 @@ export default function Sidebar() {
 
   const width = collapsed ? "w-16" : "w-56";
   const homeActive = pathname === "/home";
+  const activeGroup = activeGroupForPath(pathname);
 
   return (
     <aside
@@ -141,14 +155,14 @@ export default function Sidebar() {
           {!collapsed && <span className="truncate">Inicio</span>}
         </button>
         <div className="h-px bg-gray-100 my-1 mx-5" />
-        {visibleModules.map((m) => {
-          const active = pathname.startsWith(m.href) && m.href !== "/home";
-          const Icon = m.icon;
+        {visibleGroups.map((g) => {
+          const active = activeGroup === g.key;
+          const Icon = g.icon;
           return (
             <button
-              key={m.key}
-              onClick={() => router.push(m.href)}
-              title={collapsed ? m.label : undefined}
+              key={g.key}
+              onClick={() => router.push(g.href)}
+              title={collapsed ? g.label : undefined}
               className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-3 px-5"} py-2.5 text-sm transition-all border-l-2 ${
                 active
                   ? "bg-gray-50 text-black font-medium border-l-blue-500"
@@ -156,7 +170,7 @@ export default function Sidebar() {
               }`}
             >
               <Icon size={16} strokeWidth={1.5} />
-              {!collapsed && <span className="truncate">{m.label}</span>}
+              {!collapsed && <span className="truncate">{g.label}</span>}
             </button>
           );
         })}
