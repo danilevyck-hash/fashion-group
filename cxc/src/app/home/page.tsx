@@ -10,6 +10,7 @@ import SearchBar from "@/components/SearchBar";
 import { useBadges } from "@/lib/hooks/useBadges";
 import { cacheSet, cacheGet, CACHE_KEYS } from "@/lib/offlineCache";
 import { useOnline } from "@/lib/OnlineContext";
+import { ALL_MODULES, GROUP_LABELS, GROUP_ORDER } from "@/lib/modules";
 
 // SVG icon components for a premium internal-tool feel
 const MODULE_ICONS: Record<string, React.ReactNode> = {
@@ -28,22 +29,6 @@ const MODULE_ICONS: Record<string, React.ReactNode> = {
   marketing: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l18-8v18L3 13z"/><path d="M11 19a3 3 0 01-6 0v-6"/><path d="M18 8v8"/></svg>,
 };
 
-const ALL_MODULES = [
-  { key: "cxc", label: "Cuentas por Cobrar", subtitle: "Quién debe, cuánto y desde cuándo", href: "/admin", roles: ["admin", "secretaria", "director", "vendedor"], group: "dia" as const },
-  { key: "upload", label: "Actualizar Datos", subtitle: "Subir archivos de Switch Soft", href: "/upload", roles: ["admin", "secretaria"], group: "dia" as const },
-  { key: "guias", label: "Guías de Despacho", subtitle: "Crear y rastrear envíos", href: "/guias", roles: ["admin", "secretaria", "bodega", "director", "vendedor"], group: "dia" as const },
-  { key: "caja", label: "Caja Menuda", subtitle: "Registrar gastos del día a día", href: "/caja", roles: ["admin", "secretaria"], group: "consulta" as const },
-  { key: "directorio", label: "Directorio", subtitle: "Clientes y contactos", href: "/directorio", roles: ["admin", "secretaria", "director", "contabilidad", "vendedor"], group: "consulta" as const },
-  { key: "cheques", label: "Cheques", subtitle: "Control de cheques por cobrar", href: "/cheques", roles: ["admin", "secretaria", "director"], group: "dia" as const },
-  { key: "prestamos", label: "Préstamos", subtitle: "Adelantos y deducciones de empleados", href: "/prestamos", roles: ["admin", "contabilidad"], group: "consulta" as const },
-  { key: "reclamos", label: "Reclamos", subtitle: "Reportar y dar seguimiento", href: "/reclamos", roles: ["admin", "secretaria", "director"], group: "dia" as const },
-  { key: "packing-lists", label: "Packing Lists", subtitle: "Índices de bultos por estilo", href: "/packing-lists", roles: ["admin", "secretaria", "bodega", "director", "vendedor"], group: "dia" as const },
-  { key: "ventas", label: "Ventas", subtitle: "Ver por mes y comparar períodos", href: "/ventas", roles: ["admin", "director", "contabilidad"], group: "consulta" as const },
-  { key: "marketing", label: "Marketing", subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)", href: "/marketing", roles: ["admin", "secretaria", "director"], group: "dia" as const },
-  { key: "catalogos", label: "Catálogos", subtitle: "Reebok, Joybees", href: "/catalogos", roles: ["admin", "vendedor", "cliente", "secretaria"], group: "catalogo" as const },
-  { key: "camisetas", label: "Camisetas Selección", subtitle: "Pedidos y stock", href: "/camisetas", roles: ["admin", "vendedor"], group: "catalogo" as const },
-];
-
 function getGreeting() {
   const h = new Date().getHours();
   if (h >= 6 && h < 12) return "Buenos días";
@@ -57,15 +42,6 @@ function getDateLabel() {
   const meses = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
   return `${dias[d.getDay()]}, ${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`;
 }
-
-type ModuleGroup = "dia" | "consulta" | "catalogo" | "admin";
-const GROUP_LABELS: Record<ModuleGroup, { title: string; description: string }> = {
-  dia: { title: "Día a día", description: "Lo que usas todos los días" },
-  consulta: { title: "Consultas y reportes", description: "Información cuando la necesites" },
-  catalogo: { title: "Catálogos", description: "Productos y pedidos" },
-  admin: { title: "Administración", description: "Configuración del sistema" },
-};
-const GROUP_ORDER: ModuleGroup[] = ["dia", "consulta", "catalogo", "admin"];
 
 export default function PlantillasPage() {
   const router = useRouter();
