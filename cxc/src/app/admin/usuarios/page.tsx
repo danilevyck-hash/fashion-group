@@ -545,92 +545,100 @@ export default function UsuariosPage() {
           })()}
         </section>
 
-        <hr className="mb-8 border-gray-200" />
+        <hr className="mb-8 border-stone-200" />
 
-        <h2 className="text-sm font-medium uppercase tracking-wide text-gray-400 mb-4">Roles y Permisos</h2>
-        <p className="text-xs text-gray-400 mb-6">Configura qué módulos puede ver cada rol del sistema. Los cambios afectan a todos los usuarios con ese rol.</p>
+        <section>
+          <h2 className="text-[11px] font-medium uppercase tracking-[0.12em] text-stone-500 mb-2">Roles y Permisos</h2>
+          <p className="text-xs text-stone-500 mb-6">Configura qué módulos puede ver cada rol del sistema. Los cambios afectan a todos los usuarios con ese rol.</p>
 
-        {loading ? (
-          <div className="py-20 flex justify-center"><svg className="animate-spin h-6 w-6 text-gray-300" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
-        ) : (
-          <div className="space-y-4">
-            {roles.map((r) => {
-              const isExpanded = expandedRole === r.role;
-              const isAdmin = r.role === "admin";
-              return (
-                <div key={r.role} className="border border-gray-200 rounded-lg overflow-hidden transition">
-                  {/* Role header */}
-                  <button
-                    onClick={() => setExpandedRole(isExpanded ? null : r.role)}
-                    className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-medium ${
-                        r.role === "admin" ? "bg-black" :
-                        r.role === "director" ? "bg-gray-700" :
-                        r.role === "contabilidad" ? "bg-blue-600" :
-                        r.role === "vendedor" ? "bg-emerald-600" :
-                        "bg-gray-400"
-                      }`}>
-                        {r.label[0]}
-                      </div>
-                      <div>
-                        <div className="text-sm font-medium">{r.label}</div>
-                        <div className="text-xs text-gray-400">Rol: {r.role}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-gray-400">{r.modulos.length} módulo{r.modulos.length !== 1 ? "s" : ""}</span>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-gray-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}><polyline points="6 9 12 15 18 9"/></svg>
-                    </div>
-                  </button>
-
-                  {/* Expanded content */}
-                  {isExpanded && (
-                    <div className="px-5 pb-5 border-t border-gray-200">
-                      {isAdmin ? (
-                        <div className="mt-4 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-                          <p className="text-sm text-gray-700">
-                            El rol <strong>Administrador</strong> tiene acceso completo a todos los módulos del sistema. Esta configuración no se puede modificar.
-                          </p>
+          {loading ? (
+            <div className="py-20 flex justify-center"><svg className="animate-spin h-6 w-6 text-stone-300" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
+          ) : (
+            <div className="space-y-3">
+              {roles.map((r) => {
+                const isExpanded = expandedRole === r.role;
+                const isAdmin = r.role === "admin";
+                const allChecked = MODULES.every(m => r.modulos.includes(m.key));
+                return (
+                  <div key={r.role} className="border border-stone-200 bg-white rounded-lg overflow-hidden transition">
+                    <button
+                      onClick={() => setExpandedRole(isExpanded ? null : r.role)}
+                      className="w-full flex items-center justify-between px-4 sm:px-5 py-4 hover:bg-stone-50 transition text-left"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <Avatar name={r.label} role={r.role} size="md" />
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-stone-900 truncate">{r.label}</div>
+                          <div className="text-xs text-stone-500">Rol: {r.role}</div>
                         </div>
-                      ) : (
-                        <>
-                          <div className="mt-4 mb-2 flex items-center justify-between">
-                            <span className="text-xs text-gray-400 uppercase tracking-wide">Módulos con acceso</span>
-                            <button onClick={() => selectAll(r.role)} className="text-xs text-blue-600 hover:underline">
-                              {MODULES.every(m => r.modulos.includes(m.key)) ? "Desmarcar todos" : "Seleccionar todos"}
-                            </button>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-xs text-stone-500 tabular-nums">{r.modulos.length} módulo{r.modulos.length !== 1 ? "s" : ""}</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-stone-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}>
+                          <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                      </div>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="px-4 sm:px-5 pb-5 border-t border-stone-100">
+                        {isAdmin ? (
+                          <div className="mt-4 bg-stone-50 border border-teal-100 rounded-lg px-4 py-3 flex items-start gap-3">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-teal-700 shrink-0 mt-0.5">
+                              <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+                            </svg>
+                            <p className="text-sm text-stone-700 leading-relaxed">
+                              El rol <strong className="font-medium text-stone-900">Administrador</strong> tiene acceso completo a todos los módulos del sistema. Esta configuración no se puede modificar.
+                            </p>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                            {MODULES.map((mod) => {
-                              const checked = r.modulos.includes(mod.key);
-                              const disabled = saving === r.role;
-                              return (
-                                <label key={mod.key} className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition ${
-                                  disabled ? "opacity-60 cursor-not-allowed" : checked ? "bg-green-50" : "hover:bg-gray-50"
-                                }`}>
-                                  <input
-                                    type="checkbox"
-                                    checked={checked}
-                                    disabled={disabled}
-                                    onChange={() => toggleModule(r.role, mod.key)}
-                                    className="accent-black w-4 h-4"
-                                  />
-                                  <span className="text-sm">{mod.label}</span>
-                                </label>
-                              );
-                            })}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                        ) : (
+                          <>
+                            <div className="mt-4 mb-3 flex items-center justify-between">
+                              <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-stone-500">Módulos con acceso</span>
+                              <button
+                                onClick={() => selectAll(r.role)}
+                                className="text-[11px] text-stone-500 hover:text-teal-700 underline-offset-2 hover:underline transition"
+                              >
+                                {allChecked ? "Desmarcar todos" : "Marcar todos"}
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                              {MODULES.map((mod) => {
+                                const checked = r.modulos.includes(mod.key);
+                                const disabled = saving === r.role;
+                                return (
+                                  <label
+                                    key={mod.key}
+                                    className={`flex items-center gap-2.5 px-3 py-2 rounded-md border transition cursor-pointer ${
+                                      disabled
+                                        ? "opacity-60 cursor-not-allowed border-stone-200"
+                                        : checked
+                                          ? "bg-teal-50 border-teal-200"
+                                          : "border-stone-200 hover:bg-stone-50"
+                                    }`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      disabled={disabled}
+                                      onChange={() => toggleModule(r.role, mod.key)}
+                                      className="accent-teal-700 w-4 h-4"
+                                    />
+                                    <span className="text-sm text-stone-800">{mod.label}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
       </div>
 
