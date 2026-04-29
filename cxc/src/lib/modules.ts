@@ -47,7 +47,7 @@ export const ALL_MODULES: AppModule[] = [
   { key: "packing-lists", label: "Packing Lists",       subtitle: "Índices de bultos por estilo",      href: "/packing-lists",  icon: ClipboardList,    roles: ["admin", "secretaria", "bodega", "director", "vendedor"],       group: "dia" },
   { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",   href: "/ventas",         icon: TrendingUp,       roles: ["admin", "director", "contabilidad"],                           group: "consulta" },
   { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas",       href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria", "director"],                             group: "dia" },
-  { key: "catalogos",     label: "Catálogos",           subtitle: "Reebok, Joybees",                   href: "/catalogos",      icon: BookOpen,         roles: ["admin", "vendedor", "cliente", "secretaria"],                  group: "catalogo" },
+  { key: "catalogos",     label: "Catálogos",           subtitle: "Reebok, Joybees",                   href: "/catalogos",      icon: BookOpen,         roles: ["admin", "vendedor", "secretaria"],                             group: "catalogo" },
   { key: "camisetas",     label: "Camisetas Selección", subtitle: "Pedidos y stock",                   href: "/camisetas",      icon: Shirt,            roles: ["admin", "vendedor"],                                           group: "catalogo" },
 ];
 

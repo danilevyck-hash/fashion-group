@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   const { password } = await req.json();
 
-  // 1. Check fg_users table (supports both hashed and plaintext during migration)
+  // 1. Check fg_users table (bcrypt hash required)
   try {
     const { data: users } = await supabaseServer
       .from("fg_users")
@@ -56,9 +56,12 @@ export async function POST(req: NextRequest) {
 
     if (users) {
       for (const user of users) {
-        const match = isHash(user.password)
-          ? (await bcrypt.compare(password, user.password) || await bcrypt.compare(password.toLowerCase(), user.password))
-          : password.toLowerCase() === user.password.toLowerCase();
+        if (!isHash(user.password)) {
+          console.warn(`[auth] User "${user.name}" has non-bcrypt password — login skipped. Re-hash required.`);
+          continue;
+        }
+        const match = await bcrypt.compare(password, user.password)
+          || await bcrypt.compare(password.toLowerCase(), user.password);
 
         if (match) {
           // Módulos por rol — fuente única: role_permissions.
