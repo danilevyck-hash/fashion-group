@@ -93,6 +93,11 @@ export default function UsuariosPage() {
       ? roleData.modulos.filter(m => m !== moduleKey)
       : [...roleData.modulos, moduleKey];
 
+    if (role !== "admin" && newModulos.length === 0) {
+      showToast("Un rol debe tener al menos un módulo. No se guardó el cambio.");
+      return;
+    }
+
     setSaving(role);
     try {
       const res = await fetch("/api/admin/usuarios", {
@@ -185,6 +190,11 @@ export default function UsuariosPage() {
     const allKeys = MODULES.map(m => m.key);
     const hasAll = allKeys.every(k => roleData.modulos.includes(k));
     const newModulos = hasAll ? [] : allKeys;
+
+    if (role !== "admin" && newModulos.length === 0) {
+      showToast("Un rol debe tener al menos un módulo. No se guardó el cambio.");
+      return;
+    }
 
     setSaving(role);
     fetch("/api/admin/usuarios", {
