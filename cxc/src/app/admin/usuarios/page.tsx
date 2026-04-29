@@ -80,6 +80,16 @@ export default function UsuariosPage() {
   const [sessionsOpen, setSessionsOpen] = useState(false);
   const [sessionRange, setSessionRange] = useState<"today" | "7d" | "30d" | "all">("7d");
 
+  // Modal: toggle ver/ocultar contraseña + cierre por ESC
+  const [showModalPw, setShowModalPw] = useState(false);
+  useEffect(() => {
+    if (!showUserModal) return;
+    setShowModalPw(false);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setShowUserModal(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showUserModal]);
+
   const filteredUsers = useMemo(() => {
     const term = userSearch.trim().toLowerCase();
     return fgUsers.filter(u => {
@@ -394,43 +404,114 @@ export default function UsuariosPage() {
           )}
         </section>
 
-        {/* ══ User modal ══ */}
+        {/* User modal */}
         {showUserModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-              <h2 className="font-medium mb-4">{editUserId ? "Editar Usuario" : "Nuevo Usuario"}</h2>
-              <div className="space-y-3">
+          <div
+            className="fixed inset-0 bg-stone-900/40 backdrop-blur-[2px] flex items-center justify-center z-50 px-4"
+            onClick={(e) => { if (e.target === e.currentTarget) setShowUserModal(false); }}
+          >
+            <div
+              className="bg-white rounded-xl shadow-xl border border-stone-200 max-w-md w-full max-h-[90vh] overflow-y-auto"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="usuario-modal-title"
+            >
+              <div className="px-6 pt-6 pb-2">
+                <h2
+                  id="usuario-modal-title"
+                  className="text-stone-900 leading-tight"
+                  style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 700, fontSize: "20px" }}
+                >
+                  {editUserId ? "Editar usuario" : "Nuevo usuario"}
+                </h2>
+                <p className="text-xs text-stone-500 mt-1">Los permisos se configuran en &ldquo;Roles y Permisos&rdquo; abajo.</p>
+              </div>
+
+              <div className="px-6 py-5 space-y-4">
                 <div>
-                  <label className="text-[11px] text-gray-400 uppercase block mb-1">Nombre *</label>
-                  <input value={uName} onChange={e => setUName(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+                  <label className="text-[11px] font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">Nombre</label>
+                  <input
+                    value={uName}
+                    onChange={e => setUName(e.target.value)}
+                    placeholder="Nombre del usuario"
+                    autoFocus
+                    className="w-full bg-white border border-stone-200 rounded-md px-3 py-3 text-sm placeholder:text-stone-400 focus:outline-none focus:border-teal-700 transition"
+                  />
                 </div>
+
                 <div>
-                  <label className="text-[11px] text-gray-400 uppercase block mb-1">{editUserId ? "Nueva contraseña (dejar vacío para no cambiar)" : "Contraseña *"}</label>
-                  <input value={uPassword} onChange={e => setUPassword(e.target.value)} placeholder={editUserId ? "Sin cambios" : ""} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition font-mono" />
+                  <label className="text-[11px] font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">
+                    {editUserId ? "Nueva contraseña" : "Contraseña"}
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showModalPw ? "text" : "password"}
+                      value={uPassword}
+                      onChange={e => setUPassword(e.target.value)}
+                      placeholder={editUserId ? "Dejar vacío para no cambiar" : "Mínimo 3 caracteres"}
+                      className="w-full bg-white border border-stone-200 rounded-md px-3 py-3 pr-10 text-sm font-mono placeholder:text-stone-400 placeholder:font-sans focus:outline-none focus:border-teal-700 transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowModalPw(s => !s)}
+                      title={showModalPw ? "Ocultar" : "Ver"}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 p-1.5 rounded transition"
+                    >
+                      {showModalPw ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      )}
+                    </button>
+                  </div>
                 </div>
+
                 <div>
-                  <label className="text-[11px] text-gray-400 uppercase block mb-1">Rol</label>
-                  <select value={uRole} onChange={e => setURole(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition bg-transparent">
-                    <option value="admin">admin — Acceso total</option>
-                    <option value="director">director — Lectura y reportes</option>
-                    <option value="secretaria">secretaria — Operaciones diarias</option>
-                    <option value="vendedor">vendedor — Catálogo y CXC</option>
-                    <option value="contabilidad">contabilidad — Préstamos y ventas</option>
-                    <option value="bodega">bodega — Despacho de guías</option>
+                  <label className="text-[11px] font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">Rol</label>
+                  <select
+                    value={uRole}
+                    onChange={e => setURole(e.target.value)}
+                    className="w-full bg-white border border-stone-200 rounded-md px-3 py-3 text-sm focus:outline-none focus:border-teal-700 transition"
+                  >
+                    <option value="admin">Admin — acceso total</option>
+                    <option value="director">Director — lectura y reportes</option>
+                    <option value="secretaria">Secretaria — operaciones diarias</option>
+                    <option value="vendedor">Vendedor — catálogo y CXC</option>
+                    <option value="contabilidad">Contabilidad — préstamos y ventas</option>
+                    <option value="bodega">Bodega — despacho de guías</option>
                   </select>
                   {editUserId === currentUserId && uRole !== "admin" && (
-                    <p className="text-xs text-amber-600 mt-1">¡Cuidado! Cambiar tu propio rol te quitará acceso de administrador.</p>
+                    <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5 mt-2">
+                      Cambiar tu propio rol te quitará acceso de administrador.
+                    </p>
                   )}
                 </div>
+
                 <div>
-                  <label className="text-[11px] text-gray-400 uppercase block mb-1">Empresa (opcional)</label>
-                  <input value={uCompany} onChange={e => setUCompany(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+                  <label className="text-[11px] font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">
+                    Empresa <span className="font-normal text-stone-400 normal-case">(opcional)</span>
+                  </label>
+                  <input
+                    value={uCompany}
+                    onChange={e => setUCompany(e.target.value)}
+                    placeholder="Vistana, Fashion Wear, etc."
+                    className="w-full bg-white border border-stone-200 rounded-md px-3 py-3 text-sm placeholder:text-stone-400 focus:outline-none focus:border-teal-700 transition"
+                  />
                 </div>
-                <p className="text-[11px] text-gray-400 pt-1">Los permisos se configuran en la sección &ldquo;Roles y Permisos&rdquo; abajo.</p>
               </div>
-              <div className="flex gap-2 mt-6">
-                <button onClick={() => setShowUserModal(false)} className="flex-1 py-2 border border-gray-200 rounded-full text-sm hover:border-gray-400 transition">Cancelar</button>
-                <button onClick={saveUser} disabled={savingUser} className="flex-1 py-2 bg-black text-white rounded-full text-sm hover:bg-gray-800 transition disabled:opacity-50">
+
+              <div className="px-6 py-4 border-t border-stone-100 flex justify-end gap-2">
+                <button
+                  onClick={() => setShowUserModal(false)}
+                  className="px-4 py-2 text-sm text-stone-600 hover:bg-stone-100 rounded-md transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveUser}
+                  disabled={savingUser}
+                  className="px-5 py-2 bg-teal-700 text-white text-sm font-medium rounded-md hover:bg-teal-800 transition disabled:opacity-50"
+                >
                   {savingUser ? "Guardando..." : "Guardar"}
                 </button>
               </div>
