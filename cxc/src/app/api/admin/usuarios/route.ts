@@ -15,7 +15,7 @@ const SYSTEM_ROLES = [
 // All modules in the system — debe coincidir con ALL_MODULES de src/lib/modules.ts
 const ALL_MODULES = [
   "cxc", "guias", "caja", "directorio", "reclamos", "prestamos", "ventas",
-  "upload", "cheques", "reebok", "catalogo_reebok", "camisetas", "marketing", "packing-lists", "catalogos",
+  "upload", "cheques", "reebok", "camisetas", "marketing", "packing-lists", "catalogos",
 ];
 
 // Default module access per role — debe coincidir con DEFAULTS de /api/auth/route.ts

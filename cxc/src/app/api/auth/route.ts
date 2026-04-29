@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
           } catch { /* use defaults below if table missing */ }
 
           if (modules.length === 0) {
-            const ALL = ["cxc","guias","caja","directorio","reclamos","prestamos","ventas","upload","cheques","reebok","catalogo_reebok","camisetas","marketing","packing-lists","catalogos"];
+            const ALL = ["cxc","guias","caja","directorio","reclamos","prestamos","ventas","upload","cheques","reebok","camisetas","marketing","packing-lists","catalogos"];
             const DEFAULTS: Record<string, string[]> = {
               admin: ALL, director: ALL,
               contabilidad: ["prestamos"],
