@@ -26,6 +26,20 @@ const MODULES = ALL_MODULES.map(m => ({ key: m.key, label: m.label }));
 // Roles disponibles para crear/filtrar usuarios. Mismo orden que el select del modal.
 const USER_ROLES = ["admin", "director", "secretaria", "vendedor", "contabilidad", "bodega"] as const;
 
+function relativeTime(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (isNaN(t)) return "—";
+  const diff = Math.max(0, Date.now() - t);
+  const min = Math.floor(diff / 60_000);
+  if (min < 1) return "ahora";
+  if (min < 60) return `hace ${min} min`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `hace ${hr} h`;
+  const d = Math.floor(hr / 24);
+  if (d < 7) return `hace ${d} d`;
+  return new Date(iso).toLocaleDateString("es-PA", { day: "2-digit", month: "short" });
+}
+
 export default function UsuariosPage() {
   const router = useRouter();
   const { authChecked } = useAuth({ moduleKey: "admin", allowedRoles: ["admin"] });
@@ -61,6 +75,10 @@ export default function UsuariosPage() {
   const [userSearch, setUserSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+
+  // Sesiones: colapsadas por defecto + filtro por dia
+  const [sessionsOpen, setSessionsOpen] = useState(false);
+  const [sessionRange, setSessionRange] = useState<"today" | "7d" | "30d" | "all">("7d");
 
   const filteredUsers = useMemo(() => {
     const term = userSearch.trim().toLowerCase();
@@ -420,72 +438,112 @@ export default function UsuariosPage() {
           </div>
         )}
 
-        {/* ══ SESSIONS section ══ */}
-        <div className="mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-sm font-medium uppercase tracking-wide text-gray-400">Sesiones Activas</h2>
-              <p className="text-xs text-gray-400 mt-0.5">Sesiones con acceso al sistema — revoca para cerrar sesión remotamente</p>
-            </div>
-            <button onClick={loadSessions} className="text-xs text-gray-400 hover:text-black transition">Actualizar</button>
-          </div>
-          {loadingSessions ? (
-            <SkeletonTable rows={3} cols={5} />
-          ) : (() => {
+        {/* Sesiones Activas — colapsable */}
+        <section className="mb-10">
+          {(() => {
             const active = sessions.filter(s => !s.revoked);
-            if (active.length === 0) return <p className="text-sm text-gray-400 py-4">No hay sesiones activas</p>;
+            const now = Date.now();
+            const filtered = active.filter(s => {
+              if (sessionRange === "all") return true;
+              const t = new Date(s.last_seen).getTime();
+              if (isNaN(t)) return false;
+              const diffDays = (now - t) / 86_400_000;
+              if (sessionRange === "today") return diffDays < 1;
+              if (sessionRange === "7d") return diffDays < 7;
+              if (sessionRange === "30d") return diffDays < 30;
+              return true;
+            });
 
-            // Group by user for "revoke all" button
-            const userNames = [...new Set(active.map(s => s.user_name))];
+            // Cuenta sesiones activas por usuario (sobre el set total, no el filtrado, para que
+            // el boton 'revocar todas' siempre revoque TODAS las activas del user).
+            const countByUser: Record<string, number> = {};
+            for (const s of active) countByUser[s.user_name] = (countByUser[s.user_name] || 0) + 1;
 
             return (
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                {userNames.length > 1 && (
-                  <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 flex gap-2 flex-wrap">
-                    {userNames.map(name => {
-                      const count = active.filter(s => s.user_name === name).length;
-                      return (
-                        <button key={name} onClick={() => revokeAllSessions(name)} disabled={revokingSession === name}
-                          className="text-[11px] bg-red-50 text-red-600 px-2.5 py-1 rounded-full hover:bg-red-100 transition disabled:opacity-50">
-                          Revocar todas de {name} ({count})
-                        </button>
-                      );
-                    })}
+              <>
+                <button
+                  onClick={() => setSessionsOpen(o => !o)}
+                  className="w-full flex items-center justify-between gap-3 py-2 text-left"
+                  aria-expanded={sessionsOpen}
+                >
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-[11px] font-medium uppercase tracking-[0.12em] text-stone-500">Sesiones activas</h2>
+                    <span className="text-xs text-stone-400">{active.length} {active.length === 1 ? "sesión" : "sesiones"}</span>
+                  </div>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-stone-400 transition-transform ${sessionsOpen ? "rotate-180" : ""}`}>
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+
+                {sessionsOpen && (
+                  <div className="mt-3 space-y-3">
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                      <div className="flex flex-wrap gap-1.5">
+                        <Chip variant="neutral" active={sessionRange === "today"} onClick={() => setSessionRange("today")}>Hoy</Chip>
+                        <Chip variant="neutral" active={sessionRange === "7d"} onClick={() => setSessionRange("7d")}>7 días</Chip>
+                        <Chip variant="neutral" active={sessionRange === "30d"} onClick={() => setSessionRange("30d")}>30 días</Chip>
+                        <Chip variant="neutral" active={sessionRange === "all"} onClick={() => setSessionRange("all")}>Todas</Chip>
+                      </div>
+                      <button onClick={loadSessions} className="text-xs text-stone-400 hover:text-stone-700 transition">Actualizar</button>
+                    </div>
+
+                    {loadingSessions ? (
+                      <SkeletonTable rows={3} cols={5} />
+                    ) : filtered.length === 0 ? (
+                      <p className="text-sm text-stone-500 py-4 text-center">No hay sesiones en este rango.</p>
+                    ) : (
+                      <div className="border border-stone-200 bg-white rounded-lg divide-y divide-stone-100">
+                        {filtered.map(s => {
+                          const userTotal = countByUser[s.user_name] || 0;
+                          const showRevokeAll = userTotal >= 2;
+                          return (
+                            <div key={s.id} className="flex items-center gap-3 px-4 py-3">
+                              <Avatar name={s.user_name} role={s.user_role} size="sm" />
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-sm font-medium text-stone-900 truncate">{s.user_name}</span>
+                                  <span className="text-[11px] text-stone-400 capitalize">{s.user_role}</span>
+                                </div>
+                                <div className="text-[11px] text-stone-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                                  <span title={new Date(s.last_seen).toLocaleString("es-PA")}>{relativeTime(s.last_seen)}</span>
+                                  {s.ip_address && (
+                                    <>
+                                      <span className="text-stone-300">·</span>
+                                      <span className="font-mono text-[10px]">{s.ip_address}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {showRevokeAll && (
+                                  <button
+                                    onClick={() => revokeAllSessions(s.user_name)}
+                                    disabled={revokingSession === s.user_name}
+                                    title={`Revocar todas las sesiones de ${s.user_name}`}
+                                    className="text-[11px] text-stone-500 hover:text-red-600 px-2 py-1 transition disabled:opacity-50"
+                                  >
+                                    Revocar todas ({userTotal})
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => setRevokeTarget({ id: s.id, userName: s.user_name })}
+                                  disabled={revokingSession === s.id}
+                                  className="text-xs text-red-600 hover:underline disabled:opacity-50 px-2 py-1"
+                                >
+                                  {revokingSession === s.id ? "Revocando..." : "Revocar"}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 )}
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-white z-10">
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Usuario</th>
-                      <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Rol</th>
-                      <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">IP</th>
-                      <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Último acceso</th>
-                      <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Creada</th>
-                      <th className="px-4 py-2.5"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {active.map(s => (
-                      <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 font-medium">{s.user_name}</td>
-                        <td className="px-4 py-3 text-gray-500">{s.user_role}</td>
-                        <td className="px-4 py-3 text-gray-400 font-mono text-xs">{s.ip_address || "—"}</td>
-                        <td className="px-4 py-3 text-gray-400 text-xs">{new Date(s.last_seen).toLocaleString("es-PA")}</td>
-                        <td className="px-4 py-3 text-gray-400 text-xs">{new Date(s.created_at).toLocaleString("es-PA")}</td>
-                        <td className="px-4 py-3 text-right">
-                          <button onClick={() => setRevokeTarget({ id: s.id, userName: s.user_name })} disabled={revokingSession === s.id}
-                            className="text-xs text-red-600 hover:underline disabled:opacity-50">
-                            {revokingSession === s.id ? "Revocando..." : "Revocar"}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              </>
             );
           })()}
-        </div>
+        </section>
 
         <hr className="mb-8 border-gray-200" />
 
