@@ -103,6 +103,17 @@ export async function POST(req: NextRequest) {
           };
 
           const sessionToken = randomUUID();
+          // Revoke any previous active session of this user before creating a new one.
+          // El middleware respeta `revoked = true` y redirige al login con ?expired=1.
+          // Esto invalida cookies anteriores (ej: si fueron robadas) cuando el usuario reloguea.
+          try {
+            await supabaseServer
+              .from("user_sessions")
+              .update({ revoked: true })
+              .eq("user_name", user.name)
+              .eq("revoked", false);
+          } catch { /* table may not exist yet */ }
+
           // Create revocable session record
           try {
             await supabaseServer.from("user_sessions").insert({
