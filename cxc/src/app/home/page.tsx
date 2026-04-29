@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 import SearchBar from "@/components/SearchBar";
-import { ALL_MODULES, getVisibleGroups, getVisibleModules } from "@/lib/modules";
+import { getVisibleGroups, getVisibleModules } from "@/lib/modules";
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -98,11 +98,6 @@ export default function HomePage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           {visibleGroups.map((g) => {
             const Icon = g.icon;
-            const moduleCount = ALL_MODULES.filter(m => m.group === g.key && (
-              role === "admin" ||
-              (fgModules && fgModules.includes(m.key)) ||
-              (!fgModules && m.roles.includes(role))
-            )).length;
             return (
               <button
                 key={g.key}
@@ -122,9 +117,6 @@ export default function HomePage() {
                   <div className="min-w-0 flex-1">
                     <div className={`text-base font-semibold leading-tight ${darkMode ? "text-gray-100" : "text-gray-900"}`}>
                       {g.label}
-                    </div>
-                    <div className={`text-xs mt-1 ${darkMode ? "text-gray-500" : "text-gray-400"}`}>
-                      {moduleCount} {moduleCount === 1 ? "módulo" : "módulos"}
                     </div>
                   </div>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={darkMode ? "text-gray-600" : "text-gray-300"}>
