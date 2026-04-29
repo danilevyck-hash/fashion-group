@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
 
   const { name, password, role, associated_company } = await req.json();
   if (!name || !password) return NextResponse.json({ error: "Nombre y contraseña requeridos" }, { status: 400 });
+  if (name.trim().length < 3) return NextResponse.json({ error: "El nombre debe tener al menos 3 caracteres" }, { status: 400 });
   if (password.length < 3) return NextResponse.json({ error: "La contraseña debe tener al menos 3 caracteres" }, { status: 400 });
 
   // Check for duplicate name
@@ -55,7 +56,23 @@ export async function PUT(req: NextRequest) {
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  if (name !== undefined) update.name = name;
+  if (name !== undefined) {
+    const trimmed = String(name).trim();
+    if (trimmed.length < 3) return NextResponse.json({ error: "El nombre debe tener al menos 3 caracteres" }, { status: 400 });
+
+    // Check for duplicate name (excluding the user being edited)
+    const { data: existing } = await supabaseServer
+      .from("fg_users")
+      .select("id")
+      .eq("name", trimmed)
+      .neq("id", id)
+      .limit(1);
+    if (existing && existing.length > 0) {
+      return NextResponse.json({ error: "Ya existe un usuario con ese nombre" }, { status: 400 });
+    }
+
+    update.name = trimmed;
+  }
   if (password !== undefined) {
     if (password.length < 3) return NextResponse.json({ error: "La contraseña debe tener al menos 3 caracteres" }, { status: 400 });
     const bcrypt = (await import("bcryptjs")).default;
