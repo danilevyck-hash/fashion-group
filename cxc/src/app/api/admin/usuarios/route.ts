@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
-import { getDefaultModulesForRole } from "@/lib/modules";
+import { getDefaultModulesForRole, ALL_MODULE_KEYS } from "@/lib/modules";
 
 // All system roles
 const SYSTEM_ROLES = [
@@ -12,6 +12,8 @@ const SYSTEM_ROLES = [
   { key: "bodega", label: "Bodega" },
   { key: "vendedor", label: "Vendedor" },
 ];
+
+const SYSTEM_ROLE_KEYS = SYSTEM_ROLES.map((r) => r.key);
 
 export const dynamic = "force-dynamic";
 
@@ -72,11 +74,42 @@ export async function POST(req: NextRequest) {
   const { role, modulos, activo } = body;
 
   if (!role) return NextResponse.json({ error: "Role requerido" }, { status: 400 });
+  if (!SYSTEM_ROLE_KEYS.includes(role)) {
+    return NextResponse.json(
+      { error: `Rol inválido. Roles permitidos: ${SYSTEM_ROLE_KEYS.join(", ")}` },
+      { status: 400 }
+    );
+  }
+
+  const incomingModulos: string[] = Array.isArray(modulos) ? modulos : [];
+  const invalidModule = incomingModulos.find((m) => !ALL_MODULE_KEYS.includes(m));
+  if (invalidModule) {
+    return NextResponse.json(
+      { error: `Módulo inválido: '${invalidModule}'. Módulos válidos: ${ALL_MODULE_KEYS.join(", ")}` },
+      { status: 400 }
+    );
+  }
+
+  // Admin runtime tiene acceso completo en getVisibleModules/getDefaultModulesForRole.
+  // Persistimos la lista completa para mantener coherencia visual con la UI; ignoramos
+  // lo que venga en el body para que admin nunca quede con lista vacía.
+  // Roles no-admin requieren al menos un módulo: si la lista queda vacía, los usuarios
+  // de ese rol no verían nada (y el login override-aría con defaults silenciosamente).
+  const persistModulos = role === "admin"
+    ? ALL_MODULE_KEYS
+    : incomingModulos;
+
+  if (role !== "admin" && persistModulos.length === 0) {
+    return NextResponse.json(
+      { error: "Un rol no-admin debe tener al menos un módulo asignado." },
+      { status: 400 }
+    );
+  }
 
   const { data, error } = await supabaseServer
     .from("role_permissions")
     .upsert(
-      { role, modulos: modulos || [], activo: activo !== false, updated_at: new Date().toISOString() },
+      { role, modulos: persistModulos, activo: activo !== false, updated_at: new Date().toISOString() },
       { onConflict: "role" }
     )
     .select()
