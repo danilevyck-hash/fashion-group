@@ -764,9 +764,13 @@ function UploadPageInner() {
                 <ol className="list-decimal list-inside space-y-1 mt-1">
                   <li><strong>Reporte</strong> &rarr; Listado de comprobantes</li>
                   <li><strong>Filtrar</strong> por fecha (mes completo)</li>
-                  <li><strong>Descargar</strong> el archivo CSV o Excel</li>
+                  <li>Usa el boton <strong>Descargar</strong> (NO <strong>Descargar Detalle</strong>) para bajar el archivo CSV o Excel</li>
                   <li>Arrastra o selecciona la empresa correspondiente abajo</li>
                 </ol>
+                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-amber-800">
+                  <p className="font-semibold mb-0.5">Importante</p>
+                  <p>Asegurate de descargar con el boton <strong>&ldquo;Descargar&rdquo;</strong> (NO <strong>&ldquo;Descargar Detalle&rdquo;</strong>) desde Switch Soft. El detalle por linea de producto no es compatible con este flujo.</p>
+                </div>
                 <p className="mt-2 text-blue-500">Nota: Multifashion se carga semanalmente. Las demas empresas se cargan mensualmente.</p>
               </div>
             </details>
