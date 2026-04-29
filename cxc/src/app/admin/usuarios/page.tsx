@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast, SkeletonTable, EmptyState, ConfirmModal } from "@/components/ui";
+import { Toast, SkeletonTable, EmptyState, ConfirmModal, Avatar, Chip } from "@/components/ui";
 import { ALL_MODULES } from "@/lib/modules";
 import XLSX from "xlsx-js-style";
+
+// Cargar Playfair Display sin contaminar otros módulos —
+// el <link> queda inerte si ya está en cache desde otra página.
+const PLAYFAIR_HREF = "https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&display=swap";
 
 interface RolePermission {
   role: string;
@@ -210,13 +214,28 @@ export default function UsuariosPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-stone-50">
+      {/* Playfair Display para el título de página (carga lazy, no afecta otros módulos) */}
+      <link rel="stylesheet" href={PLAYFAIR_HREF} />
+
       <AppHeader
-        module="Admin"
-        breadcrumbs={[{ label: "Usuarios y Permisos" }]}
+        module="Sistema"
+        breadcrumbs={[{ label: "Usuarios" }]}
       />
 
       <div className="max-w-5xl mx-auto px-6 py-8">
+        <div className="mb-8 flex items-end justify-between gap-4 flex-wrap">
+          <div>
+            <h1
+              className="text-2xl sm:text-[28px] text-stone-900 leading-tight tracking-tight"
+              style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 700 }}
+            >
+              Usuarios
+            </h1>
+            <p className="text-sm text-stone-600 mt-1">Gestión de usuarios y permisos por rol</p>
+          </div>
+        </div>
+
         <div className="mb-6">
           <h1 className="text-xl font-semibold">Usuarios y Permisos</h1>
           <p className="text-sm text-gray-400 mt-1">Gestión de usuarios y permisos por rol</p>
