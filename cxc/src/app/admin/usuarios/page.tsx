@@ -23,6 +23,9 @@ interface RolePermission {
 // Derivada de ALL_MODULES (src/lib/modules.ts) — fuente única de verdad.
 const MODULES = ALL_MODULES.map(m => ({ key: m.key, label: m.label }));
 
+// Roles disponibles para crear/filtrar usuarios. Mismo orden que el select del modal.
+const USER_ROLES = ["admin", "director", "secretaria", "vendedor", "contabilidad", "bodega"] as const;
+
 export default function UsuariosPage() {
   const router = useRouter();
   const { authChecked } = useAuth({ moduleKey: "admin", allowedRoles: ["admin"] });
@@ -53,6 +56,22 @@ export default function UsuariosPage() {
   const [showUserPw, setShowUserPw] = useState<Record<string, boolean>>({});
   const [deactivateTarget, setDeactivateTarget] = useState<{id: string, name: string, active: boolean} | null>(null);
   const currentUserId = typeof window !== "undefined" ? sessionStorage.getItem("fg_user_id") : null;
+
+  // Filtros de la lista de usuarios
+  const [userSearch, setUserSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+
+  const filteredUsers = useMemo(() => {
+    const term = userSearch.trim().toLowerCase();
+    return fgUsers.filter(u => {
+      if (roleFilter !== "all" && u.role !== roleFilter) return false;
+      if (statusFilter === "active" && !u.active) return false;
+      if (statusFilter === "inactive" && u.active) return false;
+      if (term && !u.name.toLowerCase().includes(term)) return false;
+      return true;
+    });
+  }, [fgUsers, roleFilter, statusFilter, userSearch]);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
@@ -236,65 +255,126 @@ export default function UsuariosPage() {
           </div>
         </div>
 
-        <div className="mb-6">
-          <h1 className="text-xl font-semibold">Usuarios y Permisos</h1>
-          <p className="text-sm text-gray-400 mt-1">Gestión de usuarios y permisos por rol</p>
-        </div>
-
         {/* ══ NEW: fg_users section ══ */}
-        <div className="mb-10">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-sm font-medium uppercase tracking-wide text-gray-400">Usuarios del Sistema</h2>
-            </div>
+        <section className="mb-10">
+          <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
+            <h2 className="text-[11px] font-medium uppercase tracking-[0.12em] text-stone-500">Usuarios del Sistema</h2>
             <div className="flex gap-2">
-              <button onClick={exportUsersExcel} className="text-sm border border-gray-200 px-4 py-2 rounded-md hover:border-gray-400 transition">{"\u2193"} Excel</button>
-              <button onClick={openNewUser} className="text-sm bg-black text-white px-4 py-2 rounded-md hover:bg-gray-800 transition">+ Nuevo Usuario</button>
+              <button onClick={exportUsersExcel} className="text-sm border border-stone-200 bg-white text-stone-700 px-4 py-2 rounded-md hover:border-stone-400 hover:bg-stone-50 transition">
+                Excel
+              </button>
+              <button onClick={openNewUser} className="text-sm bg-teal-700 text-white px-4 py-2 rounded-md hover:bg-teal-800 transition flex items-center gap-1.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Nuevo Usuario
+              </button>
             </div>
           </div>
+
+          {/* Filtros + buscador */}
+          <div className="mb-5 space-y-3">
+            <div className="relative">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+              <input
+                type="text"
+                value={userSearch}
+                onChange={(e) => setUserSearch(e.target.value)}
+                placeholder="Buscar por nombre"
+                className="w-full bg-white border border-stone-200 rounded-md pl-9 pr-3 py-2.5 text-sm placeholder:text-stone-400 focus:outline-none focus:border-teal-700 transition"
+              />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <Chip variant="neutral" active={roleFilter === "all"} onClick={() => setRoleFilter("all")}>Todos los roles</Chip>
+              {USER_ROLES.map(r => (
+                <Chip key={r} variant="neutral" active={roleFilter === r} onClick={() => setRoleFilter(r)}>
+                  <span className="capitalize">{r}</span>
+                </Chip>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <Chip variant="neutral" active={statusFilter === "all"} onClick={() => setStatusFilter("all")}>Todos</Chip>
+              <Chip variant="success" active={statusFilter === "active"} onClick={() => setStatusFilter("active")}>Activos</Chip>
+              <Chip variant="danger" active={statusFilter === "inactive"} onClick={() => setStatusFilter("inactive")}>Inactivos</Chip>
+            </div>
+          </div>
+
           {loadingUsers ? (
             <SkeletonTable rows={3} cols={4} />
           ) : fgUsers.length === 0 ? (
             <EmptyState title="No hay usuarios" subtitle="Crea el primer usuario del sistema" actionLabel="+ Nuevo Usuario" onAction={openNewUser} />
+          ) : filteredUsers.length === 0 ? (
+            <div className="border border-stone-200 bg-white rounded-lg px-6 py-10 text-center">
+              <p className="text-sm text-stone-500">No hay usuarios que coincidan con los filtros.</p>
+            </div>
           ) : (
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
-              <div className="overflow-x-auto -mx-4 sm:mx-0"><div className="min-w-[600px] px-4 sm:px-0">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-white z-10">
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Nombre</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Rol</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal hidden sm:table-cell">Empresa</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal hidden sm:table-cell">Contraseña</th>
-                    <th className="text-left px-4 py-2.5 text-[11px] uppercase text-gray-400 font-normal">Estado</th>
-                    <th className="px-4 py-2.5"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fgUsers.map(u => (
-                    <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-3 font-medium">{u.name}</td>
-                      <td className="px-4 py-3 text-gray-500">{u.role}</td>
-                      <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">{u.associated_company || "—"}</td>
-                      <td className="px-4 py-3 hidden sm:table-cell">
-                        <span className="font-mono text-xs">{showUserPw[u.id] ? u.password : "••••••"}</span>
-                        <button onClick={() => setShowUserPw(p => ({ ...p, [u.id]: !p[u.id] }))} className="text-[10px] text-gray-400 hover:text-gray-600 ml-1 min-w-[44px] min-h-[44px] inline-flex items-center justify-center">{showUserPw[u.id] ? "ocultar" : "ver"}</button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`text-[11px] px-2 py-0.5 rounded-full ${u.active ? "bg-green-50 text-green-700" : "bg-red-50 text-red-600"}`}>{u.active ? "Activo" : "Inactivo"}</span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button onClick={() => openEditUser(u)} className="text-xs text-blue-600 hover:underline mr-2 py-2.5 sm:py-1.5 px-1">Editar</button>
-                        <button onClick={() => setDeactivateTarget({id: u.id, name: u.name, active: u.active})} className="text-xs text-gray-400 hover:text-black py-2.5 sm:py-1.5 px-1">{u.active ? "Desactivar" : "Activar"}</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              </div></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {filteredUsers.map(u => (
+                <article
+                  key={u.id}
+                  className="group relative bg-white border border-stone-200 rounded-lg p-4 transition-shadow hover:shadow-sm hover:border-stone-300"
+                >
+                  <div className="flex items-start gap-3">
+                    <Avatar name={u.name} role={u.role} size="lg" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-stone-900 leading-tight truncate">{u.name}</div>
+                      <div className="text-xs text-stone-500 mt-0.5 capitalize">{u.role}</div>
+                      {u.associated_company && (
+                        <div className="text-[11px] text-stone-400 mt-1 truncate" title={u.associated_company}>
+                          {u.associated_company}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-stone-100">
+                    <div className="flex items-center gap-1.5 text-[11px] text-stone-600">
+                      <span className={`w-1.5 h-1.5 rounded-full ${u.active ? "bg-emerald-500" : "bg-stone-300"}`} />
+                      {u.active ? "Activo" : "Inactivo"}
+                    </div>
+                    <div className="flex items-center gap-1 sm:opacity-60 sm:group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => setShowUserPw(p => ({ ...p, [u.id]: !p[u.id] }))}
+                        title={showUserPw[u.id] ? "Ocultar contraseña" : "Ver contraseña"}
+                        className="text-stone-400 hover:text-stone-700 p-1.5 rounded transition-colors"
+                      >
+                        {showUserPw[u.id] ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => openEditUser(u)}
+                        title="Editar"
+                        className="text-stone-400 hover:text-stone-700 p-1.5 rounded transition-colors"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                      </button>
+                      <button
+                        onClick={() => setDeactivateTarget({ id: u.id, name: u.name, active: u.active })}
+                        title={u.active ? "Desactivar" : "Reactivar"}
+                        className="text-stone-400 hover:text-red-600 p-1.5 rounded transition-colors"
+                      >
+                        {u.active ? (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                        ) : (
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {showUserPw[u.id] && (
+                    <div className="mt-2 px-2 py-1.5 bg-stone-50 border border-stone-200 rounded text-[11px] font-mono text-stone-600 break-all">
+                      {u.password}
+                    </div>
+                  )}
+                </article>
+              ))}
             </div>
           )}
-        </div>
+        </section>
 
         {/* ══ User modal ══ */}
         {showUserModal && (
