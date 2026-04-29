@@ -33,6 +33,7 @@ export default function UsuariosPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [revokingSession, setRevokingSession] = useState<string | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<{ id: string; userName: string } | null>(null);
 
   // New user system
   interface FgUser { id: string; name: string; password: string; role: string; active: boolean; associated_company: string; }
@@ -363,7 +364,7 @@ export default function UsuariosPage() {
                         <td className="px-4 py-3 text-gray-400 text-xs">{new Date(s.last_seen).toLocaleString("es-PA")}</td>
                         <td className="px-4 py-3 text-gray-400 text-xs">{new Date(s.created_at).toLocaleString("es-PA")}</td>
                         <td className="px-4 py-3 text-right">
-                          <button onClick={() => revokeSession(s.id)} disabled={revokingSession === s.id}
+                          <button onClick={() => setRevokeTarget({ id: s.id, userName: s.user_name })} disabled={revokingSession === s.id}
                             className="text-xs text-red-600 hover:underline disabled:opacity-50">
                             {revokingSession === s.id ? "Revocando..." : "Revocar"}
                           </button>
@@ -480,6 +481,16 @@ export default function UsuariosPage() {
             : `¿Reactivar a ${deactivateTarget?.name}? Podrá iniciar sesión de nuevo.`)}
         confirmLabel={deactivateTarget?.active ? "Desactivar" : "Reactivar"}
         destructive={deactivateTarget?.active || false}
+      />
+
+      <ConfirmModal
+        open={!!revokeTarget}
+        onClose={() => setRevokeTarget(null)}
+        onConfirm={() => { if (revokeTarget) { revokeSession(revokeTarget.id); setRevokeTarget(null); } }}
+        title={`¿Revocar sesión de ${revokeTarget?.userName ?? ""}?`}
+        message="El usuario tendrá que iniciar sesión de nuevo. Si esta es tu sesión actual, te cerrará la sesión."
+        confirmLabel="Revocar"
+        destructive
       />
 
       <Toast message={toast} />
