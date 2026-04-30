@@ -4,7 +4,7 @@ import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
-import { ESTADOS, daysSince, calcSub, buildReclamosPdfHtml, openPdfWindow, FACTOR_TOTAL, estadoLabel } from "./constants";
+import { ESTADOS, daysSince, calcSub, FACTOR_TOTAL, estadoLabel } from "./constants";
 import { EmptyState, StatusBadge, Toast } from "@/components/ui";
 
 interface Props {
@@ -30,14 +30,18 @@ interface Props {
   onDeleteReclamo: (id: string) => void;
 }
 
+type BulkAction = "pdf" | "email" | "whatsapp";
+
 export default function EmpresaList({
-  role, activeEmpresa, reclamos, contactos, search, setSearch,
+  activeEmpresa, reclamos, contactos, search, setSearch,
   filterEstado, setFilterEstado, selectionMode, setSelectionMode,
   selectedIds, setSelectedIds, sortCol, setSortCol, sortDir, setSortDir,
-  onBack, onNewReclamo, onLoadDetail, onDeleteReclamo,
+  onBack, onNewReclamo, onLoadDetail,
 }: Props) {
   const [toast, setToast] = useState<string | null>(null);
+  const [busy, setBusy] = useState<BulkAction | null>(null);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+
   const allEmpresaRecs = reclamos.filter((r) => r.empresa === activeEmpresa);
   const empresaRecs = allEmpresaRecs.filter((r) => {
     if (filterEstado !== "all" && r.estado !== filterEstado) return false;
@@ -73,66 +77,108 @@ export default function EmpresaList({
     else { setSortCol(col); setSortDir("desc"); }
   }
 
-  async function downloadSelectedExcel() {
-    if (!selectedIds.length) return;
-    const res = await fetch("/api/reclamos/export-excel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: selectedIds }) });
-    if (res.ok) {
+  const visibleIds = sortedRecs.map((r) => r.id);
+  const empresaPath = encodeURIComponent(activeEmpresa);
+
+  function buildBulkBody(ids: string[]) {
+    if (ids.length > 0) return { reclamo_ids: ids };
+    return { all_with_filter: { tab: filterEstado, search } };
+  }
+
+  async function downloadBulkPdf(ids: string[]) {
+    if (busy) return;
+    if (ids.length === 0 && sortedRecs.length === 0) {
+      showToast("No hay reclamos para descargar.");
+      return;
+    }
+    setBusy("pdf");
+    try {
+      const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/export-pdf`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildBulkBody(ids)),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || "Error al generar el PDF.");
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url; a.download = `Reclamos-${activeEmpresa}-${new Date().toISOString().slice(0, 10)}.xlsx`;
-      a.click(); URL.revokeObjectURL(url);
+      const safe = activeEmpresa.replace(/[^A-Za-z0-9_-]+/g, "_");
+      a.href = url;
+      a.download = `Reclamos_${safe}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("PDF descargado");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Error al descargar PDF");
+    } finally {
+      setBusy(null);
     }
   }
 
-  function downloadSelectedPdf() {
-    if (!selectedIds.length) return;
-    const sel = reclamos.filter((r) => selectedIds.includes(r.id));
-    if (!sel.length) return;
-    openPdfWindow(buildReclamosPdfHtml(sel, activeEmpresa));
+  async function sendBulkEmail(ids: string[], opts?: { silent?: boolean }) {
+    if (busy && !opts?.silent) return null;
+    if (!c?.correo) {
+      if (!opts?.silent) showToast(`No hay correo configurado para ${activeEmpresa}.`);
+      return false;
+    }
+    if (ids.length === 0 && sortedRecs.length === 0) {
+      if (!opts?.silent) showToast("No hay reclamos para enviar.");
+      return false;
+    }
+    if (!opts?.silent) setBusy("email");
+    try {
+      const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/send-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildBulkBody(ids)),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || "Error al enviar correo.");
+      }
+      if (!opts?.silent) showToast(`Email enviado a ${c.correo}`);
+      return true;
+    } catch (err) {
+      if (!opts?.silent) showToast(err instanceof Error ? err.message : "Error al enviar correo");
+      return false;
+    } finally {
+      if (!opts?.silent) setBusy(null);
+    }
   }
 
-  function sendBulkWA(ids: string[]) {
-    if (!c?.whatsapp) { showToast("No hay contacto con WhatsApp para esta empresa."); return; }
-    const sel = reclamos.filter((r) => ids.includes(r.id));
-    if (!sel.length) { showToast("No hay reclamos seleccionados."); return; }
-    const nombre = c.nombre_contacto || c.nombre || "equipo";
-    const lines = sel.map((r) => {
-      const factura = (r.nro_factura || "").length > 30 ? (r.nro_factura || "").slice(0, 27) + "..." : (r.nro_factura || "");
-      const total = calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL;
-      return `📋 ${r.nro_reclamo} | Factura: ${factura} | $${fmt(total)} | ${r.estado}`;
-    }).join("\n");
+  async function sendBulkWhatsApp(ids: string[]) {
+    if (busy) return;
+    if (!c?.whatsapp) {
+      showToast(`No hay WhatsApp configurado para ${activeEmpresa}.`);
+      return;
+    }
+    const targetIds = ids.length > 0 ? ids : visibleIds;
+    const sel = reclamos.filter((r) => targetIds.includes(r.id));
+    if (!sel.length) {
+      showToast("No hay reclamos para enviar.");
+      return;
+    }
     const grandTotal = sel.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
-    const msg = `Hola ${nombre}, te escribimos de parte de Fashion Group.\n\nTe enviamos el resumen de reclamos pendientes de ${activeEmpresa}:\n\n${lines}\n\nTotal a acreditar: $${fmt(grandTotal)}\n\nPor favor confirmar recepción y estado de cada reclamo.\nGracias.`;
-    window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
-  }
-
-  const [emailProgress, setEmailProgress] = useState<string | null>(null);
-
-  async function sendBulkEmail(ids: string[]) {
-    if (!ids.length) return;
-    setEmailProgress(`Enviando 1 de ${ids.length}...`);
-    let sent = 0, failed = 0;
-    for (let i = 0; i < ids.length; i++) {
-      setEmailProgress(`Enviando ${i + 1} de ${ids.length}...`);
-      try {
-        const res = await fetch(`/api/reclamos/${ids[i]}/send-email`, { method: "POST" });
-        if (res.ok) sent++;
-        else failed++;
-      } catch { failed++; }
-    }
-    setEmailProgress(null);
-    showToast(failed > 0 ? `${sent} enviado${sent !== 1 ? "s" : ""}, ${failed} fallaron` : `${sent} email${sent !== 1 ? "s" : ""} enviado${sent !== 1 ? "s" : ""}`);
-  }
-
-  function sendSingleWA(r: Reclamo) {
-    if (!c?.whatsapp) { showToast("No hay contacto con WhatsApp para esta empresa."); return; }
     const nombre = c.nombre_contacto || c.nombre || "equipo";
-    const factura = (r.nro_factura || "").length > 30 ? (r.nro_factura || "").slice(0, 27) + "..." : (r.nro_factura || "");
-    const total = calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL;
-    const msg = `Hola ${nombre}, te escribimos de parte de Fashion Group.\n\nReclamo pendiente de ${activeEmpresa}:\n\n📋 ${r.nro_reclamo} | Factura: ${factura} | $${fmt(total)} | ${r.estado}\n\nPor favor confirmar recepción y estado.\nGracias.`;
-    window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank");
+    const msg = `Hola ${nombre}, te envío ${sel.length} reclamo${sel.length === 1 ? "" : "s"} pendiente${sel.length === 1 ? "" : "s"} con un total de $${fmt(grandTotal)}. Detalle adjunto en email.`;
+    const waUrl = `https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`;
+
+    setBusy("whatsapp");
+    try {
+      window.open(waUrl, "_blank");
+      const ok = await sendBulkEmail(ids, { silent: true });
+      showToast(ok ? "Email enviado y abriendo WhatsApp..." : "WhatsApp abierto. El email no se pudo enviar.");
+    } finally {
+      setBusy(null);
+    }
   }
+
+  const selCount = selectedIds.length;
+  const headerDisabled = busy !== null;
+  const headerEmptyVisible = sortedRecs.length === 0;
 
   return (
     <div>
@@ -145,33 +191,44 @@ export default function EmpresaList({
         <button onClick={onBack} className="text-sm text-gray-400 hover:text-black transition">← Reclamos</button>
       </div>
 
-      <div className="flex items-end justify-between mb-6 sm:mb-8 flex-wrap gap-4">
+      <div className="flex items-end justify-between mb-4 sm:mb-6 flex-wrap gap-4">
         <div>
           <h1 className="text-xl font-light tracking-tight">{activeEmpresa}</h1>
           {c && <p className="text-xs text-gray-400 mt-1">Contacto: {(c.nombre_contacto || c.nombre || "equipo")} | {c.correo}</p>}
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          {selectionMode ? (
-            <>
-              <span className="text-sm text-gray-400">{selectedIds.length} seleccionados</span>
-              {selectedIds.length > 0 && <>
-                <button onClick={() => sendBulkEmail(selectedIds)} disabled={!!emailProgress} className="text-sm bg-black text-white px-5 py-2 rounded-md hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50 flex items-center gap-1">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
-                  {emailProgress || "Enviar por Email"}
-                </button>
-                <button onClick={downloadSelectedPdf} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md active:bg-gray-100 transition-all">↓ PDF</button>
-                <button onClick={downloadSelectedExcel} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md active:bg-gray-100 transition-all">↓ Excel</button>
-                <button onClick={() => sendBulkWA(selectedIds)} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md active:bg-gray-100 transition-all">WhatsApp</button>
-              </>}
-              <button onClick={() => { setSelectionMode(false); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
-            </>
-          ) : (
-            <>
-              <button onClick={() => { setSelectionMode(true); setSelectedIds([]); }} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md transition">Seleccionar</button>
-              <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
-            </>
-          )}
+          <button onClick={() => { setSelectionMode(true); setSelectedIds([]); }} disabled={selectionMode} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md transition disabled:opacity-40">Seleccionar</button>
+          <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
         </div>
+      </div>
+
+      {/* Header bulk actions — apply to all visible reclamos */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <span className="text-[11px] uppercase tracking-widest text-gray-400 mr-1">Acciones sobre lo visible</span>
+        <button
+          onClick={() => sendBulkEmail([])}
+          disabled={headerDisabled || headerEmptyVisible || !c?.correo}
+          title={!c?.correo ? "No hay correo configurado para esta empresa" : `Enviar ${sortedRecs.length} reclamo(s) por email`}
+          className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition disabled:opacity-40 disabled:hover:text-gray-500 disabled:hover:border-gray-200 flex items-center gap-1"
+        >
+          {busy === "email" ? "Enviando..." : `Email todos (${sortedRecs.length})`}
+        </button>
+        <button
+          onClick={() => sendBulkWhatsApp([])}
+          disabled={headerDisabled || headerEmptyVisible || !c?.whatsapp}
+          title={!c?.whatsapp ? "No hay WhatsApp configurado para esta empresa" : `Enviar ${sortedRecs.length} reclamo(s) por WhatsApp + email`}
+          className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition disabled:opacity-40 disabled:hover:text-gray-500 disabled:hover:border-gray-200 flex items-center gap-1"
+        >
+          {busy === "whatsapp" ? "Abriendo..." : `WhatsApp todos (${sortedRecs.length})`}
+        </button>
+        <button
+          onClick={() => downloadBulkPdf([])}
+          disabled={headerDisabled || headerEmptyVisible}
+          title={`Descargar ${sortedRecs.length} reclamo(s) en PDF`}
+          className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition disabled:opacity-40 disabled:hover:text-gray-500 disabled:hover:border-gray-200 flex items-center gap-1"
+        >
+          {busy === "pdf" ? "Generando..." : `PDF todos (${sortedRecs.length})`}
+        </button>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -232,7 +289,6 @@ export default function EmpresaList({
 
       {sortedRecs.length === 0 ? (() => {
         const openCount = allEmpresaRecs.filter(r => r.estado !== "Aplicado" && r.estado !== "Rechazado").length;
-        // Empresa has reclamos but all are resolved — celebration state
         if (allEmpresaRecs.length > 0 && openCount === 0 && filterEstado === "all" && !search) {
           return (
             <div className="flex flex-col items-center py-16 text-center">
@@ -244,7 +300,6 @@ export default function EmpresaList({
             </div>
           );
         }
-        // Filter/search produced no results
         if (allEmpresaRecs.length > 0) {
           return (
             <div className="flex flex-col items-center py-12 text-center">
@@ -271,7 +326,6 @@ export default function EmpresaList({
               <th onClick={() => toggleSort("dias")} className="text-right pb-3 font-medium cursor-pointer hover:text-black select-none">Antigüedad {sortCol === "dias" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
               <th onClick={() => toggleSort("estado")} className="text-left pb-3 font-medium cursor-pointer hover:text-black select-none">Estado {sortCol === "estado" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
               <th onClick={() => toggleSort("total")} className="text-right pb-3 font-medium cursor-pointer hover:text-black select-none">Total {sortCol === "total" ? (sortDir === "asc" ? "↑" : "↓") : ""}</th>
-              <th className="text-right pb-3 font-medium"></th>
             </tr>
           </thead>
           <tbody>
@@ -294,13 +348,6 @@ export default function EmpresaList({
                   <td className={`py-3 text-right tabular-nums ${days > 60 && isOpen ? "text-red-600 font-medium" : days > 30 && isOpen ? "text-amber-600" : "text-gray-400"}`}>{days}d</td>
                   <td className="py-3"><StatusBadge estado={r.estado} /></td>
                   <td className="py-3 text-right tabular-nums">${fmt(total)}</td>
-                  <td className="py-3 text-right flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                    {isOpen && !selectionMode && (
-                      <button onClick={() => sendSingleWA(r)} className="text-green-500 hover:text-green-700 transition" title="Enviar por WhatsApp">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                      </button>
-                    )}
-                  </td>
                 </tr>
               );
             })}
@@ -309,6 +356,48 @@ export default function EmpresaList({
           </div>
         </div>
       )}
+
+      {/* Floating selection bar — only when in selection mode */}
+      {selectionMode && (
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 w-[calc(100vw-2rem)] max-w-3xl">
+          <div className="bg-black text-white rounded-xl shadow-2xl border border-gray-800 px-4 py-3 flex items-center gap-3 flex-wrap">
+            <span className="text-sm font-medium">
+              {selCount === 0 ? "Selecciona reclamos para acciones masivas" : `${selCount} reclamo${selCount === 1 ? "" : "s"} seleccionado${selCount === 1 ? "" : "s"}`}
+            </span>
+            <div className="flex-1" />
+            <button
+              onClick={() => downloadBulkPdf(selectedIds)}
+              disabled={selCount === 0 || busy !== null}
+              className="text-xs bg-white text-black px-4 py-1.5 rounded-full font-medium hover:bg-gray-100 active:scale-[0.97] transition-all disabled:opacity-40"
+            >
+              {busy === "pdf" ? "Generando..." : "Descargar PDF"}
+            </button>
+            <button
+              onClick={() => sendBulkEmail(selectedIds)}
+              disabled={selCount === 0 || busy !== null || !c?.correo}
+              title={!c?.correo ? "No hay correo configurado" : ""}
+              className="text-xs bg-white text-black px-4 py-1.5 rounded-full font-medium hover:bg-gray-100 active:scale-[0.97] transition-all disabled:opacity-40"
+            >
+              {busy === "email" ? "Enviando..." : "Enviar por Email"}
+            </button>
+            <button
+              onClick={() => sendBulkWhatsApp(selectedIds)}
+              disabled={selCount === 0 || busy !== null || !c?.whatsapp}
+              title={!c?.whatsapp ? "No hay WhatsApp configurado" : ""}
+              className="text-xs bg-white text-black px-4 py-1.5 rounded-full font-medium hover:bg-gray-100 active:scale-[0.97] transition-all disabled:opacity-40"
+            >
+              {busy === "whatsapp" ? "Abriendo..." : "Enviar por WhatsApp"}
+            </button>
+            <button
+              onClick={() => { setSelectionMode(false); setSelectedIds([]); }}
+              className="text-xs text-gray-300 hover:text-white px-2 py-1.5 transition"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       <Toast message={toast} />
       </div>
     </div>

@@ -361,7 +361,6 @@ function ReclamosPage() {
       <ReclamoDetail
         current={current}
         role={role}
-        contactos={contactos}
         nota={nota} setNota={setNota}
         editMode={editMode} setEditMode={setEditMode}
         editEmpresa={editEmpresa} setEditEmpresa={setEditEmpresa}

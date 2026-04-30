@@ -4,8 +4,8 @@ import { useRef, useState, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox, ScrollableTable } from "@/components/ui";
-import { Reclamo, RItem, Contacto } from "./types";
-import { ESTADOS, EMPRESAS, EC, TALLAS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, buildSingleReclamoPdfHtml, openPdfWindow, loadCustomMotivos, saveCustomMotivo, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, estadoLabel } from "./constants";
+import { Reclamo, RItem } from "./types";
+import { ESTADOS, EMPRESAS, EC, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, buildSingleReclamoPdfHtml, openPdfWindow, loadCustomMotivos, saveCustomMotivo, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, estadoLabel } from "./constants";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
 
@@ -20,7 +20,6 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 interface Props {
   current: Reclamo;
   role: string;
-  contactos: Contacto[];
   nota: string;
   setNota: (v: string) => void;
   editMode: boolean;
@@ -73,7 +72,7 @@ interface Props {
 const SUPA_URL = typeof window !== "undefined" ? (process.env.NEXT_PUBLIC_SUPABASE_URL || "") : "";
 
 export default function ReclamoDetail({
-  current, role, contactos, nota, setNota, editMode, setEditMode,
+  current, role, nota, setNota, editMode, setEditMode,
   editEmpresa, setEditEmpresa, editFactura, setEditFactura, editPedido, setEditPedido,
   editFecha, setEditFecha, editNotas, setEditNotas, editEstado, setEditEstado,
   editItems, setEditItems, editSaving, confirmingEstado, setConfirmingEstado,
@@ -89,33 +88,7 @@ export default function ReclamoDetail({
   const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
   const [deleteFotoTarget, setDeleteFotoTarget] = useState<{ id: string; path: string } | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
-  const [sendingEmail, setSendingEmail] = useState(false);
-  const [showEmailConfirm, setShowEmailConfirm] = useState(false);
   const [showEstadoHelp, setShowEstadoHelp] = useState(false);
-
-  async function sendEmail() {
-    const c = getC(current.empresa);
-    if (!c?.correo) {
-      showToast(`No hay contacto con email para ${current.empresa}. Agrega un contacto primero.`);
-      setShowEmailConfirm(false);
-      return;
-    }
-    setShowEmailConfirm(false);
-    setSendingEmail(true);
-    try {
-      const res = await fetch(`/api/reclamos/${current.id}/send-email`, { method: "POST" });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => null);
-        throw new Error(errData?.error || `HTTP ${res.status}`);
-      }
-      showToast("Email enviado al proveedor");
-    } catch (err) {
-      console.error("Send email error:", err);
-      showToast("Error al enviar el email");
-    } finally {
-      setSendingEmail(false);
-    }
-  }
 
   const items = current.reclamo_items ?? [];
   const seg = current.reclamo_seguimiento ?? [];
@@ -136,10 +109,6 @@ export default function ReclamoDetail({
 
   const { suggestion: reclamoSuggestion, dismiss: dismissReclamo } = useSmartSuggestions(reclamoSuggestions);
 
-  function getC(empresa: string) {
-    return contactos.find((c) => c.empresa === empresa) || null;
-  }
-
   function startEdit() {
     setEditEmpresa(current.empresa);
     setEditFactura(current.nro_factura || "");
@@ -158,15 +127,6 @@ export default function ReclamoDetail({
       u.subtotal = (Number(u.cantidad) || 0) * (Number(u.precio_unitario) || 0);
       return u;
     }));
-  }
-
-  function sendWA() {
-    const c = getC(current.empresa);
-    if (!c?.whatsapp) { showToast("No hay contacto WhatsApp para esta empresa."); return; }
-    const nombre = c.nombre_contacto || c.nombre || "equipo";
-    const total = calcSub(current.reclamo_items ?? []) * FACTOR_TOTAL;
-    const msg = `Hola ${nombre}, te escribo de parte de Fashion Group para dar seguimiento al reclamo ${current.nro_reclamo}.\n\nFactura: ${current.nro_factura}\nTotal a acreditar: $${fmt(total)}\nEstado: ${current.estado}\nFecha: ${fmtDate(current.fecha_reclamo)}\n\n¿Nos puedes confirmar el estado? Gracias.`;
-    try { window.open(`https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
   }
 
   return (
@@ -206,30 +166,6 @@ export default function ReclamoDetail({
         <button onClick={startEdit} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 active:bg-gray-100 transition-all flex items-center gap-1">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
           Editar
-        </button>
-        <div className="relative">
-          <button onClick={() => setShowEmailConfirm(!showEmailConfirm)} disabled={sendingEmail} className="text-xs bg-black text-white px-4 py-2.5 sm:py-1.5 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-1 disabled:opacity-50">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
-            {sendingEmail ? "Enviando..." : "Enviar por Email"}
-          </button>
-          {showEmailConfirm && (() => { const c = getC(current.empresa); return (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-3 z-10" style={{ minWidth: 220 }}>
-              {c?.correo ? (<>
-                <p className="text-xs text-gray-500 mb-2">Enviar a <strong>{c.correo}</strong>?</p>
-                <div className="flex gap-1">
-                  <button onClick={sendEmail} className="text-[11px] bg-black text-white px-3 py-1 rounded-full hover:bg-gray-800 active:scale-[0.97] transition-all">Enviar</button>
-                  <button onClick={() => setShowEmailConfirm(false)} className="text-[11px] text-gray-400 px-2 py-1 hover:text-black transition">Cancelar</button>
-                </div>
-              </>) : (<>
-                <p className="text-xs text-red-500 mb-2">No hay correo configurado para {current.empresa}</p>
-                <button onClick={() => setShowEmailConfirm(false)} className="text-[11px] text-gray-400 px-2 py-1 hover:text-black transition">Cerrar</button>
-              </>)}
-            </div>
-          ); })()}
-        </div>
-        <button onClick={sendWA} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 active:bg-gray-100 transition-all flex items-center gap-1">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
-          WhatsApp
         </button>
         <button onClick={() => openPdfWindow(buildSingleReclamoPdfHtml(current, fotos))} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /><rect x="6" y="2" width="12" height="4" rx="1" /><path d="M4 18h16" /></svg>
