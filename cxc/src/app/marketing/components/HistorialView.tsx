@@ -191,7 +191,10 @@ export default function HistorialView({
             </thead>
             <tbody>
               {proyectos.map((p) => {
-                const nombreVis = p.nombre || p.tienda;
+                // Cliente (tienda) arriba; tipo de gasto (nombre) al subtítulo.
+                const tituloVis = p.tienda || p.nombre || "";
+                const subtituloTipo = p.nombre && p.nombre !== p.tienda ? p.nombre : "";
+                const nombreVis = tituloVis;
                 const desgloseTooltip = p.cobrado_por_marca.length > 0
                   ? p.cobrado_por_marca
                       .map((d) => `${d.marca_nombre}: ${formatearMonto(d.monto)}`)
@@ -206,10 +209,10 @@ export default function HistorialView({
                     {/* Proyecto */}
                     <td className="px-[18px] py-3 align-middle">
                       <div className="font-semibold text-gray-900 truncate">
-                        {nombreVis}
+                        {tituloVis}
                       </div>
                       <div className="text-[12px] text-gray-500 truncate">
-                        {p.tienda && p.tienda !== nombreVis ? `${p.tienda} · ` : ""}
+                        {subtituloTipo ? `${subtituloTipo} · ` : ""}
                         {p.facturas_count}{" "}
                         {p.facturas_count === 1 ? "factura" : "facturas"} ·{" "}
                         {p.fotos_count}{" "}

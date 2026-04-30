@@ -406,7 +406,13 @@ export async function getAnulados(): Promise<AnuladoItem[]> {
 
   for (const row of proy ?? []) {
     const r = row as Record<string, unknown>;
-    const nombre = String(r.nombre ?? "") || String(r.tienda ?? "");
+    // Cliente (tienda) primero como ancla; el tipo de gasto va después.
+    const tienda = String(r.tienda ?? "").trim();
+    const nombreProy = String(r.nombre ?? "").trim();
+    const nombre =
+      tienda && nombreProy && nombreProy !== tienda
+        ? `${tienda} — ${nombreProy}`
+        : tienda || nombreProy;
     items.push({
       tipo: "proyecto",
       id: String(r.id),

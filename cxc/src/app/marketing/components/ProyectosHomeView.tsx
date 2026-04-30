@@ -376,7 +376,14 @@ export default function ProyectosHomeView({
             </thead>
             <tbody>
               {proyectos.map((p) => {
-                const nombreVis = p.nombre || p.tienda;
+                // Cliente (tienda) es el ancla visual principal; el tipo de
+                // gasto (nombre) cae al subtítulo junto con los contadores.
+                // nombreVis se sigue usando como etiqueta canónica en
+                // confirmaciones, ARIA y menús — refleja lo que el usuario
+                // está viendo en la fila.
+                const tituloVis = p.tienda || p.nombre || "";
+                const subtituloTipo = p.nombre && p.nombre !== p.tienda ? p.nombre : "";
+                const nombreVis = tituloVis;
                 const fechaLabel =
                   p.estado === "cobrado" && p.fecha_cobrado
                     ? { label: "Cobrado", iso: p.fecha_cobrado }
@@ -399,10 +406,10 @@ export default function ProyectosHomeView({
                     {/* Proyecto */}
                     <td className="px-[18px] py-3 align-middle">
                       <div className="font-semibold text-gray-900 truncate">
-                        {nombreVis}
+                        {tituloVis}
                       </div>
                       <div className="text-[12px] text-gray-500 truncate">
-                        {p.tienda && p.tienda !== nombreVis ? `${p.tienda} · ` : ""}
+                        {subtituloTipo ? `${subtituloTipo} · ` : ""}
                         {p.facturas_count}{" "}
                         {p.facturas_count === 1 ? "factura" : "facturas"} ·{" "}
                         {p.fotos_count}{" "}
