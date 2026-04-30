@@ -6,6 +6,7 @@ import { EmptyState, StatusBadge } from "@/components/ui";
 
 interface Props {
   sortedMovs: Movimiento[];
+  saldoByMov: Map<string, number>;
   isAdmin: boolean;
   isAdminOrDirector: boolean;
   canEdit: boolean;
@@ -15,36 +16,63 @@ interface Props {
   onDelete: (movId: string) => void;
 }
 
-export default function MovimientoTable({ sortedMovs, isAdmin, isAdminOrDirector, canEdit, canDelete, onApprove, onEdit, onDelete }: Props) {
+const PRESTAMO_CONCEPTOS = ["Préstamo", "Responsabilidad por daño"];
+
+function isCargo(concepto: string) {
+  return PRESTAMO_CONCEPTOS.includes(concepto);
+}
+
+export default function MovimientoTable({ sortedMovs, saldoByMov, isAdmin, isAdminOrDirector, canEdit, canDelete, onApprove, onEdit, onDelete }: Props) {
+  const total = sortedMovs.length;
+  const hasMixedEstados = sortedMovs.some(m => m.estado !== "aprobado");
+
   return (
     <div className="mb-6">
-      <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Historial de Movimientos</h2>
+      <div className="flex items-baseline justify-between mb-3">
+        <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400">Estado de Cuenta</h2>
+        {total > 0 && (
+          <span className="text-xs text-gray-400 tabular-nums">{total} movimiento{total !== 1 ? "s" : ""}</span>
+        )}
+      </div>
       {sortedMovs.length === 0 ? (
         <EmptyState title="Sin movimientos registrados" subtitle="Registra el primer movimiento" />
       ) : (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
-          <div className="min-w-[600px] px-4 sm:px-0">
+          <div className="min-w-[700px] px-4 sm:px-0">
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b border-gray-200">
                 <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Fecha</th>
                 <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Concepto</th>
-                <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Monto</th>
                 <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Notas</th>
-                <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Estado</th>
+                <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Monto</th>
+                <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Saldo</th>
+                {hasMixedEstados && (
+                  <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Estado</th>
+                )}
                 <th className="py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {sortedMovs.map((m, i) => (
+              {sortedMovs.map((m, i) => {
+                const cargo = isCargo(m.concepto);
+                const sign = cargo ? "+" : "−";
+                const montoColor = cargo ? "text-red-600" : "text-green-600";
+                const saldo = saldoByMov.get(m.id);
+                return (
                 <tr key={m.id} className={`${i % 2 === 1 ? "bg-gray-50/50" : ""} hover:bg-gray-50 transition-colors`}>
                   <td className="py-3 px-4 tabular-nums">{fmtDate(m.fecha)}</td>
                   <td className={`py-3 px-4 font-medium ${CONCEPTO_COLORS[m.concepto] || ""}`}>{m.concepto}</td>
-                  <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(m.monto)}</td>
                   <td className="py-3 px-4 text-gray-400 text-xs max-w-[200px] truncate" title={m.notas || ""}>{m.notas || "—"}</td>
-                  <td className="py-3 px-4">
-                    <StatusBadge estado={m.estado === "pendiente_aprobacion" ? "En revisión" : m.estado} />
+                  <td className={`py-3 px-4 text-right tabular-nums font-medium ${montoColor}`}>{sign}${fmt(m.monto)}</td>
+                  <td className="py-3 px-4 text-right tabular-nums font-medium text-gray-700">
+                    {saldo !== undefined ? `$${fmt(saldo)}` : <span className="text-gray-300">—</span>}
                   </td>
+                  {hasMixedEstados && (
+                    <td className="py-3 px-4">
+                      <StatusBadge estado={m.estado === "pendiente_aprobacion" ? "En revisión" : m.estado} />
+                    </td>
+                  )}
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-1">
                       {m.estado === "pendiente_aprobacion" && isAdmin && (
@@ -63,7 +91,8 @@ export default function MovimientoTable({ sortedMovs, isAdmin, isAdminOrDirector
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
           </div>

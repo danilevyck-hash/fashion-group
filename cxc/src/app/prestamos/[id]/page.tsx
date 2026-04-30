@@ -11,7 +11,6 @@ import UndoToast from "@/components/UndoToast";
 import { Empleado } from "../components/types";
 import EmpleadoHeader from "../components/EmpleadoHeader";
 import SummaryCards from "../components/SummaryCards";
-import DeduccionesHistorial from "../components/DeduccionesHistorial";
 import MovimientoTable from "../components/MovimientoTable";
 import DangerZone from "../components/DangerZone";
 import MovimientoModal from "../components/MovimientoModal";
@@ -80,10 +79,29 @@ export default function PrestamoDetallePage() {
   const sortedMovs = [...movs].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.created_at.localeCompare(a.created_at));
   const movToDelete = movForm.confirmDeleteMovId ? movs.find(m => m.id === movForm.confirmDeleteMovId) ?? null : null;
 
-  const prestado = movs.filter(m => (m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
+  const PRESTAMO_CONCEPTOS = ["Préstamo", "Responsabilidad por daño"];
+  const prestado = movs.filter(m => PRESTAMO_CONCEPTOS.includes(m.concepto) && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
   const pagado = movs.filter(m => (m.concepto === "Pago" || m.concepto === "Abono extra" || m.concepto === "Pago de responsabilidad") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
   const saldo = prestado - pagado;
   const pct = prestado > 0 ? (pagado / prestado) * 100 : 0;
+
+  // Saldo corriente por movimiento (solo aprobados afectan el balance)
+  const saldoByMov = new Map<string, number>();
+  const ascAprobados = [...movs]
+    .filter(m => m.estado === "aprobado")
+    .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.created_at.localeCompare(b.created_at));
+  let running = 0;
+  for (const m of ascAprobados) {
+    if (PRESTAMO_CONCEPTOS.includes(m.concepto)) running += Number(m.monto);
+    else running -= Number(m.monto);
+    saldoByMov.set(m.id, running);
+  }
+  if (ascAprobados.length > 0) {
+    const last = saldoByMov.get(ascAprobados[ascAprobados.length - 1].id) ?? 0;
+    if (Math.abs(last - saldo) > 0.01) {
+      console.warn(`[Préstamos] Saldo running ($${last.toFixed(2)}) no coincide con saldo backend ($${saldo.toFixed(2)}) para ${empleado.nombre}`);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -106,8 +124,6 @@ export default function PrestamoDetallePage() {
 
         <SummaryCards prestado={prestado} pagado={pagado} saldo={saldo} pct={pct} />
 
-        <DeduccionesHistorial movs={movs} deduccionQuincenal={empleado.deduccion_quincenal} />
-
         <div className="flex flex-wrap gap-3 mb-6">
           <button onClick={actions.pagoQuincenal} className="bg-emerald-600 text-white px-5 py-2 rounded-md text-sm hover:bg-emerald-700 transition font-medium">
             Pago Quincenal · ${fmt(empleado.deduccion_quincenal)}
@@ -119,6 +135,7 @@ export default function PrestamoDetallePage() {
 
         <MovimientoTable
           sortedMovs={sortedMovs}
+          saldoByMov={saldoByMov}
           isAdmin={isAdmin}
           isAdminOrDirector={isAdminOrDirector}
           canEdit={canEdit}

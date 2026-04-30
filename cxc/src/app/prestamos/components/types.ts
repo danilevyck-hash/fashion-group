@@ -33,7 +33,6 @@ export function progressColorText(pct: number) {
 }
 
 export const MESES_FULL = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
-export const MESES_DET = ["", "Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 export function getQuincenaRange() {
   const now = new Date();
@@ -53,30 +52,6 @@ export function hasDeduccionEnQuincena(movs: Movimiento[], qStart: Date, qEnd: D
     const fecha = new Date(m.fecha + "T12:00:00");
     return fecha.getTime() >= qStart.getTime() - tolerance && fecha.getTime() <= qEnd.getTime() + tolerance;
   });
-}
-
-export function getLast12Quincenas(): { label: string; start: Date; end: Date }[] {
-  const result: { label: string; start: Date; end: Date }[] = [];
-  const now = new Date();
-  let y = now.getFullYear(), m = now.getMonth();
-  let isSecond = now.getDate() > 15;
-
-  for (let i = 0; i < 12; i++) {
-    const mes = MESES_DET[m + 1];
-    if (isSecond) {
-      result.push({ label: `${mes} ${y} 2da`, start: new Date(y, m, 16), end: new Date(y, m + 1, 0) });
-    } else {
-      result.push({ label: `${mes} ${y} 1ra`, start: new Date(y, m, 1), end: new Date(y, m, 15) });
-    }
-    if (isSecond) {
-      isSecond = false;
-    } else {
-      isSecond = true;
-      m--;
-      if (m < 0) { m = 11; y--; }
-    }
-  }
-  return result;
 }
 
 export const MOV_TYPES = [
