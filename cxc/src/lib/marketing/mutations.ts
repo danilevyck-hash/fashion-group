@@ -4,6 +4,7 @@
 // Inputs tipados, sin `any`. Inmutable: nunca mutamos inputs.
 // ============================================================================
 import { supabaseServer } from "@/lib/supabase-server";
+import { calcularCostoTotal } from "@/lib/marketing-calc";
 import {
   tituloCase,
   oracionCase,
@@ -352,11 +353,15 @@ export async function createFactura(
   if (!Number.isFinite(subtotal) || subtotal < 0) {
     throw new Error("subtotal inválido");
   }
-  const itbms = round2(Number(input.itbms ?? 0));
+  const tieneImportacion = Boolean(input.tieneImportacion);
+  // Zona libre y ITBMS son mutuamente excluyentes: si zona libre, ITBMS = 0.
+  const itbms = tieneImportacion ? 0 : round2(Number(input.itbms ?? 0));
   if (!Number.isFinite(itbms) || itbms < 0) {
     throw new Error("itbms inválido");
   }
-  const total = round2(subtotal + itbms);
+  const total = tieneImportacion
+    ? calcularCostoTotal(subtotal, true)
+    : round2(subtotal + itbms);
 
   const payload = {
     proyecto_id: input.proyectoId,
@@ -367,6 +372,7 @@ export async function createFactura(
     subtotal,
     itbms,
     total,
+    tiene_importacion: tieneImportacion,
   };
 
   const { data, error } = await supabaseServer
@@ -408,13 +414,14 @@ export async function updateFactura(
     payload.concepto = c;
   }
 
-  // Si cambia subtotal o itbms, recalcular total.
+  // Si cambia subtotal, itbms o tieneImportacion, recalcular total.
   const hasSubtotal = input.subtotal !== undefined;
   const hasItbms = input.itbms !== undefined;
-  if (hasSubtotal || hasItbms) {
+  const hasTieneImportacion = input.tieneImportacion !== undefined;
+  if (hasSubtotal || hasItbms || hasTieneImportacion) {
     const { data: actual, error: err } = await supabaseServer
       .from("mk_facturas")
-      .select("subtotal, itbms")
+      .select("subtotal, itbms, tiene_importacion")
       .eq("id", id)
       .maybeSingle();
     if (err || !actual) {
@@ -422,12 +429,23 @@ export async function updateFactura(
     }
     const a = actual as Record<string, unknown>;
     const sub = hasSubtotal ? Number(input.subtotal) : Number(a.subtotal ?? 0);
-    const itb = hasItbms ? Number(input.itbms) : Number(a.itbms ?? 0);
+    const tieneImp = hasTieneImportacion
+      ? Boolean(input.tieneImportacion)
+      : Boolean(a.tiene_importacion);
+    // Zona libre fuerza ITBMS = 0; si no, usa input o el actual.
+    const itb = tieneImp
+      ? 0
+      : hasItbms
+        ? Number(input.itbms)
+        : Number(a.itbms ?? 0);
     if (!Number.isFinite(sub) || sub < 0) throw new Error("subtotal inválido");
     if (!Number.isFinite(itb) || itb < 0) throw new Error("itbms inválido");
     payload.subtotal = round2(sub);
     payload.itbms = round2(itb);
-    payload.total = round2(sub + itb);
+    payload.tiene_importacion = tieneImp;
+    payload.total = tieneImp
+      ? calcularCostoTotal(sub, true)
+      : round2(sub + itb);
   }
 
   if (Object.keys(payload).length === 0) {

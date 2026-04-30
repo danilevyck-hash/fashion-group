@@ -64,6 +64,7 @@ function mapFactura(row: Record<string, unknown>): MkFactura {
     subtotal: Number(row.subtotal ?? 0),
     itbms: Number(row.itbms ?? 0),
     total: Number(row.total ?? 0),
+    tiene_importacion: Boolean(row.tiene_importacion ?? false),
     anulado_en: (row.anulado_en as string | null) ?? null,
     anulado_motivo: (row.anulado_motivo as string | null) ?? null,
     created_at: String(row.created_at ?? ""),

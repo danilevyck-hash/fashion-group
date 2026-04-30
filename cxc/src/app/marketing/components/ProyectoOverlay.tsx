@@ -20,6 +20,10 @@ import {
   formatearFecha,
   formatearMonto,
 } from "@/lib/marketing/normalizar";
+import {
+  PORCENTAJE_IMPORTACION_ZONA_LIBRE,
+  calcularImportacion,
+} from "@/lib/marketing-calc";
 import type {
   FacturaConAdjuntos,
   MarcaConPorcentaje,
@@ -123,10 +127,19 @@ export default function ProyectoOverlay({
     const vigentes = facturas.filter((f) => !f.anulado_en);
     const subtotal = vigentes.reduce((acc, f) => acc + f.subtotal, 0);
     const total = vigentes.reduce((acc, f) => acc + f.total, 0);
+    // Importación 15%: sumar solo facturas con tiene_importacion = true.
+    const importacion = vigentes.reduce(
+      (acc, f) =>
+        acc + calcularImportacion(f.subtotal, Boolean(f.tiene_importacion)),
+      0,
+    );
+    const tieneAlgunaZonaLibre = vigentes.some((f) => f.tiene_importacion);
     return {
       subtotal: Number(subtotal.toFixed(2)),
+      importacion: Number(importacion.toFixed(2)),
       total: Number(total.toFixed(2)),
       conteo: vigentes.length,
+      tieneAlgunaZonaLibre,
     };
   }, [facturas]);
 
@@ -331,7 +344,11 @@ export default function ProyectoOverlay({
               </div>
             )}
 
-            <div className="grid grid-cols-3 gap-3 mt-4 pt-3 border-t border-gray-100">
+            <div
+              className={`grid ${
+                totales.tieneAlgunaZonaLibre ? "grid-cols-4" : "grid-cols-3"
+              } gap-3 mt-4 pt-3 border-t border-gray-100`}
+            >
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-gray-400">
                   Facturas
@@ -348,9 +365,22 @@ export default function ProyectoOverlay({
                   {formatearMonto(totales.subtotal)}
                 </div>
               </div>
+              {totales.tieneAlgunaZonaLibre && (
+                <div>
+                  <div
+                    className="text-[10px] uppercase tracking-wider text-amber-700"
+                    title="Sumatoria del 15% de importación de las facturas marcadas como zona libre"
+                  >
+                    Importación {PORCENTAJE_IMPORTACION_ZONA_LIBRE}%
+                  </div>
+                  <div className="text-sm font-semibold font-mono tabular-nums text-amber-800">
+                    +{formatearMonto(totales.importacion)}
+                  </div>
+                </div>
+              )}
               <div>
                 <div className="text-[10px] uppercase tracking-wider text-gray-400">
-                  Total
+                  Costo total
                 </div>
                 <div className="text-sm font-semibold font-mono tabular-nums text-gray-900">
                   {formatearMonto(totales.total)}

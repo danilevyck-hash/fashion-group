@@ -2,6 +2,10 @@
 
 import type { FacturaConAdjuntos, MkMarca } from "@/lib/marketing/types";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
+import {
+  PORCENTAJE_IMPORTACION_ZONA_LIBRE,
+  calcularImportacion,
+} from "@/lib/marketing-calc";
 
 interface PorcentajeMarca {
   marca: MkMarca;
@@ -52,6 +56,14 @@ export function FacturaCard({
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {factura.tiene_importacion && !anulada && (
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-medium"
+              title={`Compra en zona libre · ${PORCENTAJE_IMPORTACION_ZONA_LIBRE}% de importación incluido en el total`}
+            >
+              Zona libre
+            </span>
+          )}
           {tienePdf && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-900 text-white font-semibold tracking-wide">
               PDF
@@ -73,9 +85,17 @@ export function FacturaCard({
           </div>
         </div>
         <div>
-          <div className="text-gray-400">ITBMS</div>
+          <div className="text-gray-400">
+            {factura.tiene_importacion
+              ? `Importación ${PORCENTAJE_IMPORTACION_ZONA_LIBRE}%`
+              : "ITBMS"}
+          </div>
           <div className={`tabular-nums font-mono ${textoBase}`}>
-            {formatearMonto(factura.itbms)}
+            {factura.tiene_importacion
+              ? formatearMonto(
+                  calcularImportacion(factura.subtotal, true),
+                )
+              : formatearMonto(factura.itbms)}
           </div>
         </div>
         <div>

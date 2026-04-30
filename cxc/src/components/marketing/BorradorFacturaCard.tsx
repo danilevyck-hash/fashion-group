@@ -7,6 +7,11 @@
 
 import { useMemo } from "react";
 import type { MkMarca } from "@/lib/marketing/types";
+import {
+  PORCENTAJE_IMPORTACION_ZONA_LIBRE,
+  calcularCostoTotal,
+  calcularImportacion,
+} from "@/lib/marketing-calc";
 
 export type EstadoBorrador =
   | { tipo: "ocr-pendiente" }       // PDF subido, esperando OCR
@@ -40,6 +45,7 @@ export interface BorradorFactura {
   concepto: string;
   subtotalStr: string;
   itbmsOption: "0" | "7";
+  tieneImportacion: boolean; // Compra en zona libre — suma 15% al subtotal.
   marcaIds: string[]; // ids seleccionados (regla 50/50)
   // Detección de duplicados
   duplicados: DuplicadoItem[];
@@ -72,11 +78,19 @@ export function BorradorFacturaCard({
   onDescartar,
 }: Props) {
   const subtotal = Number(borrador.subtotalStr) || 0;
-  const itbms = useMemo(
-    () => (borrador.itbmsOption === "7" ? round2(subtotal * 0.07) : 0),
-    [subtotal, borrador.itbmsOption],
+  const tieneImportacion = borrador.tieneImportacion;
+  const itbms = useMemo(() => {
+    if (tieneImportacion) return 0;
+    return borrador.itbmsOption === "7" ? round2(subtotal * 0.07) : 0;
+  }, [subtotal, borrador.itbmsOption, tieneImportacion]);
+  const importacion = useMemo(
+    () => calcularImportacion(subtotal, tieneImportacion),
+    [subtotal, tieneImportacion],
   );
-  const total = useMemo(() => round2(subtotal + itbms), [subtotal, itbms]);
+  const total = useMemo(() => {
+    if (tieneImportacion) return calcularCostoTotal(subtotal, true);
+    return round2(subtotal + itbms);
+  }, [subtotal, itbms, tieneImportacion]);
 
   const estaProcesando =
     borrador.estado.tipo === "ocr-pendiente" ||
@@ -248,19 +262,40 @@ export function BorradorFacturaCard({
                 itbmsOption: e.target.value as "0" | "7",
               })
             }
-            disabled={estaProcesando}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white focus:border-black focus:outline-none disabled:bg-gray-50"
+            disabled={estaProcesando || tieneImportacion}
+            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white focus:border-black focus:outline-none disabled:bg-gray-50 disabled:opacity-60"
           >
             <option value="0">0% (exento)</option>
             <option value="7">7%</option>
           </select>
+          {tieneImportacion && (
+            <div className="text-[11px] text-gray-500 mt-1">
+              ITBMS no aplica en zona libre
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Zona libre */}
+      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={tieneImportacion}
+          onChange={(e) =>
+            onChange(borrador.cardId, { tieneImportacion: e.target.checked })
+          }
+          disabled={estaProcesando}
+          className="accent-black w-4 h-4 disabled:cursor-not-allowed"
+        />
+        Compra en zona libre ({PORCENTAJE_IMPORTACION_ZONA_LIBRE}%)
+      </label>
 
       {/* Total derivado */}
       <div className="flex justify-between text-xs text-gray-600 pt-1 border-t border-gray-200">
         <span>
-          Subtotal {formatearMonto(subtotal)} · ITBMS {formatearMonto(itbms)}
+          {tieneImportacion
+            ? `Subtotal ${formatearMonto(subtotal)} · Importación ${formatearMonto(importacion)}`
+            : `Subtotal ${formatearMonto(subtotal)} · ITBMS ${formatearMonto(itbms)}`}
         </span>
         <span className="font-semibold text-gray-900">
           Total {formatearMonto(total)}

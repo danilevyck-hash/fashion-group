@@ -85,6 +85,9 @@ export interface MkFactura {
   subtotal: number;
   itbms: number;
   total: number;
+  // Zona libre: si true, total = subtotal × 1.15 (ITBMS forzado a 0).
+  // Si false, total = subtotal + itbms (comportamiento clásico).
+  tiene_importacion: boolean;
   anulado_en: string | null;
   anulado_motivo: string | null;
   created_at: string;
@@ -168,6 +171,7 @@ export interface CreateFacturaInput {
   concepto: string;
   subtotal: number;
   itbms?: number;
+  tieneImportacion?: boolean;
 }
 
 export interface UpdateFacturaInput {
@@ -177,6 +181,7 @@ export interface UpdateFacturaInput {
   concepto?: string;
   subtotal?: number;
   itbms?: number;
+  tieneImportacion?: boolean;
 }
 
 export interface CreateAdjuntoInput {

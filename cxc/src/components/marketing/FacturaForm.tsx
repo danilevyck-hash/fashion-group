@@ -20,6 +20,11 @@ import { AutocompleteInput } from "./AutocompleteInput";
 import { PasoInstruccion } from "./PasoInstruccion";
 import { PdfUploader, UploadResult } from "./PdfUploader";
 import { formatearMonto } from "@/lib/marketing/normalizar";
+import {
+  PORCENTAJE_IMPORTACION_ZONA_LIBRE,
+  calcularCostoTotal,
+  calcularImportacion,
+} from "@/lib/marketing-calc";
 
 export interface FacturaFormValues {
   numeroFactura: string;
@@ -28,6 +33,7 @@ export interface FacturaFormValues {
   concepto: string;
   subtotal: number;
   itbms: number;
+  tieneImportacion: boolean;
   marcasSeleccionadas: MarcaPorcentajeInput[];
   // El usuario confirmó que aunque haya duplicado quiere guardar igual.
   // Se loguea en activity_logs para auditoría.
@@ -124,6 +130,9 @@ export function FacturaForm({
     }
     return "0";
   });
+  const [tieneImportacion, setTieneImportacion] = useState<boolean>(
+    Boolean(initial?.tiene_importacion),
+  );
   const [pdfFile, setPdfFile] = useState<File | undefined>(undefined);
   const [pdfSubido, setPdfSubido] = useState(false);
   const [leyendoIA, setLeyendoIA] = useState(false);
@@ -155,11 +164,19 @@ export function FacturaForm({
   );
 
   const subtotal = Number(subtotalStr) || 0;
-  const itbms = useMemo(
-    () => (itbmsOption === "7" ? round2(subtotal * 0.07) : 0),
-    [subtotal, itbmsOption],
+  // Zona libre y ITBMS son mutuamente excluyentes: si zona libre, ITBMS = 0.
+  const itbms = useMemo(() => {
+    if (tieneImportacion) return 0;
+    return itbmsOption === "7" ? round2(subtotal * 0.07) : 0;
+  }, [subtotal, itbmsOption, tieneImportacion]);
+  const importacion = useMemo(
+    () => calcularImportacion(subtotal, tieneImportacion),
+    [subtotal, tieneImportacion],
   );
-  const total = useMemo(() => round2(subtotal + itbms), [subtotal, itbms]);
+  const total = useMemo(() => {
+    if (tieneImportacion) return calcularCostoTotal(subtotal, true);
+    return round2(subtotal + itbms);
+  }, [subtotal, itbms, tieneImportacion]);
 
   // Payload final: cada marca seleccionada con porcentaje fijo 50.
   const marcasPayload: MarcaPorcentajeInput[] = useMemo(
@@ -292,6 +309,7 @@ export function FacturaForm({
           concepto,
           subtotal,
           itbms,
+          tieneImportacion,
           marcasSeleccionadas: marcasPayload,
           permitirDuplicado,
         },
@@ -441,18 +459,22 @@ export function FacturaForm({
               <div
                 role="radiogroup"
                 aria-labelledby="factura-itbms-label"
-                className="flex rounded-md border border-gray-300 overflow-hidden"
+                aria-disabled={tieneImportacion}
+                className={`flex rounded-md border border-gray-300 overflow-hidden ${
+                  tieneImportacion ? "opacity-50" : ""
+                }`}
               >
                 <button
                   type="button"
                   role="radio"
                   aria-checked={itbmsOption === "0"}
+                  disabled={tieneImportacion}
                   onClick={() => setItbmsOption("0")}
                   className={`flex-1 px-3 py-2 text-sm transition ${
                     itbmsOption === "0"
                       ? "bg-black text-white"
                       : "bg-white text-gray-700 hover:bg-gray-50"
-                  }`}
+                  } disabled:cursor-not-allowed`}
                 >
                   0%
                 </button>
@@ -460,18 +482,21 @@ export function FacturaForm({
                   type="button"
                   role="radio"
                   aria-checked={itbmsOption === "7"}
+                  disabled={tieneImportacion}
                   onClick={() => setItbmsOption("7")}
                   className={`flex-1 px-3 py-2 text-sm transition border-l border-gray-300 ${
                     itbmsOption === "7"
                       ? "bg-black text-white"
                       : "bg-white text-gray-700 hover:bg-gray-50"
-                  }`}
+                  } disabled:cursor-not-allowed`}
                 >
                   7%
                 </button>
               </div>
               <div className="text-xs text-gray-500 mt-1 tabular-nums">
-                {formatearMonto(itbms)}
+                {tieneImportacion
+                  ? "ITBMS no aplica en zona libre"
+                  : formatearMonto(itbms)}
               </div>
             </div>
             <div>
@@ -490,9 +515,47 @@ export function FacturaForm({
                 className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm tabular-nums text-gray-700"
               />
               <div className="text-xs text-gray-400 mt-1">
-                Subtotal + ITBMS
+                {tieneImportacion
+                  ? `Subtotal + ${PORCENTAJE_IMPORTACION_ZONA_LIBRE}% importación`
+                  : "Subtotal + ITBMS"}
               </div>
             </div>
+          </div>
+
+          {/* Zona libre */}
+          <div className="rounded-md border border-gray-200 bg-gray-50/60 px-3 py-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={tieneImportacion}
+                onChange={(e) => setTieneImportacion(e.target.checked)}
+                className="accent-black w-4 h-4"
+              />
+              <span className="text-sm text-gray-800">
+                Compra en zona libre ({PORCENTAJE_IMPORTACION_ZONA_LIBRE}%)
+              </span>
+            </label>
+            {tieneImportacion && subtotal > 0 && (
+              <dl className="mt-2 space-y-0.5 text-xs tabular-nums">
+                <div className="flex justify-between text-gray-600">
+                  <dt>Subtotal</dt>
+                  <dd>{formatearMonto(subtotal)}</dd>
+                </div>
+                <div className="flex justify-between text-gray-600">
+                  <dt>Importación {PORCENTAJE_IMPORTACION_ZONA_LIBRE}%</dt>
+                  <dd>+{formatearMonto(importacion)}</dd>
+                </div>
+                <div className="flex justify-between text-gray-900 font-semibold pt-0.5 border-t border-gray-200 mt-1">
+                  <dt>Costo total</dt>
+                  <dd>{formatearMonto(total)}</dd>
+                </div>
+              </dl>
+            )}
+            {tieneImportacion && subtotal === 0 && (
+              <div className="mt-1 text-[11px] text-gray-500">
+                El {PORCENTAJE_IMPORTACION_ZONA_LIBRE}% se calcula al ingresar el subtotal.
+              </div>
+            )}
           </div>
         </div>
       </PasoInstruccion>

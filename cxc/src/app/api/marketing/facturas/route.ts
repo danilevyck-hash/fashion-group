@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
       concepto: body.concepto,
       subtotal: Number(body.subtotal),
       itbms: body.itbms !== undefined ? Number(body.itbms) : 0,
+      tieneImportacion: Boolean(body.tieneImportacion),
     });
 
     // Si el usuario decidió guardar a sabiendas un duplicado, dejamos rastro

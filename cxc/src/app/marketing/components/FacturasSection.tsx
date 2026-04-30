@@ -189,6 +189,7 @@ export default function FacturasSection({
       concepto: string;
       subtotal: number;
       itbms: number;
+      tieneImportacion: boolean;
       marcasSeleccionadas: MarcaPorcentajeInput[];
       permitirDuplicado?: boolean;
     },
@@ -311,6 +312,7 @@ export default function FacturasSection({
       concepto: string;
       subtotal: number;
       itbms: number;
+      tieneImportacion: boolean;
       marcasSeleccionadas: MarcaPorcentajeInput[];
     },
   ) => {

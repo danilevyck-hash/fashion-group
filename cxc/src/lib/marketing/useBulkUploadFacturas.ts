@@ -55,6 +55,7 @@ function borradorVacio(file: File): BorradorFactura {
     concepto: "",
     subtotalStr: "",
     itbmsOption: "0",
+    tieneImportacion: false,
     marcaIds: [],
     duplicados: [],
     verificandoDuplicado: false,
@@ -334,7 +335,12 @@ export function useBulkUploadFacturas({ proyectoId }: UseArgs) {
     try {
       const items = cardsListas.map((b) => {
         const sub = Number(b.subtotalStr);
-        const itbms = b.itbmsOption === "7" ? round2(sub * 0.07) : 0;
+        // Zona libre fuerza ITBMS = 0; si no, depende del radio.
+        const itbms = b.tieneImportacion
+          ? 0
+          : b.itbmsOption === "7"
+            ? round2(sub * 0.07)
+            : 0;
         return {
           cardId: b.cardId,
           numeroFactura: b.numeroFactura.trim(),
@@ -343,6 +349,7 @@ export function useBulkUploadFacturas({ proyectoId }: UseArgs) {
           concepto: b.concepto.trim(),
           subtotal: round2(sub),
           itbms,
+          tieneImportacion: b.tieneImportacion,
           marcaIds: b.marcaIds,
           // Solo permite duplicado si el user lo confirmó explícitamente.
           // Caller debe verificar `borradoresConDuplicadoSinConfirmar` antes

@@ -19,6 +19,7 @@ interface BulkItem {
   concepto?: unknown;
   subtotal?: unknown;
   itbms?: unknown;
+  tieneImportacion?: unknown;
   marcaIds?: unknown;
   permitirDuplicado?: unknown;
   pdfPath?: unknown;
@@ -39,6 +40,7 @@ interface ItemNormalizado {
   concepto: string;
   subtotal: number;
   itbms: number;
+  tieneImportacion: boolean;
   marcaIds: string[];
   permitirDuplicado: boolean;
   pdfPath: string | null;
@@ -70,7 +72,9 @@ function normalizar(raw: BulkItem): ItemNormalizado | { error: string } {
   if (subtotal === null || subtotal <= 0) {
     return { error: "Subtotal debe ser mayor a 0" };
   }
-  const itbms = asNumber(raw.itbms) ?? 0;
+  const tieneImportacion = Boolean(raw.tieneImportacion);
+  // Zona libre fuerza ITBMS = 0; si no, lee del payload.
+  const itbms = tieneImportacion ? 0 : asNumber(raw.itbms) ?? 0;
   if (itbms < 0) return { error: "ITBMS inválido" };
   if (!Array.isArray(raw.marcaIds) || raw.marcaIds.length === 0) {
     return { error: "Selecciona al menos una marca" };
@@ -89,6 +93,7 @@ function normalizar(raw: BulkItem): ItemNormalizado | { error: string } {
     concepto,
     subtotal,
     itbms,
+    tieneImportacion,
     marcaIds,
     permitirDuplicado: Boolean(raw.permitirDuplicado),
     pdfPath: asString(raw.pdfPath),
@@ -177,6 +182,7 @@ export async function POST(req: NextRequest) {
         concepto: norm.concepto,
         subtotal: norm.subtotal,
         itbms: norm.itbms,
+        tieneImportacion: norm.tieneImportacion,
       });
 
       // 2. Asignar marcas (regla 50/50 fija; el helper ignora porcentajes recibidos)
