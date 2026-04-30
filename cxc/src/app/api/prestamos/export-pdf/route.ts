@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
+import { filterEmpleadosMovimientos } from "@/lib/prestamos-helpers";
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
 import { FG_LOGO_BASE64, FG_LOGO_WIDTH, FG_LOGO_HEIGHT } from "@/lib/pdf-logo";
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
 
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
-  const empleados = (data || []).filter((emp) => {
+  const empleados = filterEmpleadosMovimientos(data).filter((emp) => {
     const movs = emp.prestamos_movimientos || [];
     const prestado = movs
       .filter((m: { concepto: string; estado: string }) => (m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño") && m.estado === "aprobado")

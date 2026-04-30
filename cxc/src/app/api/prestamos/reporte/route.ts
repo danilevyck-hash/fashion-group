@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
+import { filterEmpleadosMovimientos } from "@/lib/prestamos-helpers";
 
 const PRESTAMOS_ROLES = ["admin", "contabilidad"];
 
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest) {
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
 
   // Filter to only employees with pending balance
-  const result = (data || []).filter((emp) => {
+  const result = filterEmpleadosMovimientos(data).filter((emp) => {
     const movs = emp.prestamos_movimientos || [];
     const prestado = movs
       .filter((m: { concepto: string; estado: string }) => (m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño") && m.estado === "aprobado")

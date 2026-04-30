@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
   let query = supabaseServer
     .from("prestamos_movimientos")
     .select("*")
+    .or("deleted.is.null,deleted.eq.false")
     .order("fecha", { ascending: false })
     .order("created_at", { ascending: false });
 

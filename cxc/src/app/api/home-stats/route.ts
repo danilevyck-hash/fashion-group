@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     supabaseServer.from("guia_transporte").select("*", { count: "exact", head: true }).eq("estado", "Pendiente Bodega").eq("deleted", false),
     supabaseServer.from("directorio_clientes").select("*", { count: "exact", head: true }).eq("deleted", false),
     supabaseServer.from("cxc_uploads").select("uploaded_at").order("uploaded_at", { ascending: false }).limit(1),
-    supabaseServer.from("prestamos_movimientos").select("*", { count: "exact", head: true }).eq("estado", "pendiente_aprobacion"),
+    supabaseServer.from("prestamos_movimientos").select("*", { count: "exact", head: true }).eq("estado", "pendiente_aprobacion").or("deleted.is.null,deleted.eq.false"),
     // Ventas mes actual
     getVentasMensuales(currentYear, currentMonth).then(d => ({ data: d, error: null })).catch(() => ({ data: null, error: null })),
     // Ventas mes anterior

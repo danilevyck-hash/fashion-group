@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
     // Préstamos: buscar por nombre en prestamos_empleados
     supabaseServer
       .from("prestamos_empleados")
-      .select("id, nombre, empresa, activo, prestamos_movimientos(monto, concepto, estado)")
+      .select("id, nombre, empresa, activo, prestamos_movimientos(monto, concepto, estado, deleted)")
       .ilike("nombre", pattern)
       .eq("activo", true)
       .order("nombre")
@@ -149,8 +149,8 @@ export async function GET(req: NextRequest) {
     saldo: number;
   }
   const prestamosRaw = prestamosRes.data || [];
-  const prestamosData: PrestamoResult[] = prestamosRaw.map((emp: { id: string; nombre: string; empresa: string | null; prestamos_movimientos: { monto: number; concepto: string; estado: string }[] }) => {
-    const movs = emp.prestamos_movimientos || [];
+  const prestamosData: PrestamoResult[] = prestamosRaw.map((emp: { id: string; nombre: string; empresa: string | null; prestamos_movimientos: { monto: number; concepto: string; estado: string; deleted?: boolean | null }[] }) => {
+    const movs = (emp.prestamos_movimientos || []).filter(m => m.deleted !== true);
     const prestado = movs
       .filter((m) => (m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño") && m.estado === "aprobado")
       .reduce((s, m) => s + Number(m.monto), 0);

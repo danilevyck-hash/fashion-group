@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
+import { filterEmpleadoMovimientos } from "@/lib/prestamos-helpers";
 
 const PRESTAMOS_ROLES = ["admin", "contabilidad"];
 
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const { data, error } = await supabaseServer
     .from("prestamos_empleados").select("*, prestamos_movimientos(*)").eq("id", params.id).single();
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
-  return NextResponse.json(data);
+  return NextResponse.json(data ? filterEmpleadoMovimientos(data) : data);
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {

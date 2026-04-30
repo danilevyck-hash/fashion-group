@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
+import { filterEmpleadosMovimientos } from "@/lib/prestamos-helpers";
 
 const PRESTAMOS_ROLES = ["admin", "contabilidad"];
 
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await query;
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
-  return NextResponse.json(data);
+  return NextResponse.json(filterEmpleadosMovimientos(data));
 }
 
 export async function POST(req: NextRequest) {
