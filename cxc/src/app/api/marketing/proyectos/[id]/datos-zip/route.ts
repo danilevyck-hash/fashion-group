@@ -6,8 +6,10 @@ import {
   getFacturasByProyecto,
   getAdjuntosByProyecto,
 } from "@/lib/marketing/queries";
+import { listEntregasByProyecto } from "@/lib/marketing/inventario";
 import { firmarAdjuntos } from "@/lib/marketing/storage";
 import type {
+  EntregaConItems,
   MarcaConPorcentaje,
   MkAdjunto,
   MkFactura,
@@ -41,9 +43,10 @@ export async function GET(
       return NextResponse.json({ error: "Proyecto no existe" }, { status: 404 });
     }
 
-    const [facturasConAdj, fotosProyecto] = await Promise.all([
+    const [facturasConAdj, fotosProyecto, entregas] = await Promise.all([
       getFacturasByProyecto(params.id),
       getAdjuntosByProyecto(params.id),
+      listEntregasByProyecto(params.id),
     ]);
 
     const facturaIds = facturasConAdj.map((f) => f.id);
@@ -109,10 +112,15 @@ export async function GET(
       firmarAdjuntos(fotosProyecto),
     ]);
 
-    // Marcas involucradas (únicas, orden alfabético)
+    // Marcas involucradas (únicas, orden alfabético): facturas + entregas.
     const marcasInvolucradasSet = new Set<string>();
     for (const f of facturas) {
       for (const m of f.marcas) marcasInvolucradasSet.add(m.marca.id);
+    }
+    for (const e of entregas) {
+      for (const marcaId of Object.keys(e.total_por_marca ?? {})) {
+        marcasInvolucradasSet.add(marcaId);
+      }
     }
     const marcasInvolucradas = Array.from(marcasInvolucradasSet)
       .map((id) => marcaById.get(id))
@@ -125,6 +133,7 @@ export async function GET(
       adjuntosFacturas,
       fotosProyecto: fotosFirmadas,
       marcasInvolucradas,
+      entregas: entregas as EntregaConItems[],
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error interno";

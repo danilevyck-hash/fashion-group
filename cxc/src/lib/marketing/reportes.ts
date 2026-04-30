@@ -7,6 +7,7 @@ import XLSX from "xlsx-js-style";
 import { supabaseServer } from "@/lib/supabase-server";
 import { formatearFecha } from "./normalizar";
 import { getMarcas } from "./queries";
+import { getEntregaTotalPorMarcaBatch, getEntregaTotalByProyectoBatch } from "./inventario";
 import type { MkMarca, EstadoProyecto } from "./types";
 
 // ----------------------------------------------------------------------------
@@ -222,10 +223,11 @@ export async function reportePorMarca(
   if (marcas.length === 0) return [];
 
   const proyectoIds = proyectos.map((p) => p.id);
-  const [proyMarcas, facturas, cobranzas] = await Promise.all([
+  const [proyMarcas, facturas, cobranzas, entregasByProyMarca] = await Promise.all([
     cargarProyMarcas(proyectoIds),
     cargarFacturas(proyectoIds),
 cargarCobranzas(proyectoIds, proyectos),
+    getEntregaTotalPorMarcaBatch(proyectoIds),
   ]);
 
   // Total facturado por proyecto
@@ -240,6 +242,13 @@ cargarCobranzas(proyectoIds, proyectos),
     const proyTotal = totalByProy.get(pm.proyecto_id) ?? 0;
     const parte = (proyTotal * pm.porcentaje) / 100;
     gastadoByMarca.set(pm.marca_id, (gastadoByMarca.get(pm.marca_id) ?? 0) + parte);
+  }
+
+  // Sumar entregas: total_por_marca ya viene desglosado por marca, no usa %.
+  for (const [, byMarca] of entregasByProyMarca) {
+    for (const [marcaId, monto] of byMarca) {
+      gastadoByMarca.set(marcaId, (gastadoByMarca.get(marcaId) ?? 0) + monto);
+    }
   }
 
   // Cobrado por marca = suma de montos de cobranzas en estado 'cobrada'
@@ -332,10 +341,11 @@ export async function reportePorProyecto(
   if (proyectos.length === 0) return [];
 
   const proyectoIds = proyectos.map((p) => p.id);
-  const [proyMarcas, facturas, cobranzas] = await Promise.all([
+  const [proyMarcas, facturas, cobranzas, entregaTotalByProy] = await Promise.all([
     cargarProyMarcas(proyectoIds),
     cargarFacturas(proyectoIds),
 cargarCobranzas(proyectoIds, proyectos),
+    getEntregaTotalByProyectoBatch(proyectoIds),
   ]);
 
   // Si se filtra por marcaId, solo incluir proyectos que tengan esa marca
@@ -375,7 +385,9 @@ cargarCobranzas(proyectoIds, proyectos),
 
   return proyectosFiltrados
     .map((p) => {
-      const gasto = Number((totalByProy.get(p.id) ?? 0).toFixed(2));
+      const gastoFact = totalByProy.get(p.id) ?? 0;
+      const gastoEntregas = entregaTotalByProy.get(p.id) ?? 0;
+      const gasto = Number((gastoFact + gastoEntregas).toFixed(2));
       const cobrado = Number((cobradoByProy.get(p.id) ?? 0).toFixed(2));
       return {
         proyecto: p,

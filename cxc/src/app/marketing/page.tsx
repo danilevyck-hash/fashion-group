@@ -161,6 +161,7 @@ function MarketingPage() {
             onOpenAnulados={() => navegar({ vista: "anulados" })}
             onOpenReportes={() => navegar({ vista: "reportes" })}
             onOpenHistorial={() => navegar({ vista: "historial" })}
+            onOpenInventario={() => router.push("/marketing/inventario")}
             refreshKey={refreshKey}
           />
         )}

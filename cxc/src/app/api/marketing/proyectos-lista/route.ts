@@ -107,8 +107,8 @@ export async function GET(req: NextRequest) {
 
     const proyectoIds = proyectos.map((p) => String(p.id));
 
-    // 2. Cargar facturas + adjuntos + marcas-de-factura en batch
-    const [facturasRes, adjFotosRes, fmRes] = await Promise.all([
+    // 2. Cargar facturas + adjuntos + marcas-de-factura + entregas en batch
+    const [facturasRes, adjFotosRes, fmRes, entregasRes] = await Promise.all([
       supabaseServer
         .from("mk_facturas")
         .select("id, proyecto_id, total, anulado_en")
@@ -122,11 +122,16 @@ export async function GET(req: NextRequest) {
       supabaseServer
         .from("mk_factura_marcas")
         .select("factura_id, marca_id, porcentaje"),
+      supabaseServer
+        .from("mk_entregas_muebles")
+        .select("proyecto_id, total_por_marca")
+        .in("proyecto_id", proyectoIds),
     ]);
 
     if (facturasRes.error) throw new Error(`facturas: ${facturasRes.error.message}`);
     if (adjFotosRes.error) throw new Error(`adjuntos: ${adjFotosRes.error.message}`);
     if (fmRes.error) throw new Error(`factura_marcas: ${fmRes.error.message}`);
+    if (entregasRes.error) throw new Error(`entregas: ${entregasRes.error.message}`);
 
     const facturas = (facturasRes.data ?? []) as Array<{
       id: string;
@@ -178,6 +183,27 @@ export async function GET(req: NextRequest) {
         cobrableFactByProyMarca.get(pid) ?? new Map<string, number>();
       const monto = (finfo.total * Number(r.porcentaje ?? 0)) / 100;
       inner.set(mid, (inner.get(mid) ?? 0) + monto);
+      cobrableFactByProyMarca.set(pid, inner);
+    }
+
+    // Sumar entregas de muebles al cobrable por marca de cada proyecto.
+    // total_por_marca es {"<marca_id>": <monto>} y va sin desglose.
+    for (const e of (entregasRes.data ?? []) as Array<{
+      proyecto_id: string;
+      total_por_marca: Record<string, number> | null;
+    }>) {
+      const pid = String(e.proyecto_id);
+      const tpm = e.total_por_marca ?? {};
+      const set = marcasByProy.get(pid) ?? new Set<string>();
+      const inner =
+        cobrableFactByProyMarca.get(pid) ?? new Map<string, number>();
+      for (const [mid, monto] of Object.entries(tpm)) {
+        const n = Number(monto);
+        if (!Number.isFinite(n) || n <= 0) continue;
+        set.add(mid);
+        inner.set(mid, (inner.get(mid) ?? 0) + n);
+      }
+      marcasByProy.set(pid, set);
       cobrableFactByProyMarca.set(pid, inner);
     }
 

@@ -52,6 +52,7 @@ interface Props {
   onOpenAnulados: () => void;
   onOpenReportes: () => void;
   onOpenHistorial: () => void;
+  onOpenInventario: () => void;
   refreshKey: number;
 }
 
@@ -92,6 +93,7 @@ export default function ProyectosHomeView({
   onOpenAnulados,
   onOpenReportes,
   onOpenHistorial,
+  onOpenInventario,
   refreshKey,
 }: Props) {
   const { toast } = useToast();
@@ -254,6 +256,14 @@ export default function ProyectosHomeView({
             className="text-gray-600 hover:text-black transition"
           >
             Historial
+          </button>
+          <span className="text-gray-300">·</span>
+          <button
+            type="button"
+            onClick={onOpenInventario}
+            className="text-gray-600 hover:text-black transition"
+          >
+            Inventario
           </button>
           <span className="text-gray-300">·</span>
           <button

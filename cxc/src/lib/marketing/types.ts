@@ -193,3 +193,73 @@ export interface CreateAdjuntoInput {
   sizeBytes?: number;
 }
 
+// ----------------------------------------------------------------------------
+// Inventario de muebles + entregas por proyecto
+// ----------------------------------------------------------------------------
+// Modelo plano: productos con stock_total disponible (no histórico). Cada
+// entrega de un proyecto consume cantidades por marca, expresadas como un
+// jsonb {"<marca_id>": <unidades>}. El total_por_marca de la entrega se
+// SUMA al total del proyecto al cobrar — sin línea separada en reporte.
+
+export interface MkInventarioProducto {
+  id: string;
+  nombre: string;
+  precio: number;
+  stock_total: number; // unidades disponibles ahora mismo (no histórico).
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MkEntregaItem {
+  id: string;
+  entrega_id: string;
+  producto_id: string;
+  // {"<marca_id>": <unidades>} — claves son marca_id (uuid string)
+  cantidad_por_marca: Record<string, number>;
+  precio_unitario: number;
+  created_at: string;
+}
+
+export interface MkEntregaMuebles {
+  id: string;
+  proyecto_id: string;
+  total: number;
+  // {"<marca_id>": <monto>} — claves son marca_id (uuid string)
+  total_por_marca: Record<string, number>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EntregaConItems extends MkEntregaMuebles {
+  items: MkEntregaItem[];
+}
+
+// Inputs (mutations)
+export interface EntregaItemInput {
+  productoId: string;
+  // {"<marca_id>": <unidades>}; cantidades en 0 se aceptan pero se filtran al
+  // guardar (no se inserta el item).
+  cantidadPorMarca: Record<string, number>;
+}
+
+export interface CreateEntregaInput {
+  proyectoId: string;
+  items: EntregaItemInput[];
+}
+
+export interface UpdateEntregaInput {
+  items: EntregaItemInput[];
+}
+
+export interface CreateProductoInput {
+  nombre: string;
+  precio: number;
+  stockTotal: number;
+}
+
+export interface UpdateProductoInput {
+  nombre?: string;
+  precio?: number;
+  stockTotal?: number;
+}
+

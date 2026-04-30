@@ -15,6 +15,7 @@ import XLSX from "xlsx-js-style";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import type {
+  EntregaConItems,
   MarcaConPorcentaje,
   MkAdjunto,
   MkFactura,
@@ -97,6 +98,9 @@ export interface DatosZipProyecto {
   adjuntosFacturas: MkAdjunto[];
   fotosProyecto: MkAdjunto[];
   marcasInvolucradas: MkMarca[];
+  // Entregas de muebles del proyecto. Se suman al cobrable por marca como
+  // una sola fila más en el Excel maestro (sin desglose factura/entrega).
+  entregas?: EntregaConItems[];
 }
 
 function sanitizar(s: string): string {
@@ -141,6 +145,7 @@ function generarRespaldoExcel(
   proyecto: MkProyecto,
   facturas: FacturaConMarcas[],
   marcasDelProyecto: MkMarca[],
+  entregas: ReadonlyArray<EntregaConItems> = [],
 ): Blob {
   const mes = mesEjecucion(proyecto.fecha_enviado ?? proyecto.created_at ?? null);
   const detalle = proyecto.nombre ?? proyecto.tienda ?? "";
@@ -182,6 +187,24 @@ function generarRespaldoExcel(
     row.push(""); // Comentarios
     return row;
   });
+
+  // Agregar entregas como filas adicionales (1 por entrega) sin desglose
+  // factura/entrega — la marca solo ve "Entrega de muebles" y el monto.
+  for (const e of entregas) {
+    const row: Celda[] = [
+      mes,
+      proyecto.tienda,
+      "Entrega de muebles",
+      detalle,
+      round2(Number(e.total ?? 0)),
+    ];
+    for (const marca of marcasOrden) {
+      const monto = Number(e.total_por_marca?.[marca.id] ?? 0);
+      row.push(round2(monto));
+    }
+    row.push(""); // Comentarios
+    rows.push(row);
+  }
 
   // Construimos la matriz primero con valores numéricos para fila TOTALES,
   // luego inyectamos fórmulas SUM(...) reales en esas celdas.
@@ -319,7 +342,7 @@ export async function generarZipProyecto(
   datos: DatosZipProyecto,
   opts: GenerarZipOptions = {},
 ): Promise<void> {
-  const { proyecto, facturas, adjuntosFacturas, fotosProyecto, marcasInvolucradas } = datos;
+  const { proyecto, facturas, adjuntosFacturas, fotosProyecto, marcasInvolucradas, entregas = [] } = datos;
   const { onEtapa } = opts;
   const vigentes = facturas.filter((f) => !f.anulado_en);
   const zip = new JSZip();
@@ -402,7 +425,7 @@ export async function generarZipProyecto(
   // ── Etapa 3: generar Excel maestro ───────────────────────────────────────
   onEtapa?.("Generando Excel...");
   await yieldUI();
-  const excelBlob = generarRespaldoExcel(proyecto, vigentes, marcasInvolucradas);
+  const excelBlob = generarRespaldoExcel(proyecto, vigentes, marcasInvolucradas, entregas);
   zip.file("respaldo.xlsx", excelBlob);
 
   if (errores.length > 0) {

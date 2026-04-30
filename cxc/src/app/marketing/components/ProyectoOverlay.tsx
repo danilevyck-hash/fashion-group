@@ -36,7 +36,9 @@ interface FacturaConAdjuntosYMarcas extends FacturaConAdjuntos {
 }
 import FacturasSection from "./FacturasSection";
 import FotosSection from "./FotosSection";
+import EntregasSection from "./EntregasSection";
 import EditarProyectoModal from "./EditarProyectoModal";
+import type { EntregaConItems } from "@/lib/marketing/types";
 
 type Tab = "facturas" | "fotos";
 
@@ -61,6 +63,7 @@ export default function ProyectoOverlay({
   const { toast } = useToast();
   const [proyecto, setProyecto] = useState<ProyectoConMarcas | null>(null);
   const [facturas, setFacturas] = useState<FacturaConAdjuntosYMarcas[]>([]);
+  const [entregas, setEntregas] = useState<EntregaConItems[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("facturas");
   const [marcasCatalogo, setMarcasCatalogo] = useState<MkMarca[]>([]);
@@ -110,6 +113,20 @@ export default function ProyectoOverlay({
       setProyecto(body);
       onNombreProyectoRef.current?.(body.nombre || body.tienda);
       setFacturas(Array.isArray(body.facturas) ? body.facturas : []);
+
+      // Cargar entregas en paralelo (no bloquea si falla)
+      try {
+        const eRes = await fetch(
+          `/api/marketing/inventario/entregas?proyecto_id=${proyectoId}`,
+          { cache: "no-store" },
+        );
+        if (eRes.ok) {
+          const eData = (await eRes.json()) as EntregaConItems[];
+          setEntregas(Array.isArray(eData) ? eData : []);
+        }
+      } catch {
+        /* no bloquear el overlay si entregas no carga */
+      }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Error al cargar";
       toast(msg, "error");
@@ -125,8 +142,8 @@ export default function ProyectoOverlay({
 
   const totales = useMemo(() => {
     const vigentes = facturas.filter((f) => !f.anulado_en);
-    const subtotal = vigentes.reduce((acc, f) => acc + f.subtotal, 0);
-    const total = vigentes.reduce((acc, f) => acc + f.total, 0);
+    const subtotalFact = vigentes.reduce((acc, f) => acc + f.subtotal, 0);
+    const totalFact = vigentes.reduce((acc, f) => acc + f.total, 0);
     // Importación 15%: sumar solo facturas con tiene_importacion = true.
     const importacion = vigentes.reduce(
       (acc, f) =>
@@ -134,14 +151,22 @@ export default function ProyectoOverlay({
       0,
     );
     const tieneAlgunaZonaLibre = vigentes.some((f) => f.tiene_importacion);
+    // Suma de entregas — se acumula al total del proyecto sin línea separada.
+    const totalEntregas = entregas.reduce(
+      (acc, e) => acc + Number(e.total ?? 0),
+      0,
+    );
     return {
-      subtotal: Number(subtotal.toFixed(2)),
+      subtotal: Number(subtotalFact.toFixed(2)),
       importacion: Number(importacion.toFixed(2)),
-      total: Number(total.toFixed(2)),
+      // total del proyecto = facturas + entregas
+      total: Number((totalFact + totalEntregas).toFixed(2)),
+      totalEntregas: Number(totalEntregas.toFixed(2)),
       conteo: vigentes.length,
+      conteoEntregas: entregas.length,
       tieneAlgunaZonaLibre,
     };
-  }, [facturas]);
+  }, [facturas, entregas]);
 
   // Por cobrar por marca = SUM(factura.total × porcentaje) leyendo las marcas
   // asignadas a cada factura (mk_factura_marcas). Porcentaje = 50 para marcas
@@ -173,6 +198,29 @@ export default function ProyectoOverlay({
       }
     }
 
+    // Sumar entregas: cada entrega trae total_por_marca por marca_id.
+    // Se buscan los datos de la marca en proyecto.marcas o en byMarcaId.
+    for (const e of entregas) {
+      for (const [marcaId, monto] of Object.entries(e.total_por_marca ?? {})) {
+        const n = Number(monto ?? 0);
+        if (!Number.isFinite(n) || n <= 0) continue;
+        const existente = byMarcaId.get(marcaId);
+        if (existente) {
+          byMarcaId.set(marcaId, { ...existente, monto: existente.monto + n });
+        } else {
+          // Marca presente en entrega pero no en facturas — buscar en proyecto.marcas.
+          const m = proyecto.marcas.find((x) => x.marca.id === marcaId);
+          if (m) {
+            byMarcaId.set(marcaId, {
+              marca: m.marca,
+              porcentaje: m.porcentaje,
+              monto: n,
+            });
+          }
+        }
+      }
+    }
+
     if (byMarcaId.size > 0) {
       return Array.from(byMarcaId.values()).map((v) => ({
         ...v,
@@ -190,7 +238,7 @@ export default function ProyectoOverlay({
         monto: Number(monto.toFixed(2)),
       };
     });
-  }, [proyecto, facturas, totales.total]);
+  }, [proyecto, facturas, entregas, totales.total]);
 
   if (loading || !proyecto) {
     return (
@@ -451,15 +499,25 @@ export default function ProyectoOverlay({
           </div>
 
           {tab === "facturas" && (
-            <FacturasSection
-              proyecto={proyecto}
-              facturasIniciales={facturas}
-              onChange={() => {
-                cargar();
-                onChange();
-              }}
-              readonly={false}
-            />
+            <div className="space-y-6">
+              <FacturasSection
+                proyecto={proyecto}
+                facturasIniciales={facturas}
+                onChange={() => {
+                  cargar();
+                  onChange();
+                }}
+                readonly={false}
+              />
+              <EntregasSection
+                proyecto={proyecto}
+                marcasParaEntrega={proyecto.marcas}
+                onChange={() => {
+                  cargar();
+                  onChange();
+                }}
+              />
+            </div>
           )}
           {tab === "fotos" && (
             <FotosSection
