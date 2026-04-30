@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
-import { fmt } from "@/lib/format";
+import { fmt, fmtDate } from "@/lib/format";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, ConfirmModal } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
@@ -76,7 +76,9 @@ export default function PrestamoDetallePage() {
   const isAdmin = role === "admin";
   const isAdminOrDirector = role === "admin" || role === "director";
   const canEdit = role === "admin" || role === "contabilidad";
+  const canDelete = role === "admin" || role === "contabilidad";
   const sortedMovs = [...movs].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.created_at.localeCompare(a.created_at));
+  const movToDelete = movForm.confirmDeleteMovId ? movs.find(m => m.id === movForm.confirmDeleteMovId) ?? null : null;
 
   const prestado = movs.filter(m => (m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
   const pagado = movs.filter(m => (m.concepto === "Pago" || m.concepto === "Abono extra" || m.concepto === "Pago de responsabilidad") && m.estado === "aprobado").reduce((s, m) => s + Number(m.monto), 0);
@@ -120,6 +122,7 @@ export default function PrestamoDetallePage() {
           isAdmin={isAdmin}
           isAdminOrDirector={isAdminOrDirector}
           canEdit={canEdit}
+          canDelete={canDelete}
           onApprove={movForm.approveMov}
           onEdit={editMov.openEditMov}
           onDelete={movForm.requestDeleteMov}
@@ -218,6 +221,18 @@ export default function PrestamoDetallePage() {
         saldo={saldo}
         onClose={() => actions.setShowForceArchive(false)}
         onConfirm={actions.forceArchive}
+      />
+
+      <ConfirmModal
+        open={!!movToDelete}
+        onClose={() => movForm.setConfirmDeleteMovId(null)}
+        onConfirm={movForm.doDeleteMov}
+        title="¿Eliminar movimiento?"
+        message={movToDelete
+          ? `Vas a eliminar el ${movToDelete.concepto.toLowerCase()} de $${fmt(movToDelete.monto)} del ${fmtDate(movToDelete.fecha)} al préstamo de ${empleado.nombre}. Esta acción se registrará en el log de auditoría.`
+          : ""}
+        confirmLabel="Eliminar"
+        destructive
       />
 
       {movForm.pendingUndoMov && <UndoToast message={movForm.pendingUndoMov.message} startedAt={movForm.pendingUndoMov.startedAt} onUndo={movForm.undoActionMov} />}
