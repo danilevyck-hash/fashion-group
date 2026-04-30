@@ -477,31 +477,32 @@ export default function PrestamosPage() {
         <div className="flex flex-wrap items-center gap-3 mb-6">
           <button onClick={openNewEmp} className="border border-gray-200 px-5 py-2.5 sm:py-2 rounded-md text-sm hover:border-gray-400 transition">+ Nuevo Empleado</button>
           <button onClick={openNewMov} className="bg-black text-white px-5 py-2.5 sm:py-2 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo Préstamo</button>
-          <button onClick={() => router.push("/prestamos/reporte")} className="border border-gray-200 px-5 py-2.5 sm:py-2 rounded-md text-sm hover:border-gray-400 transition">Reporte Deducciones</button>
           <button
             disabled={exportingExcel}
             onClick={async () => {
               setExportingExcel(true);
-              const now = new Date();
-              const q = now.getDate() <= 15 ? "1" : "2";
-              const m = String(now.getMonth() + 1);
-              const a = String(now.getFullYear());
               try {
-                const res = await fetch(`/api/prestamos/export-excel?quincena=${q}&mes=${m}&año=${a}`);
+                const qs = filterEmpresa && filterEmpresa !== "all" ? `?empresa=${encodeURIComponent(filterEmpresa)}` : "";
+                const res = await fetch(`/api/prestamos/export-excel${qs}`);
                 if (res.ok) {
                   const blob = await res.blob();
                   const url = URL.createObjectURL(blob);
                   const link = document.createElement("a");
                   link.href = url;
-                  link.download = `prestamos-${q === "1" ? "1ra" : "2da"}-quincena-${MESES[Number(m)]?.toLowerCase()}-${a}.xlsx`;
+                  const today = new Date();
+                  const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+                  const slug = filterEmpresa && filterEmpresa !== "all"
+                    ? filterEmpresa.toLowerCase().replace(/\s+/g, "_")
+                    : "todos";
+                  link.download = `historial_prestamos_${slug}_${ymd}.xlsx`;
                   link.click();
                   URL.revokeObjectURL(url);
-                } else { showToast("Error al exportar"); }
-              } catch { showToast("Error al exportar"); }
+                } else { showToast("Error al descargar"); }
+              } catch { showToast("Error al descargar"); }
               setExportingExcel(false);
             }}
             className="border border-gray-200 px-5 py-2.5 sm:py-2 rounded-md text-sm hover:border-gray-400 transition disabled:opacity-50"
-          >{exportingExcel ? "Exportando..." : "Exportar Excel"}</button>
+          >{exportingExcel ? "Descargando..." : "Descargar Historial"}</button>
 
           <div className="flex-1" />
 
