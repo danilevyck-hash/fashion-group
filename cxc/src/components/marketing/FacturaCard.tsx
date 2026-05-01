@@ -6,10 +6,12 @@ import {
   PORCENTAJE_IMPORTACION_ZONA_LIBRE,
   calcularImportacion,
 } from "@/lib/marketing-calc";
+import { getEmpresaStyle } from "@/lib/marketing/empresa-styles";
 
 interface PorcentajeMarca {
   marca: MkMarca;
   porcentaje: number;
+  empresa_pagadora_codigo?: string | null;
 }
 
 interface FacturaCardProps {
@@ -113,18 +115,49 @@ export function FacturaCard({
             const inicial = (m.marca.nombre || m.marca.codigo || "?")
               .charAt(0)
               .toUpperCase();
+            const esInterna = m.marca.tipo === "interna";
+            const empresaCodigo = m.empresa_pagadora_codigo;
+            // Para externas: la empresa interna absorbe la misma fracción que
+            // la marca externa (50% × total). Para internas (Joybees) no hay
+            // empresa pagadora — la marca absorbe el 100%.
+            const empresaStyle =
+              !esInterna && empresaCodigo
+                ? getEmpresaStyle(empresaCodigo)
+                : null;
             return (
               <div
                 key={m.marca.id}
-                className={`inline-flex items-center gap-1.5 border rounded-md px-1.5 py-0.5 text-[11px] ${colorParaMarca(m.marca.codigo)}`}
+                className="inline-flex items-center gap-1.5"
               >
-                <span className="font-semibold">[{inicial}]</span>
-                <span className="font-medium">{m.marca.nombre}</span>
-                <span className="tabular-nums opacity-70">{m.porcentaje}%</span>
-                <span className="text-gray-400">→</span>
-                <span className="font-mono tabular-nums font-semibold">
-                  {formatearMonto(cobrable)}
-                </span>
+                <div
+                  className={`inline-flex items-center gap-1.5 border rounded-md px-1.5 py-0.5 text-[11px] ${colorParaMarca(m.marca.codigo)}`}
+                >
+                  <span className="font-semibold">[{inicial}]</span>
+                  <span className="font-medium">{m.marca.nombre}</span>
+                  <span className="tabular-nums opacity-70">
+                    {m.porcentaje}%
+                  </span>
+                  <span className="text-gray-400">→</span>
+                  <span className="font-mono tabular-nums font-semibold">
+                    {formatearMonto(cobrable)}
+                  </span>
+                </div>
+                {empresaStyle && (
+                  <div
+                    className={`inline-flex items-center gap-1.5 border rounded-md px-1.5 py-0.5 text-[11px] ${empresaStyle.bg} ${empresaStyle.text} ${empresaStyle.border}`}
+                    title={`${empresaStyle.nombre} absorbe el otro 50%`}
+                  >
+                    <span className="font-semibold">[{empresaStyle.code}]</span>
+                    <span className="font-medium">{empresaStyle.nombre}</span>
+                    <span className="tabular-nums opacity-70">
+                      {m.porcentaje}%
+                    </span>
+                    <span className="text-gray-400">→</span>
+                    <span className="font-mono tabular-nums font-semibold">
+                      {formatearMonto(cobrable)}
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}

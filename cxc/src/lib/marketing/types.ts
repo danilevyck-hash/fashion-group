@@ -112,6 +112,10 @@ export interface MkAdjunto {
 export interface MarcaConPorcentaje {
   marca: MkMarca;
   porcentaje: number;
+  // Empresa interna del grupo que paga el otro 50% (mk_factura_marcas).
+  // null para marcas internas (Joybees) o filas legacy sin backfill.
+  // Ausente para mk_proyecto_marcas (legacy) — esa tabla no tiene la columna.
+  empresa_pagadora_codigo?: string | null;
 }
 
 export interface ProyectoConMarcas extends MkProyecto {

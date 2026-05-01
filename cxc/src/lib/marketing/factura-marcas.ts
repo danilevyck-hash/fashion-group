@@ -177,7 +177,7 @@ export async function getMarcasDeFactura(
   if (!facturaId) throw new Error("facturaId requerido");
   const { data, error } = await supabaseServer
     .from("mk_factura_marcas")
-    .select("porcentaje, marca:mk_marcas(*)")
+    .select("porcentaje, empresa_pagadora_codigo, marca:mk_marcas(*)")
     .eq("factura_id", facturaId)
     .order("porcentaje", { ascending: false });
   if (error) {
@@ -185,19 +185,20 @@ export async function getMarcasDeFactura(
   }
   const rows = (data ?? []) as unknown as Array<{
     porcentaje: number;
+    empresa_pagadora_codigo: string | null;
     marca: Record<string, unknown> | Array<Record<string, unknown>> | null;
   }>;
-  return rows
-    .map((r) => {
-      // Supabase FK embedding puede devolver objeto o array según el schema.
-      const marcaRaw = Array.isArray(r.marca) ? r.marca[0] : r.marca;
-      if (!marcaRaw) return null;
-      return {
-        marca: mapMarca(marcaRaw),
-        porcentaje: Number(r.porcentaje ?? 0),
-      };
-    })
-    .filter((x): x is MarcaConPorcentaje => x !== null);
+  const out: MarcaConPorcentaje[] = [];
+  for (const r of rows) {
+    const marcaRaw = Array.isArray(r.marca) ? r.marca[0] : r.marca;
+    if (!marcaRaw) continue;
+    out.push({
+      marca: mapMarca(marcaRaw),
+      porcentaje: Number(r.porcentaje ?? 0),
+      empresa_pagadora_codigo: r.empresa_pagadora_codigo ?? null,
+    });
+  }
+  return out;
 }
 
 /**
