@@ -23,6 +23,7 @@ interface ProyectoListItem {
   fecha_cobrado: string | null;
   facturas_count: number;
   fotos_count: number;
+  entregas_count?: number;
   marcas: Array<{ id: string; nombre: string; codigo: string }>;
   por_cobrar_total: number;
   por_cobrar_por_marca: Array<{
@@ -208,13 +209,47 @@ export default function HistorialView({
                   >
                     {/* Proyecto */}
                     <td className="px-[18px] py-3 align-middle">
-                      <div className="font-semibold text-gray-900 truncate">
-                        {tituloVis}
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-semibold text-gray-900 truncate">
+                          {tituloVis}
+                        </span>
+                        {(p.entregas_count ?? 0) > 0 && (
+                          <span
+                            title="Este proyecto tiene entregas de muebles"
+                            className="inline-flex items-center gap-1 shrink-0 bg-white border border-teal-300 text-teal-700 rounded-md px-2 py-0.5 text-xs"
+                          >
+                            <svg
+                              width="11"
+                              height="11"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M16.5 9.4l-9-5.19" />
+                              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                              <path d="M3.27 6.96L12 12.01l8.73-5.05" />
+                              <path d="M12 22.08V12" />
+                            </svg>
+                            Muebles
+                          </span>
+                        )}
                       </div>
                       <div className="text-[12px] text-gray-500 truncate">
                         {subtituloTipo ? `${subtituloTipo} · ` : ""}
                         {p.facturas_count}{" "}
-                        {p.facturas_count === 1 ? "factura" : "facturas"} ·{" "}
+                        {p.facturas_count === 1 ? "factura" : "facturas"}
+                        {(p.entregas_count ?? 0) > 0 && (
+                          <>
+                            {" · "}
+                            {p.entregas_count}{" "}
+                            {p.entregas_count === 1 ? "entrega" : "entregas"}
+                          </>
+                        )}
+                        {" · "}
                         {p.fotos_count}{" "}
                         {p.fotos_count === 1 ? "foto" : "fotos"}
                       </div>

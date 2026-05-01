@@ -189,11 +189,13 @@ export async function GET(req: NextRequest) {
 
     // Sumar entregas de muebles al cobrable por marca de cada proyecto.
     // total_por_marca es {"<marca_id>": <monto>} y va sin desglose.
+    const entregasCountByProy = new Map<string, number>();
     for (const e of (entregasRes.data ?? []) as Array<{
       proyecto_id: string;
       total_por_marca: Record<string, number> | null;
     }>) {
       const pid = String(e.proyecto_id);
+      entregasCountByProy.set(pid, (entregasCountByProy.get(pid) ?? 0) + 1);
       const tpm = e.total_por_marca ?? {};
       const set = marcasByProy.get(pid) ?? new Set<string>();
       const inner =
@@ -299,6 +301,7 @@ export async function GET(req: NextRequest) {
           fecha_cobrado: p.fecha_cobrado,
           facturas_count: facturasCountByProy.get(pid) ?? 0,
           fotos_count: fotosCountByProy.get(pid) ?? 0,
+          entregas_count: entregasCountByProy.get(pid) ?? 0,
           marcas: marcasArr,
           // Activos: desglose de pendiente; cobrados: 0 (ya cobrado).
           por_cobrar_total: esCobrado ? 0 : desg.total,
