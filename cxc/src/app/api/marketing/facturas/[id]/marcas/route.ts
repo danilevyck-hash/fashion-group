@@ -43,7 +43,11 @@ export async function PUT(
   }
   try {
     const body = (await req.json()) as {
-      marcas?: Array<{ marcaId: string; porcentaje: number }>;
+      marcas?: Array<{
+        marcaId: string;
+        porcentaje?: number;
+        empresaPagadoraCodigo?: string | null;
+      }>;
     };
     if (!Array.isArray(body.marcas)) {
       return NextResponse.json(
@@ -51,7 +55,13 @@ export async function PUT(
         { status: 400 },
       );
     }
-    await setMarcasDeFactura(params.id, body.marcas);
+    // Pasamos `empresaPagadoraCodigo` si vino. Default = marca.empresa_codigo.
+    const marcasInput = body.marcas.map((m) => ({
+      marcaId: String(m.marcaId),
+      porcentaje: Number(m.porcentaje ?? 50),
+      empresaPagadoraCodigo: m.empresaPagadoraCodigo,
+    }));
+    await setMarcasDeFactura(params.id, marcasInput);
     return NextResponse.json({ ok: true });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error interno";

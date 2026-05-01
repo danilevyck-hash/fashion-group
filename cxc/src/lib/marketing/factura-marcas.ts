@@ -26,6 +26,9 @@ function porcentajeParaTipo(tipo: TipoMarca): number {
 interface MarcaPorcentajeInput {
   marcaId: string;
   porcentaje?: number; // ignorado: el valor real se deriva del tipo de marca.
+  // Empresa interna del grupo que paga el otro 50% (default = marca.empresa_codigo).
+  // Marcas internas (Joybees) ignoran este campo.
+  empresaPagadoraCodigo?: string | null;
 }
 
 function mapMarca(row: Record<string, unknown>): MkMarca {
@@ -59,6 +62,31 @@ async function tiposDeMarcas(
     const tipoRaw = String(row.tipo ?? "externa");
     const tipo: TipoMarca = tipoRaw === "interna" ? "interna" : "externa";
     out.set(String(row.id), tipo);
+  }
+  return out;
+}
+
+// Trae tipo + empresa_codigo por marca. Default empresa_pagadora_codigo se
+// deriva de aquí cuando el caller no manda override.
+async function infoDeMarcas(
+  marcaIds: ReadonlyArray<string>,
+): Promise<Map<string, { tipo: TipoMarca; empresa_codigo: string }>> {
+  if (marcaIds.length === 0) return new Map();
+  const { data, error } = await supabaseServer
+    .from("mk_marcas")
+    .select("id, tipo, empresa_codigo")
+    .in("id", marcaIds);
+  if (error) {
+    throw new Error(`infoDeMarcas: ${error.message}`);
+  }
+  const out = new Map<string, { tipo: TipoMarca; empresa_codigo: string }>();
+  for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+    const tipoRaw = String(row.tipo ?? "externa");
+    const tipo: TipoMarca = tipoRaw === "interna" ? "interna" : "externa";
+    out.set(String(row.id), {
+      tipo,
+      empresa_codigo: String(row.empresa_codigo ?? ""),
+    });
   }
   return out;
 }
@@ -206,9 +234,10 @@ export async function setMarcasDeFactura(
   }
   const marcaIds = Array.from(ids);
 
-  // Validación de tipos: todas las marcas del mismo tipo + coherencia con
-  // el resto de facturas del proyecto.
-  const tipos = await tiposDeMarcas(marcaIds);
+  // Validación de tipos + lookup de empresa_codigo default.
+  const info = await infoDeMarcas(marcaIds);
+  const tipos = new Map<string, TipoMarca>();
+  for (const [id, v] of info) tipos.set(id, v.tipo);
   const tipoNuevo = validarMismoTipo(marcaIds, tipos);
   await validarTipoCoherenteConProyecto(facturaId, tipoNuevo);
 
@@ -221,12 +250,29 @@ export async function setMarcasDeFactura(
     throw new Error(`setMarcasDeFactura[delete]: ${delError.message}`);
   }
 
-  // Insertar nuevas — porcentaje depende del tipo de cada marca.
-  const payload = marcas.map((m) => ({
-    factura_id: facturaId,
-    marca_id: m.marcaId,
-    porcentaje: porcentajeParaTipo(tipos.get(m.marcaId) ?? "externa"),
-  }));
+  // Insertar nuevas — porcentaje depende del tipo de cada marca; empresa
+  // pagadora default = mk_marcas.empresa_codigo (override desde input si vino).
+  // Marca interna (Joybees): empresa_pagadora_codigo = NULL (no aplica).
+  const payload = marcas.map((m) => {
+    const meta = info.get(m.marcaId);
+    const tipo = meta?.tipo ?? "externa";
+    let empresa: string | null;
+    if (tipo === "interna") {
+      empresa = null;
+    } else if (m.empresaPagadoraCodigo !== undefined) {
+      empresa = m.empresaPagadoraCodigo === null
+        ? null
+        : String(m.empresaPagadoraCodigo) || null;
+    } else {
+      empresa = meta?.empresa_codigo || null;
+    }
+    return {
+      factura_id: facturaId,
+      marca_id: m.marcaId,
+      porcentaje: porcentajeParaTipo(tipo),
+      empresa_pagadora_codigo: empresa,
+    };
+  });
   const { error: insError } = await supabaseServer
     .from("mk_factura_marcas")
     .insert(payload);

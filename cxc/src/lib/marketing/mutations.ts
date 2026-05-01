@@ -694,15 +694,17 @@ export async function actualizarRepartoProyecto(
   const marcaIds = marcas.map((m) => m.marcaId);
   const { data: marcasRows, error: mErr } = await supabaseServer
     .from("mk_marcas")
-    .select("id, tipo")
+    .select("id, tipo, empresa_codigo")
     .in("id", marcaIds);
   if (mErr) {
     throw new Error(`actualizarRepartoProyecto[marcas read]: ${mErr.message}`);
   }
   const tipoById = new Map<string, "externa" | "interna">();
+  const empresaById = new Map<string, string>();
   for (const r of (marcasRows ?? []) as Array<Record<string, unknown>>) {
     const t = String(r.tipo ?? "externa") === "interna" ? "interna" : "externa";
     tipoById.set(String(r.id), t);
+    empresaById.set(String(r.id), String(r.empresa_codigo ?? ""));
   }
   if (tipoById.size !== marcaIds.length) {
     throw new Error("Alguna marca seleccionada no existe");
@@ -712,6 +714,25 @@ export async function actualizarRepartoProyecto(
     throw new Error(
       "Joybees no se puede mezclar con otras marcas en el mismo proyecto.",
     );
+  }
+
+  // Resolver empresa_pagadora_codigo por marca: override desde input si vino,
+  // si no, usa marca.empresa_codigo. Marca interna → null.
+  const empresaResueltaById = new Map<string, string | null>();
+  for (const m of marcas) {
+    const tipo = tipoById.get(m.marcaId);
+    if (tipo === "interna") {
+      empresaResueltaById.set(m.marcaId, null);
+    } else if (m.empresaPagadoraCodigo !== undefined) {
+      empresaResueltaById.set(
+        m.marcaId,
+        m.empresaPagadoraCodigo === null
+          ? null
+          : String(m.empresaPagadoraCodigo) || null,
+      );
+    } else {
+      empresaResueltaById.set(m.marcaId, empresaById.get(m.marcaId) || null);
+    }
   }
 
   // Listar facturas vigentes del proyecto.
@@ -739,12 +760,13 @@ export async function actualizarRepartoProyecto(
       );
     }
 
-    // 2. Insertar nuevas filas (factura × marca).
+    // 2. Insertar nuevas filas (factura × marca) con empresa pagadora.
     const fmPayload = facturaIds.flatMap((fid) =>
       marcaIds.map((mid) => ({
         factura_id: fid,
         marca_id: mid,
         porcentaje: tipoById.get(mid) === "interna" ? 100 : 50,
+        empresa_pagadora_codigo: empresaResueltaById.get(mid) ?? null,
       })),
     );
     if (fmPayload.length > 0) {

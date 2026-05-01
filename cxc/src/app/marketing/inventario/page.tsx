@@ -429,9 +429,13 @@ export default function InventarioPage() {
                 ) : (
                   <>
                     {entregas.map((e) => {
-                      const proy = proyectoById.get(e.proyecto_id);
+                      const proy = e.proyecto_id
+                        ? proyectoById.get(e.proyecto_id)
+                        : null;
                       const tienda =
-                        proy?.tienda || proy?.nombre || "(proyecto borrado)";
+                        proy?.tienda ||
+                        proy?.nombre ||
+                        (e.proyecto_id ? "(proyecto borrado)" : "(sin asignar)");
                       const tpm = e.total_por_marca ?? {};
                       return (
                         <tr key={e.id} className="border-t border-gray-100">
@@ -469,8 +473,13 @@ export default function InventarioPage() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => descargarExcel(e.proyecto_id)}
-                              disabled={downloading === e.proyecto_id}
+                              onClick={() =>
+                                e.proyecto_id && descargarExcel(e.proyecto_id)
+                              }
+                              disabled={
+                                !e.proyecto_id ||
+                                downloading === e.proyecto_id
+                              }
                               className="text-xs text-gray-700 hover:text-black underline disabled:opacity-60"
                             >
                               {downloading === e.proyecto_id ? "…" : "Excel"}
@@ -584,14 +593,16 @@ export default function InventarioPage() {
 
       {/* Modal editar entrega — usa marcas asignadas al proyecto */}
       {editEntrega && (() => {
-        const proy = proyectoConMarcasById.get(editEntrega.proyecto_id);
+        const proy = editEntrega.proyecto_id
+          ? proyectoConMarcasById.get(editEntrega.proyecto_id)
+          : null;
         const marcasParaEntrega: MarcaConPorcentaje[] =
           proy?.marcas ?? [];
         const proyNombre = proy?.nombre || proy?.tienda || "Proyecto";
         return (
           <EntregaForm
             open={true}
-            proyectoId={editEntrega.proyecto_id}
+            proyectoId={editEntrega.proyecto_id ?? ""}
             proyectoNombre={proyNombre}
             marcasProyecto={marcasParaEntrega}
             productos={productos}

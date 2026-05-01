@@ -146,6 +146,9 @@ export interface AnuladoItem {
 export interface MarcaPorcentajeInput {
   marcaId: string;
   porcentaje: number;
+  // Empresa interna del grupo que paga el otro 50% (override del default
+  // mk_marcas.empresa_codigo). Marcas internas (Joybees) lo ignoran.
+  empresaPagadoraCodigo?: string | null;
 }
 
 export interface CreateProyectoInput {
@@ -197,9 +200,15 @@ export interface CreateAdjuntoInput {
 // Inventario de muebles + entregas por proyecto
 // ----------------------------------------------------------------------------
 // Modelo plano: productos con stock_total disponible (no histórico). Cada
-// entrega de un proyecto consume cantidades por marca, expresadas como un
-// jsonb {"<marca_id>": <unidades>}. El total_por_marca de la entrega se
-// SUMA al total del proyecto al cobrar — sin línea separada en reporte.
+// entrega tiene N items (una fila por producto entregado) con un array
+// `reparto` de tuplas (marca_id, empresa_codigo, cantidad).
+//
+// Reglas de reparto:
+//   - Marca externa (Tommy/Calvin/Reebok): 50/50 entre marca y empresa_codigo
+//     pagadora interna. La empresa default = mk_marcas.empresa_codigo pero
+//     se puede override por entrega/item.
+//   - Marca interna (Joybees): 100% va a la marca, empresa interna no aplica.
+// El monto de la entrega se SUMA al total del proyecto sin línea separada.
 
 export interface MkInventarioProducto {
   id: string;
@@ -210,11 +219,23 @@ export interface MkInventarioProducto {
   updated_at: string;
 }
 
+// Tupla en jsonb `reparto`: marca + empresa pagadora interna + cantidad.
+// `empresa` es codigo string ('fashion_wear', 'vistana', etc.) o null si
+// la marca es interna (no aplica empresa pagadora).
+export interface RepartoItemEntry {
+  marca_id: string;
+  empresa: string | null;
+  cantidad: number;
+}
+
 export interface MkEntregaItem {
   id: string;
   entrega_id: string;
   producto_id: string;
-  // {"<marca_id>": <unidades>} — claves son marca_id (uuid string)
+  reparto: RepartoItemEntry[];
+  // DERIVADO al mapear desde la DB: agrega cantidades por marca_id.
+  // No persiste en la tabla (la columna fue eliminada en el schema 2026-05).
+  // Existe solo como compat para callers que aún leen el shape viejo.
   cantidad_por_marca: Record<string, number>;
   precio_unitario: number;
   created_at: string;
@@ -222,10 +243,16 @@ export interface MkEntregaItem {
 
 export interface MkEntregaMuebles {
   id: string;
-  proyecto_id: string;
+  proyecto_id: string | null; // NULLABLE: entregas pendientes sin asignar
   total: number;
-  // {"<marca_id>": <monto>} — claves son marca_id (uuid string)
+  // {"<marca_id>": <monto>} — claves son marca_id (uuid string).
+  // Marcas externas reciben 50% de su parte; Joybees recibe 100%.
   total_por_marca: Record<string, number>;
+  // {"<empresa_codigo>": <monto>} — claves son empresa_codigo (text key
+  // de companies.ts). Suma del 50% interno de cada item externo.
+  // Joybees no contribuye aquí (su 100% va completo a total_por_marca).
+  total_por_empresa_interna: Record<string, number>;
+  notas: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -235,20 +262,34 @@ export interface EntregaConItems extends MkEntregaMuebles {
 }
 
 // Inputs (mutations)
+// Cada item viene con un array de tuplas {marcaId, empresa, cantidad}.
+// `empresa` puede ser null (Joybees) o un codigo string para overrides
+// (ej: marca Tommy con empresa "fashion_shoes" en vez del default).
+// Si `empresa` es undefined, el backend lo deriva de marca.empresa_codigo.
+export interface RepartoItemInput {
+  marcaId: string;
+  empresa?: string | null;
+  cantidad: number;
+}
+
 export interface EntregaItemInput {
   productoId: string;
-  // {"<marca_id>": <unidades>}; cantidades en 0 se aceptan pero se filtran al
-  // guardar (no se inserta el item).
-  cantidadPorMarca: Record<string, number>;
+  // Shape nuevo (preferido).
+  reparto?: RepartoItemInput[];
+  // Compat shape legacy {"<marca_id>": <cantidad>}; el backend lo convierte
+  // a `reparto` al recibir el body. Mantener mientras migramos UIs.
+  cantidadPorMarca?: Record<string, number>;
 }
 
 export interface CreateEntregaInput {
-  proyectoId: string;
+  proyectoId?: string | null;
   items: EntregaItemInput[];
+  notas?: string | null;
 }
 
 export interface UpdateEntregaInput {
   items: EntregaItemInput[];
+  notas?: string | null;
 }
 
 export interface CreateProductoInput {

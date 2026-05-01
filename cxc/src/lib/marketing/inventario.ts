@@ -3,12 +3,20 @@
 // ============================================================================
 // Server-side. Usa supabaseServer (service role).
 //
-// Reglas:
-//   - cantidad_por_marca y total_por_marca son JSONB con shape
-//     {"<marca_id>": <number>}; las claves son marca_id (uuid string).
-//   - Stock se descuenta al insertar/actualizar entregas. Permitimos negativo
-//     (warning en UI, no bloqueo) — Daniel lo recompone al recibir mercancía.
-//   - Sin soft-delete: las entregas se hard-deletean (cascada limpia items).
+// Modelo (post 2026-05):
+//   mk_entrega_items.reparto = jsonb [{marca_id, empresa, cantidad}]
+//   mk_entregas_muebles.proyecto_id NULLABLE (entregas pendientes)
+//   mk_entregas_muebles.total_por_marca           = {"<marca_id>": <monto>}
+//   mk_entregas_muebles.total_por_empresa_interna = {"<empresa_codigo>": <monto>}
+//   mk_entregas_muebles.notas TEXT (opcional)
+//
+// Reglas de negocio:
+//   - Marca externa (Tommy/Calvin/Reebok): 50% para la marca + 50% para
+//     `empresa` interna pagadora (default = mk_marcas.empresa_codigo, override
+//     posible por entrega/item desde el cliente).
+//   - Marca interna (Joybees, tipo='interna'): 100% para la marca, empresa
+//     se ignora/no aplica (no contribuye a total_por_empresa_interna).
+//   - Stock se descuenta al insertar/actualizar (delta neto). Permite negativo.
 // ============================================================================
 
 import { supabaseServer } from "@/lib/supabase-server";
@@ -25,6 +33,9 @@ import type {
   MkEntregaItem,
   MkEntregaMuebles,
   MkInventarioProducto,
+  RepartoItemEntry,
+  RepartoItemInput,
+  TipoMarca,
   UpdateEntregaInput,
   UpdateProductoInput,
 } from "./types";
@@ -44,27 +55,91 @@ function mapProducto(row: Record<string, unknown>): MkInventarioProducto {
   };
 }
 
+function normalizeReparto(raw: unknown): RepartoItemEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: RepartoItemEntry[] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== "object") continue;
+    const obj = r as Record<string, unknown>;
+    const marcaId = String(obj.marca_id ?? obj.marcaId ?? "");
+    if (!marcaId) continue;
+    const cant = Number(obj.cantidad ?? 0);
+    if (!Number.isFinite(cant) || cant <= 0) continue;
+    const empresaRaw = obj.empresa;
+    const empresa =
+      empresaRaw === null
+        ? null
+        : typeof empresaRaw === "string" && empresaRaw.length > 0
+          ? empresaRaw
+          : null;
+    out.push({ marca_id: marcaId, empresa, cantidad: Math.trunc(cant) });
+  }
+  return out;
+}
+
 function mapEntrega(row: Record<string, unknown>): MkEntregaMuebles {
   return {
     id: String(row.id),
-    proyecto_id: String(row.proyecto_id),
+    proyecto_id: (row.proyecto_id as string | null) ?? null,
     total: Number(row.total ?? 0),
     total_por_marca: (row.total_por_marca as Record<string, number>) ?? {},
+    total_por_empresa_interna:
+      (row.total_por_empresa_interna as Record<string, number>) ?? {},
+    notas: (row.notas as string | null) ?? null,
     created_at: String(row.created_at ?? ""),
     updated_at: String(row.updated_at ?? ""),
   };
 }
 
 function mapItem(row: Record<string, unknown>): MkEntregaItem {
+  const reparto = normalizeReparto(row.reparto);
+  // Compat shape: agrega cantidades por marca_id para callers legacy.
+  const cantidadPorMarca: Record<string, number> = {};
+  for (const r of reparto) {
+    cantidadPorMarca[r.marca_id] =
+      (cantidadPorMarca[r.marca_id] ?? 0) + r.cantidad;
+  }
   return {
     id: String(row.id),
     entrega_id: String(row.entrega_id),
     producto_id: String(row.producto_id),
-    cantidad_por_marca:
-      (row.cantidad_por_marca as Record<string, number>) ?? {},
+    reparto,
+    cantidad_por_marca: cantidadPorMarca,
     precio_unitario: Number(row.precio_unitario ?? 0),
     created_at: String(row.created_at ?? ""),
   };
+}
+
+// ----------------------------------------------------------------------------
+// Marcas — helper para obtener tipo + empresa default
+// ----------------------------------------------------------------------------
+interface MarcaInfo {
+  tipo: TipoMarca;
+  empresa_codigo: string;
+}
+
+async function loadMarcasInfo(
+  marcaIds: ReadonlyArray<string>,
+): Promise<Map<string, MarcaInfo>> {
+  const out = new Map<string, MarcaInfo>();
+  if (marcaIds.length === 0) return out;
+  const { data, error } = await supabaseServer
+    .from("mk_marcas")
+    .select("id, tipo, empresa_codigo")
+    .in("id", marcaIds);
+  if (error) throw new Error(`loadMarcasInfo: ${error.message}`);
+  for (const r of (data ?? []) as Array<{
+    id: string;
+    tipo: string | null;
+    empresa_codigo: string | null;
+  }>) {
+    const tipo: TipoMarca = r.tipo === "interna" ? "interna" : "externa";
+    out.set(String(r.id), {
+      tipo,
+      empresa_codigo: String(r.empresa_codigo ?? ""),
+    });
+  }
+  return out;
 }
 
 // ----------------------------------------------------------------------------
@@ -138,7 +213,6 @@ export async function updateProducto(
 
 export async function deleteProducto(id: string): Promise<void> {
   if (!id) throw new Error("id requerido");
-  // Validar que no esté en uso en items existentes.
   const { data: usos, error: usosErr } = await supabaseServer
     .from("mk_entrega_items")
     .select("id")
@@ -156,8 +230,31 @@ export async function deleteProducto(id: string): Promise<void> {
 }
 
 // ----------------------------------------------------------------------------
-// Entregas
+// Entregas — listings
 // ----------------------------------------------------------------------------
+async function attachItems(
+  entregas: MkEntregaMuebles[],
+): Promise<EntregaConItems[]> {
+  if (entregas.length === 0) return [];
+  const ids = entregas.map((e) => e.id);
+  const { data: itemRows, error: itemErr } = await supabaseServer
+    .from("mk_entrega_items")
+    .select("*")
+    .in("entrega_id", ids);
+  if (itemErr) throw new Error(`attachItems: ${itemErr.message}`);
+  const itemsByEntrega = new Map<string, MkEntregaItem[]>();
+  for (const r of itemRows ?? []) {
+    const it = mapItem(r as Record<string, unknown>);
+    const arr = itemsByEntrega.get(it.entrega_id) ?? [];
+    arr.push(it);
+    itemsByEntrega.set(it.entrega_id, arr);
+  }
+  return entregas.map((e) => ({
+    ...e,
+    items: itemsByEntrega.get(e.id) ?? [],
+  }));
+}
+
 export async function listEntregasByProyecto(
   proyectoId: string,
 ): Promise<EntregaConItems[]> {
@@ -171,25 +268,20 @@ export async function listEntregasByProyecto(
   const entregas = (entRows ?? []).map((r) =>
     mapEntrega(r as Record<string, unknown>),
   );
-  if (entregas.length === 0) return [];
+  return attachItems(entregas);
+}
 
-  const ids = entregas.map((e) => e.id);
-  const { data: itemRows, error: itemErr } = await supabaseServer
-    .from("mk_entrega_items")
+export async function listEntregasPendientes(): Promise<EntregaConItems[]> {
+  const { data: entRows, error: entErr } = await supabaseServer
+    .from("mk_entregas_muebles")
     .select("*")
-    .in("entrega_id", ids);
-  if (itemErr) throw new Error(`listEntregasByProyecto[items]: ${itemErr.message}`);
-  const itemsByEntrega = new Map<string, MkEntregaItem[]>();
-  for (const r of itemRows ?? []) {
-    const it = mapItem(r as Record<string, unknown>);
-    const arr = itemsByEntrega.get(it.entrega_id) ?? [];
-    arr.push(it);
-    itemsByEntrega.set(it.entrega_id, arr);
-  }
-  return entregas.map((e) => ({
-    ...e,
-    items: itemsByEntrega.get(e.id) ?? [],
-  }));
+    .is("proyecto_id", null)
+    .order("created_at", { ascending: false });
+  if (entErr) throw new Error(`listEntregasPendientes: ${entErr.message}`);
+  const entregas = (entRows ?? []).map((r) =>
+    mapEntrega(r as Record<string, unknown>),
+  );
+  return attachItems(entregas);
 }
 
 export async function listAllEntregas(): Promise<EntregaConItems[]> {
@@ -201,40 +293,62 @@ export async function listAllEntregas(): Promise<EntregaConItems[]> {
   const entregas = (entRows ?? []).map((r) =>
     mapEntrega(r as Record<string, unknown>),
   );
-  if (entregas.length === 0) return [];
-  const ids = entregas.map((e) => e.id);
-  const { data: itemRows, error: itemErr } = await supabaseServer
-    .from("mk_entrega_items")
-    .select("*")
-    .in("entrega_id", ids);
-  if (itemErr) throw new Error(`listAllEntregas[items]: ${itemErr.message}`);
-  const itemsByEntrega = new Map<string, MkEntregaItem[]>();
-  for (const r of itemRows ?? []) {
-    const it = mapItem(r as Record<string, unknown>);
-    const arr = itemsByEntrega.get(it.entrega_id) ?? [];
-    arr.push(it);
-    itemsByEntrega.set(it.entrega_id, arr);
-  }
-  return entregas.map((e) => ({
-    ...e,
-    items: itemsByEntrega.get(e.id) ?? [],
-  }));
+  return attachItems(entregas);
 }
 
-// Filtra cantidades en 0/null y normaliza a números enteros >= 0.
+// ----------------------------------------------------------------------------
+// Mutations
+// ----------------------------------------------------------------------------
+function normalizarReparto(
+  reparto: ReadonlyArray<RepartoItemInput>,
+): RepartoItemInput[] {
+  const out: RepartoItemInput[] = [];
+  for (const r of reparto ?? []) {
+    const marcaId = String(r.marcaId ?? "");
+    if (!marcaId) continue;
+    const cant = Math.trunc(Number(r.cantidad));
+    if (!Number.isFinite(cant) || cant <= 0) continue;
+    const empresa =
+      r.empresa === undefined
+        ? undefined
+        : r.empresa === null || r.empresa === ""
+          ? null
+          : String(r.empresa);
+    out.push({ marcaId, empresa, cantidad: cant });
+  }
+  return out;
+}
+
+interface NormalizedItem {
+  productoId: string;
+  reparto: RepartoItemInput[];
+}
+
 function normalizarItems(
   items: ReadonlyArray<EntregaItemInput>,
-): EntregaItemInput[] {
+): NormalizedItem[] {
   return items
     .map((it) => {
-      const cant: Record<string, number> = {};
-      for (const [k, v] of Object.entries(it.cantidadPorMarca ?? {})) {
-        const n = Math.trunc(Number(v));
-        if (Number.isFinite(n) && n > 0) cant[String(k)] = n;
+      // Compat: si el caller mandó cantidadPorMarca legacy, lo convertimos.
+      let reparto: RepartoItemInput[];
+      if (Array.isArray(it.reparto) && it.reparto.length > 0) {
+        reparto = normalizarReparto(it.reparto);
+      } else if (it.cantidadPorMarca) {
+        reparto = normalizarReparto(
+          Object.entries(it.cantidadPorMarca).map(([marcaId, cant]) => ({
+            marcaId,
+            cantidad: Number(cant),
+          })),
+        );
+      } else {
+        reparto = [];
       }
-      return { productoId: String(it.productoId ?? ""), cantidadPorMarca: cant };
+      return {
+        productoId: String(it.productoId ?? ""),
+        reparto,
+      };
     })
-    .filter((it) => it.productoId && Object.keys(it.cantidadPorMarca).length > 0);
+    .filter((it) => it.productoId && it.reparto.length > 0);
 }
 
 async function loadPreciosByProductoId(
@@ -254,7 +368,7 @@ async function loadPreciosByProductoId(
 }
 
 async function ajustarStock(
-  delta: Map<string, number>, // positivo = restar del stock; negativo = devolver
+  delta: Map<string, number>,
 ): Promise<void> {
   if (delta.size === 0) return;
   for (const [productoId, unidades] of delta) {
@@ -264,8 +378,6 @@ async function ajustarStock(
       { p_id: productoId, p_delta: -unidades },
     );
     if (error) {
-      // Fallback sin RPC: lectura + escritura (race-prone pero suficiente para
-      // este volumen). Si la RPC no existe, hacemos UPDATE inline.
       const { data: prod, error: e1 } = await supabaseServer
         .from("mk_inventario_productos")
         .select("stock_total")
@@ -288,66 +400,156 @@ async function ajustarStock(
   }
 }
 
-function totalesPorMarca(
-  items: ReadonlyArray<EntregaItemInput>,
-  precios: Map<string, number>,
-): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const it of items) {
-    const precio = precios.get(it.productoId) ?? 0;
-    for (const [marcaId, cant] of Object.entries(it.cantidadPorMarca)) {
-      const n = Number(cant);
-      if (!Number.isFinite(n) || n <= 0) continue;
-      out[marcaId] = round2((out[marcaId] ?? 0) + precio * n);
+// Resuelve `empresa` para cada entry: si viene en input, se respeta (puede ser
+// null si la marca es interna); si no, se deriva de marca.empresa_codigo.
+// Marcas internas (Joybees) → empresa=null siempre.
+function resolverRepartoConEmpresa(
+  reparto: ReadonlyArray<RepartoItemInput>,
+  marcasInfo: Map<string, MarcaInfo>,
+): RepartoItemEntry[] {
+  const out: RepartoItemEntry[] = [];
+  for (const r of reparto) {
+    const info = marcasInfo.get(r.marcaId);
+    if (!info) continue; // marca desconocida
+    let empresa: string | null;
+    if (info.tipo === "interna") {
+      empresa = null;
+    } else if (r.empresa !== undefined) {
+      empresa = r.empresa;
+    } else {
+      empresa = info.empresa_codigo || null;
     }
+    out.push({
+      marca_id: r.marcaId,
+      empresa,
+      cantidad: r.cantidad,
+    });
   }
   return out;
+}
+
+// Calcula total_por_marca y total_por_empresa_interna desde items + precios.
+//   - Externa: 50% al marca_id, 50% al empresa
+//   - Interna: 100% al marca_id, empresa ignorada
+function totalesByItems(
+  items: ReadonlyArray<{
+    productoId: string;
+    reparto: ReadonlyArray<RepartoItemEntry>;
+  }>,
+  precios: Map<string, number>,
+  marcasInfo: Map<string, MarcaInfo>,
+): {
+  total: number;
+  totalPorMarca: Record<string, number>;
+  totalPorEmpresaInterna: Record<string, number>;
+} {
+  const totalPorMarca: Record<string, number> = {};
+  const totalPorEmpresaInterna: Record<string, number> = {};
+  let total = 0;
+  for (const it of items) {
+    const precio = precios.get(it.productoId) ?? 0;
+    for (const r of it.reparto) {
+      const cant = Number(r.cantidad);
+      if (!Number.isFinite(cant) || cant <= 0) continue;
+      const subtotal = precio * cant;
+      total += subtotal;
+      const tipo = marcasInfo.get(r.marca_id)?.tipo ?? "externa";
+      if (tipo === "interna") {
+        totalPorMarca[r.marca_id] =
+          (totalPorMarca[r.marca_id] ?? 0) + subtotal;
+      } else {
+        const mitad = subtotal / 2;
+        totalPorMarca[r.marca_id] =
+          (totalPorMarca[r.marca_id] ?? 0) + mitad;
+        if (r.empresa) {
+          totalPorEmpresaInterna[r.empresa] =
+            (totalPorEmpresaInterna[r.empresa] ?? 0) + mitad;
+        }
+        // Si empresa es null en una marca externa, ese 50% queda sin
+        // atribución interna (Fashion Group genérico). Suma al total
+        // pero no al desglose interno — coherente con facturas legacy.
+      }
+    }
+  }
+  // Redondear
+  for (const k of Object.keys(totalPorMarca)) {
+    totalPorMarca[k] = round2(totalPorMarca[k]);
+  }
+  for (const k of Object.keys(totalPorEmpresaInterna)) {
+    totalPorEmpresaInterna[k] = round2(totalPorEmpresaInterna[k]);
+  }
+  return {
+    total: round2(total),
+    totalPorMarca,
+    totalPorEmpresaInterna,
+  };
 }
 
 export async function createEntrega(
   input: CreateEntregaInput,
 ): Promise<EntregaConItems> {
-  if (!input.proyectoId) throw new Error("proyectoId requerido");
   const items = normalizarItems(input.items ?? []);
-  if (items.length === 0) throw new Error("La entrega debe tener al menos un item");
-
-  // Validar proyecto vigente (no anulado).
-  const { data: proy, error: proyErr } = await supabaseServer
-    .from("mk_proyectos")
-    .select("id, anulado_en")
-    .eq("id", input.proyectoId)
-    .maybeSingle();
-  if (proyErr) throw new Error(`createEntrega[proyecto]: ${proyErr.message}`);
-  if (!proy) throw new Error("Proyecto no encontrado");
-  if ((proy as { anulado_en: string | null }).anulado_en) {
-    throw new Error("El proyecto está anulado");
+  if (items.length === 0) {
+    throw new Error("La entrega debe tener al menos un item");
   }
 
-  // Cargar precios actuales (snapshot al momento de la entrega).
-  const productoIds = Array.from(new Set(items.map((i) => i.productoId)));
-  const precios = await loadPreciosByProductoId(productoIds);
-  for (const pid of productoIds) {
-    if (!precios.has(pid)) {
-      throw new Error(`Producto no existe: ${pid}`);
+  // proyectoId opcional. Si viene, validar que no esté anulado.
+  const proyectoId = input.proyectoId ? String(input.proyectoId) : null;
+  if (proyectoId) {
+    const { data: proy, error: proyErr } = await supabaseServer
+      .from("mk_proyectos")
+      .select("id, anulado_en")
+      .eq("id", proyectoId)
+      .maybeSingle();
+    if (proyErr) throw new Error(`createEntrega[proyecto]: ${proyErr.message}`);
+    if (!proy) throw new Error("Proyecto no encontrado");
+    if ((proy as { anulado_en: string | null }).anulado_en) {
+      throw new Error("El proyecto está anulado");
     }
   }
 
-  const total = calcularTotalEntrega(
-    items.map((it) => ({
-      cantidadPorMarca: it.cantidadPorMarca,
-      productoId: it.productoId,
-    })),
-    precios,
+  // Cargar precios y tipos de marcas.
+  const productoIds = Array.from(new Set(items.map((i) => i.productoId)));
+  const marcaIds = Array.from(
+    new Set(items.flatMap((i) => i.reparto.map((r) => r.marcaId))),
   );
-  const tpm = totalesPorMarca(items, precios);
+  const [precios, marcasInfo] = await Promise.all([
+    loadPreciosByProductoId(productoIds),
+    loadMarcasInfo(marcaIds),
+  ]);
+  for (const pid of productoIds) {
+    if (!precios.has(pid)) throw new Error(`Producto no existe: ${pid}`);
+  }
+  for (const mid of marcaIds) {
+    if (!marcasInfo.has(mid)) throw new Error(`Marca no existe: ${mid}`);
+  }
+
+  // Resolver reparto.empresa (default desde marca.empresa_codigo, override OK).
+  const itemsResueltos = items.map((it) => ({
+    productoId: it.productoId,
+    reparto: resolverRepartoConEmpresa(it.reparto, marcasInfo),
+  }));
+
+  const { total, totalPorMarca, totalPorEmpresaInterna } = totalesByItems(
+    itemsResueltos,
+    precios,
+    marcasInfo,
+  );
+
+  const notas =
+    input.notas !== undefined && input.notas !== null
+      ? String(input.notas).trim() || null
+      : null;
 
   // 1) Insert entrega
   const { data: entRow, error: entErr } = await supabaseServer
     .from("mk_entregas_muebles")
     .insert({
-      proyecto_id: input.proyectoId,
+      proyecto_id: proyectoId,
       total,
-      total_por_marca: tpm,
+      total_por_marca: totalPorMarca,
+      total_por_empresa_interna: totalPorEmpresaInterna,
+      notas,
     })
     .select("*")
     .single();
@@ -356,11 +558,11 @@ export async function createEntrega(
   }
   const entrega = mapEntrega(entRow as Record<string, unknown>);
 
-  // 2) Insert items
-  const itemsPayload = items.map((it) => ({
+  // 2) Insert items con reparto resuelto
+  const itemsPayload = itemsResueltos.map((it) => ({
     entrega_id: entrega.id,
     producto_id: it.productoId,
-    cantidad_por_marca: it.cantidadPorMarca,
+    reparto: it.reparto,
     precio_unitario: precios.get(it.productoId) ?? 0,
   }));
   const { data: itemRows, error: itemErr } = await supabaseServer
@@ -368,14 +570,20 @@ export async function createEntrega(
     .insert(itemsPayload)
     .select("*");
   if (itemErr) {
-    // Rollback best-effort
     await supabaseServer.from("mk_entregas_muebles").delete().eq("id", entrega.id);
     throw new Error(`createEntrega[items]: ${itemErr.message}`);
   }
 
-  // 3) Descontar stock
-  const delta = sumaUnidadesPorProducto(items);
-  await ajustarStock(delta);
+  // 3) Descontar stock (suma todas las cantidades del reparto por producto)
+  const inputItemsForStock: EntregaItemInput[] = itemsResueltos.map((it) => ({
+    productoId: it.productoId,
+    reparto: it.reparto.map((r) => ({
+      marcaId: r.marca_id,
+      empresa: r.empresa,
+      cantidad: r.cantidad,
+    })),
+  }));
+  await ajustarStock(sumaUnidadesPorProducto(inputItemsForStock));
 
   return {
     ...entrega,
@@ -389,9 +597,11 @@ export async function updateEntrega(
 ): Promise<EntregaConItems> {
   if (!id) throw new Error("id requerido");
   const items = normalizarItems(input.items ?? []);
-  if (items.length === 0) throw new Error("La entrega debe tener al menos un item");
+  if (items.length === 0) {
+    throw new Error("La entrega debe tener al menos un item");
+  }
 
-  // Cargar items previos (para calcular delta de stock)
+  // Cargar items previos para delta de stock.
   const { data: prevRows, error: prevErr } = await supabaseServer
     .from("mk_entrega_items")
     .select("*")
@@ -401,26 +611,48 @@ export async function updateEntrega(
     mapItem(r as Record<string, unknown>),
   );
 
-  // Precios actuales para los nuevos items
+  // Precios + tipos de marca
   const productoIds = Array.from(new Set(items.map((i) => i.productoId)));
-  const precios = await loadPreciosByProductoId(productoIds);
+  const marcaIds = Array.from(
+    new Set(items.flatMap((i) => i.reparto.map((r) => r.marcaId))),
+  );
+  const [precios, marcasInfo] = await Promise.all([
+    loadPreciosByProductoId(productoIds),
+    loadMarcasInfo(marcaIds),
+  ]);
   for (const pid of productoIds) {
     if (!precios.has(pid)) throw new Error(`Producto no existe: ${pid}`);
   }
+  for (const mid of marcaIds) {
+    if (!marcasInfo.has(mid)) throw new Error(`Marca no existe: ${mid}`);
+  }
 
-  const total = calcularTotalEntrega(
-    items.map((it) => ({
-      cantidadPorMarca: it.cantidadPorMarca,
-      productoId: it.productoId,
-    })),
+  const itemsResueltos = items.map((it) => ({
+    productoId: it.productoId,
+    reparto: resolverRepartoConEmpresa(it.reparto, marcasInfo),
+  }));
+
+  const { total, totalPorMarca, totalPorEmpresaInterna } = totalesByItems(
+    itemsResueltos,
     precios,
+    marcasInfo,
   );
-  const tpm = totalesPorMarca(items, precios);
 
-  // 1) Update entrega
+  // 1) Update entrega (total + ambos jsonb + notas si vino)
+  const updPayload: Record<string, unknown> = {
+    total,
+    total_por_marca: totalPorMarca,
+    total_por_empresa_interna: totalPorEmpresaInterna,
+  };
+  if (input.notas !== undefined) {
+    updPayload.notas =
+      input.notas === null
+        ? null
+        : String(input.notas).trim() || null;
+  }
   const { error: updErr } = await supabaseServer
     .from("mk_entregas_muebles")
-    .update({ total, total_por_marca: tpm })
+    .update(updPayload)
     .eq("id", id);
   if (updErr) throw new Error(`updateEntrega[entrega]: ${updErr.message}`);
 
@@ -431,10 +663,10 @@ export async function updateEntrega(
     .eq("entrega_id", id);
   if (delErr) throw new Error(`updateEntrega[delete items]: ${delErr.message}`);
 
-  const itemsPayload = items.map((it) => ({
+  const itemsPayload = itemsResueltos.map((it) => ({
     entrega_id: id,
     producto_id: it.productoId,
-    cantidad_por_marca: it.cantidadPorMarca,
+    reparto: it.reparto,
     precio_unitario: precios.get(it.productoId) ?? 0,
   }));
   const { data: itemRows, error: insErr } = await supabaseServer
@@ -443,9 +675,17 @@ export async function updateEntrega(
     .select("*");
   if (insErr) throw new Error(`updateEntrega[insert items]: ${insErr.message}`);
 
-  // 3) Ajustar stock por delta neto: nuevas - viejas
+  // 3) Stock delta
+  const newItemsForStock: EntregaItemInput[] = itemsResueltos.map((it) => ({
+    productoId: it.productoId,
+    reparto: it.reparto.map((r) => ({
+      marcaId: r.marca_id,
+      empresa: r.empresa,
+      cantidad: r.cantidad,
+    })),
+  }));
   const sumaPrev = sumaUnidadesPorProducto(prevItems);
-  const sumaNew = sumaUnidadesPorProducto(items);
+  const sumaNew = sumaUnidadesPorProducto(newItemsForStock);
   const delta = new Map<string, number>();
   const allIds = new Set<string>([...sumaPrev.keys(), ...sumaNew.keys()]);
   for (const pid of allIds) {
@@ -471,7 +711,6 @@ export async function updateEntrega(
 
 export async function deleteEntrega(id: string): Promise<void> {
   if (!id) throw new Error("id requerido");
-  // Devolver al stock antes de borrar.
   const { data: prevRows, error: prevErr } = await supabaseServer
     .from("mk_entrega_items")
     .select("*")
@@ -489,16 +728,69 @@ export async function deleteEntrega(id: string): Promise<void> {
 
   const sumaPrev = sumaUnidadesPorProducto(prev);
   const delta = new Map<string, number>();
-  for (const [pid, n] of sumaPrev) delta.set(pid, -n); // devolver al stock
+  for (const [pid, n] of sumaPrev) delta.set(pid, -n);
   await ajustarStock(delta);
 }
 
-// Suma total_por_marca de todas las entregas vigentes de un proyecto.
-// Usado por reportes / cobranza para sumarlo al total facturado.
+/**
+ * Asigna una entrega pendiente (proyecto_id NULL) a un proyecto.
+ * Falla si la entrega ya tiene proyecto_id.
+ */
+export async function asignarEntregaAProyecto(
+  entregaId: string,
+  proyectoId: string,
+): Promise<EntregaConItems> {
+  if (!entregaId) throw new Error("entregaId requerido");
+  if (!proyectoId) throw new Error("proyectoId requerido");
+
+  const { data: ent, error: entErr } = await supabaseServer
+    .from("mk_entregas_muebles")
+    .select("id, proyecto_id")
+    .eq("id", entregaId)
+    .maybeSingle();
+  if (entErr) throw new Error(`asignarEntregaAProyecto[read]: ${entErr.message}`);
+  if (!ent) throw new Error("Entrega no encontrada");
+  if ((ent as { proyecto_id: string | null }).proyecto_id) {
+    throw new Error("La entrega ya está asignada a un proyecto");
+  }
+
+  const { data: proy, error: proyErr } = await supabaseServer
+    .from("mk_proyectos")
+    .select("id, anulado_en")
+    .eq("id", proyectoId)
+    .maybeSingle();
+  if (proyErr) throw new Error(`asignarEntregaAProyecto[proy]: ${proyErr.message}`);
+  if (!proy) throw new Error("Proyecto no encontrado");
+  if ((proy as { anulado_en: string | null }).anulado_en) {
+    throw new Error("El proyecto está anulado");
+  }
+
+  const { data: updRow, error: updErr } = await supabaseServer
+    .from("mk_entregas_muebles")
+    .update({ proyecto_id: proyectoId })
+    .eq("id", entregaId)
+    .select("*")
+    .single();
+  if (updErr || !updRow) {
+    throw new Error(
+      `asignarEntregaAProyecto[update]: ${updErr?.message ?? "sin datos"}`,
+    );
+  }
+
+  const entrega = mapEntrega(updRow as Record<string, unknown>);
+  const conItems = await attachItems([entrega]);
+  return conItems[0]!;
+}
+
+// ----------------------------------------------------------------------------
+// Agregaciones para reportes (filtran proyecto_id IS NOT NULL implícitamente
+// vía .in con ids existentes — pendientes nunca se incluyen).
+// ----------------------------------------------------------------------------
 export async function getEntregaTotalPorMarcaByProyecto(
   proyectoId: string,
 ): Promise<Map<string, number>> {
   const out = new Map<string, number>();
+  if (!proyectoId) return out;
   const { data, error } = await supabaseServer
     .from("mk_entregas_muebles")
     .select("total_por_marca")
@@ -517,7 +809,6 @@ export async function getEntregaTotalPorMarcaByProyecto(
   return out;
 }
 
-// Versión batch: misma agregación pero para varios proyectos en una query.
 export async function getEntregaTotalPorMarcaBatch(
   proyectoIds: ReadonlyArray<string>,
 ): Promise<Map<string, Map<string, number>>> {
@@ -526,7 +817,8 @@ export async function getEntregaTotalPorMarcaBatch(
   const { data, error } = await supabaseServer
     .from("mk_entregas_muebles")
     .select("proyecto_id, total_por_marca")
-    .in("proyecto_id", proyectoIds);
+    .in("proyecto_id", proyectoIds)
+    .not("proyecto_id", "is", null);
   if (error) throw new Error(`getEntregaTotalPorMarcaBatch: ${error.message}`);
   for (const r of (data ?? []) as Array<{
     proyecto_id: string;
@@ -545,7 +837,6 @@ export async function getEntregaTotalPorMarcaBatch(
   return out;
 }
 
-// Total agregado por proyecto (suma de los totales de todas sus entregas).
 export async function getEntregaTotalByProyectoBatch(
   proyectoIds: ReadonlyArray<string>,
 ): Promise<Map<string, number>> {
@@ -554,7 +845,8 @@ export async function getEntregaTotalByProyectoBatch(
   const { data, error } = await supabaseServer
     .from("mk_entregas_muebles")
     .select("proyecto_id, total")
-    .in("proyecto_id", proyectoIds);
+    .in("proyecto_id", proyectoIds)
+    .not("proyecto_id", "is", null);
   if (error) throw new Error(`getEntregaTotalByProyectoBatch: ${error.message}`);
   for (const r of (data ?? []) as Array<{ proyecto_id: string; total: number }>) {
     const pid = String(r.proyecto_id);
@@ -563,8 +855,5 @@ export async function getEntregaTotalByProyectoBatch(
   return out;
 }
 
-// Suprime warning del helper si no se importa fuera.
 export type { EntregaConItems };
-
-// Re-exporta calcularTotalPorMarca para mantener consumidores con un único path.
-export { calcularTotalPorMarca };
+export { calcularTotalPorMarca, calcularTotalEntrega };

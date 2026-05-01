@@ -125,7 +125,8 @@ export async function GET(req: NextRequest) {
       supabaseServer
         .from("mk_entregas_muebles")
         .select("proyecto_id, total_por_marca")
-        .in("proyecto_id", proyectoIds),
+        .in("proyecto_id", proyectoIds)
+        .not("proyecto_id", "is", null),
     ]);
 
     if (facturasRes.error) throw new Error(`facturas: ${facturasRes.error.message}`);

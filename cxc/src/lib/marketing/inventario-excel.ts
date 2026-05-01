@@ -207,8 +207,11 @@ function hojaResumen(
   const aoa: (string | number)[][] = [header];
 
   for (const e of entregas) {
-    const proy = proyectoById.get(e.proyecto_id);
-    const tienda = proy?.tienda || proy?.nombre || "—";
+    const proy = e.proyecto_id ? proyectoById.get(e.proyecto_id) : null;
+    const tienda =
+      proy?.tienda ||
+      proy?.nombre ||
+      (e.proyecto_id ? "—" : "(sin asignar)");
     const row: (string | number)[] = [tienda];
     for (const p of productos) {
       const item = e.items.find((it) => it.producto_id === p.id);
@@ -335,7 +338,7 @@ export function exportarExcelGlobal(args: {
   // Nombres de hoja únicos (Excel no permite duplicados ni > 31 chars).
   const usedNames = new Set<string>(["Resumen", "Productos"]);
   for (const e of entregas) {
-    const proy = proyectoById.get(e.proyecto_id);
+    const proy = e.proyecto_id ? proyectoById.get(e.proyecto_id) : null;
     const baseName =
       proy?.tienda || proy?.nombre || `Entrega ${e.id.slice(0, 6)}`;
     let name = sanitizeSheetName(baseName);
@@ -345,11 +348,13 @@ export function exportarExcelGlobal(args: {
       name = sanitizeSheetName(baseName.slice(0, 31 - suffix.length) + suffix);
     }
     usedNames.add(name);
-    XLSX.utils.book_append_sheet(
-      wb,
-      hojaTienda(proy as MkProyecto, e, productos, marcas),
-      name,
-    );
+    if (proy) {
+      XLSX.utils.book_append_sheet(
+        wb,
+        hojaTienda(proy as MkProyecto, e, productos, marcas),
+        name,
+      );
+    }
   }
   return XLSX.write(wb, { bookType: "xlsx", type: "array" }) as Uint8Array;
 }
