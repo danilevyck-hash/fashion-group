@@ -15,7 +15,7 @@ import {
 } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmTypeNameModal } from "@/components/ui";
-import { EstadoBadge, MarcaBadge } from "@/components/marketing";
+import { EstadoBadge } from "@/components/marketing";
 import {
   formatearFecha,
   formatearMonto,
@@ -24,7 +24,6 @@ import {
   PORCENTAJE_IMPORTACION_ZONA_LIBRE,
   calcularImportacion,
 } from "@/lib/marketing-calc";
-import { getEmpresaStyle } from "@/lib/marketing/empresa-styles";
 import type {
   FacturaConAdjuntos,
   MarcaConPorcentaje,
@@ -42,10 +41,6 @@ import EditarProyectoModal from "./EditarProyectoModal";
 import type { EntregaConItems } from "@/lib/marketing/types";
 
 type Tab = "facturas" | "fotos";
-
-function esMarcaConocida(c: string): c is "TH" | "CK" | "RBK" | "J" {
-  return c === "TH" || c === "CK" || c === "RBK" || c === "J";
-}
 
 interface Props {
   proyectoId: string;
@@ -168,128 +163,6 @@ export default function ProyectoOverlay({
       tieneAlgunaZonaLibre,
     };
   }, [facturas, entregas]);
-
-  // Por cobrar por marca = SUM(factura.total × porcentaje) leyendo las marcas
-  // asignadas a cada factura (mk_factura_marcas). Porcentaje = 50 para marcas
-  // externas, 100 para internas (Joybees absorbe 100%).
-  // Fallback a proyecto.marcas (mk_proyecto_marcas, legacy) si no hay facturas
-  // con marcas asignadas todavía.
-  const cobrablePorMarca = useMemo(() => {
-    if (!proyecto) return [];
-    const vigentes = facturas.filter((f) => !f.anulado_en);
-
-    // Agrega montos desde mk_factura_marcas (flow nuevo).
-    const byMarcaId = new Map<
-      string,
-      { marca: MarcaConPorcentaje["marca"]; porcentaje: number; monto: number }
-    >();
-    for (const f of vigentes) {
-      for (const m of f.marcas ?? []) {
-        const pct = Number(m.porcentaje ?? 50);
-        const monto = (Number(f.total) * pct) / 100;
-        const prev = byMarcaId.get(m.marca.id);
-        if (prev) {
-          byMarcaId.set(m.marca.id, {
-            ...prev,
-            monto: prev.monto + monto,
-          });
-        } else {
-          byMarcaId.set(m.marca.id, { marca: m.marca, porcentaje: pct, monto });
-        }
-      }
-    }
-
-    // Sumar entregas: cada entrega trae total_por_marca por marca_id.
-    // Se buscan los datos de la marca en proyecto.marcas o en byMarcaId.
-    for (const e of entregas) {
-      for (const [marcaId, monto] of Object.entries(e.total_por_marca ?? {})) {
-        const n = Number(monto ?? 0);
-        if (!Number.isFinite(n) || n <= 0) continue;
-        const existente = byMarcaId.get(marcaId);
-        if (existente) {
-          byMarcaId.set(marcaId, { ...existente, monto: existente.monto + n });
-        } else {
-          // Marca presente en entrega pero no en facturas — buscar en proyecto.marcas.
-          const m = proyecto.marcas.find((x) => x.marca.id === marcaId);
-          if (m) {
-            byMarcaId.set(marcaId, {
-              marca: m.marca,
-              porcentaje: m.porcentaje,
-              monto: n,
-            });
-          }
-        }
-      }
-    }
-
-    if (byMarcaId.size > 0) {
-      return Array.from(byMarcaId.values()).map((v) => ({
-        ...v,
-        monto: Number(v.monto.toFixed(2)),
-      }));
-    }
-
-    // Fallback legacy (mk_proyecto_marcas).
-    if (!proyecto.marcas || proyecto.marcas.length === 0) return [];
-    return proyecto.marcas.map((m) => {
-      const monto = (totales.total * m.porcentaje) / 100;
-      return {
-        marca: m.marca,
-        porcentaje: m.porcentaje,
-        monto: Number(monto.toFixed(2)),
-      };
-    });
-  }, [proyecto, facturas, entregas, totales.total]);
-
-  // Pagado por empresa interna: suma del 50% absorbido en facturas + entregas.
-  //   - Facturas: por cada marca externa con empresa_pagadora_codigo, la
-  //     empresa absorbe (factura.total × porcentaje / 100). Marcas internas
-  //     (Joybees, porcentaje=100) no contribuyen — no hay empresa interna.
-  //   - Entregas: viene desglosado en e.total_por_empresa_interna jsonb.
-  // Map<empresa_codigo, monto>. Si todo da $0 / vacío, la card se oculta.
-  const pagadoPorEmpresa = useMemo(() => {
-    const byEmpresa = new Map<string, number>();
-    const vigentes = facturas.filter((f) => !f.anulado_en);
-
-    for (const f of vigentes) {
-      for (const m of f.marcas ?? []) {
-        const empresa = m.empresa_pagadora_codigo;
-        if (!empresa) continue; // marca interna o legacy sin backfill
-        // El % en mk_factura_marcas representa lo que cobra la marca; la
-        // empresa absorbe la misma fracción. Para externas eso es 50% de f.total.
-        const pct = Number(m.porcentaje ?? 50);
-        const monto = (Number(f.total) * pct) / 100;
-        byEmpresa.set(empresa, (byEmpresa.get(empresa) ?? 0) + monto);
-      }
-    }
-
-    for (const e of entregas) {
-      for (const [empresa, monto] of Object.entries(
-        e.total_por_empresa_interna ?? {},
-      )) {
-        const n = Number(monto ?? 0);
-        if (!Number.isFinite(n) || n <= 0) continue;
-        byEmpresa.set(empresa, (byEmpresa.get(empresa) ?? 0) + n);
-      }
-    }
-
-    // Filtrar $0 y redondear
-    const arr: Array<{ empresa: string; monto: number }> = [];
-    for (const [empresa, m] of byEmpresa) {
-      const r = Number(m.toFixed(2));
-      if (r > 0) arr.push({ empresa, monto: r });
-    }
-    return arr.sort((a, b) => b.monto - a.monto);
-  }, [facturas, entregas]);
-
-  const totalCobrableMarcas = useMemo(
-    () => cobrablePorMarca.reduce((s, c) => s + c.monto, 0),
-    [cobrablePorMarca],
-  );
-  const totalPagadoEmpresas = useMemo(
-    () => pagadoPorEmpresa.reduce((s, e) => s + e.monto, 0),
-    [pagadoPorEmpresa],
-  );
 
   if (loading || !proyecto) {
     return (
@@ -487,99 +360,6 @@ export default function ProyectoOverlay({
               </div>
             </div>
 
-            {cobrablePorMarca.length > 0 && !esCobrado && (
-              <div
-                className={`mt-3 pt-3 border-t border-gray-100 grid gap-3 ${
-                  pagadoPorEmpresa.length > 0
-                    ? "grid-cols-1 md:grid-cols-2"
-                    : "grid-cols-1"
-                }`}
-              >
-                {/* Card 1: Cobrable por marca externa */}
-                <div className="rounded-md border border-gray-200 bg-white p-3">
-                  <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">
-                    Cobrable por marca externa
-                  </div>
-                  <div className="space-y-1">
-                    {cobrablePorMarca.map((c) => (
-                      <div
-                        key={c.marca.id}
-                        className="flex items-center justify-between text-sm"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          {esMarcaConocida(c.marca.codigo) ? (
-                            <MarcaBadge codigo={c.marca.codigo} />
-                          ) : (
-                            <span className="text-xs font-medium text-gray-700">
-                              {c.marca.nombre}
-                            </span>
-                          )}
-                          <span className="text-gray-600 truncate">
-                            {c.marca.nombre}{" "}
-                            <span className="text-gray-400 tabular-nums">
-                              {c.porcentaje}%
-                            </span>
-                          </span>
-                        </div>
-                        <span className="font-mono tabular-nums text-gray-900 font-semibold shrink-0">
-                          {formatearMonto(c.monto)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex items-center justify-between text-sm pt-2 mt-2 border-t border-gray-100">
-                    <span className="text-[11px] uppercase tracking-wider text-gray-500">
-                      Total cobrable
-                    </span>
-                    <span className="font-mono tabular-nums text-gray-900 font-semibold">
-                      {formatearMonto(totalCobrableMarcas)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Card 2: Pagado por empresa interna (oculta si vacío) */}
-                {pagadoPorEmpresa.length > 0 && (
-                  <div className="rounded-md border-2 border-teal-200 bg-teal-50/30 p-3">
-                    <div className="text-[10px] uppercase tracking-wider text-teal-700 mb-2">
-                      Pagado por empresa interna
-                    </div>
-                    <div className="space-y-1">
-                      {pagadoPorEmpresa.map((e) => {
-                        const style = getEmpresaStyle(e.empresa);
-                        return (
-                          <div
-                            key={e.empresa}
-                            className="flex items-center justify-between text-sm"
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span
-                                className={`inline-flex items-center justify-center w-6 h-6 rounded-md border text-[11px] font-bold ${style.bg} ${style.text} ${style.border}`}
-                              >
-                                {style.code}
-                              </span>
-                              <span className="text-gray-700 truncate">
-                                {style.nombre}
-                              </span>
-                            </div>
-                            <span className="font-mono tabular-nums text-gray-900 font-semibold shrink-0">
-                              {formatearMonto(e.monto)}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="flex items-center justify-between text-sm pt-2 mt-2 border-t border-teal-200">
-                      <span className="text-[11px] uppercase tracking-wider text-teal-700">
-                        Total absorbido
-                      </span>
-                      <span className="font-mono tabular-nums text-gray-900 font-semibold">
-                        {formatearMonto(totalPagadoEmpresas)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Tabs: solo Facturas y Fotos */}
