@@ -1,0 +1,378 @@
+import XLSX from "xlsx-js-style";
+import { supabaseServer } from "@/lib/supabase-server";
+import { buildReclamoSheet } from "@/lib/excel-reclamo";
+
+const TASA_IMPORTACION = 0.10;
+const TASA_ITBMS = 0.077;
+const FACTOR_TOTAL = 1 + TASA_IMPORTACION + TASA_ITBMS;
+
+const PRI = "1B3A5C";
+const MID = "2E5E8E";
+const SEP = "D4E6F1";
+const LBL_BG = "EBF5FB";
+const VAL_BG = "FDFEFE";
+const DATA_BG = "F8F9F9";
+const BRD = "D5DBDB";
+const ESTADO_FG: Record<string, string> = { "Enviado": "1D4ED8", "Confirmado": "C2410C", "Aplicado": "15803D", "Rechazado": "991B1B" };
+const ESTADO_BG: Record<string, string> = { "Enviado": "EBF5FB", "Confirmado": "FFF7ED", "Aplicado": "F0FDF4", "Rechazado": "FEE2E2" };
+const B = {
+  top: { style: "thin", color: { rgb: BRD } },
+  bottom: { style: "thin", color: { rgb: BRD } },
+  left: { style: "thin", color: { rgb: BRD } },
+  right: { style: "thin", color: { rgb: BRD } },
+};
+
+interface ReclamoItem {
+  referencia?: string;
+  descripcion?: string;
+  talla?: string;
+  cantidad?: number;
+  precio_unitario?: number;
+  motivo?: string;
+  nro_factura?: string;
+  nro_orden_compra?: string;
+}
+
+interface ReclamoFoto {
+  url?: string;
+  storage_path: string;
+}
+
+interface ReclamoFull {
+  id: string;
+  nro_reclamo?: string;
+  empresa?: string;
+  proveedor?: string;
+  marca?: string;
+  nro_factura?: string;
+  nro_orden_compra?: string;
+  fecha_reclamo?: string;
+  estado?: string;
+  notas?: string;
+  reclamo_items?: ReclamoItem[];
+  reclamo_fotos?: ReclamoFoto[];
+}
+
+export interface BulkSelector {
+  reclamo_ids?: string[];
+  all_with_filter?: { tab?: string; search?: string };
+}
+
+interface Contacto {
+  nombre?: string;
+  nombre_contacto?: string;
+  correo?: string;
+  whatsapp?: string;
+}
+
+function fmtDate(d: string | undefined): string {
+  if (!d) return "";
+  const [y, m, day] = d.split("-");
+  return `${day}/${m}/${y}`;
+}
+
+function daysSince(d: string | undefined): number {
+  if (!d) return 0;
+  return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
+}
+
+function addr(r: number, c: number) {
+  return XLSX.utils.encode_cell({ r, c });
+}
+
+function fillRow(cMax: number, r: number, ws: XLSX.WorkSheet, bg: string) {
+  for (let i = 0; i <= cMax; i++) {
+    if (!ws[addr(r, i)]) ws[addr(r, i)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: bg } } } };
+  }
+}
+
+function buildResumenSheet(reclamos: ReclamoFull[], empresa: string, contacto: Contacto | null): XLSX.WorkSheet {
+  const ws: XLSX.WorkSheet = {};
+  const h: number[] = [];
+  const merges: XLSX.Range[] = [];
+  let r = 0;
+
+  // Title
+  ws[addr(r, 0)] = {
+    v: "FASHION GROUP",
+    t: "s",
+    s: {
+      font: { bold: true, sz: 18, color: { rgb: "FFFFFF" }, name: "Calibri" },
+      fill: { fgColor: { rgb: PRI } },
+      alignment: { horizontal: "center", vertical: "center" },
+    },
+  };
+  fillRow(8, r, ws, PRI);
+  merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+  h[r] = 32; r++;
+
+  // Subtitle
+  ws[addr(r, 0)] = {
+    v: `Reclamos a Proveedor — ${empresa}`,
+    t: "s",
+    s: {
+      font: { bold: true, sz: 12, color: { rgb: "FFFFFF" }, name: "Calibri" },
+      fill: { fgColor: { rgb: MID } },
+      alignment: { horizontal: "center", vertical: "center" },
+    },
+  };
+  fillRow(8, r, ws, MID);
+  merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+  h[r] = 22; r++;
+
+  // Separator
+  fillRow(8, r, ws, SEP);
+  merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+  h[r] = 6; r++;
+
+  // Meta rows: contacto + fecha + total
+  const meta: [string, string][] = [
+    ["Generado", new Date().toLocaleDateString("es-PA")],
+    ["Reclamos", String(reclamos.length)],
+    ["Contacto", contacto?.nombre_contacto || contacto?.nombre || "—"],
+    ["Correo", contacto?.correo || "—"],
+  ];
+  for (const [lbl, val] of meta) {
+    ws[addr(r, 0)] = {
+      v: lbl,
+      t: "s",
+      s: {
+        font: { bold: true, sz: 10, color: { rgb: PRI }, name: "Calibri" },
+        fill: { fgColor: { rgb: LBL_BG } },
+        alignment: { horizontal: "left" },
+        border: B,
+      },
+    };
+    ws[addr(r, 1)] = {
+      v: val,
+      t: "s",
+      s: {
+        font: { sz: 10, color: { rgb: "111111" }, name: "Calibri" },
+        fill: { fgColor: { rgb: VAL_BG } },
+        alignment: { horizontal: "left" },
+        border: { bottom: { style: "thin", color: { rgb: BRD } } },
+      },
+    };
+    for (let c = 2; c <= 8; c++) {
+      ws[addr(r, c)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: VAL_BG } } } };
+    }
+    merges.push({ s: { r, c: 1 }, e: { r, c: 8 } });
+    h[r] = 18; r++;
+  }
+
+  // Spacer
+  fillRow(8, r, ws, "FFFFFF");
+  merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+  h[r] = 8; r++;
+
+  // Headers
+  const headers = ["N° Reclamo", "Factura", "Fecha", "Antigüedad (d)", "Estado", "Subtotal", "Importación", "ITBMS", "Total"];
+  headers.forEach((hv, i) => {
+    ws[addr(r, i)] = {
+      v: hv,
+      t: "s",
+      s: {
+        font: { bold: true, sz: 10, color: { rgb: "FFFFFF" }, name: "Calibri" },
+        fill: { fgColor: { rgb: PRI } },
+        alignment: { horizontal: "center", vertical: "center" },
+        border: B,
+      },
+    };
+  });
+  h[r] = 22; r++;
+
+  // Data rows + grand total
+  let grandSub = 0;
+  let grandImp = 0;
+  let grandItbms = 0;
+  let grandTotal = 0;
+  for (const rec of reclamos) {
+    const items = rec.reclamo_items || [];
+    const sub = items.reduce(
+      (s, i) => s + (Number(i.cantidad) || 0) * (Number(i.precio_unitario) || 0),
+      0,
+    );
+    const imp = sub * TASA_IMPORTACION;
+    const itbms = sub * TASA_ITBMS;
+    const total = sub * FACTOR_TOTAL;
+    grandSub += sub;
+    grandImp += imp;
+    grandItbms += itbms;
+    grandTotal += total;
+
+    const days = daysSince(rec.fecha_reclamo);
+    const estado = rec.estado || "";
+    const estadoFg = ESTADO_FG[estado] || "374151";
+    const estadoBg = ESTADO_BG[estado] || VAL_BG;
+
+    const txt = (v: string, ha: string, bold = false) => ({
+      v,
+      t: "s" as const,
+      s: {
+        font: { sz: 10, bold, color: { rgb: "111111" }, name: "Calibri" },
+        fill: { fgColor: { rgb: DATA_BG } },
+        alignment: { horizontal: ha },
+        border: B,
+      },
+    });
+    const num = (v: number, bold = false) => ({
+      v,
+      t: "n" as const,
+      z: '"$"#,##0.00',
+      s: {
+        font: { sz: 10, bold, color: { rgb: "111111" }, name: "Calibri" },
+        fill: { fgColor: { rgb: DATA_BG } },
+        alignment: { horizontal: "right" },
+        border: B,
+      },
+    });
+
+    ws[addr(r, 0)] = txt(rec.nro_reclamo || "", "left", true);
+    ws[addr(r, 1)] = txt(rec.nro_factura || "", "left");
+    ws[addr(r, 2)] = txt(fmtDate(rec.fecha_reclamo), "center");
+    ws[addr(r, 3)] = {
+      v: days,
+      t: "n",
+      s: {
+        font: { sz: 10, color: { rgb: days > 60 ? "991B1B" : days > 30 ? "C2410C" : "111111" }, name: "Calibri" },
+        fill: { fgColor: { rgb: DATA_BG } },
+        alignment: { horizontal: "right" },
+        border: B,
+      },
+    };
+    ws[addr(r, 4)] = {
+      v: estado,
+      t: "s",
+      s: {
+        font: { bold: true, sz: 10, color: { rgb: estadoFg }, name: "Calibri" },
+        fill: { fgColor: { rgb: estadoBg } },
+        alignment: { horizontal: "center" },
+        border: B,
+      },
+    };
+    ws[addr(r, 5)] = num(sub);
+    ws[addr(r, 6)] = num(imp);
+    ws[addr(r, 7)] = num(itbms);
+    ws[addr(r, 8)] = num(total, true);
+    h[r] = 18; r++;
+  }
+
+  // Total row
+  const tBand = (v: string, ha: string) => ({
+    v,
+    t: "s" as const,
+    s: {
+      font: { bold: true, sz: 11, color: { rgb: "FFFFFF" }, name: "Calibri" },
+      fill: { fgColor: { rgb: PRI } },
+      alignment: { horizontal: ha, vertical: "center" },
+    },
+  });
+  const tNum = (v: number) => ({
+    v,
+    t: "n" as const,
+    z: '"$"#,##0.00',
+    s: {
+      font: { bold: true, sz: 11, color: { rgb: "FFFFFF" }, name: "Calibri" },
+      fill: { fgColor: { rgb: PRI } },
+      alignment: { horizontal: "right", vertical: "center" },
+    },
+  });
+  ws[addr(r, 0)] = tBand("TOTAL GENERAL", "left");
+  for (let c = 1; c <= 4; c++) ws[addr(r, c)] = tBand("", "left");
+  ws[addr(r, 5)] = tNum(grandSub);
+  ws[addr(r, 6)] = tNum(grandImp);
+  ws[addr(r, 7)] = tNum(grandItbms);
+  ws[addr(r, 8)] = tNum(grandTotal);
+  merges.push({ s: { r, c: 0 }, e: { r, c: 4 } });
+  h[r] = 24; r++;
+
+  ws["!ref"] = `A1:I${r}`;
+  ws["!merges"] = merges;
+  ws["!cols"] = [
+    { wch: 16 },
+    { wch: 18 },
+    { wch: 12 },
+    { wch: 14 },
+    { wch: 13 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 14 },
+    { wch: 16 },
+  ];
+  ws["!rows"] = h.map((v) => ({ hpt: v || 16 }));
+  return ws;
+}
+
+function safeSheetName(name: string, used: Set<string>): string {
+  let base = (name || "Reclamo").replace(/[\\/?*[\]:]/g, "_").slice(0, 31).trim() || "Reclamo";
+  let candidate = base;
+  let n = 2;
+  while (used.has(candidate.toLowerCase())) {
+    const suffix = `_${n}`;
+    candidate = base.slice(0, 31 - suffix.length) + suffix;
+    n++;
+  }
+  used.add(candidate.toLowerCase());
+  return candidate;
+}
+
+export async function buildBulkReclamosExcel(
+  reclamos: ReclamoFull[],
+  empresa: string,
+  contacto: Contacto | null,
+): Promise<Buffer> {
+  const wb = XLSX.utils.book_new();
+  const used = new Set<string>();
+
+  const resumen = buildResumenSheet(reclamos, empresa, contacto);
+  XLSX.utils.book_append_sheet(wb, resumen, safeSheetName("Resumen", used));
+
+  for (const rec of reclamos) {
+    const items = (rec.reclamo_items || []) as Record<string, unknown>[];
+    const fotos = (rec.reclamo_fotos || []) as ReclamoFoto[];
+    const sheet = buildReclamoSheet(rec as unknown as Record<string, unknown>, items, fotos);
+    XLSX.utils.book_append_sheet(wb, sheet, safeSheetName(rec.nro_reclamo || "Reclamo", used));
+  }
+
+  const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+  return buf as Buffer;
+}
+
+export async function fetchReclamosForEmpresa(empresa: string, sel: BulkSelector): Promise<ReclamoFull[]> {
+  if (sel.reclamo_ids && sel.reclamo_ids.length > 0) {
+    const { data, error } = await supabaseServer
+      .from("reclamos")
+      .select("*, reclamo_items(*), reclamo_fotos(*)")
+      .eq("empresa", empresa)
+      .in("id", sel.reclamo_ids)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error("Error al cargar reclamos");
+    return (data as ReclamoFull[]) || [];
+  }
+
+  if (sel.all_with_filter) {
+    const tab = sel.all_with_filter.tab || "all";
+    const search = (sel.all_with_filter.search || "").trim();
+    let query = supabaseServer
+      .from("reclamos")
+      .select("*, reclamo_items(*), reclamo_fotos(*)")
+      .eq("empresa", empresa)
+      .order("created_at", { ascending: false });
+    if (tab !== "all") query = query.eq("estado", tab);
+    if (search) {
+      const escaped = search.replace(/[%_,]/g, "\\$&");
+      query = query.or(`nro_reclamo.ilike.%${escaped}%,nro_factura.ilike.%${escaped}%`);
+    }
+    const { data, error } = await query;
+    if (error) throw new Error("Error al cargar reclamos");
+    return (data as ReclamoFull[]) || [];
+  }
+
+  return [];
+}
+
+export function reclamoBulkConstants() {
+  return { TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL };
+}
+
+export type { ReclamoFull };

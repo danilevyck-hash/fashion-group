@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { Resend } from "resend";
-import { buildBulkReclamosPdf, fetchReclamosForEmpresa, BulkSelector, reclamoBulkConstants } from "@/lib/reclamos/pdf-bulk";
+import {
+  buildBulkReclamosExcel,
+  fetchReclamosForEmpresa,
+  BulkSelector,
+  reclamoBulkConstants,
+} from "@/lib/reclamos/excel-bulk";
 
 export const dynamic = "force-dynamic";
 
@@ -76,10 +81,9 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       })
       .join("");
 
-    const doc = await buildBulkReclamosPdf(reclamos, empresa);
-    const pdfBuf = Buffer.from(doc.output("arraybuffer"));
+    const xlsxBuf = await buildBulkReclamosExcel(reclamos, empresa, contacto);
     const safeName = empresa.replace(/[^A-Za-z0-9_-]+/g, "_");
-    const pdfFilename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.pdf`;
+    const xlsxFilename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
     const nombre = contacto.nombre_contacto || contacto.nombre || "equipo";
     const html = `
@@ -108,7 +112,7 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
             </tr>
           </tfoot>
         </table>
-        <p>El detalle completo de cada reclamo (ítems, evidencia fotográfica y totales por reclamo) se encuentra en el PDF adjunto.</p>
+        <p>El detalle completo de cada reclamo (ítems, totales y enlaces a la evidencia fotográfica) se encuentra en el archivo Excel adjunto, con una hoja por reclamo.</p>
         <p>Quedamos en espera de la nota de crédito correspondiente.</p>
         <p style="margin-top:24px">Saludos,<br><strong>Fashion Group</strong></p>
         <div style="border-top:1px solid #eee;margin-top:32px;padding-top:12px;font-size:11px;color:#999">Este correo fue enviado desde el sistema interno de Fashion Group.</div>
@@ -121,7 +125,7 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       to: [contacto.correo],
       subject,
       html,
-      attachments: [{ filename: pdfFilename, content: pdfBuf }],
+      attachments: [{ filename: xlsxFilename, content: xlsxBuf }],
     });
 
     if (sendError) {

@@ -30,7 +30,7 @@ interface Props {
   onDeleteReclamo: (id: string) => void;
 }
 
-type BulkAction = "pdf" | "email" | "whatsapp";
+type BulkAction = "excel" | "email";
 
 export default function EmpresaList({
   activeEmpresa, reclamos, contactos, search, setSearch,
@@ -77,108 +77,69 @@ export default function EmpresaList({
     else { setSortCol(col); setSortDir("desc"); }
   }
 
-  const visibleIds = sortedRecs.map((r) => r.id);
   const empresaPath = encodeURIComponent(activeEmpresa);
 
-  function buildBulkBody(ids: string[]) {
-    if (ids.length > 0) return { reclamo_ids: ids };
-    return { all_with_filter: { tab: filterEstado, search } };
-  }
-
-  async function downloadBulkPdf(ids: string[]) {
-    if (busy) return;
-    if (ids.length === 0 && sortedRecs.length === 0) {
-      showToast("No hay reclamos para descargar.");
-      return;
-    }
-    setBusy("pdf");
+  async function downloadBulkExcel() {
+    if (busy || selectedIds.length === 0) return;
+    setBusy("excel");
     try {
-      const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/export-pdf`, {
+      const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/export-excel`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildBulkBody(ids)),
+        body: JSON.stringify({ reclamo_ids: selectedIds }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.error || "Error al generar el PDF.");
+        throw new Error(err?.error || "Error al generar Excel.");
       }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       const safe = activeEmpresa.replace(/[^A-Za-z0-9_-]+/g, "_");
       a.href = url;
-      a.download = `Reclamos_${safe}_${new Date().toISOString().slice(0, 10)}.pdf`;
+      a.download = `Reclamos_${safe}_${new Date().toISOString().slice(0, 10)}.xlsx`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast("PDF descargado");
+      showToast(`Excel descargado con ${selectedIds.length} reclamo${selectedIds.length === 1 ? "" : "s"}`);
     } catch (err) {
-      showToast(err instanceof Error ? err.message : "Error al descargar PDF");
+      showToast(err instanceof Error ? err.message : "Error al descargar Excel");
     } finally {
       setBusy(null);
     }
   }
 
-  async function sendBulkEmail(ids: string[], opts?: { silent?: boolean }) {
-    if (busy && !opts?.silent) return null;
+  async function sendBulkEmail() {
+    if (busy || selectedIds.length === 0) return;
     if (!c?.correo) {
-      if (!opts?.silent) showToast(`No hay correo configurado para ${activeEmpresa}.`);
-      return false;
+      showToast(`No hay correo configurado para ${activeEmpresa}.`);
+      return;
     }
-    if (ids.length === 0 && sortedRecs.length === 0) {
-      if (!opts?.silent) showToast("No hay reclamos para enviar.");
-      return false;
-    }
-    if (!opts?.silent) setBusy("email");
+    setBusy("email");
     try {
       const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/send-email`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(buildBulkBody(ids)),
+        body: JSON.stringify({ reclamo_ids: selectedIds }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => null);
         throw new Error(err?.error || "Error al enviar correo.");
       }
-      if (!opts?.silent) showToast(`Email enviado a ${c.correo}`);
-      return true;
+      showToast(`Email enviado a ${activeEmpresa} con ${selectedIds.length} reclamo${selectedIds.length === 1 ? "" : "s"}`);
     } catch (err) {
-      if (!opts?.silent) showToast(err instanceof Error ? err.message : "Error al enviar correo");
-      return false;
-    } finally {
-      if (!opts?.silent) setBusy(null);
-    }
-  }
-
-  async function sendBulkWhatsApp(ids: string[]) {
-    if (busy) return;
-    if (!c?.whatsapp) {
-      showToast(`No hay WhatsApp configurado para ${activeEmpresa}.`);
-      return;
-    }
-    const targetIds = ids.length > 0 ? ids : visibleIds;
-    const sel = reclamos.filter((r) => targetIds.includes(r.id));
-    if (!sel.length) {
-      showToast("No hay reclamos para enviar.");
-      return;
-    }
-    const grandTotal = sel.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
-    const nombre = c.nombre_contacto || c.nombre || "equipo";
-    const msg = `Hola ${nombre}, te envío ${sel.length} reclamo${sel.length === 1 ? "" : "s"} pendiente${sel.length === 1 ? "" : "s"} con un total de $${fmt(grandTotal)}. Detalle adjunto en email.`;
-    const waUrl = `https://wa.me/${(c.whatsapp || "").replace(/\D/g, "")}?text=${encodeURIComponent(msg)}`;
-
-    setBusy("whatsapp");
-    try {
-      window.open(waUrl, "_blank");
-      const ok = await sendBulkEmail(ids, { silent: true });
-      showToast(ok ? "Email enviado y abriendo WhatsApp..." : "WhatsApp abierto. El email no se pudo enviar.");
+      showToast(err instanceof Error ? err.message : "Error al enviar correo");
     } finally {
       setBusy(null);
     }
   }
 
+  function cancelSelection() {
+    setSelectionMode(false);
+    setSelectedIds([]);
+  }
+
   const selCount = selectedIds.length;
-  const headerDisabled = busy !== null;
-  const headerEmptyVisible = sortedRecs.length === 0;
+  const hasSelection = selectionMode && selCount > 0;
 
   return (
     <div>
@@ -197,38 +158,49 @@ export default function EmpresaList({
           {c && <p className="text-xs text-gray-400 mt-1">Contacto: {(c.nombre_contacto || c.nombre || "equipo")} | {c.correo}</p>}
         </div>
         <div className="flex items-center gap-3 flex-wrap">
-          <button onClick={() => { setSelectionMode(true); setSelectedIds([]); }} disabled={selectionMode} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md transition disabled:opacity-40">Seleccionar</button>
-          <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
+          {hasSelection ? (
+            <>
+              <span className="text-sm text-gray-500">
+                {selCount} seleccionado{selCount === 1 ? "" : "s"}
+              </span>
+              <button
+                onClick={downloadBulkExcel}
+                disabled={busy !== null}
+                className="text-sm bg-black text-white px-5 py-2 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
+              >
+                {busy === "excel" ? "Generando..." : "Descargar Excel"}
+              </button>
+              <button
+                onClick={sendBulkEmail}
+                disabled={busy !== null || !c?.correo}
+                title={!c?.correo ? "No hay correo configurado para esta empresa" : ""}
+                className="text-sm border border-gray-300 px-4 py-2 rounded-md text-gray-700 hover:text-black hover:border-gray-400 transition disabled:opacity-40"
+              >
+                {busy === "email" ? "Enviando..." : "Enviar por Email"}
+              </button>
+              <button
+                onClick={cancelSelection}
+                disabled={busy !== null}
+                className="text-sm border border-gray-200 px-4 py-2 rounded-md text-gray-400 hover:text-black transition disabled:opacity-40"
+              >
+                Cancelar
+              </button>
+            </>
+          ) : (
+            <>
+              {selectionMode && (
+                <span className="text-sm text-gray-400">Selecciona reclamos…</span>
+              )}
+              <button
+                onClick={() => { setSelectionMode(!selectionMode); setSelectedIds([]); }}
+                className={`text-sm border px-4 py-2 rounded-md transition ${selectionMode ? "border-black text-black bg-gray-50" : "border-gray-200 text-gray-400 hover:text-black"}`}
+              >
+                {selectionMode ? "Salir" : "Seleccionar"}
+              </button>
+              <button onClick={onNewReclamo} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all">Nuevo Reclamo</button>
+            </>
+          )}
         </div>
-      </div>
-
-      {/* Header bulk actions — apply to all visible reclamos */}
-      <div className="flex items-center gap-2 mb-4 flex-wrap">
-        <span className="text-[11px] uppercase tracking-widest text-gray-400 mr-1">Acciones sobre lo visible</span>
-        <button
-          onClick={() => sendBulkEmail([])}
-          disabled={headerDisabled || headerEmptyVisible || !c?.correo}
-          title={!c?.correo ? "No hay correo configurado para esta empresa" : `Enviar ${sortedRecs.length} reclamo(s) por email`}
-          className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition disabled:opacity-40 disabled:hover:text-gray-500 disabled:hover:border-gray-200 flex items-center gap-1"
-        >
-          {busy === "email" ? "Enviando..." : `Email todos (${sortedRecs.length})`}
-        </button>
-        <button
-          onClick={() => sendBulkWhatsApp([])}
-          disabled={headerDisabled || headerEmptyVisible || !c?.whatsapp}
-          title={!c?.whatsapp ? "No hay WhatsApp configurado para esta empresa" : `Enviar ${sortedRecs.length} reclamo(s) por WhatsApp + email`}
-          className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition disabled:opacity-40 disabled:hover:text-gray-500 disabled:hover:border-gray-200 flex items-center gap-1"
-        >
-          {busy === "whatsapp" ? "Abriendo..." : `WhatsApp todos (${sortedRecs.length})`}
-        </button>
-        <button
-          onClick={() => downloadBulkPdf([])}
-          disabled={headerDisabled || headerEmptyVisible}
-          title={`Descargar ${sortedRecs.length} reclamo(s) en PDF`}
-          className="text-xs border border-gray-200 px-3 py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition disabled:opacity-40 disabled:hover:text-gray-500 disabled:hover:border-gray-200 flex items-center gap-1"
-        >
-          {busy === "pdf" ? "Generando..." : `PDF todos (${sortedRecs.length})`}
-        </button>
       </div>
 
       <div className="flex flex-wrap gap-2 mb-4">
@@ -318,7 +290,7 @@ export default function EmpresaList({
           <thead className="sticky top-0 bg-white z-10">
             <tr className="border-b border-gray-200 text-xs uppercase tracking-widest text-gray-400">
               {selectionMode && <th className="pb-3 w-8">
-                <input type="checkbox" checked={allSelected} onChange={() => allSelected ? setSelectedIds([]) : setSelectedIds(allSelectableIds)} className="accent-black" title="Seleccionar todos" />
+                <input type="checkbox" checked={allSelected} onChange={() => allSelected ? setSelectedIds([]) : setSelectedIds(allSelectableIds)} className="accent-black" title="Seleccionar todos los visibles" />
               </th>}
               <th className="text-left pb-3 font-medium">N° Reclamo</th>
               <th className="text-left pb-3 font-medium">Factura</th>
@@ -353,47 +325,6 @@ export default function EmpresaList({
             })}
           </tbody>
         </table>
-          </div>
-        </div>
-      )}
-
-      {/* Floating selection bar — only when in selection mode */}
-      {selectionMode && (
-        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 w-[calc(100vw-2rem)] max-w-3xl">
-          <div className="bg-black text-white rounded-xl shadow-2xl border border-gray-800 px-4 py-3 flex items-center gap-3 flex-wrap">
-            <span className="text-sm font-medium">
-              {selCount === 0 ? "Selecciona reclamos para acciones masivas" : `${selCount} reclamo${selCount === 1 ? "" : "s"} seleccionado${selCount === 1 ? "" : "s"}`}
-            </span>
-            <div className="flex-1" />
-            <button
-              onClick={() => downloadBulkPdf(selectedIds)}
-              disabled={selCount === 0 || busy !== null}
-              className="text-xs bg-white text-black px-4 py-1.5 rounded-full font-medium hover:bg-gray-100 active:scale-[0.97] transition-all disabled:opacity-40"
-            >
-              {busy === "pdf" ? "Generando..." : "Descargar PDF"}
-            </button>
-            <button
-              onClick={() => sendBulkEmail(selectedIds)}
-              disabled={selCount === 0 || busy !== null || !c?.correo}
-              title={!c?.correo ? "No hay correo configurado" : ""}
-              className="text-xs bg-white text-black px-4 py-1.5 rounded-full font-medium hover:bg-gray-100 active:scale-[0.97] transition-all disabled:opacity-40"
-            >
-              {busy === "email" ? "Enviando..." : "Enviar por Email"}
-            </button>
-            <button
-              onClick={() => sendBulkWhatsApp(selectedIds)}
-              disabled={selCount === 0 || busy !== null || !c?.whatsapp}
-              title={!c?.whatsapp ? "No hay WhatsApp configurado" : ""}
-              className="text-xs bg-white text-black px-4 py-1.5 rounded-full font-medium hover:bg-gray-100 active:scale-[0.97] transition-all disabled:opacity-40"
-            >
-              {busy === "whatsapp" ? "Abriendo..." : "Enviar por WhatsApp"}
-            </button>
-            <button
-              onClick={() => { setSelectionMode(false); setSelectedIds([]); }}
-              className="text-xs text-gray-300 hover:text-white px-2 py-1.5 transition"
-            >
-              Cancelar
-            </button>
           </div>
         </div>
       )}
