@@ -1,6 +1,5 @@
 import XLSX from "xlsx-js-style";
 
-function fmtDate(d: string) { if (!d) return ""; const [y, m, day] = d.split("-"); return `${day}/${m}/${y}`; }
 function addr(r: number, c: number) { return XLSX.utils.encode_cell({ r, c }); }
 
 interface ReclamoFoto {
@@ -11,7 +10,6 @@ interface ReclamoFoto {
 // Blue corporate palette
 const PRI = "1B3A5C"; const MID = "2E5E8E"; const SEP = "D4E6F1"; const LBL_BG = "EBF5FB"; const VAL_BG = "FDFEFE"; const DATA_BG = "F8F9F9"; const BRD = "D5DBDB";
 const B = { top: { style: "thin", color: { rgb: BRD } }, bottom: { style: "thin", color: { rgb: BRD } }, left: { style: "thin", color: { rgb: BRD } }, right: { style: "thin", color: { rgb: BRD } } };
-const ESTADO_FG: Record<string, string> = { "Enviado": "1D4ED8", "Confirmado": "C2410C", "Aplicado": "15803D", "Rechazado": "991B1B" };
 
 function fill(c: number, r: number, ws: XLSX.WorkSheet, bg: string) { for (let i = 0; i <= c; i++) if (!ws[addr(r, i)]) ws[addr(r, i)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: bg } } } }; }
 
@@ -36,29 +34,20 @@ export function buildReclamoSheet(rec: Record<string, unknown>, items: Record<st
   const mLbl = (v: string) => ({ v, t: "s", s: { font: { bold: true, sz: 10, color: { rgb: PRI }, name: "Calibri" }, fill: { fgColor: { rgb: LBL_BG } }, alignment: { horizontal: "left" }, border: B } });
   const mVal = (v: string, bold = false) => ({ v, t: "s", s: { font: { bold, sz: 10, color: { rgb: "111111" }, name: "Calibri" }, fill: { fgColor: { rgb: VAL_BG } }, alignment: { horizontal: "left" }, border: { bottom: { style: "thin", color: { rgb: BRD } } } } });
 
-  // Rows 3-6: Metadata
+  // Metadata rows: N° Reclamo / Empresa / Proveedor / N° Factura / N° Pedido
   const meta = [
-    ["N° Reclamo", String(rec.nro_reclamo || ""), true, "Empresa", String(rec.empresa || ""), false],
-    ["Proveedor", String(rec.proveedor || ""), false, "Marca", String(rec.marca || ""), false],
-    ["N° Factura", String(rec.nro_factura || ""), true, "Fecha", fmtDate(String(rec.fecha_reclamo || "")), false],
-    ["N° Pedido", String(rec.nro_orden_compra || "—"), false, "Estado", String(rec.estado || ""), false],
+    ["N° Reclamo", String(rec.nro_reclamo || ""), true],
+    ["Empresa", String(rec.empresa || ""), false],
+    ["Proveedor", String(rec.proveedor || ""), false],
+    ["N° Factura", String(rec.nro_factura || ""), true],
+    ["N° Pedido", String(rec.nro_orden_compra || "—"), false],
   ] as const;
 
-  for (const [aLbl, aVal, aBold, eLbl, eVal] of meta) {
-    ws[addr(r, 0)] = mLbl(aLbl);
-    ws[addr(r, 1)] = mVal(aVal, aBold as boolean);
-    for (let c = 2; c <= 3; c++) ws[addr(r, c)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: VAL_BG } } } };
-    ws[addr(r, 4)] = mLbl(eLbl);
-    if (eLbl === "Estado") {
-      const fg = ESTADO_FG[eVal as string] || "374151";
-      const ebg = ({ "Enviado": "EBF5FB", "Confirmado": "FFF7ED", "Aplicado": "F0FDF4", "Rechazado": "FEE2E2" } as Record<string, string>)[eVal as string] || VAL_BG;
-      ws[addr(r, 5)] = { v: eVal, t: "s", s: { font: { bold: true, sz: 10, color: { rgb: fg }, name: "Calibri" }, fill: { fgColor: { rgb: ebg } }, alignment: { horizontal: "left" }, border: B } };
-    } else {
-      ws[addr(r, 5)] = mVal(eVal as string);
-    }
-    ws[addr(r, 6)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: VAL_BG } } } };
-    merges.push({ s: { r, c: 1 }, e: { r, c: 3 } });
-    merges.push({ s: { r, c: 5 }, e: { r, c: 6 } });
+  for (const [lbl, val, bold] of meta) {
+    ws[addr(r, 0)] = mLbl(lbl);
+    ws[addr(r, 1)] = mVal(val, bold as boolean);
+    for (let c = 2; c <= 6; c++) ws[addr(r, c)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: VAL_BG } } } };
+    merges.push({ s: { r, c: 1 }, e: { r, c: 6 } });
     h[r] = 18; r++;
   }
 

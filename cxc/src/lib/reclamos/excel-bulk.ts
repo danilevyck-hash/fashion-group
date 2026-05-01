@@ -9,7 +9,6 @@ const FACTOR_TOTAL = 1 + TASA_IMPORTACION + TASA_ITBMS;
 const PRI = "1B3A5C";
 const MID = "2E5E8E";
 const SEP = "D4E6F1";
-const LBL_BG = "EBF5FB";
 const VAL_BG = "FDFEFE";
 const DATA_BG = "F8F9F9";
 const BRD = "D5DBDB";
@@ -86,7 +85,7 @@ function fillRow(cMax: number, r: number, ws: XLSX.WorkSheet, bg: string) {
   }
 }
 
-function buildResumenSheet(reclamos: ReclamoFull[], empresa: string, contacto: Contacto | null): XLSX.WorkSheet {
+function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkSheet {
   const ws: XLSX.WorkSheet = {};
   const h: number[] = [];
   const merges: XLSX.Range[] = [];
@@ -124,46 +123,6 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string, contacto: C
   fillRow(8, r, ws, SEP);
   merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
   h[r] = 6; r++;
-
-  // Meta rows: contacto + fecha + total
-  const meta: [string, string][] = [
-    ["Generado", new Date().toLocaleDateString("es-PA")],
-    ["Reclamos", String(reclamos.length)],
-    ["Contacto", contacto?.nombre_contacto || contacto?.nombre || "—"],
-    ["Correo", contacto?.correo || "—"],
-  ];
-  for (const [lbl, val] of meta) {
-    ws[addr(r, 0)] = {
-      v: lbl,
-      t: "s",
-      s: {
-        font: { bold: true, sz: 10, color: { rgb: PRI }, name: "Calibri" },
-        fill: { fgColor: { rgb: LBL_BG } },
-        alignment: { horizontal: "left" },
-        border: B,
-      },
-    };
-    ws[addr(r, 1)] = {
-      v: val,
-      t: "s",
-      s: {
-        font: { sz: 10, color: { rgb: "111111" }, name: "Calibri" },
-        fill: { fgColor: { rgb: VAL_BG } },
-        alignment: { horizontal: "left" },
-        border: { bottom: { style: "thin", color: { rgb: BRD } } },
-      },
-    };
-    for (let c = 2; c <= 8; c++) {
-      ws[addr(r, c)] = { v: "", t: "s", s: { fill: { fgColor: { rgb: VAL_BG } } } };
-    }
-    merges.push({ s: { r, c: 1 }, e: { r, c: 8 } });
-    h[r] = 18; r++;
-  }
-
-  // Spacer
-  fillRow(8, r, ws, "FFFFFF");
-  merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
-  h[r] = 8; r++;
 
   // Headers
   const headers = ["N° Reclamo", "Factura", "Fecha", "Antigüedad (d)", "Estado", "Subtotal", "Importación", "ITBMS", "Total"];
@@ -324,7 +283,7 @@ export async function buildBulkReclamosExcel(
   const wb = XLSX.utils.book_new();
   const used = new Set<string>();
 
-  const resumen = buildResumenSheet(reclamos, empresa, contacto);
+  const resumen = buildResumenSheet(reclamos, empresa);
   XLSX.utils.book_append_sheet(wb, resumen, safeSheetName("Resumen", used));
 
   for (const rec of reclamos) {
