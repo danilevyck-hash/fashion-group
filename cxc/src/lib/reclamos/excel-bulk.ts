@@ -9,11 +9,8 @@ const FACTOR_TOTAL = 1 + TASA_IMPORTACION + TASA_ITBMS;
 const PRI = "1B3A5C";
 const MID = "2E5E8E";
 const SEP = "D4E6F1";
-const VAL_BG = "FDFEFE";
 const DATA_BG = "F8F9F9";
 const BRD = "D5DBDB";
-const ESTADO_FG: Record<string, string> = { "Enviado": "1D4ED8", "Confirmado": "C2410C", "Aplicado": "15803D", "Rechazado": "991B1B" };
-const ESTADO_BG: Record<string, string> = { "Enviado": "EBF5FB", "Confirmado": "FFF7ED", "Aplicado": "F0FDF4", "Rechazado": "FEE2E2" };
 const B = {
   top: { style: "thin", color: { rgb: BRD } },
   bottom: { style: "thin", color: { rgb: BRD } },
@@ -70,11 +67,6 @@ function fmtDate(d: string | undefined): string {
   return `${day}/${m}/${y}`;
 }
 
-function daysSince(d: string | undefined): number {
-  if (!d) return 0;
-  return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
-}
-
 function addr(r: number, c: number) {
   return XLSX.utils.encode_cell({ r, c });
 }
@@ -101,8 +93,8 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
       alignment: { horizontal: "center", vertical: "center" },
     },
   };
-  fillRow(8, r, ws, PRI);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+  fillRow(6, r, ws, PRI);
+  merges.push({ s: { r, c: 0 }, e: { r, c: 6 } });
   h[r] = 32; r++;
 
   // Subtitle
@@ -115,17 +107,17 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
       alignment: { horizontal: "center", vertical: "center" },
     },
   };
-  fillRow(8, r, ws, MID);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+  fillRow(6, r, ws, MID);
+  merges.push({ s: { r, c: 0 }, e: { r, c: 6 } });
   h[r] = 22; r++;
 
   // Separator
-  fillRow(8, r, ws, SEP);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 8 } });
+  fillRow(6, r, ws, SEP);
+  merges.push({ s: { r, c: 0 }, e: { r, c: 6 } });
   h[r] = 6; r++;
 
   // Headers
-  const headers = ["N° Reclamo", "Factura", "Fecha", "Antigüedad (d)", "Estado", "Subtotal", "Importación", "ITBMS", "Total"];
+  const headers = ["N° Reclamo", "Factura", "Fecha", "Subtotal", "Importación", "ITBMS", "Total"];
   headers.forEach((hv, i) => {
     ws[addr(r, i)] = {
       v: hv,
@@ -159,11 +151,6 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
     grandItbms += itbms;
     grandTotal += total;
 
-    const days = daysSince(rec.fecha_reclamo);
-    const estado = rec.estado || "";
-    const estadoFg = ESTADO_FG[estado] || "374151";
-    const estadoBg = ESTADO_BG[estado] || VAL_BG;
-
     const txt = (v: string, ha: string, bold = false) => ({
       v,
       t: "s" as const,
@@ -189,30 +176,10 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
     ws[addr(r, 0)] = txt(rec.nro_reclamo || "", "left", true);
     ws[addr(r, 1)] = txt(rec.nro_factura || "", "left");
     ws[addr(r, 2)] = txt(fmtDate(rec.fecha_reclamo), "center");
-    ws[addr(r, 3)] = {
-      v: days,
-      t: "n",
-      s: {
-        font: { sz: 10, color: { rgb: days > 60 ? "991B1B" : days > 30 ? "C2410C" : "111111" }, name: "Calibri" },
-        fill: { fgColor: { rgb: DATA_BG } },
-        alignment: { horizontal: "right" },
-        border: B,
-      },
-    };
-    ws[addr(r, 4)] = {
-      v: estado,
-      t: "s",
-      s: {
-        font: { bold: true, sz: 10, color: { rgb: estadoFg }, name: "Calibri" },
-        fill: { fgColor: { rgb: estadoBg } },
-        alignment: { horizontal: "center" },
-        border: B,
-      },
-    };
-    ws[addr(r, 5)] = num(sub);
-    ws[addr(r, 6)] = num(imp);
-    ws[addr(r, 7)] = num(itbms);
-    ws[addr(r, 8)] = num(total, true);
+    ws[addr(r, 3)] = num(sub);
+    ws[addr(r, 4)] = num(imp);
+    ws[addr(r, 5)] = num(itbms);
+    ws[addr(r, 6)] = num(total, true);
     h[r] = 18; r++;
   }
 
@@ -237,22 +204,20 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
     },
   });
   ws[addr(r, 0)] = tBand("TOTAL GENERAL", "left");
-  for (let c = 1; c <= 4; c++) ws[addr(r, c)] = tBand("", "left");
-  ws[addr(r, 5)] = tNum(grandSub);
-  ws[addr(r, 6)] = tNum(grandImp);
-  ws[addr(r, 7)] = tNum(grandItbms);
-  ws[addr(r, 8)] = tNum(grandTotal);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 4 } });
+  for (let c = 1; c <= 2; c++) ws[addr(r, c)] = tBand("", "left");
+  ws[addr(r, 3)] = tNum(grandSub);
+  ws[addr(r, 4)] = tNum(grandImp);
+  ws[addr(r, 5)] = tNum(grandItbms);
+  ws[addr(r, 6)] = tNum(grandTotal);
+  merges.push({ s: { r, c: 0 }, e: { r, c: 2 } });
   h[r] = 24; r++;
 
-  ws["!ref"] = `A1:I${r}`;
+  ws["!ref"] = `A1:G${r}`;
   ws["!merges"] = merges;
   ws["!cols"] = [
     { wch: 16 },
     { wch: 18 },
     { wch: 12 },
-    { wch: 14 },
-    { wch: 13 },
     { wch: 14 },
     { wch: 14 },
     { wch: 14 },
