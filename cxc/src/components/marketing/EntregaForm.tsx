@@ -1,9 +1,19 @@
 "use client";
 
 // Form modal para crear/editar una entrega de muebles.
-// Tabla con una fila por producto del inventario y una columna por cada marca
-// asignada al proyecto. Cada celda es un input de cantidad. Total en vivo.
-// No bloquea si supera stock — muestra warning naranja.
+//
+// Flow nuevo (mayo 2026):
+//   1) Selector de marca (Tommy / Calvin / Reebok / Joybees según corresponda).
+//      La empresa interna pagadora se deriva de marca.empresa_codigo y NO se
+//      expone en UI — el backend la resuelve por default al guardar.
+//   2) Input destacado "Cantidad de paneles" (driver del kit).
+//   3) Bloque "Accesorios": tablas, conjunto, norte, barra. Al escribir paneles
+//      se autorrellenan según la curva sugerida (3/3/1/3). Editables a mano.
+//      Si el usuario edita uno y luego cambia paneles, se ofrece un link
+//      "Recalcular según curva" en vez de pisar el valor manual.
+//   4) Resumen en vivo: total $, reparto Marca / Empresa interna o "100%
+//      absorbe" si la marca es interna (Joybees).
+// ============================================================================
 
 import { useEffect, useMemo, useState } from "react";
 import type {
@@ -11,9 +21,11 @@ import type {
   EntregaItemInput,
   MarcaConPorcentaje,
   MkInventarioProducto,
+  MkMarca,
 } from "@/lib/marketing/types";
 import { useToast } from "@/components/ToastSystem";
 import { formatearMonto } from "@/lib/marketing/normalizar";
+import { getEmpresaStyle } from "@/lib/marketing/empresa-styles";
 
 interface Props {
   open: boolean;
@@ -26,20 +38,38 @@ interface Props {
   onSaved: () => void;
 }
 
-interface CeldaState {
-  // {producto_id × marca_id} → cantidad como string (para input controlado)
-  [key: string]: string;
+// ---- Curva del KIT: paneles es el driver. ----
+const CURVA: Record<string, number> = {
+  paneles: 1,
+  tablas: 3,
+  conjunto: 3,
+  norte: 1,
+  barra: 3,
+};
+
+type Categoria = "paneles" | "tablas" | "conjunto" | "norte" | "barra" | "otros";
+
+function categorizarProducto(nombre: string): Categoria {
+  const n = nombre.toLowerCase();
+  if (n.includes("panel")) return "paneles";
+  if (n.includes("tabla")) return "tablas";
+  if (n.includes("conjunto")) return "conjunto";
+  if (n.includes("norte") || n.includes("colgador")) return "norte";
+  if (n.includes("barra")) return "barra";
+  return "otros";
 }
 
-function keyCell(productoId: string, marcaId: string): string {
-  return `${productoId}::${marcaId}`;
+function labelAccesorio(c: Categoria): string {
+  if (c === "tablas") return "Tablas";
+  if (c === "conjunto") return "Conjunto soporte";
+  if (c === "norte") return "Norte (colgador)";
+  if (c === "barra") return "Barra plana";
+  return "Otro";
 }
 
-function getCant(state: CeldaState, productoId: string, marcaId: string): number {
-  const v = state[keyCell(productoId, marcaId)];
-  if (v === undefined || v === "") return 0;
-  const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? Math.trunc(n) : 0;
+function trunc(n: number): number {
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.trunc(n));
 }
 
 export default function EntregaForm({
@@ -53,123 +83,331 @@ export default function EntregaForm({
   onSaved,
 }: Props) {
   const { toast } = useToast();
-  const [cantidades, setCantidades] = useState<CeldaState>({});
-  const [guardando, setGuardando] = useState(false);
 
-  // Inicializar cantidades cuando se abre o cambia `initial`.
+  // ---- Marcas elegibles ----
+  // Si el form se abre desde un proyecto, las opciones son las marcas del
+  // proyecto. Si es standalone (sin proyecto: marcasProyecto vacío), cargamos
+  // todas las marcas activas del catálogo.
+  const [catalogoMarcas, setCatalogoMarcas] = useState<MkMarca[]>([]);
   useEffect(() => {
     if (!open) return;
-    const next: CeldaState = {};
-    if (initial?.items) {
-      for (const it of initial.items) {
-        for (const [marcaId, cant] of Object.entries(it.cantidad_por_marca ?? {})) {
-          const n = Number(cant);
-          if (Number.isFinite(n) && n > 0) {
-            next[keyCell(it.producto_id, marcaId)] = String(n);
-          }
+    if (marcasProyecto.length > 0) return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/marketing/marcas", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as MkMarca[];
+        if (!cancelado) setCatalogoMarcas(Array.isArray(data) ? data : []);
+      } catch {
+        /* noop */
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, [open, marcasProyecto.length]);
+
+  const marcasOpciones: MkMarca[] = useMemo(() => {
+    if (marcasProyecto.length > 0) {
+      return marcasProyecto.map((m) => m.marca);
+    }
+    return catalogoMarcas;
+  }, [marcasProyecto, catalogoMarcas]);
+
+  // ---- Estado del form ----
+  const [marcaIdSel, setMarcaIdSel] = useState<string>("");
+  const [panelesStr, setPanelesStr] = useState<string>("");
+  // Cantidades por categoría (string para input controlado).
+  const [accesorios, setAccesorios] = useState<Record<Categoria, string>>({
+    paneles: "",
+    tablas: "",
+    conjunto: "",
+    norte: "",
+    barra: "",
+    otros: "",
+  });
+  // Tracking: ¿el usuario tocó manualmente el accesorio? (evita pisar al
+  // recalcular paneles).
+  const [tocadoManual, setTocadoManual] = useState<Record<Categoria, boolean>>({
+    paneles: false,
+    tablas: false,
+    conjunto: false,
+    norte: false,
+    barra: false,
+    otros: false,
+  });
+  // Cantidades libres para productos en categoría "otros" (uno por producto).
+  const [otrosCant, setOtrosCant] = useState<Record<string, string>>({});
+  const [guardando, setGuardando] = useState(false);
+
+  // ---- Hidratar al abrir / cuando cambia initial ----
+  useEffect(() => {
+    if (!open) return;
+    if (initial) {
+      // Reconstruir desde la entrega existente. Asumimos una sola marca en el
+      // reparto (caso normal) — tomamos el marca_id del primer entry con
+      // cantidad>0.
+      const productoNombreById = new Map(
+        productos.map((p) => [p.id, p.nombre]),
+      );
+      let marcaId = "";
+      const cantsByCat: Record<Categoria, number> = {
+        paneles: 0,
+        tablas: 0,
+        conjunto: 0,
+        norte: 0,
+        barra: 0,
+        otros: 0,
+      };
+      const otros: Record<string, string> = {};
+      for (const it of initial.items ?? []) {
+        const nombre = productoNombreById.get(it.producto_id) ?? "";
+        const cat = categorizarProducto(nombre);
+        let totalItem = 0;
+        for (const r of it.reparto ?? []) {
+          if (!marcaId) marcaId = r.marca_id;
+          totalItem += Number(r.cantidad ?? 0);
+        }
+        if (cat === "otros") {
+          otros[it.producto_id] = String(totalItem);
+        } else {
+          cantsByCat[cat] += totalItem;
         }
       }
+      setMarcaIdSel(marcaId);
+      setPanelesStr(cantsByCat.paneles > 0 ? String(cantsByCat.paneles) : "");
+      setAccesorios({
+        paneles: cantsByCat.paneles > 0 ? String(cantsByCat.paneles) : "",
+        tablas: cantsByCat.tablas > 0 ? String(cantsByCat.tablas) : "",
+        conjunto: cantsByCat.conjunto > 0 ? String(cantsByCat.conjunto) : "",
+        norte: cantsByCat.norte > 0 ? String(cantsByCat.norte) : "",
+        barra: cantsByCat.barra > 0 ? String(cantsByCat.barra) : "",
+        otros: "",
+      });
+      // En edit, asumimos que cualquier valor que difiera de la curva pudo
+      // ser editado a mano — marcamos todo como tocado para no pisar.
+      setTocadoManual({
+        paneles: false,
+        tablas: true,
+        conjunto: true,
+        norte: true,
+        barra: true,
+        otros: true,
+      });
+      setOtrosCant(otros);
+    } else {
+      // Reset al abrir en modo crear.
+      setMarcaIdSel("");
+      setPanelesStr("");
+      setAccesorios({
+        paneles: "",
+        tablas: "",
+        conjunto: "",
+        norte: "",
+        barra: "",
+        otros: "",
+      });
+      setTocadoManual({
+        paneles: false,
+        tablas: false,
+        conjunto: false,
+        norte: false,
+        barra: false,
+        otros: false,
+      });
+      setOtrosCant({});
     }
-    setCantidades(next);
-  }, [open, initial]);
+  }, [open, initial, productos]);
 
-  const setCelda = (productoId: string, marcaId: string, value: string) => {
-    setCantidades((prev) => {
-      const next = { ...prev };
-      const clean = value.replace(/[^0-9]/g, "");
-      if (clean === "" || clean === "0") {
-        delete next[keyCell(productoId, marcaId)];
-      } else {
-        next[keyCell(productoId, marcaId)] = clean;
-      }
+  // ---- Auto-fill al cambiar paneles ----
+  // Solo rellenamos accesorios que NO fueron tocados manualmente.
+  // Sincroniza accesorios.paneles con panelesStr.
+  useEffect(() => {
+    const n = trunc(Number(panelesStr));
+    setAccesorios((prev) => {
+      const next = { ...prev, paneles: panelesStr };
+      if (!tocadoManual.tablas) next.tablas = n > 0 ? String(n * CURVA.tablas) : "";
+      if (!tocadoManual.conjunto)
+        next.conjunto = n > 0 ? String(n * CURVA.conjunto) : "";
+      if (!tocadoManual.norte)
+        next.norte = n > 0 ? String(n * CURVA.norte) : "";
+      if (!tocadoManual.barra)
+        next.barra = n > 0 ? String(n * CURVA.barra) : "";
       return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelesStr]);
+
+  // ---- Productos por categoría (para mapear accesorios → productoId) ----
+  const productosByCat = useMemo(() => {
+    const out: Record<Categoria, MkInventarioProducto[]> = {
+      paneles: [],
+      tablas: [],
+      conjunto: [],
+      norte: [],
+      barra: [],
+      otros: [],
+    };
+    for (const p of productos) {
+      out[categorizarProducto(p.nombre)].push(p);
+    }
+    return out;
+  }, [productos]);
+
+  // Tomamos el primer producto de cada categoría (el seed tiene un único
+  // producto por categoría — Paneles, Tablas, Conjunto soporte, etc).
+  const productoDe = (c: Categoria): MkInventarioProducto | null =>
+    productosByCat[c][0] ?? null;
+
+  // Marca seleccionada
+  const marcaSel = useMemo(
+    () => marcasOpciones.find((m) => m.id === marcaIdSel) ?? null,
+    [marcasOpciones, marcaIdSel],
+  );
+  const esInterna = marcaSel?.tipo === "interna";
+  const empresaCodigo = marcaSel?.empresa_codigo ?? "";
+  const empresaStyle = !esInterna && empresaCodigo
+    ? getEmpresaStyle(empresaCodigo)
+    : null;
+
+  // ---- Cálculo en vivo ----
+  const filasParaResumen = useMemo(() => {
+    const filas: Array<{ producto: MkInventarioProducto; cant: number }> = [];
+    const cats: Categoria[] = ["paneles", "tablas", "conjunto", "norte", "barra"];
+    for (const c of cats) {
+      const prod = productoDe(c);
+      const cant = trunc(Number(accesorios[c]));
+      if (prod && cant > 0) filas.push({ producto: prod, cant });
+    }
+    for (const p of productosByCat.otros) {
+      const cant = trunc(Number(otrosCant[p.id] ?? 0));
+      if (cant > 0) filas.push({ producto: p, cant });
+    }
+    return filas;
+  }, [accesorios, otrosCant, productosByCat]);
+
+  const totalEntrega = useMemo(() => {
+    let t = 0;
+    for (const f of filasParaResumen) {
+      t += Number(f.producto.precio) * f.cant;
+    }
+    return Math.round(t * 100) / 100;
+  }, [filasParaResumen]);
+
+  const repartoMarca = useMemo(() => {
+    if (esInterna) return totalEntrega;
+    return Math.round(totalEntrega * 50) / 100;
+  }, [totalEntrega, esInterna]);
+  const repartoEmpresa = useMemo(() => {
+    if (esInterna) return 0;
+    return Math.round(totalEntrega * 50) / 100;
+  }, [totalEntrega, esInterna]);
+
+  // ---- Handlers ----
+  const setAccesorio = (cat: Categoria, value: string) => {
+    const clean = value.replace(/[^0-9]/g, "");
+    setAccesorios((prev) => ({ ...prev, [cat]: clean }));
+    if (cat !== "paneles") {
+      setTocadoManual((prev) => ({ ...prev, [cat]: true }));
+    }
+  };
+
+  const setPaneles = (value: string) => {
+    const clean = value.replace(/[^0-9]/g, "");
+    setPanelesStr(clean);
+  };
+
+  const recalcularCurva = () => {
+    const n = trunc(Number(panelesStr));
+    if (n <= 0) return;
+    setAccesorios({
+      paneles: String(n),
+      tablas: String(n * CURVA.tablas),
+      conjunto: String(n * CURVA.conjunto),
+      norte: String(n * CURVA.norte),
+      barra: String(n * CURVA.barra),
+      otros: "",
+    });
+    setTocadoManual({
+      paneles: false,
+      tablas: false,
+      conjunto: false,
+      norte: false,
+      barra: false,
+      otros: false,
     });
   };
 
-  // Cantidades previas por producto en esta misma entrega (para warning de stock)
-  const previasPorProducto = useMemo<Map<string, number>>(() => {
-    const out = new Map<string, number>();
-    if (!initial?.items) return out;
-    for (const it of initial.items) {
-      let total = 0;
-      for (const v of Object.values(it.cantidad_por_marca ?? {})) {
-        total += Number(v ?? 0);
+  // ¿Algún accesorio editado a mano difiere de la curva? Si sí, ofrecemos
+  // el link "Recalcular según curva".
+  const hayManualEditado = useMemo(() => {
+    return (["tablas", "conjunto", "norte", "barra"] as Categoria[]).some(
+      (c) => tocadoManual[c],
+    );
+  }, [tocadoManual]);
+
+  // Sugerido por accesorio (gris debajo del input cuando difiere del valor real).
+  const sugeridoDe = (cat: Categoria): number => {
+    const n = trunc(Number(panelesStr));
+    if (n <= 0) return 0;
+    return n * (CURVA[cat] ?? 0);
+  };
+
+  // ---- Validación ----
+  const tieneAlMenosUno = filasParaResumen.length > 0;
+  const panelesOk = trunc(Number(panelesStr)) >= 1;
+  const marcaOk = !!marcaIdSel;
+  const puedeGuardar = panelesOk && marcaOk && tieneAlMenosUno && !guardando;
+
+  // Warnings de stock por producto (no bloqueantes).
+  const warningsStock = useMemo(() => {
+    const out: Array<{ nombre: string; pedido: number; disponible: number }> = [];
+    for (const f of filasParaResumen) {
+      // Si está en initial, sumamos lo que esa entrega ya tomaba para no contar
+      // doble (lectura informativa, el backend recalcula stock al guardar).
+      let previa = 0;
+      if (initial) {
+        for (const it of initial.items ?? []) {
+          if (it.producto_id !== f.producto.id) continue;
+          for (const r of it.reparto ?? []) previa += Number(r.cantidad ?? 0);
+        }
       }
-      out.set(it.producto_id, total);
+      const disponibleEfectivo = Number(f.producto.stock_total ?? 0) + previa;
+      if (f.cant > disponibleEfectivo) {
+        out.push({
+          nombre: f.producto.nombre,
+          pedido: f.cant,
+          disponible: disponibleEfectivo,
+        });
+      }
     }
     return out;
-  }, [initial]);
+  }, [filasParaResumen, initial]);
 
-  const productoById = useMemo(
-    () => new Map(productos.map((p) => [p.id, p])),
-    [productos],
-  );
-
-  // Totales por marca y total general (en vivo).
-  const totalPorMarca = useMemo<Record<string, number>>(() => {
-    const out: Record<string, number> = {};
-    for (const p of productos) {
-      for (const m of marcasProyecto) {
-        const c = getCant(cantidades, p.id, m.marca.id);
-        if (c <= 0) continue;
-        out[m.marca.id] = (out[m.marca.id] ?? 0) + p.precio * c;
-      }
-    }
-    for (const k of Object.keys(out)) {
-      out[k] = Math.round(out[k] * 100) / 100;
-    }
-    return out;
-  }, [cantidades, productos, marcasProyecto]);
-
-  const totalGeneral = useMemo(() => {
-    let t = 0;
-    for (const v of Object.values(totalPorMarca)) t += v;
-    return Math.round(t * 100) / 100;
-  }, [totalPorMarca]);
-
-  // Cantidades por producto (para warning de stock vs disponible)
-  const cantPorProducto = useMemo<Map<string, number>>(() => {
-    const out = new Map<string, number>();
-    for (const p of productos) {
-      let total = 0;
-      for (const m of marcasProyecto) {
-        total += getCant(cantidades, p.id, m.marca.id);
-      }
-      if (total > 0) out.set(p.id, total);
-    }
-    return out;
-  }, [cantidades, productos, marcasProyecto]);
-
-  const tieneAlgo = useMemo(
-    () => Array.from(cantPorProducto.values()).some((v) => v > 0),
-    [cantPorProducto],
-  );
-
+  // ---- Guardar ----
   const handleGuardar = async () => {
-    if (!tieneAlgo) {
-      toast("Agrega al menos una cantidad para guardar la entrega", "warning");
-      return;
-    }
+    if (!puedeGuardar) return;
     setGuardando(true);
     try {
-      // Construir items: una fila por producto con cantidades > 0 en alguna marca.
-      const items: EntregaItemInput[] = [];
-      for (const p of productos) {
-        const cantidadPorMarca: Record<string, number> = {};
-        for (const m of marcasProyecto) {
-          const c = getCant(cantidades, p.id, m.marca.id);
-          if (c > 0) cantidadPorMarca[m.marca.id] = c;
-        }
-        if (Object.keys(cantidadPorMarca).length > 0) {
-          items.push({ productoId: p.id, cantidadPorMarca });
-        }
-      }
+      const items: EntregaItemInput[] = filasParaResumen.map((f) => ({
+        productoId: f.producto.id,
+        // No mandamos `empresa` — el backend la deriva de marca.empresa_codigo.
+        reparto: [{ marcaId: marcaIdSel, cantidad: f.cant }],
+      }));
 
       const url = initial
         ? `/api/marketing/inventario/entregas/${initial.id}`
         : "/api/marketing/inventario/entregas";
       const method = initial ? "PATCH" : "POST";
-      const body = initial ? { items } : { proyectoId, items };
+      const body = initial
+        ? { items }
+        : {
+            // proyectoId="" significa "standalone, sin proyecto" → null para
+            // que entre a la bandeja de pendientes.
+            proyectoId: proyectoId ? proyectoId : null,
+            items,
+          };
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -214,6 +452,7 @@ export default function EntregaForm({
 
   if (!open) return null;
 
+  // ---- Render ----
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
       <div
@@ -221,152 +460,248 @@ export default function EntregaForm({
         onClick={() => !guardando && onClose()}
       />
       <div
-        className="relative bg-white sm:rounded-lg rounded-t-2xl max-w-3xl w-full mx-0 sm:mx-4 border border-gray-200 max-h-[95vh] overflow-y-auto"
+        className="relative bg-white sm:rounded-lg rounded-t-2xl max-w-2xl w-full mx-0 sm:mx-4 border border-stone-200 max-h-[95vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex items-center justify-between">
-          <div>
-            <h3 className="text-base font-semibold text-gray-900">
+        <div className="sticky top-0 bg-white border-b border-stone-100 px-6 py-4 flex items-center justify-between">
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-stone-900">
               {initial ? "Editar entrega" : "Nueva entrega de muebles"}
             </h3>
-            <p className="text-xs text-gray-500 truncate">{proyectoNombre}</p>
+            <p className="text-xs text-stone-500 truncate">{proyectoNombre}</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             disabled={guardando}
-            className="text-sm text-gray-500 hover:text-black transition disabled:opacity-50"
+            className="text-sm text-stone-500 hover:text-black transition disabled:opacity-50"
           >
             Cerrar
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          {marcasProyecto.length === 0 ? (
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              Este proyecto no tiene marcas asignadas. Asigna marcas al proyecto
-              antes de registrar una entrega.
+        <div className="p-6 space-y-6">
+          {productos.length === 0 ? (
+            <div className="rounded-md border border-stone-200 bg-stone-50 p-3 text-sm text-stone-600">
+              No hay productos en el inventario. Agrega productos primero en{" "}
+              <span className="underline">/marketing/inventario</span>.
             </div>
-          ) : productos.length === 0 ? (
-            <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600">
-              No hay productos en el inventario. Agrega productos en{" "}
-              <span className="underline">/marketing/inventario</span> primero.
+          ) : marcasOpciones.length === 0 ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              No hay marcas disponibles. Asigna marcas al proyecto antes de
+              registrar la entrega.
             </div>
           ) : (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-[11px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
-                      <th className="text-left font-medium px-3 py-2">Producto</th>
-                      <th className="text-right font-medium px-3 py-2 w-20">
-                        Precio
-                      </th>
-                      {marcasProyecto.map((m) => (
-                        <th
-                          key={m.marca.id}
-                          className="text-center font-medium px-3 py-2 w-28"
-                          title={m.marca.nombre}
-                        >
-                          {m.marca.nombre}
-                        </th>
-                      ))}
-                      <th className="text-right font-medium px-3 py-2 w-24">
-                        Costo línea
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {productos.map((p) => {
-                      const cantTotal = cantPorProducto.get(p.id) ?? 0;
-                      const previa = previasPorProducto.get(p.id) ?? 0;
-                      const efectivo = (p.stock_total ?? 0) + previa;
-                      const supera = cantTotal > efectivo;
-                      const costoLinea = p.precio * cantTotal;
-                      return (
-                        <tr
-                          key={p.id}
-                          className="border-b border-gray-100 hover:bg-gray-50/50"
-                        >
-                          <td className="px-3 py-2">
-                            <div className="text-sm text-gray-900">{p.nombre}</div>
-                            <div className="text-[11px] text-gray-400">
-                              Stock disponible:{" "}
-                              <span className={supera ? "text-orange-600 font-medium" : ""}>
-                                {efectivo}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="px-3 py-2 text-right tabular-nums text-gray-700">
-                            {formatearMonto(p.precio)}
-                          </td>
-                          {marcasProyecto.map((m) => {
-                            const v = cantidades[keyCell(p.id, m.marca.id)] ?? "";
-                            return (
-                              <td key={m.marca.id} className="px-2 py-2">
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step={1}
-                                  value={v}
-                                  onChange={(e) =>
-                                    setCelda(p.id, m.marca.id, e.target.value)
-                                  }
-                                  disabled={guardando}
-                                  className="w-full text-center rounded-md border border-gray-300 px-2 py-1.5 text-sm tabular-nums focus:border-black focus:outline-none disabled:bg-gray-50"
-                                  placeholder="0"
-                                />
-                              </td>
-                            );
-                          })}
-                          <td className="px-3 py-2 text-right font-mono tabular-nums text-gray-900">
-                            {costoLinea > 0 ? formatearMonto(costoLinea) : (
-                              <span className="text-gray-300">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
+              {/* Paso 1: Marca */}
+              <section className="space-y-2">
+                <label className="block text-sm font-medium text-stone-800">
+                  ¿A qué marca pertenece esta entrega?
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {marcasOpciones.map((m) => {
+                    const seleccionada = marcaIdSel === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setMarcaIdSel(m.id)}
+                        disabled={guardando}
+                        className={`text-left rounded-lg border-2 px-4 py-3 transition ${
+                          seleccionada
+                            ? "border-stone-900 bg-stone-50"
+                            : "border-stone-200 bg-white hover:border-stone-400"
+                        } disabled:opacity-50`}
+                      >
+                        <div className="text-sm font-medium text-stone-900">
+                          {m.nombre}
+                        </div>
+                        {m.tipo === "interna" && (
+                          <div className="text-[11px] text-emerald-700 mt-0.5">
+                            Marca interna · absorbe 100%
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </section>
 
-              {/* Warnings de stock */}
-              {productos.some((p) => {
-                const cantTotal = cantPorProducto.get(p.id) ?? 0;
-                const previa = previasPorProducto.get(p.id) ?? 0;
-                const efectivo = (p.stock_total ?? 0) + previa;
-                return cantTotal > efectivo && cantTotal > 0;
-              }) && (
+              {/* Paso 2: Paneles destacado */}
+              <section className="space-y-2">
+                <label
+                  htmlFor="entrega-paneles"
+                  className="block text-base font-semibold text-stone-900"
+                >
+                  Cantidad de paneles
+                </label>
+                <p className="text-xs text-stone-500">
+                  Los paneles definen el kit. Cuando escribas la cantidad,
+                  los accesorios se llenan según la curva sugerida (×3 tablas,
+                  ×3 conjunto, ×1 colgador, ×3 barra). Podés ajustarlos a mano.
+                </p>
+                <input
+                  id="entrega-paneles"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  step={1}
+                  value={panelesStr}
+                  onChange={(e) => setPaneles(e.target.value)}
+                  disabled={guardando}
+                  className="w-full rounded-md border border-stone-300 px-3 py-3 text-lg font-mono tabular-nums focus:border-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900 disabled:bg-stone-50"
+                  placeholder="0"
+                />
+                {hayManualEditado && panelesOk && (
+                  <button
+                    type="button"
+                    onClick={recalcularCurva}
+                    className="text-xs text-stone-600 hover:text-black underline"
+                  >
+                    Recalcular accesorios según curva
+                  </button>
+                )}
+              </section>
+
+              {/* Paso 3: Accesorios */}
+              <section className="space-y-2">
+                <h4 className="text-sm font-medium text-stone-800">
+                  Accesorios
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {(["tablas", "conjunto", "norte", "barra"] as Categoria[]).map(
+                    (cat) => {
+                      const prod = productoDe(cat);
+                      const value = accesorios[cat] ?? "";
+                      const sugerido = sugeridoDe(cat);
+                      const valActual = trunc(Number(value));
+                      const muestraSugerido =
+                        panelesOk && sugerido > 0 && valActual !== sugerido;
+                      return (
+                        <div key={cat}>
+                          <label className="block text-sm text-stone-700 mb-1">
+                            {labelAccesorio(cat)}
+                            {prod ? null : (
+                              <span className="text-amber-700 text-xs ml-1">
+                                (no existe en inventario)
+                              </span>
+                            )}
+                          </label>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            step={1}
+                            value={value}
+                            onChange={(e) => setAccesorio(cat, e.target.value)}
+                            disabled={guardando || !prod}
+                            className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm font-mono tabular-nums focus:border-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900 disabled:bg-stone-50"
+                            placeholder="0"
+                          />
+                          {muestraSugerido && (
+                            <div className="text-[11px] text-stone-400 mt-0.5">
+                              Sugerido: {sugerido}
+                            </div>
+                          )}
+                          {prod && (
+                            <div className="text-[11px] text-stone-400 mt-0.5">
+                              Stock disponible: {prod.stock_total}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    },
+                  )}
+                </div>
+
+                {/* Otros productos del catálogo (si hay) */}
+                {productosByCat.otros.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-stone-100">
+                    {productosByCat.otros.map((p) => (
+                      <div key={p.id}>
+                        <label className="block text-sm text-stone-700 mb-1">
+                          {p.nombre}
+                        </label>
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={0}
+                          step={1}
+                          value={otrosCant[p.id] ?? ""}
+                          onChange={(e) =>
+                            setOtrosCant((prev) => ({
+                              ...prev,
+                              [p.id]: e.target.value.replace(/[^0-9]/g, ""),
+                            }))
+                          }
+                          disabled={guardando}
+                          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm font-mono tabular-nums focus:border-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900 disabled:bg-stone-50"
+                          placeholder="0"
+                        />
+                        <div className="text-[11px] text-stone-400 mt-0.5">
+                          Stock disponible: {p.stock_total}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              {/* Warnings stock */}
+              {warningsStock.length > 0 && (
                 <div className="rounded-md border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
-                  ⚠ Algunos productos superan el stock disponible. Puedes guardar
-                  igual; el stock quedará negativo hasta que registres la próxima
-                  compra.
+                  ⚠ Algunas cantidades superan el stock disponible:{" "}
+                  {warningsStock
+                    .map(
+                      (w) => `${w.nombre} (pedido ${w.pedido}, disp. ${w.disponible})`,
+                    )
+                    .join(", ")}
+                  . Podés guardar igual; el stock quedará negativo hasta la
+                  próxima compra.
                 </div>
               )}
 
-              {/* Footer totales */}
-              <div className="rounded-md border border-gray-200 bg-gray-50/50 p-3">
-                <div className="text-[11px] uppercase tracking-wider text-gray-500 mb-2">
-                  Totales en vivo
+              {/* Resumen */}
+              <section className="rounded-md border border-stone-200 bg-stone-50/50 p-3 space-y-1">
+                <div className="text-[11px] uppercase tracking-wider text-stone-500">
+                  Resumen
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {marcasProyecto.map((m) => (
-                    <div key={m.marca.id}>
-                      <div className="text-[11px] text-gray-500">{m.marca.nombre}</div>
-                      <div className="text-sm font-mono tabular-nums text-gray-900">
-                        {formatearMonto(totalPorMarca[m.marca.id] ?? 0)}
+                <div className="flex justify-between text-sm">
+                  <span className="text-stone-700">Total entrega</span>
+                  <span className="font-mono tabular-nums font-semibold text-stone-900">
+                    {formatearMonto(totalEntrega)}
+                  </span>
+                </div>
+                {marcaSel && totalEntrega > 0 && (
+                  <div className="text-xs text-stone-600 pt-1 border-t border-stone-200">
+                    {esInterna ? (
+                      <div className="flex justify-between">
+                        <span>{marcaSel.nombre} absorbe 100%</span>
+                        <span className="font-mono tabular-nums">
+                          {formatearMonto(totalEntrega)}
+                        </span>
                       </div>
-                    </div>
-                  ))}
-                  <div className="border-l border-gray-200 pl-3">
-                    <div className="text-[11px] text-gray-500">Total general</div>
-                    <div className="text-sm font-semibold font-mono tabular-nums text-gray-900">
-                      {formatearMonto(totalGeneral)}
-                    </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-between">
+                          <span>{marcaSel.nombre} paga</span>
+                          <span className="font-mono tabular-nums">
+                            {formatearMonto(repartoMarca)}
+                          </span>
+                        </div>
+                        {empresaStyle && (
+                          <div className="flex justify-between">
+                            <span>{empresaStyle.nombre} paga</span>
+                            <span className="font-mono tabular-nums">
+                              {formatearMonto(repartoEmpresa)}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
-                </div>
-              </div>
+                )}
+              </section>
             </>
           )}
 
@@ -388,17 +723,30 @@ export default function EntregaForm({
                 type="button"
                 onClick={onClose}
                 disabled={guardando}
-                className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
+                className="rounded-md border border-stone-300 bg-white text-stone-700 px-3 py-2 text-sm hover:bg-stone-50 disabled:opacity-50"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleGuardar}
-                disabled={guardando || marcasProyecto.length === 0 || productos.length === 0}
-                className="rounded-md bg-black text-white px-4 py-2 text-sm font-medium active:scale-[0.97] transition disabled:opacity-50"
+                disabled={!puedeGuardar}
+                className="rounded-md bg-stone-900 text-white px-4 py-2 text-sm font-medium active:scale-[0.97] transition disabled:opacity-50"
+                title={
+                  !marcaOk
+                    ? "Selecciona una marca"
+                    : !panelesOk
+                      ? "Indica al menos 1 panel"
+                      : !tieneAlMenosUno
+                        ? "Agrega al menos una cantidad"
+                        : undefined
+                }
               >
-                {guardando ? "Guardando…" : initial ? "Guardar cambios" : "Registrar entrega"}
+                {guardando
+                  ? "Guardando…"
+                  : initial
+                    ? "Guardar cambios"
+                    : "Registrar entrega"}
               </button>
             </div>
           </div>
