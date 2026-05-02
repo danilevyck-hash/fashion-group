@@ -6,7 +6,6 @@ import {
   listEntregasByProyecto,
   listProductos,
 } from "@/lib/marketing/inventario";
-import { getMarcas } from "@/lib/marketing/queries";
 import {
   exportarExcelGlobal,
   exportarExcelTienda,
@@ -48,8 +47,9 @@ export async function GET(req: NextRequest) {
   const proyectoId = searchParams.get("proyecto_id");
 
   try {
-    const [productos, marcas] = await Promise.all([listProductos(), getMarcas()]);
+    const productos = await listProductos();
 
+    // ---- Export individual de un proyecto ----
     if (proyectoId) {
       if (!uuidRegex.test(proyectoId)) {
         return NextResponse.json({ error: "ID inválido" }, { status: 400 });
@@ -76,13 +76,10 @@ export async function GET(req: NextRequest) {
           { status: 404 },
         );
       }
-      // Si hay varias entregas en el proyecto, exportar la primera (caso normal:
-      // 1 entrega por proyecto). Daniel puede pedir export global para detalle.
       const buffer = exportarExcelTienda({
-        proyecto,
-        entrega: entregas[0],
         productos,
-        marcas,
+        entregas,
+        proyecto,
       });
       const fname = `entrega-${fileSafe(proyecto.tienda || proyecto.nombre || proyectoId)}.xlsx`;
       return new NextResponse(Buffer.from(buffer), {
@@ -95,9 +92,17 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Export global
+    // ---- Export global formato changalo ----
+    // Incluye TODAS las entregas (pendientes con proyecto_id NULL también);
+    // las pendientes derivan su tienda desde notas.
     const entregas = await listAllEntregas();
-    const proyectoIds = Array.from(new Set(entregas.map((e) => e.proyecto_id)));
+    const proyectoIds = Array.from(
+      new Set(
+        entregas
+          .map((e) => e.proyecto_id)
+          .filter((id): id is string => !!id),
+      ),
+    );
     let proyectos: MkProyecto[] = [];
     if (proyectoIds.length > 0) {
       const { data, error } = await supabaseServer
@@ -115,7 +120,6 @@ export async function GET(req: NextRequest) {
       productos,
       entregas,
       proyectos,
-      marcas,
     });
     const today = new Date().toISOString().slice(0, 10);
     const fname = `inventario-muebles-${today}.xlsx`;

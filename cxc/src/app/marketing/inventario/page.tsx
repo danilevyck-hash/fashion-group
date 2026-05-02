@@ -11,6 +11,7 @@ import { useToast } from "@/components/ToastSystem";
 import { ConfirmDeleteModal } from "@/components/ui";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { getEmpresaStyle } from "@/lib/marketing/empresa-styles";
+import { resumirPorTienda } from "@/lib/marketing/inventario-resumen";
 import EntregaForm from "@/components/marketing/EntregaForm";
 import type {
   EntregaConItems,
@@ -176,6 +177,36 @@ export default function InventarioPage() {
     () => entregas.filter((e) => e.proyecto_id),
     [entregas],
   );
+
+  // Agregado tipo changalo: 1 fila por tienda con paneles + montos por empresa.
+  // Usa todas las entregas (incl. pendientes — derivan tienda de notas).
+  const resumenPorTienda = useMemo(() => {
+    const proyectos: MkProyecto[] = Array.from(proyectoById.values());
+    return resumirPorTienda(entregas, proyectos, productos);
+  }, [entregas, proyectoById, productos]);
+
+  const totalResumen = useMemo(() => {
+    const t = {
+      panelesFW: 0,
+      panelesVistana: 0,
+      totalPaneles: 0,
+      montoFW: 0,
+      montoVistana: 0,
+      totalMonto: 0,
+    };
+    for (const f of resumenPorTienda) {
+      t.panelesFW += f.panelesFW;
+      t.panelesVistana += f.panelesVistana;
+      t.totalPaneles += f.totalPaneles;
+      t.montoFW += f.montoFW;
+      t.montoVistana += f.montoVistana;
+      t.totalMonto += f.totalMonto;
+    }
+    t.montoFW = Math.round(t.montoFW * 100) / 100;
+    t.montoVistana = Math.round(t.montoVistana * 100) / 100;
+    t.totalMonto = Math.round(t.totalMonto * 100) / 100;
+    return t;
+  }, [resumenPorTienda]);
 
   const ejecutarAsignar = async () => {
     if (!asignarPendiente || !asignarProyectoId) return;
@@ -603,103 +634,161 @@ export default function InventarioPage() {
           </div>
         </section>
 
-        {/* Tabla reparto por tienda */}
+        {/* Resumen por tienda — formato changalo. Toma TODAS las entregas
+            (incluidas pendientes), agrupa por tienda (proyecto.tienda o notas),
+            y reparte Paneles + montos entre Fashion Wear y Vistana. */}
         <section className="space-y-1.5">
-          <h2 className="text-xs uppercase tracking-wider text-gray-500 font-medium">
-            Reparto por tienda
-          </h2>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xs uppercase tracking-wider text-gray-500 font-medium">
+                Resumen por tienda
+              </h2>
+              <p className="text-[11px] text-gray-400 mt-0.5">
+                Paneles enviados y monto cobrado por marca, con totales
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => descargarExcel()}
+              disabled={downloading === "global"}
+              className="text-[11px] text-gray-500 hover:text-black underline disabled:opacity-60"
+            >
+              {downloading === "global" ? "Generando…" : "Descargar Excel"}
+            </button>
+          </div>
           <div className="rounded-[10px] border border-gray-200 overflow-hidden bg-white">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm border-collapse">
               <thead className="bg-gray-50">
                 <tr className="text-[11px] uppercase tracking-wider text-gray-500">
-                  <th className="text-left font-medium px-3 py-2">Tienda</th>
-                  <th className="text-left font-medium px-3 py-2 w-[260px]">Por marca</th>
-                  <th className="text-right font-medium px-3 py-2 w-32">Total</th>
-                  <th className="text-right font-medium px-3 py-2 w-40">Acciones</th>
+                  <th className="text-left font-medium px-3 py-2">Cliente</th>
+                  <th className="text-right font-medium px-3 py-2 w-24">
+                    Paneles FW
+                  </th>
+                  <th className="text-right font-medium px-3 py-2 w-28">
+                    Paneles Vistana
+                  </th>
+                  <th className="text-right font-medium px-3 py-2 w-28">
+                    Total Paneles
+                  </th>
+                  <th className="text-right font-medium px-3 py-2 w-28">
+                    $ Fashion Wear
+                  </th>
+                  <th className="text-right font-medium px-3 py-2 w-28">
+                    $ Vistana
+                  </th>
+                  <th className="text-right font-medium px-3 py-2 w-28">
+                    Total $
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={4} className="px-3 py-6 text-center text-gray-400 text-sm">
+                    <td
+                      colSpan={7}
+                      className="px-3 py-6 text-center text-gray-400 text-sm"
+                    >
                       Cargando…
                     </td>
                   </tr>
-                ) : entregasAsignadas.length === 0 ? (
+                ) : resumenPorTienda.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-3 py-6 text-center text-gray-400 text-sm">
-                      Aún no hay entregas asignadas a un proyecto.
+                    <td
+                      colSpan={7}
+                      className="px-3 py-6 text-center text-gray-400 text-sm"
+                    >
+                      Aún no hay entregas registradas.
                     </td>
                   </tr>
                 ) : (
                   <>
-                    {entregasAsignadas.map((e) => {
-                      const proy = e.proyecto_id
-                        ? proyectoById.get(e.proyecto_id)
-                        : null;
-                      const tienda =
-                        proy?.tienda ||
-                        proy?.nombre ||
-                        (e.proyecto_id ? "(proyecto borrado)" : "(sin asignar)");
-                      const tpm = e.total_por_marca ?? {};
-                      return (
-                        <tr key={e.id} className="border-t border-gray-100">
-                          <td className="px-3 py-2 text-gray-900">{tienda}</td>
-                          <td className="px-3 py-2 text-xs text-gray-600 space-y-0.5">
-                            {Object.entries(tpm).length === 0 ? (
-                              <span className="text-gray-300">—</span>
-                            ) : (
-                              Object.entries(tpm).map(([marcaId, monto]) => {
-                                const m = marcas.find((mm) => mm.id === marcaId);
-                                return (
-                                  <div
-                                    key={marcaId}
-                                    className="flex justify-between gap-3"
-                                  >
-                                    <span>{m?.nombre ?? "Marca"}</span>
-                                    <span className="font-mono tabular-nums text-gray-800">
-                                      {formatearMonto(Number(monto ?? 0))}
-                                    </span>
-                                  </div>
-                                );
-                              })
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-gray-900">
-                            {formatearMonto(e.total)}
-                          </td>
-                          <td className="px-3 py-2 text-right space-x-2">
-                            <button
-                              type="button"
-                              onClick={() => setEditEntrega(e)}
-                              className="text-xs text-gray-700 hover:text-black underline"
-                            >
-                              Editar
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                e.proyecto_id && descargarExcel(e.proyecto_id)
-                              }
-                              disabled={
-                                !e.proyecto_id ||
-                                downloading === e.proyecto_id
-                              }
-                              className="text-xs text-gray-700 hover:text-black underline disabled:opacity-60"
-                            >
-                              {downloading === e.proyecto_id ? "…" : "Excel"}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    <tr className="border-t border-gray-200 bg-gray-50/50 font-semibold text-gray-900">
-                      <td className="px-3 py-2">TOTAL</td>
-                      <td />
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {formatearMonto(metricas.entregado)}
+                    {resumenPorTienda.map((f) => (
+                      <tr
+                        key={f.tienda}
+                        className="border-t border-gray-100 hover:bg-gray-50 transition-colors"
+                      >
+                        <td className="px-3 py-2 text-gray-900">{f.tienda}</td>
+                        <td className="px-3 py-2 text-right font-mono tabular-nums">
+                          {f.panelesFW > 0 ? (
+                            f.panelesFW
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono tabular-nums">
+                          {f.panelesVistana > 0 ? (
+                            f.panelesVistana
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono tabular-nums text-gray-700">
+                          {f.totalPaneles > 0 ? (
+                            f.totalPaneles
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono tabular-nums">
+                          {f.montoFW > 0 ? (
+                            formatearMonto(f.montoFW)
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono tabular-nums">
+                          {f.montoVistana > 0 ? (
+                            formatearMonto(f.montoVistana)
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-gray-900">
+                          {f.totalMonto > 0 ? (
+                            formatearMonto(f.totalMonto)
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {/* Fila TOTAL — fondo oscuro estilo changalo (la fila amarilla
+                        queda solo en el Excel descargable; en pantalla usamos
+                        oscuro para mejor contraste con el resto del módulo). */}
+                    <tr className="border-t border-gray-300 bg-gray-900 text-white">
+                      <td className="px-3 py-2.5 font-bold uppercase text-xs tracking-wider">
+                        Total
                       </td>
-                      <td />
+                      <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
+                        {totalResumen.panelesFW || (
+                          <span className="opacity-50">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
+                        {totalResumen.panelesVistana || (
+                          <span className="opacity-50">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
+                        {totalResumen.totalPaneles || (
+                          <span className="opacity-50">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
+                        {totalResumen.montoFW > 0
+                          ? formatearMonto(totalResumen.montoFW)
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
+                        {totalResumen.montoVistana > 0
+                          ? formatearMonto(totalResumen.montoVistana)
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
+                        {totalResumen.totalMonto > 0
+                          ? formatearMonto(totalResumen.totalMonto)
+                          : "—"}
+                      </td>
                     </tr>
                   </>
                 )}
