@@ -344,22 +344,20 @@ export default function InventarioPage() {
             type="button"
             onClick={() => descargarExcel()}
             disabled={downloading === "global"}
-            className="rounded-md bg-black text-white px-3 py-2 text-sm active:scale-[0.97] transition disabled:opacity-60"
+            className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-2 text-sm hover:bg-gray-50 active:scale-[0.97] transition disabled:opacity-60"
           >
             {downloading === "global" ? "Generando…" : "Descargar Excel"}
           </button>
         </div>
 
-        {/* Cards métricas */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <MetricCard label="Valor inventario" value={formatearMonto(metricas.valor)} />
-          <MetricCard label="Entregado" value={formatearMonto(metricas.entregado)} />
-          <MetricCard
-            label="Disponible"
-            value={formatearMonto(metricas.disponible)}
-            valueClassName="text-emerald-700"
-          />
-          <MetricCard label="Tiendas servidas" value={String(metricas.tiendas)} />
+        {/* Resumen sutil — sin cards grandes, solo línea de texto. */}
+        <div className="text-xs text-gray-500 tabular-nums">
+          Valor total: {formatearMonto(metricas.valor)} · Entregado:{" "}
+          {formatearMonto(metricas.entregado)} · Disponible:{" "}
+          <span className="text-emerald-700">
+            {formatearMonto(metricas.disponible)}
+          </span>{" "}
+          · Tiendas: {metricas.tiendas}
         </div>
 
         {/* Bandeja: entregas pendientes de asignar a un proyecto. Solo se
@@ -490,13 +488,15 @@ export default function InventarioPage() {
         )}
 
         {/* Tabla productos */}
-        <section className="space-y-2">
+        <section className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-900">Productos</h2>
+            <h2 className="text-xs uppercase tracking-wider text-gray-500 font-medium">
+              Productos
+            </h2>
             <button
               type="button"
               onClick={abrirNuevoProducto}
-              className="text-xs rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-1.5 hover:bg-gray-50 transition"
+              className="text-[11px] text-gray-500 hover:text-black underline"
             >
               + Agregar producto
             </button>
@@ -604,8 +604,10 @@ export default function InventarioPage() {
         </section>
 
         {/* Tabla reparto por tienda */}
-        <section className="space-y-2">
-          <h2 className="text-base font-semibold text-gray-900">Reparto por tienda</h2>
+        <section className="space-y-1.5">
+          <h2 className="text-xs uppercase tracking-wider text-gray-500 font-medium">
+            Reparto por tienda
+          </h2>
           <div className="rounded-[10px] border border-gray-200 overflow-hidden bg-white">
             <table className="w-full text-sm">
               <thead className="bg-gray-50">

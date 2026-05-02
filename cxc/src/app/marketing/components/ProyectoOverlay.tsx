@@ -15,7 +15,7 @@ import {
 } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmTypeNameModal } from "@/components/ui";
-import { EstadoBadge } from "@/components/marketing";
+import { useDescargarZip } from "@/lib/marketing/useDescargarZip";
 import {
   formatearFecha,
   formatearMonto,
@@ -67,6 +67,7 @@ export default function ProyectoOverlay({
   const [eliminando, setEliminando] = useState(false);
   const [eliminandoLoading, setEliminandoLoading] = useState(false);
   const [role, setRole] = useState<string>("");
+  const { estados: zipEstados, descargar: descargarZip } = useDescargarZip();
 
   useEffect(() => {
     setRole(sessionStorage.getItem("cxc_role") ?? "");
@@ -177,7 +178,6 @@ export default function ProyectoOverlay({
     );
   }
 
-  const esCobrado = proyecto.estado === "cobrado";
   const esAdmin = role === "admin";
 
   const handleEliminar = async () => {
@@ -223,13 +223,33 @@ export default function ProyectoOverlay({
               <span className="text-sm font-medium text-gray-800 truncate">
                 {proyecto.nombre || proyecto.tienda}
               </span>
-              <EstadoBadge estado={proyecto.estado} />
               {proyecto.anulado_en && (
                 <span className="text-[10px] px-2 py-0.5 rounded bg-red-50 text-red-700 font-medium shrink-0">
                   Anulado
                 </span>
               )}
             </div>
+            {!proyecto.anulado_en && (
+              <button
+                type="button"
+                onClick={(ev) => {
+                  ev.stopPropagation();
+                  descargarZip(proyecto.id);
+                }}
+                disabled={
+                  zipEstados[proyecto.id]?.tipo === "trabajando" ||
+                  zipEstados[proyecto.id]?.tipo === "exito"
+                }
+                className="text-xs rounded-md bg-black text-white px-3 py-1.5 active:scale-[0.97] transition disabled:opacity-60 shrink-0"
+                title="Descargar ZIP del proyecto (Excel + PDFs + fotos)"
+              >
+                {zipEstados[proyecto.id]?.tipo === "trabajando"
+                  ? "Generando…"
+                  : zipEstados[proyecto.id]?.tipo === "exito"
+                    ? "Listo ✓"
+                    : "Descargar ZIP"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -261,26 +281,11 @@ export default function ProyectoOverlay({
                     Tienda: {proyecto.tienda}
                   </div>
                 )}
-                <div className="text-xs text-gray-400 mt-1 space-x-2">
+                <div className="text-xs text-gray-400 mt-1">
                   <span>Inicio: {formatearFecha(proyecto.fecha_inicio)}</span>
-                  {proyecto.fecha_enviado && (
-                    <>
-                      <span>·</span>
-                      <span>Enviado: {formatearFecha(proyecto.fecha_enviado)}</span>
-                    </>
-                  )}
-                  {proyecto.fecha_cobrado && (
-                    <>
-                      <span>·</span>
-                      <span className="text-emerald-700">
-                        Cobrado: {formatearFecha(proyecto.fecha_cobrado)}
-                      </span>
-                    </>
-                  )}
                 </div>
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0">
-                <EstadoBadge estado={proyecto.estado} size="md" />
                 {proyecto.anulado_en && (
                   <span className="text-[10px] px-2 py-0.5 rounded bg-red-50 text-red-700 font-medium">
                     Anulado

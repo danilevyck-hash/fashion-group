@@ -6,19 +6,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { MkMarca } from "@/lib/marketing/types";
-import { EstadoBadge } from "@/components/marketing";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
 import { useToast } from "@/components/ToastSystem";
-import { ConfirmModal } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import { useDescargarZip } from "@/lib/marketing/useDescargarZip";
 
-type FiltroEstado =
-  | "activos"
-  | "todos"
-  | "abierto"
-  | "enviado"
-  | "joybees";
+// Solo usado para inicializar el estado fijo; ya no hay UI de filtro por estado.
+type FiltroEstado = "todos";
 
 interface ProyectoListItem {
   id: string;
@@ -44,6 +38,14 @@ interface ProyectoListItem {
     marca_nombre: string;
     monto: number;
   }>;
+  // Proyectos cobrados llevan su monto en `cobrado_*`. Para el archivo plano
+  // sumamos ambos para mostrar el total gastado real sin importar estado.
+  cobrado_total?: number;
+  cobrado_por_marca?: Array<{
+    marca_id: string;
+    marca_nombre: string;
+    monto: number;
+  }>;
 }
 
 interface Props {
@@ -52,18 +54,10 @@ interface Props {
   onNuevoProyecto: () => void;
   onOpenAnulados: () => void;
   onOpenReportes: () => void;
-  onOpenHistorial: () => void;
   onOpenInventario: () => void;
   refreshKey: number;
 }
 
-const PILLS: Array<{ key: FiltroEstado; label: string }> = [
-  { key: "activos", label: "Activos" },
-  { key: "todos", label: "Todos" },
-  { key: "abierto", label: "Abiertos" },
-  { key: "enviado", label: "Enviados" },
-  { key: "joybees", label: "Joybees" },
-];
 
 function colorParaMarca(codigo: string): string {
   if (codigo === "TH") return "bg-red-50 text-red-700 border-red-200";
@@ -93,26 +87,18 @@ export default function ProyectosHomeView({
   onNuevoProyecto,
   onOpenAnulados,
   onOpenReportes,
-  onOpenHistorial,
   onOpenInventario,
   refreshKey,
 }: Props) {
   const { toast } = useToast();
-  const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("activos");
+  // Archivo plano: ya no hay filtros por estado en la UI. Forzamos "todos"
+  // para que la query backend devuelva la lista completa sin condicionar.
+  const [filtroEstado] = useState<FiltroEstado>("todos");
   const [marcaIdFiltro, setMarcaIdFiltro] = useState<string>("");
   const [busqueda, setBusqueda] = useState<string>("");
   const [busquedaDebounced, setBusquedaDebounced] = useState<string>("");
   const [proyectos, setProyectos] = useState<ProyectoListItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [accionPendiente, setAccionPendiente] = useState<
-    | {
-        id: string;
-        nombre: string;
-        tipo: "enviado" | "cobrado" | "reabrir";
-      }
-    | null
-  >(null);
-  const [accionLoading, setAccionLoading] = useState(false);
   const { estados: zipEstados, descargar: descargarZip } = useDescargarZip();
   const [anularPendiente, setAnularPendiente] = useState<
     { id: string; nombre: string } | null
@@ -156,40 +142,6 @@ export default function ProyectosHomeView({
   // exactos y mostramos solo la lista filtrada.
   const conteoActual = proyectos.length;
 
-  const ejecutarTransicion = async () => {
-    if (!accionPendiente) return;
-    setAccionLoading(true);
-    try {
-      const endpoint =
-        accionPendiente.tipo === "enviado"
-          ? "marcar-enviado"
-          : accionPendiente.tipo === "cobrado"
-            ? "marcar-cobrado"
-            : "reabrir";
-      const res = await fetch(
-        `/api/marketing/proyectos/${accionPendiente.id}/${endpoint}`,
-        { method: "POST" },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo aplicar la acción");
-      }
-      const msg =
-        accionPendiente.tipo === "enviado"
-          ? "Proyecto marcado como enviado"
-          : accionPendiente.tipo === "cobrado"
-            ? "Proyecto archivado como cobrado"
-            : "Proyecto reabierto";
-      toast(msg, "success");
-      setAccionPendiente(null);
-      cargar();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Error", "error");
-    } finally {
-      setAccionLoading(false);
-    }
-  };
-
   const ejecutarAnular = async () => {
     if (!anularPendiente || !anularMotivo.trim()) return;
     setAnulando(true);
@@ -217,29 +169,6 @@ export default function ProyectosHomeView({
     }
   };
 
-  const tituloConfirm =
-    accionPendiente?.tipo === "enviado"
-      ? "Marcar como enviado"
-      : accionPendiente?.tipo === "cobrado"
-        ? "Marcar como cobrado"
-        : "Reabrir proyecto";
-
-  const mensajeConfirm =
-    accionPendiente?.tipo === "enviado"
-      ? `¿Confirmas que ya enviaste "${accionPendiente.nombre}" al proveedor?`
-      : accionPendiente?.tipo === "cobrado"
-        ? `¿Confirmas que ya recibiste el pago/NC de "${accionPendiente.nombre}"? Pasará al historial.`
-        : accionPendiente
-          ? `"${accionPendiente.nombre}" volverá a estado Enviado.`
-          : "";
-
-  const labelConfirm =
-    accionPendiente?.tipo === "enviado"
-      ? "Marcar enviado"
-      : accionPendiente?.tipo === "cobrado"
-        ? "Marcar cobrado"
-        : "Reabrir";
-
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -247,18 +176,10 @@ export default function ProyectosHomeView({
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Marketing</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Gastos compartidos a marcas
+            Archivo de gastos cobrables a marcas
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0">
-          <button
-            type="button"
-            onClick={onOpenHistorial}
-            className="text-gray-600 hover:text-black transition"
-          >
-            Historial
-          </button>
-          <span className="text-gray-300">·</span>
           <button
             type="button"
             onClick={onOpenInventario}
@@ -278,7 +199,7 @@ export default function ProyectosHomeView({
           <button
             type="button"
             onClick={onOpenAnulados}
-            className="text-gray-600 hover:text-black transition"
+            className="text-[11px] text-gray-400 hover:text-gray-700 transition"
           >
             Anulados
           </button>
@@ -315,25 +236,12 @@ export default function ProyectosHomeView({
         </select>
       </div>
 
-      {/* Pills de estado */}
+      {/* Pill única: Todos N. El módulo es archivo plano sin estados. */}
       <div className="flex flex-wrap gap-2 items-center">
-        {PILLS.map((p) => (
-          <button
-            key={p.key}
-            type="button"
-            onClick={() => setFiltroEstado(p.key)}
-            className={`text-xs px-3 py-1 rounded-full transition ${
-              filtroEstado === p.key
-                ? "bg-black text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
-          >
-            {p.label}
-            {filtroEstado === p.key && (
-              <span className="ml-1 opacity-60 tabular-nums">{conteoActual}</span>
-            )}
-          </button>
-        ))}
+        <span className="text-xs px-3 py-1 rounded-full bg-black text-white">
+          Todos{" "}
+          <span className="ml-1 opacity-60 tabular-nums">{conteoActual}</span>
+        </span>
       </div>
 
       {/* Lista */}
@@ -348,9 +256,7 @@ export default function ProyectosHomeView({
           <div className="text-sm text-gray-600 mb-1">
             {busquedaDebounced || marcaIdFiltro
               ? "No hay proyectos que coincidan con el filtro."
-              : filtroEstado === "activos"
-                ? "No hay proyectos activos todavía."
-                : "No hay proyectos todavía."}
+              : "No hay proyectos todavía."}
           </div>
           {!busquedaDebounced && !marcaIdFiltro && (
             <button
@@ -368,19 +274,16 @@ export default function ProyectosHomeView({
             <thead className="bg-gray-50">
               <tr className="text-[11px] uppercase tracking-wider text-gray-500">
                 <th className="text-left font-medium px-[18px] py-2.5">Proyecto</th>
-                <th className="text-left font-medium px-[18px] py-2.5 w-[120px]">
-                  Estado
-                </th>
                 <th className="text-left font-medium px-[18px] py-2.5 w-[120px] hidden md:table-cell">
                   Marcas
                 </th>
                 <th className="text-right font-medium px-[18px] py-2.5 w-[140px]">
-                  Por cobrar
+                  Gastado
                 </th>
                 <th className="text-left font-medium px-[18px] py-2.5 w-[110px] hidden md:table-cell">
                   Fecha
                 </th>
-                <th className="text-right font-medium px-[18px] py-2.5 w-[180px]">
+                <th className="text-right font-medium px-[18px] py-2.5 w-[140px]">
                   Acciones
                 </th>
               </tr>
@@ -395,15 +298,20 @@ export default function ProyectosHomeView({
                 const tituloVis = p.tienda || p.nombre || "";
                 const subtituloTipo = p.nombre && p.nombre !== p.tienda ? p.nombre : "";
                 const nombreVis = tituloVis;
-                const fechaLabel =
-                  p.estado === "cobrado" && p.fecha_cobrado
-                    ? { label: "Cobrado", iso: p.fecha_cobrado }
-                    : p.estado === "enviado" && p.fecha_enviado
-                      ? { label: "Enviado", iso: p.fecha_enviado }
-                      : { label: "Creado", iso: p.created_at };
+                // Archivo plano: solo fecha de creación, sin label de transición.
+                const fechaIso = p.created_at;
 
-                const desgloseTooltip = p.por_cobrar_por_marca.length > 0
-                  ? p.por_cobrar_por_marca
+                // Archivo plano: ya no diferenciamos "por cobrar" vs "cobrado".
+                // El total gastado es el desglose completo, sin condicionar
+                // por estado del proyecto.
+                const totalGastado =
+                  (p.por_cobrar_total || 0) + (p.cobrado_total || 0);
+                const desgloseFuente =
+                  p.por_cobrar_por_marca.length > 0
+                    ? p.por_cobrar_por_marca
+                    : p.cobrado_por_marca;
+                const desgloseTooltip = desgloseFuente && desgloseFuente.length > 0
+                  ? desgloseFuente
                       .map((d) => `${d.marca_nombre}: ${formatearMonto(d.monto)}`)
                       .join("\n")
                   : undefined;
@@ -461,10 +369,6 @@ export default function ProyectosHomeView({
                         {p.fotos_count === 1 ? "foto" : "fotos"}
                       </div>
                     </td>
-                    {/* Estado */}
-                    <td className="px-[18px] py-3 align-middle">
-                      <EstadoBadge estado={p.estado} />
-                    </td>
                     {/* Marcas */}
                     <td className="px-[18px] py-3 align-middle hidden md:table-cell">
                       {p.marcas.length === 0 ? (
@@ -483,123 +387,36 @@ export default function ProyectosHomeView({
                         </div>
                       )}
                     </td>
-                    {/* Por cobrar */}
+                    {/* Gastado */}
                     <td
                       className="px-[18px] py-3 align-middle text-right tabular-nums"
                       title={desgloseTooltip}
                     >
-                      {p.facturas_count === 0 ? (
+                      {totalGastado === 0 ? (
                         <span className="text-gray-300 text-xs">—</span>
-                      ) : p.por_cobrar_total === 0 ? (
-                        <span className="text-emerald-700 font-medium text-xs">
-                          Todo cobrado
-                        </span>
                       ) : (
                         <span className="font-semibold text-gray-900">
-                          {formatearMonto(p.por_cobrar_total)}
+                          {formatearMonto(totalGastado)}
                         </span>
                       )}
                     </td>
                     {/* Fecha */}
                     <td className="px-[18px] py-3 align-middle text-[12px] text-gray-500 hidden md:table-cell">
-                      <div>{formatearFecha(fechaLabel.iso)}</div>
-                      <div className="text-[11px] text-gray-400">
-                        {fechaLabel.label}
-                      </div>
+                      {formatearFecha(fechaIso)}
                     </td>
-                    {/* Acciones */}
+                    {/* Acciones — archivo plano: Editar (abre overlay), ZIP, Anular */}
                     <td
                       className="px-[18px] py-3 align-middle"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-end gap-1.5">
-                        {!p.anulado_en && p.estado === "abierto" && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setAccionPendiente({
-                                id: p.id,
-                                nombre: nombreVis,
-                                tipo: "enviado",
-                              })
-                            }
-                            className="hidden md:inline-flex text-xs rounded-md bg-black text-white px-3 py-1.5 active:scale-[0.97] transition"
-                          >
-                            Enviar
-                          </button>
-                        )}
-                        {!p.anulado_en && p.estado === "enviado" && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setAccionPendiente({
-                                id: p.id,
-                                nombre: nombreVis,
-                                tipo: "cobrado",
-                              })
-                            }
-                            className="hidden md:inline-flex text-xs rounded-md bg-black text-white px-3 py-1.5 active:scale-[0.97] transition"
-                          >
-                            Cobrar
-                          </button>
-                        )}
-                        {!p.anulado_en && p.estado === "cobrado" && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setAccionPendiente({
-                                id: p.id,
-                                nombre: nombreVis,
-                                tipo: "reabrir",
-                              })
-                            }
-                            className="hidden md:inline-flex text-xs rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-1.5 hover:bg-gray-50 active:scale-[0.97] transition"
-                          >
-                            Reabrir
-                          </button>
-                        )}
                         {!p.anulado_en && (
                           <OverflowMenu
                             items={[
-                              ...(p.estado === "abierto"
-                                ? [
-                                    {
-                                      label: "Marcar como enviado",
-                                      onClick: () =>
-                                        setAccionPendiente({
-                                          id: p.id,
-                                          nombre: nombreVis,
-                                          tipo: "enviado" as const,
-                                        }),
-                                    },
-                                  ]
-                                : []),
-                              ...(p.estado === "enviado"
-                                ? [
-                                    {
-                                      label: "Marcar como cobrado",
-                                      onClick: () =>
-                                        setAccionPendiente({
-                                          id: p.id,
-                                          nombre: nombreVis,
-                                          tipo: "cobrado" as const,
-                                        }),
-                                    },
-                                  ]
-                                : []),
-                              ...(p.estado === "cobrado"
-                                ? [
-                                    {
-                                      label: "Reabrir",
-                                      onClick: () =>
-                                        setAccionPendiente({
-                                          id: p.id,
-                                          nombre: nombreVis,
-                                          tipo: "reabrir" as const,
-                                        }),
-                                    },
-                                  ]
-                                : []),
+                              {
+                                label: "Editar",
+                                onClick: () => onOpenProyecto(p.id),
+                              },
                               {
                                 label: "Descargar ZIP",
                                 onClick: () => descargarZip(p.id),
@@ -630,16 +447,6 @@ export default function ProyectosHomeView({
           </table>
         </div>
       )}
-
-      <ConfirmModal
-        open={!!accionPendiente}
-        onClose={() => !accionLoading && setAccionPendiente(null)}
-        onConfirm={ejecutarTransicion}
-        title={tituloConfirm}
-        message={mensajeConfirm}
-        confirmLabel={labelConfirm}
-        loading={accionLoading}
-      />
 
       {anularPendiente && (
         <div

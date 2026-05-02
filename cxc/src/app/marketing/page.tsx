@@ -20,9 +20,10 @@ import ProyectoOverlay from "./components/ProyectoOverlay";
 import AnuladosLista from "./components/AnuladosLista";
 import ReportesTabs from "./components/ReportesTabs";
 import NuevoProyectoModal from "./components/NuevoProyectoModal";
-import HistorialView from "./components/HistorialView";
 
-type VistaExtra = "anulados" | "reportes" | "historial" | null;
+// `historial` se removió de la UI; el archivo del componente queda en disco
+// (HistorialView.tsx) por si se reactiva, pero ya no se rutea.
+type VistaExtra = "anulados" | "reportes" | null;
 
 export default function MarketingPageWrapper() {
   return (
@@ -47,9 +48,7 @@ function MarketingPage() {
   const vistaParam: VistaExtra =
     vistaRaw === "papelera"
       ? "anulados"
-      : vistaRaw === "anulados" ||
-          vistaRaw === "reportes" ||
-          vistaRaw === "historial"
+      : vistaRaw === "anulados" || vistaRaw === "reportes"
         ? (vistaRaw as VistaExtra)
         : null;
 
@@ -112,17 +111,13 @@ function MarketingPage() {
   if (!authChecked) return null;
 
   const mostrandoVistaExtra =
-    vistaParam === "anulados" ||
-    vistaParam === "reportes" ||
-    vistaParam === "historial";
+    vistaParam === "anulados" || vistaParam === "reportes";
 
   const breadcrumbs: { label: string; onClick?: () => void }[] = [];
   if (vistaParam === "anulados") {
     breadcrumbs.push({ label: "Anulados" });
   } else if (vistaParam === "reportes") {
     breadcrumbs.push({ label: "Reportes" });
-  } else if (vistaParam === "historial") {
-    breadcrumbs.push({ label: "Historial" });
   } else if (proyectoParam && nombreProyectoActual) {
     breadcrumbs.push({ label: nombreProyectoActual });
   }
@@ -142,13 +137,6 @@ function MarketingPage() {
             </button>
             {vistaParam === "anulados" ? (
               <AnuladosLista esAdmin={role === "admin"} />
-            ) : vistaParam === "historial" ? (
-              <HistorialView
-                marcas={marcas}
-                onOpenProyecto={(id) => navegar({ proyecto: id })}
-                onChange={refrescar}
-                refreshKey={refreshKey}
-              />
             ) : (
               <ReportesTabs />
             )}
@@ -160,7 +148,6 @@ function MarketingPage() {
             onNuevoProyecto={() => setShowNuevoProyecto(true)}
             onOpenAnulados={() => navegar({ vista: "anulados" })}
             onOpenReportes={() => navegar({ vista: "reportes" })}
-            onOpenHistorial={() => navegar({ vista: "historial" })}
             onOpenInventario={() => router.push("/marketing/inventario")}
             refreshKey={refreshKey}
           />
