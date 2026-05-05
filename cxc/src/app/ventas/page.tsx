@@ -59,8 +59,6 @@ interface ClienteDetalle {
 // ── Formatting helpers ─────────────────────────────────────────────────────────
 
 function fmtK(n: number) {
-  if (Math.abs(n) >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(n) >= 1000) return `$${(n / 1000).toFixed(0)}k`;
   return `$${fmt(n)}`;
 }
 
