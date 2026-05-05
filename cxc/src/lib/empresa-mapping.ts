@@ -7,7 +7,8 @@ export const EMPRESA_KEY_TO_NAME: Record<string, string> = {
   active_shoes: "Active Shoes",
   active_wear: "Active Wear",
   joystep: "Joystep",
-  boston: "Confecciones Boston",
+  confecciones_boston: "Confecciones Boston",
+  boston: "Confecciones Boston", // alias retrocompatible para uploads históricos
   american_classic: "Multifashion",
 };
 

@@ -5,7 +5,7 @@ import { getVentasMensuales, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 
 export const dynamic = "force-dynamic";
 
-const ALL_EMPRESAS = Object.values(EMPRESA_KEY_TO_NAME);
+const ALL_EMPRESAS = [...new Set(Object.values(EMPRESA_KEY_TO_NAME))];
 
 /**
  * Compute monthly distribution weights from prior year ventas_raw data.
