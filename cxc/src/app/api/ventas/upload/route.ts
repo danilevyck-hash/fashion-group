@@ -56,7 +56,9 @@ function parseFecha(raw: string): string | null {
 
 function toNum(v: unknown): number {
   if (v === null || v === undefined || v === "") return 0;
-  const n = typeof v === "number" ? v : parseFloat(String(v).replace(",", "."));
+  if (typeof v === "number") return isNaN(v) ? 0 : v;
+  const s = String(v).trim().replace(/,/g, "");
+  const n = parseFloat(s);
   return isNaN(n) ? 0 : n;
 }
 
