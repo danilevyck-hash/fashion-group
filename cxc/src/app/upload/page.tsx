@@ -387,7 +387,7 @@ function UploadPageInner() {
         const subtotal = toNum(get("SUBTOTAL"));
         const utilidad = toNum(get("UTILIDAD"));
         if (subtotal === 0 && utilidad === 0) continue;
-        if (Math.abs(subtotal) < 1.00) continue;
+        if (Math.abs(subtotal) < 0.01) continue;
 
         const tipo = (get("TIPO") || "").trim().replace(/\s+/g, " ");
         if (!VALID_TIPOS.has(tipo)) continue;

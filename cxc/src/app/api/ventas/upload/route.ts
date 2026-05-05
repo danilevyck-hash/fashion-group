@@ -100,7 +100,7 @@ function parseCSV(text: string, empresa: string): ParseResult {
     const subtotal = toNum(get("SUBTOTAL"));
     const utilidad = toNum(get("UTILIDAD"));
     if (subtotal === 0 && utilidad === 0) { filtered.zeroSubtotal++; continue; }
-    if (Math.abs(subtotal) < 1.00) { filtered.subtotalLow++; continue; }
+    if (Math.abs(subtotal) < 0.01) { filtered.subtotalLow++; continue; }
 
     const tipo = normTipo(get("TIPO"));
     if (!VALID_TIPOS.has(tipo)) { filtered.invalidTipo++; continue; }
@@ -170,7 +170,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
     const subtotal = getNum("SUBTOTAL");
     const utilidad = getNum("UTILIDAD");
     if (subtotal === 0 && utilidad === 0) { filtered.zeroSubtotal++; continue; }
-    if (Math.abs(subtotal) < 1.00) { filtered.subtotalLow++; continue; }
+    if (Math.abs(subtotal) < 0.01) { filtered.subtotalLow++; continue; }
 
     const tipo = normTipo(get("TIPO"));
     if (!VALID_TIPOS.has(tipo)) { filtered.invalidTipo++; continue; }
