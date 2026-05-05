@@ -49,7 +49,7 @@ interface VentasPreview {
   formatError: string; file: File;
 }
 
-const VALID_TIPOS = new Set(["Factura", "Nota de Crédito", "Nota de Débito"]);
+const VALID_TIPOS = new Set(["Factura", "Nota de Crédito", "Nota de Débito", "Transacción", "Transaccion"]);
 
 // ── Inner component ─────────────────────────────────────────────────────────
 

@@ -66,7 +66,7 @@ function normTipo(raw: string): string {
   return (raw ?? "").trim().replace(/\s+/g, " ");
 }
 
-const VALID_TIPOS = new Set(["Factura", "Nota de Crédito", "Nota de Débito"]);
+const VALID_TIPOS = new Set(["Factura", "Nota de Crédito", "Nota de Débito", "Transacción", "Transaccion"]);
 
 // ─── CSV parser ───────────────────────────────────────────────────────────────
 
