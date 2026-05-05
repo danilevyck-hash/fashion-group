@@ -37,6 +37,56 @@ interface FilteredCounts {
 interface ParseResult {
   rows: RawRow[];
   filtered: FilteredCounts;
+  warnings: string[];
+  detectedFormat: "us_thousands" | "no_thousands";
+}
+
+// ─── Validation helpers ───────────────────────────────────────────────────────
+
+const REQUIRED_HEADERS = ["FECHA", "TIPO", "VENDEDOR", "CLIENTE", "SUBTOTAL", "TOTAL"];
+
+function validateHeaders(headers: string[]): void {
+  const missing = REQUIRED_HEADERS.filter((h) => !headers.includes(h));
+  // N.SISTEMA o N.INTERNO (cualquiera de los dos)
+  if (!headers.includes("N.SISTEMA") && !headers.includes("N.INTERNO")) {
+    missing.push("N.SISTEMA");
+  }
+  if (missing.length > 0) {
+    throw new Error(
+      `El archivo no tiene los encabezados requeridos. Faltan: ${missing.join(", ")}. Verifica que descargaste el reporte correcto en Switch Soft.`
+    );
+  }
+  // Detectar formato reporte_v / Descargar Detalle (rechazar)
+  const reporteVHeaders = ["CODIGO", "FACTURADO POR", "MODULO", "SALDO"];
+  const matchedReporteV = reporteVHeaders.filter((h) => headers.includes(h));
+  if (matchedReporteV.length === reporteVHeaders.length) {
+    throw new Error(
+      "Este archivo está en formato 'Descargar Detalle' o reporte_v. El sistema solo acepta el formato 'Descargar' / comprobantes (con columnas COSTO y UTILIDAD). Vuelve a descargar el reporte en Switch Soft con el botón correcto."
+    );
+  }
+}
+
+function buildHeaderWarnings(headers: string[]): string[] {
+  const warnings: string[] = [];
+  if (!headers.includes("COSTO") || !headers.includes("UTILIDAD")) {
+    warnings.push("El archivo no contiene la columna COSTO/UTILIDAD. Esos campos quedarán en 0 para las filas insertadas.");
+  }
+  return warnings;
+}
+
+function detectThousandsFormat(samples: string[]): "us_thousands" | "no_thousands" {
+  // Sample numeric cells; if >50% match /\d,\d{3}/ then us_thousands
+  let total = 0;
+  let withThousands = 0;
+  for (const s of samples) {
+    if (!s || s === "0") continue;
+    const trimmed = s.trim();
+    if (!/\d/.test(trimmed)) continue;
+    total++;
+    if (/\d,\d{3}/.test(trimmed)) withThousands++;
+  }
+  if (total === 0) return "no_thousands";
+  return withThousands / total > 0.5 ? "us_thousands" : "no_thousands";
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -89,7 +139,21 @@ function parseCSV(text: string, empresa: string): ParseResult {
     throw new Error("No se encontró la columna FECHA en el archivo. Verifica que el formato sea correcto.");
   }
 
-  const headers = lines[headerIdx].split(";").map((h) => h.trim().toUpperCase());
+  const headers = lines[headerIdx].split(";").map((h) => h.trim().replace(/\s+/g, " ").toUpperCase());
+  validateHeaders(headers);
+  const warnings = buildHeaderWarnings(headers);
+
+  // Sample primeras 10 filas para detectar formato de número
+  const subIdx = headers.indexOf("SUBTOTAL");
+  const totIdx = headers.indexOf("TOTAL");
+  const numSamples: string[] = [];
+  for (let i = headerIdx + 1; i < Math.min(headerIdx + 11, lines.length); i++) {
+    const cols = lines[i].split(";");
+    if (subIdx >= 0 && cols[subIdx]) numSamples.push(cols[subIdx].trim());
+    if (totIdx >= 0 && cols[totIdx]) numSamples.push(cols[totIdx].trim());
+  }
+  const detectedFormat = detectThousandsFormat(numSamples);
+
   const rows: RawRow[] = [];
   const filtered: FilteredCounts = { zeroSubtotal: 0, subtotalLow: 0, invalidTipo: 0, invalidDate: 0 };
 
@@ -135,7 +199,7 @@ function parseCSV(text: string, empresa: string): ParseResult {
     });
   }
 
-  return { rows, filtered };
+  return { rows, filtered, warnings, detectedFormat };
 }
 
 // ─── Excel parser ─────────────────────────────────────────────────────────────
@@ -158,7 +222,21 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
     throw new Error("No se encontró la columna FECHA en el archivo. Verifica que el formato sea correcto.");
   }
 
-  const headers = (raw[headerIdx] as string[]).map((h) => String(h).trim().toUpperCase());
+  const headers = (raw[headerIdx] as string[]).map((h) => String(h).trim().replace(/\s+/g, " ").toUpperCase());
+  validateHeaders(headers);
+  const warnings = buildHeaderWarnings(headers);
+
+  // Sample primeras 10 filas para detectar formato de número
+  const subIdxX = headers.indexOf("SUBTOTAL");
+  const totIdxX = headers.indexOf("TOTAL");
+  const numSamples: string[] = [];
+  for (let i = headerIdx + 1; i < Math.min(headerIdx + 11, raw.length); i++) {
+    const cols = raw[i] as unknown[];
+    if (subIdxX >= 0 && cols[subIdxX] !== undefined) numSamples.push(String(cols[subIdxX]).trim());
+    if (totIdxX >= 0 && cols[totIdxX] !== undefined) numSamples.push(String(cols[totIdxX]).trim());
+  }
+  const detectedFormat = detectThousandsFormat(numSamples);
+
   const rows: RawRow[] = [];
   const filtered: FilteredCounts = { zeroSubtotal: 0, subtotalLow: 0, invalidTipo: 0, invalidDate: 0 };
 
@@ -210,7 +288,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
     });
   }
 
-  return { rows, filtered };
+  return { rows, filtered, warnings, detectedFormat };
 }
 
 // ─── Route ────────────────────────────────────────────────────────────────────
@@ -225,6 +303,8 @@ export async function POST(req: NextRequest) {
   let empresa: string;
   let rows: RawRow[];
   let filtered: FilteredCounts;
+  let warnings: string[] = [];
+  let detectedFormat: "us_thousands" | "no_thousands" = "no_thousands";
 
   try {
     const form = await req.formData();
@@ -260,7 +340,7 @@ export async function POST(req: NextRequest) {
 
     if (isExcel) {
       const buffer = await file.arrayBuffer();
-      ({ rows, filtered } = parseExcel(buffer, empresa));
+      ({ rows, filtered, warnings, detectedFormat } = parseExcel(buffer, empresa));
     } else {
       // Decode CSV: try UTF-8 first, fall back to latin-1 if replacement chars found
       const buffer = await file.arrayBuffer();
@@ -273,7 +353,7 @@ export async function POST(req: NextRequest) {
       if (hadEncodingIssue && text.includes("\uFFFD")) {
         throw new Error("El archivo tiene caracteres especiales. Guárdalo como UTF-8 e intenta de nuevo.");
       }
-      ({ rows, filtered } = parseCSV(text, empresa));
+      ({ rows, filtered, warnings, detectedFormat } = parseCSV(text, empresa));
     }
   } catch (err) {
     console.error("[ventas/upload] parse error", err);
@@ -300,7 +380,7 @@ export async function POST(req: NextRequest) {
     inserted += batch.length;
   }
 
-  await logActivity(session?.role || "unknown", "ventas_upload", "ventas", { empresa, rowCount: inserted, filtered }, session?.userName);
+  await logActivity(session?.role || "unknown", "ventas_upload", "ventas", { empresa, rowCount: inserted, filtered, detectedFormat, warnings }, session?.userName);
 
-  return NextResponse.json({ ok: true, count: inserted, filtered });
+  return NextResponse.json({ ok: true, count: inserted, filtered, warnings, detectedFormat });
 }

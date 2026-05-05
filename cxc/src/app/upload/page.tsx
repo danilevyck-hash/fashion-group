@@ -374,7 +374,23 @@ function UploadPageInner() {
         return;
       }
 
-      const headers = lines[headerIdx].split(delimiter).map((h) => h.trim().toUpperCase());
+      const headers = lines[headerIdx].split(delimiter).map((h) => h.trim().replace(/\s+/g, " ").toUpperCase());
+
+      // A) Validar headers requeridos
+      const requiredHeaders = ["FECHA", "TIPO", "VENDEDOR", "CLIENTE", "SUBTOTAL", "TOTAL"];
+      const missing = requiredHeaders.filter((h) => !headers.includes(h));
+      if (!headers.includes("N.SISTEMA") && !headers.includes("N.INTERNO")) missing.push("N.SISTEMA");
+      if (missing.length > 0) {
+        setVentasPreview({ empresaKey, empresaName, rows: [], validCount: 0, errorCount: 0, duplicateCount: 0, formatError: `El archivo no tiene los encabezados requeridos. Faltan: ${missing.join(", ")}. Verifica que descargaste el reporte correcto en Switch Soft.`, file });
+        return;
+      }
+      // C) Rechazar formato reporte_v / Descargar Detalle
+      const reporteVHeaders = ["CODIGO", "FACTURADO POR", "MODULO", "SALDO"];
+      if (reporteVHeaders.every((h) => headers.includes(h))) {
+        setVentasPreview({ empresaKey, empresaName, rows: [], validCount: 0, errorCount: 0, duplicateCount: 0, formatError: "Este archivo está en formato 'Descargar Detalle' o reporte_v. El sistema solo acepta el formato 'Descargar' / comprobantes (con columnas COSTO y UTILIDAD). Vuelve a descargar el reporte en Switch Soft con el botón correcto.", file });
+        return;
+      }
+
       const getIdx = (key: string) => headers.indexOf(key);
 
       const parsedRows: VentasPreviewRow[] = [];
