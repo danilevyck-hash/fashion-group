@@ -37,19 +37,6 @@ interface PrevYearRow {
   subtotal: number;
   utilidad: number;
 }
-interface MetaAutoEmpresa {
-  empresa: string;
-  cagr: number;
-  suggestedRate: number;
-  monthlyMetas: number[];
-  monthlyPrevYear: number[];
-  hasUserOverrides: boolean;
-}
-interface MetaAutoResponse {
-  empresas: MetaAutoEmpresa[];
-  groupAvgCAGR: number;
-  ceiling: number;
-}
 interface ClienteDetalle {
   cliente: string;
   subtotal: number;
@@ -86,7 +73,6 @@ function periodLabel(months: number[], year: number): string {
 function calcKPIs(
   rows: VentaRow[],
   prevRows: PrevYearRow[],
-  metasAuto: MetaAutoEmpresa[],
   maxMonth: number,
 ) {
   // Only include months 1..maxMonth for equivalent comparison
@@ -106,13 +92,6 @@ function calcKPIs(
   const margenBruto = ventasNetas ? (totalUtil / ventasNetas) * 100 : 0;
   const prevMargen = prevTotal > 0 ? (prevUtil / prevTotal) * 100 : null;
 
-  // Meta = sum of monthly metas for months 1..maxMonth
-  const metaTotal = metasAuto.reduce((s, e) => {
-    for (let m = 0; m < maxMonth; m++) s += e.monthlyMetas[m] ?? 0;
-    return s;
-  }, 0);
-  const vsMeta = metaTotal > 0 ? (ventasNetas / metaTotal) * 100 : 0;
-
   return {
     ventasNetas,
     vsAnterior,
@@ -120,8 +99,6 @@ function calcKPIs(
     prevUtil,
     margenBruto,
     prevMargen,
-    metaTotal,
-    vsMeta,
     hasPrevData: prevFiltered.length > 0,
   };
 }
@@ -139,23 +116,19 @@ interface TableRow {
   margen: number;
   prevTotal: number;
   prevTotalUtil: number;
-  metaTotal: number;
 }
 
 function buildTable(
   rows: VentaRow[],
   prevRows: PrevYearRow[],
-  metasAuto: MetaAutoEmpresa[],
   vista: "mensual" | "quarter",
   maxMonth: number,
 ) {
   const periods = vista === "quarter" ? ["Q1", "Q2", "Q3", "Q4"] : MES_NAMES;
-  const metaMap = new Map(metasAuto.map(e => [e.empresa, e]));
 
   const tableRows: TableRow[] = EMPRESAS.map(emp => {
     const empRows = rows.filter(r => r.empresa === emp);
     const empPrev = prevRows.filter(r => r.empresa === emp);
-    const empMeta = metaMap.get(emp);
 
     const values = periods.map((_, i) => {
       const filtered = vista === "quarter"
@@ -191,24 +164,24 @@ function buildTable(
     const prevTotal = empPrev.filter(r => r.mes <= maxMonth).reduce((s, r) => s + r.subtotal, 0);
     const prevTotalUtil = empPrev.filter(r => r.mes <= maxMonth).reduce((s, r) => s + r.utilidad, 0);
 
-    // Meta total for equivalent period
-    let metaTotal = 0;
-    if (empMeta) {
-      for (let m = 0; m < maxMonth; m++) metaTotal += empMeta.monthlyMetas[m] ?? 0;
-    }
-
-    return { empresa: emp, values, utilValues, prevValues, prevUtilValues, total, totalUtil, margen, prevTotal, prevTotalUtil, metaTotal };
+    return { empresa: emp, values, utilValues, prevValues, prevUtilValues, total, totalUtil, margen, prevTotal, prevTotalUtil };
   });
 
   const totalValues = periods.map((_, i) => tableRows.reduce((s, r) => s + r.values[i], 0));
   const totalUtilValues = periods.map((_, i) => tableRows.reduce((s, r) => s + r.utilValues[i], 0));
+  const totalPrevValues = periods.map((_, i) => tableRows.reduce((s, r) => s + r.prevValues[i], 0));
+  const totalPrevUtilValues = periods.map((_, i) => tableRows.reduce((s, r) => s + r.prevUtilValues[i], 0));
   const grandTotal = totalValues.reduce((s, v) => s + v, 0);
   const grandUtil = totalUtilValues.reduce((s, v) => s + v, 0);
   const grandMargen = grandTotal ? (grandUtil / grandTotal) * 100 : 0;
   const grandPrevTotal = tableRows.reduce((s, r) => s + r.prevTotal, 0);
-  const grandMetaTotal = tableRows.reduce((s, r) => s + r.metaTotal, 0);
 
-  return { periods, tableRows, totalValues, totalUtilValues, grandTotal, grandUtil, grandMargen, grandPrevTotal, grandMetaTotal };
+  return {
+    periods, tableRows,
+    totalValues, totalUtilValues,
+    totalPrevValues, totalPrevUtilValues,
+    grandTotal, grandUtil, grandMargen, grandPrevTotal,
+  };
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -249,7 +222,6 @@ export default function VentasDashboard() {
   const [ventas, setVentas] = useState<VentaRow[]>([]);
   const [ventasPrev, setVentasPrev] = useState<PrevYearRow[]>([]);
   const [años, setAños] = useState<number[]>([]);
-  const [metasAuto, setMetasAuto] = useState<MetaAutoEmpresa[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"resumen" | "clientes">("resumen");
   const [resumenMode, setResumenMode] = useState<"ventas" | "utilidad">("ventas");
@@ -291,10 +263,9 @@ export default function VentasDashboard() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const [v2Raw, metasAutoRes] = await Promise.all([
-        fetch(`/api/ventas/v2?anio=${año}&desde=${desdeStr}`).then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch(`/api/ventas/metas-auto?anio=${año}`).then(r => r.ok ? r.json() : null).catch(() => null),
-      ]);
+      const v2Raw = await fetch(`/api/ventas/v2?anio=${año}&desde=${desdeStr}`)
+        .then(r => r.ok ? r.json() : null)
+        .catch(() => null);
       const v2 = v2Raw as {
         byEmpresaMes?: VentaRow[];
         prevYear?: PrevYearRow[];
@@ -303,9 +274,6 @@ export default function VentasDashboard() {
       setVentas(Array.isArray(v2?.byEmpresaMes) ? v2.byEmpresaMes : []);
       setVentasPrev(Array.isArray(v2?.prevYear) ? v2.prevYear.map(r => ({ ...r, utilidad: r.utilidad ?? 0 })) : []);
       setClientesData(Array.isArray(v2?.clientesDetalle) ? v2.clientesDetalle : []);
-
-      const autoRes = metasAutoRes as MetaAutoResponse | null;
-      setMetasAuto(autoRes?.empresas ?? []);
     } catch { showToast("Error al cargar datos de ventas"); }
     setLoading(false);
   }, [año, desdeStr]);
@@ -324,11 +292,6 @@ export default function VentasDashboard() {
     return ventasPrev.filter(r => r.empresa === empresaFilter);
   }, [ventasPrev, empresaFilter]);
 
-  const filteredMetasAuto = useMemo(() => {
-    if (empresaFilter === "all") return metasAuto;
-    return metasAuto.filter(e => e.empresa === empresaFilter);
-  }, [metasAuto, empresaFilter]);
-
   // maxMonthWithData: highest month that has data in the selected year
   const maxMonth = useMemo(() => {
     if (filtered.length === 0) return 0;
@@ -341,13 +304,13 @@ export default function VentasDashboard() {
   }, [filtered]);
 
   const kpi = useMemo(
-    () => calcKPIs(filtered, filteredPrev, filteredMetasAuto, maxMonth),
-    [filtered, filteredPrev, filteredMetasAuto, maxMonth],
+    () => calcKPIs(filtered, filteredPrev, maxMonth),
+    [filtered, filteredPrev, maxMonth],
   );
 
   const table = useMemo(
-    () => buildTable(filtered, filteredPrev, filteredMetasAuto, vista, maxMonth),
-    [filtered, filteredPrev, filteredMetasAuto, vista, maxMonth],
+    () => buildTable(filtered, filteredPrev, vista, maxMonth),
+    [filtered, filteredPrev, vista, maxMonth],
   );
 
   // ── Chart data ─────────────────────────────────────────────────────────────
@@ -515,15 +478,6 @@ export default function VentasDashboard() {
       flag: margenPts !== null && margenPts < 0,
       trend: margenPts !== null ? (margenPts >= 0 ? ("up" as const) : ("down" as const)) : null,
     },
-    {
-      key: "vsMeta",
-      label: "vs Meta",
-      subtitle: kpi.metaTotal > 0 ? `meta: ${fmtK(kpi.metaTotal)}` : "sin metas",
-      value: kpi.metaTotal > 0 ? `${kpi.vsMeta.toFixed(0)}%` : "N/A",
-      flag: kpi.metaTotal > 0 && kpi.vsMeta < 80,
-      trend: kpi.metaTotal > 0 ? (kpi.vsMeta >= 100 ? ("up" as const) : ("down" as const)) : null,
-      amber: kpi.metaTotal > 0 && kpi.vsMeta >= 80 && kpi.vsMeta < 100,
-    },
   ];
 
   // ── YoY and vs Meta columns for the table ──────────────────────────────────
@@ -535,12 +489,17 @@ export default function VentasDashboard() {
     return { text: `▼${pct.toFixed(0)}%`, color: "text-red-600 bg-red-50" };
   }
 
-  function metaBadge(current: number, meta: number) {
-    if (!meta) return { text: "—", color: "text-gray-400" };
-    const pct = (current / meta) * 100;
-    if (pct >= 100) return { text: `${pct.toFixed(0)}%`, color: "text-green-700 bg-green-50" };
-    if (pct >= 80) return { text: `${pct.toFixed(0)}%`, color: "text-amber-700 bg-amber-50" };
-    return { text: `${pct.toFixed(0)}%`, color: "text-red-700 bg-red-50" };
+  // Comparativo mes-a-mes (o trimestre-a-trimestre) vs mismo período del año anterior
+  function monthYoY(curr: number, prev: number): { text: string; color: string } {
+    if (curr === 0 && prev === 0) return { text: "—", color: "text-gray-300" };
+    if (prev === 0 && curr !== 0) {
+      return curr > 0
+        ? { text: "▲ nuevo", color: "text-green-600" }
+        : { text: "▼ nuevo", color: "text-red-600" };
+    }
+    const pct = ((curr - prev) / Math.abs(prev)) * 100;
+    if (pct >= 0) return { text: `▲ +${pct.toFixed(0)}%`, color: "text-green-600" };
+    return { text: `▼ ${pct.toFixed(0)}%`, color: "text-red-600" };
   }
 
   return (
@@ -560,16 +519,10 @@ export default function VentasDashboard() {
               </button>
             )}
             {isAdmin && (
-              <>
-                <button onClick={exportExcel}
-                  className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all">
-                  ↓ Excel
-                </button>
-                <button onClick={() => router.push("/ventas/metas")}
-                  className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all">
-                  ⚙ Metas
-                </button>
-              </>
+              <button onClick={exportExcel}
+                className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all">
+                ↓ Excel
+              </button>
             )}
             <button onClick={() => window.open(`/ventas/reporte?anio=${año}&empresa=${empresaFilter}&vista=${vista}`, "_blank")}
               className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all">
@@ -615,14 +568,14 @@ export default function VentasDashboard() {
         </div>
 
         {/* ── KPI Cards ─────────────────────────────────────────────── */}
-        {loading ? <SkeletonKPI count={5} /> : (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6 tabular-nums">
+        {loading ? <SkeletonKPI count={4} /> : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 tabular-nums">
             {kpiCards.map(k => (
               <div key={k.key} className={`rounded-lg p-3 border ${k.flag ? "border-red-200 bg-red-50/50" : "border-gray-200 bg-gray-50"}`}>
                 <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-0.5">{k.label}</p>
                 <div className="flex items-center gap-1">
                   <p className={`text-xl font-semibold tabular-nums ${
-                    "amber" in k && k.amber ? "text-amber-600" : k.trend === "up" ? "text-green-600" : k.trend === "down" ? "text-red-600" : ""
+                    k.trend === "up" ? "text-green-600" : k.trend === "down" ? "text-red-600" : ""
                   }`}>
                     {k.value}
                   </p>
@@ -737,7 +690,6 @@ export default function VentasDashboard() {
                       <th className="text-right px-3 py-2 font-medium text-gray-500">Total</th>
                       <th className="text-right px-3 py-2 font-medium text-gray-500">Margen%</th>
                       <th className="text-right px-3 py-2 font-medium text-gray-500 whitespace-nowrap">vs {año - 1}</th>
-                      <th className="text-right px-3 py-2 font-medium text-gray-500 whitespace-nowrap">vs Meta</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -747,7 +699,6 @@ export default function VentasDashboard() {
                       const prevDisplayValues = resumenMode === "ventas" ? row.prevValues : row.prevUtilValues;
                       const displayTotal = resumenMode === "ventas" ? row.total : row.totalUtil;
                       const yoy = yoyBadge(row.total, row.prevTotal);
-                      const meta = metaBadge(row.total, row.metaTotal);
 
                       return (
                         <tr key={row.empresa} className="border-b border-gray-50 hover:bg-gray-50/50">
@@ -758,9 +709,11 @@ export default function VentasDashboard() {
                             const drop = v > 0 && prev > 0 && v < prev * 0.9;
                             const grow = v > 0 && prev > 0 && v > prev * 1.1;
                             const cellBg = drop ? "bg-red-50" : grow ? "bg-green-50" : "";
+                            const my = monthYoY(v, prev);
                             return (
-                              <td key={i} className={`text-right px-2 py-2 tabular-nums hidden sm:table-cell ${cell.isZero ? "text-gray-300" : "text-gray-600"} ${cellBg}`}>
-                                {cell.text}
+                              <td key={i} className={`text-right px-2 py-2 tabular-nums hidden sm:table-cell align-top ${cellBg}`}>
+                                <div className={cell.isZero ? "text-gray-300" : "text-gray-600"}>{cell.text}</div>
+                                <div className={`text-[10px] mt-0.5 font-medium ${my.color}`}>{my.text}</div>
                               </td>
                             );
                           })}
@@ -777,11 +730,6 @@ export default function VentasDashboard() {
                               {yoy.text}
                             </span>
                           </td>
-                          <td className="text-right px-3 py-2">
-                            <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-medium tabular-nums ${meta.color}`}>
-                              {meta.text}
-                            </span>
-                          </td>
                         </tr>
                       );
                     })}
@@ -789,10 +737,13 @@ export default function VentasDashboard() {
                     <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
                       <td className="px-3 py-2 sticky left-0 bg-gray-50 z-10">TOTAL</td>
                       {(resumenMode === "ventas" ? table.totalValues : table.totalUtilValues).map((v, i) => {
+                        const prev = (resumenMode === "ventas" ? table.totalPrevValues : table.totalPrevUtilValues)[i];
                         const cell = fmtCell(v);
+                        const my = monthYoY(v, prev);
                         return (
-                          <td key={i} className={`text-right px-2 py-2 tabular-nums hidden sm:table-cell ${cell.isZero ? "text-gray-300" : ""}`}>
-                            {cell.isZero ? "—" : fmtK(v)}
+                          <td key={i} className="text-right px-2 py-2 tabular-nums hidden sm:table-cell align-top">
+                            <div className={cell.isZero ? "text-gray-300" : ""}>{cell.isZero ? "—" : fmtK(v)}</div>
+                            <div className={`text-[10px] mt-0.5 font-medium ${my.color}`}>{my.text}</div>
                           </td>
                         );
                       })}
@@ -806,12 +757,6 @@ export default function VentasDashboard() {
                         {(() => {
                           const yoy = yoyBadge(table.grandTotal, table.grandPrevTotal);
                           return <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-medium tabular-nums ${yoy.color}`}>{yoy.text}</span>;
-                        })()}
-                      </td>
-                      <td className="text-right px-3 py-2">
-                        {(() => {
-                          const meta = metaBadge(table.grandTotal, table.grandMetaTotal);
-                          return <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-medium tabular-nums ${meta.color}`}>{meta.text}</span>;
                         })()}
                       </td>
                     </tr>
