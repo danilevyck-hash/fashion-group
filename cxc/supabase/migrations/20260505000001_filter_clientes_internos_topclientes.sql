@@ -1,11 +1,13 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- Migration: filtrar CLIENTES_INTERNOS en ventas_topclientes_summary
+-- Migration: filtrar CLIENTES_INTERNOS y CLIENTES_GENERICOS en
+--            ventas_topclientes_summary
 --
 -- CONTEXTO:
 -- ventas_topclientes_summary devolvía clientes internos del grupo
--- (MULTI FASHION HOLDING, CONFECCIONES BOSTON, etc.) en el top de clientes
--- externos. Estas son tiendas propias que compran al grupo, no clientes
--- externos. Aplica el mismo filtro que ventas_clientes_detalle_summary.
+-- (MULTI FASHION HOLDING, CONFECCIONES BOSTON, etc.) y genéricos
+-- (CONTADO, VENTAS) en el top. Estos no son clientes externos reales:
+-- los internos son tiendas propias del grupo y los genéricos son ventas
+-- al mostrador sin nombre asociado.
 --
 -- Solo cambia el WHERE: agrega cliente_norm NOT IN (...).
 -- Resto idéntico al original.
@@ -41,7 +43,8 @@ LANGUAGE sql STABLE AS $$
     SUM(utilidad)::numeric
   FROM normalized
   WHERE cliente_norm NOT IN (
-    'CONFECCIONES BOSTON', 'MULTI FASHION HOLDING', 'MULTIFASHION', 'BOSTON'
+    'CONFECCIONES BOSTON', 'MULTI FASHION HOLDING', 'MULTIFASHION', 'BOSTON',
+    'CONTADO', 'VENTAS'
   )
   GROUP BY cliente_norm
   ORDER BY SUM(subtotal) DESC
