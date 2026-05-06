@@ -94,13 +94,28 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       }
       // New items inserted successfully — delete old items (positive orden)
       await supabaseServer.from("guia_items").delete().eq("guia_id", id).gte("orden", 0);
-      // Fix orden: flip negative to positive
-      const { data: newItems } = await supabaseServer.from("guia_items").select("id, orden").eq("guia_id", id);
-      if (newItems) {
-        for (const ni of newItems) {
-          if (ni.orden < 0) {
-            await supabaseServer.from("guia_items").update({ orden: -ni.orden }).eq("id", ni.id);
-          }
+      // Fix orden: flip negative to positive en paralelo (vs loop secuencial N+1)
+      const { data: newItems } = await supabaseServer
+        .from("guia_items")
+        .select("id, orden")
+        .eq("guia_id", id)
+        .lt("orden", 0);
+      if (newItems && newItems.length > 0) {
+        const results = await Promise.allSettled(
+          newItems.map((ni) =>
+            supabaseServer
+              .from("guia_items")
+              .update({ orden: -ni.orden })
+              .eq("id", ni.id)
+          )
+        );
+        const failed = results.filter((r) => r.status === "rejected");
+        if (failed.length > 0) {
+          console.error("[guias/PUT] flip parcial fallido:", failed);
+          return NextResponse.json(
+            { error: `Algunos items no se pudieron actualizar (${failed.length}/${newItems.length})` },
+            { status: 500 }
+          );
         }
       }
     } else {
