@@ -5,6 +5,9 @@ import { logActivity } from "@/lib/log-activity";
 import { normalizeName } from "@/lib/normalize";
 import * as XLSX from "xlsx-js-style";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface RawRow {
@@ -368,8 +371,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No se encontraron filas válidas en el archivo" }, { status: 400 });
   }
 
-  // Upsert in batches of 500 — ON CONFLICT (n_sistema, empresa) DO UPDATE all fields
-  const BATCH = 500;
+  // Dedup por (empresa, n_sistema) — last-write-wins.
+  // Postgres rechaza ON CONFLICT con duplicados en el mismo statement (PG 21000).
+  const dedupMap = new Map<string, RawRow>();
+  for (const r of rows) {
+    dedupMap.set(`${r.empresa}|${r.n_sistema}`, r);
+  }
+  const duplicatesRemoved = rows.length - dedupMap.size;
+  rows = [...dedupMap.values()];
+
+  // Upsert en batches grandes — ON CONFLICT (n_sistema, empresa) DO UPDATE all fields
+  const BATCH = 2000;
   let inserted = 0;
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH).map(r => ({ ...r, uploaded_by: uploadedBy }));
@@ -383,7 +395,7 @@ export async function POST(req: NextRequest) {
     inserted += batch.length;
   }
 
-  await logActivity(session?.role || "unknown", "ventas_upload", "ventas", { empresa, rowCount: inserted, filtered, detectedFormat, warnings }, session?.userName);
+  await logActivity(session?.role || "unknown", "ventas_upload", "ventas", { empresa, rowCount: inserted, duplicatesRemoved, filtered, detectedFormat, warnings }, session?.userName);
 
-  return NextResponse.json({ ok: true, count: inserted, filtered, warnings, detectedFormat });
+  return NextResponse.json({ ok: true, count: inserted, duplicatesRemoved, filtered, warnings, detectedFormat });
 }
