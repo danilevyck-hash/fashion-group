@@ -41,6 +41,7 @@ interface ClienteDetalleRow {
 // ─── Route ────────────────────────────────────────────────────────────────────
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req, ["admin", "director", "contabilidad"]);
