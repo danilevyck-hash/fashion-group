@@ -10,9 +10,12 @@ export const dynamic = "force-dynamic";
 export async function GET(req: NextRequest) {
   const session = getSession(req);
   if (!session || !GUIAS_ROLES.includes(session.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
+  // SELECT explícito: excluye firmas base64 (firma_transportista, firma_base64,
+  // firma_entregador_base64) que pesan 30-100 KB cada una. El detalle completo
+  // se sirve desde /api/guias/[id] cuando el usuario expande una fila.
   const { data, error } = await supabaseServer
     .from("guia_transporte")
-    .select("*, guia_items(bultos, facturas, cliente)")
+    .select("id, numero, fecha, transportista, placa, observaciones, monto_total, estado, tipo_despacho, receptor_nombre, nombre_entregador, entregado_por, nombre_chofer, numero_guia_transp, created_at, deleted, guia_items(bultos, facturas, cliente)")
     .eq("deleted", false)
     .order("numero", { ascending: false });
 
