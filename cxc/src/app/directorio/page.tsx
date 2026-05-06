@@ -8,7 +8,6 @@ import { Toast, SkeletonTable, EmptyState, ConfirmDeleteModal, ConfirmModal, Acc
 import UndoToast from "@/components/UndoToast";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { fmtDate } from "@/lib/format";
-import XLSX from "xlsx-js-style";
 import { usePersistedState, usePersistedScroll } from "@/lib/hooks/usePersistedState";
 
 interface Cliente {
@@ -288,6 +287,7 @@ export default function DirectorioPage() {
 
   async function exportSelectedExcel() {
     if (selectedIds.size === 0) return;
+    const XLSX = (await import("xlsx-js-style")).default;
     const selected = clientes.filter(c => selectedIds.has(c.id));
     const rows: string[][] = [["FASHION GROUP — Directorio Seleccionados"], [], ["Nombre", "Empresa", "Teléfono", "Celular", "WhatsApp", "Correo", "Contacto", "Notas"]];
     for (const c of selected) rows.push([c.nombre, c.empresa, c.telefono, c.celular, c.whatsapp, c.correo, c.contacto, c.notas]);
@@ -401,6 +401,7 @@ export default function DirectorioPage() {
                 Imprimir
               </button>
               <button onClick={async () => {
+                const XLSX = (await import("xlsx-js-style")).default;
                 const allRes = await fetch("/api/directorio");
                 const allClientes = allRes.ok ? await allRes.json() : [];
                 const rows: string[][] = [["FASHION GROUP — Directorio de Clientes"], [], ["Nombre", "Empresa", "Teléfono", "Celular", "Correo", "Contacto", "Notas"]];

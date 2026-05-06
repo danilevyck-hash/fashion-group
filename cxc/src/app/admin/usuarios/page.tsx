@@ -6,7 +6,6 @@ import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, Avatar, Chip } from "@/components/ui";
 import { ALL_MODULES } from "@/lib/modules";
-import XLSX from "xlsx-js-style";
 
 // Cargar Playfair Display sin contaminar otros módulos —
 // el <link> queda inerte si ya está en cache desde otra página.
@@ -167,7 +166,8 @@ export default function UsuariosPage() {
     setSaving(null);
   }
 
-  function exportUsersExcel() {
+  async function exportUsersExcel() {
+    const XLSX = (await import("xlsx-js-style")).default;
     const rows: string[][] = [["FASHION GROUP \u2014 Usuarios del Sistema"], [], ["Nombre", "Rol", "Empresa", "Estado"]];
     for (const u of fgUsers) {
       rows.push([u.name, u.role, u.associated_company || "", u.active ? "Activo" : "Inactivo"]);

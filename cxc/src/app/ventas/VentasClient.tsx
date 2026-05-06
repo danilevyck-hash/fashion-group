@@ -2,12 +2,17 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { fmt } from "@/lib/format";
 import { SkeletonTable, SkeletonKPI, Toast } from "@/components/ui";
-import { BarChart, Bar, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer } from "recharts";
-import XLSX from "xlsx-js-style";
+
+// Lazy: Recharts (~120 KB) solo se carga cuando hay data
+const VentasChart = dynamic(() => import("./VentasChart"), {
+  ssr: false,
+  loading: () => <div className="h-[160px] sm:h-[220px] flex items-center justify-center text-xs text-gray-400">Cargando gráfico...</div>,
+});
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -411,7 +416,8 @@ export default function VentasDashboard() {
 
   // ── Excel export ───────────────────────────────────────────────────────────
 
-  function exportExcel() {
+  async function exportExcel() {
+    const XLSX = (await import("xlsx-js-style")).default;
     const rows: (string | number)[][] = [
       [`FASHION GROUP — Ventas ${año}`],
       [],
@@ -641,17 +647,7 @@ export default function VentasDashboard() {
         {!loading && hasData && (
           <div className="mb-6 border border-gray-200 rounded-lg p-3 sm:p-4 print:hidden">
             <p className="text-xs uppercase tracking-wide text-gray-500 mb-3">Ventas mensuales {año}</p>
-            <ResponsiveContainer width="100%" height={isNarrow ? 160 : 220}>
-              <BarChart data={chartData} barCategoryGap="20%">
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false}
-                  tickFormatter={(v: number) => v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)}
-                  width={40} />
-                <RTooltip formatter={(v) => [`$${fmt(Number(v))}`, ""]} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                <Bar dataKey="ventas" fill="#1a1a1a" radius={[3, 3, 0, 0]} />
-                <Bar dataKey="prev" fill="#e5e7eb" radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <VentasChart data={chartData} isNarrow={isNarrow} />
             <p className="text-xs text-gray-500 mt-1 text-center">Negro: {año} · Gris: {año - 1}</p>
           </div>
         )}

@@ -7,8 +7,6 @@ import { supabase } from "@/lib/supabase";
 import { ALL_COMPANIES } from "@/lib/companies";
 import { normalizeName } from "@/lib/normalize";
 import { resolveAlias } from "@/lib/aliases";
-import Papa from "papaparse";
-import * as XLSX from "xlsx-js-style";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { logActivityClient } from "@/lib/logActivityClient";
 
@@ -99,6 +97,7 @@ function UploadPageInner() {
 
   async function readFileAsText(file: File): Promise<string> {
     if (file.name.endsWith(".xlsx") || file.name.endsWith(".xls")) {
+      const XLSX = await import("xlsx-js-style");
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array" });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -258,6 +257,7 @@ function UploadPageInner() {
 
       const text = await readFileAsText(theFile);
       const delimiter = detectDelimiter(text);
+      const Papa = (await import("papaparse")).default;
       const parsed = Papa.parse(text, { delimiter, header: true, skipEmptyLines: true });
 
       if (parsed.errors.length > 0 && parsed.data.length === 0) {

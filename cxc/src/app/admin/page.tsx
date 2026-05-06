@@ -15,9 +15,7 @@ import UndoToast from "@/components/UndoToast";
 import KpiCards from "./components/KpiCards";
 import ClientTable from "./components/ClientTable";
 import { SkeletonRow } from "./components/Skeleton";
-import { generatePDFResumen, generatePDFDetallado } from "@/lib/pdf-cxc";
 import useAdminData from "./hooks/useAdminData";
-import { exportConsolidado } from "@/lib/excel-cxc-consolidado";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
@@ -584,7 +582,10 @@ function AdminDashboardInner() {
             <span className="sm:hidden">Cargar</span>
           </button>
           <button
-            onClick={() => exportConsolidado(roleClients, cxcCompanies)}
+            onClick={async () => {
+              const { exportConsolidado } = await import("@/lib/excel-cxc-consolidado");
+              exportConsolidado(roleClients, cxcCompanies);
+            }}
             className="text-sm border border-gray-200 text-gray-700 px-4 sm:px-5 rounded-lg font-medium hover:bg-gray-50 active:bg-gray-100 transition-all flex items-center gap-2 min-h-[44px]"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
@@ -621,8 +622,9 @@ function AdminDashboardInner() {
                   </div>
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const sub = buildExportSubtitle();
+                    const { generatePDFResumen } = await import("@/lib/pdf-cxc");
                     generatePDFResumen(filtered, sub);
                     setShowExport(false);
                   }}
@@ -635,8 +637,9 @@ function AdminDashboardInner() {
                   </div>
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     const sub = buildExportSubtitle();
+                    const { generatePDFDetallado } = await import("@/lib/pdf-cxc");
                     generatePDFDetallado(filtered, cxcCompanies, sub);
                     setShowExport(false);
                   }}

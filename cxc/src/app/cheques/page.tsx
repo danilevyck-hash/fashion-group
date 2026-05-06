@@ -8,7 +8,6 @@ import type { ContextMenuItem, SwipeAction } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import Drawer from "@/components/Drawer";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
-import XLSX from "xlsx-js-style";
 import { fmt, fmtDate } from "@/lib/format";
 import { groupByTimePeriod } from "@/lib/group-by-time";
 import TimeGroupHeader from "@/components/TimeGroupHeader";
@@ -489,7 +488,8 @@ function ChequesPage() {
     }
   }
 
-  function exportCheques() {
+  async function exportCheques() {
+    const XLSX = (await import("xlsx-js-style")).default;
     const hoy = todayStr();
     const semana = getVencenSemanaRange(hoy).end;
     let data: Cheque[];

@@ -8,7 +8,6 @@ import { SkeletonTable, EmptyState, StatusBadge, AccordionContent, ScrollableTab
 import type { SwipeAction } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import DespachoForm from "./DespachoForm";
-import { exportGuiasExcel } from "./excel-guias";
 import { groupByTimePeriod } from "@/lib/group-by-time";
 import TimeGroupHeader from "@/components/TimeGroupHeader";
 
@@ -93,8 +92,9 @@ export default function GuiasList({
     ids.forEach(id => window.open(`/guias?id=${id}`, '_blank'));
   }
 
-  function exportSelectedExcel() {
+  async function exportSelectedExcel() {
     if (selectedIds.size === 0) return;
+    const { exportGuiasExcel } = await import("./excel-guias");
     const selected = guias.filter(g => selectedIds.has(g.id));
     exportGuiasExcel(selected, `${selected.length} guías seleccionadas`);
   }
@@ -127,7 +127,8 @@ export default function GuiasList({
                   <>
                     <button onClick={() => { setSelectionMode(true); setSelectedIds(new Set()); }} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-4 py-2 rounded-md transition">Seleccionar</button>
                     <button
-                      onClick={() => {
+                      onClick={async () => {
+                        const { exportGuiasExcel } = await import("./excel-guias");
                         const filtered = guias
                           .filter((g) => {
                             if (!search) return true;
