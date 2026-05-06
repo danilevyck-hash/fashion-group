@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
-import { exportarExcelReporte } from "@/lib/marketing/reportes";
 import type { ReporteMarcaItem } from "@/lib/marketing/reportes";
 import { MarcaBadge } from "@/components/marketing/MarcaBadge";
 
@@ -67,8 +66,9 @@ export function ReportePorMarcaView() {
     );
   }, [items]);
 
-  function exportar() {
+  async function exportar() {
     try {
+      const { exportarExcelReporte } = await import("@/lib/marketing/reportes");
       const blob = exportarExcelReporte("marca", items);
       const suf = anio === "todos" ? "todos" : String(anio);
       descargarBlob(blob, `Marketing-PorMarca-${suf}.xlsx`);

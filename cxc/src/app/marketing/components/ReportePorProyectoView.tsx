@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
-import { exportarExcelReporte } from "@/lib/marketing/reportes";
 import type { ReporteProyectoItem } from "@/lib/marketing/reportes";
 import { fmtDate } from "@/lib/format";
 import type { EstadoProyecto, MkMarca } from "@/lib/marketing/types";
@@ -115,8 +114,9 @@ export function ReportePorProyectoView() {
     [items]
   );
 
-  function exportar() {
+  async function exportar() {
     try {
+      const { exportarExcelReporte } = await import("@/lib/marketing/reportes");
       const blob = exportarExcelReporte("proyecto", items);
       const suf = anio === "todos" ? "todos" : String(anio);
       descargarBlob(blob, `Marketing-PorProyecto-${suf}.xlsx`);

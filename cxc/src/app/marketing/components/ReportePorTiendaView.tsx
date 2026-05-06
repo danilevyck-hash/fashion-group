@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
-import { exportarExcelReporte } from "@/lib/marketing/reportes";
 import type { ReporteTiendaItem } from "@/lib/marketing/reportes";
 
 const ANIO_ACTUAL = new Date().getFullYear();
@@ -81,8 +80,9 @@ export function ReportePorTiendaView() {
     [itemsVisibles]
   );
 
-  function exportar() {
+  async function exportar() {
     try {
+      const { exportarExcelReporte } = await import("@/lib/marketing/reportes");
       const blob = exportarExcelReporte("tienda", itemsVisibles);
       const suf = anio === "todos" ? "todos" : String(anio);
       descargarBlob(blob, `Marketing-PorTienda-${suf}.xlsx`);
