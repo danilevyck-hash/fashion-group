@@ -321,13 +321,16 @@ export async function POST(req: NextRequest) {
 
     // Archive original file to Storage para audit trail (mismo patrón que CxC).
     // No bloqueante: si falla, log warning y seguimos procesando.
+    // Path con timestamp HH-MM-SS para evitar pisar archivos previos del mismo día.
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      const time = now.toISOString().slice(11, 19).replace(/:/g, "-");
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const archivePath = `ventas-uploads/${empresa}/${today}_${safeName}`;
+      const archivePath = `ventas-uploads/${empresa}/${today}_${time}_${safeName}`;
       const { error: archErr } = await supabaseServer.storage
         .from("backups")
-        .upload(archivePath, file, { upsert: true });
+        .upload(archivePath, file, { upsert: false });
       if (archErr) {
         console.warn("[ventas/upload] archive failed (non-blocking):", archErr.message);
       }

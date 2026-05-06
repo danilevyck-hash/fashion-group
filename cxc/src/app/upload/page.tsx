@@ -248,10 +248,13 @@ function UploadPageInner() {
       }
 
       // Archive original file in Supabase Storage for audit trail
-      const today = new Date().toISOString().slice(0, 10);
+      // Path con timestamp HH-MM-SS para evitar pisar archivos previos del mismo día.
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      const time = now.toISOString().slice(11, 19).replace(/:/g, "-");
       const safeName = theFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const archivePath = `cxc-uploads/${companyKey}/${today}_${safeName}`;
-      await supabase.storage.from("backups").upload(archivePath, theFile, { upsert: true });
+      const archivePath = `cxc-uploads/${companyKey}/${today}_${time}_${safeName}`;
+      await supabase.storage.from("backups").upload(archivePath, theFile, { upsert: false });
 
       const text = await readFileAsText(theFile);
       const delimiter = detectDelimiter(text);
