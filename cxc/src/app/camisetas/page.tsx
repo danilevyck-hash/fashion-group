@@ -367,6 +367,11 @@ export default function CamisetasPage() {
             <button onClick={() => { setShowInfo(true); setInfoTab("precios"); }} className="text-gray-400 hover:text-black transition flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center" title="Info de productos">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
             </button>
+            {!isVendedor && (
+              <a href="/api/camisetas/export" className="border border-gray-200 text-gray-700 px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-50 active:bg-gray-100 transition flex-shrink-0 min-h-[44px] flex items-center" title="Descargar Excel">
+                ↓ Excel
+              </a>
+            )}
             <button onClick={openNuevo} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 transition flex-shrink-0 min-h-[44px]">
               + Nuevo Pedido
             </button>
