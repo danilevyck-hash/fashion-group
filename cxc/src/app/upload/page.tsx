@@ -322,7 +322,7 @@ function UploadPageInner() {
       const diff = prevCount != null ? (insertedCount - prevCount) : null;
       const diffText = diff != null && diff !== 0 ? ` (${diff > 0 ? "+" : ""}${diff} vs. carga anterior)` : "";
       setMessage({ text: `${companyName}: ${insertedCount.toLocaleString()} registros cargados correctamente${diffText}`, type: "ok" });
-      loadCxcUploads();
+      await loadCxcUploads();
     } catch (err: unknown) {
       setMessage({ text: err instanceof Error ? err.message : "Error desconocido", type: "err" });
     } finally {
@@ -334,7 +334,7 @@ function UploadPageInner() {
 
   async function loadVentasStatus() {
     try {
-      const res = await fetch("/api/ventas/v2/status");
+      const res = await fetch("/api/ventas/v2/status", { cache: "no-store" });
       if (res.ok) setVentasUploads(await res.json());
     } catch { console.error('Failed to load ventas status'); }
   }
