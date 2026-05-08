@@ -334,7 +334,7 @@ function UploadPageInner() {
 
   async function loadVentasStatus() {
     try {
-      const res = await fetch("/api/ventas/v2/status", { cache: "no-store" });
+      const res = await fetch(`/api/ventas/v2/status?_=${Date.now()}`, { cache: "no-store" });
       if (res.ok) setVentasUploads(await res.json());
     } catch { console.error('Failed to load ventas status'); }
   }
