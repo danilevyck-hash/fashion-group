@@ -47,7 +47,21 @@ interface VentasPreview {
   formatError: string; file: File;
 }
 
-const VALID_TIPOS = new Set(["Factura", "Nota de Crédito", "Nota de Débito", "Transacción", "Transaccion"]);
+// Acepta el formato `listacomprobantes` (mayúsculas sin diacríticos) y el viejo
+// `comprobantes` (mixto). Cualquier otro tipo (PEDIDO, COTIZACION, ...) se ignora.
+function canonicalTipo(raw: string): string | null {
+  const t = (raw ?? "").trim().replace(/\s+/g, " ").toUpperCase();
+  switch (t) {
+    case "FACTURA":            return "Factura";
+    case "TRANSACCION":
+    case "TRANSACCIÓN":        return "Transacción";
+    case "NOTA DE DEBITO":
+    case "NOTA DE DÉBITO":     return "Nota de Débito";
+    case "NOTA DE CREDITO":
+    case "NOTA DE CRÉDITO":    return "Nota de Crédito";
+    default:                   return null;
+  }
+}
 
 // ── Inner component ─────────────────────────────────────────────────────────
 
@@ -403,33 +417,33 @@ function UploadPageInner() {
         const cols = lines[i].split(delimiter);
         const get = (key: string) => (cols[getIdx(key)] ?? "").trim();
 
-        const subtotal = toNum(get("SUBTOTAL"));
-        const utilidad = toNum(get("UTILIDAD"));
-        if (subtotal === 0 && utilidad === 0) continue;
-        if (Math.abs(subtotal) < 0.01) continue;
+        // Sprint 1 Fase 3: filtrar SOLO por tipo. Sin filtro de subtotal.
+        const tipo = canonicalTipo(get("TIPO"));
+        if (!tipo) continue;
 
-        const tipo = (get("TIPO") || "").trim().replace(/\s+/g, " ");
-        if (!VALID_TIPOS.has(tipo)) continue;
+        const isNC = tipo === "Nota de Crédito";
+        const subtotal = isNC ? -Math.abs(toNum(get("SUBTOTAL"))) : toNum(get("SUBTOTAL"));
+        const total    = isNC ? -Math.abs(toNum(get("TOTAL")))    : toNum(get("TOTAL"));
 
         const fechaRaw = get("FECHA");
         const fechaResult = parseVentasFecha(fechaRaw);
-        const nSistema = get("N.SISTEMA");
+        const nSistema = get("N.SISTEMA") || get("N.INTERNO");
         const errors: string[] = [];
 
         if (!fechaResult.valid) errors.push(fechaResult.error);
-        if (!nSistema) errors.push("N.SISTEMA vacio");
+        if (!nSistema) errors.push("N.SISTEMA / N.INTERNO vacio");
         if (!get("CLIENTE")) errors.push("CLIENTE vacio");
 
         nSistemas.push(nSistema);
         parsedRows.push({
           fecha: fechaRaw, tipo, nSistema, nFiscal: get("N.FISCAL"),
-          cliente: get("CLIENTE"), subtotal, total: toNum(get("TOTAL")),
+          cliente: get("CLIENTE"), subtotal, total,
           vendedor: get("VENDEDOR"), errors, isDuplicate: false,
         });
       }
 
       if (parsedRows.length === 0) {
-        setVentasPreview({ empresaKey, empresaName, rows: [], validCount: 0, errorCount: 0, duplicateCount: 0, formatError: "No se encontraron filas validas (Factura, Nota de Crédito o Nota de Débito con subtotal mayor a $1).", file });
+        setVentasPreview({ empresaKey, empresaName, rows: [], validCount: 0, errorCount: 0, duplicateCount: 0, formatError: "No se encontraron filas válidas (Factura, Transacción, Nota de Crédito o Nota de Débito).", file });
         return;
       }
 
@@ -478,16 +492,18 @@ function UploadPageInner() {
       const res = await fetch("/api/ventas/upload", { method: "POST", body: form });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Error al cargar");
-      const filtered = json.filtered as { zeroSubtotal: number; subtotalLow: number; invalidTipo: number; invalidDate: number } | undefined;
-      const totalDescartadas = filtered ? filtered.zeroSubtotal + filtered.subtotalLow + filtered.invalidTipo + filtered.invalidDate : 0;
+      const filtered = json.filtered as { invalidTipo: number; invalidDate: number } | undefined;
+      const totalDescartadas = filtered ? filtered.invalidTipo + filtered.invalidDate : 0;
       let mensaje = `${file.name}: ${json.count} registros cargados para ${empresaName}`;
       if (totalDescartadas > 0 && filtered) {
         const breakdown: string[] = [];
-        if (filtered.subtotalLow > 0) breakdown.push(`${filtered.subtotalLow} subtotal bajo`);
-        if (filtered.zeroSubtotal > 0) breakdown.push(`${filtered.zeroSubtotal} en cero`);
         if (filtered.invalidTipo > 0) breakdown.push(`${filtered.invalidTipo} tipo inválido`);
         if (filtered.invalidDate > 0) breakdown.push(`${filtered.invalidDate} fecha inválida`);
         mensaje += `, ${totalDescartadas} descartadas (${breakdown.join(", ")})`;
+      }
+      // Sprint 1 Fase 3: agregar info de matching contra clientes_master
+      if (typeof json.matched === "number" && typeof json.unmatched === "number") {
+        mensaje += ` · ${json.matched} con código matcheado, ${json.unmatched} sin match (${json.pct_unmatched ?? 0}%)`;
       }
       setMessage({ text: mensaje, type: "ok" });
       await loadVentasStatus();

@@ -21,6 +21,7 @@ interface RawRow {
   n_fiscal: string;
   vendedor: string;
   cliente: string;
+  cliente_codigo: string | null;
   costo: number;
   descuento: number;
   subtotal: number;
@@ -31,9 +32,7 @@ interface RawRow {
 }
 
 interface FilteredCounts {
-  zeroSubtotal: number;  // subtotal=0 y utilidad=0
-  subtotalLow: number;   // |subtotal| < $1
-  invalidTipo: number;   // no es Factura/NC/ND
+  invalidTipo: number;   // no está en canonicalTipo() (excluye PEDIDO, COTIZACION, etc.)
   invalidDate: number;   // fecha no parseable
 }
 
@@ -115,11 +114,24 @@ function toNum(v: unknown): number {
   return isNaN(n) ? 0 : n;
 }
 
-function normTipo(raw: string): string {
-  return (raw ?? "").trim().replace(/\s+/g, " ");
+// Normaliza el tipo a su forma canónica para queries / dashboard.
+// El nuevo `listacomprobantes` viene en MAYÚSCULAS sin diacríticos
+// (FACTURA, TRANSACCION, NOTA DE DEBITO, NOTA DE CREDITO).
+// El viejo `comprobantes` venía con casing mixto (Factura, Transacción, etc.).
+// Devuelve null si el tipo no está permitido (ej. PEDIDO, COTIZACION).
+function canonicalTipo(raw: string): string | null {
+  const t = (raw ?? "").trim().replace(/\s+/g, " ").toUpperCase();
+  switch (t) {
+    case "FACTURA":            return "Factura";
+    case "TRANSACCION":
+    case "TRANSACCIÓN":        return "Transacción";
+    case "NOTA DE DEBITO":
+    case "NOTA DE DÉBITO":     return "Nota de Débito";
+    case "NOTA DE CREDITO":
+    case "NOTA DE CRÉDITO":    return "Nota de Crédito";
+    default:                   return null;
+  }
 }
-
-const VALID_TIPOS = new Set(["Factura", "Nota de Crédito", "Nota de Débito", "Transacción", "Transaccion"]);
 
 // ─── CSV parser ───────────────────────────────────────────────────────────────
 
@@ -158,19 +170,15 @@ function parseCSV(text: string, empresa: string): ParseResult {
   const detectedFormat = detectThousandsFormat(numSamples);
 
   const rows: RawRow[] = [];
-  const filtered: FilteredCounts = { zeroSubtotal: 0, subtotalLow: 0, invalidTipo: 0, invalidDate: 0 };
+  const filtered: FilteredCounts = { invalidTipo: 0, invalidDate: 0 };
 
   for (let i = headerIdx + 1; i < lines.length; i++) {
     const cols = lines[i].split(";");
     const get = (key: string) => cols[headers.indexOf(key)]?.trim() ?? "";
 
-    const subtotal = toNum(get("SUBTOTAL"));
-    const utilidad = toNum(get("UTILIDAD"));
-    if (subtotal === 0 && utilidad === 0) { filtered.zeroSubtotal++; continue; }
-    if (Math.abs(subtotal) < 0.01) { filtered.subtotalLow++; continue; }
-
-    const tipo = normTipo(get("TIPO"));
-    if (!VALID_TIPOS.has(tipo)) { filtered.invalidTipo++; continue; }
+    // Filtrar SOLO por tipo y fecha (Sprint 1 Fase 3: sin filtro de subtotal).
+    const tipo = canonicalTipo(get("TIPO"));
+    if (!tipo) { filtered.invalidTipo++; continue; }
 
     const fechaRaw = get("FECHA");
     const fechaISO = parseFecha(fechaRaw);
@@ -180,6 +188,17 @@ function parseCSV(text: string, empresa: string): ParseResult {
     const mes = dateObj.getMonth() + 1;
     const año = dateObj.getFullYear();
     const quarter = Math.ceil(mes / 3);
+
+    // NOTA DE CREDITO: subtotal y total siempre negativos.
+    const isNC = tipo === "Nota de Crédito";
+    const subtotal = isNC ? -Math.abs(toNum(get("SUBTOTAL"))) : toNum(get("SUBTOTAL"));
+    const total    = isNC ? -Math.abs(toNum(get("TOTAL")))    : toNum(get("TOTAL"));
+
+    // CODIGO viene en `listacomprobantes`. En el formato viejo no existe → null.
+    const cliente_codigo = (() => { const v = get("CODIGO"); return v === "" ? null : v; })();
+
+    // IMPUESTO en formato nuevo, ITBMS en formato viejo.
+    const itbms = toNum(get("IMPUESTO") || get("ITBMS"));
 
     rows.push({
       empresa,
@@ -192,13 +211,14 @@ function parseCSV(text: string, empresa: string): ParseResult {
       n_fiscal: get("N.FISCAL"),
       vendedor: get("VENDEDOR"),
       cliente: normalizeName(get("CLIENTE") || ""),
+      cliente_codigo,
       costo: toNum(get("COSTO")),
       descuento: toNum(get("DESCUENTO")),
       subtotal,
-      itbms: toNum(get("ITBMS")),
-      total: toNum(get("TOTAL")),
-      utilidad,
-      pct_utilidad: (() => { const v = Math.abs(toNum(get("% UTILIDAD") || get("%  UTILIDAD") || get("% UTILIDAD"))); return v > 999.99 ? null : v; })(),
+      itbms,
+      total,
+      utilidad: toNum(get("UTILIDAD")),
+      pct_utilidad: (() => { const v = Math.abs(toNum(get("% UTILIDAD") || get("%  UTILIDAD"))); return v > 999.99 ? null : v; })(),
     });
   }
 
@@ -241,20 +261,15 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
   const detectedFormat = detectThousandsFormat(numSamples);
 
   const rows: RawRow[] = [];
-  const filtered: FilteredCounts = { zeroSubtotal: 0, subtotalLow: 0, invalidTipo: 0, invalidDate: 0 };
+  const filtered: FilteredCounts = { invalidTipo: 0, invalidDate: 0 };
 
   for (let i = headerIdx + 1; i < raw.length; i++) {
     const cols = raw[i] as unknown[];
     const get = (key: string): string => String(cols[headers.indexOf(key)] ?? "").trim();
     const getNum = (key: string): number => toNum(cols[headers.indexOf(key)]);
 
-    const subtotal = getNum("SUBTOTAL");
-    const utilidad = getNum("UTILIDAD");
-    if (subtotal === 0 && utilidad === 0) { filtered.zeroSubtotal++; continue; }
-    if (Math.abs(subtotal) < 0.01) { filtered.subtotalLow++; continue; }
-
-    const tipo = normTipo(get("TIPO"));
-    if (!VALID_TIPOS.has(tipo)) { filtered.invalidTipo++; continue; }
+    const tipo = canonicalTipo(get("TIPO"));
+    if (!tipo) { filtered.invalidTipo++; continue; }
 
     const fechaRaw = get("FECHA");
     const fechaISO = parseFecha(fechaRaw);
@@ -265,10 +280,19 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
     const año = dateObj.getFullYear();
     const quarter = Math.ceil(mes / 3);
 
-    // Try both possible column name variants for % UTILIDAD
     const pctKey = headers.find((h) => h.includes("UTILIDAD") && h.includes("%")) ?? "";
     const pctRaw = pctKey ? toNum(cols[headers.indexOf(pctKey)]) : 0;
     const pct_utilidad = Math.abs(pctRaw) > 999.99 ? null : Math.abs(pctRaw);
+
+    const isNC = tipo === "Nota de Crédito";
+    const subtotal = isNC ? -Math.abs(getNum("SUBTOTAL")) : getNum("SUBTOTAL");
+    const total    = isNC ? -Math.abs(getNum("TOTAL"))    : getNum("TOTAL");
+
+    const codigoRaw = get("CODIGO");
+    const cliente_codigo = codigoRaw === "" ? null : codigoRaw;
+
+    // IMPUESTO formato nuevo, ITBMS formato viejo
+    const itbmsKey = headers.includes("IMPUESTO") ? "IMPUESTO" : "ITBMS";
 
     rows.push({
       empresa,
@@ -281,12 +305,13 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
       n_fiscal: get("N.FISCAL"),
       vendedor: get("VENDEDOR"),
       cliente: normalizeName(get("CLIENTE") || ""),
+      cliente_codigo,
       costo: getNum("COSTO"),
       descuento: getNum("DESCUENTO"),
       subtotal,
-      itbms: getNum("ITBMS"),
-      total: getNum("TOTAL"),
-      utilidad,
+      itbms: getNum(itbmsKey),
+      total,
+      utilidad: getNum("UTILIDAD"),
       pct_utilidad,
     });
   }
@@ -380,11 +405,49 @@ export async function POST(req: NextRequest) {
   const duplicatesRemoved = rows.length - dedupMap.size;
   rows = [...dedupMap.values()];
 
+  // Match cliente_id por codigo contra clientes_master (Sprint 1 Fase 3).
+  // Solo match exacto por codigo. Sin matching por nombre, sin transformaciones.
+  const codigoToId = new Map<string, string>();
+  {
+    const { data: clientes, error: cErr } = await supabaseServer
+      .from("clientes_master")
+      .select("id, codigo")
+      .eq("deleted", false);
+    if (cErr) {
+      console.error("[ventas/upload] error cargando clientes_master:", cErr.message);
+      return NextResponse.json({ error: `No se pudo cargar clientes_master: ${cErr.message}` }, { status: 500 });
+    }
+    for (const c of clientes ?? []) {
+      if (c.codigo) codigoToId.set(c.codigo, c.id);
+    }
+  }
+
+  let matchedCount = 0;
+  const unmatchedCodigos = new Map<string, number>();   // codigo → veces sin match
+  let nullCodigoCount = 0;                              // filas sin CODIGO en CSV
+  const rowsWithMatch = rows.map(r => {
+    let cliente_id: string | null = null;
+    if (!r.cliente_codigo) {
+      nullCodigoCount++;
+    } else {
+      const id = codigoToId.get(r.cliente_codigo);
+      if (id) {
+        cliente_id = id;
+        matchedCount++;
+      } else {
+        unmatchedCodigos.set(r.cliente_codigo, (unmatchedCodigos.get(r.cliente_codigo) ?? 0) + 1);
+      }
+    }
+    return { ...r, cliente_id };
+  });
+
   // Upsert en batches grandes — ON CONFLICT (n_sistema, empresa) DO UPDATE all fields
   const BATCH = 2000;
   let inserted = 0;
-  for (let i = 0; i < rows.length; i += BATCH) {
-    const batch = rows.slice(i, i + BATCH).map(r => ({ ...r, uploaded_by: uploadedBy }));
+  let totalNeto = 0;
+  for (let i = 0; i < rowsWithMatch.length; i += BATCH) {
+    const batch = rowsWithMatch.slice(i, i + BATCH).map(r => ({ ...r, uploaded_by: uploadedBy }));
+    for (const r of batch) totalNeto += r.total;
     const { error: upsErr } = await supabaseServer
       .from("ventas_raw")
       .upsert(batch, { onConflict: "n_sistema,empresa" });
@@ -395,7 +458,31 @@ export async function POST(req: NextRequest) {
     inserted += batch.length;
   }
 
-  await logActivity(session?.role || "unknown", "ventas_upload", "ventas", { empresa, rowCount: inserted, duplicatesRemoved, filtered, detectedFormat, warnings }, session?.userName);
+  // Top 20 codigos que no matchearon (para que Daniel valide)
+  const unmatchedTop = [...unmatchedCodigos.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([codigo, count]) => ({ codigo, count }));
 
-  return NextResponse.json({ ok: true, count: inserted, duplicatesRemoved, filtered, warnings, detectedFormat });
+  await logActivity(session?.role || "unknown", "ventas_upload", "ventas", {
+    empresa, rowCount: inserted, duplicatesRemoved, filtered, detectedFormat, warnings,
+    matched: matchedCount, unmatched: rowsWithMatch.length - matchedCount - nullCodigoCount, nullCodigo: nullCodigoCount,
+  }, session?.userName);
+
+  return NextResponse.json({
+    ok: true,
+    count: inserted,
+    duplicatesRemoved,
+    filtered,
+    warnings,
+    detectedFormat,
+    total_neto: Math.round(totalNeto * 100) / 100,
+    matched: matchedCount,
+    unmatched: rowsWithMatch.length - matchedCount - nullCodigoCount,
+    null_codigo: nullCodigoCount,
+    pct_unmatched: rowsWithMatch.length > 0
+      ? Math.round(((rowsWithMatch.length - matchedCount) / rowsWithMatch.length) * 1000) / 10
+      : 0,
+    unmatched_codigos: unmatchedTop,
+  });
 }
