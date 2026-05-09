@@ -5,8 +5,6 @@ import { useSearchParams } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { supabase } from "@/lib/supabase";
 import { ALL_COMPANIES } from "@/lib/companies";
-import { normalizeName } from "@/lib/normalize";
-import { resolveAlias } from "@/lib/aliases";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { logActivityClient } from "@/lib/logActivityClient";
 
@@ -161,184 +159,54 @@ function UploadPageInner() {
     setCxcSummaryLoading(null);
   }
 
-  function buildCxcPreview(text: string, companyKey: string): CxcPreview {
-    const lines = text.split("\n").filter((l) => l.trim());
-    if (lines.length < 2) {
-      return { companyKey, headers: [], rows: [], validCount: 0, errorCount: 0, duplicateNames: new Set(), bucketExceedsTotal: 0, formatError: "El archivo esta vacio.", delimiter: ";" };
-    }
-
-    const delimiter = detectDelimiter(text);
-    const headers = lines[0].split(delimiter).map((h) => h.trim());
-    const required = ["CODIGO", "NOMBRE", "TOTAL"];
-    const missing = required.filter((r) => !headers.some((h) => h.toUpperCase().includes(r)));
-    if (missing.length > 0) {
-      return { companyKey, headers, rows: [], validCount: 0, errorCount: 0, duplicateNames: new Set(), bucketExceedsTotal: 0, formatError: `Faltan columnas: ${missing.join(", ")}. Verifica que sea el reporte CxC separado por '${delimiter}'.`, delimiter };
-    }
-
-    const nombreIdx = headers.findIndex((h) => h.toUpperCase().includes("NOMBRE"));
-    const totalIdx = headers.findIndex((h) => h.toUpperCase().includes("TOTAL"));
-    const codigoIdx = headers.findIndex((h) => h.toUpperCase().includes("CODIGO"));
-
-    // Bucket column indices for sum validation
-    const bucketPatterns = ["0-30", "31-60", "61-90", "91-120", "121-180", "181-270", "271-365", "Mas de 365"];
-    const bucketIdxs = bucketPatterns.map((p) => headers.findIndex((h) => h.trim() === p || h.trim().toUpperCase() === p.toUpperCase())).filter((i) => i >= 0);
-
-    // Count name occurrences for duplicate detection
-    const nameCounts: Record<string, number> = {};
-    const dataLines = lines.slice(1);
-    for (const line of dataLines) {
-      const vals = line.split(delimiter).map((v) => v.trim());
-      const nombre = (vals[nombreIdx] || "").trim();
-      if (nombre && !/^\d[\d.,\s-]*$/.test(nombre) && !/^\d+-\d+$/.test(nombre) && !/^Mas\s+de/i.test(nombre) && !/^Total$/i.test(nombre)) {
-        const norm = nombre.toUpperCase();
-        nameCounts[norm] = (nameCounts[norm] || 0) + 1;
-      }
-    }
-    const duplicateNames = new Set(Object.entries(nameCounts).filter(([, c]) => c > 1).map(([n]) => n));
-
-    let validCount = 0;
-    let errorCount = 0;
-    let bucketExceedsTotal = 0;
-    const rows: CxcPreviewRow[] = [];
-
-    for (const line of dataLines) {
-      const values = line.split(delimiter).map((v) => v.trim());
-      const nombre = (values[nombreIdx] || "").trim();
-
-      // Skip junk rows
-      if (!nombre) continue;
-      if (/^\d[\d.,\s-]*$/.test(nombre)) continue;
-      if (/^\d+-\d+$/.test(nombre)) continue;
-      if (/^Mas\s+de/i.test(nombre)) continue;
-      if (/^Total$/i.test(nombre)) continue;
-
-      const errors: string[] = [];
-      if (codigoIdx >= 0 && !(values[codigoIdx] || "").trim()) errors.push("CODIGO vacio");
-      const totalVal = parseNum(values[totalIdx]);
-      if (totalIdx >= 0 && totalVal < 0) errors.push("TOTAL negativo");
-      if (totalIdx >= 0 && totalVal === 0 && !(values[totalIdx] || "").trim()) errors.push("TOTAL vacio");
-      if (duplicateNames.has(nombre.toUpperCase())) errors.push("Nombre duplicado");
-
-      // Check if sum of aging buckets exceeds TOTAL
-      if (totalIdx >= 0 && bucketIdxs.length > 0) {
-        const bucketSum = bucketIdxs.reduce((sum, idx) => sum + parseNum(values[idx]), 0);
-        if (bucketSum > totalVal + 0.01) {
-          errors.push("Suma de buckets excede TOTAL");
-          bucketExceedsTotal++;
-        }
-      }
-
-      if (errors.length > 0) errorCount++;
-      else validCount++;
-
-      rows.push({ values, errors });
-    }
-
-    return { companyKey, headers, rows, validCount, errorCount, duplicateNames, bucketExceedsTotal, formatError: "", delimiter };
+  // Sprint 1 Fase 4C: el formato detallessaldos es per-document. El parsing,
+  // matching de cliente_id y archive a Storage los hace el server. La UI
+  // sube el archivo directo y muestra los stats que devuelve el endpoint.
+  function buildCxcPreview(_text: string, companyKey: string): CxcPreview {
+    return { companyKey, headers: [], rows: [], validCount: 0, errorCount: 0, duplicateNames: new Set(), bucketExceedsTotal: 0, formatError: "", delimiter: ";" };
   }
 
   async function openCxcPreview(companyKey: string, file: File) {
-    const text = await readFileAsText(file);
-    const preview = buildCxcPreview(text, companyKey);
-    setCxcPreview(preview);
     setPendingFile(file);
+    setCxcPreview(buildCxcPreview("", companyKey));
+    // Subida automática inmediata; el server valida headers y devuelve stats.
+    await handleCxcUpload(file, companyKey);
   }
 
-  async function handleCxcUpload() {
-    if (!cxcPreview || !pendingFile) return;
-    const companyKey = cxcPreview.companyKey;
-    const theFile = pendingFile;
+  async function handleCxcUpload(fileArg?: File, companyKeyArg?: string) {
+    const theFile = fileArg ?? pendingFile;
+    const companyKey = companyKeyArg ?? cxcPreview?.companyKey;
+    if (!theFile || !companyKey) return;
+
     setCxcPreview(null);
     setPendingFile(null);
     setUploading(companyKey);
     setMessage(null);
+    setUploadProgress(`Procesando ${theFile.name}...`);
 
     try {
-      // Lock check
-      const twoMinAgo = new Date(Date.now() - 120_000).toISOString();
-      const { data: recentUploads } = await supabase.from("cxc_uploads").select("id").eq("company_key", companyKey).gte("uploaded_at", twoMinAgo).limit(1);
-      if (recentUploads && recentUploads.length > 0) {
-        throw new Error("Ya hay un upload reciente para esta empresa. Espera 2 minutos e intenta de nuevo.");
-      }
-
-      // Archive original file in Supabase Storage for audit trail
-      // Path con timestamp HH-MM-SS para evitar pisar archivos previos del mismo día.
-      const now = new Date();
-      const today = now.toISOString().slice(0, 10);
-      const time = now.toISOString().slice(11, 19).replace(/:/g, "-");
-      const safeName = theFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const archivePath = `cxc-uploads/${companyKey}/${today}_${time}_${safeName}`;
-      await supabase.storage.from("backups").upload(archivePath, theFile, { upsert: false });
-
-      const text = await readFileAsText(theFile);
-      const delimiter = detectDelimiter(text);
-      const Papa = (await import("papaparse")).default;
-      const parsed = Papa.parse(text, { delimiter, header: true, skipEmptyLines: true });
-
-      if (parsed.errors.length > 0 && parsed.data.length === 0) {
-        throw new Error("Error al parsear CSV: " + parsed.errors[0].message);
-      }
-
-      const rows = (parsed.data as Record<string, string>[])
-        .map((row) => {
-          const clean: Record<string, string> = {};
-          for (const [key, val] of Object.entries(row)) {
-            clean[key.trim().replace(/\s+/g, " ")] = (val || "").trim();
-          }
-          return clean;
-        })
-        .filter((r) => {
-          const nombre = (r["NOMBRE"] || "").trim();
-          if (!nombre) return false;
-          if (/^\d[\d.,\s-]*$/.test(nombre)) return false;
-          if (/^\d+-\d+$/.test(nombre)) return false;
-          if (/^Mas\s+de/i.test(nombre)) return false;
-          if (/^Total$/i.test(nombre)) return false;
-          return true;
-        })
-        .map((r) => ({
-          codigo: r["CODIGO"] || "",
-          nombre: r["NOMBRE"] || "",
-          nombre_normalized: resolveAlias(normalizeName(r["NOMBRE"] || "")),
-          correo: r["CORREO"] || "",
-          telefono: r["TELEFONO"] || "",
-          celular: r["CELULAR"] || "",
-          contacto: r["CONTACTO"] || "",
-          pais: r["PAIS"] || "",
-          provincia: r["PROVINCIA"] || "",
-          distrito: r["DISTRITO"] || "",
-          corregimiento: r["CORREGIMIENTO"] || "",
-          limite_credito: parseNum(r["LIMITE CREDITO"]),
-          limite_morosidad: parseNum(r["LIMITE MOROSIDAD"]),
-          d0_30: parseNum(r["0-30"]),
-          d31_60: parseNum(r["31-60"]),
-          d61_90: parseNum(r["61-90"]),
-          d91_120: parseNum(r["91-120"]),
-          d121_180: parseNum(r["121-180"]),
-          d181_270: parseNum(r["181-270"]),
-          d271_365: parseNum(r["271-365"]),
-          mas_365: parseNum(r["Mas de 365"]),
-          total: parseNum(r["TOTAL"]),
-        }));
-
-      setUploadProgress(`Subiendo ${rows.length.toLocaleString()} registros...`);
-      const res = await fetch("/api/cxc/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ companyKey, filename: theFile.name, rows }),
-      });
-      setUploadProgress(null);
+      const form = new FormData();
+      form.append("empresa", companyKey);
+      form.append("file", theFile);
+      const res = await fetch("/api/cxc/upload", { method: "POST", body: form });
       const json = await res.json();
+      setUploadProgress(null);
       if (!res.ok) throw new Error(json.error || "Error al cargar");
 
       const insertedCount: number = json.count ?? 0;
-      const prevCount = cxcUploads[companyKey]?.row_count;
+      const totalNeto: number = json.total_neto ?? 0;
+      const matched: number = json.matched ?? 0;
+      const unmatched: number = json.unmatched ?? 0;
+      const pct: number = json.pct_unmatched ?? 0;
       const companyName = cxcCompanies.find(c => c.key === companyKey)?.name || companyKey;
-      const diff = prevCount != null ? (insertedCount - prevCount) : null;
-      const diffText = diff != null && diff !== 0 ? ` (${diff > 0 ? "+" : ""}${diff} vs. carga anterior)` : "";
-      setMessage({ text: `${companyName}: ${insertedCount.toLocaleString()} registros cargados correctamente${diffText}`, type: "ok" });
+      let mensaje = `${companyName}: ${insertedCount.toLocaleString()} documentos · saldo neto $${totalNeto.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      if (matched + unmatched > 0) {
+        mensaje += ` · ${matched} con cliente, ${unmatched} sin match (${pct}%)`;
+      }
+      setMessage({ text: mensaje, type: "ok" });
       await loadCxcUploads();
     } catch (err: unknown) {
+      setUploadProgress(null);
       setMessage({ text: err instanceof Error ? err.message : "Error desconocido", type: "err" });
     } finally {
       setUploading(null);
