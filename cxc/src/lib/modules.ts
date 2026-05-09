@@ -67,7 +67,7 @@ export const ALL_MODULES: AppModule[] = [
   { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",                    href: "/ventas",         icon: TrendingUp,       roles: ["admin", "director"],                                           group: "reportes" },
   { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)",href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria", "director"],                             group: "reportes" },
   { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones de empleados",               href: "/prestamos",      icon: HandCoins,        roles: ["admin", "director", "contabilidad"],                           group: "reportes" },
-  { key: "directorio",    label: "Directorio",          subtitle: "Clientes y contactos",                               href: "/directorio",     icon: Contact,          roles: ["admin", "director", "secretaria", "vendedor"],                 group: "reportes" },
+  { key: "directorio",    label: "Clientes",            subtitle: "Datos fiscales, contacto y CXC actual",              href: "/clientes",       icon: Contact,          roles: ["admin", "director", "secretaria", "vendedor", "bodega"],       group: "reportes" },
 
   // Catálogos
   { key: "catalogos",     label: "Catálogos",           subtitle: "Reebok, Joybees",                                    href: "/catalogos/marcas",icon: BookOpen,        roles: ["admin", "director", "secretaria", "vendedor", "bodega"],       group: "catalogos" },
