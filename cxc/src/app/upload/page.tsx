@@ -153,8 +153,8 @@ function UploadPageInner() {
     if (cxcSummary?.key === companyKey) { setCxcSummary(null); return; }
     setCxcSummaryLoading(companyKey);
     try {
-      const { data: top5 } = await supabase.from("cxc_rows").select("nombre, total").eq("company_key", companyKey).order("total", { ascending: false }).limit(5);
-      const { data: totalData } = await supabase.from("cxc_rows").select("total").eq("company_key", companyKey);
+      const { data: top5 } = await supabase.from("cxc_aging").select("nombre, total").eq("company_key", companyKey).order("total", { ascending: false }).limit(5);
+      const { data: totalData } = await supabase.from("cxc_aging").select("total").eq("company_key", companyKey);
       const totalCartera = (totalData || []).reduce((s, r) => s + (Number(r.total) || 0), 0);
       setCxcSummary({ key: companyKey, top5: (top5 || []).map(r => ({ nombre: r.nombre, total: Number(r.total) || 0 })), totalCartera });
     } catch { setCxcSummary(null); }

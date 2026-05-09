@@ -60,7 +60,7 @@ export default async function DirectorioPage() {
       .select("empresa")
       .eq("deleted", false),
     supabaseServer
-      .from("cxc_rows")
+      .from("cxc_aging")
       .select("nombre_normalized"),
   ]);
 
