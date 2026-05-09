@@ -397,11 +397,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No se encontraron filas válidas en el archivo" }, { status: 400 });
   }
 
-  // Dedup por (empresa, n_sistema) — last-write-wins.
+  // Dedup por (empresa, tipo, n_sistema, fecha) — last-write-wins.
+  // Switch reusa N.INTERNO entre comprobantes de años distintos y entre tipos
+  // distintos, así que la clave necesita tipo + fecha además de empresa+n_sistema.
   // Postgres rechaza ON CONFLICT con duplicados en el mismo statement (PG 21000).
   const dedupMap = new Map<string, RawRow>();
   for (const r of rows) {
-    dedupMap.set(`${r.empresa}|${r.n_sistema}`, r);
+    dedupMap.set(`${r.empresa}|${r.tipo}|${r.n_sistema}|${r.fecha}`, r);
   }
   const duplicatesRemoved = rows.length - dedupMap.size;
   rows = [...dedupMap.values()];
@@ -451,7 +453,7 @@ export async function POST(req: NextRequest) {
     for (const r of batch) totalNeto += r.total;
     const { error: upsErr } = await supabaseServer
       .from("ventas_raw")
-      .upsert(batch, { onConflict: "n_sistema,empresa" });
+      .upsert(batch, { onConflict: "empresa,tipo,n_sistema,fecha" });
     if (upsErr) {
       console.error("[ventas/upload] upsert FULL ERROR:", JSON.stringify(upsErr));
       return NextResponse.json({ error: `Error: ${upsErr.code} — ${upsErr.message}` }, { status: 500 });
