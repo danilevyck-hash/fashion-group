@@ -35,6 +35,7 @@ export function getModuleKeyFromPath(pathname: string): string | null {
   if (pathname.startsWith("/reclamos"))        return "reclamos";
   if (pathname.startsWith("/caja"))            return "caja";
   if (pathname.startsWith("/directorio"))      return "directorio";
+  if (pathname.startsWith("/clientes"))        return "directorio";
   if (pathname.startsWith("/prestamos"))       return "prestamos";
   if (pathname.startsWith("/ventas"))          return "ventas";
   if (pathname.startsWith("/marketing"))       return "marketing";
