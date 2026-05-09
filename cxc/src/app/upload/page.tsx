@@ -55,6 +55,7 @@ function canonicalTipo(raw: string): string | null {
     case "FACTURA":            return "Factura";
     case "TRANSACCION":
     case "TRANSACCIÓN":        return "Transacción";
+    case "TIQUETE":            return "Tiquete";
     case "NOTA DE DEBITO":
     case "NOTA DE DÉBITO":     return "Nota de Débito";
     case "NOTA DE CREDITO":
@@ -443,7 +444,7 @@ function UploadPageInner() {
       }
 
       if (parsedRows.length === 0) {
-        setVentasPreview({ empresaKey, empresaName, rows: [], validCount: 0, errorCount: 0, duplicateCount: 0, formatError: "No se encontraron filas válidas (Factura, Transacción, Nota de Crédito o Nota de Débito).", file });
+        setVentasPreview({ empresaKey, empresaName, rows: [], validCount: 0, errorCount: 0, duplicateCount: 0, formatError: "No se encontraron filas válidas (Factura, Transacción, Tiquete, Nota de Crédito o Nota de Débito).", file });
         return;
       }
 

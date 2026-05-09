@@ -116,7 +116,7 @@ function toNum(v: unknown): number {
 
 // Normaliza el tipo a su forma canónica para queries / dashboard.
 // El nuevo `listacomprobantes` viene en MAYÚSCULAS sin diacríticos
-// (FACTURA, TRANSACCION, NOTA DE DEBITO, NOTA DE CREDITO).
+// (FACTURA, TRANSACCION, TIQUETE, NOTA DE DEBITO, NOTA DE CREDITO).
 // El viejo `comprobantes` venía con casing mixto (Factura, Transacción, etc.).
 // Devuelve null si el tipo no está permitido (ej. PEDIDO, COTIZACION).
 function canonicalTipo(raw: string): string | null {
@@ -125,6 +125,7 @@ function canonicalTipo(raw: string): string | null {
     case "FACTURA":            return "Factura";
     case "TRANSACCION":
     case "TRANSACCIÓN":        return "Transacción";
+    case "TIQUETE":            return "Tiquete";
     case "NOTA DE DEBITO":
     case "NOTA DE DÉBITO":     return "Nota de Débito";
     case "NOTA DE CREDITO":
