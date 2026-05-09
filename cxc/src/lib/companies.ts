@@ -1,3 +1,5 @@
+import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
+
 export interface Company {
   key: string;
   name: string;
@@ -26,6 +28,15 @@ export const ALL_COMPANIES: Company[] = [...ADMIN_COMPANIES, ...DIRECTOR_EXTRA_C
 
 // Legacy export for backward compat
 export const COMPANIES = ALL_COMPANIES;
+
+/**
+ * Las 6 empresas B2B (con clientes D-XXX y CXC). Derivado de B2B_EMPRESA_KEYS
+ * en empresa-mapping.ts (single source of truth) preservando el orden canónico.
+ * Usado por /admin (CXC dashboard), /clientes (detalle), y todo flow CXC.
+ */
+export const B2B_COMPANIES: Company[] = B2B_EMPRESA_KEYS
+  .map((k) => ALL_COMPANIES.find((c) => c.key === k))
+  .filter((c): c is Company => c != null);
 
 export function getCompany(key: string) {
   return ALL_COMPANIES.find((c) => c.key === key);

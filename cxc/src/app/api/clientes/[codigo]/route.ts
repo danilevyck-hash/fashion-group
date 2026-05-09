@@ -11,16 +11,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
+import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 
 export const dynamic = "force-dynamic";
 
 const READ_ROLES = ["admin", "director", "secretaria", "vendedor", "bodega"];
 const WRITE_ROLES = ["admin", "director", "secretaria"];
-
-const B2B_EMPRESAS = [
-  "vistana", "fashion_wear", "fashion_shoes",
-  "active_shoes", "active_wear", "joystep",
-] as const;
 
 interface EmpresaTotals {
   empresa: string;
@@ -83,7 +79,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
     cxcMap.set(r.company_key, (cxcMap.get(r.company_key) ?? 0) + net);
   }
 
-  const empresas: EmpresaTotals[] = B2B_EMPRESAS.map(e => ({
+  const empresas: EmpresaTotals[] = B2B_EMPRESA_KEYS.map(e => ({
     empresa: e,
     ventas_ytd: Math.round((ventasMap.get(e) ?? 0) * 100) / 100,
     cxc: Math.round((cxcMap.get(e) ?? 0) * 100) / 100,

@@ -11,6 +11,25 @@ export const EMPRESA_KEY_TO_NAME: Record<string, string> = {
   american_classic: "Multifashion",
 };
 
+/**
+ * Las 6 empresas B2B que tienen clientes con código D-XXX en Switch
+ * y CXC/ventas matcheable contra clientes_master. Lista canónica para
+ * los flows que dependen del esquema D-XXX (CXC dashboard, /clientes,
+ * upload de detallessaldos / listacomprobantes).
+ *
+ * Excluye Confecciones Boston y American Classic (retail, sin código).
+ */
+export const B2B_EMPRESA_KEYS = [
+  "vistana",
+  "fashion_wear",
+  "fashion_shoes",
+  "active_shoes",
+  "active_wear",
+  "joystep",
+] as const;
+
+export type B2BEmpresaKey = typeof B2B_EMPRESA_KEYS[number];
+
 export function mapEmpresaName(key: string): string {
   return EMPRESA_KEY_TO_NAME[key] ?? key;
 }

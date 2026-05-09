@@ -7,14 +7,10 @@
 import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase-server";
+import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import ClienteDetail, { type ClienteDetailData } from "./ClienteDetail";
 
 const ALLOWED_ROLES = ["admin", "secretaria", "director", "vendedor", "bodega"];
-
-const B2B_EMPRESAS = [
-  "vistana", "fashion_wear", "fashion_shoes",
-  "active_shoes", "active_wear", "joystep",
-] as const;
 
 export const dynamic = "force-dynamic";
 
@@ -92,7 +88,7 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
   for (const r of (cxcRes.data ?? []) as { company_key: string; debito: number; credito: number }[]) {
     cxcMap.set(r.company_key, (cxcMap.get(r.company_key) ?? 0) + (Number(r.debito ?? 0) - Number(r.credito ?? 0)));
   }
-  const empresas = B2B_EMPRESAS.map(e => ({
+  const empresas = B2B_EMPRESA_KEYS.map(e => ({
     empresa: e,
     ventas_ytd: Math.round((ventasMap.get(e) ?? 0) * 100) / 100,
     cxc:        Math.round((cxcMap.get(e) ?? 0) * 100) / 100,

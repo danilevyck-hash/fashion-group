@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { fmt } from "@/lib/format";
-import { COMPANIES, getCompaniesForRole } from "@/lib/companies";
+import { COMPANIES, B2B_COMPANIES } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
 import { VENDOR_MAP } from "@/lib/vendors";
@@ -208,15 +208,13 @@ function AdminDashboardInner() {
     });
   }
 
-  const roleCompanies = useMemo(() => getCompaniesForRole(userRole), [userRole]);
-
-  const CXC_RESTRICTED = ["fashion_wear", "fashion_shoes", "vistana", "active_wear", "active_shoes"];
+  // CXC sólo aplica a las 6 empresas B2B (Boston y American Classic son retail
+  // sin código D-XXX, no tienen detallessaldos). B2B_COMPANIES es la lista
+  // canónica desde lib/empresa-mapping.ts — incluye joystep.
   const cxcCompanies = useMemo(() => {
-    const base = userRole === "director" ? roleCompanies : roleCompanies.filter(c => CXC_RESTRICTED.includes(c.key));
-    // If user has empresa restriction, only show that empresa
-    if (empresaRestriction) return base.filter(c => c.key === empresaRestriction);
-    return base;
-  }, [userRole, roleCompanies, empresaRestriction]);
+    if (empresaRestriction) return B2B_COMPANIES.filter(c => c.key === empresaRestriction);
+    return B2B_COMPANIES;
+  }, [empresaRestriction]);
 
   // ── Filtering + sorting ──────────────────────────────
 
