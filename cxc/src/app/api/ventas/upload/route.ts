@@ -190,10 +190,12 @@ function parseCSV(text: string, empresa: string): ParseResult {
     const año = dateObj.getFullYear();
     const quarter = Math.ceil(mes / 3);
 
-    // NOTA DE CREDITO: subtotal y total siempre negativos.
+    // NOTA DE CREDITO: subtotal, total y costo siempre negativos.
+    // (utilidad la mandamos como viene — el CSV de Switch ya la trae en negativo).
     const isNC = tipo === "Nota de Crédito";
     const subtotal = isNC ? -Math.abs(toNum(get("SUBTOTAL"))) : toNum(get("SUBTOTAL"));
     const total    = isNC ? -Math.abs(toNum(get("TOTAL")))    : toNum(get("TOTAL"));
+    const costo    = isNC ? -Math.abs(toNum(get("COSTO")))    : toNum(get("COSTO"));
 
     // CODIGO viene en `listacomprobantes`. En el formato viejo no existe → null.
     const cliente_codigo = (() => { const v = get("CODIGO"); return v === "" ? null : v; })();
@@ -213,7 +215,7 @@ function parseCSV(text: string, empresa: string): ParseResult {
       vendedor: get("VENDEDOR"),
       cliente: normalizeName(get("CLIENTE") || ""),
       cliente_codigo,
-      costo: toNum(get("COSTO")),
+      costo,
       descuento: toNum(get("DESCUENTO")),
       subtotal,
       itbms,
@@ -285,9 +287,12 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
     const pctRaw = pctKey ? toNum(cols[headers.indexOf(pctKey)]) : 0;
     const pct_utilidad = Math.abs(pctRaw) > 999.99 ? null : Math.abs(pctRaw);
 
+    // NOTA DE CREDITO: subtotal, total y costo siempre negativos.
+    // (utilidad la mandamos como viene — el CSV de Switch ya la trae en negativo).
     const isNC = tipo === "Nota de Crédito";
     const subtotal = isNC ? -Math.abs(getNum("SUBTOTAL")) : getNum("SUBTOTAL");
     const total    = isNC ? -Math.abs(getNum("TOTAL"))    : getNum("TOTAL");
+    const costo    = isNC ? -Math.abs(getNum("COSTO"))    : getNum("COSTO");
 
     const codigoRaw = get("CODIGO");
     const cliente_codigo = codigoRaw === "" ? null : codigoRaw;
@@ -307,7 +312,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
       vendedor: get("VENDEDOR"),
       cliente: normalizeName(get("CLIENTE") || ""),
       cliente_codigo,
-      costo: getNum("COSTO"),
+      costo,
       descuento: getNum("DESCUENTO"),
       subtotal,
       itbms: getNum(itbmsKey),
