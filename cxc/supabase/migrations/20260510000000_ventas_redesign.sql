@@ -369,7 +369,7 @@ SELECT
     ELSE NULL
   END                                                                             AS delta_pct,
   a.ultima_compra                                                                 AS ultima_compra,
-  COALESCE(NULLIF(m.whatsapp, ''), NULLIF(m.celular, ''), NULLIF(m.telefono, '')) AS wa
+  COALESCE(NULLIF(m.celular, ''), NULLIF(m.telefono, '')) AS wa
 FROM ytd_actual a
 LEFT JOIN ytd_prev   p  ON p.cliente_norm  = a.cliente_norm
 LEFT JOIN empresa_top et ON et.cliente_norm = a.cliente_norm
