@@ -141,18 +141,32 @@ function RetailKpi({ label, value, sub }: { label: string; value: string; sub?: 
 }
 
 function RetailRow({ row }: { row: RetailMonthly }) {
+  const isEmpty = row.tickets === 0 && row.ventas === 0;
+  const vs = row.vs2025 ?? 0;
   const tone =
-    row.vs2025 > 0.05  ? "text-emerald-600" :
-    row.vs2025 < -0.05 ? "text-red-600"     : "text-stone-500";
+    vs > 0.05  ? "text-emerald-600" :
+    vs < -0.05 ? "text-red-600"     : "text-stone-500";
+  const empty = "border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-400 tabular-nums";
   return (
     <tr>
       <td className="border-b border-stone-200 px-3.5 py-2.5 text-sm text-stone-950">{row.mes} 2026</td>
-      <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-950 tabular-nums">{fmtMoney(row.ventas)}</td>
-      <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-700 tabular-nums">{row.tickets.toLocaleString()}</td>
-      <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-700 tabular-nums">${row.ticketProm.toFixed(2)}</td>
-      <td className={cn("border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-xs tabular-nums", tone)}>
-        {deltaSymbol(row.vs2025)} {fmtPct(row.vs2025)}
-      </td>
+      {isEmpty ? (
+        <>
+          <td className={empty}>—</td>
+          <td className={empty}>—</td>
+          <td className={empty}>—</td>
+          <td className={empty}>—</td>
+        </>
+      ) : (
+        <>
+          <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-950 tabular-nums">{fmtMoney(row.ventas)}</td>
+          <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-700 tabular-nums">{row.tickets.toLocaleString()}</td>
+          <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-700 tabular-nums">${row.ticketProm.toFixed(2)}</td>
+          <td className={cn("border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-xs tabular-nums", tone)}>
+            {deltaSymbol(row.vs2025)} {fmtPct(row.vs2025)}
+          </td>
+        </>
+      )}
     </tr>
   );
 }

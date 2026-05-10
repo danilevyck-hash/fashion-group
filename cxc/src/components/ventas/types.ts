@@ -64,7 +64,7 @@ export type RetailMonthly = {
   ventas: number;
   tickets: number;
   ticketProm: number;
-  vs2025: number;
+  vs2025: number | null;
 };
 
 export type Vendedora = {
