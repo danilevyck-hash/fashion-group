@@ -35,7 +35,13 @@ export function ResumenView({
     rows.forEach(r => { if (r.cells[ci].value != null) { v += r.cells[ci].value!; hasAny = true; } });
     return hasAny ? v : null;
   });
+  // Total grupo del año anterior, mes/trimestre a mes/trimestre, para comparativo
+  const totalColsPrev = cols.map((_, ci) =>
+    rows.reduce((s, r) => s + (r.cells[ci].prevValue || 0), 0)
+  );
   const totalYtd = rows.reduce((s, r) => s + r.total, 0);
+  const totalPrevYtd = totalColsPrev.reduce((s, v) => s + v, 0);
+  const totalYtdDelta = totalPrevYtd > 0 ? (totalYtd - totalPrevYtd) / totalPrevYtd : null;
   const ventasDelta = k.ventas2025YTD > 0 ? (k.ventasNetasYTD - k.ventas2025YTD) / k.ventas2025YTD : null;
 
   const ventasKpiLabel = isClosedYear ? `VENTAS NETAS ${selectedYear}` : "VENTAS NETAS YTD";
@@ -135,11 +141,22 @@ export function ResumenView({
               <tr className="bg-stone-950 text-white">
                 <td className="sticky left-0 z-10 bg-stone-950 px-3.5 py-3 text-xs font-medium uppercase tracking-widest">Total Grupo</td>
                 {totalCols.map((v, ci) => (
-                  <td key={ci} className="px-2.5 py-3 text-right font-mono text-xs tabular-nums">
-                    {v == null ? <span className="text-stone-500">—</span> : fmtMoneyCompact(v)}
-                  </td>
+                  <TotalGroupCell
+                    key={ci}
+                    value={v}
+                    prevValue={totalColsPrev[ci]}
+                    periodLabel={`${cols[ci]} ${selectedYear}`}
+                    prevYear={prevYear}
+                  />
                 ))}
-                <td className="whitespace-nowrap px-3.5 py-3 text-right font-mono text-sm font-semibold tabular-nums">{fmtMoney(totalYtd)}</td>
+                <TotalGroupCell
+                  isAnnual
+                  value={totalYtd}
+                  prevValue={totalPrevYtd}
+                  periodLabel={`Total ${selectedYear}`}
+                  prevYear={prevYear}
+                  delta={totalYtdDelta}
+                />
               </tr>
             </tbody>
           </table>
@@ -224,6 +241,91 @@ function HeatCell({ cell, prevYear }: { cell: Cell; prevYear: number }) {
                 cell.delta < -0.05 ? "text-orange-300" : "text-stone-300"
               )}>
                 {deltaSymbol(cell.delta)} {fmtPct(cell.delta)} vs {prevYear}
+              </span>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </td>
+  );
+}
+
+/**
+ * Celda de la fila TOTAL GRUPO (fondo bg-stone-950). Muestra:
+ *   ▲/▼/— (color según delta) + monto (blanco)
+ * con tooltip que detalla {prev | actual | delta vs prevYear}.
+ *
+ * Colores legibles sobre fondo oscuro: emerald/orange/stone-300 saturados,
+ * NO los pasteles que usa heatmapClasses para filas blancas.
+ */
+function TotalGroupCell({
+  value, prevValue, periodLabel, prevYear, isAnnual = false, delta: deltaProp,
+}: {
+  value: number | null;
+  prevValue: number;
+  periodLabel: string;
+  prevYear: number;
+  isAnnual?: boolean;
+  delta?: number | null;
+}) {
+  if (value == null) {
+    return (
+      <td className={cn(
+        "whitespace-nowrap px-2.5 py-3 text-right font-mono text-xs tabular-nums",
+        isAnnual && "px-3.5 text-sm font-semibold"
+      )}>
+        <span className="text-stone-500">—</span>
+      </td>
+    );
+  }
+  const delta = deltaProp !== undefined
+    ? deltaProp
+    : prevValue > 0 ? (value - prevValue) / prevValue : null;
+  const arrowTone =
+    delta == null     ? "text-stone-300"  :
+    delta > 0.05      ? "text-emerald-400" :
+    delta < -0.05     ? "text-orange-400"  : "text-stone-300";
+
+  return (
+    <td className={cn(
+      "whitespace-nowrap p-0 text-right font-mono tabular-nums",
+      isAnnual ? "text-sm font-semibold" : "text-xs"
+    )}>
+      <TooltipProvider delayDuration={120}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className={cn(
+                "block w-full cursor-help text-right outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40",
+                isAnnual ? "px-3.5 py-3" : "px-2.5 py-3"
+              )}
+            >
+              <span className="inline-flex items-baseline gap-1.5">
+                <span className={cn("text-[10px]", arrowTone)}>{deltaSymbol(delta)}</span>
+                <span className="text-white">{isAnnual ? fmtMoney(value) : fmtMoneyCompact(value)}</span>
+              </span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" align="end" className="min-w-[220px] border-0 bg-white p-3 text-stone-950 shadow-lg">
+            <div className="flex justify-between gap-6 text-[11px] text-stone-500">
+              <span>{periodLabel.replace(String(prevYear + 1), String(prevYear))}</span>
+              <span className="font-mono text-stone-950 tabular-nums">
+                {prevValue ? fmtMoney(prevValue) : "—"}
+              </span>
+            </div>
+            <div className="mt-1 flex justify-between gap-6 text-[11px]">
+              <span className="text-stone-500">{periodLabel}</span>
+              <span className="font-mono font-medium text-stone-950 tabular-nums">{fmtMoney(value)}</span>
+            </div>
+            <div className="mt-2 flex justify-end border-t border-stone-200 pt-1.5">
+              <span className={cn(
+                "font-mono text-[11px] font-medium",
+                delta == null ? "text-stone-500" :
+                delta > 0.05  ? "text-emerald-700" :
+                delta < -0.05 ? "text-orange-700"  : "text-stone-500"
+              )}>
+                {deltaSymbol(delta)} {fmtPct(delta)} vs {prevYear}
               </span>
             </div>
           </TooltipContent>
