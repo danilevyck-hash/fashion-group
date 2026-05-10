@@ -178,7 +178,7 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   };
 }
 
-interface Clientes12mRow {
+interface ClientesEmpresaRow {
   cliente_id: string | null;
   cliente_nombre: string | null;
   cliente_codigo: string | null;
@@ -188,36 +188,68 @@ interface Clientes12mRow {
   delta_vs_2025: number | string | null;
   ultima_compra: string | null;
   whatsapp: string | null;
+  /** Sólo presente en clientes_agregado_12m_vw (modo Todas) */
+  empresas_count?: number | string | null;
 }
 
 /**
  * Clientes tab — clientes activos en últimos 12 meses (rolling).
- * Lee de clientes_12m_vw (materialized view, refresh manual por ahora).
- * Orden default: ultima_compra DESC.
+ *
+ * Ramas:
+ *   - empresaKey null/'todas': lee de clientes_agregado_12m_vw — agregado
+ *     por cliente con window functions, una fila por cliente único, badge
+ *     +N visible cuando empresas_count > 1.
+ *   - empresaKey específica (vistana, fashion_wear, ...): lee de
+ *     clientes_empresa_12m_vw filtrando por empresa — una fila por par
+ *     (cliente, empresa). Cada cliente que compra a esta empresa aparece,
+ *     incluso si también compra a otras (sin badge en este modo).
+ *
+ * Orden default: ultima_compra DESC NULLS LAST.
  */
-export async function fetchClientes({ year: _year }: { year: number }): Promise<Clientes> {
+export async function fetchClientes({
+  year: _year,
+  empresaKey,
+}: {
+  year: number;
+  empresaKey?: string | null;
+}): Promise<Clientes> {
   void _year;
-  const { data, error } = await supabaseServer
-    .from("clientes_12m_vw")
-    .select("*")
-    .order("ultima_compra", { ascending: false, nullsFirst: false })
-    .limit(2000);
 
-  if (error) throw new Error(`clientes_12m_vw: ${error.message}`);
+  const isTodas = !empresaKey || empresaKey === "todas";
 
-  const rows = ((data as Clientes12mRow[] | null) ?? []).map((r, i) => {
-    const empresaKey = r.empresa ?? "";
+  const query = isTodas
+    ? supabaseServer
+        .from("clientes_agregado_12m_vw")
+        .select("*")
+        .order("ultima_compra", { ascending: false, nullsFirst: false })
+        .limit(5000)
+    : supabaseServer
+        .from("clientes_empresa_12m_vw")
+        .select("*")
+        .eq("empresa", empresaKey)
+        .order("ultima_compra", { ascending: false, nullsFirst: false })
+        .limit(5000);
+
+  const { data, error } = await query;
+  if (error) {
+    const view = isTodas ? "clientes_agregado_12m_vw" : `clientes_empresa_12m_vw(${empresaKey})`;
+    throw new Error(`${view}: ${error.message}`);
+  }
+
+  const rows = ((data as ClientesEmpresaRow[] | null) ?? []).map((r, i) => {
+    const ek = r.empresa ?? "";
     return {
       rank: i + 1,
       id: r.cliente_codigo ?? "—",
       nombre: r.cliente_nombre ?? "(Sin nombre)",
-      empresa: EMPRESA_KEY_TO_NAME[empresaKey] ?? empresaKey ?? "—",
-      empresaKey,
+      empresa: EMPRESA_KEY_TO_NAME[ek] ?? ek ?? "—",
+      empresaKey: ek,
       ytd: toNum(r.compras_ytd),
       delta: r.delta_vs_2025 == null ? 0 : toNum(r.delta_vs_2025),
       ultima: r.ultima_compra ? fmtDate(r.ultima_compra) : "",
       ultimaIso: r.ultima_compra ?? "",
       wa: r.whatsapp ? normalizeWa(r.whatsapp) : "",
+      empresas_count: isTodas ? Math.max(1, toNum(r.empresas_count)) : 1,
     };
   });
 

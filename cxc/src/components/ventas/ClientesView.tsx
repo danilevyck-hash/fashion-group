@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
@@ -23,11 +23,39 @@ const EMPRESA_PILLS: { id: string; label: string }[] = [
   { id: "american_classic",     label: "Multifashion" },
 ];
 
-export function ClientesView({ data }: { data: Clientes }) {
+export function ClientesView({ data: initialData }: { data: Clientes }) {
   const [search, setSearch] = useState("");
   const [empresa, setEmpresa] = useState("todas");
+  const [data, setData] = useState<Clientes>(initialData);
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const [, startTransition] = useTransition();
   const [sortBy, setSortBy] = useState<SortKey>("ultima");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+
+  // Pill click → refetch desde server (la branching cliente/empresa vive en queries.ts)
+  const onEmpresaChange = async (next: string) => {
+    if (next === empresa) return;
+    setEmpresa(next);
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const res = await fetch(`/api/ventas/clientes-12m?empresa=${encodeURIComponent(next)}`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? `HTTP ${res.status}`);
+      }
+      const fresh = (await res.json()) as Clientes;
+      startTransition(() => setData(fresh));
+    } catch (err) {
+      console.error("[ventas/clientes] refetch failed", err);
+      setFetchError(err instanceof Error ? err.message : "error inesperado");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     let r = data.rows.slice();
@@ -35,7 +63,6 @@ export function ClientesView({ data }: { data: Clientes }) {
       const q = search.toLowerCase();
       r = r.filter(c => c.nombre.toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
     }
-    if (empresa !== "todas") r = r.filter(c => c.empresaKey === empresa);
     r.sort((a, b) => {
       const sign = sortDir === "asc" ? 1 : -1;
       switch (sortBy) {
@@ -48,7 +75,7 @@ export function ClientesView({ data }: { data: Clientes }) {
       }
     });
     return r;
-  }, [data.rows, search, empresa, sortBy, sortDir]);
+  }, [data.rows, search, sortBy, sortDir]);
 
   const onSort = (col: SortKey) => {
     if (sortBy === col) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -56,13 +83,14 @@ export function ClientesView({ data }: { data: Clientes }) {
   };
 
   return (
-    <div className="space-y-3">
-      {/*
-        Sticky único: search + counter + pills en un solo bloque al top:0.
-        Evita anidación de stickys (toolbar + thead) que causaba que la
-        primera row quedara escondida por offsets desincronizados y por el
-        wrapper overflow-x-auto que rompe sticky vertical en thead/th.
-      */}
+    <div className={cn("space-y-3", loading && "opacity-60 pointer-events-none transition-opacity")}>
+      {fetchError && (
+        <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
+          No se pudo cargar la lista: {fetchError}
+        </div>
+      )}
+
+      {/* Sticky único: search + counter + pills en un solo bloque al top:0. */}
       <div className="sticky top-0 z-20 -mx-1 space-y-2 border-b border-stone-200 bg-stone-50 px-1 pb-2.5 pt-2.5">
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative min-w-[200px] max-w-[360px] flex-1">
@@ -79,7 +107,6 @@ export function ClientesView({ data }: { data: Clientes }) {
           </p>
         </div>
 
-        {/* Pills empresas — segmented control horizontal */}
         <div className="-mx-1 overflow-x-auto px-1">
           <div className="flex flex-nowrap gap-1.5">
             {EMPRESA_PILLS.map(p => {
@@ -88,7 +115,8 @@ export function ClientesView({ data }: { data: Clientes }) {
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => setEmpresa(p.id)}
+                  onClick={() => onEmpresaChange(p.id)}
+                  disabled={loading}
                   className={cn(
                     "whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition",
                     active
@@ -104,7 +132,6 @@ export function ClientesView({ data }: { data: Clientes }) {
         </div>
       </div>
 
-      {/* Lista — column headers scrollean naturalmente (no sticky) */}
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse" style={{ minWidth: 920 }}>
@@ -120,7 +147,7 @@ export function ClientesView({ data }: { data: Clientes }) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(c => <ClienteRow key={`${c.id}-${c.rank}`} c={c} />)}
+              {filtered.map(c => <ClienteRow key={`${c.empresaKey}-${c.id}-${c.rank}`} c={c} />)}
               {filtered.length === 0 && (
                 <tr><td colSpan={7} className="px-3.5 py-12 text-center text-sm text-stone-500">
                   No se encontraron clientes con esos filtros.
@@ -138,6 +165,7 @@ function ClienteRow({ c }: { c: Cliente }) {
   const tone =
     c.delta > 0.05  ? "text-emerald-600" :
     c.delta < -0.05 ? "text-red-600"     : "text-stone-500";
+  const extraEmpresas = c.empresas_count - 1;
 
   return (
     <tr className="cursor-pointer transition hover:bg-stone-50">
@@ -146,7 +174,17 @@ function ClienteRow({ c }: { c: Cliente }) {
         <div className="font-medium leading-tight">{c.nombre}</div>
         <div className="font-mono text-[11px] leading-tight text-stone-500">{c.id}</div>
       </td>
-      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-xs text-stone-700">{c.empresa}</td>
+      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-xs text-stone-700">
+        {c.empresa}
+        {extraEmpresas > 0 && (
+          <span
+            className="ml-2 rounded-md bg-stone-100 px-1.5 py-0.5 text-xs text-stone-600"
+            title={`Compra a ${c.empresas_count} empresas en últimos 12 meses`}
+          >
+            +{extraEmpresas}
+          </span>
+        )}
+      </td>
       <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">{fmtMoney(c.ytd)}</td>
       <td className={cn("whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", tone)}>
         {deltaSymbol(c.delta)} {fmtPct(c.delta)}

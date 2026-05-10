@@ -62,6 +62,13 @@ export type Cliente = {
   ultima: string;
   /** Raw ISO date for sorting; "" when no purchase */
   ultimaIso: string;
+  /**
+   * Cantidad de empresas a las que el cliente compró en últimos 12 meses.
+   * 1 = single-empresa (sin badge).
+   * >1 = multiempresa, render "+N" badge en modo "Todas".
+   * Siempre 1 cuando filter es una empresa específica.
+   */
+  empresas_count: number;
   /** WhatsApp E.164 number, e.g. "+50760001111" */
   wa: string;
 };
