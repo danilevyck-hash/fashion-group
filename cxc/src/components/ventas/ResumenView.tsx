@@ -287,7 +287,7 @@ function HeatCell({ cell, prevYear, metricLabel }: { cell: Cell; prevYear: numbe
               </span>
             </button>
           </TooltipTrigger>
-          <TooltipContent side="top" align="end" sideOffset={4} alignOffset={-4} collisionPadding={8} className="min-w-[200px] border-0 bg-stone-950 p-3 text-white shadow-lg">
+          <TooltipContent side="bottom" align="end" sideOffset={4} collisionPadding={12} className="min-w-[200px] border-0 bg-stone-950 p-3 text-white shadow-lg">
             <div className="flex justify-between gap-6 text-[11px] text-stone-300">
               <span>{metricLabel} {prevPeriod}</span>
               <span className="font-mono text-white tabular-nums">
@@ -357,7 +357,7 @@ function EmpresaTotalCell({
               {fmtMoney(total)}
             </button>
           </TooltipTrigger>
-          <TooltipContent side="top" align="end" sideOffset={4} alignOffset={-4} collisionPadding={8} className="min-w-[220px] border-0 bg-stone-950 p-3 text-white shadow-lg">
+          <TooltipContent side="bottom" align="end" sideOffset={4} collisionPadding={12} className="min-w-[220px] border-0 bg-stone-950 p-3 text-white shadow-lg">
             <div className="text-[11px] font-medium text-white">{empresaNombre}</div>
             <div className="mt-1.5 flex justify-between gap-6 text-[11px] text-stone-300">
               <span>{selectedYear} actual</span>
@@ -437,7 +437,7 @@ function TotalGroupCell({
               </span>
             </button>
           </TooltipTrigger>
-          <TooltipContent side="top" align="end" sideOffset={4} alignOffset={-4} collisionPadding={8} className="min-w-[220px] border-0 bg-white p-3 text-stone-950 shadow-lg">
+          <TooltipContent side="bottom" align="end" sideOffset={4} collisionPadding={12} className="min-w-[220px] border-0 bg-white p-3 text-stone-950 shadow-lg">
             <div className="flex justify-between gap-6 text-[11px] text-stone-500">
               <span>{metricLabel} {prevPeriod}</span>
               <span className="font-mono text-stone-950 tabular-nums">
