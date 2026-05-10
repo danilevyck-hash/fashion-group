@@ -84,7 +84,7 @@ export function ClienteHoverCard({
           loading={isLoading}
         />
         <Stat
-          label="Última compra"
+          label="Actividad"
           value={ready ? formatDias(ready.dias_desde_ultima_compra) : ""}
           caption={ready && ready.dias_desde_ultima_compra != null ? "sin comprar" : undefined}
           valueTone={ready ? diasTone(ready.dias_desde_ultima_compra) : undefined}
