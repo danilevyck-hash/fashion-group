@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useTransition, useCallback } from "react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -12,12 +13,49 @@ import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/
 
 interface VentasShellProps {
   year: number;
+  availableYears: number[];
   resumen: VentasResumen | null;
   clientes: Clientes | null;
   multi: Multifashion | null;
 }
 
-export function VentasShell({ year, resumen, clientes, multi }: VentasShellProps) {
+export function VentasShell({
+  year: initialYear,
+  availableYears,
+  resumen: initialResumen,
+  clientes,
+  multi,
+}: VentasShellProps) {
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(initialYear);
+  const [resumen, setResumen] = useState<VentasResumen | null>(initialResumen);
+  const [, startTransition] = useTransition();
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const onYearChange = useCallback(async (year: number) => {
+    if (year === selectedYear) return;
+    setSelectedYear(year);
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const res = await fetch(`/api/ventas/resumen?year=${year}`, { cache: "no-store" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body?.error ?? `HTTP ${res.status}`);
+      }
+      const data = (await res.json()) as VentasResumen;
+      startTransition(() => {
+        setResumen(data);
+      });
+    } catch (err) {
+      console.error("[ventas] resumen refetch failed", err);
+      setFetchError(err instanceof Error ? err.message : "error inesperado");
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedYear]);
+
   const onExportExcel = async () => {
     if (!resumen) return;
     try {
@@ -27,9 +65,12 @@ export function VentasShell({ year, resumen, clientes, multi }: VentasShellProps
     }
   };
 
-  const mesesLabel = resumen && resumen.mesActual > 0
-    ? `cierre ${MES_SHORT[resumen.mesActual - 1]} (mes en curso ${MES_SHORT[Math.min(11, resumen.mesActual)]})`
-    : "sin cierres aún";
+  const isClosedYear = selectedYear < currentYear;
+  const mesesLabel = isClosedYear
+    ? "año cerrado"
+    : (resumen && resumen.mesActual > 0
+        ? `cierre ${MES_SHORT[resumen.mesActual - 1]} (mes en curso ${MES_SHORT[Math.min(11, resumen.mesActual)]})`
+        : "sin cierres aún");
 
   return (
     <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
@@ -40,7 +81,7 @@ export function VentasShell({ year, resumen, clientes, multi }: VentasShellProps
             Ventas
           </h1>
           <p className="mt-1 text-xs text-stone-500">
-            8 empresas · año fiscal {year} · {mesesLabel}
+            8 empresas · año fiscal {selectedYear} · {mesesLabel}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -78,7 +119,17 @@ export function VentasShell({ year, resumen, clientes, multi }: VentasShellProps
         </TabsList>
 
         <TabsContent value="resumen" className="mt-5">
-          {resumen ? <ResumenView data={resumen} /> : <ErrorState scope="resumen" />}
+          {resumen ? (
+            <ResumenView
+              data={resumen}
+              availableYears={availableYears}
+              selectedYear={selectedYear}
+              isClosedYear={isClosedYear}
+              loading={loading}
+              error={fetchError}
+              onYearChange={onYearChange}
+            />
+          ) : <ErrorState scope="resumen" />}
         </TabsContent>
         <TabsContent value="clientes" className="mt-5">
           {clientes ? <ClientesView data={clientes} /> : <ErrorState scope="clientes" />}

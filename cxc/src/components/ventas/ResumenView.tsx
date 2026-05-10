@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { VentasResumen } from "./types";
 import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, deltaSymbol, heatmapClasses } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
@@ -10,56 +11,90 @@ import { cn } from "@/lib/utils";
 type Granularity = "mensual" | "trimestral";
 type Cell = { value: number | null; delta: number | null; prevValue: number; periodLabel: string };
 
-export function ResumenView({ data }: { data: VentasResumen }) {
+interface ResumenViewProps {
+  data: VentasResumen;
+  availableYears: number[];
+  selectedYear: number;
+  isClosedYear: boolean;
+  loading: boolean;
+  error: string | null;
+  onYearChange: (year: number) => void;
+}
+
+export function ResumenView({
+  data, availableYears, selectedYear, isClosedYear, loading, error, onYearChange,
+}: ResumenViewProps) {
   const [granularity, setGranularity] = useState<Granularity>("mensual");
   const k = data.kpis;
+  const prevYear = selectedYear - 1;
 
   const cols = granularity === "mensual" ? MONTHS : QUARTERS;
-  const rows = data.empresas.map(e => buildRow(e.ventas2026, e.ventas2025, granularity, e.empresa));
+  const rows = data.empresas.map(e => buildRow(e.ventas2026, e.ventas2025, granularity, e.empresa, selectedYear));
   const totalCols = cols.map((_, ci) => {
     let v = 0, hasAny = false;
     rows.forEach(r => { if (r.cells[ci].value != null) { v += r.cells[ci].value!; hasAny = true; } });
     return hasAny ? v : null;
   });
-  const totalYtd = rows.reduce((s,r) => s + r.total, 0);
-  const ventasDelta = (k.ventasNetasYTD - k.ventas2025YTD) / k.ventas2025YTD;
+  const totalYtd = rows.reduce((s, r) => s + r.total, 0);
+  const ventasDelta = k.ventas2025YTD > 0 ? (k.ventasNetasYTD - k.ventas2025YTD) / k.ventas2025YTD : null;
+
+  const ventasKpiLabel = isClosedYear ? `VENTAS NETAS ${selectedYear}` : "VENTAS NETAS YTD";
+  const utilidadKpiLabel = isClosedYear ? `UTILIDAD ${selectedYear}` : "UTILIDAD YTD";
+  const ventasKpiSub = isClosedYear
+    ? `Año completo · ${deltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`
+    : `${MONTHS[0]}–${MONTHS[Math.max(0, data.mesActual - 1)]} ${selectedYear} · ${deltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`;
+  const margenDeltaPts = (k.margenYTD - k.margen2025YTD) * 100;
+  const utilidadKpiSub = `Margen ${(k.margenYTD * 100).toFixed(1)}% · ${margenDeltaPts >= 0 ? "▲ +" : "▼ "}${margenDeltaPts.toFixed(1)} pts`;
 
   return (
-    <div className="space-y-5">
-      {/* KPI cards — 2 cols, no Multifashion KPI here */}
+    <div className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
+      {/* Banner de error de refetch */}
+      {error && (
+        <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
+          No se pudo cargar el año {selectedYear}: {error}
+        </div>
+      )}
+
+      {/* KPI cards — 2 cols */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <KpiCard
-          label="VENTAS NETAS YTD"
-          value={fmtMoney(k.ventasNetasYTD)}
-          sub={`${MONTHS[0]}–${MONTHS[data.mesActual - 1]} 2026 · ${deltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs 2025`}
-        />
-        <KpiCard
-          label="UTILIDAD YTD"
-          value={fmtMoney(k.utilidadYTD)}
-          sub={`Margen ${(k.margenYTD * 100).toFixed(1)}% · ▲ +${((k.margenYTD - k.margen2025YTD) * 100).toFixed(1)} pts`}
-        />
+        <KpiCard label={ventasKpiLabel} value={fmtMoney(k.ventasNetasYTD)} sub={ventasKpiSub} />
+        <KpiCard label={utilidadKpiLabel} value={fmtMoney(k.utilidadYTD)} sub={utilidadKpiSub} />
       </div>
 
-      {/* Toolbar */}
-      <div className="flex items-center justify-between gap-2">
+      {/* Toolbar — leyenda · year selector + granularity toggle */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-stone-500">
-          Mostrando {granularity === "mensual" ? "mes a mes" : "por trimestre"} · comparando vs 2025
+          Mostrando {granularity === "mensual" ? "mes a mes" : "por trimestre"} · comparando vs {prevYear}
         </p>
-        <div className="inline-flex rounded-full bg-stone-100 p-0.5 text-xs">
-          {(["mensual","trimestral"] as const).map(g => (
-            <button
-              key={g}
-              onClick={() => setGranularity(g)}
-              className={cn(
-                "rounded-full px-3.5 py-1.5 font-medium transition",
-                granularity === g
-                  ? "bg-white text-stone-950 shadow-sm"
-                  : "text-stone-500 hover:text-stone-700"
-              )}
-            >
-              {g === "mensual" ? "Mensual" : "Trimestral"}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <Select value={String(selectedYear)} onValueChange={v => onYearChange(parseInt(v, 10))}>
+            <SelectTrigger className="h-8 w-auto min-w-[88px] gap-1.5 text-xs font-mono tabular-nums">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableYears.map(y => (
+                <SelectItem key={y} value={String(y)} className="font-mono tabular-nums">
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="inline-flex rounded-full bg-stone-100 p-0.5 text-xs">
+            {(["mensual", "trimestral"] as const).map(g => (
+              <button
+                key={g}
+                onClick={() => setGranularity(g)}
+                className={cn(
+                  "rounded-full px-3.5 py-1.5 font-medium transition",
+                  granularity === g
+                    ? "bg-white text-stone-950 shadow-sm"
+                    : "text-stone-500 hover:text-stone-700"
+                )}
+              >
+                {g === "mensual" ? "Mensual" : "Trimestral"}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -91,7 +126,7 @@ export function ResumenView({ data }: { data: VentasResumen }) {
                       {r.empresa.nombre}
                     </span>
                   </td>
-                  {r.cells.map((c, ci) => <HeatCell key={ci} cell={c} />)}
+                  {r.cells.map((c, ci) => <HeatCell key={ci} cell={c} prevYear={prevYear} />)}
                   <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">
                     {fmtMoney(r.total)}
                   </td>
@@ -113,10 +148,12 @@ export function ResumenView({ data }: { data: VentasResumen }) {
 
       {/* Legend (colorblind-safe: symbols always present) */}
       <div className="flex flex-wrap items-center gap-4 text-[11px] text-stone-500">
-        <LegendItem swatch="bg-teal-100" label="▲ vs 2025 mayor a +5%" />
+        <LegendItem swatch="bg-teal-100" label={`▲ vs ${prevYear} mayor a +5%`} />
         <LegendItem swatch="bg-white border border-stone-200" label="— entre ±5%" />
         <LegendItem swatch="bg-orange-200" label="▼ menor a −5%" />
-        <span className="inline-flex items-center gap-1.5"><span className="text-stone-400">—</span>mes futuro</span>
+        {!isClosedYear && (
+          <span className="inline-flex items-center gap-1.5"><span className="text-stone-400">—</span>mes futuro</span>
+        )}
       </div>
     </div>
   );
@@ -138,9 +175,8 @@ function KpiCard({ label, value, sub, accent = false }: { label: string; value: 
   );
 }
 
-function HeatCell({ cell }: { cell: Cell }) {
+function HeatCell({ cell, prevYear }: { cell: Cell; prevYear: number }) {
   const cls = heatmapClasses(cell.delta);
-  // Empty cell (future months / no data): no tooltip, just dash.
   if (cell.value == null) {
     return (
       <td className={cn(
@@ -151,7 +187,6 @@ function HeatCell({ cell }: { cell: Cell }) {
       </td>
     );
   }
-  // Cell with data: ONLY money + symbol visible. % shown inside tooltip.
   return (
     <td className={cn(
       "whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono text-xs tabular-nums transition",
@@ -172,7 +207,7 @@ function HeatCell({ cell }: { cell: Cell }) {
           </TooltipTrigger>
           <TooltipContent side="top" align="end" className="min-w-[200px] border-0 bg-stone-950 p-3 text-white shadow-lg">
             <div className="flex justify-between gap-6 text-[11px] text-stone-300">
-              <span>{cell.periodLabel.replace("2026", "2025")}</span>
+              <span>{cell.periodLabel.replace(String(prevYear + 1), String(prevYear))}</span>
               <span className="font-mono text-white tabular-nums">
                 {cell.prevValue ? fmtMoney(cell.prevValue) : "—"}
               </span>
@@ -188,7 +223,7 @@ function HeatCell({ cell }: { cell: Cell }) {
                 cell.delta > 0.05  ? "text-teal-300" :
                 cell.delta < -0.05 ? "text-orange-300" : "text-stone-300"
               )}>
-                {deltaSymbol(cell.delta)} {fmtPct(cell.delta)} vs 2025
+                {deltaSymbol(cell.delta)} {fmtPct(cell.delta)} vs {prevYear}
               </span>
             </div>
           </TooltipContent>
@@ -208,30 +243,31 @@ function LegendItem({ swatch, label }: { swatch: string; label: string }) {
 }
 
 function buildRow(
-  v26: (number | null)[],
-  v25: (number | null)[],
+  vCur: (number | null)[],
+  vPrev: (number | null)[],
   granularity: Granularity,
-  empresa: { id: string; nombre: string }
+  empresa: { id: string; nombre: string },
+  year: number
 ): { empresa: typeof empresa; cells: Cell[]; total: number } {
   if (granularity === "mensual") {
-    const cells: Cell[] = v26.map((v, i) => {
-      const prev = v25[i] ?? 0;
+    const cells: Cell[] = vCur.map((v, i) => {
+      const prev = vPrev[i] ?? 0;
       const delta = v == null ? null : prev > 0 ? (v - prev) / prev : null;
-      return { value: v, delta, prevValue: prev, periodLabel: `${MONTHS[i]} 2026` };
+      return { value: v, delta, prevValue: prev, periodLabel: `${MONTHS[i]} ${year}` };
     });
-    return { empresa, cells, total: cells.reduce((s,c) => s + (c.value || 0), 0) };
+    return { empresa, cells, total: cells.reduce((s, c) => s + (c.value || 0), 0) };
   }
-  const groups = [[0,1,2],[3,4,5],[6,7,8],[9,10,11]];
+  const groups = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]];
   const cells: Cell[] = groups.map((q, qi) => {
-    const has26 = q.some(i => v26[i] != null);
-    const v = q.reduce((s,i) => v26[i] == null ? s : s + (v26[i] as number), 0);
-    const prev = q.reduce((s,i) => s + (v25[i] || 0), 0);
+    const has = q.some(i => vCur[i] != null);
+    const v = q.reduce((s, i) => vCur[i] == null ? s : s + (vCur[i] as number), 0);
+    const prev = q.reduce((s, i) => s + (vPrev[i] || 0), 0);
     return {
-      value: has26 ? v : null,
-      delta: !has26 ? null : prev > 0 ? (v - prev) / prev : null,
+      value: has ? v : null,
+      delta: !has ? null : prev > 0 ? (v - prev) / prev : null,
       prevValue: prev,
-      periodLabel: `${QUARTERS[qi]} 2026`,
+      periodLabel: `${QUARTERS[qi]} ${year}`,
     };
   });
-  return { empresa, cells, total: cells.reduce((s,c) => s + (c.value || 0), 0) };
+  return { empresa, cells, total: cells.reduce((s, c) => s + (c.value || 0), 0) };
 }

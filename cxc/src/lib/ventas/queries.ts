@@ -209,6 +209,25 @@ function normalizeWa(raw: string): string {
 }
 
 /**
+ * Años con data en ventas_raw — alimenta el dropdown del tab Resumen.
+ * Devuelve siempre al menos el año actual, ordenado descendente.
+ */
+export async function fetchAvailableYears(): Promise<number[]> {
+  const [minRes, maxRes] = await Promise.all([
+    supabaseServer.from("ventas_raw").select("anio").order("anio", { ascending: true }).limit(1),
+    supabaseServer.from("ventas_raw").select("anio").order("anio", { ascending: false }).limit(1),
+  ]);
+  const minYear = (minRes.data?.[0]?.anio as number | undefined) ?? null;
+  const maxYear = (maxRes.data?.[0]?.anio as number | undefined) ?? null;
+  const years = new Set<number>();
+  if (minYear && maxYear) {
+    for (let y = minYear; y <= maxYear; y++) years.add(y);
+  }
+  years.add(new Date().getFullYear());
+  return [...years].sort((a, b) => b - a);
+}
+
+/**
  * Multifashion tab — single retail store snapshot.
  * Llama al RPC multifashion_mensual que retorna jsonb con todo el shape listo.
  */
