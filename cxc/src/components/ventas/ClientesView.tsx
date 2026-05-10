@@ -1,12 +1,14 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Search } from "lucide-react";
 import type { Clientes, Cliente } from "./types";
 import { fmtMoney, fmtPct, deltaSymbol } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
+import { ClienteHoverCard, type HistorialState } from "./ClienteHoverCard";
 
 type SortKey = "rank" | "nombre" | "empresa" | "ytd" | "delta" | "ultima";
 type SortDir = "asc" | "desc";
@@ -56,6 +58,42 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
       setLoading(false);
     }
   };
+
+  // Cache de historial-mensual por (codigo + empresaKey). Lazy: solo se
+  // popula al primer hover sobre cada cliente. Segundo hover = instantáneo.
+  const [historialCache, setHistorialCache] = useState<Record<string, HistorialState>>({});
+  const inFlightRef = useRef<Set<string>>(new Set());
+
+  const loadHistorial = useCallback((codigo: string, empresaKey: string) => {
+    const key = `${codigo}|${empresaKey}`;
+    if (inFlightRef.current.has(key)) return;
+    setHistorialCache(prev => {
+      if (prev[key] && prev[key].status !== "idle") return prev;
+      return { ...prev, [key]: { status: "loading" } };
+    });
+    inFlightRef.current.add(key);
+
+    fetch(`/api/clientes/${encodeURIComponent(codigo)}/historial-mensual?empresa=${encodeURIComponent(empresaKey)}`)
+      .then(async r => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${r.status}`);
+        }
+        return r.json();
+      })
+      .then(data => {
+        setHistorialCache(prev => ({ ...prev, [key]: { status: "ready", data } }));
+      })
+      .catch(err => {
+        setHistorialCache(prev => ({
+          ...prev,
+          [key]: { status: "error", message: err?.message ?? "Error al cargar" },
+        }));
+      })
+      .finally(() => {
+        inFlightRef.current.delete(key);
+      });
+  }, []);
 
   const filtered = useMemo(() => {
     let r = data.rows.slice();
@@ -147,7 +185,18 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(c => <ClienteRow key={`${c.empresaKey}-${c.id}-${c.rank}`} c={c} />)}
+              {filtered.map(c => {
+                const cacheKey = `${c.id}|${c.empresaKey}`;
+                const state = historialCache[cacheKey] ?? { status: "idle" as const };
+                return (
+                  <ClienteRow
+                    key={`${c.empresaKey}-${c.id}-${c.rank}`}
+                    c={c}
+                    state={state}
+                    onFirstHover={() => loadHistorial(c.id, c.empresaKey)}
+                  />
+                );
+              })}
               {filtered.length === 0 && (
                 <tr><td colSpan={7} className="px-3.5 py-12 text-center text-sm text-stone-500">
                   No se encontraron clientes con esos filtros.
@@ -161,7 +210,15 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
   );
 }
 
-function ClienteRow({ c }: { c: Cliente }) {
+function ClienteRow({
+  c,
+  state,
+  onFirstHover,
+}: {
+  c: Cliente;
+  state: HistorialState;
+  onFirstHover: () => void;
+}) {
   const tone =
     c.delta > 0.05  ? "text-emerald-600" :
     c.delta < -0.05 ? "text-red-600"     : "text-stone-500";
@@ -171,7 +228,35 @@ function ClienteRow({ c }: { c: Cliente }) {
     <tr className="cursor-pointer transition hover:bg-stone-50">
       <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">{c.rank}</td>
       <td className="border-b border-stone-200 px-3.5 py-3 text-sm text-stone-950">
-        <div className="font-medium leading-tight">{c.nombre}</div>
+        {/*
+          HoverCard solo se monta en desktop (md+). En mobile el trigger
+          renderiza como inline-block normal sin abrir nada — no usamos
+          BottomSheet en este sprint para evitar bloquear el merge; queda
+          como follow-up.
+        */}
+        <HoverCard openDelay={250} closeDelay={100}>
+          <HoverCardTrigger asChild>
+            <button
+              type="button"
+              className="block max-w-full text-left font-medium leading-tight hover:text-teal-700 md:cursor-help"
+            >
+              {c.nombre}
+            </button>
+          </HoverCardTrigger>
+          <HoverCardContent
+            side="right"
+            align="start"
+            className="hidden w-[280px] md:block"
+          >
+            <ClienteHoverCard
+              nombre={c.nombre}
+              codigo={c.id}
+              ultima={c.ultima}
+              state={state}
+              onFirstHover={onFirstHover}
+            />
+          </HoverCardContent>
+        </HoverCard>
         <div className="font-mono text-[11px] leading-tight text-stone-500">{c.id}</div>
       </td>
       <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-xs text-stone-700">
