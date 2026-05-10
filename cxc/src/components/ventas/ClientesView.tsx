@@ -115,8 +115,16 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
       });
   }, []);
 
+  // Vista 12m (universo rolling) vs YTD strict — el universo cambia con
+  // el sort: cuando el usuario ordena por última compra quiere ver a TODOS
+  // los clientes activos en los últimos 12 meses, incluyendo los que no
+  // compraron aún en el año en curso. Para cualquier otro sort, la lista
+  // se restringe a clientes con compras YTD > 0 (vista "estricta del año").
+  const is12mView = sortBy === "ultima";
+
   const filtered = useMemo(() => {
     let r = data.rows.slice();
+    if (!is12mView) r = r.filter(c => c.ytd > 0);
     if (search) {
       const q = search.toLowerCase();
       r = r.filter(c => c.nombre.toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
@@ -133,7 +141,7 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
       }
     });
     return r;
-  }, [data.rows, search, sortBy, sortDir]);
+  }, [data.rows, search, sortBy, sortDir, is12mView]);
 
   const onSort = (col: SortKey) => {
     if (sortBy === col) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -160,9 +168,24 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
               className="w-full pl-8"
             />
           </div>
-          <p className="ml-auto whitespace-nowrap text-xs text-stone-500">
-            <span className="font-mono text-stone-950">{filtered.length}</span> clientes activos · Compras YTD {new Date().getFullYear()} · ordenados por {SORT_LABELS[sortBy]}
-          </p>
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2 whitespace-nowrap text-xs text-stone-500">
+            <p>
+              <span className="font-mono text-stone-950">{filtered.length}</span> clientes activos · {is12mView ? "últimos 12 meses" : `Compras YTD ${new Date().getFullYear()}`} · ordenados por {SORT_LABELS[sortBy]}
+            </p>
+            <span
+              className={cn(
+                "rounded-md px-2 py-0.5 text-xs font-medium",
+                is12mView
+                  ? "bg-teal-50 text-teal-700"
+                  : "bg-stone-100 text-stone-700"
+              )}
+              title={is12mView
+                ? "Sort por última compra expande la lista al universo rolling de 12 meses (incluye clientes sin compras YTD)."
+                : "Vista estricta del año fiscal en curso: sólo clientes con compras YTD > 0."}
+            >
+              Vista: {is12mView ? "Últimos 12 meses" : `YTD ${new Date().getFullYear()}`}
+            </span>
+          </div>
         </div>
 
         <div className="-mx-1 overflow-x-auto px-1">

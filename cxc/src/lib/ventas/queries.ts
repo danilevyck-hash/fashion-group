@@ -226,24 +226,21 @@ export async function fetchClientes({
 
   const isTodas = !empresaKey || empresaKey === "todas";
 
-  // compras_ytd > 0: alinear el filtro de inclusión con el numerador del
-  // cálculo. La materialized view incluye pares (cliente, empresa) con
-  // alguna factura en los últimos 12 meses rolling, lo que arrastra
-  // clientes sin compras en el año actual (compras_ytd = 0). En la UI
-  // del tab Clientes la columna principal es "Compras YTD {año}", así
-  // que esos clientes son ruido.
+  // Universo: devolvemos TODOS los clientes activos en últimos 12m
+  // (la materialized view ya filtra a active_pairs con fecha >= cutoff 12m).
+  // El filtro condicional por compras_ytd > 0 se aplica client-side en
+  // ClientesView según el sort actual: vista YTD strict por default,
+  // vista 12m rolling cuando sort === "ultima".
   const query = isTodas
     ? supabaseServer
         .from("clientes_agregado_12m_vw")
         .select("*")
-        .gt("compras_ytd", 0)
         .order("ultima_compra", { ascending: false, nullsFirst: false })
         .limit(5000)
     : supabaseServer
         .from("clientes_empresa_12m_vw")
         .select("*")
         .eq("empresa", empresaKey)
-        .gt("compras_ytd", 0)
         .order("ultima_compra", { ascending: false, nullsFirst: false })
         .limit(5000);
 
