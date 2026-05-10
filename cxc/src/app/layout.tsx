@@ -1,7 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import { GeistMono } from "geist/font/mono";
+import { Playfair_Display } from "next/font/google";
 
 import { ContextMenuProviderWrapper } from "@/components/ContextMenuWrapper";
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-playfair",
+  display: "swap",
+});
 import { OnlineProvider } from "@/lib/OnlineContext";
 import OfflineBanner from "@/components/OfflineBanner";
 import Sidebar, { SidebarAwareMain } from "@/components/Sidebar";
@@ -47,7 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black" />
         <meta name="apple-mobile-web-app-title" content="Fashion Group" />
       </head>
-      <body className={`${GeistMono.variable} min-h-screen safe-top`}>
+      <body className={`${GeistMono.variable} ${playfair.variable} min-h-screen safe-top`}>
         <OnlineProvider>
           <OfflineBanner />
           <ContextMenuProviderWrapper>

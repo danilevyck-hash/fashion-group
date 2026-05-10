@@ -11,6 +11,10 @@ const config: Config = {
         grey: '#f5f5f5',
       },
     },
+    fontFamily: {
+      display: ['var(--font-playfair)', 'Georgia', 'serif'],
+      mono: ['var(--font-geist-mono)', 'ui-monospace', 'monospace'],
+    },
     keyframes: {
       'save-flash': {
         '0%': { backgroundColor: 'rgb(220 252 231)', borderRadius: '4px', padding: '0 4px' },

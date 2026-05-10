@@ -12,6 +12,36 @@ export const EMPRESA_KEY_TO_NAME: Record<string, string> = {
 };
 
 /**
+ * Short ids usados por el bundle de Ventas redesign (matrix heatmap, mock-data).
+ * El módulo Ventas trabaja con estos ids cortos en el shape de la API; el resto
+ * del codebase sigue usando las DB keys largas (vistana, fashion_wear, ...).
+ *
+ * Mapeo bidireccional con la DB key canónica.
+ */
+export const EMPRESA_KEY_TO_VENTAS_ID: Record<string, string> = {
+  vistana: "vistana",
+  fashion_wear: "fwear",
+  fashion_shoes: "fshoes",
+  active_shoes: "ashoes",
+  active_wear: "awear",
+  joystep: "joystep",
+  confecciones_boston: "boston",
+  american_classic: "multi",
+};
+
+export const VENTAS_ID_TO_EMPRESA_KEY: Record<string, string> = Object.fromEntries(
+  Object.entries(EMPRESA_KEY_TO_VENTAS_ID).map(([k, v]) => [v, k])
+);
+
+export type VentasEmpresaId =
+  | "vistana" | "fwear" | "fshoes" | "ashoes"
+  | "awear" | "joystep" | "boston" | "multi";
+
+export function mapEmpresaKeyToVentasId(key: string): VentasEmpresaId | null {
+  return (EMPRESA_KEY_TO_VENTAS_ID[key] as VentasEmpresaId) ?? null;
+}
+
+/**
  * Las 6 empresas B2B que tienen clientes con código D-XXX en Switch
  * y CXC/ventas matcheable contra clientes_master. Lista canónica para
  * los flows que dependen del esquema D-XXX (CXC dashboard, /clientes,
@@ -33,7 +63,8 @@ export type B2BEmpresaKey = typeof B2B_EMPRESA_KEYS[number];
 /**
  * Las 8 empresas del grupo en su orden canónico para el módulo de uploads
  * y para flows que necesitan listar todas las empresas (ventas usa las 8;
- * CXC sólo las 6 B2B). Mismo orden visual que en /upload.
+ * CXC sólo las 6 B2B). Boston es B2B y va junto a las otras B2B; Multifashion
+ * (retail puro) se renderiza al final como fila destacada.
  */
 export const ALL_EMPRESA_KEYS = [
   "vistana",
@@ -42,8 +73,8 @@ export const ALL_EMPRESA_KEYS = [
   "active_shoes",
   "active_wear",
   "joystep",
-  "american_classic",
   "confecciones_boston",
+  "american_classic",
 ] as const;
 
 export type EmpresaKey = typeof ALL_EMPRESA_KEYS[number];
