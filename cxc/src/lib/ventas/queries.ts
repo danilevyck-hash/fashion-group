@@ -149,42 +149,48 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   };
 }
 
-interface ClientesRow {
-  rank: number;
-  id: string;
-  nombre: string;
-  empresa: string;
-  ytd2026: number | string;
-  ytd2025: number | string;
-  delta_pct: number | string | null;
+interface Clientes12mRow {
+  cliente_id: string | null;
+  cliente_nombre: string | null;
+  cliente_codigo: string | null;
+  empresa: string | null;
+  compras_ytd: number | string;
+  compras_anio_anterior: number | string;
+  delta_vs_2025: number | string | null;
   ultima_compra: string | null;
-  wa: string | null;
+  whatsapp: string | null;
 }
 
 /**
- * Clientes tab — flat list ordenado por YTD desc.
- * Devuelve hasta 1000 filas (la view es liviana — JOINs prefiltrados).
+ * Clientes tab — clientes activos en últimos 12 meses (rolling).
+ * Lee de clientes_12m_vw (materialized view, refresh manual por ahora).
+ * Orden default: ultima_compra DESC.
  */
 export async function fetchClientes({ year: _year }: { year: number }): Promise<Clientes> {
   void _year;
   const { data, error } = await supabaseServer
-    .from("clientes_ytd_vw")
+    .from("clientes_12m_vw")
     .select("*")
-    .order("ytd2026", { ascending: false })
-    .limit(1000);
+    .order("ultima_compra", { ascending: false, nullsFirst: false })
+    .limit(2000);
 
-  if (error) throw new Error(`clientes_ytd_vw: ${error.message}`);
+  if (error) throw new Error(`clientes_12m_vw: ${error.message}`);
 
-  const rows = ((data as ClientesRow[] | null) ?? []).map((r, i) => ({
-    rank: r.rank ?? i + 1,
-    id: r.id ?? "—",
-    nombre: r.nombre ?? "(Sin nombre)",
-    empresa: r.empresa ?? "—",
-    ytd: toNum(r.ytd2026),
-    delta: r.delta_pct == null ? 0 : toNum(r.delta_pct),
-    ultima: r.ultima_compra ? fmtDate(r.ultima_compra) : "",
-    wa: r.wa ? normalizeWa(r.wa) : "",
-  }));
+  const rows = ((data as Clientes12mRow[] | null) ?? []).map((r, i) => {
+    const empresaKey = r.empresa ?? "";
+    return {
+      rank: i + 1,
+      id: r.cliente_codigo ?? "—",
+      nombre: r.cliente_nombre ?? "(Sin nombre)",
+      empresa: EMPRESA_KEY_TO_NAME[empresaKey] ?? empresaKey ?? "—",
+      empresaKey,
+      ytd: toNum(r.compras_ytd),
+      delta: r.delta_vs_2025 == null ? 0 : toNum(r.delta_vs_2025),
+      ultima: r.ultima_compra ? fmtDate(r.ultima_compra) : "",
+      ultimaIso: r.ultima_compra ?? "",
+      wa: r.whatsapp ? normalizeWa(r.whatsapp) : "",
+    };
+  });
 
   return {
     total: rows.length,

@@ -43,12 +43,17 @@ export type Cliente = {
   /** Internal Switch Soft code, e.g. "D-04" */
   id: string;
   nombre: string;
+  /** Display name, e.g. "Vistana International" */
   empresa: string;
+  /** Long key for filtering, e.g. "vistana" */
+  empresaKey: string;
   ytd: number;
   /** Δ vs same period 2025 as decimal: 0.18 = +18% */
   delta: number;
   /** Display-formatted date "27 abr 2026" */
   ultima: string;
+  /** Raw ISO date for sorting; "" when no purchase */
+  ultimaIso: string;
   /** WhatsApp E.164 number, e.g. "+50760001111" */
   wa: string;
 };
