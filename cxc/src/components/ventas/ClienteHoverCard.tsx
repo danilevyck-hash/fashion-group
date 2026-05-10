@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
-import { fmtMoneyCompact, MONTHS } from "@/lib/ventas/format";
+import { fmtMoneyCompact } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 
 interface MesPunto {
@@ -16,9 +16,12 @@ export interface HistorialMensual {
   cliente_nombre: string;
   meses: MesPunto[];
   total_12m: number;
+  /** Promedio sobre meses ACTIVOS (no sobre 12 fijos). */
   promedio_mensual: number;
-  mejor_mes: MesPunto | null;
-  peor_mes: MesPunto | null;
+  /** Cantidad de meses con compra en últimos 12 meses (0-12). */
+  meses_activos: number;
+  /** Días desde la última factura registrada. null si no hay compras. */
+  dias_desde_ultima_compra: number | null;
 }
 
 export type HistorialState =
@@ -30,9 +33,9 @@ export type HistorialState =
 interface ClienteHoverCardProps {
   /** Display name fallback while loading */
   nombre: string;
-  /** Switch Soft codigo, e.g. "D-04" */
+  /** Switch Soft codigo, e.g. "D-04" — kept for API key, NOT shown */
   codigo: string;
-  /** Última compra (display string), e.g. "27 abr 2026" */
+  /** Última compra (display string) — kept for compat, NOT shown (vive en la fila) */
   ultima: string;
   /** Cached state in parent — null = nunca cargado */
   state: HistorialState;
@@ -42,8 +45,6 @@ interface ClienteHoverCardProps {
 
 export function ClienteHoverCard({
   nombre,
-  codigo,
-  ultima,
   state,
   onFirstHover,
 }: ClienteHoverCardProps) {
@@ -53,45 +54,41 @@ export function ClienteHoverCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const ready = state.status === "ready" ? state.data : null;
+  const isLoading = state.status === "loading" || state.status === "idle";
+
   return (
     <div className="space-y-2.5">
-      <div>
-        <div className="text-sm font-semibold leading-tight text-stone-950">{nombre}</div>
-        <div className="font-mono text-[11px] leading-tight text-stone-500">{codigo}</div>
-      </div>
+      {/* Header: solo nombre. Codigo + última compra ya están en la fila. */}
+      <div className="text-sm font-medium leading-tight text-stone-950">{nombre}</div>
 
       <Sparkline state={state} />
 
-      <div className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-stone-100 pt-2.5 text-[11px]">
+      {/* Stats grid 2x2 */}
+      <div className="grid grid-cols-2 gap-x-3 gap-y-3 border-t border-stone-100 pt-2.5">
         <Stat
           label="Total 12m"
-          value={state.status === "ready" ? fmtMoneyCompact(state.data.total_12m) : "…"}
-          loading={state.status === "loading"}
+          value={ready ? fmtMoneyCompact(ready.total_12m) : ""}
+          loading={isLoading}
         />
         <Stat
-          label="Promedio"
-          value={
-            state.status === "ready"
-              ? `${fmtMoneyCompact(state.data.promedio_mensual)}/mes`
-              : "…"
-          }
-          loading={state.status === "loading"}
+          label="Promedio mensual"
+          value={ready ? `${fmtMoneyCompact(ready.promedio_mensual)}/mes` : ""}
+          caption={ready ? "sobre meses activos" : undefined}
+          loading={isLoading}
         />
         <Stat
-          label="Mejor mes"
-          value={
-            state.status === "ready" && state.data.mejor_mes
-              ? `${MONTHS[state.data.mejor_mes.mes - 1]} ${state.data.mejor_mes.anio} · ${fmtMoneyCompact(state.data.mejor_mes.total)}`
-              : state.status === "ready"
-                ? "Sin compras"
-                : "…"
-          }
-          loading={state.status === "loading"}
+          label="Meses activos"
+          value={ready ? `${ready.meses_activos}/12` : ""}
+          caption={ready ? activityLabel(ready.meses_activos) : undefined}
+          loading={isLoading}
         />
         <Stat
           label="Última compra"
-          value={ultima || "—"}
-          loading={false}
+          value={ready ? formatDias(ready.dias_desde_ultima_compra) : ""}
+          caption={ready && ready.dias_desde_ultima_compra != null ? "sin comprar" : undefined}
+          valueTone={ready ? diasTone(ready.dias_desde_ultima_compra) : undefined}
+          loading={isLoading}
         />
       </div>
 
@@ -102,22 +99,63 @@ export function ClienteHoverCard({
   );
 }
 
+/** Label semántico según meses activos (0-12) */
+function activityLabel(mesesActivos: number): string {
+  if (mesesActivos >= 10) return "muy recurrente";
+  if (mesesActivos >= 6)  return "regular";
+  if (mesesActivos >= 3)  return "ocasional";
+  if (mesesActivos >= 1)  return "esporádico";
+  return "sin actividad";
+}
+
+/** Display "Hace N días" o "—" cuando no hay compras */
+function formatDias(dias: number | null): string {
+  if (dias == null) return "—";
+  if (dias === 0) return "Hoy";
+  if (dias === 1) return "Hace 1 día";
+  return `Hace ${dias} días`;
+}
+
+/** Color del valor "Última compra" según días sin comprar */
+function diasTone(dias: number | null): string | undefined {
+  if (dias == null)        return "text-stone-400";
+  if (dias <= 30)          return "text-stone-700";
+  if (dias <= 60)          return "text-amber-600";
+  return                          "text-orange-600";
+}
+
 function Stat({
   label,
   value,
+  caption,
   loading,
-}: { label: string; value: string; loading: boolean }) {
+  valueTone,
+}: {
+  label: string;
+  value: string;
+  caption?: string;
+  loading: boolean;
+  valueTone?: string;
+}) {
+  if (loading) {
+    return (
+      <div className="space-y-1">
+        <div className="text-[10px] uppercase tracking-wider text-stone-500">{label}</div>
+        <div className="h-4 w-16 animate-pulse rounded bg-stone-100" />
+        <div className="h-2.5 w-12 animate-pulse rounded bg-stone-100" />
+      </div>
+    );
+  }
   return (
     <div className="space-y-0.5">
       <div className="text-[10px] uppercase tracking-wider text-stone-500">{label}</div>
-      <div
-        className={cn(
-          "font-mono text-stone-950 tabular-nums",
-          loading && "animate-pulse text-stone-400"
-        )}
-      >
+      <div className={cn(
+        "font-mono text-sm font-medium tabular-nums",
+        valueTone ?? "text-stone-950"
+      )}>
         {value}
       </div>
+      {caption && <div className="text-[10px] text-stone-500">{caption}</div>}
     </div>
   );
 }
