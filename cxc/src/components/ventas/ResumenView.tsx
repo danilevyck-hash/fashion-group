@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,6 +9,7 @@ import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, deltaSymbol, heatm
 import { cn } from "@/lib/utils";
 
 type Granularity = "mensual" | "trimestral";
+type ViewMode = "ventas" | "utilidad";
 type Cell = { value: number | null; delta: number | null; prevValue: number; periodLabel: string };
 
 interface ResumenViewProps {
@@ -25,54 +26,100 @@ export function ResumenView({
   data, availableYears, selectedYear, isClosedYear, loading, error, onYearChange,
 }: ResumenViewProps) {
   const [granularity, setGranularity] = useState<Granularity>("mensual");
+  const [viewMode, setViewMode] = useState<ViewMode>("ventas");
+  const [, startTransition] = useTransition();
   const k = data.kpis;
   const prevYear = selectedYear - 1;
+  const isUtil = viewMode === "utilidad";
+  const metricLabel = isUtil ? "Utilidad" : "Ventas";
+
+  const onToggleMode = (mode: ViewMode) => {
+    startTransition(() => setViewMode(mode));
+  };
 
   const cols = granularity === "mensual" ? MONTHS : QUARTERS;
-  const rows = data.empresas.map(e => buildRow(e.ventas2026, e.ventas2025, granularity, e.empresa, selectedYear));
+  const rows = data.empresas.map(e => {
+    const cur  = isUtil ? e.utilidad2026 : e.ventas2026;
+    const prev = isUtil ? e.utilidad2025 : e.ventas2025;
+    return buildRow(cur, prev, granularity, e.empresa, selectedYear);
+  });
   const totalCols = cols.map((_, ci) => {
     let v = 0, hasAny = false;
     rows.forEach(r => { if (r.cells[ci].value != null) { v += r.cells[ci].value!; hasAny = true; } });
     return hasAny ? v : null;
   });
-  // Total grupo del año anterior, mes/trimestre a mes/trimestre, para comparativo
   const totalColsPrev = cols.map((_, ci) =>
     rows.reduce((s, r) => s + (r.cells[ci].prevValue || 0), 0)
   );
   const totalYtd = rows.reduce((s, r) => s + r.total, 0);
   const totalPrevYtd = totalColsPrev.reduce((s, v) => s + v, 0);
   const totalYtdDelta = totalPrevYtd > 0 ? (totalYtd - totalPrevYtd) / totalPrevYtd : null;
-  const ventasDelta = k.ventas2025YTD > 0 ? (k.ventasNetasYTD - k.ventas2025YTD) / k.ventas2025YTD : null;
 
-  const ventasKpiLabel = isClosedYear ? `VENTAS NETAS ${selectedYear}` : "VENTAS NETAS YTD";
-  const utilidadKpiLabel = isClosedYear ? `UTILIDAD ${selectedYear}` : "UTILIDAD YTD";
-  const ventasKpiSub = isClosedYear
-    ? `Año completo · ${deltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`
-    : `${MONTHS[0]}–${MONTHS[Math.max(0, data.mesActual - 1)]} ${selectedYear} · ${deltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`;
+  // KPIs según modo
+  const ventasDelta   = k.ventas2025YTD   > 0 ? (k.ventasNetasYTD - k.ventas2025YTD) / k.ventas2025YTD : null;
+  const utilidadDelta = k.utilidad2025YTD > 0 ? (k.utilidadYTD    - k.utilidad2025YTD) / k.utilidad2025YTD : null;
   const margenDeltaPts = (k.margenYTD - k.margen2025YTD) * 100;
-  const utilidadKpiSub = `Margen ${(k.margenYTD * 100).toFixed(1)}% · ${margenDeltaPts >= 0 ? "▲ +" : "▼ "}${margenDeltaPts.toFixed(1)} pts`;
+  const margenSign = margenDeltaPts >= 0 ? "▲ +" : "▼ ";
+
+  const periodoLabel = isClosedYear
+    ? "Año completo"
+    : `${MONTHS[0]}–${MONTHS[Math.max(0, data.mesActual - 1)]} ${selectedYear}`;
+
+  let kpi1Label: string, kpi1Value: string, kpi1Sub: string;
+  let kpi2Label: string, kpi2Value: string, kpi2Sub: string;
+
+  if (isUtil) {
+    kpi1Label = isClosedYear ? `UTILIDAD ${selectedYear}` : "UTILIDAD YTD";
+    kpi1Value = fmtMoney(k.utilidadYTD);
+    kpi1Sub   = `${periodoLabel} · ${deltaSymbol(utilidadDelta)} ${fmtPct(utilidadDelta)} vs ${prevYear}`;
+    kpi2Label = "MARGEN PROMEDIO";
+    kpi2Value = `${(k.margenYTD * 100).toFixed(1)}%`;
+    kpi2Sub   = `${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
+  } else {
+    kpi1Label = isClosedYear ? `VENTAS NETAS ${selectedYear}` : "VENTAS NETAS YTD";
+    kpi1Value = fmtMoney(k.ventasNetasYTD);
+    kpi1Sub   = `${periodoLabel} · ${deltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`;
+    kpi2Label = isClosedYear ? `UTILIDAD ${selectedYear}` : "UTILIDAD YTD";
+    kpi2Value = fmtMoney(k.utilidadYTD);
+    kpi2Sub   = `Margen ${(k.margenYTD * 100).toFixed(1)}% · ${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
+  }
 
   return (
     <div className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
-      {/* Banner de error de refetch */}
       {error && (
         <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
           No se pudo cargar el año {selectedYear}: {error}
         </div>
       )}
 
-      {/* KPI cards — 2 cols */}
+      {/* KPI cards — 2 cols, swap content por viewMode */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <KpiCard label={ventasKpiLabel} value={fmtMoney(k.ventasNetasYTD)} sub={ventasKpiSub} />
-        <KpiCard label={utilidadKpiLabel} value={fmtMoney(k.utilidadYTD)} sub={utilidadKpiSub} />
+        <KpiCard label={kpi1Label} value={kpi1Value} sub={kpi1Sub} />
+        <KpiCard label={kpi2Label} value={kpi2Value} sub={kpi2Sub} />
       </div>
 
-      {/* Toolbar — leyenda · year selector + granularity toggle */}
+      {/* Toolbar — leyenda · [Ventas|Utilidad] · year · Mensual/Trimestral */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs text-stone-500">
-          Mostrando {granularity === "mensual" ? "mes a mes" : "por trimestre"} · comparando vs {prevYear}
+          Mostrando {isUtil ? "utilidad " : ""}{granularity === "mensual" ? "mes a mes" : "por trimestre"} · comparando vs {prevYear}
         </p>
         <div className="flex items-center gap-2">
+          <div className="inline-flex rounded-full bg-stone-100 p-0.5 text-xs">
+            {(["ventas", "utilidad"] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => onToggleMode(m)}
+                className={cn(
+                  "rounded-full px-3.5 py-1.5 font-medium capitalize transition",
+                  viewMode === m
+                    ? "bg-white text-stone-950 shadow-sm"
+                    : "text-stone-500 hover:text-stone-700"
+                )}
+              >
+                {m === "ventas" ? "Ventas" : "Utilidad"}
+              </button>
+            ))}
+          </div>
           <Select value={String(selectedYear)} onValueChange={v => onYearChange(parseInt(v, 10))}>
             <SelectTrigger className="h-8 w-auto min-w-[88px] gap-1.5 text-xs font-mono tabular-nums">
               <SelectValue />
@@ -132,7 +179,9 @@ export function ResumenView({
                       {r.empresa.nombre}
                     </span>
                   </td>
-                  {r.cells.map((c, ci) => <HeatCell key={ci} cell={c} prevYear={prevYear} />)}
+                  {r.cells.map((c, ci) => (
+                    <HeatCell key={ci} cell={c} prevYear={prevYear} metricLabel={metricLabel} />
+                  ))}
                   <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">
                     {fmtMoney(r.total)}
                   </td>
@@ -147,6 +196,7 @@ export function ResumenView({
                     prevValue={totalColsPrev[ci]}
                     periodLabel={`${cols[ci]} ${selectedYear}`}
                     prevYear={prevYear}
+                    metricLabel={metricLabel}
                   />
                 ))}
                 <TotalGroupCell
@@ -155,6 +205,7 @@ export function ResumenView({
                   prevValue={totalPrevYtd}
                   periodLabel={`Total ${selectedYear}`}
                   prevYear={prevYear}
+                  metricLabel={metricLabel}
                   delta={totalYtdDelta}
                 />
               </tr>
@@ -163,7 +214,7 @@ export function ResumenView({
         </div>
       </Card>
 
-      {/* Legend (colorblind-safe: symbols always present) */}
+      {/* Legend */}
       <div className="flex flex-wrap items-center gap-4 text-[11px] text-stone-500">
         <LegendItem swatch="bg-teal-100" label={`▲ vs ${prevYear} mayor a +5%`} />
         <LegendItem swatch="bg-white border border-stone-200" label="— entre ±5%" />
@@ -192,7 +243,7 @@ function KpiCard({ label, value, sub, accent = false }: { label: string; value: 
   );
 }
 
-function HeatCell({ cell, prevYear }: { cell: Cell; prevYear: number }) {
+function HeatCell({ cell, prevYear, metricLabel }: { cell: Cell; prevYear: number; metricLabel: string }) {
   const cls = heatmapClasses(cell.delta);
   if (cell.value == null) {
     return (
@@ -204,6 +255,7 @@ function HeatCell({ cell, prevYear }: { cell: Cell; prevYear: number }) {
       </td>
     );
   }
+  const prevPeriod = cell.periodLabel.replace(String(prevYear + 1), String(prevYear));
   return (
     <td className={cn(
       "whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono text-xs tabular-nums transition",
@@ -224,13 +276,13 @@ function HeatCell({ cell, prevYear }: { cell: Cell; prevYear: number }) {
           </TooltipTrigger>
           <TooltipContent side="top" align="end" className="min-w-[200px] border-0 bg-stone-950 p-3 text-white shadow-lg">
             <div className="flex justify-between gap-6 text-[11px] text-stone-300">
-              <span>{cell.periodLabel.replace(String(prevYear + 1), String(prevYear))}</span>
+              <span>{metricLabel} {prevPeriod}</span>
               <span className="font-mono text-white tabular-nums">
                 {cell.prevValue ? fmtMoney(cell.prevValue) : "—"}
               </span>
             </div>
             <div className="mt-1 flex justify-between gap-6 text-[11px]">
-              <span className="text-stone-300">{cell.periodLabel}</span>
+              <span className="text-stone-300">{metricLabel} {cell.periodLabel}</span>
               <span className="font-mono font-medium text-white tabular-nums">{fmtMoney(cell.value)}</span>
             </div>
             <div className="mt-2 flex justify-end border-t border-white/10 pt-1.5">
@@ -254,17 +306,15 @@ function HeatCell({ cell, prevYear }: { cell: Cell; prevYear: number }) {
  * Celda de la fila TOTAL GRUPO (fondo bg-stone-950). Muestra:
  *   ▲/▼/— (color según delta) + monto (blanco)
  * con tooltip que detalla {prev | actual | delta vs prevYear}.
- *
- * Colores legibles sobre fondo oscuro: emerald/orange/stone-300 saturados,
- * NO los pasteles que usa heatmapClasses para filas blancas.
  */
 function TotalGroupCell({
-  value, prevValue, periodLabel, prevYear, isAnnual = false, delta: deltaProp,
+  value, prevValue, periodLabel, prevYear, metricLabel, isAnnual = false, delta: deltaProp,
 }: {
   value: number | null;
   prevValue: number;
   periodLabel: string;
   prevYear: number;
+  metricLabel: string;
   isAnnual?: boolean;
   delta?: number | null;
 }) {
@@ -285,6 +335,7 @@ function TotalGroupCell({
     delta == null     ? "text-stone-300"  :
     delta > 0.05      ? "text-emerald-400" :
     delta < -0.05     ? "text-orange-400"  : "text-stone-300";
+  const prevPeriod = periodLabel.replace(String(prevYear + 1), String(prevYear));
 
   return (
     <td className={cn(
@@ -309,13 +360,13 @@ function TotalGroupCell({
           </TooltipTrigger>
           <TooltipContent side="top" align="end" className="min-w-[220px] border-0 bg-white p-3 text-stone-950 shadow-lg">
             <div className="flex justify-between gap-6 text-[11px] text-stone-500">
-              <span>{periodLabel.replace(String(prevYear + 1), String(prevYear))}</span>
+              <span>{metricLabel} {prevPeriod}</span>
               <span className="font-mono text-stone-950 tabular-nums">
                 {prevValue ? fmtMoney(prevValue) : "—"}
               </span>
             </div>
             <div className="mt-1 flex justify-between gap-6 text-[11px]">
-              <span className="text-stone-500">{periodLabel}</span>
+              <span className="text-stone-500">{metricLabel} {periodLabel}</span>
               <span className="font-mono font-medium text-stone-950 tabular-nums">{fmtMoney(value)}</span>
             </div>
             <div className="mt-2 flex justify-end border-t border-stone-200 pt-1.5">

@@ -17,6 +17,11 @@ export type EmpresaMonthlySales = {
   empresa: Empresa;
   ventas2026: MonthlySeries;
   ventas2025: MonthlySeries;
+  /** Utilidad mensual del año actual (toggle Utilidad del heatmap) */
+  utilidad2026: MonthlySeries;
+  /** Utilidad mensual del año anterior */
+  utilidad2025: MonthlySeries;
+  /** Margen YTD real, filtrado por costo > 0 (excluye ajustes contables) */
   margenPct: number;
 };
 
@@ -24,7 +29,10 @@ export type ResumenKpis = {
   ventasNetasYTD: number;
   ventas2025YTD: number;
   utilidadYTD: number;
+  /** Utilidad YTD real del año previo (NO aproximación) */
+  utilidad2025YTD: number;
   margenYTD: number;
+  /** Margen YTD real del año previo, filtrado por costo > 0 */
   margen2025YTD: number;
   multifashionYTD: number;
   metaAnualMultifashion: number;

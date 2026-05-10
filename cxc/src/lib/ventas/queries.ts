@@ -70,7 +70,7 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   const metaAnualMultifashion = Number(metaRes.data ?? 800000) || 800000;
 
   // Build lookup: { [key]: number[12] }
-  const buildSeries = (rows: DashboardSummaryRow[], field: "total_subtotal" | "total_utilidad") => {
+  const buildSeries = (rows: DashboardSummaryRow[], field: "total_subtotal" | "total_utilidad" | "total_costo") => {
     const map: Record<string, MonthlySeries> = {};
     for (const k of ALL_EMPRESA_KEYS) map[k] = Array(12).fill(null);
     for (const r of rows) {
@@ -81,9 +81,13 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     return map;
   };
 
-  const cur26 = buildSeries(cur, "total_subtotal");
-  const cur26Util = buildSeries(cur, "total_utilidad");
-  const prev25 = buildSeries(prev, "total_subtotal");
+  // Series mensuales por empresa para subtotal, utilidad, costo (cur + prev)
+  const cur26      = buildSeries(cur,  "total_subtotal");
+  const cur26Util  = buildSeries(cur,  "total_utilidad");
+  const cur26Costo = buildSeries(cur,  "total_costo");
+  const prev25     = buildSeries(prev, "total_subtotal");
+  const prev25Util = buildSeries(prev, "total_utilidad");
+  const prev25Costo = buildSeries(prev, "total_costo");
 
   // mesActual: último mes con data en el año en curso (cualquier empresa)
   let mesActual = 0;
@@ -93,17 +97,38 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     }
   }
 
-  // Empresas array — orden canónico de ALL_EMPRESA_KEYS
+  // Aprox. fila-FILTER WHERE costo > 0 a nivel empresa-mes:
+  // si una empresa tuvo costo > 0 en el mes m, ese mes contribuye al margen.
+  // Excluye empresa-mes donde sólo hay ajustes contables (notas de débito
+  // sin costo asociado), que distorsionarían el ratio.
+  const sumFiltered = (
+    vals: MonthlySeries,
+    costo: MonthlySeries,
+    upTo: number = 12
+  ): number => {
+    let s = 0;
+    const limit = Math.min(upTo, vals.length);
+    for (let i = 0; i < limit; i++) {
+      const c = costo[i];
+      if (c != null && c > 0) s += vals[i] ?? 0;
+    }
+    return s;
+  };
+
+  // Empresa-level: margen real (filtered) — usado en margenPct expuesto al cliente
   const empresas: EmpresaMonthlySales[] = ALL_EMPRESA_KEYS.map(key => {
-    const ventas = cur26[key];
-    const ventasPrev = prev25[key];
-    const totalCur = ventas.reduce<number>((s, v) => s + (v ?? 0), 0);
-    const totalUtil = cur26Util[key].reduce<number>((s, v) => s + (v ?? 0), 0);
-    const margenPct = totalCur > 0 ? totalUtil / totalCur : 0;
+    const ventas    = cur26[key];
+    const utilidad  = cur26Util[key];
+    const costo     = cur26Costo[key];
+    const filteredV = sumFiltered(ventas, costo);
+    const filteredU = sumFiltered(utilidad, costo);
+    const margenPct = filteredV > 0 ? filteredU / filteredV : 0;
     return {
       empresa: buildEmpresa(key),
-      ventas2026: ventas,
-      ventas2025: ventasPrev,
+      ventas2026:   ventas,
+      ventas2025:   prev25[key],
+      utilidad2026: utilidad,
+      utilidad2025: prev25Util[key],
       margenPct,
     };
   });
@@ -112,23 +137,26 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   const sumSlice = (a: MonthlySeries, n: number) =>
     a.slice(0, n).reduce<number>((s, v) => s + (v ?? 0), 0);
 
-  const ventasNetasYTD = empresas.reduce((s, e) => s + sumYTD(e.ventas2026), 0);
-  const ventas2025YTD = empresas.reduce(
-    (s, e) => s + sumSlice(e.ventas2025, Math.max(mesActual, 1)),
-    0
-  );
-  const utilidadYTD = empresas.reduce(
-    (s, e) => s + sumYTD(e.ventas2026) * e.margenPct,
-    0
-  );
-  const margenYTD = ventasNetasYTD > 0 ? utilidadYTD / ventasNetasYTD : 0;
+  // Slice para comparar mismo período (Ene..mesActual). Año cerrado ⇒ mesActual=12.
+  const upTo = Math.max(mesActual, 1);
 
-  // margen2025YTD: aproximación con la misma fórmula sobre 2025 hasta mesActual
-  const utilidad2025YTD = empresas.reduce((s, e) => {
-    const v = sumSlice(e.ventas2025, Math.max(mesActual, 1));
-    return s + v * e.margenPct;
-  }, 0);
-  const margen2025YTD = ventas2025YTD > 0 ? utilidad2025YTD / ventas2025YTD : 0;
+  // Totales absolutos — sin filtro (utilidad real incluye ajustes)
+  const ventasNetasYTD  = empresas.reduce((s, e) => s + sumYTD(e.ventas2026), 0);
+  const ventas2025YTD   = empresas.reduce((s, e) => s + sumSlice(e.ventas2025, upTo), 0);
+  const utilidadYTD     = empresas.reduce((s, e) => s + sumYTD(e.utilidad2026), 0);
+  const utilidad2025YTD = empresas.reduce((s, e) => s + sumSlice(e.utilidad2025, upTo), 0);
+
+  // Margen del grupo — filtered (excluye empresa-mes con costo=0)
+  let totalFilteredUtilCur = 0, totalFilteredVCur = 0;
+  let totalFilteredUtilPrev = 0, totalFilteredVPrev = 0;
+  for (const k of ALL_EMPRESA_KEYS) {
+    totalFilteredUtilCur  += sumFiltered(cur26Util[k],  cur26Costo[k]);
+    totalFilteredVCur     += sumFiltered(cur26[k],      cur26Costo[k]);
+    totalFilteredUtilPrev += sumFiltered(prev25Util[k], prev25Costo[k], upTo);
+    totalFilteredVPrev    += sumFiltered(prev25[k],     prev25Costo[k], upTo);
+  }
+  const margenYTD     = totalFilteredVCur  > 0 ? totalFilteredUtilCur  / totalFilteredVCur  : 0;
+  const margen2025YTD = totalFilteredVPrev > 0 ? totalFilteredUtilPrev / totalFilteredVPrev : 0;
 
   const multiRow = empresas.find(e => e.empresa.id === "multi");
   const multifashionYTD = multiRow ? sumYTD(multiRow.ventas2026) : 0;
@@ -140,6 +168,7 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
       ventasNetasYTD,
       ventas2025YTD,
       utilidadYTD,
+      utilidad2025YTD,
       margenYTD,
       margen2025YTD,
       multifashionYTD,
