@@ -22,6 +22,16 @@ const TONE_LIGHT: Record<DeltaTone, string> = {
   stone:   "text-stone-500",
 };
 
+// Label legible del sort actual para el subtitle del header.
+const SORT_LABELS: Record<SortKey, string> = {
+  rank:    "rank",
+  nombre:  "nombre",
+  empresa: "empresa",
+  ytd:     "compras YTD",
+  delta:   "delta",
+  ultima:  "última compra",
+};
+
 const EMPRESA_PILLS: { id: string; label: string }[] = [
   { id: "todas",                label: "Todas" },
   { id: "vistana",              label: "Vistana International" },
@@ -150,7 +160,7 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
             />
           </div>
           <p className="ml-auto whitespace-nowrap text-xs text-stone-500">
-            <span className="font-mono text-stone-950">{filtered.length}</span> clientes activos · últimos 12 meses · ordenados por última compra
+            <span className="font-mono text-stone-950">{filtered.length}</span> clientes activos · Compras YTD {new Date().getFullYear()} · ordenados por {SORT_LABELS[sortBy]}
           </p>
         </div>
 
