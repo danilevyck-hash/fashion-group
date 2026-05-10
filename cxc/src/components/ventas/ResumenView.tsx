@@ -12,6 +12,19 @@ type Granularity = "mensual" | "trimestral";
 type ViewMode = "ventas" | "utilidad";
 type Cell = { value: number | null; delta: number | null; prevValue: number; periodLabel: string };
 
+/**
+ * Direction symbol para celdas con valor: solo ▲/▼ cuando delta cruza ±5%.
+ * En zona neutral devuelve null (NO renderizar prefijo) para evitar la
+ * confusión visual del em dash con signo menos en montos negativos.
+ * El em dash sigue usándose como placeholder cuando NO hay valor.
+ */
+function arrow(d: number | null | undefined): "▲" | "▼" | null {
+  if (d == null) return null;
+  if (d > 0.05) return "▲";
+  if (d < -0.05) return "▼";
+  return null;
+}
+
 interface ResumenViewProps {
   data: VentasResumen;
   availableYears: number[];
@@ -217,10 +230,10 @@ export function ResumenView({
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-4 text-[11px] text-stone-500">
         <LegendItem swatch="bg-teal-100" label={`▲ vs ${prevYear} mayor a +5%`} />
-        <LegendItem swatch="bg-white border border-stone-200" label="— entre ±5%" />
+        <LegendItem swatch="bg-white border border-stone-200" label="entre ±5%" />
         <LegendItem swatch="bg-orange-200" label="▼ menor a −5%" />
         {!isClosedYear && (
-          <span className="inline-flex items-center gap-1.5"><span className="text-stone-400">—</span>mes futuro</span>
+          <span className="inline-flex items-center gap-1.5"><span className="text-stone-400">—</span>sin data</span>
         )}
       </div>
     </div>
@@ -269,7 +282,9 @@ function HeatCell({ cell, prevYear, metricLabel }: { cell: Cell; prevYear: numbe
               className="block w-full cursor-help px-2.5 py-2.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
             >
               <span className="inline-flex items-baseline gap-1.5">
-                <span className={cn("text-[10px]", cls.fg)}>{deltaSymbol(cell.delta)}</span>
+                {arrow(cell.delta) && (
+                  <span className={cn("text-[10px]", cls.fg)}>{arrow(cell.delta)}</span>
+                )}
                 <span className="text-stone-950">{fmtMoneyCompact(cell.value)}</span>
               </span>
             </button>
@@ -353,7 +368,9 @@ function TotalGroupCell({
               )}
             >
               <span className="inline-flex items-baseline gap-1.5">
-                <span className={cn("text-[10px]", arrowTone)}>{deltaSymbol(delta)}</span>
+                {arrow(delta) && (
+                  <span className={cn("text-[10px]", arrowTone)}>{arrow(delta)}</span>
+                )}
                 <span className="text-white">{isAnnual ? fmtMoney(value) : fmtMoneyCompact(value)}</span>
               </span>
             </button>
