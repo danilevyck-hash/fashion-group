@@ -197,6 +197,8 @@ interface ClientesEmpresaRow {
   whatsapp: string | null;
   /** Sólo presente en clientes_agregado_12m_vw (modo Todas) */
   empresas_count?: number | string | null;
+  /** jsonb_agg de { empresa, monto } ordenado DESC. Modo Todas únicamente. */
+  empresas_breakdown?: Array<{ empresa: string; monto: number | string }> | null;
 }
 
 /**
@@ -253,6 +255,15 @@ export async function fetchClientes({
 
   const rows = ((data as ClientesEmpresaRow[] | null) ?? []).map((r, i) => {
     const ek = r.empresa ?? "";
+    const empresasCount = isTodas ? Math.max(1, toNum(r.empresas_count)) : 1;
+    const empresasBreakdown =
+      isTodas && empresasCount > 1 && Array.isArray(r.empresas_breakdown)
+        ? r.empresas_breakdown.map(b => ({
+            empresaKey: b.empresa,
+            empresaNombre: EMPRESA_KEY_TO_NAME[b.empresa] ?? b.empresa,
+            monto: toNum(b.monto),
+          }))
+        : undefined;
     return {
       rank: i + 1,
       id: r.cliente_codigo ?? "—",
@@ -264,7 +275,8 @@ export async function fetchClientes({
       ultima: r.ultima_compra ? fmtDate(r.ultima_compra) : "",
       ultimaIso: r.ultima_compra ?? "",
       wa: r.whatsapp ? normalizeWa(r.whatsapp) : "",
-      empresas_count: isTodas ? Math.max(1, toNum(r.empresas_count)) : 1,
+      empresas_count: empresasCount,
+      empresas_breakdown: empresasBreakdown,
     };
   });
 

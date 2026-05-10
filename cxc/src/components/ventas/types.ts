@@ -67,10 +67,16 @@ export type Cliente = {
   /**
    * Cantidad de empresas a las que el cliente compró en últimos 12 meses.
    * 1 = single-empresa (sin badge).
-   * >1 = multiempresa, render "+N" badge en modo "Todas".
-   * Siempre 1 cuando filter es una empresa específica.
+   * >1 = multiempresa, en modo "Todas" la celda muestra "N empresas" +
+   * hover con el desglose. Siempre 1 cuando filter es empresa específica.
    */
   empresas_count: number;
+  /**
+   * Desglose por empresa para el hover de la columna en modo "Todas".
+   * Ordenado por monto DESC. Sólo populated cuando empresas_count > 1
+   * (en modo empresa específica queda undefined).
+   */
+  empresas_breakdown?: { empresaKey: string; empresaNombre: string; monto: number }[];
   /** WhatsApp E.164 number, e.g. "+50760001111" */
   wa: string;
 };

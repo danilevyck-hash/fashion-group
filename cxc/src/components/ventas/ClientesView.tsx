@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Search } from "lucide-react";
 import type { Clientes, Cliente } from "./types";
 import { fmtMoney } from "@/lib/ventas/format";
@@ -239,7 +240,7 @@ function ClienteRow({
   onFirstHover: () => void;
 }) {
   const fmt = formatDeltaRatio(c.delta);
-  const extraEmpresas = c.empresas_count - 1;
+  const isMultiEmpresa = c.empresas_count > 1 && (c.empresas_breakdown?.length ?? 0) > 1;
 
   return (
     <tr className="cursor-pointer transition hover:bg-stone-50">
@@ -277,14 +278,40 @@ function ClienteRow({
         <div className="font-mono text-[11px] leading-tight text-stone-500">{c.id}</div>
       </td>
       <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-xs text-stone-700">
-        {c.empresa}
-        {extraEmpresas > 0 && (
-          <span
-            className="ml-2 rounded-md bg-stone-100 px-1.5 py-0.5 text-xs text-stone-600"
-            title={`Compra a ${c.empresas_count} empresas en últimos 12 meses`}
-          >
-            +{extraEmpresas}
-          </span>
+        {isMultiEmpresa ? (
+          <TooltipProvider delayDuration={120}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="cursor-help underline decoration-dotted decoration-stone-300 underline-offset-4 hover:text-stone-950"
+                >
+                  {c.empresas_count} empresas
+                </button>
+              </TooltipTrigger>
+              <TooltipContent
+                side="bottom"
+                align="start"
+                sideOffset={4}
+                collisionPadding={8}
+                className="min-w-[240px] border-0 bg-stone-950 p-3 text-white shadow-lg"
+              >
+                <div className="text-[10px] font-medium uppercase tracking-wider text-stone-400">
+                  Desglose por empresa
+                </div>
+                <div className="mt-2 space-y-1">
+                  {(c.empresas_breakdown ?? []).map(b => (
+                    <div key={b.empresaKey} className="flex justify-between gap-4 text-[11px]">
+                      <span className="text-stone-300">{b.empresaNombre}</span>
+                      <span className="font-mono text-white tabular-nums">{fmtMoney(b.monto)}</span>
+                    </div>
+                  ))}
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          c.empresa
         )}
       </td>
       <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">{fmtMoney(c.ytd)}</td>
