@@ -21,8 +21,10 @@ export type EmpresaMonthlySales = {
   utilidad2026: MonthlySeries;
   /** Utilidad mensual del año anterior */
   utilidad2025: MonthlySeries;
-  /** Margen YTD real, filtrado por costo > 0 (excluye ajustes contables) */
+  /** Margen YTD real del año actual, filtrado por costo > 0 (excluye ajustes contables) */
   margenPct: number;
+  /** Margen YTD real del año previo, filtrado por costo > 0 (mismo período Ene..mesActual) */
+  margenPctPrev: number;
 };
 
 export type ResumenKpis = {

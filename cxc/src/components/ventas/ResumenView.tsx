@@ -54,7 +54,11 @@ export function ResumenView({
   const rows = data.empresas.map(e => {
     const cur  = isUtil ? e.utilidad2026 : e.ventas2026;
     const prev = isUtil ? e.utilidad2025 : e.ventas2025;
-    return buildRow(cur, prev, granularity, e.empresa, selectedYear);
+    return {
+      ...buildRow(cur, prev, granularity, e.empresa, selectedYear),
+      margenPct: e.margenPct,
+      margenPctPrev: e.margenPctPrev,
+    };
   });
   const totalCols = cols.map((_, ci) => {
     let v = 0, hasAny = false;
@@ -195,9 +199,15 @@ export function ResumenView({
                   {r.cells.map((c, ci) => (
                     <HeatCell key={ci} cell={c} prevYear={prevYear} metricLabel={metricLabel} />
                   ))}
-                  <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">
-                    {fmtMoney(r.total)}
-                  </td>
+                  <EmpresaTotalCell
+                    total={r.total}
+                    showMargenTooltip={isUtil}
+                    empresaNombre={r.empresa.nombre}
+                    margenPct={r.margenPct}
+                    margenPctPrev={r.margenPctPrev}
+                    selectedYear={selectedYear}
+                    prevYear={prevYear}
+                  />
                 </tr>
               ))}
               <tr className="bg-stone-950 text-white">
@@ -308,6 +318,68 @@ function HeatCell({ cell, prevYear, metricLabel }: { cell: Cell; prevYear: numbe
                 cell.delta < -0.05 ? "text-orange-300" : "text-stone-300"
               )}>
                 {deltaSymbol(cell.delta)} {fmtPct(cell.delta)} vs {prevYear}
+              </span>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </td>
+  );
+}
+
+/**
+ * TOTAL anual por empresa (última columna). En modo Utilidad envuelve el
+ * monto en Tooltip con margen real del año actual vs año previo. En modo
+ * Ventas se renderiza como antes (sin tooltip).
+ */
+function EmpresaTotalCell({
+  total, showMargenTooltip, empresaNombre, margenPct, margenPctPrev, selectedYear, prevYear,
+}: {
+  total: number;
+  showMargenTooltip: boolean;
+  empresaNombre: string;
+  margenPct: number;
+  margenPctPrev: number;
+  selectedYear: number;
+  prevYear: number;
+}) {
+  if (!showMargenTooltip) {
+    return (
+      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">
+        {fmtMoney(total)}
+      </td>
+    );
+  }
+  const deltaPts = (margenPct - margenPctPrev) * 100;
+  const sign = deltaPts >= 0 ? "▲ +" : "▼ ";
+  const tone =
+    Math.abs(deltaPts) < 0.1 ? "text-stone-500" :
+    deltaPts > 0              ? "text-emerald-700" : "text-orange-700";
+  return (
+    <td className="whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">
+      <TooltipProvider delayDuration={120}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="block w-full cursor-help px-3.5 py-2.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
+            >
+              {fmtMoney(total)}
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" align="end" className="min-w-[220px] border-0 bg-stone-950 p-3 text-white shadow-lg">
+            <div className="text-[11px] font-medium text-white">{empresaNombre}</div>
+            <div className="mt-1.5 flex justify-between gap-6 text-[11px] text-stone-300">
+              <span>{selectedYear} actual</span>
+              <span className="font-mono text-white tabular-nums">{(margenPct * 100).toFixed(1)}%</span>
+            </div>
+            <div className="flex justify-between gap-6 text-[11px] text-stone-300">
+              <span>{prevYear}</span>
+              <span className="font-mono text-white tabular-nums">{(margenPctPrev * 100).toFixed(1)}%</span>
+            </div>
+            <div className="mt-2 flex justify-end border-t border-white/10 pt-1.5">
+              <span className={cn("font-mono text-[11px] font-medium", tone)}>
+                {sign}{Math.abs(deltaPts).toFixed(1)} pts vs {prevYear}
               </span>
             </div>
           </TooltipContent>

@@ -115,30 +115,37 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     return s;
   };
 
-  // Empresa-level: margen real (filtered) — usado en margenPct expuesto al cliente
-  const empresas: EmpresaMonthlySales[] = ALL_EMPRESA_KEYS.map(key => {
-    const ventas    = cur26[key];
-    const utilidad  = cur26Util[key];
-    const costo     = cur26Costo[key];
-    const filteredV = sumFiltered(ventas, costo);
-    const filteredU = sumFiltered(utilidad, costo);
-    const margenPct = filteredV > 0 ? filteredU / filteredV : 0;
-    return {
-      empresa: buildEmpresa(key),
-      ventas2026:   ventas,
-      ventas2025:   prev25[key],
-      utilidad2026: utilidad,
-      utilidad2025: prev25Util[key],
-      margenPct,
-    };
-  });
-
   const sumYTD = (a: MonthlySeries) => a.reduce<number>((s, v) => s + (v ?? 0), 0);
   const sumSlice = (a: MonthlySeries, n: number) =>
     a.slice(0, n).reduce<number>((s, v) => s + (v ?? 0), 0);
 
   // Slice para comparar mismo período (Ene..mesActual). Año cerrado ⇒ mesActual=12.
   const upTo = Math.max(mesActual, 1);
+
+  // Empresa-level: margen real (filtered) — current year y prev year
+  const empresas: EmpresaMonthlySales[] = ALL_EMPRESA_KEYS.map(key => {
+    const ventas       = cur26[key];
+    const utilidad     = cur26Util[key];
+    const costo        = cur26Costo[key];
+    const ventasPrev   = prev25[key];
+    const utilidadPrev = prev25Util[key];
+    const costoPrev    = prev25Costo[key];
+    const filteredVCur  = sumFiltered(ventas,     costo);
+    const filteredUCur  = sumFiltered(utilidad,   costo);
+    const filteredVPrev = sumFiltered(ventasPrev, costoPrev, upTo);
+    const filteredUPrev = sumFiltered(utilidadPrev, costoPrev, upTo);
+    const margenPct     = filteredVCur  > 0 ? filteredUCur  / filteredVCur  : 0;
+    const margenPctPrev = filteredVPrev > 0 ? filteredUPrev / filteredVPrev : 0;
+    return {
+      empresa: buildEmpresa(key),
+      ventas2026:   ventas,
+      ventas2025:   ventasPrev,
+      utilidad2026: utilidad,
+      utilidad2025: utilidadPrev,
+      margenPct,
+      margenPctPrev,
+    };
+  });
 
   // Totales absolutos — sin filtro (utilidad real incluye ajustes)
   const ventasNetasYTD  = empresas.reduce((s, e) => s + sumYTD(e.ventas2026), 0);
