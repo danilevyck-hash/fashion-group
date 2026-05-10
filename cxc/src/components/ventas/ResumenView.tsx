@@ -305,7 +305,9 @@ function HeatCell({ cell, prevYear, metricLabel }: { cell: Cell; prevYear: numbe
                 cell.delta > 0.05  ? "text-teal-300" :
                 cell.delta < -0.05 ? "text-orange-300" : "text-stone-300"
               )}>
-                {deltaSymbol(cell.delta)} {fmtPct(cell.delta)} vs {prevYear}
+                {cell.delta == null
+                  ? "sin comparativo"
+                  : `${deltaSymbol(cell.delta)} ${fmtPct(cell.delta)} vs ${prevYear}`}
               </span>
             </div>
           </TooltipContent>
@@ -453,7 +455,9 @@ function TotalGroupCell({
                 delta > 0.05  ? "text-emerald-700" :
                 delta < -0.05 ? "text-orange-700"  : "text-stone-500"
               )}>
-                {deltaSymbol(delta)} {fmtPct(delta)} vs {prevYear}
+                {delta == null
+                  ? "sin comparativo"
+                  : `${deltaSymbol(delta)} ${fmtPct(delta)} vs ${prevYear}`}
               </span>
             </div>
           </TooltipContent>
