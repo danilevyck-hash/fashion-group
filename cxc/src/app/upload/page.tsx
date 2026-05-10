@@ -2,24 +2,59 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import { CloudUpload, AlertCircle, Download } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
 import { supabase } from "@/lib/supabase";
 import { ALL_COMPANIES } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { logActivityClient } from "@/lib/logActivityClient";
+import {
+  ALL_EMPRESA_KEYS,
+  B2B_EMPRESA_KEYS,
+  EMPRESA_KEY_TO_NAME,
+} from "@/lib/empresa-mapping";
 
-// ── Empresas for the upload grid ──────────────────────────────────────────────
+// ── Empresas — single source of truth en lib/empresa-mapping.ts ──────────────
+// Ventas usa las 8; CXC sólo las 6 B2B.
 
-const UPLOAD_EMPRESAS = [
-  { key: "vistana", name: "Vistana International", brand: "Calvin Klein" },
-  { key: "fashion_wear", name: "Fashion Wear", brand: "Tommy Hilfiger Apparel" },
-  { key: "fashion_shoes", name: "Fashion Shoes", brand: "Tommy Hilfiger Shoes" },
-  { key: "active_shoes", name: "Active Shoes", brand: "Reebok Shoes" },
-  { key: "active_wear", name: "Active Wear", brand: "Reebok Apparel" },
-  { key: "joystep", name: "Joystep", brand: "Joystep" },
-  { key: "confecciones_boston", name: "Confecciones Boston", brand: "Boston" },
-  { key: "american_classic", name: "Multifashion", brand: "American Classics" },
-] as const;
+interface UploadEmpresa { key: string; name: string; brand: string; }
+
+function buildEmpresas(keys: readonly string[]): UploadEmpresa[] {
+  return keys.map((k) => ({
+    key: k,
+    name: EMPRESA_KEY_TO_NAME[k] ?? k,
+    brand: ALL_COMPANIES.find((c) => c.key === k)?.brand ?? "",
+  }));
+}
+
+const VENTAS_EMPRESAS: UploadEmpresa[] = buildEmpresas(ALL_EMPRESA_KEYS);
+const CXC_EMPRESAS:    UploadEmpresa[] = buildEmpresas(B2B_EMPRESA_KEYS);
+
+// ── Estado de cada card por upload ────────────────────────────────────────────
+// Umbrales: ≤7 días al día / 8-10 vence pronto / >10 vencido. Sin uploads = none.
+
+type CardState = "fresh" | "warn" | "overdue" | "none";
+
+interface CardStatus {
+  state: CardState;
+  days: number | null;
+  label: string;
+}
+
+function computeStatus(iso: string | null | undefined): CardStatus {
+  if (!iso) return { state: "none", days: null, label: "Sin uploads" };
+  const t = new Date(iso).getTime();
+  if (isNaN(t)) return { state: "none", days: null, label: "Sin uploads" };
+  const days = Math.max(0, Math.floor((Date.now() - t) / 86_400_000));
+  if (days === 0) return { state: "fresh", days, label: "Hoy" };
+  if (days === 1) return { state: "fresh", days, label: "Hace 1 día" };
+  if (days <= 7)  return { state: "fresh", days, label: `Hace ${days} días` };
+  if (days <= 10) {
+    const left = 10 - days;
+    return { state: "warn", days, label: left <= 0 ? "Vence hoy" : `Vence en ${left} día${left === 1 ? "" : "s"}` };
+  }
+  return { state: "overdue", days, label: `Hace ${days} días` };
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -62,6 +97,124 @@ function canonicalTipo(raw: string): string | null {
   }
 }
 
+// ── Card sub-components ──────────────────────────────────────────────────────
+
+function StatusBanner({ statusList }: { statusList: CardStatus[] }) {
+  const total = statusList.length;
+  const atDia = statusList.filter((s) => s.state === "fresh").length;
+  const vencidas = statusList.filter((s) => s.state === "overdue").length;
+  const vencenPronto = statusList.filter((s) => s.state === "warn").length;
+
+  return (
+    <div className="bg-white border border-stone-200 rounded-xl px-4 py-3 mb-3 flex items-center justify-between">
+      <div>
+        <div className="text-[11px] uppercase tracking-[0.05em] text-stone-600">Empresas al día</div>
+        <div className="mt-1 flex items-baseline">
+          <span
+            className="text-[22px] font-medium tabular-nums leading-none"
+            style={{ fontFamily: "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" }}
+          >
+            {atDia}
+          </span>
+          <span className="text-sm text-stone-600 ml-1 tabular-nums">/{total}</span>
+        </div>
+      </div>
+      <div className="text-right space-y-1">
+        {vencidas > 0 && (
+          <div className="flex items-center gap-1.5 justify-end">
+            <span className="rounded-full" style={{ width: 7, height: 7, background: "#B91C1C" }} />
+            <span className="text-xs font-medium" style={{ color: "#B91C1C" }}>
+              {vencidas} {vencidas === 1 ? "vencida" : "vencidas"}
+            </span>
+          </div>
+        )}
+        {vencenPronto > 0 && (
+          <div className="flex items-center gap-1.5 justify-end">
+            <span className="rounded-full" style={{ width: 7, height: 7, background: "#F59E0B" }} />
+            <span className="text-xs font-medium" style={{ color: "#B45309" }}>
+              {vencenPronto} {vencenPronto === 1 ? "vence pronto" : "vencen pronto"}
+            </span>
+          </div>
+        )}
+        <div className="text-[11px] text-stone-600">Actualizar cada 7-10 días</div>
+      </div>
+    </div>
+  );
+}
+
+interface EmpresaCardProps {
+  name: string;
+  status: CardStatus;
+  isDragOver: boolean;
+  isUploading: boolean;
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: () => void;
+  onDrop: (e: React.DragEvent) => void;
+  onClick: () => void;
+  children?: React.ReactNode;
+}
+
+function EmpresaCard({ name, status, isDragOver, isUploading, onDragOver, onDragLeave, onDrop, onClick, children }: EmpresaCardProps) {
+  const dotColor =
+    status.state === "fresh"   ? "#16A34A" :
+    status.state === "warn"    ? "#F59E0B" :
+    status.state === "overdue" ? "#DC2626" :
+                                 "#A8A29E";  // stone-400
+  const labelColor =
+    status.state === "fresh"   ? "#15803D" : // green-700
+    status.state === "warn"    ? "#B45309" :
+    status.state === "overdue" ? "#B91C1C" :
+                                 "#78716C";  // stone-500
+
+  // Layout base
+  let containerStyle: React.CSSProperties = {
+    background: "white",
+    borderRadius: 8,
+    border: "1px dashed #D6D3D1",
+    minHeight: 110,
+    padding: "16px 12px",
+  };
+  let icon = <CloudUpload size={24} className="text-stone-400" />;
+
+  if (status.state === "overdue" && !isDragOver) {
+    containerStyle = { ...containerStyle, background: "#FFFBEB", border: "1px dashed #F59E0B" };
+    icon = <AlertCircle size={24} style={{ color: "#D97706" }} />;
+  }
+  if (isDragOver) {
+    containerStyle = { ...containerStyle, background: "#F0FDFA", border: "2px dashed #0F766E" };
+    icon = <Download size={24} style={{ color: "#0F766E" }} />;
+  }
+
+  return (
+    <div
+      style={containerStyle}
+      className={`relative cursor-pointer transition flex flex-col items-center justify-center gap-2 text-center ${isUploading ? "opacity-60 pointer-events-none" : ""}`}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+      onClick={onClick}
+    >
+      {isUploading && <span className="text-[9px] bg-black text-white px-2 py-0.5 rounded-full font-medium absolute top-2 right-2">Subiendo...</span>}
+      {icon}
+      {isDragOver ? (
+        <>
+          <div className="text-[13px] font-medium" style={{ color: "#0F766E" }}>Soltá aquí</div>
+          <div className="text-[11px]" style={{ color: "#0F766E" }}>{name}</div>
+        </>
+      ) : (
+        <>
+          <div className="text-[13px] font-medium leading-tight">{name}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="rounded-full inline-block" style={{ width: 6, height: 6, background: dotColor }} />
+            <span className="text-[11px] font-medium" style={{ color: labelColor }}>{status.label}</span>
+          </div>
+        </>
+      )}
+      {children}
+    </div>
+  );
+}
+
 // ── Inner component ─────────────────────────────────────────────────────────
 
 function UploadPageInner() {
@@ -93,7 +246,9 @@ function UploadPageInner() {
 
   const cxcFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const ventasFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
-  const cxcCompanies = ALL_COMPANIES;
+  // CXC tab muestra las 6 B2B (Boston y American Classic son retail sin
+  // detallessaldos). Ventas muestra las 8.
+  const cxcCompanies = CXC_EMPRESAS;
 
   useEffect(() => { if (authChecked) { loadCxcUploads(); loadVentasStatus(); } }, [authChecked]);
 
@@ -352,6 +507,12 @@ function UploadPageInner() {
     if (!ventasPreview) return;
     const { empresaKey, empresaName, file } = ventasPreview;
     setVentasPreview(null);
+    await uploadVentasFile(empresaKey, empresaName, file);
+  }
+
+  // Direct path para el flujo card-based (Sprint 1 Fase 4): drop/click en
+  // una card de empresa salta el preview y manda el archivo directo al server.
+  async function uploadVentasFile(empresaKey: string, empresaName: string, file: File) {
     setVentasUploading(empresaName);
     setMessage(null);
     try {
@@ -370,7 +531,6 @@ function UploadPageInner() {
         if (filtered.invalidDate > 0) breakdown.push(`${filtered.invalidDate} fecha inválida`);
         mensaje += `, ${totalDescartadas} descartadas (${breakdown.join(", ")})`;
       }
-      // Sprint 1 Fase 3: agregar info de matching contra clientes_master
       if (typeof json.matched === "number" && typeof json.unmatched === "number") {
         mensaje += ` · ${json.matched} con código matcheado, ${json.unmatched} sin match (${json.pct_unmatched ?? 0}%)`;
       }
@@ -383,44 +543,11 @@ function UploadPageInner() {
     }
   }
 
-  // ── Status indicator ──────────────────────────────────────────────────────
+  // El status indicator viejo (badges de "Al dia / Pendiente / Atrasado" con
+  // formato verbose) se reemplazó por EmpresaCard + StatusBanner de Sprint 1
+  // Fase 4 (UX card-based con dot+texto y banner global). computeStatus() en
+  // top-level del archivo es la fuente única de los estados.
 
-  // Formatea timestamp ISO a "DD-mmm-YYYY" en TZ Panama (sin shifts UTC)
-  function fmtFechaCorta(iso: string | null | undefined): string {
-    if (!iso) return "Sin datos";
-    const d = new Date(iso);
-    if (isNaN(d.getTime())) return "Sin datos";
-    const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-    // en-CA con TZ Panama da "YYYY-MM-DD"
-    const ymd = new Intl.DateTimeFormat("en-CA", {
-      year: "numeric", month: "2-digit", day: "2-digit", timeZone: "America/Panama",
-    }).format(d);
-    const [yyyy, mm, dd] = ymd.split("-");
-    const idx = parseInt(mm, 10) - 1;
-    if (!yyyy || !dd || idx < 0 || idx > 11) return "Sin datos";
-    return `${dd}-${MESES[idx]}-${yyyy}`;
-  }
-
-  function getStatusIndicator(key: string, type: "cxc" | "ventas") {
-    if (type === "cxc") {
-      const up = cxcUploads[key];
-      if (!up) return <div className="flex items-center gap-1.5 text-xs text-gray-400"><span className="opacity-50">&#9898;</span> Sin datos</div>;
-      const days = (Date.now() - new Date(up.uploaded_at).getTime()) / 86400000;
-      const detail = fmtFechaCorta(up.uploaded_at);
-      if (days > 14) return <div className="flex items-center gap-1.5 text-xs text-red-600"><span>&#128308;</span> Atrasado &middot; {detail}</div>;
-      if (days > 7) return <div className="flex items-center gap-1.5 text-xs text-amber-600"><span>&#9888;&#65039;</span> Pendiente &middot; {detail}</div>;
-      return <div className="flex items-center gap-1.5 text-xs text-green-600"><span>&#9989;</span> Al dia &middot; {detail}</div>;
-    } else {
-      const up = ventasUploads[key] ?? ventasUploads[UPLOAD_EMPRESAS.find(e => e.key === key)?.name ?? ""];
-      if (!up) return <div className="flex items-center gap-1.5 text-xs text-gray-400"><span className="opacity-50">&#9898;</span> Sin datos</div>;
-      const days = (Date.now() - new Date(up.date).getTime()) / 86400000;
-      const thresholds = { warn: 30, alert: 60 };
-      const detail = `${up.label}${up.count ? ` · ${up.count.toLocaleString()} reg.` : ""}`;
-      if (days > thresholds.alert) return <div className="flex items-center gap-1.5 text-xs text-red-600"><span>&#128308;</span> Atrasado &middot; {detail}</div>;
-      if (days > thresholds.warn) return <div className="flex items-center gap-1.5 text-xs text-amber-600"><span>&#9888;&#65039;</span> Pendiente &middot; {detail}</div>;
-      return <div className="flex items-center gap-1.5 text-xs text-green-600"><span>&#9989;</span> Al dia &middot; {detail}</div>;
-    }
-  }
 
   // ── Preview Modal (shared) ────────────────────────────────────────────────
 
@@ -556,7 +683,7 @@ function UploadPageInner() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div>
+    <div className="min-h-screen" style={{ background: "#FAFAF9" }}>
       <AppHeader module="Carga de Archivos" />
       <div className="max-w-6xl mx-auto px-6 py-6">
 
@@ -570,137 +697,124 @@ function UploadPageInner() {
           <button onClick={() => setActiveTab("ventas")} className={`flex-1 py-2.5 sm:py-2 px-4 text-sm rounded-md transition ${activeTab === "ventas" ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}>Ventas</button>
         </div>
 
-        {/* Step indicator */}
-        <div className="flex items-center gap-0 mb-6">
-          {[
-            { num: 1, label: "Selecciona el archivo", active: !cxcPreview && !ventasPreview && !message, done: !!cxcPreview || !!ventasPreview || !!message },
-            { num: 2, label: "Revisa los datos", active: !!cxcPreview || !!ventasPreview, done: !!message },
-            { num: 3, label: "Confirmar carga", active: false, done: message?.type === "ok" },
-          ].map((step, i) => (
-            <div key={step.num} className="flex items-center">
-              {i > 0 && <div className={`w-8 sm:w-12 h-px ${step.done || step.active ? "bg-black" : "bg-gray-200"} mx-1`} />}
-              <div className="flex items-center gap-2">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0 ${step.done ? "bg-black text-white" : step.active ? "bg-black text-white" : "bg-gray-100 text-gray-400"}`}>
-                  {step.done ? <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg> : step.num}
-                </div>
-                <span className={`text-xs whitespace-nowrap ${step.done || step.active ? "text-black font-medium" : "text-gray-400"}`}>{step.label}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-
         {message && (
-          <div className={`mb-6 px-4 py-3 rounded-lg text-sm ${message.type === "ok" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
+          <div className={`mb-4 px-4 py-3 rounded-lg text-sm ${message.type === "ok" ? "bg-green-50 text-green-800 border border-green-200" : "bg-red-50 text-red-800 border border-red-200"}`}>
             {message.type === "ok" && <span className="font-medium block mb-0.5">Carga completada</span>}
             {message.text}
           </div>
         )}
 
         {/* ── CXC Tab ──────────────────────────────────────────────────────── */}
-        {activeTab === "cxc" && (
-          <>
-            <details className="mb-6 bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
-              <summary className="px-4 py-3 text-xs text-blue-700 cursor-pointer hover:bg-blue-100 transition flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                <span className="font-medium">Como sacar el reporte en Switch</span>
-              </summary>
-              <div className="px-4 pb-3 text-xs text-blue-600 leading-relaxed">
-                <ol className="list-decimal list-inside space-y-1 mt-1">
-                  <li><strong>Reporte</strong> &rarr; Estado de cuenta cliente</li>
-                  <li><strong>Generar</strong> &rarr; Antiguedad de deuda</li>
-                  <li><strong>Descargar</strong> el archivo CSV</li>
-                  <li>Seleccionar la empresa correspondiente abajo y subir el archivo</li>
-                </ol>
-              </div>
-            </details>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-              {cxcCompanies.map((co) => (
-                <div key={co.key}
-                  className={`border rounded-lg p-4 transition cursor-pointer relative ${dragOver === co.key ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"} ${uploading === co.key ? "opacity-60 pointer-events-none" : ""}`}
-                  onDragOver={(e) => { e.preventDefault(); setDragOver(co.key); }}
-                  onDragLeave={() => setDragOver(null)}
-                  onDrop={async (e) => { e.preventDefault(); setDragOver(null); const f = e.dataTransfer.files[0]; if (f) openCxcPreview(co.key, f); }}
-                  onClick={() => cxcFileRefs.current[co.key]?.click()}>
-                  {uploading === co.key && <span className="text-[9px] bg-black text-white px-2 py-0.5 rounded-full font-medium absolute top-3 right-3">{uploadProgress || "Subiendo..."}</span>}
-                  <div className="text-sm font-medium mb-0.5">{co.name}</div>
-                  <div className="text-xs text-gray-400 mb-3">{co.brand}</div>
-                  {getStatusIndicator(co.key, "cxc")}
-                  {cxcUploads[co.key] && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); loadCxcSummary(co.key); }}
-                      className="text-[10px] text-blue-600 hover:text-blue-800 transition mt-2 block"
-                    >
-                      {cxcSummaryLoading === co.key ? "Cargando..." : cxcSummary?.key === co.key ? "Ocultar resumen" : "Ver resumen"}
-                    </button>
-                  )}
-                  {cxcSummary?.key === co.key && (
-                    <div className="mt-2 bg-gray-50 rounded-lg p-3 text-xs" onClick={(e) => e.stopPropagation()}>
-                      <div className="font-medium text-gray-700 mb-2">Top 5 clientes</div>
-                      {cxcSummary.top5.map((r, i) => (
-                        <div key={i} className="flex justify-between py-0.5 text-gray-600">
-                          <span className="truncate mr-2">{r.nombre}</span>
-                          <span className="tabular-nums font-medium flex-shrink-0">${r.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                        </div>
-                      ))}
-                      <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between font-medium text-gray-800">
-                        <span>Total cartera</span>
-                        <span className="tabular-nums">${cxcSummary.totalCartera.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                      </div>
-                    </div>
-                  )}
-                  <div className="text-[10px] text-gray-300 mt-3"><span className="sm:hidden">Toca para seleccionar</span><span className="hidden sm:inline">Arrastra el CSV aqui o haz click</span></div>
-                  <input ref={(el) => { cxcFileRefs.current[co.key] = el; }} type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden"
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={async (e) => { const f = e.target.files?.[0]; if (f) openCxcPreview(co.key, f); e.target.value = ""; }} />
+        {activeTab === "cxc" && (() => {
+          const empresas = cxcCompanies;
+          const statuses: Record<string, CardStatus> = {};
+          for (const e of empresas) {
+            statuses[e.key] = computeStatus(cxcUploads[e.key]?.uploaded_at);
+          }
+          const statusList = Object.values(statuses);
+          return (
+            <>
+              <details className="mb-4 bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
+                <summary className="px-4 py-3 text-xs text-blue-700 cursor-pointer hover:bg-blue-100 transition flex items-center gap-2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  <span className="font-medium">Cómo sacar el reporte en Switch</span>
+                </summary>
+                <div className="px-4 pb-3 text-xs text-blue-600 leading-relaxed">
+                  <ol className="list-decimal list-inside space-y-1 mt-1">
+                    <li><strong>Reporte</strong> &rarr; Estado de cuenta cliente</li>
+                    <li><strong>Generar</strong> &rarr; Detalle de saldos</li>
+                    <li><strong>Descargar Todos</strong> — Switch baja un <code>detallessaldos</code> por cada empresa B2B (6 archivos en total)</li>
+                    <li>Arrastrá cada CSV sobre la empresa correspondiente abajo</li>
+                  </ol>
                 </div>
-              ))}
-            </div>
-          </>
-        )}
+              </details>
+
+              <StatusBanner statusList={statusList} />
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+                {empresas.map((co) => (
+                  <EmpresaCard
+                    key={co.key}
+                    name={co.name}
+                    status={statuses[co.key]}
+                    isDragOver={dragOver === co.key}
+                    isUploading={uploading === co.key}
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(co.key); }}
+                    onDragLeave={() => setDragOver(null)}
+                    onDrop={async (e) => { e.preventDefault(); setDragOver(null); const f = e.dataTransfer.files[0]; if (f) await openCxcPreview(co.key, f); }}
+                    onClick={() => cxcFileRefs.current[co.key]?.click()}
+                  >
+                    <input ref={(el) => { cxcFileRefs.current[co.key] = el; }} type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden"
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={async (e) => { const f = e.target.files?.[0]; if (f) await openCxcPreview(co.key, f); e.target.value = ""; }} />
+                  </EmpresaCard>
+                ))}
+              </div>
+
+              <p className="text-[11px] text-stone-600 text-center mt-4">
+                Arrastrá el archivo CSV sobre la empresa correspondiente, o hacé click para seleccionar.
+              </p>
+            </>
+          );
+        })()}
 
         {/* ── Ventas Tab ───────────────────────────────────────────────────── */}
-        {activeTab === "ventas" && (
-          <>
-            <details className="mb-6 bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
-              <summary className="px-4 py-3 text-xs text-blue-700 cursor-pointer hover:bg-blue-100 transition flex items-center gap-2">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                <span className="font-medium">Como sacar el reporte en Switch</span>
-              </summary>
-              <div className="px-4 pb-3 text-xs text-blue-600 leading-relaxed">
-                <ol className="list-decimal list-inside space-y-1 mt-1">
-                  <li><strong>Reporte</strong> &rarr; Listado de comprobantes</li>
-                  <li><strong>Filtrar</strong> por fecha (mes completo)</li>
-                  <li>Usa el boton <strong>Descargar</strong> (NO <strong>Descargar Detalle</strong>) para bajar el archivo CSV o Excel</li>
-                  <li>Arrastra o selecciona la empresa correspondiente abajo</li>
-                </ol>
-                <div className="mt-3 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-amber-800">
-                  <p className="font-semibold mb-0.5">Importante</p>
-                  <p>Asegurate de descargar con el boton <strong>&ldquo;Descargar&rdquo;</strong> (NO <strong>&ldquo;Descargar Detalle&rdquo;</strong>) desde Switch Soft. El detalle por linea de producto no es compatible con este flujo.</p>
+        {activeTab === "ventas" && (() => {
+          const empresas = VENTAS_EMPRESAS;
+          const statuses: Record<string, CardStatus> = {};
+          for (const e of empresas) {
+            statuses[e.key] = computeStatus(ventasUploads[e.key]?.date);
+          }
+          const statusList = Object.values(statuses);
+          return (
+            <>
+              <details className="mb-4 bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
+                <summary className="px-4 py-3 text-xs text-blue-700 cursor-pointer hover:bg-blue-100 transition flex items-center gap-2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  <span className="font-medium">Cómo sacar el reporte en Switch</span>
+                </summary>
+                <div className="px-4 pb-3 text-xs text-blue-600 leading-relaxed">
+                  <ol className="list-decimal list-inside space-y-1 mt-1">
+                    <li><strong>Reporte</strong> &rarr; Listado de comprobantes</li>
+                    <li><strong>Filtrar</strong> por fecha (rango deseado)</li>
+                    <li><strong>Descargar Todos</strong> — Switch baja un <code>listacomprobantes</code> por cada empresa (8 archivos en total, incluye Boston y Multifashion)</li>
+                    <li>Arrastrá cada CSV sobre la empresa correspondiente abajo</li>
+                  </ol>
+                  <div className="mt-3 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-amber-800">
+                    <p className="font-semibold mb-0.5">Importante</p>
+                    <p>Usá el botón <strong>&ldquo;Descargar Todos&rdquo;</strong> (no &ldquo;Descargar Detalle&rdquo;). El detalle por línea de producto no es compatible con este flujo.</p>
+                  </div>
                 </div>
-                <p className="mt-2 text-blue-500">Nota: Multifashion se carga semanalmente. Las demas empresas se cargan mensualmente.</p>
+              </details>
+
+              <StatusBanner statusList={statusList} />
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
+                {empresas.map((co) => (
+                  <EmpresaCard
+                    key={co.key}
+                    name={co.name}
+                    status={statuses[co.key]}
+                    isDragOver={dragOver === co.key}
+                    isUploading={ventasUploading === co.name}
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(co.key); }}
+                    onDragLeave={() => setDragOver(null)}
+                    onDrop={async (e) => { e.preventDefault(); setDragOver(null); const f = e.dataTransfer.files[0]; if (f) await uploadVentasFile(co.key, co.name, f); }}
+                    onClick={() => ventasFileRefs.current[co.key]?.click()}
+                  >
+                    <input ref={(el) => { ventasFileRefs.current[co.key] = el; }} type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden"
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={async (e) => { const f = e.target.files?.[0]; if (f) await uploadVentasFile(co.key, co.name, f); e.target.value = ""; }} />
+                  </EmpresaCard>
+                ))}
               </div>
-            </details>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-              {UPLOAD_EMPRESAS.map((co) => (
-                <div key={co.key}
-                  className={`border rounded-lg p-4 transition cursor-pointer relative ${dragOver === co.key ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300"} ${ventasUploading === co.name ? "opacity-60 pointer-events-none" : ""}`}
-                  onDragOver={(e) => { e.preventDefault(); setDragOver(co.key); }}
-                  onDragLeave={() => setDragOver(null)}
-                  onDrop={(e) => { e.preventDefault(); setDragOver(null); const f = e.dataTransfer.files[0]; if (f) openVentasPreview(co.key, co.name, f); }}
-                  onClick={() => ventasFileRefs.current[co.key]?.click()}>
-                  {ventasUploading === co.name && <span className="text-[9px] bg-black text-white px-2 py-0.5 rounded-full font-medium absolute top-3 right-3">Subiendo...</span>}
-                  <div className="text-sm font-medium mb-0.5">{co.name}</div>
-                  <div className="text-xs text-gray-400 mb-3">{co.brand}</div>
-                  {getStatusIndicator(co.key, "ventas")}
-                  <div className="text-[10px] text-gray-300 mt-3">{ventasPreviewLoading ? "Analizando..." : <><span className="sm:hidden">Toca para seleccionar</span><span className="hidden sm:inline">Arrastra el CSV aqui o haz click</span></>}</div>
-                  <input ref={(el) => { ventasFileRefs.current[co.key] = el; }} type="file" accept=".csv,.txt,.xlsx,.xls" className="hidden"
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) openVentasPreview(co.key, co.name, f); e.target.value = ""; }} />
-                </div>
-              ))}
-            </div>
-          </>
-        )}
+
+              <p className="text-[11px] text-stone-600 text-center mt-4">
+                Arrastrá el archivo CSV sobre la empresa correspondiente, o hacé click para seleccionar.
+              </p>
+            </>
+          );
+        })()}
 
         {/* ── CXC Preview Modal ───────────────────────────────────────────── */}
         {cxcPreview && (

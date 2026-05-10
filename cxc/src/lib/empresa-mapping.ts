@@ -30,6 +30,24 @@ export const B2B_EMPRESA_KEYS = [
 
 export type B2BEmpresaKey = typeof B2B_EMPRESA_KEYS[number];
 
+/**
+ * Las 8 empresas del grupo en su orden canónico para el módulo de uploads
+ * y para flows que necesitan listar todas las empresas (ventas usa las 8;
+ * CXC sólo las 6 B2B). Mismo orden visual que en /upload.
+ */
+export const ALL_EMPRESA_KEYS = [
+  "vistana",
+  "fashion_wear",
+  "fashion_shoes",
+  "active_shoes",
+  "active_wear",
+  "joystep",
+  "american_classic",
+  "confecciones_boston",
+] as const;
+
+export type EmpresaKey = typeof ALL_EMPRESA_KEYS[number];
+
 export function mapEmpresaName(key: string): string {
   return EMPRESA_KEY_TO_NAME[key] ?? key;
 }
