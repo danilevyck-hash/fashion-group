@@ -1,13 +1,19 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/clientes/[id]/historial-mensual?empresa={empresaKey}
+// GET /api/clientes/[codigo]/historial-mensual?empresa={empresaKey}
 //
 // Devuelve agregado mensual de ventas de los últimos 12 meses cerrados +
 // el mes actual, para el cliente y empresa indicados. Pensado para alimentar
 // la mini gráfica que aparece al hover sobre el nombre del cliente en
 // la tab Clientes del módulo Ventas.
 //
-// [id] = código Switch Soft del cliente (ej. "D-04"), igual que Cliente.id
+// [codigo] = código Switch Soft del cliente (ej. "D-04"), igual que Cliente.id
 // del bundle del frontend de Ventas.
+//
+// Stats:
+//   - promedio_mensual:        SUM(total) / COUNT(DISTINCT (anio, mes))
+//                              denominador = meses CON compra (no 12 fijos).
+//   - meses_activos:           COUNT(DISTINCT (anio, mes)) en últimos 12m, 0-12.
+//   - dias_desde_ultima_compra: (CURRENT_DATE - MAX(fecha))::int
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -82,8 +88,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
     return NextResponse.json({ error: vErr.message }, { status: 500 });
   }
 
-  // 3. Agregar por (anio, mes)
+  // 3. Agregar por (anio, mes) y trackear fecha máxima
   const bucket = new Map<string, MesAgg>();
+  let maxFechaIso: string | null = null;
   for (const r of (rows ?? []) as VentaRow[]) {
     let anio = r.anio ?? 0;
     let mes = r.mes ?? 0;
@@ -93,6 +100,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
       mes = d.getUTCMonth() + 1;
     }
     if (!anio || !mes) continue;
+
+    if (r.fecha && (!maxFechaIso || r.fecha > maxFechaIso)) {
+      maxFechaIso = r.fecha;
+    }
 
     const key = `${anio}-${mes}`;
     const prev = bucket.get(key);
@@ -120,17 +131,19 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
     });
   }
 
+  // 5. Stats accionables
   const total12m = meses.reduce((s, m) => s + m.total, 0);
-  const mesesConVenta = meses.filter(m => m.total > 0);
-  const promedioMensual = mesesConVenta.length
-    ? total12m / mesesConVenta.length
-    : 0;
-
-  let mejor: MesAgg | null = null;
-  let peor: MesAgg | null = null;
-  for (const m of mesesConVenta) {
-    if (!mejor || m.total > mejor.total) mejor = m;
-    if (!peor || m.total < peor.total) peor = m;
+  // meses_activos: distinct (anio, mes) con compra en la ventana
+  const mesesActivos = meses.filter(m => m.total > 0).length;
+  // promedio sobre meses activos (no sobre 12 fijos): refleja ticket-mes real
+  const promedioMensual = mesesActivos > 0 ? total12m / mesesActivos : 0;
+  // días desde la última factura (no desde el inicio del mes)
+  let diasDesdeUltimaCompra: number | null = null;
+  if (maxFechaIso) {
+    const ms = Date.parse(maxFechaIso);
+    if (!Number.isNaN(ms)) {
+      diasDesdeUltimaCompra = Math.max(0, Math.floor((Date.now() - ms) / 86_400_000));
+    }
   }
 
   return NextResponse.json({
@@ -138,7 +151,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
     meses,
     total_12m: Math.round(total12m * 100) / 100,
     promedio_mensual: Math.round(promedioMensual * 100) / 100,
-    mejor_mes: mejor,
-    peor_mes: peor,
+    meses_activos: mesesActivos,
+    dias_desde_ultima_compra: diasDesdeUltimaCompra,
   });
 }
