@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { CloudUpload, AlertCircle, Download } from "lucide-react";
+import { CloudUpload, AlertCircle, Download, HelpCircle, ChevronRight } from "lucide-react";
 import AppHeader from "@/components/AppHeader";
+import { AccordionContent } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { ALL_COMPANIES } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -99,6 +100,54 @@ function canonicalTipo(raw: string): string | null {
 
 // ── Card sub-components ──────────────────────────────────────────────────────
 
+function HowToCollapsible({ tab }: { tab: "ventas" | "cxc" }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between rounded-lg bg-transparent border border-stone-300/70 hover:bg-stone-100/60 transition px-3.5 py-2.5"
+      >
+        <span className="flex items-center gap-2">
+          <HelpCircle size={16} className="text-stone-500" />
+          <span className="text-[13px] font-medium text-stone-700">Cómo descargar de Switch</span>
+        </span>
+        <ChevronRight size={16} className={`text-stone-500 transition-transform duration-200 ${open ? "rotate-90" : ""}`} />
+      </button>
+      <AccordionContent open={open}>
+        <div className="mt-2 px-3.5 py-3.5 bg-white border border-stone-200 rounded-lg">
+          {tab === "ventas" ? (
+            <>
+              <ol className="list-decimal list-inside space-y-1.5 text-[12px] text-stone-700">
+                <li>Módulo <span className="font-medium">Reportes</span></li>
+                <li><span className="font-medium">Listado de comprobantes</span></li>
+                <li>Filtrar fecha (o usar <span className="font-medium">&ldquo;Últimos 30 días&rdquo;</span>) → click <span className="font-medium">Generar</span></li>
+                <li>Click <span className="font-medium">Descargar Todos</span></li>
+              </ol>
+              <p className="text-[11px] text-stone-600 mt-3">
+                Repetir para cada una de las 8 empresas. Genera 8 archivos CSV.
+              </p>
+            </>
+          ) : (
+            <>
+              <ol className="list-decimal list-inside space-y-1.5 text-[12px] text-stone-700">
+                <li>Módulo <span className="font-medium">Reportes</span></li>
+                <li><span className="font-medium">Estado de cuenta Cliente</span></li>
+                <li>Click <span className="font-medium">Generar</span> → cambiar a la pestaña <span className="font-medium">Antigüedad de deuda</span></li>
+                <li>Click <span className="font-medium">Descargar</span> → seleccionar <span className="font-medium">Descargar Saldos</span></li>
+              </ol>
+              <p className="text-[11px] text-stone-600 mt-3">
+                Repetir para las 6 empresas B2B. Boston y American Classic no entran en CXC. Genera 6 archivos CSV.
+              </p>
+            </>
+          )}
+        </div>
+      </AccordionContent>
+    </div>
+  );
+}
+
 function StatusBanner({ statusList }: { statusList: CardStatus[] }) {
   const total = statusList.length;
   const atDia = statusList.filter((s) => s.state === "fresh").length;
@@ -106,7 +155,7 @@ function StatusBanner({ statusList }: { statusList: CardStatus[] }) {
   const vencenPronto = statusList.filter((s) => s.state === "warn").length;
 
   return (
-    <div className="bg-white border border-stone-200 rounded-xl px-4 py-3 mb-3 flex items-center justify-between">
+    <div className="bg-white border border-stone-200 rounded-xl px-4 py-3 mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-0">
       <div>
         <div className="text-[11px] uppercase tracking-[0.05em] text-stone-600">Empresas al día</div>
         <div className="mt-1 flex items-baseline">
@@ -119,9 +168,9 @@ function StatusBanner({ statusList }: { statusList: CardStatus[] }) {
           <span className="text-sm text-stone-600 ml-1 tabular-nums">/{total}</span>
         </div>
       </div>
-      <div className="text-right space-y-1">
+      <div className="md:text-right space-y-1">
         {vencidas > 0 && (
-          <div className="flex items-center gap-1.5 justify-end">
+          <div className="flex items-center gap-1.5 md:justify-end">
             <span className="rounded-full" style={{ width: 7, height: 7, background: "#B91C1C" }} />
             <span className="text-xs font-medium" style={{ color: "#B91C1C" }}>
               {vencidas} {vencidas === 1 ? "vencida" : "vencidas"}
@@ -129,7 +178,7 @@ function StatusBanner({ statusList }: { statusList: CardStatus[] }) {
           </div>
         )}
         {vencenPronto > 0 && (
-          <div className="flex items-center gap-1.5 justify-end">
+          <div className="flex items-center gap-1.5 md:justify-end">
             <span className="rounded-full" style={{ width: 7, height: 7, background: "#F59E0B" }} />
             <span className="text-xs font-medium" style={{ color: "#B45309" }}>
               {vencenPronto} {vencenPronto === 1 ? "vence pronto" : "vencen pronto"}
@@ -714,24 +763,11 @@ function UploadPageInner() {
           const statusList = Object.values(statuses);
           return (
             <>
-              <details className="mb-4 bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
-                <summary className="px-4 py-3 text-xs text-blue-700 cursor-pointer hover:bg-blue-100 transition flex items-center gap-2">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                  <span className="font-medium">Cómo sacar el reporte en Switch</span>
-                </summary>
-                <div className="px-4 pb-3 text-xs text-blue-600 leading-relaxed">
-                  <ol className="list-decimal list-inside space-y-1 mt-1">
-                    <li><strong>Reporte</strong> &rarr; Estado de cuenta cliente</li>
-                    <li><strong>Generar</strong> &rarr; Detalle de saldos</li>
-                    <li><strong>Descargar Todos</strong> — Switch baja un <code>detallessaldos</code> por cada empresa B2B (6 archivos en total)</li>
-                    <li>Arrastrá cada CSV sobre la empresa correspondiente abajo</li>
-                  </ol>
-                </div>
-              </details>
+              <HowToCollapsible tab="cxc" />
 
               <StatusBanner statusList={statusList} />
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
                 {empresas.map((co) => (
                   <EmpresaCard
                     key={co.key}
@@ -752,7 +788,8 @@ function UploadPageInner() {
               </div>
 
               <p className="text-[11px] text-stone-600 text-center mt-4">
-                Arrastrá el archivo CSV sobre la empresa correspondiente, o hacé click para seleccionar.
+                <span className="md:hidden">Tocá una empresa para subir el archivo CSV.</span>
+                <span className="hidden md:inline">Arrastrá el archivo CSV sobre la empresa correspondiente, o hacé click para seleccionar.</span>
               </p>
             </>
           );
@@ -768,28 +805,11 @@ function UploadPageInner() {
           const statusList = Object.values(statuses);
           return (
             <>
-              <details className="mb-4 bg-blue-50 border border-blue-200 rounded-lg overflow-hidden">
-                <summary className="px-4 py-3 text-xs text-blue-700 cursor-pointer hover:bg-blue-100 transition flex items-center gap-2">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-                  <span className="font-medium">Cómo sacar el reporte en Switch</span>
-                </summary>
-                <div className="px-4 pb-3 text-xs text-blue-600 leading-relaxed">
-                  <ol className="list-decimal list-inside space-y-1 mt-1">
-                    <li><strong>Reporte</strong> &rarr; Listado de comprobantes</li>
-                    <li><strong>Filtrar</strong> por fecha (rango deseado)</li>
-                    <li><strong>Descargar Todos</strong> — Switch baja un <code>listacomprobantes</code> por cada empresa (8 archivos en total, incluye Boston y Multifashion)</li>
-                    <li>Arrastrá cada CSV sobre la empresa correspondiente abajo</li>
-                  </ol>
-                  <div className="mt-3 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 text-amber-800">
-                    <p className="font-semibold mb-0.5">Importante</p>
-                    <p>Usá el botón <strong>&ldquo;Descargar Todos&rdquo;</strong> (no &ldquo;Descargar Detalle&rdquo;). El detalle por línea de producto no es compatible con este flujo.</p>
-                  </div>
-                </div>
-              </details>
+              <HowToCollapsible tab="ventas" />
 
               <StatusBanner statusList={statusList} />
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3">
                 {empresas.map((co) => (
                   <EmpresaCard
                     key={co.key}
@@ -810,7 +830,8 @@ function UploadPageInner() {
               </div>
 
               <p className="text-[11px] text-stone-600 text-center mt-4">
-                Arrastrá el archivo CSV sobre la empresa correspondiente, o hacé click para seleccionar.
+                <span className="md:hidden">Tocá una empresa para subir el archivo CSV.</span>
+                <span className="hidden md:inline">Arrastrá el archivo CSV sobre la empresa correspondiente, o hacé click para seleccionar.</span>
               </p>
             </>
           );
