@@ -57,59 +57,66 @@ export function ClientesView({ data }: { data: Clientes }) {
 
   return (
     <div className="space-y-3">
-      {/* Toolbar — search (flex-1) | counter (right) */}
-      <div className="sticky top-0 z-20 -mx-1 flex flex-wrap items-center gap-3 border-b border-stone-200 bg-stone-50 px-1 py-2.5">
-        <div className="relative min-w-[200px] max-w-[360px] flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-stone-500" />
-          <Input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar cliente o código…"
-            className="w-full pl-8"
-          />
+      {/*
+        Sticky único: search + counter + pills en un solo bloque al top:0.
+        Evita anidación de stickys (toolbar + thead) que causaba que la
+        primera row quedara escondida por offsets desincronizados y por el
+        wrapper overflow-x-auto que rompe sticky vertical en thead/th.
+      */}
+      <div className="sticky top-0 z-20 -mx-1 space-y-2 border-b border-stone-200 bg-stone-50 px-1 pb-2.5 pt-2.5">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative min-w-[200px] max-w-[360px] flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-stone-500" />
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar cliente o código…"
+              className="w-full pl-8"
+            />
+          </div>
+          <p className="ml-auto whitespace-nowrap text-xs text-stone-500">
+            <span className="font-mono text-stone-950">{filtered.length}</span> clientes activos · últimos 12 meses · ordenados por última compra
+          </p>
         </div>
-        <p className="ml-auto whitespace-nowrap text-xs text-stone-500">
-          <span className="font-mono text-stone-950">{filtered.length}</span> clientes activos · últimos 12 meses · ordenados por última compra
-        </p>
+
+        {/* Pills empresas — segmented control horizontal */}
+        <div className="-mx-1 overflow-x-auto px-1">
+          <div className="flex flex-nowrap gap-1.5">
+            {EMPRESA_PILLS.map(p => {
+              const active = empresa === p.id;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setEmpresa(p.id)}
+                  className={cn(
+                    "whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition",
+                    active
+                      ? "bg-teal-700 text-white"
+                      : "bg-stone-100 text-stone-700 hover:bg-stone-200"
+                  )}
+                >
+                  {p.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      {/* Empresa pills — segmented control horizontal */}
-      <div className="-mx-1 overflow-x-auto px-1">
-        <div className="flex flex-nowrap gap-1.5">
-          {EMPRESA_PILLS.map(p => {
-            const active = empresa === p.id;
-            return (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setEmpresa(p.id)}
-                className={cn(
-                  "whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition",
-                  active
-                    ? "bg-teal-700 text-white"
-                    : "bg-stone-100 text-stone-700 hover:bg-stone-200"
-                )}
-              >
-                {p.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Lista completa — header sticky bajo el toolbar */}
+      {/* Lista — column headers scrollean naturalmente (no sticky) */}
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse" style={{ minWidth: 920 }}>
             <thead>
-              <tr>
+              <tr className="bg-stone-100">
                 <SortHeader col="rank"    align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>#</SortHeader>
                 <SortHeader col="nombre"  align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Cliente</SortHeader>
                 <SortHeader col="empresa" align="left"  sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Empresa</SortHeader>
                 <SortHeader col="ytd"     align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Compras YTD</SortHeader>
                 <SortHeader col="delta"   align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Δ vs 2025</SortHeader>
                 <SortHeader col="ultima"  align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Última compra</SortHeader>
-                <th className="sticky top-[56px] z-10 w-12 border-b border-stone-200 bg-stone-50 px-3.5 py-2.5" />
+                <th className="w-12 border-b border-stone-200 px-3.5 py-2.5" />
               </tr>
             </thead>
             <tbody>
@@ -173,7 +180,7 @@ function SortHeader({
     <th
       onClick={() => onClick(col)}
       className={cn(
-        "sticky top-[56px] z-10 cursor-pointer select-none whitespace-nowrap border-b border-stone-200 bg-stone-50 px-3.5 py-2.5 text-[11px] font-medium uppercase tracking-wider transition",
+        "cursor-pointer select-none whitespace-nowrap border-b border-stone-200 bg-stone-100 px-3.5 py-2.5 text-[11px] font-medium uppercase tracking-wider transition",
         align === "right" ? "text-right" : "text-left",
         active ? "text-stone-950" : "text-stone-500 hover:text-stone-700"
       )}
