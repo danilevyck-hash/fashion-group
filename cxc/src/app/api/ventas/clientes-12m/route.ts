@@ -7,7 +7,7 @@ import { fetchClientes } from "@/lib/ventas/queries";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "director", "contabilidad", "vendedor"]);
+  const auth = requireRole(req, ["admin", "director", "contabilidad"]);
   if (auth instanceof NextResponse) return auth;
 
   const empresa = req.nextUrl.searchParams.get("empresa");
