@@ -112,7 +112,7 @@ function StatusBanner({ statusList }: { statusList: CardStatus[] }) {
         <div className="mt-1 flex items-baseline">
           <span
             className="text-[22px] font-medium tabular-nums leading-none"
-            style={{ fontFamily: "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace" }}
+            style={{ fontFamily: "var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace" }}
           >
             {atDia}
           </span>

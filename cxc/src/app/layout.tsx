@@ -1,10 +1,15 @@
 import type { Metadata, Viewport } from "next";
+import { GeistMono } from "geist/font/mono";
 
 import { ContextMenuProviderWrapper } from "@/components/ContextMenuWrapper";
 import { OnlineProvider } from "@/lib/OnlineContext";
 import OfflineBanner from "@/components/OfflineBanner";
 import Sidebar, { SidebarAwareMain } from "@/components/Sidebar";
 import "./globals.css";
+
+// Geist Mono via el package oficial de Vercel (`geist`). Next 14.2.3 todavía
+// no tiene Geist_Mono en next/font/google, así que usamos este helper que
+// expone --font-geist-mono igual que pediste. Equivalente exacto.
 
 export const metadata: Metadata = {
   title: "Fashion Group",
@@ -42,7 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black" />
         <meta name="apple-mobile-web-app-title" content="Fashion Group" />
       </head>
-      <body className="min-h-screen safe-top">
+      <body className={`${GeistMono.variable} min-h-screen safe-top`}>
         <OnlineProvider>
           <OfflineBanner />
           <ContextMenuProviderWrapper>
