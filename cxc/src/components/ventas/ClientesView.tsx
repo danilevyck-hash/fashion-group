@@ -6,12 +6,21 @@ import { Input } from "@/components/ui/input";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Search } from "lucide-react";
 import type { Clientes, Cliente } from "./types";
-import { fmtMoney, fmtPct, deltaSymbol } from "@/lib/ventas/format";
+import { fmtMoney } from "@/lib/ventas/format";
+import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 import { ClienteHoverCard, type HistorialState } from "./ClienteHoverCard";
 
 type SortKey = "rank" | "nombre" | "empresa" | "ytd" | "delta" | "ultima";
 type SortDir = "asc" | "desc";
+
+// Mapping de tono semántico → clase Tailwind para celdas con bg claro.
+// Histórico de Clientes usa red-600 para negativos (no orange-600 como Resumen).
+const TONE_LIGHT: Record<DeltaTone, string> = {
+  emerald: "text-emerald-600",
+  orange:  "text-red-600",
+  stone:   "text-stone-500",
+};
 
 const EMPRESA_PILLS: { id: string; label: string }[] = [
   { id: "todas",                label: "Todas" },
@@ -219,9 +228,7 @@ function ClienteRow({
   state: HistorialState;
   onFirstHover: () => void;
 }) {
-  const tone =
-    c.delta > 0.05  ? "text-emerald-600" :
-    c.delta < -0.05 ? "text-red-600"     : "text-stone-500";
+  const fmt = formatDeltaRatio(c.delta);
   const extraEmpresas = c.empresas_count - 1;
 
   return (
@@ -271,8 +278,9 @@ function ClienteRow({
         )}
       </td>
       <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">{fmtMoney(c.ytd)}</td>
-      <td className={cn("whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", tone)}>
-        {deltaSymbol(c.delta)} {fmtPct(c.delta)}
+      <td className={cn("whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
+        {fmt.arrow && <span className="mr-1">{fmt.arrow}</span>}
+        {fmt.displayValue}
       </td>
       <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">{c.ultima || "—"}</td>
       <td className="border-b border-stone-200 px-3.5 py-3 text-center">

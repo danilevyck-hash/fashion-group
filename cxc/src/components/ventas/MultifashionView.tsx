@@ -5,7 +5,14 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp } from "lucide-react";
 import type { Multifashion, Vendedora, RetailMonthly } from "./types";
 import { fmtMoney, fmtPct, deltaSymbol } from "@/lib/ventas/format";
+import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
+
+const VENDEDORA_TONE: Record<DeltaTone, string> = {
+  emerald: "text-emerald-600",
+  orange:  "text-red-600",
+  stone:   "text-stone-500",
+};
 
 export function MultifashionView({ data }: { data: Multifashion }) {
   const pctMeta = data.ytdVentas / data.metaAnual;
@@ -172,9 +179,7 @@ function RetailRow({ row }: { row: RetailMonthly }) {
 }
 
 function VendedoraRow({ v, bono }: { v: Vendedora; bono: number }) {
-  const tone =
-    v.deltaMarzo > 0.05  ? "text-emerald-600" :
-    v.deltaMarzo < -0.05 ? "text-red-600"     : "text-stone-500";
+  const fmt = formatDeltaRatio(v.deltaMarzo);
   return (
     <tr className={v.top ? "bg-teal-50" : ""}>
       <td className="border-b border-stone-200 px-3.5 py-3 text-sm text-stone-950">
@@ -186,8 +191,9 @@ function VendedoraRow({ v, bono }: { v: Vendedora; bono: number }) {
       </td>
       <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm text-stone-700 tabular-nums">{v.tickets.toLocaleString()}</td>
       <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">{fmtMoney(v.ventas)}</td>
-      <td className={cn("border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", tone)}>
-        {deltaSymbol(v.deltaMarzo)} {fmtPct(v.deltaMarzo)}
+      <td className={cn("border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", VENDEDORA_TONE[fmt.tone])}>
+        {fmt.arrow && <span className="mr-1">{fmt.arrow}</span>}
+        {fmt.displayValue}
       </td>
       <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm text-stone-700 tabular-nums">${v.ticketProm.toFixed(2)}</td>
       <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right">

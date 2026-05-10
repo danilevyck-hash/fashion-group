@@ -6,24 +6,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { VentasResumen } from "./types";
 import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, deltaSymbol, heatmapClasses } from "@/lib/ventas/format";
+import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 
 type Granularity = "mensual" | "trimestral";
 type ViewMode = "ventas" | "utilidad";
 type Cell = { value: number | null; delta: number | null; prevValue: number; periodLabel: string };
-
-/**
- * Direction symbol para celdas con valor: solo ▲/▼ cuando delta cruza ±5%.
- * En zona neutral devuelve null (NO renderizar prefijo) para evitar la
- * confusión visual del em dash con signo menos en montos negativos.
- * El em dash sigue usándose como placeholder cuando NO hay valor.
- */
-function arrow(d: number | null | undefined): "▲" | "▼" | null {
-  if (d == null) return null;
-  if (d > 0.05) return "▲";
-  if (d < -0.05) return "▼";
-  return null;
-}
 
 interface ResumenViewProps {
   data: VentasResumen;
@@ -292,8 +280,8 @@ function HeatCell({ cell, prevYear, metricLabel }: { cell: Cell; prevYear: numbe
               className="block w-full cursor-help px-2.5 py-2.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
             >
               <span className="inline-flex items-baseline gap-1.5">
-                {arrow(cell.delta) && (
-                  <span className={cn("text-[10px]", cls.fg)}>{arrow(cell.delta)}</span>
+                {formatDeltaRatio(cell.delta).arrow && (
+                  <span className={cn("text-[10px]", cls.fg)}>{formatDeltaRatio(cell.delta).arrow}</span>
                 )}
                 <span className="text-stone-950">{fmtMoneyCompact(cell.value)}</span>
               </span>
@@ -440,8 +428,8 @@ function TotalGroupCell({
               )}
             >
               <span className="inline-flex items-baseline gap-1.5">
-                {arrow(delta) && (
-                  <span className={cn("text-[10px]", arrowTone)}>{arrow(delta)}</span>
+                {formatDeltaRatio(delta).arrow && (
+                  <span className={cn("text-[10px]", arrowTone)}>{formatDeltaRatio(delta).arrow}</span>
                 )}
                 <span className="text-white">{isAnnual ? fmtMoney(value) : fmtMoneyCompact(value)}</span>
               </span>
