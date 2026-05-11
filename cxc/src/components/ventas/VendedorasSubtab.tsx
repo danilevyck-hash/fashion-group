@@ -49,28 +49,47 @@ function formatFechaCortePA(iso: string): string {
 }
 
 // Construye la cola "Comparativo vs ..." según el período activo.
-//   mes:       "Comparativo vs Mayo 1–11 2025"
-//   trimestre: "Comparativo vs Q2 2025 (al 11 May)"
-//   ytd:       "Comparativo vs YTD 2025 (Ene 1 – 11 May)"
+// mes/trimestre comparan contra el período inmediatamente anterior; ytd
+// sigue comparando contra el año anterior.
+//
+//   mes (rolls over):       "Comparativo vs Abril 1–9"        (mismo año)
+//                           "Comparativo vs Diciembre 1–5 2025"  (cruza año)
+//   trimestre (rolls over): "Comparativo vs Q1 2026"          (mismo año)
+//                           "Comparativo vs Q4 2025"          (cruza año)
+//   ytd:                    "Comparativo vs YTD 2025 (Ene 1 – 11 May)"
 function buildComparativoLabel(
   periodo: VendedorasPeriodoTipo,
   year: number,
-  mes: number,
-  trimestre: number,
-  diaCorteAnioAnterior: string,
+  diaCortePrevio: string,
 ): string {
-  const prevYear = year - 1;
-  const corte = parseIsoDate(diaCorteAnioAnterior);
+  const corte = parseIsoDate(diaCortePrevio);
   const corteDay = corte.getDate();
-  const corteMonthShort = MES_SHORT[corte.getMonth()];
+  const corteMonth = corte.getMonth();      // 0-indexed
+  const corteYear = corte.getFullYear();
+  const corteMonthShort = MES_SHORT[corteMonth];
 
   if (periodo === "mes") {
-    return `Comparativo vs ${MES_FULL[mes - 1]} 1–${corteDay} ${prevYear}`;
+    const prevMesName = MES_FULL[corteMonth];
+    const yearSuffix = corteYear !== year ? ` ${corteYear}` : "";
+    return `Comparativo vs ${prevMesName} 1–${corteDay}${yearSuffix}`;
   }
   if (periodo === "trimestre") {
-    return `Comparativo vs Q${trimestre} ${prevYear} (al ${corteDay} ${corteMonthShort})`;
+    const prevTrim = Math.ceil((corteMonth + 1) / 3);
+    return `Comparativo vs Q${prevTrim} ${corteYear}`;
   }
+  // ytd — comparativo vs YTD del año anterior, sin cambio
+  const prevYear = year - 1;
   return `Comparativo vs YTD ${prevYear} (Ene 1 – ${corteDay} ${corteMonthShort})`;
+}
+
+// Label corto del delta total del subtitle.
+//   mes       → "vs mes anterior"
+//   trimestre → "vs trimestre anterior"
+//   ytd       → "vs <año-1>"
+function subtitleDeltaLabel(periodo: VendedorasPeriodoTipo, year: number): string {
+  if (periodo === "mes") return "vs mes anterior";
+  if (periodo === "trimestre") return "vs trimestre anterior";
+  return `vs ${year - 1}`;
 }
 
 const TONE_LIGHT: Record<DeltaTone, string> = {
@@ -184,6 +203,11 @@ export function VendedorasSubtab({ data }: VendedorasSubtabProps) {
 
   const totalDelta = formatDelta(resp?.ventas_total, resp?.ventas_total_prev);
 
+  // Compat transicional: el campo nuevo es dia_corte_periodo_anterior, pero
+  // si el backend desplegado todavía manda dia_corte_anio_anterior (rollout
+  // previo a la migration MoM), usamos ese como fallback.
+  const diaCortePrevio = resp?.dia_corte_periodo_anterior ?? resp?.dia_corte_anio_anterior ?? null;
+
   return (
     <div className={cn("space-y-4", loading && "opacity-60 pointer-events-none transition-opacity")}>
       {error && (
@@ -217,16 +241,16 @@ export function VendedorasSubtab({ data }: VendedorasSubtabProps) {
             <span className="font-mono tabular-nums text-stone-700">{resp.total_vendedoras_periodo}</span> vendedoras ·
             {" "}<span className="font-mono tabular-nums text-stone-700">{fmtMoney(resp.ventas_total)}</span> ventas ·
             {" "}<span className="font-mono tabular-nums text-stone-700">{resp.tickets_total.toLocaleString()}</span> tickets
-            {" "}· vs mismo período {year - 1}:{" "}
+            {" "}· {subtitleDeltaLabel(periodo, year)}:{" "}
             <span className={cn("font-mono tabular-nums", TONE_LIGHT[totalDelta.tone])}>
               {totalDelta.arrow}{totalDelta.arrow ? " " : ""}{totalDelta.displayValue}
             </span>
           </p>
         )}
-        {resp?.es_periodo_parcial && resp.fecha_corte && resp.dia_corte_anio_anterior && (
+        {resp?.es_periodo_parcial && resp.fecha_corte && diaCortePrevio && (
           <p className="mt-1 text-xs text-stone-500">
             Actualizado al {formatFechaCortePA(resp.fecha_corte)} ·{" "}
-            {buildComparativoLabel(periodo, year, mes, trimestre, resp.dia_corte_anio_anterior)}
+            {buildComparativoLabel(periodo, year, diaCortePrevio)}
           </p>
         )}
       </div>
