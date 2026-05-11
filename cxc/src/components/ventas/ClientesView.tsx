@@ -369,6 +369,16 @@ function ClienteRow({
 }) {
   const fmt = formatDeltaRatio(c.delta);
   const isMultiEmpresa = c.empresas_count > 1 && (c.empresas_breakdown?.length ?? 0) > 1;
+  // Auto-flip: cliente en la mitad inferior de la viewport → HoverCard se
+  // abre hacia arriba (side="top") en vez de a la derecha. Evita que el
+  // card se corte cuando el row está cerca del bottom del scroll.
+  const [hoverSide, setHoverSide] = useState<"right" | "top">("right");
+
+  const handleHoverEnter = (e: React.SyntheticEvent<HTMLElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const middle = window.innerHeight / 2;
+    setHoverSide(rect.top > middle ? "top" : "right");
+  };
 
   return (
     <tr className="cursor-pointer transition hover:bg-stone-50">
@@ -380,6 +390,8 @@ function ClienteRow({
           <HoverCardTrigger asChild>
             <button
               type="button"
+              onMouseEnter={handleHoverEnter}
+              onFocus={handleHoverEnter}
               onClick={(e) => {
                 // En desktop el HoverCard maneja el open via hover; el click
                 // sólo activa el flow mobile. md+ ignora el tap-to-open.
@@ -394,8 +406,9 @@ function ClienteRow({
             </button>
           </HoverCardTrigger>
           <HoverCardContent
-            side="right"
+            side={hoverSide}
             align="start"
+            collisionPadding={12}
             className="hidden w-[320px] md:block"
           >
             <ClienteHoverCard

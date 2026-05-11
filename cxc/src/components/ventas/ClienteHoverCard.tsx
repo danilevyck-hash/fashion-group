@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
+import { fmtMoneyCompact } from "@/lib/ventas/format";
 import { formatDelta, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 
@@ -218,16 +218,21 @@ export function ClienteHoverCard({
   );
 }
 
-/** Chip CXC info-only: 4 estados según presencia/ausencia en buckets.
+/** Chip CXC info-only. Cuando hay saldo, expone SIEMPRE los 3 buckets
+ *  (0-90, 91-120, 121+) — incluso si alguno es $0 — para que la vista de
+ *  cara al cliente sea consistente y comparable entre filas. El label
+ *  semántico ("Al día" / "Cuentas pendientes" / "Atención") deriva del
+ *  bucket más severo con saldo > 0.
+ *
  *  Errores se silencian (no se renderiza el chip) para no romper el card. */
 function CxcChip({ state }: { state: CxcState }) {
   if (state.status === "loading") {
-    return <div className="h-5 w-40 animate-pulse rounded bg-stone-100" />;
+    return <div className="h-5 w-56 animate-pulse rounded bg-stone-100" />;
   }
   if (state.status === "error") {
     return null;
   }
-  const { saldo_total, monto_91_120, monto_121_plus } = state.data;
+  const { saldo_total, monto_0_90, monto_91_120, monto_121_plus } = state.data;
 
   if (saldo_total <= 0) {
     return (
@@ -248,10 +253,28 @@ function CxcChip({ state }: { state: CxcState }) {
   }
 
   return (
-    <div className={cn("inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium", cls)}>
-      {label} · debe <span className="ml-1 font-mono tabular-nums">{fmtMoney(saldo_total)}</span>
+    <div className={cn(
+      "inline-flex flex-wrap items-center gap-x-1.5 rounded px-2 py-1 text-[11px] font-medium leading-tight",
+      cls
+    )}>
+      <span>{label}</span>
+      <span aria-hidden className="opacity-50">·</span>
+      <span>0-90 <span className="font-mono tabular-nums">{fmtBucketK(monto_0_90)}</span></span>
+      <span aria-hidden className="opacity-50">·</span>
+      <span>91-120 <span className="font-mono tabular-nums">{fmtBucketK(monto_91_120)}</span></span>
+      <span aria-hidden className="opacity-50">·</span>
+      <span>121+ <span className="font-mono tabular-nums">{fmtBucketK(monto_121_plus)}</span></span>
     </div>
   );
+}
+
+/** Redondeo a "k" para los buckets del chip:
+ *  $0 → "$0", $500 → "$500", $113000 → "$113k", $216509 → "$217k".
+ *  Bajo $1000 mantiene unidades; ≥$1000 redondea a miles enteros. */
+function fmtBucketK(n: number): string {
+  if (n <= 0) return "$0";
+  if (n < 1000) return `$${Math.round(n)}`;
+  return `$${Math.round(n / 1000)}k`;
 }
 
 function DetailRow({
