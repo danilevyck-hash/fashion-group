@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ClienteHoverCard, type HistorialState, type CxcAgingState } from "./ClienteHoverCard";
+import { ClienteHoverCard, type HistorialState } from "./ClienteHoverCard";
 
 /**
  * Mobile bottom-sheet para el detalle de cliente — equivalente del HoverCard
@@ -9,7 +9,8 @@ import { ClienteHoverCard, type HistorialState, type CxcAgingState } from "./Cli
  * mode: es un sheet info-only que se cierra con backdrop tap o Escape.
  *
  * El cuerpo es el mismo `<ClienteHoverCard>` que se monta en el HoverCard
- * desktop — un solo lugar de verdad para el contenido.
+ * desktop — un solo lugar de verdad para el contenido (incluyendo el chip
+ * CXC que se fetcha internamente).
  */
 interface ClienteSheetProps {
   open: boolean;
@@ -17,9 +18,8 @@ interface ClienteSheetProps {
   nombre: string;
   codigo: string;
   empresa: string;
-  ultima: string;
+  empresaScope: string;
   historial: HistorialState;
-  cxc: CxcAgingState;
   onFirstHover: () => void;
 }
 
@@ -29,9 +29,8 @@ export function ClienteSheet({
   nombre,
   codigo,
   empresa,
-  ultima,
+  empresaScope,
   historial,
-  cxc,
   onFirstHover,
 }: ClienteSheetProps) {
   // Animate in/out
@@ -84,9 +83,8 @@ export function ClienteSheet({
             nombre={nombre}
             codigo={codigo}
             empresa={empresa}
-            ultima={ultima}
+            empresaScope={empresaScope}
             historial={historial}
-            cxc={cxc}
             onFirstHover={onFirstHover}
           />
         </div>

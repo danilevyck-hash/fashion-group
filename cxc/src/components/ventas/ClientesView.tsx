@@ -10,7 +10,7 @@ import type { Clientes, Cliente } from "./types";
 import { fmtMoney } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
-import { ClienteHoverCard, type HistorialState, type CxcAgingState } from "./ClienteHoverCard";
+import { ClienteHoverCard, type HistorialState } from "./ClienteHoverCard";
 import { ClienteSheet } from "./ClienteSheet";
 import { OtrosClientesDialog } from "./OtrosClientesDialog";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
@@ -90,77 +90,38 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
     }
   };
 
-  // Caches por (codigo + empresaKey). Lazy: se popula al primer hover/tap
-  // sobre cada cliente. Cargas subsecuentes = instantáneas. Histórico y
-  // CXC se cargan en paralelo desde el mismo trigger.
+  // Cache de historial-mensual por (codigo + empresaKey). Lazy: solo se
+  // popula al primer hover/tap sobre cada cliente. El CXC aging se fetchea
+  // y cachea internamente en ClienteHoverCard (cache module-level allá).
   const [historialCache, setHistorialCache] = useState<Record<string, HistorialState>>({});
-  const [cxcCache, setCxcCache] = useState<Record<string, CxcAgingState>>({});
   const histInFlight = useRef<Set<string>>(new Set());
-  const cxcInFlight = useRef<Set<string>>(new Set());
 
-  /** Dispara ambos fetches en paralelo. cxcScope = filtro del ClientesView,
-   *  "todas" agrega saldo de todas las empresas; key específica filtra esa. */
-  const loadDetail = useCallback(
-    (codigo: string, empresaKey: string, cxcScope: string) => {
-      // ── Histórico mensual ──
-      const histKey = `${codigo}|${empresaKey}`;
-      if (!histInFlight.current.has(histKey)) {
-        let triggerHist = false;
-        setHistorialCache(prev => {
-          if (prev[histKey] && prev[histKey].status !== "idle") return prev;
-          triggerHist = true;
-          return { ...prev, [histKey]: { status: "loading" } };
-        });
-        if (triggerHist) {
-          histInFlight.current.add(histKey);
-          fetch(`/api/clientes/${encodeURIComponent(codigo)}/historial-mensual?empresa=${encodeURIComponent(empresaKey)}`)
-            .then(async r => {
-              if (!r.ok) {
-                const body = await r.json().catch(() => ({}));
-                throw new Error(body.error || `HTTP ${r.status}`);
-              }
-              return r.json();
-            })
-            .then(data => setHistorialCache(prev => ({ ...prev, [histKey]: { status: "ready", data } })))
-            .catch(err => setHistorialCache(prev => ({
-              ...prev,
-              [histKey]: { status: "error", message: err?.message ?? "Error al cargar" },
-            })))
-            .finally(() => { histInFlight.current.delete(histKey); });
+  const loadHistorial = useCallback((codigo: string, empresaKey: string) => {
+    const histKey = `${codigo}|${empresaKey}`;
+    if (histInFlight.current.has(histKey)) return;
+    let trigger = false;
+    setHistorialCache(prev => {
+      if (prev[histKey] && prev[histKey].status !== "idle") return prev;
+      trigger = true;
+      return { ...prev, [histKey]: { status: "loading" } };
+    });
+    if (!trigger) return;
+    histInFlight.current.add(histKey);
+    fetch(`/api/clientes/${encodeURIComponent(codigo)}/historial-mensual?empresa=${encodeURIComponent(empresaKey)}`)
+      .then(async r => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${r.status}`);
         }
-      }
-
-      // ── CXC aging ──
-      const cxcKey = `${codigo}|${cxcScope}`;
-      if (!cxcInFlight.current.has(cxcKey)) {
-        let triggerCxc = false;
-        setCxcCache(prev => {
-          if (prev[cxcKey] && prev[cxcKey].status !== "idle") return prev;
-          triggerCxc = true;
-          return { ...prev, [cxcKey]: { status: "loading" } };
-        });
-        if (triggerCxc) {
-          cxcInFlight.current.add(cxcKey);
-          const cxcUrl = `/api/cxc/aging-por-cliente/${encodeURIComponent(codigo)}?empresa=${encodeURIComponent(cxcScope)}`;
-          fetch(cxcUrl)
-            .then(async r => {
-              if (!r.ok) {
-                const body = await r.json().catch(() => ({}));
-                throw new Error(body.error || `HTTP ${r.status}`);
-              }
-              return r.json();
-            })
-            .then(data => setCxcCache(prev => ({ ...prev, [cxcKey]: { status: "ready", data } })))
-            .catch(err => setCxcCache(prev => ({
-              ...prev,
-              [cxcKey]: { status: "error", message: err?.message ?? "Error al cargar" },
-            })))
-            .finally(() => { cxcInFlight.current.delete(cxcKey); });
-        }
-      }
-    },
-    []
-  );
+        return r.json();
+      })
+      .then(data => setHistorialCache(prev => ({ ...prev, [histKey]: { status: "ready", data } })))
+      .catch(err => setHistorialCache(prev => ({
+        ...prev,
+        [histKey]: { status: "error", message: err?.message ?? "Error al cargar" },
+      })))
+      .finally(() => { histInFlight.current.delete(histKey); });
+  }, []);
 
   // Vista 12m (universo rolling) vs YTD strict — el universo cambia con
   // el sort: cuando el usuario ordena por última compra quiere ver a TODOS
@@ -252,13 +213,9 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
     else { setSortBy(col); setSortDir(col === "nombre" || col === "empresa" ? "asc" : "desc"); }
   };
 
-  // Lookup helpers para HoverCard/Sheet
-  const histKeyFor = (c: Cliente) => `${c.id}|${c.empresaKey}`;
-  const cxcKeyFor = (c: Cliente) => `${c.id}|${empresa}`;
+  // Lookup helper para HoverCard/Sheet
   const histStateFor = (c: Cliente): HistorialState =>
-    historialCache[histKeyFor(c)] ?? { status: "idle" };
-  const cxcStateFor = (c: Cliente): CxcAgingState =>
-    cxcCache[cxcKeyFor(c)] ?? { status: "idle" };
+    historialCache[`${c.id}|${c.empresaKey}`] ?? { status: "idle" };
 
   return (
     <div className={cn("space-y-3", loading && "opacity-60 pointer-events-none transition-opacity")}>
@@ -355,8 +312,8 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
                     key={`${c.empresaKey}-${c.id}-${c.rank}`}
                     c={c}
                     histState={histStateFor(c)}
-                    cxcState={cxcStateFor(c)}
-                    onTriggerDetail={() => loadDetail(c.id, c.empresaKey, empresa)}
+                    empresaScope={empresa}
+                    onTriggerHistorial={() => loadHistorial(c.id, c.empresaKey)}
                     onMobileTap={() => setSheetCliente(c)}
                   />
                 );
@@ -379,19 +336,18 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
       />
 
       {/* Sheet mobile: equivalente del HoverCard desktop. Aparece sólo
-          en `md:hidden` (su breakpoint interno). El cliente seleccionado
-          dispara loadDetail() vía onFirstHover del card. */}
+          en `md:hidden` (su breakpoint interno). El chip CXC se fetchea
+          internamente en ClienteHoverCard. */}
       <ClienteSheet
         open={!!sheetCliente}
         onClose={() => setSheetCliente(null)}
         nombre={sheetCliente?.nombre ?? ""}
         codigo={sheetCliente?.id ?? ""}
         empresa={sheetCliente?.empresa ?? ""}
-        ultima={sheetCliente?.ultima ?? ""}
+        empresaScope={empresa}
         historial={sheetCliente ? histStateFor(sheetCliente) : { status: "idle" }}
-        cxc={sheetCliente ? cxcStateFor(sheetCliente) : { status: "idle" }}
         onFirstHover={() => {
-          if (sheetCliente) loadDetail(sheetCliente.id, sheetCliente.empresaKey, empresa);
+          if (sheetCliente) loadHistorial(sheetCliente.id, sheetCliente.empresaKey);
         }}
       />
     </div>
@@ -401,14 +357,14 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
 function ClienteRow({
   c,
   histState,
-  cxcState,
-  onTriggerDetail,
+  empresaScope,
+  onTriggerHistorial,
   onMobileTap,
 }: {
   c: Cliente;
   histState: HistorialState;
-  cxcState: CxcAgingState;
-  onTriggerDetail: () => void;
+  empresaScope: string;
+  onTriggerHistorial: () => void;
   onMobileTap: () => void;
 }) {
   const fmt = formatDeltaRatio(c.delta);
@@ -446,10 +402,9 @@ function ClienteRow({
               nombre={c.nombre}
               codigo={c.id}
               empresa={c.empresa}
-              ultima={c.ultima}
+              empresaScope={empresaScope}
               historial={histState}
-              cxc={cxcState}
-              onFirstHover={onTriggerDetail}
+              onFirstHover={onTriggerHistorial}
             />
           </HoverCardContent>
         </HoverCard>

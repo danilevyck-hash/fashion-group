@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { formatDelta, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
@@ -40,11 +40,76 @@ export interface CxcAging {
   monto_121_plus: number;
 }
 
-export type CxcAgingState =
-  | { status: "idle" }
+type CxcState =
   | { status: "loading" }
   | { status: "ready"; data: CxcAging }
-  | { status: "error"; message: string };
+  | { status: "error" };
+
+// Cache module-level del aging CXC keyed por (codigo|empresaScope). El
+// HoverCard se monta/desmonta con cada hover (Radix HoverCardContent),
+// así que un estado local se pierde entre aperturas. Este cache sobrevive
+// mientras la sesión esté viva — primer hover dispara fetch, hovers
+// subsecuentes son instantáneos.
+const cxcCache = new Map<string, CxcState>();
+const cxcInFlight = new Set<string>();
+const cxcSubscribers = new Map<string, Set<() => void>>();
+
+function subscribeCxc(key: string, cb: () => void): () => void {
+  let set = cxcSubscribers.get(key);
+  if (!set) {
+    set = new Set();
+    cxcSubscribers.set(key, set);
+  }
+  set.add(cb);
+  return () => {
+    set?.delete(cb);
+    if (set && set.size === 0) cxcSubscribers.delete(key);
+  };
+}
+
+function notifyCxc(key: string) {
+  cxcSubscribers.get(key)?.forEach(cb => cb());
+}
+
+function fetchCxcAging(codigo: string, empresaScope: string): void {
+  const key = `${codigo}|${empresaScope}`;
+  if (cxcCache.has(key) || cxcInFlight.has(key)) return;
+  cxcInFlight.add(key);
+  cxcCache.set(key, { status: "loading" });
+  notifyCxc(key);
+
+  const url = `/api/cxc/aging-por-cliente/${encodeURIComponent(codigo)}?empresa=${encodeURIComponent(empresaScope)}`;
+  fetch(url)
+    .then(async r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json() as Promise<CxcAging>;
+    })
+    .then(data => {
+      cxcCache.set(key, { status: "ready", data });
+    })
+    .catch(() => {
+      cxcCache.set(key, { status: "error" });
+    })
+    .finally(() => {
+      cxcInFlight.delete(key);
+      notifyCxc(key);
+    });
+}
+
+/** Hook que retorna el aging del cliente, disparando fetch al montar si
+ *  no está en cache. Re-renderiza cuando llega data. */
+function useCxcAging(codigo: string, empresaScope: string): CxcState {
+  const key = `${codigo}|${empresaScope}`;
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = subscribeCxc(key, () => setTick(t => t + 1));
+    fetchCxcAging(codigo, empresaScope);
+    return unsubscribe;
+  }, [codigo, empresaScope, key]);
+
+  return cxcCache.get(key) ?? { status: "loading" };
+}
 
 interface ClienteHoverCardProps {
   nombre: string;
@@ -52,13 +117,13 @@ interface ClienteHoverCardProps {
   codigo: string;
   /** Empresa display name, ej. "Vistana International" — visible en el subtítulo */
   empresa: string;
-  /** Fecha display "21 abr 2026" desde la fila — se combina con días del endpoint */
-  ultima: string;
+  /** Filtro empresa actual del ClientesView ("todas" o key específica).
+   *  Define el scope del fetch CXC: empresa específica → solo esa, "todas" →
+   *  suma cross-empresa. */
+  empresaScope: string;
   /** Historial mensual cacheado en parent. idle = aún no triggered */
   historial: HistorialState;
-  /** Aging CXC cacheado en parent. idle = aún no triggered */
-  cxc: CxcAgingState;
-  /** Trigger lazy load — fires once on mount del card. Padre dedupea. */
+  /** Trigger lazy load del histórico — fires once on mount. Padre dedupea. */
   onFirstHover: () => void;
 }
 
@@ -72,9 +137,8 @@ export function ClienteHoverCard({
   nombre,
   codigo,
   empresa,
-  ultima,
+  empresaScope,
   historial,
-  cxc,
   onFirstHover,
 }: ClienteHoverCardProps) {
   useEffect(() => {
@@ -82,6 +146,8 @@ export function ClienteHoverCard({
     // Una sola vez al montar — el padre dedupea por (codigo + empresaKey)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const cxc = useCxcAging(codigo, empresaScope);
 
   const ready = historial.status === "ready" ? historial.data : null;
   const histLoading = historial.status === "loading" || historial.status === "idle";
@@ -138,7 +204,7 @@ export function ClienteHoverCard({
         )}
       </div>
 
-      {/* Detalles: recurrencia + última compra */}
+      {/* Detalles: recurrencia (última compra vive en la columna de la fila) */}
       <div className="space-y-2 border-t border-stone-100 pt-3 text-xs">
         <DetailRow
           label="Recurrencia"
@@ -147,27 +213,19 @@ export function ClienteHoverCard({
             : null}
           loading={histLoading}
         />
-        <DetailRow
-          label="Última compra"
-          value={ready ? formatUltima(ultima, ready.dias_desde_ultima_compra) : null}
-          loading={histLoading}
-        />
       </div>
     </div>
   );
 }
 
-/** Chip CXC info-only: 4 estados según presencia/ausencia en buckets. */
-function CxcChip({ state }: { state: CxcAgingState }) {
-  if (state.status === "loading" || state.status === "idle") {
+/** Chip CXC info-only: 4 estados según presencia/ausencia en buckets.
+ *  Errores se silencian (no se renderiza el chip) para no romper el card. */
+function CxcChip({ state }: { state: CxcState }) {
+  if (state.status === "loading") {
     return <div className="h-5 w-40 animate-pulse rounded bg-stone-100" />;
   }
   if (state.status === "error") {
-    return (
-      <div className="inline-flex items-center rounded px-2 py-0.5 text-[11px] font-medium bg-stone-100 text-stone-500">
-        Saldo no disponible
-      </div>
-    );
+    return null;
   }
   const { saldo_total, monto_91_120, monto_121_plus } = state.data;
 
@@ -224,11 +282,4 @@ function recurrenciaLabel(mesesActivos: number): string {
   if (mesesActivos >= 4)  return "regular";
   if (mesesActivos >= 1)  return "esporádico";
   return "inactivo";
-}
-
-/** "21 abr 2026 · hace 20 días" — concatena fecha display + días relativos. */
-function formatUltima(fecha: string, dias: number | null): string {
-  if (dias == null) return fecha || "Sin compras";
-  const rel = dias === 0 ? "hoy" : dias === 1 ? "hace 1 día" : `hace ${dias} días`;
-  return fecha ? `${fecha} · ${rel}` : rel;
 }
