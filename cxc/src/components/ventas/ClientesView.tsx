@@ -11,6 +11,8 @@ import { fmtMoney } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 import { ClienteHoverCard, type HistorialState } from "./ClienteHoverCard";
+import { OtrosClientesDialog } from "./OtrosClientesDialog";
+import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 
 type SortKey = "rank" | "nombre" | "empresa" | "ytd" | "delta" | "ultima";
 type SortDir = "asc" | "desc";
@@ -45,6 +47,11 @@ const EMPRESA_PILLS: { id: string; label: string }[] = [
   { id: "american_classic",     label: "Multifashion" },
 ];
 
+// Pills donde la fila agregada "Otros clientes" NO se renderiza.
+// Boston y Multifashion son retail con semántica propia; no consolidan
+// huérfanos en una fila agregada.
+const SKIP_OTROS_FOR = new Set(["confecciones_boston", "american_classic"]);
+
 export function ClientesView({ data: initialData }: { data: Clientes }) {
   const [search, setSearch] = useState("");
   const [empresa, setEmpresa] = useState("todas");
@@ -54,6 +61,7 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
   const [, startTransition] = useTransition();
   const [sortBy, setSortBy] = useState<SortKey>("ultima");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [otrosOpen, setOtrosOpen] = useState(false);
 
   // Pill click → refetch desde server (la branching cliente/empresa vive en queries.ts)
   const onEmpresaChange = async (next: string) => {
@@ -122,13 +130,68 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
   // se restringe a clientes con compras YTD > 0 (vista "estricta del año").
   const is12mView = sortBy === "ultima";
 
+  // Universo según sort. Esto define qué huérfanos se agrupan en "Otros".
+  const universe = useMemo(() => {
+    return is12mView ? data.rows : data.rows.filter(c => c.ytd > 0);
+  }, [data.rows, is12mView]);
+
+  // Huérfanos del universo actual (cliente_id NULL en la materialized view).
+  // Sólo aplica para pills B2B; Boston/Multi se manejan sin Otros row.
+  const orphans = useMemo(() => {
+    if (SKIP_OTROS_FOR.has(empresa)) return [];
+    return universe.filter(c => c.isOrphan);
+  }, [universe, empresa]);
+
+  // Fila sintética "Otros clientes" — null cuando no hay huérfanos
+  // (o cuando la pill activa es Boston/Multi).
+  const otrosRow = useMemo<Cliente | null>(() => {
+    if (orphans.length === 0) return null;
+    const sumYtd  = orphans.reduce((s, o) => s + o.ytd, 0);
+    const sumPrev = orphans.reduce((s, o) => s + o.prev, 0);
+    // Delta same-period agregado: (Σytd - Σprev) / Σprev. Misma fórmula
+    // que aplica el resto del módulo (ver migration 040 fix same-period).
+    const aggDelta = sumPrev > 0 ? (sumYtd - sumPrev) / sumPrev : 0;
+    const maxUltimaIso = orphans
+      .map(o => o.ultimaIso)
+      .filter(Boolean)
+      .sort()
+      .pop() ?? "";
+    const ultimaDisplay = maxUltimaIso
+      ? orphans.find(o => o.ultimaIso === maxUltimaIso)?.ultima ?? ""
+      : "";
+    const empresaLabel = empresa === "todas"
+      ? "Varias"
+      : EMPRESA_KEY_TO_NAME[empresa] ?? empresa;
+    return {
+      rank: 0,
+      id: "",
+      nombre: `Otros clientes (${orphans.length})`,
+      empresa: empresaLabel,
+      empresaKey: empresa === "todas" ? "" : empresa,
+      ytd: sumYtd,
+      prev: sumPrev,
+      delta: aggDelta,
+      ultima: ultimaDisplay,
+      ultimaIso: maxUltimaIso,
+      wa: "",
+      empresas_count: 1,
+      isOrphan: false,
+      isOtrosAggregate: true,
+    };
+  }, [orphans, empresa]);
+
   const filtered = useMemo(() => {
-    let r = data.rows.slice();
-    if (!is12mView) r = r.filter(c => c.ytd > 0);
+    // Masters: universo sin huérfanos. La búsqueda sólo aplica a masters
+    // — la fila "Otros" permanece visible independiente del search text.
+    const masters = universe.filter(c => !c.isOrphan);
+    let r = masters.slice();
     if (search) {
       const q = search.toLowerCase();
       r = r.filter(c => c.nombre.toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
     }
+    // Inyectar fila Otros antes del sort para que se posicione según su
+    // total acumulado, igual que cualquier otra fila.
+    if (otrosRow) r.push(otrosRow);
     r.sort((a, b) => {
       const sign = sortDir === "asc" ? 1 : -1;
       switch (sortBy) {
@@ -141,7 +204,7 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
       }
     });
     return r;
-  }, [data.rows, search, sortBy, sortDir, is12mView]);
+  }, [universe, search, sortBy, sortDir, otrosRow]);
 
   const onSort = (col: SortKey) => {
     if (sortBy === col) setSortDir(sortDir === "asc" ? "desc" : "asc");
@@ -229,6 +292,15 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
             </thead>
             <tbody>
               {filtered.map(c => {
+                if (c.isOtrosAggregate) {
+                  return (
+                    <OtrosRow
+                      key="__otros__"
+                      c={c}
+                      onClick={() => setOtrosOpen(true)}
+                    />
+                  );
+                }
                 const cacheKey = `${c.id}|${c.empresaKey}`;
                 const state = historialCache[cacheKey] ?? { status: "idle" as const };
                 return (
@@ -249,6 +321,13 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
           </table>
         </div>
       </Card>
+
+      <OtrosClientesDialog
+        open={otrosOpen}
+        onClose={() => setOtrosOpen(false)}
+        orphans={orphans}
+        showEmpresaColumn={empresa === "todas"}
+      />
     </div>
   );
 }
@@ -356,6 +435,43 @@ function ClienteRow({
           </a>
         ) : null}
       </td>
+    </tr>
+  );
+}
+
+/**
+ * Fila agregada "Otros clientes (N)" — agrupa huérfanos sin master.
+ * Background diferenciado, click abre Dialog con detalle. Sin HoverCard
+ * (los promedios cross-cliente no aplican) ni WhatsApp (heterogéneo).
+ */
+function OtrosRow({ c, onClick }: { c: Cliente; onClick: () => void }) {
+  const fmt = formatDeltaRatio(c.delta);
+  return (
+    <tr
+      className="cursor-pointer bg-stone-100 transition hover:bg-stone-200"
+      onClick={onClick}
+      role="button"
+      aria-label="Abrir detalle de otros clientes"
+    >
+      <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-400 tabular-nums">—</td>
+      <td className="border-b border-stone-200 px-3.5 py-3 text-sm text-stone-950">
+        <div className="font-medium leading-tight">{c.nombre}</div>
+        <div className="font-mono text-[11px] leading-tight text-stone-500">click para ver detalle</div>
+      </td>
+      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-xs text-stone-700">
+        {c.empresa}
+      </td>
+      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">
+        {fmtMoney(c.ytd)}
+      </td>
+      <td className={cn("whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
+        {fmt.arrow && <span className="mr-1">{fmt.arrow}</span>}
+        {fmt.displayValue}
+      </td>
+      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">
+        {c.ultima || "—"}
+      </td>
+      <td className="border-b border-stone-200 px-3.5 py-3 text-center" />
     </tr>
   );
 }

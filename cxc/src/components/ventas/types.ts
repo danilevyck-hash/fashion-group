@@ -79,6 +79,15 @@ export type Cliente = {
   empresas_breakdown?: { empresaKey: string; empresaNombre: string; monto: number }[];
   /** WhatsApp E.164 number, e.g. "+50760001111" */
   wa: string;
+  /** Compras del año anterior (mismo período YTD). Usado para agregar deltas
+   *  same-period en la fila sintética "Otros clientes". */
+  prev: number;
+  /** true cuando el row no tiene match en clientes_master (cliente_id NULL).
+   *  Estos rows se agrupan en la fila "Otros clientes" en la UI. */
+  isOrphan: boolean;
+  /** true sólo en la fila sintética "Otros clientes" que agrupa huérfanos.
+   *  Cliente individual nunca tiene este flag. */
+  isOtrosAggregate?: boolean;
 };
 
 export type Clientes = {

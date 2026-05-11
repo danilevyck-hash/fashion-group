@@ -268,12 +268,16 @@ export async function fetchClientes({
       empresa: EMPRESA_KEY_TO_NAME[ek] ?? ek ?? "—",
       empresaKey: ek,
       ytd: toNum(r.compras_ytd),
+      prev: toNum(r.compras_anio_anterior),
       delta: r.delta_vs_2025 == null ? 0 : toNum(r.delta_vs_2025),
       ultima: r.ultima_compra ? fmtDate(r.ultima_compra) : "",
       ultimaIso: r.ultima_compra ?? "",
       wa: r.whatsapp ? normalizeWa(r.whatsapp) : "",
       empresas_count: empresasCount,
       empresas_breakdown: empresasBreakdown,
+      // Huérfano = no match en clientes_master (cliente_id NULL en la view).
+      // En la UI estos rows se colapsan en la fila sintética "Otros clientes".
+      isOrphan: r.cliente_id == null,
     };
   });
 
