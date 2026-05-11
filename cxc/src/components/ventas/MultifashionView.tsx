@@ -1,20 +1,13 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, CalendarRange, Users, UserCircle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { Multifashion, Vendedora, RetailMonthly } from "./types";
+import type { Multifashion, RetailMonthly } from "./types";
 import { fmtMoney, fmtPct, deltaSymbol } from "@/lib/ventas/format";
-import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
-
-const VENDEDORA_TONE: Record<DeltaTone, string> = {
-  emerald: "text-emerald-600",
-  orange:  "text-red-600",
-  stone:   "text-stone-500",
-};
+import { VendedorasSubtab } from "./VendedorasSubtab";
 
 const SUBTAB_TRIGGER_CLASS =
   "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-3 py-2 text-xs text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none";
@@ -44,7 +37,7 @@ export function MultifashionView({ data }: { data: Multifashion }) {
         <PlaceholderSubtab icon={CalendarRange} label="Mes en curso" />
       </TabsContent>
       <TabsContent value="vendedoras" className="mt-5">
-        <PlaceholderSubtab icon={Users} label="Vendedoras" />
+        <VendedorasSubtab data={data} />
       </TabsContent>
       <TabsContent value="clientes" className="mt-5">
         <PlaceholderSubtab icon={UserCircle} label="Clientes" />
@@ -144,34 +137,6 @@ function OverviewSubtab({ data }: { data: Multifashion }) {
         </Card>
       </section>
 
-      {/* 5. Vendedoras */}
-      <section>
-        <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="font-display text-base font-semibold text-stone-950">Vendedoras · Abril 2026</h3>
-          <p className="text-[11px] text-stone-500">Cerrado el 30 abr · comisiones se pagan el 5 may</p>
-        </div>
-
-        <Card className="overflow-hidden p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse" style={{ minWidth: 720 }}>
-              <thead>
-                <tr className="bg-stone-100">
-                  {["Vendedora", "Tickets", "Ventas", "Δ Marzo", "Ticket prom.", "Comisión"].map((h, i) => (
-                    <th key={h} className={cn(
-                      "border-b border-stone-200 px-3.5 py-2.5 text-[11px] font-medium uppercase tracking-wider text-stone-500",
-                      i === 0 ? "text-left" : "text-right"
-                    )}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {data.vendedoras.map(v => <VendedoraRow key={v.nombre} v={v} bono={data.bonoTop} />)}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-      </section>
-
     </div>
   );
 }
@@ -228,32 +193,3 @@ function RetailRow({ row }: { row: RetailMonthly }) {
   );
 }
 
-function VendedoraRow({ v, bono }: { v: Vendedora; bono: number }) {
-  const fmt = formatDeltaRatio(v.deltaMarzo);
-  return (
-    <tr className={v.top ? "bg-teal-50" : ""}>
-      <td className="border-b border-stone-200 px-3.5 py-3 text-sm text-stone-950">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">{v.nombre}</span>
-          {v.top && <Badge className="bg-teal-700 text-white">★ TOP</Badge>}
-          {v.manager && <Badge variant="outline" className="font-normal">manager</Badge>}
-        </div>
-      </td>
-      <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm text-stone-700 tabular-nums">{v.tickets.toLocaleString()}</td>
-      <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">{fmtMoney(v.ventas)}</td>
-      <td className={cn("border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs tabular-nums", VENDEDORA_TONE[fmt.tone])}>
-        {fmt.arrow && <span className="mr-1">{fmt.arrow}</span>}
-        {fmt.displayValue}
-      </td>
-      <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm text-stone-700 tabular-nums">${v.ticketProm.toFixed(2)}</td>
-      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right">
-        <span className="font-mono text-sm font-medium text-stone-950 tabular-nums">${v.comision.toFixed(2)}</span>
-        {v.top && v.deltaMarzo > 0 && (
-          <span className="ml-1.5 inline-block rounded-full border border-teal-100 bg-white px-2 py-0.5 text-[10.5px] font-medium text-teal-800">
-            + bono ${bono}
-          </span>
-        )}
-      </td>
-    </tr>
-  );
-}
