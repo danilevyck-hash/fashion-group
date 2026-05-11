@@ -24,10 +24,10 @@ const supa = createClient(url, key, { auth: { persistSession: false } });
 // 1. Call exactly como lo hace route.ts
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n═══════════════════════════════════════════════════════════');
-console.log('1. supabaseServer.rpc("multifashion_vendedoras", ...)');
+console.log('1. supabaseServer.rpc("multifashion_vendedoras_v3", ...)');
 console.log('═══════════════════════════════════════════════════════════');
 {
-  const { data, error } = await supa.rpc('multifashion_vendedoras', {
+  const { data, error } = await supa.rpc('multifashion_vendedoras_v3', {
     p_year: 2026,
     p_periodo: 'mes',
     p_mes: 5,
@@ -47,14 +47,14 @@ console.log('══════════════════════�
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. Call directo via fetch al endpoint POST /rest/v1/rpc/multifashion_vendedoras
+// 2. Call directo via fetch al endpoint POST /rest/v1/rpc/multifashion_vendedoras_v3
 //    (esto es exactamente lo que supabase-js hace por debajo)
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n═══════════════════════════════════════════════════════════');
-console.log('2. fetch directo a /rest/v1/rpc/multifashion_vendedoras');
+console.log('2. fetch directo a /rest/v1/rpc/multifashion_vendedoras_v3');
 console.log('═══════════════════════════════════════════════════════════');
 {
-  const resp = await fetch(`${url}/rest/v1/rpc/multifashion_vendedoras`, {
+  const resp = await fetch(`${url}/rest/v1/rpc/multifashion_vendedoras_v3`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -78,7 +78,7 @@ console.log('══════════════════════�
 // 3. Inspeccionar overloads y definición de la función vía pg_proc
 // ─────────────────────────────────────────────────────────────────────────────
 console.log('\n═══════════════════════════════════════════════════════════');
-console.log('3. pg_proc → todas las firmas de multifashion_vendedoras');
+console.log('3. pg_proc → todas las firmas de multifashion_vendedoras_v3');
 console.log('═══════════════════════════════════════════════════════════');
 {
   // Helper: ejecutar SQL arbitrario via una RPC genérica si existe, sino
@@ -130,7 +130,7 @@ console.log('\n═════════════════════�
 console.log('5. Re-llamar con cache-busting headers');
 console.log('═══════════════════════════════════════════════════════════');
 {
-  const resp = await fetch(`${url}/rest/v1/rpc/multifashion_vendedoras?_=${Date.now()}`, {
+  const resp = await fetch(`${url}/rest/v1/rpc/multifashion_vendedoras_v3?_=${Date.now()}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

@@ -1,5 +1,5 @@
 // Endpoint del sub-tab Vendedoras (/ventas → Multifashion → Vendedoras).
-// Llama a la RPC multifashion_vendedoras_v2 y devuelve el jsonb tal cual.
+// Llama a la RPC multifashion_vendedoras_v3 y devuelve el jsonb tal cual.
 //
 // Query params:
 //   year       int   — año fiscal (default: año actual)
@@ -9,9 +9,10 @@
 //
 // Mismos roles que /api/ventas/* (admin/director/contabilidad).
 //
-// Nota: el RPC se llama `multifashion_vendedoras_v2` (no `_vendedoras`)
-// por bug de runtime de Vercel/PostgREST que servía data vieja a pesar de
-// la migration aplicada. Ver migration 20260511150000_multifashion_vendedoras_v2.sql.
+// Nota: el RPC se llama `multifashion_vendedoras_v3` por dos rondas del
+// mismo bug de runtime stale en Vercel/PostgREST: data vieja servida a
+// pesar de migrations aplicadas (v1→v2 en 20260511150000, v2→v3 en
+// 20260511170000). Ver esas migrations para el historial completo.
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "trimestre requerido (1..4) cuando periodo=trimestre" }, { status: 400 });
   }
 
-  const { data, error } = await supabaseServer.rpc("multifashion_vendedoras_v2", {
+  const { data, error } = await supabaseServer.rpc("multifashion_vendedoras_v3", {
     p_year: year,
     p_periodo: periodoRaw,
     p_mes: periodoRaw === "mes" ? mes : null,
