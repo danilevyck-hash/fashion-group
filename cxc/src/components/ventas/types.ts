@@ -116,6 +116,34 @@ export type Vendedora = {
   top: boolean;
 };
 
+/** Período activo del sub-tab Vendedoras. */
+export type VendedorasPeriodoTipo = "mes" | "trimestre" | "ytd";
+
+/** Una fila del ranking de vendedoras devuelta por la RPC
+ *  multifashion_vendedoras(...). Delta compara contra el mismo período
+ *  del año anterior; null = no había actividad para comparar. */
+export type VendedoraDetalle = {
+  nombre: string;
+  tickets: number;
+  ventas: number;
+  ticket_promedio: number;
+  comision: number;
+  manager: boolean;
+  top: boolean;
+  delta_ventas_pct: number | null;
+  delta_tickets_pct: number | null;
+};
+
+/** Shape JSON devuelto por la RPC multifashion_vendedoras. */
+export type VendedorasPeriodo = {
+  vendedoras: VendedoraDetalle[];
+  total_vendedoras_periodo: number;
+  ventas_total: number;
+  tickets_total: number;
+  ventas_total_prev: number;
+  tickets_total_prev: number;
+};
+
 export type Multifashion = {
   tienda: string;
   ubicacion: string;
