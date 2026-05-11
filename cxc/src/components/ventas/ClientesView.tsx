@@ -5,14 +5,15 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Search } from "lucide-react";
+import { ArrowUpDown, Search } from "lucide-react";
 import type { Clientes, Cliente } from "./types";
-import { fmtMoney } from "@/lib/ventas/format";
+import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 import { ClienteHoverCard, type HistorialState } from "./ClienteHoverCard";
 import { ClienteSheet } from "./ClienteSheet";
 import { OtrosClientesDialog } from "./OtrosClientesDialog";
+import { SortSheet } from "./SortSheet";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 
 type SortKey = "rank" | "nombre" | "empresa" | "ytd" | "delta" | "ultima";
@@ -34,6 +35,16 @@ const SORT_LABELS: Record<SortKey, string> = {
   ytd:     "compras YTD",
   delta:   "delta",
   ultima:  "última compra",
+};
+
+// Label corto para el botón de sort en mobile (más compacto que SORT_LABELS).
+const SORT_LABELS_SHORT: Record<SortKey, string> = {
+  rank:    "Rank",
+  nombre:  "Cliente",
+  empresa: "Empresa",
+  ytd:     "Compras YTD",
+  delta:   "Δ vs 2025",
+  ultima:  "Última compra",
 };
 
 const EMPRESA_PILLS: { id: string; label: string }[] = [
@@ -65,6 +76,8 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
   const [otrosOpen, setOtrosOpen] = useState(false);
   // Cliente seleccionado para el ClienteSheet en mobile. null = sheet cerrado.
   const [sheetCliente, setSheetCliente] = useState<Cliente | null>(null);
+  // Sheet picker de ordenamiento (mobile).
+  const [sortOpen, setSortOpen] = useState(false);
 
   // Pill click → refetch desde server (la branching cliente/empresa vive en queries.ts)
   const onEmpresaChange = async (next: string) => {
@@ -217,6 +230,11 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
   const histStateFor = (c: Cliente): HistorialState =>
     historialCache[`${c.id}|${c.empresaKey}`] ?? { status: "idle" };
 
+  // En modo "Todas", mostrar la empresa principal en las cards mobile.
+  // En modo empresa específica, la empresa está implícita en el filtro,
+  // así que se omite del subtítulo para reducir ruido visual.
+  const showEmpresaInCard = empresa === "todas";
+
   return (
     <div className={cn("space-y-3", loading && "opacity-60 pointer-events-none transition-opacity")}>
       {fetchError && (
@@ -225,10 +243,10 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
         </div>
       )}
 
-      {/* Sticky único: search + counter + pills en un solo bloque al top:0. */}
+      {/* Sticky header: search + counter + pills + sort button (mobile only). */}
       <div className="sticky top-0 z-20 -mx-1 space-y-2 border-b border-stone-200 bg-stone-50 px-1 pb-2.5 pt-2.5">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative min-w-[200px] max-w-[360px] flex-1">
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
+          <div className="relative min-w-[180px] max-w-full flex-1 md:max-w-[360px]">
             <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-stone-500" />
             <Input
               value={search}
@@ -237,7 +255,22 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
               className="w-full pl-8"
             />
           </div>
-          <div className="ml-auto flex flex-wrap items-center justify-end gap-2 whitespace-nowrap text-xs text-stone-500">
+
+          {/* Sort button — visible sólo en mobile (md-). En desktop se usan
+              los headers de columna clickeables. */}
+          <button
+            type="button"
+            onClick={() => setSortOpen(true)}
+            className="inline-flex h-10 items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3 text-xs font-medium text-stone-700 active:bg-stone-100 md:hidden"
+            aria-label="Ordenar lista"
+          >
+            <ArrowUpDown className="h-3.5 w-3.5 text-stone-500" />
+            <span>{SORT_LABELS_SHORT[sortBy]}</span>
+            <span className="text-stone-500">{sortDir === "desc" ? "↓" : "↑"}</span>
+          </button>
+
+          {/* Counter + chip de vista — desktop: una línea. Mobile: apilado debajo. */}
+          <div className="ml-auto hidden flex-wrap items-center justify-end gap-2 whitespace-nowrap text-xs text-stone-500 md:flex">
             <p>
               <span className="font-mono text-stone-950">{filtered.length}</span> clientes activos · {is12mView ? "últimos 12 meses" : `Compras YTD ${new Date().getFullYear()}`} · ordenados por {SORT_LABELS[sortBy]}
             </p>
@@ -257,7 +290,22 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
           </div>
         </div>
 
-        <div className="-mx-1 overflow-x-auto px-1">
+        {/* Counter mobile — apilado debajo de la primera fila. */}
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 md:hidden">
+          <span>
+            <span className="font-mono text-stone-950">{filtered.length}</span> clientes · {is12mView ? "últimos 12m" : `YTD ${new Date().getFullYear()}`}
+          </span>
+          <span
+            className={cn(
+              "rounded px-1.5 py-0.5 text-[10px] font-medium",
+              is12mView ? "bg-teal-50 text-teal-700" : "bg-stone-100 text-stone-700"
+            )}
+          >
+            {is12mView ? "Vista 12m" : `YTD ${new Date().getFullYear()}`}
+          </span>
+        </div>
+
+        <div className="-mx-1 overflow-x-auto px-1" style={{ scrollSnapType: "x proximity" }}>
           <div className="flex flex-nowrap gap-1.5">
             {EMPRESA_PILLS.map(p => {
               const active = empresa === p.id;
@@ -267,8 +315,9 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
                   type="button"
                   onClick={() => onEmpresaChange(p.id)}
                   disabled={loading}
+                  style={{ scrollSnapAlign: "start" }}
                   className={cn(
-                    "whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition",
+                    "min-h-[40px] whitespace-nowrap rounded-full px-4 py-2.5 text-xs font-medium transition",
                     active
                       ? "bg-teal-700 text-white"
                       : "bg-stone-100 text-stone-700 hover:bg-stone-200"
@@ -282,7 +331,8 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
         </div>
       </div>
 
-      <Card className="overflow-hidden p-0">
+      {/* ─────── Desktop (md+): tabla con headers clickeables ─────── */}
+      <Card className="hidden overflow-hidden p-0 md:block">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse" style={{ minWidth: 920 }}>
             <thead>
@@ -328,6 +378,34 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
         </div>
       </Card>
 
+      {/* ─────── Mobile (-md): cards verticales ─────── */}
+      <div className="space-y-2 md:hidden">
+        {filtered.map(c => {
+          if (c.isOtrosAggregate) {
+            return (
+              <OtrosCard
+                key="__otros_card__"
+                c={c}
+                onTap={() => setOtrosOpen(true)}
+              />
+            );
+          }
+          return (
+            <ClienteCard
+              key={`card-${c.empresaKey}-${c.id}-${c.rank}`}
+              c={c}
+              showEmpresa={showEmpresaInCard}
+              onTap={() => setSheetCliente(c)}
+            />
+          );
+        })}
+        {filtered.length === 0 && (
+          <div className="rounded-lg border border-stone-200 bg-white px-4 py-12 text-center text-sm text-stone-500">
+            No se encontraron clientes con esos filtros.
+          </div>
+        )}
+      </div>
+
       <OtrosClientesDialog
         open={otrosOpen}
         onClose={() => setOtrosOpen(false)}
@@ -349,6 +427,15 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
         onFirstHover={() => {
           if (sheetCliente) loadHistorial(sheetCliente.id, sheetCliente.empresaKey);
         }}
+      />
+
+      {/* Sort picker mobile — abre desde el botón "Ordenar" arriba. */}
+      <SortSheet
+        open={sortOpen}
+        onClose={() => setSortOpen(false)}
+        sortBy={sortBy === "rank" ? "ultima" : sortBy}
+        sortDir={sortDir}
+        onChange={(key, dir) => { setSortBy(key); setSortDir(dir); }}
       />
     </div>
   );
@@ -517,6 +604,102 @@ function OtrosRow({ c, onClick }: { c: Cliente; onClick: () => void }) {
       </td>
       <td className="border-b border-stone-200 px-3.5 py-3 text-center" />
     </tr>
+  );
+}
+
+/**
+ * Card mobile equivalente a ClienteRow. Tap en cualquier parte (menos el
+ * botón WhatsApp) abre el ClienteSheet con el detalle. Touch target del
+ * WhatsApp ≥ 44px independiente del icono visual.
+ */
+function ClienteCard({
+  c,
+  showEmpresa,
+  onTap,
+}: {
+  c: Cliente;
+  showEmpresa: boolean;
+  onTap: () => void;
+}) {
+  const fmt = formatDeltaRatio(c.delta);
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onTap}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTap(); } }}
+      className="flex items-stretch gap-1 rounded-lg border border-stone-200 bg-white active:bg-stone-50"
+    >
+      <div className="flex-1 px-4 py-3.5">
+        <div className="flex items-baseline justify-between gap-2">
+          <div className="min-w-0 flex-1 truncate text-[15px] font-medium leading-tight text-stone-950">
+            {c.nombre}
+          </div>
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] text-stone-500">
+          <span className="font-mono">{c.id}</span>
+          {showEmpresa && c.empresa && (
+            <>
+              <span aria-hidden className="opacity-50">·</span>
+              <span className="truncate">{c.empresa}</span>
+            </>
+          )}
+        </div>
+
+        <div className="mt-3 flex items-baseline gap-3">
+          <div className="font-mono text-base font-medium tabular-nums text-stone-950">
+            {fmtMoneyCompact(c.ytd)}
+          </div>
+          <div className={cn("font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
+            {fmt.arrow && <span className="mr-0.5">{fmt.arrow}</span>}
+            {fmt.displayValue}
+          </div>
+          <div className="ml-auto truncate text-[11px] text-stone-500">
+            {c.ultima || "—"}
+          </div>
+        </div>
+      </div>
+
+      {c.wa ? (
+        <a
+          href={`https://wa.me/${c.wa.replace("+","")}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Enviar WhatsApp a ${c.nombre}`}
+          onClick={e => e.stopPropagation()}
+          className="flex w-12 flex-shrink-0 items-center justify-center text-[#25D366] active:bg-stone-100"
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.4-1.5-.9-.8-1.5-1.8-1.6-2.1-.2-.3 0-.4.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.6-1.5-.9-2.1-.2-.5-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4 0 1.4 1 2.8 1.2 3 .1.2 2.1 3.2 5.1 4.5 1.8.7 2.5.8 3.4.7.5-.1 1.7-.7 2-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3z M12 2C6.5 2 2 6.5 2 12c0 1.7.4 3.3 1.2 4.7L2 22l5.3-1.2c1.4.7 3 1.1 4.7 1.1 5.5 0 10-4.5 10-10S17.5 2 12 2zm0 18c-1.5 0-3-.4-4.3-1.1l-.3-.2-3.2.7.7-3-.2-.4C4 14.6 4 13.3 4 12c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8z"/></svg>
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
+/** Card mobile equivalente a OtrosRow. Bg gris, sin WhatsApp; tap abre Dialog. */
+function OtrosCard({ c, onTap }: { c: Cliente; onTap: () => void }) {
+  const fmt = formatDeltaRatio(c.delta);
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onTap}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTap(); } }}
+      className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3.5 active:bg-stone-100"
+    >
+      <div className="text-[15px] font-medium leading-tight text-stone-950">{c.nombre}</div>
+      <div className="mt-1 text-[11px] text-stone-500">Ver detalle de huérfanos sin master</div>
+      <div className="mt-3 flex items-baseline gap-3">
+        <div className="font-mono text-base font-medium tabular-nums text-stone-950">
+          {fmtMoneyCompact(c.ytd)}
+        </div>
+        <div className={cn("font-mono text-xs tabular-nums", TONE_LIGHT[fmt.tone])}>
+          {fmt.arrow && <span className="mr-0.5">{fmt.arrow}</span>}
+          {fmt.displayValue}
+        </div>
+        <div className="ml-auto text-[11px] text-stone-500">{c.ultima || "—"}</div>
+      </div>
+    </div>
   );
 }
 
