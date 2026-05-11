@@ -142,6 +142,16 @@ export type VendedorasPeriodo = {
   tickets_total: number;
   ventas_total_prev: number;
   tickets_total_prev: number;
+  /** MAX(fecha) con data en el período actual. ISO YYYY-MM-DD.
+   *  null cuando no hay data en el período actual (período futuro o vacío). */
+  fecha_corte: string | null;
+  /** true cuando el período seleccionado contiene la fecha actual del
+   *  calendario, false cuando ya cerró. */
+  es_periodo_parcial: boolean;
+  /** Fecha tope aplicada al período del año anterior (mismo offset de
+   *  días desde el inicio que fecha_corte). null cuando no hay data
+   *  en el período actual. */
+  dia_corte_anio_anterior: string | null;
 };
 
 export type Multifashion = {
