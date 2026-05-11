@@ -10,7 +10,8 @@ import type { Clientes, Cliente } from "./types";
 import { fmtMoney } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
-import { ClienteHoverCard, type HistorialState } from "./ClienteHoverCard";
+import { ClienteHoverCard, type HistorialState, type CxcAgingState } from "./ClienteHoverCard";
+import { ClienteSheet } from "./ClienteSheet";
 import { OtrosClientesDialog } from "./OtrosClientesDialog";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 
@@ -62,6 +63,8 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
   const [sortBy, setSortBy] = useState<SortKey>("ultima");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [otrosOpen, setOtrosOpen] = useState(false);
+  // Cliente seleccionado para el ClienteSheet en mobile. null = sheet cerrado.
+  const [sheetCliente, setSheetCliente] = useState<Cliente | null>(null);
 
   // Pill click → refetch desde server (la branching cliente/empresa vive en queries.ts)
   const onEmpresaChange = async (next: string) => {
@@ -87,41 +90,77 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
     }
   };
 
-  // Cache de historial-mensual por (codigo + empresaKey). Lazy: solo se
-  // popula al primer hover sobre cada cliente. Segundo hover = instantáneo.
+  // Caches por (codigo + empresaKey). Lazy: se popula al primer hover/tap
+  // sobre cada cliente. Cargas subsecuentes = instantáneas. Histórico y
+  // CXC se cargan en paralelo desde el mismo trigger.
   const [historialCache, setHistorialCache] = useState<Record<string, HistorialState>>({});
-  const inFlightRef = useRef<Set<string>>(new Set());
+  const [cxcCache, setCxcCache] = useState<Record<string, CxcAgingState>>({});
+  const histInFlight = useRef<Set<string>>(new Set());
+  const cxcInFlight = useRef<Set<string>>(new Set());
 
-  const loadHistorial = useCallback((codigo: string, empresaKey: string) => {
-    const key = `${codigo}|${empresaKey}`;
-    if (inFlightRef.current.has(key)) return;
-    setHistorialCache(prev => {
-      if (prev[key] && prev[key].status !== "idle") return prev;
-      return { ...prev, [key]: { status: "loading" } };
-    });
-    inFlightRef.current.add(key);
-
-    fetch(`/api/clientes/${encodeURIComponent(codigo)}/historial-mensual?empresa=${encodeURIComponent(empresaKey)}`)
-      .then(async r => {
-        if (!r.ok) {
-          const body = await r.json().catch(() => ({}));
-          throw new Error(body.error || `HTTP ${r.status}`);
+  /** Dispara ambos fetches en paralelo. cxcScope = filtro del ClientesView,
+   *  "todas" agrega saldo de todas las empresas; key específica filtra esa. */
+  const loadDetail = useCallback(
+    (codigo: string, empresaKey: string, cxcScope: string) => {
+      // ── Histórico mensual ──
+      const histKey = `${codigo}|${empresaKey}`;
+      if (!histInFlight.current.has(histKey)) {
+        let triggerHist = false;
+        setHistorialCache(prev => {
+          if (prev[histKey] && prev[histKey].status !== "idle") return prev;
+          triggerHist = true;
+          return { ...prev, [histKey]: { status: "loading" } };
+        });
+        if (triggerHist) {
+          histInFlight.current.add(histKey);
+          fetch(`/api/clientes/${encodeURIComponent(codigo)}/historial-mensual?empresa=${encodeURIComponent(empresaKey)}`)
+            .then(async r => {
+              if (!r.ok) {
+                const body = await r.json().catch(() => ({}));
+                throw new Error(body.error || `HTTP ${r.status}`);
+              }
+              return r.json();
+            })
+            .then(data => setHistorialCache(prev => ({ ...prev, [histKey]: { status: "ready", data } })))
+            .catch(err => setHistorialCache(prev => ({
+              ...prev,
+              [histKey]: { status: "error", message: err?.message ?? "Error al cargar" },
+            })))
+            .finally(() => { histInFlight.current.delete(histKey); });
         }
-        return r.json();
-      })
-      .then(data => {
-        setHistorialCache(prev => ({ ...prev, [key]: { status: "ready", data } }));
-      })
-      .catch(err => {
-        setHistorialCache(prev => ({
-          ...prev,
-          [key]: { status: "error", message: err?.message ?? "Error al cargar" },
-        }));
-      })
-      .finally(() => {
-        inFlightRef.current.delete(key);
-      });
-  }, []);
+      }
+
+      // ── CXC aging ──
+      const cxcKey = `${codigo}|${cxcScope}`;
+      if (!cxcInFlight.current.has(cxcKey)) {
+        let triggerCxc = false;
+        setCxcCache(prev => {
+          if (prev[cxcKey] && prev[cxcKey].status !== "idle") return prev;
+          triggerCxc = true;
+          return { ...prev, [cxcKey]: { status: "loading" } };
+        });
+        if (triggerCxc) {
+          cxcInFlight.current.add(cxcKey);
+          const cxcUrl = `/api/cxc/aging-por-cliente/${encodeURIComponent(codigo)}?empresa=${encodeURIComponent(cxcScope)}`;
+          fetch(cxcUrl)
+            .then(async r => {
+              if (!r.ok) {
+                const body = await r.json().catch(() => ({}));
+                throw new Error(body.error || `HTTP ${r.status}`);
+              }
+              return r.json();
+            })
+            .then(data => setCxcCache(prev => ({ ...prev, [cxcKey]: { status: "ready", data } })))
+            .catch(err => setCxcCache(prev => ({
+              ...prev,
+              [cxcKey]: { status: "error", message: err?.message ?? "Error al cargar" },
+            })))
+            .finally(() => { cxcInFlight.current.delete(cxcKey); });
+        }
+      }
+    },
+    []
+  );
 
   // Vista 12m (universo rolling) vs YTD strict — el universo cambia con
   // el sort: cuando el usuario ordena por última compra quiere ver a TODOS
@@ -189,9 +228,6 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
       const q = search.toLowerCase();
       r = r.filter(c => c.nombre.toLowerCase().includes(q) || c.id.toLowerCase().includes(q));
     }
-    // Inyectar fila Otros antes del sort para que se posicione según su
-    // total acumulado, igual que cualquier otra fila.
-    if (otrosRow) r.push(otrosRow);
     r.sort((a, b) => {
       const sign = sortDir === "asc" ? 1 : -1;
       switch (sortBy) {
@@ -203,6 +239,11 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
         case "ultima":  return a.ultimaIso.localeCompare(b.ultimaIso) * sign;
       }
     });
+    // La fila "Otros clientes" no participa del sort: se ancla al final
+    // independiente del criterio. Razón: es una agregación de huérfanos
+    // que no compite con clientes individuales — colocarla al fondo evita
+    // que se mezcle entre clientes reales y confunda la lectura.
+    if (otrosRow) r.push(otrosRow);
     return r;
   }, [universe, search, sortBy, sortDir, otrosRow]);
 
@@ -210,6 +251,14 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
     if (sortBy === col) setSortDir(sortDir === "asc" ? "desc" : "asc");
     else { setSortBy(col); setSortDir(col === "nombre" || col === "empresa" ? "asc" : "desc"); }
   };
+
+  // Lookup helpers para HoverCard/Sheet
+  const histKeyFor = (c: Cliente) => `${c.id}|${c.empresaKey}`;
+  const cxcKeyFor = (c: Cliente) => `${c.id}|${empresa}`;
+  const histStateFor = (c: Cliente): HistorialState =>
+    historialCache[histKeyFor(c)] ?? { status: "idle" };
+  const cxcStateFor = (c: Cliente): CxcAgingState =>
+    cxcCache[cxcKeyFor(c)] ?? { status: "idle" };
 
   return (
     <div className={cn("space-y-3", loading && "opacity-60 pointer-events-none transition-opacity")}>
@@ -301,14 +350,14 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
                     />
                   );
                 }
-                const cacheKey = `${c.id}|${c.empresaKey}`;
-                const state = historialCache[cacheKey] ?? { status: "idle" as const };
                 return (
                   <ClienteRow
                     key={`${c.empresaKey}-${c.id}-${c.rank}`}
                     c={c}
-                    state={state}
-                    onFirstHover={() => loadHistorial(c.id, c.empresaKey)}
+                    histState={histStateFor(c)}
+                    cxcState={cxcStateFor(c)}
+                    onTriggerDetail={() => loadDetail(c.id, c.empresaKey, empresa)}
+                    onMobileTap={() => setSheetCliente(c)}
                   />
                 );
               })}
@@ -328,18 +377,39 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
         orphans={orphans}
         showEmpresaColumn={empresa === "todas"}
       />
+
+      {/* Sheet mobile: equivalente del HoverCard desktop. Aparece sólo
+          en `md:hidden` (su breakpoint interno). El cliente seleccionado
+          dispara loadDetail() vía onFirstHover del card. */}
+      <ClienteSheet
+        open={!!sheetCliente}
+        onClose={() => setSheetCliente(null)}
+        nombre={sheetCliente?.nombre ?? ""}
+        codigo={sheetCliente?.id ?? ""}
+        empresa={sheetCliente?.empresa ?? ""}
+        ultima={sheetCliente?.ultima ?? ""}
+        historial={sheetCliente ? histStateFor(sheetCliente) : { status: "idle" }}
+        cxc={sheetCliente ? cxcStateFor(sheetCliente) : { status: "idle" }}
+        onFirstHover={() => {
+          if (sheetCliente) loadDetail(sheetCliente.id, sheetCliente.empresaKey, empresa);
+        }}
+      />
     </div>
   );
 }
 
 function ClienteRow({
   c,
-  state,
-  onFirstHover,
+  histState,
+  cxcState,
+  onTriggerDetail,
+  onMobileTap,
 }: {
   c: Cliente;
-  state: HistorialState;
-  onFirstHover: () => void;
+  histState: HistorialState;
+  cxcState: CxcAgingState;
+  onTriggerDetail: () => void;
+  onMobileTap: () => void;
 }) {
   const fmt = formatDeltaRatio(c.delta);
   const isMultiEmpresa = c.empresas_count > 1 && (c.empresas_breakdown?.length ?? 0) > 1;
@@ -348,16 +418,20 @@ function ClienteRow({
     <tr className="cursor-pointer transition hover:bg-stone-50">
       <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">{c.rank}</td>
       <td className="border-b border-stone-200 px-3.5 py-3 text-sm text-stone-950">
-        {/*
-          HoverCard solo se monta en desktop (md+). En mobile el trigger
-          renderiza como inline-block normal sin abrir nada — no usamos
-          BottomSheet en este sprint para evitar bloquear el merge; queda
-          como follow-up.
-        */}
+        {/* Desktop (md+): HoverCard con popover. Mobile (< md): el mismo
+            botón dispara onMobileTap → abre ClienteSheet en el padre. */}
         <HoverCard openDelay={250} closeDelay={100}>
           <HoverCardTrigger asChild>
             <button
               type="button"
+              onClick={(e) => {
+                // En desktop el HoverCard maneja el open via hover; el click
+                // sólo activa el flow mobile. md+ ignora el tap-to-open.
+                if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
+                  e.preventDefault();
+                  onMobileTap();
+                }
+              }}
               className="block max-w-full text-left font-medium leading-tight hover:text-teal-700 md:cursor-help"
             >
               {c.nombre}
@@ -366,14 +440,16 @@ function ClienteRow({
           <HoverCardContent
             side="right"
             align="start"
-            className="hidden w-[280px] md:block"
+            className="hidden w-[320px] md:block"
           >
             <ClienteHoverCard
               nombre={c.nombre}
               codigo={c.id}
+              empresa={c.empresa}
               ultima={c.ultima}
-              state={state}
-              onFirstHover={onFirstHover}
+              historial={histState}
+              cxc={cxcState}
+              onFirstHover={onTriggerDetail}
             />
           </HoverCardContent>
         </HoverCard>
