@@ -37,16 +37,6 @@ const SORT_LABELS: Record<SortKey, string> = {
   ultima:  "última compra",
 };
 
-// Label corto para el botón de sort en mobile (más compacto que SORT_LABELS).
-const SORT_LABELS_SHORT: Record<SortKey, string> = {
-  rank:    "Rank",
-  nombre:  "Cliente",
-  empresa: "Empresa",
-  ytd:     "Compras YTD",
-  delta:   "Δ vs 2025",
-  ultima:  "Última compra",
-};
-
 const EMPRESA_PILLS: { id: string; label: string }[] = [
   { id: "todas",                label: "Todas" },
   { id: "vistana",              label: "Vistana International" },
@@ -257,16 +247,17 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
           </div>
 
           {/* Sort button — visible sólo en mobile (md-). En desktop se usan
-              los headers de columna clickeables. */}
+              los headers de columna clickeables. Texto fijo "Ordenar" para
+              dejar más ancho al buscador; la opción actual + dirección se
+              muestran adentro del SortSheet al abrirlo. */}
           <button
             type="button"
             onClick={() => setSortOpen(true)}
-            className="inline-flex h-10 items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3 text-xs font-medium text-stone-700 active:bg-stone-100 md:hidden"
+            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3 text-xs font-medium text-stone-700 active:bg-stone-100 md:hidden"
             aria-label="Ordenar lista"
           >
             <ArrowUpDown className="h-3.5 w-3.5 text-stone-500" />
-            <span>{SORT_LABELS_SHORT[sortBy]}</span>
-            <span className="text-stone-500">{sortDir === "desc" ? "↓" : "↑"}</span>
+            <span>Ordenar</span>
           </button>
 
           {/* Counter + chip de vista — desktop: una línea. Mobile: apilado debajo. */}
@@ -290,14 +281,16 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
           </div>
         </div>
 
-        {/* Counter mobile — apilado debajo de la primera fila. */}
-        <div className="flex flex-wrap items-center gap-2 text-[11px] text-stone-500 md:hidden">
-          <span>
+        {/* Counter mobile — texto en línea 1, chip de vista debajo en
+            línea 2 con 6px de separación. Evita que el chip quede pegado
+            al texto y dé sensación de amontonamiento. */}
+        <div className="md:hidden">
+          <div className="text-[11px] text-stone-500">
             <span className="font-mono text-stone-950">{filtered.length}</span> clientes · {is12mView ? "últimos 12m" : `YTD ${new Date().getFullYear()}`}
-          </span>
+          </div>
           <span
             className={cn(
-              "rounded px-1.5 py-0.5 text-[10px] font-medium",
+              "mt-1.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium",
               is12mView ? "bg-teal-50 text-teal-700" : "bg-stone-100 text-stone-700"
             )}
           >
@@ -317,10 +310,14 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
                   disabled={loading}
                   style={{ scrollSnapAlign: "start" }}
                   className={cn(
-                    "min-h-[40px] whitespace-nowrap rounded-full px-4 py-2.5 text-xs font-medium transition",
+                    // Box-sizing idéntico entre estados: ambos llevan border
+                    // para que el activo no crezca 1px respecto al inactivo.
+                    // Sólo cambian bg, text, y el color del border (mismo
+                    // color que el bg en activo para que sea invisible).
+                    "min-h-[40px] whitespace-nowrap rounded-full border px-4 py-2.5 text-xs font-medium transition",
                     active
-                      ? "bg-teal-700 text-white"
-                      : "bg-stone-100 text-stone-700 hover:bg-stone-200"
+                      ? "border-teal-700 bg-teal-700 text-white"
+                      : "border-stone-200 bg-white text-stone-700"
                   )}
                 >
                   {p.label}
