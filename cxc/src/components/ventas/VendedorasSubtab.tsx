@@ -27,6 +27,52 @@ const MES_FULL = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
+const MES_SHORT = [
+  "Ene", "Feb", "Mar", "Abr", "May", "Jun",
+  "Jul", "Ago", "Sep", "Oct", "Nov", "Dic",
+];
+
+// Parsea "YYYY-MM-DD" como fecha local (sin shift de UTC).
+function parseIsoDate(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// "lunes 11 de mayo 2026" — español Panamá sin comas ni "de" después del año.
+function formatFechaCortePA(iso: string): string {
+  const d = parseIsoDate(iso);
+  const weekday = new Intl.DateTimeFormat("es-PA", { weekday: "long" }).format(d);
+  const day = d.getDate();
+  const month = new Intl.DateTimeFormat("es-PA", { month: "long" }).format(d);
+  const year = d.getFullYear();
+  return `${weekday} ${day} de ${month} ${year}`;
+}
+
+// Construye la cola "Comparativo vs ..." según el período activo.
+//   mes:       "Comparativo vs Mayo 1–11 2025"
+//   trimestre: "Comparativo vs Q2 2025 (al 11 May)"
+//   ytd:       "Comparativo vs YTD 2025 (Ene 1 – 11 May)"
+function buildComparativoLabel(
+  periodo: VendedorasPeriodoTipo,
+  year: number,
+  mes: number,
+  trimestre: number,
+  diaCorteAnioAnterior: string,
+): string {
+  const prevYear = year - 1;
+  const corte = parseIsoDate(diaCorteAnioAnterior);
+  const corteDay = corte.getDate();
+  const corteMonthShort = MES_SHORT[corte.getMonth()];
+
+  if (periodo === "mes") {
+    return `Comparativo vs ${MES_FULL[mes - 1]} 1–${corteDay} ${prevYear}`;
+  }
+  if (periodo === "trimestre") {
+    return `Comparativo vs Q${trimestre} ${prevYear} (al ${corteDay} ${corteMonthShort})`;
+  }
+  return `Comparativo vs YTD ${prevYear} (Ene 1 – ${corteDay} ${corteMonthShort})`;
+}
+
 const TONE_LIGHT: Record<DeltaTone, string> = {
   emerald: "text-emerald-600",
   orange:  "text-red-600",
@@ -175,6 +221,12 @@ export function VendedorasSubtab({ data }: VendedorasSubtabProps) {
             <span className={cn("font-mono tabular-nums", TONE_LIGHT[totalDelta.tone])}>
               {totalDelta.arrow}{totalDelta.arrow ? " " : ""}{totalDelta.displayValue}
             </span>
+          </p>
+        )}
+        {resp?.es_periodo_parcial && resp.fecha_corte && resp.dia_corte_anio_anterior && (
+          <p className="mt-1 text-xs text-stone-500">
+            Actualizado al {formatFechaCortePA(resp.fecha_corte)} ·{" "}
+            {buildComparativoLabel(periodo, year, mes, trimestre, resp.dia_corte_anio_anterior)}
           </p>
         )}
       </div>
