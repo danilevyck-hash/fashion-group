@@ -148,9 +148,14 @@ export type VendedorasPeriodo = {
   /** true cuando el período seleccionado contiene la fecha actual del
    *  calendario, false cuando ya cerró. */
   es_periodo_parcial: boolean;
-  /** Fecha tope aplicada al período del año anterior (mismo offset de
-   *  días desde el inicio que fecha_corte). null cuando no hay data
-   *  en el período actual. */
+  /** Fecha tope aplicada al período inmediatamente anterior (mes/trim
+   *  anterior; para ytd sigue siendo año anterior). ISO YYYY-MM-DD.
+   *  Mismo offset de días desde el inicio que fecha_corte. null cuando
+   *  no hay data en el período actual. */
+  dia_corte_periodo_anterior: string | null;
+  /** @deprecated Mantener para compatibilidad transicional: respuesta
+   *  duplicada de `dia_corte_periodo_anterior` mientras Vercel propaga
+   *  el frontend nuevo. Eliminar en sesión 4+. */
   dia_corte_anio_anterior: string | null;
 };
 
