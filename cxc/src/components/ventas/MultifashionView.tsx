@@ -2,7 +2,9 @@
 
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TrendingUp, CalendarRange, Users, UserCircle } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { Multifashion, Vendedora, RetailMonthly } from "./types";
 import { fmtMoney, fmtPct, deltaSymbol } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
@@ -14,7 +16,44 @@ const VENDEDORA_TONE: Record<DeltaTone, string> = {
   stone:   "text-stone-500",
 };
 
+const SUBTAB_TRIGGER_CLASS =
+  "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-3 py-2 text-xs text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none";
+
 export function MultifashionView({ data }: { data: Multifashion }) {
+  return (
+    <Tabs defaultValue="overview" className="w-full">
+      <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-stone-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
+        <TabsTrigger value="overview" className={SUBTAB_TRIGGER_CLASS}>
+          <TrendingUp className="h-3 w-3" /> Overview
+        </TabsTrigger>
+        <TabsTrigger value="mes" className={SUBTAB_TRIGGER_CLASS}>
+          <CalendarRange className="h-3 w-3" /> Mes en curso
+        </TabsTrigger>
+        <TabsTrigger value="vendedoras" className={SUBTAB_TRIGGER_CLASS}>
+          <Users className="h-3 w-3" /> Vendedoras
+        </TabsTrigger>
+        <TabsTrigger value="clientes" className={SUBTAB_TRIGGER_CLASS}>
+          <UserCircle className="h-3 w-3" /> Clientes
+        </TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="overview" className="mt-5">
+        <OverviewSubtab data={data} />
+      </TabsContent>
+      <TabsContent value="mes" className="mt-5">
+        <PlaceholderSubtab icon={CalendarRange} label="Mes en curso" />
+      </TabsContent>
+      <TabsContent value="vendedoras" className="mt-5">
+        <PlaceholderSubtab icon={Users} label="Vendedoras" />
+      </TabsContent>
+      <TabsContent value="clientes" className="mt-5">
+        <PlaceholderSubtab icon={UserCircle} label="Clientes" />
+      </TabsContent>
+    </Tabs>
+  );
+}
+
+function OverviewSubtab({ data }: { data: Multifashion }) {
   const pctMeta = data.ytdVentas / data.metaAnual;
   const proyeccion = data.ytdVentas / data.expectedTodayPct;
 
@@ -134,6 +173,17 @@ export function MultifashionView({ data }: { data: Multifashion }) {
       </section>
 
     </div>
+  );
+}
+
+function PlaceholderSubtab({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
+  return (
+    <Card className="flex min-h-[200px] flex-col items-center justify-center gap-3 p-12 text-center">
+      <Icon className="h-10 w-10 text-stone-400" strokeWidth={1.5} />
+      <p className="text-sm text-stone-500">
+        <span className="font-medium text-stone-600">{label}</span> · Próximamente
+      </p>
+    </Card>
   );
 }
 
