@@ -62,3 +62,5 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json(data as VendedorasPeriodo);
 }
+
+// force rebuild 1778535711
