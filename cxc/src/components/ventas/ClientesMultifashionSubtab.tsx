@@ -1,15 +1,21 @@
 "use client";
 
-// Sub-tab "Clientes" de Multifashion — layout tabla compacta.
+// Sub-tab "Clientes" de Multifashion — layout tabla compacta con pills
+// de período arriba.
+//
+// Pills (afectan ambas secciones):
+//   - Último mes:     1er día del mes corriente a hoy
+//   - Últimos 3 meses: today - 90 días a today
+//   - Últimos 6 meses: today - 180 días a today
+//   - Últimos 12 meses: today - 365 días a today (DEFAULT)
+//   - Año {selectedYear}: 1 ene a 31 dic del año del header global
 //
 // Dos secciones:
-//   1. Wholesale: clientes con is_wholesale=true (LA FRONTERA típico).
-//   2. Retail recurrentes: top 50 clientes retail (no wholesale, no
-//      CONTADO/CONSUMIDOR FINAL) con ≥ 2 tickets en el año.
+//   1. Wholesale: clientes con is_wholesale=true.
+//   2. Retail recurrentes: top 50 clientes retail con ≥ 2 tickets y
+//      SUM(subtotal) > 0 en el rango.
 //
-// Filas finas (~36-44px). Sparkline NO visible por defecto; click en una
-// row la expande mostrando histórico mensual. Solo un cliente expandido
-// a la vez (se colapsa el anterior). Click de nuevo colapsa.
+// Click en una row expande sparkline mensual (un cliente expandido a la vez).
 
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
@@ -19,7 +25,10 @@ import { cn } from "@/lib/utils";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
+type PeriodoType = "last_month" | "last_3m" | "last_6m" | "last_12m" | "year";
+
 interface MesRow {
+  mes_anio: number;
   mes_idx: number;
   mes_label: string;
   ventas: number;
@@ -36,7 +45,8 @@ interface ClienteRow {
 }
 
 interface WholesaleResp {
-  anio: number;
+  fecha_inicio: string;
+  fecha_fin: string;
   total_clientes: number;
   total_ventas: number;
   total_tickets: number;
@@ -44,7 +54,8 @@ interface WholesaleResp {
 }
 
 interface RetailResp {
-  anio: number;
+  fecha_inicio: string;
+  fecha_fin: string;
   limit: number;
   total_clientes: number;
   total_ventas: number;
@@ -70,15 +81,69 @@ function formatFechaShort(iso: string | null): string {
   return `${d.getDate()} ${MES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+function toIsoDate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+// Resuelve el rango (fecha_inicio, fecha_fin) según el pill activo.
+function resolveDateRange(periodo: PeriodoType, selectedYear: number): { fecha_inicio: string; fecha_fin: string } {
+  const today = new Date();
+  switch (periodo) {
+    case "last_month": {
+      const inicio = new Date(today.getFullYear(), today.getMonth(), 1);
+      return { fecha_inicio: toIsoDate(inicio), fecha_fin: toIsoDate(today) };
+    }
+    case "last_3m": {
+      const inicio = new Date(today.getTime() - 90 * 86400000);
+      return { fecha_inicio: toIsoDate(inicio), fecha_fin: toIsoDate(today) };
+    }
+    case "last_6m": {
+      const inicio = new Date(today.getTime() - 180 * 86400000);
+      return { fecha_inicio: toIsoDate(inicio), fecha_fin: toIsoDate(today) };
+    }
+    case "last_12m": {
+      const inicio = new Date(today.getTime() - 365 * 86400000);
+      return { fecha_inicio: toIsoDate(inicio), fecha_fin: toIsoDate(today) };
+    }
+    case "year": {
+      return { fecha_inicio: `${selectedYear}-01-01`, fecha_fin: `${selectedYear}-12-31` };
+    }
+  }
+}
+
+function periodoLabel(periodo: PeriodoType, selectedYear: number): string {
+  switch (periodo) {
+    case "last_month": return "último mes";
+    case "last_3m":    return "últimos 3 meses";
+    case "last_6m":    return "últimos 6 meses";
+    case "last_12m":   return "últimos 12 meses";
+    case "year":       return String(selectedYear);
+  }
+}
+
+const PILLS: { id: PeriodoType; label: string }[] = [
+  { id: "last_month", label: "Último mes" },
+  { id: "last_3m",    label: "Últimos 3 meses" },
+  { id: "last_6m",    label: "Últimos 6 meses" },
+  { id: "last_12m",   label: "Últimos 12 meses" },
+  { id: "year",       label: "" },  // label dinámico (Año X)
+];
+
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashionSubtabProps) {
+  const [periodo, setPeriodo] = useState<PeriodoType>("last_12m");
   const [wholesale, setWholesale] = useState<WholesaleResp | null>(null);
   const [retail, setRetail] = useState<RetailResp | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Solo un cliente expandido a la vez (string global = sectionPrefix + nombre).
   const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const range = useMemo(() => resolveDateRange(periodo, selectedYear), [periodo, selectedYear]);
+  const periodoStr = useMemo(() => periodoLabel(periodo, selectedYear), [periodo, selectedYear]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -86,8 +151,10 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
     setError(null);
     setExpandedId(null);
 
+    const qs = `fecha_inicio=${range.fecha_inicio}&fecha_fin=${range.fecha_fin}`;
+
     Promise.all([
-      fetch(`/api/multifashion/clientes-wholesale?year=${selectedYear}`, {
+      fetch(`/api/multifashion/clientes-wholesale?${qs}`, {
         cache: "no-store",
         signal: ctrl.signal,
       }).then(async r => {
@@ -97,7 +164,7 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
         }
         return r.json() as Promise<WholesaleResp>;
       }),
-      fetch(`/api/multifashion/retail-recurrentes?year=${selectedYear}`, {
+      fetch(`/api/multifashion/retail-recurrentes?${qs}`, {
         cache: "no-store",
         signal: ctrl.signal,
       }).then(async r => {
@@ -120,7 +187,7 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
       .finally(() => setLoading(false));
 
     return () => ctrl.abort();
-  }, [selectedYear]);
+  }, [range.fecha_inicio, range.fecha_fin]);
 
   // Pico mensual compartido (escala visual unificada entre ambas secciones).
   const peakMes = useMemo(() => Math.max(
@@ -129,58 +196,87 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
     1,
   ), [wholesale, retail]);
 
+  // ¿El rango cruza años? Determina si las labels de los buckets deben
+  // incluir año (ej. "May '25" vs "May").
+  const spansYears = useMemo(() => {
+    return range.fecha_inicio.slice(0, 4) !== range.fecha_fin.slice(0, 4);
+  }, [range.fecha_inicio, range.fecha_fin]);
+
   const toggleRow = (id: string) => {
     setExpandedId(prev => prev === id ? null : id);
   };
 
-  if (loading && !wholesale && !retail) {
-    return (
-      <Card className="flex min-h-[200px] items-center justify-center p-12 text-sm text-stone-500">
-        Cargando clientes…
-      </Card>
-    );
-  }
-  if (error) {
-    return (
-      <Card className="rounded-md border border-orange-200 bg-orange-50 p-4 text-xs text-orange-900">
-        No se pudo cargar la lista: {error}
-      </Card>
-    );
-  }
-
   return (
-    <div className={cn("space-y-8", loading && "opacity-60 pointer-events-none transition-opacity")}>
-      {/* Sección 1: Wholesale */}
-      <ClientesSection
-        prefix="ws"
-        title="Wholesale"
-        subtitle={wholesale
-          ? `${wholesale.total_clientes} ${wholesale.total_clientes === 1 ? "cliente" : "clientes"} · ${fmtMoney(wholesale.total_ventas)} · ${wholesale.total_tickets.toLocaleString()} tickets`
-          : "—"}
-        icon={<Package className="h-4 w-4" />}
-        iconTone="amber"
-        clientes={wholesale?.clientes ?? []}
-        peakMes={peakMes}
-        expandedId={expandedId}
-        onToggleRow={toggleRow}
-        emptyText={`No hay clientes wholesale registrados en ${selectedYear}.`}
-      />
+    <div className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
+      {/* Pills de período */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {PILLS.map(p => {
+          const label = p.id === "year" ? `Año ${selectedYear}` : p.label;
+          const active = periodo === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => setPeriodo(p.id)}
+              className={cn(
+                "whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
+                active
+                  ? "border-teal-700 bg-teal-700 text-white"
+                  : "border-stone-300 bg-white text-stone-700 hover:border-stone-400",
+              )}
+              aria-pressed={active}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
 
-      {/* Sección 2: Retail recurrentes */}
-      <ClientesSection
-        prefix="rt"
-        title="Retail recurrentes"
-        subtitle={retail
-          ? `Top ${retail.limit} · ≥ 2 visitas en ${selectedYear} · ${fmtMoney(retail.total_ventas)} · ${retail.total_tickets.toLocaleString()} tickets`
-          : "—"}
-        icon={<Users className="h-4 w-4" />}
-        iconTone="teal"
-        clientes={retail?.clientes ?? []}
-        peakMes={peakMes}
-        expandedId={expandedId}
-        onToggleRow={toggleRow}
-        emptyText={`No hay clientes retail recurrentes (con ≥ 2 visitas en ${selectedYear}).`}
-      />
+      {error ? (
+        <Card className="rounded-md border border-orange-200 bg-orange-50 p-4 text-xs text-orange-900">
+          No se pudo cargar la lista: {error}
+        </Card>
+      ) : loading && !wholesale && !retail ? (
+        <Card className="flex min-h-[200px] items-center justify-center p-12 text-sm text-stone-500">
+          Cargando clientes…
+        </Card>
+      ) : (
+        <div className="space-y-8">
+          {/* Sección 1: Wholesale */}
+          <ClientesSection
+            prefix="ws"
+            title="Wholesale"
+            subtitle={wholesale
+              ? `${wholesale.total_clientes} ${wholesale.total_clientes === 1 ? "cliente" : "clientes"} · ${fmtMoney(wholesale.total_ventas)} · ${wholesale.total_tickets.toLocaleString()} ${wholesale.total_tickets === 1 ? "ticket" : "tickets"}`
+              : "—"}
+            icon={<Package className="h-4 w-4" />}
+            iconTone="amber"
+            clientes={wholesale?.clientes ?? []}
+            peakMes={peakMes}
+            spansYears={spansYears}
+            expandedId={expandedId}
+            onToggleRow={toggleRow}
+            emptyText={`No hay clientes wholesale en ${periodoStr}.`}
+          />
+
+          {/* Sección 2: Retail recurrentes */}
+          <ClientesSection
+            prefix="rt"
+            title="Retail recurrentes"
+            subtitle={retail
+              ? `Top ${retail.limit} · ≥ 2 visitas en ${periodoStr} · ${fmtMoney(retail.total_ventas)} · ${retail.total_tickets.toLocaleString()} tickets`
+              : "—"}
+            icon={<Users className="h-4 w-4" />}
+            iconTone="teal"
+            clientes={retail?.clientes ?? []}
+            peakMes={peakMes}
+            spansYears={spansYears}
+            expandedId={expandedId}
+            onToggleRow={toggleRow}
+            emptyText={`No hay clientes retail recurrentes (con ≥ 2 visitas) en ${periodoStr}.`}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -189,7 +285,7 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
 
 function ClientesSection({
   prefix, title, subtitle, icon, iconTone,
-  clientes, peakMes, expandedId, onToggleRow, emptyText,
+  clientes, peakMes, spansYears, expandedId, onToggleRow, emptyText,
 }: {
   prefix: "ws" | "rt";
   title: string;
@@ -198,6 +294,7 @@ function ClientesSection({
   iconTone: "amber" | "teal";
   clientes: ClienteRow[];
   peakMes: number;
+  spansYears: boolean;
   expandedId: string | null;
   onToggleRow: (id: string) => void;
   emptyText: string;
@@ -208,7 +305,6 @@ function ClientesSection({
 
   return (
     <section className="space-y-3">
-      {/* Header inline compacto */}
       <div className="flex items-center gap-2.5">
         <div className={cn("flex h-7 w-7 items-center justify-center rounded-md border", toneIcon)}>
           {icon}
@@ -225,11 +321,10 @@ function ClientesSection({
         </Card>
       ) : (
         <Card className="overflow-hidden p-0">
-          {/* Header de tabla */}
           <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem] items-center gap-3 border-b border-stone-200 bg-stone-50 px-3.5 py-2 text-[10.5px] font-medium uppercase tracking-[0.04em] text-stone-500">
             <span className="text-right">#</span>
             <span>Cliente</span>
-            <span className="text-right">Total YTD</span>
+            <span className="text-right">Total</span>
             <span className="text-right">Tickets</span>
             <span className="text-right">T. prom</span>
             <span className="text-right">Última</span>
@@ -240,12 +335,13 @@ function ClientesSection({
             const id = `${prefix}-${c.nombre}`;
             const isExpanded = expandedId === id;
             return (
-              <ClienteRow
+              <ClienteRowItem
                 key={id}
                 id={id}
                 rank={idx + 1}
                 cliente={c}
                 peakMes={peakMes}
+                spansYears={spansYears}
                 isExpanded={isExpanded}
                 onToggle={onToggleRow}
               />
@@ -257,13 +353,14 @@ function ClientesSection({
   );
 }
 
-function ClienteRow({
-  id, rank, cliente, peakMes, isExpanded, onToggle,
+function ClienteRowItem({
+  id, rank, cliente, peakMes, spansYears, isExpanded, onToggle,
 }: {
   id: string;
   rank: number;
   cliente: ClienteRow;
   peakMes: number;
+  spansYears: boolean;
   isExpanded: boolean;
   onToggle: (id: string) => void;
 }) {
@@ -295,7 +392,6 @@ function ClienteRow({
         )} />
       </button>
 
-      {/* Detalle expandible — sparkline mensual */}
       <div
         className={cn(
           "grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out",
@@ -303,7 +399,7 @@ function ClienteRow({
         )}
       >
         <div className="min-h-0">
-          {isExpanded && <ClienteSparkline cliente={cliente} peakMes={peakMes} />}
+          {isExpanded && <ClienteSparkline cliente={cliente} peakMes={peakMes} spansYears={spansYears} />}
         </div>
       </div>
     </div>
@@ -311,29 +407,40 @@ function ClienteRow({
 }
 
 function ClienteSparkline({
-  cliente, peakMes,
+  cliente, peakMes, spansYears,
 }: {
   cliente: ClienteRow;
   peakMes: number;
+  spansYears: boolean;
 }) {
+  // Cuando el rango cruza años, mostramos label "May '25". Sino solo "May".
+  const labelFor = (m: MesRow) => spansYears
+    ? `${m.mes_label} '${String(m.mes_anio).slice(-2)}`
+    : m.mes_label;
+
+  const cols = Math.max(cliente.meses.length, 1);
+
   return (
     <div className="bg-stone-50/40 px-4 py-4">
-      <div className="grid grid-cols-12 gap-1">
+      <div
+        className="grid gap-1"
+        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+      >
         {cliente.meses.map(m => {
           const heightPct = peakMes > 0 ? (m.ventas / peakMes) * 100 : 0;
           const hasData = m.ventas > 0;
           return (
-            <div key={m.mes_idx} className="flex flex-col items-center gap-1">
+            <div key={`${m.mes_anio}-${m.mes_idx}`} className="flex flex-col items-center gap-1">
               <div className="relative flex h-12 w-full items-end justify-center rounded-sm bg-stone-100">
                 {hasData && (
                   <div
                     className="w-full rounded-sm bg-teal-700/80 transition-all"
                     style={{ height: `${Math.max(4, heightPct)}%` }}
-                    title={`${m.mes_label}: ${fmtMoney(m.ventas)}`}
+                    title={`${labelFor(m)}: ${fmtMoney(m.ventas)}`}
                   />
                 )}
               </div>
-              <p className="text-[9.5px] font-medium uppercase text-stone-500">{m.mes_label}</p>
+              <p className="text-[9.5px] font-medium uppercase text-stone-500 whitespace-nowrap">{labelFor(m)}</p>
               <p className={cn(
                 "font-mono text-[10px] tabular-nums",
                 hasData ? "text-stone-700" : "text-stone-300",
@@ -345,7 +452,7 @@ function ClienteSparkline({
         })}
       </div>
       <p className="mt-2 text-[10.5px] text-stone-500">
-        Histórico mensual. Escala compartida entre wholesale y retail.
+        Histórico mensual del rango. Escala compartida entre wholesale y retail.
       </p>
     </div>
   );
