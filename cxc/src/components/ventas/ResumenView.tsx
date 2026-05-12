@@ -3,7 +3,6 @@
 import { useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, Info } from "lucide-react";
 import type { VentasResumen, Multifashion } from "./types";
 import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, deltaSymbol, kpiDeltaSymbol, heatmapClasses } from "@/lib/ventas/format";
@@ -28,7 +27,7 @@ interface ResumenViewProps {
 }
 
 export function ResumenView({
-  data, multi, availableYears, selectedYear, isClosedYear, loading, error, onYearChange,
+  data, multi, selectedYear, isClosedYear, loading, error,
 }: ResumenViewProps) {
   const [granularity, setGranularity] = useState<Granularity>("mensual");
   const [viewMode, setViewMode] = useState<ViewMode>("ventas");
@@ -152,18 +151,8 @@ export function ResumenView({
               </button>
             ))}
           </div>
-          <Select value={String(selectedYear)} onValueChange={v => onYearChange(parseInt(v, 10))}>
-            <SelectTrigger className="h-8 w-auto min-w-[88px] gap-1.5 text-xs font-mono tabular-nums">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {availableYears.map(y => (
-                <SelectItem key={y} value={String(y)} className="font-mono tabular-nums">
-                  {y}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Bug #1 fix: selector año global vive ahora en VentasShell header,
+              visible desde cualquier tab. No se duplica aquí. */}
           <div className="inline-flex rounded-full bg-stone-100 p-0.5 text-xs">
             {(["mensual", "trimestral"] as const).map(g => (
               <button

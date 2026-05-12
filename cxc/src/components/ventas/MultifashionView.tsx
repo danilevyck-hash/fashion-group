@@ -8,6 +8,8 @@ import type { Multifashion, RetailMonthly, WholesaleMonthly } from "./types";
 import { fmtMoney, fmtPct, deltaSymbol, MONTHS } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 import { VendedorasSubtab } from "./VendedorasSubtab";
+import { MesEnCursoSubtab } from "./MesEnCursoSubtab";
+import { ClientesMultifashionSubtab } from "./ClientesMultifashionSubtab";
 
 const SUBTAB_TRIGGER_CLASS =
   "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-3 py-2 text-xs text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none";
@@ -43,14 +45,14 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
         {isClosedYear ? (
           <PlaceholderSubtab icon={CalendarRange} label={`Año ${selectedYear} cerrado · no hay mes en curso`} />
         ) : (
-          <PlaceholderSubtab icon={CalendarRange} label="Mes en curso" />
+          <MesEnCursoSubtab selectedYear={selectedYear} />
         )}
       </TabsContent>
       <TabsContent value="vendedoras" className="mt-5">
         <VendedorasSubtab data={data} selectedYear={selectedYear} isClosedYear={isClosedYear} />
       </TabsContent>
       <TabsContent value="clientes" className="mt-5">
-        <PlaceholderSubtab icon={UserCircle} label="Clientes" />
+        <ClientesMultifashionSubtab selectedYear={selectedYear} />
       </TabsContent>
     </Tabs>
   );
@@ -256,7 +258,7 @@ function OverviewSubtab({
             <table className="w-full border-collapse" style={{ minWidth: 640 }}>
               <thead>
                 <tr className="bg-stone-100">
-                  {["Mes", "Ventas", "Tickets", "Ticket prom.", "vs 2025"].map((h, i) => (
+                  {["Mes", "Ventas", "Tickets", "Ticket prom.", `vs ${prevYear}`].map((h, i) => (
                     <th key={h} className={cn(
                       "border-b border-stone-200 px-3.5 py-2.5 text-[11px] font-medium uppercase tracking-wider text-stone-500",
                       i === 0 ? "text-left" : "text-right"
@@ -312,10 +314,18 @@ function RetailKpi({ label, value, sub }: { label: string; value: string; sub?: 
 
 function RetailRow({ row, year }: { row: RetailMonthly; year: number }) {
   const isEmpty = row.tickets === 0 && row.ventas === 0;
-  const vs = row.vs2025 ?? 0;
-  const tone =
-    vs > 0.05  ? "text-emerald-600" :
-    vs < -0.05 ? "text-red-600"     : "text-stone-500";
+  const vs = row.vs2025;
+  // Bug #2 fix: cuando prev_year era casi cero el RPC devolvía deltas
+  // gigantes (ej. +363024900% en Mayo 2025 retail). Heurística:
+  //   - vs null               → "— —"  (sin comparativo)
+  //   - |vs| > 100 (10000%)   → "n/a"   (divisor cercano a cero, no informativo)
+  //   - resto                 → "▲/▼ X%" normal
+  const vsAbsHuge = vs != null && Math.abs(vs) > 100;
+  const tone = vs == null || vsAbsHuge
+    ? "text-stone-400"
+    : vs > 0.05  ? "text-emerald-600"
+    : vs < -0.05 ? "text-red-600"
+    : "text-stone-500";
   const empty = "border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-400 tabular-nums";
   return (
     <tr>
@@ -333,7 +343,11 @@ function RetailRow({ row, year }: { row: RetailMonthly; year: number }) {
           <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-700 tabular-nums">{row.tickets.toLocaleString()}</td>
           <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-700 tabular-nums">${row.ticketProm.toFixed(2)}</td>
           <td className={cn("border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-xs tabular-nums", tone)}>
-            {deltaSymbol(row.vs2025)} {fmtPct(row.vs2025)}
+            {vs == null
+              ? "—"
+              : vsAbsHuge
+                ? "n/a"
+                : `${deltaSymbol(vs)} ${fmtPct(vs)}`}
           </td>
         </>
       )}
