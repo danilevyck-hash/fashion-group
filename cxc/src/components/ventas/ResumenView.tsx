@@ -38,6 +38,11 @@ export function ResumenView({
     startTransition(() => setViewMode(mode));
   };
 
+  // Disclaimer/footer cuando el año en curso tiene mes parcial — same-period
+  // day-by-day ya aplicado en la RPC ventas_dashboard_prev_same_period.
+  const partialFooter = buildPartialFooter(data, selectedYear);
+  const partialKpiNote = buildPartialKpiNote(data);
+
   const cols = granularity === "mensual" ? MONTHS : QUARTERS;
   const rows = data.empresas.map(e => {
     const cur  = isUtil ? e.utilidad2026 : e.ventas2026;
@@ -99,8 +104,8 @@ export function ResumenView({
 
       {/* KPI cards — 2 cols, swap content por viewMode */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <KpiCard label={kpi1Label} value={kpi1Value} sub={kpi1Sub} />
-        <KpiCard label={kpi2Label} value={kpi2Value} sub={kpi2Sub} />
+        <KpiCard label={kpi1Label} value={kpi1Value} sub={kpi1Sub} note={partialKpiNote} />
+        <KpiCard label={kpi2Label} value={kpi2Value} sub={kpi2Sub} note={partialKpiNote} />
       </div>
 
       {/* Toolbar — leyenda · [Ventas|Utilidad] · year · Mensual/Trimestral */}
@@ -223,6 +228,11 @@ export function ResumenView({
             </tbody>
           </table>
         </div>
+        {partialFooter && (
+          <p className="border-t border-stone-200 bg-stone-50 px-3.5 py-2 text-xs text-stone-500">
+            {partialFooter}
+          </p>
+        )}
       </Card>
 
       {/* Legend */}
@@ -238,7 +248,7 @@ export function ResumenView({
   );
 }
 
-function KpiCard({ label, value, sub, accent = false }: { label: string; value: string; sub?: string; accent?: boolean }) {
+function KpiCard({ label, value, sub, note, accent = false }: { label: string; value: string; sub?: string; note?: string | null; accent?: boolean }) {
   return (
     <Card className={cn(
       "p-4",
@@ -250,6 +260,7 @@ function KpiCard({ label, value, sub, accent = false }: { label: string; value: 
         accent ? "text-teal-900" : "text-stone-950"
       )}>{value}</p>
       {sub && <p className={cn("mt-1.5 text-xs", accent ? "text-teal-800" : "text-stone-500")}>{sub}</p>}
+      {note && <p className="mt-1 text-[11px] text-stone-400">{note}</p>}
     </Card>
   );
 }
@@ -474,6 +485,37 @@ function LegendItem({ swatch, label }: { swatch: string; label: string }) {
       {label}
     </span>
   );
+}
+
+const MES_FULL_RESUMEN = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+// Parsea YYYY-MM-DD como fecha local (sin shift de UTC).
+function parseIsoDateResumen(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// Footer al pie del heatmap: "Mayo 2026 en curso · Comparativo vs Mayo 1–9 2025"
+// Solo cuando el año en curso tiene mes parcial.
+function buildPartialFooter(data: VentasResumen, year: number): string | null {
+  if (!data.es_periodo_parcial || !data.fecha_corte || !data.dia_corte_anio_anterior) return null;
+  const cur = parseIsoDateResumen(data.fecha_corte);
+  const prev = parseIsoDateResumen(data.dia_corte_anio_anterior);
+  const curMonth = MES_FULL_RESUMEN[cur.getMonth()];
+  const prevMonth = MES_FULL_RESUMEN[prev.getMonth()];
+  return `${curMonth} ${year} en curso · Comparativo vs ${prevMonth} 1–${prev.getDate()} ${prev.getFullYear()}`;
+}
+
+// Chip pequeño debajo del KPI "vs prev year" cuando hay corte day-by-day.
+// Ej: "Ajustado al 9 may"
+function buildPartialKpiNote(data: VentasResumen): string | null {
+  if (!data.es_periodo_parcial || !data.fecha_corte) return null;
+  const d = parseIsoDateResumen(data.fecha_corte);
+  const mesShort = MONTHS[d.getMonth()].toLowerCase();
+  return `Ajustado al día de corte (${d.getDate()} ${mesShort})`;
 }
 
 function buildRow(
