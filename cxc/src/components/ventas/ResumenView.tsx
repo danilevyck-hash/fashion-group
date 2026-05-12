@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "lucide-react";
 import type { VentasResumen } from "./types";
 import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, deltaSymbol, heatmapClasses } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
@@ -42,13 +43,22 @@ export function ResumenView({
   // day-by-day ya aplicado en la RPC ventas_dashboard_prev_same_period.
   const partialFooter = buildPartialFooter(data, selectedYear);
   const partialKpiNote = buildPartialKpiNote(data);
+  const datePillLabel = buildDatePillLabel(data);
+  // Rango formateado del prev YTD ("1 ene – 9 may 2025") para los tooltips
+  // de las celdas Total. Se calcula UNA vez por render.
+  const prevYtdRange = buildPrevYtdRange(data, prevYear);
 
   const cols = granularity === "mensual" ? MONTHS : QUARTERS;
   const rows = data.empresas.map(e => {
     const cur  = isUtil ? e.utilidad2026 : e.ventas2026;
     const prev = isUtil ? e.utilidad2025 : e.ventas2025;
+    // Prev YTD per empresa recortado: la RPC ya devuelve prev[cur_mes]
+    // con el cutoff per-empresa aplicado, y omite meses posteriores. Sumar
+    // todo el array con null→0 da el YTD ajustado para esa empresa.
+    const prevYtd = prev.reduce<number>((s, v) => s + (v ?? 0), 0);
     return {
       ...buildRow(cur, prev, granularity, e.empresa, selectedYear),
+      prevYtd,
       margenPct: e.margenPct,
       margenPctPrev: e.margenPctPrev,
     };
@@ -62,7 +72,7 @@ export function ResumenView({
     rows.reduce((s, r) => s + (r.cells[ci].prevValue || 0), 0)
   );
   const totalYtd = rows.reduce((s, r) => s + r.total, 0);
-  const totalPrevYtd = totalColsPrev.reduce((s, v) => s + v, 0);
+  const totalPrevYtd = rows.reduce((s, r) => s + r.prevYtd, 0);
   const totalYtdDelta = totalPrevYtd > 0 ? (totalYtd - totalPrevYtd) / totalPrevYtd : null;
 
   // KPIs según modo
@@ -108,11 +118,19 @@ export function ResumenView({
         <KpiCard label={kpi2Label} value={kpi2Value} sub={kpi2Sub} note={partialKpiNote} />
       </div>
 
-      {/* Toolbar — leyenda · [Ventas|Utilidad] · year · Mensual/Trimestral */}
+      {/* Toolbar — subtitle + date pill (left) · controls (right) */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-stone-500">
-          Mostrando {isUtil ? "utilidad " : ""}{granularity === "mensual" ? "mes a mes" : "por trimestre"} · comparando vs {prevYear}
-        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs text-stone-500">
+            Mostrando {isUtil ? "utilidad " : ""}{granularity === "mensual" ? "mes a mes" : "por trimestre"} · comparando vs {prevYear}
+          </p>
+          {datePillLabel && (
+            <span className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2.5 py-0.5 text-[11px] font-medium text-stone-600">
+              <Calendar className="h-3 w-3 text-stone-400" />
+              {datePillLabel}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-full bg-stone-100 p-0.5 text-xs">
             {(["ventas", "utilidad"] as const).map(m => (
@@ -194,12 +212,11 @@ export function ResumenView({
                   ))}
                   <EmpresaTotalCell
                     total={r.total}
-                    showMargenTooltip={isUtil}
-                    empresaNombre={r.empresa.nombre}
-                    margenPct={r.margenPct}
-                    margenPctPrev={r.margenPctPrev}
+                    prevYtd={r.prevYtd}
+                    metricLabel={metricLabel}
                     selectedYear={selectedYear}
                     prevYear={prevYear}
+                    prevYtdRange={prevYtdRange}
                   />
                 </tr>
               ))}
@@ -215,14 +232,14 @@ export function ResumenView({
                     metricLabel={metricLabel}
                   />
                 ))}
-                <TotalGroupCell
-                  isAnnual
-                  value={totalYtd}
-                  prevValue={totalPrevYtd}
-                  periodLabel={`Total ${selectedYear}`}
-                  prevYear={prevYear}
-                  metricLabel={metricLabel}
+                <TotalGroupAnnualCell
+                  totalYtd={totalYtd}
+                  totalPrevYtd={totalPrevYtd}
                   delta={totalYtdDelta}
+                  metricLabel={metricLabel}
+                  selectedYear={selectedYear}
+                  prevYear={prevYear}
+                  prevYtdRange={prevYtdRange}
                 />
               </tr>
             </tbody>
@@ -329,35 +346,27 @@ function HeatCell({ cell, prevYear, metricLabel }: { cell: Cell; prevYear: numbe
 }
 
 /**
- * TOTAL anual por empresa (última columna). En modo Utilidad envuelve el
- * monto en Tooltip con margen real del año actual vs año previo. En modo
- * Ventas se renderiza como antes (sin tooltip).
+ * TOTAL anual por empresa (última columna). Muestra monto principal y Δ%
+ * YoY abajo. Tooltip al hover: YTD curYear, YTD prevYear (recortado al
+ * mismo día per-empresa), Δ% — los 3 valores cuadran con la RPC
+ * ventas_dashboard_prev_same_period.
  */
 function EmpresaTotalCell({
-  total, showMargenTooltip, empresaNombre, margenPct, margenPctPrev, selectedYear, prevYear,
+  total, prevYtd, metricLabel, selectedYear, prevYear, prevYtdRange,
 }: {
   total: number;
-  showMargenTooltip: boolean;
-  empresaNombre: string;
-  margenPct: number;
-  margenPctPrev: number;
+  prevYtd: number;
+  metricLabel: string;
   selectedYear: number;
   prevYear: number;
+  prevYtdRange: string;
 }) {
-  if (!showMargenTooltip) {
-    return (
-      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">
-        {fmtMoney(total)}
-      </td>
-    );
-  }
-  const deltaPts = (margenPct - margenPctPrev) * 100;
-  const sign = deltaPts >= 0 ? "▲ +" : "▼ ";
-  const tone =
-    Math.abs(deltaPts) < 0.1 ? "text-stone-500" :
-    deltaPts > 0              ? "text-emerald-700" : "text-orange-700";
+  const delta = prevYtd > 0 ? (total - prevYtd) / prevYtd : null;
+  const fmt = formatDeltaRatio(delta);
+  const tone = deltaTextTone(delta);
+
   return (
-    <td className="whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">
+    <td className="whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono tabular-nums">
       <TooltipProvider delayDuration={120}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -365,22 +374,31 @@ function EmpresaTotalCell({
               type="button"
               className="block w-full cursor-help px-3.5 py-2.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
             >
-              {fmtMoney(total)}
+              <span className="block text-sm font-medium text-stone-950">{fmtMoney(total)}</span>
+              <span className={cn("mt-0.5 block text-[10.5px]", tone)}>
+                {fmt.arrow ? `${fmt.arrow} ` : ""}{fmt.displayValue}{delta != null ? ` vs ${prevYear}` : ""}
+              </span>
             </button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" align="end" sideOffset={4} collisionPadding={12} className="min-w-[220px] border-0 bg-stone-950 p-3 text-white shadow-lg">
-            <div className="text-[11px] font-medium text-white">{empresaNombre}</div>
-            <div className="mt-1.5 flex justify-between gap-6 text-[11px] text-stone-300">
-              <span>{selectedYear} actual</span>
-              <span className="font-mono text-white tabular-nums">{(margenPct * 100).toFixed(1)}%</span>
+          <TooltipContent side="bottom" align="end" sideOffset={4} collisionPadding={12} className="min-w-[240px] border-0 bg-stone-950 p-3 text-white shadow-lg">
+            <div className="flex justify-between gap-6 text-[11px]">
+              <span className="text-stone-300">{metricLabel} YTD {selectedYear}</span>
+              <span className="font-mono font-medium text-white tabular-nums">{fmtMoney(total)}</span>
             </div>
-            <div className="flex justify-between gap-6 text-[11px] text-stone-300">
-              <span>{prevYear}</span>
-              <span className="font-mono text-white tabular-nums">{(margenPctPrev * 100).toFixed(1)}%</span>
+            <div className="mt-1 flex justify-between gap-6 text-[11px] text-stone-300">
+              <span>{metricLabel} YTD {prevYtdRange}</span>
+              <span className="font-mono text-white tabular-nums">{prevYtd > 0 ? fmtMoney(prevYtd) : "—"}</span>
             </div>
             <div className="mt-2 flex justify-end border-t border-white/10 pt-1.5">
-              <span className={cn("font-mono text-[11px] font-medium", tone)}>
-                {sign}{Math.abs(deltaPts).toFixed(1)} pts vs {prevYear}
+              <span className={cn(
+                "font-mono text-[11px] font-medium",
+                delta == null ? "text-stone-300" :
+                delta > 0.05  ? "text-teal-300" :
+                delta < -0.05 ? "text-orange-300" : "text-stone-300"
+              )}>
+                {delta == null
+                  ? "sin comparativo"
+                  : `${deltaSymbol(delta)} ${fmtPct(delta)} vs ${prevYear}`}
               </span>
             </div>
           </TooltipContent>
@@ -391,34 +409,28 @@ function EmpresaTotalCell({
 }
 
 /**
- * Celda de la fila TOTAL GRUPO (fondo bg-stone-950). Muestra:
- *   ▲/▼/— (color según delta) + monto (blanco)
- * con tooltip que detalla {prev | actual | delta vs prevYear}.
+ * Celda de la fila TOTAL GRUPO (fondo bg-stone-950). Muestra monto + arrow
+ * inline. Tooltip detalla prev/actual/delta. Esta función SOLO se usa para
+ * las celdas mensuales o trimestrales del total grupo — la celda anual del
+ * Total grupo vive en TotalGroupAnnualCell con layout monto+chip apilado.
  */
 function TotalGroupCell({
-  value, prevValue, periodLabel, prevYear, metricLabel, isAnnual = false, delta: deltaProp,
+  value, prevValue, periodLabel, prevYear, metricLabel,
 }: {
   value: number | null;
   prevValue: number;
   periodLabel: string;
   prevYear: number;
   metricLabel: string;
-  isAnnual?: boolean;
-  delta?: number | null;
 }) {
   if (value == null) {
     return (
-      <td className={cn(
-        "whitespace-nowrap px-2.5 py-3 text-right font-mono text-xs tabular-nums",
-        isAnnual && "px-3.5 text-sm font-semibold"
-      )}>
+      <td className="whitespace-nowrap px-2.5 py-3 text-right font-mono text-xs tabular-nums">
         <span className="text-stone-500">—</span>
       </td>
     );
   }
-  const delta = deltaProp !== undefined
-    ? deltaProp
-    : prevValue > 0 ? (value - prevValue) / prevValue : null;
+  const delta = prevValue > 0 ? (value - prevValue) / prevValue : null;
   const arrowTone =
     delta == null     ? "text-stone-300"  :
     delta > 0.05      ? "text-emerald-400" :
@@ -426,25 +438,19 @@ function TotalGroupCell({
   const prevPeriod = periodLabel.replace(String(prevYear + 1), String(prevYear));
 
   return (
-    <td className={cn(
-      "whitespace-nowrap p-0 text-right font-mono tabular-nums",
-      isAnnual ? "text-sm font-semibold" : "text-xs"
-    )}>
+    <td className="whitespace-nowrap p-0 text-right font-mono text-xs tabular-nums">
       <TooltipProvider delayDuration={120}>
         <Tooltip>
           <TooltipTrigger asChild>
             <button
               type="button"
-              className={cn(
-                "block w-full cursor-help text-right outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40",
-                isAnnual ? "px-3.5 py-3" : "px-2.5 py-3"
-              )}
+              className="block w-full cursor-help px-2.5 py-3 text-right outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40"
             >
               <span className="inline-flex items-baseline gap-1.5">
                 {formatDeltaRatio(delta).arrow && (
                   <span className={cn("text-[10px]", arrowTone)}>{formatDeltaRatio(delta).arrow}</span>
                 )}
-                <span className="text-white">{isAnnual ? fmtMoney(value) : fmtMoneyCompact(value)}</span>
+                <span className="text-white">{fmtMoneyCompact(value)}</span>
               </span>
             </button>
           </TooltipTrigger>
@@ -478,6 +484,71 @@ function TotalGroupCell({
   );
 }
 
+/**
+ * Celda anual del Total Grupo (esquina inferior derecha). Layout monto +
+ * Δ% chip apilado, mismo tratamiento que EmpresaTotalCell pero con fondo
+ * oscuro y tooltip con bg blanco.
+ */
+function TotalGroupAnnualCell({
+  totalYtd, totalPrevYtd, delta, metricLabel, selectedYear, prevYear, prevYtdRange,
+}: {
+  totalYtd: number;
+  totalPrevYtd: number;
+  delta: number | null;
+  metricLabel: string;
+  selectedYear: number;
+  prevYear: number;
+  prevYtdRange: string;
+}) {
+  const fmt = formatDeltaRatio(delta);
+  const arrowTone =
+    delta == null   ? "text-stone-300"  :
+    delta > 0.05    ? "text-emerald-300" :
+    delta < -0.05   ? "text-orange-300"  : "text-stone-300";
+
+  return (
+    <td className="whitespace-nowrap p-0 text-right font-mono text-sm font-semibold tabular-nums">
+      <TooltipProvider delayDuration={120}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="block w-full cursor-help px-3.5 py-3 text-right outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40"
+            >
+              <span className="block text-white">{fmtMoney(totalYtd)}</span>
+              <span className={cn("mt-0.5 block text-[10.5px] font-medium", arrowTone)}>
+                {fmt.arrow ? `${fmt.arrow} ` : ""}{fmt.displayValue}{delta != null ? ` vs ${prevYear}` : ""}
+              </span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" align="end" sideOffset={4} collisionPadding={12} className="min-w-[240px] border-0 bg-white p-3 text-stone-950 shadow-lg">
+            <div className="flex justify-between gap-6 text-[11px]">
+              <span className="text-stone-500">{metricLabel} YTD {selectedYear}</span>
+              <span className="font-mono font-medium text-stone-950 tabular-nums">{fmtMoney(totalYtd)}</span>
+            </div>
+            <div className="mt-1 flex justify-between gap-6 text-[11px] text-stone-500">
+              <span>{metricLabel} YTD {prevYtdRange}</span>
+              <span className="font-mono text-stone-950 tabular-nums">{totalPrevYtd > 0 ? fmtMoney(totalPrevYtd) : "—"}</span>
+            </div>
+            <div className="mt-2 flex justify-end border-t border-stone-200 pt-1.5">
+              <span className={cn(
+                "font-mono text-[11px] font-medium",
+                delta == null ? "text-stone-500" :
+                delta > 0.05  ? "text-emerald-700" :
+                delta < -0.05 ? "text-orange-700"  : "text-stone-500"
+              )}>
+                {delta == null
+                  ? "sin comparativo"
+                  : `${deltaSymbol(delta)} ${fmtPct(delta)} vs ${prevYear}`}
+              </span>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </td>
+  );
+}
+
 function LegendItem({ swatch, label }: { swatch: string; label: string }) {
   return (
     <span className="inline-flex items-center gap-1.5">
@@ -486,6 +557,10 @@ function LegendItem({ swatch, label }: { swatch: string; label: string }) {
     </span>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers de formato/labels
+// ─────────────────────────────────────────────────────────────────────────────
 
 const MES_FULL_RESUMEN = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -496,6 +571,35 @@ const MES_FULL_RESUMEN = [
 function parseIsoDateResumen(iso: string): Date {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d);
+}
+
+// Mapping tonal para delta texto (light bg, estilo Clientes tab).
+function deltaTextTone(delta: number | null): string {
+  if (delta == null) return "text-stone-500";
+  if (delta > 0.05)  return "text-emerald-700";
+  if (delta < -0.05) return "text-red-600";
+  return "text-stone-500";
+}
+
+// Pill arriba: "Data actualizada al sábado 9 de mayo 2026"
+// Fuente: data.fecha_corte (mismo origen que el footer al pie de la tabla).
+function buildDatePillLabel(data: VentasResumen): string | null {
+  if (!data.fecha_corte) return null;
+  const d = parseIsoDateResumen(data.fecha_corte);
+  const weekday = new Intl.DateTimeFormat("es-PA", { weekday: "long" }).format(d);
+  const month = new Intl.DateTimeFormat("es-PA", { month: "long" }).format(d);
+  return `Data actualizada al ${weekday} ${d.getDate()} de ${month} ${d.getFullYear()}`;
+}
+
+// Rango formateado del prev YTD para el tooltip de Total: "1 ene – 9 may 2025"
+// cuando hay corte; "todo {prevYear}" cuando se mira un año cerrado.
+function buildPrevYtdRange(data: VentasResumen, prevYear: number): string {
+  if (!data.dia_corte_anio_anterior) {
+    return `${prevYear}`;
+  }
+  const d = parseIsoDateResumen(data.dia_corte_anio_anterior);
+  const mesShort = MONTHS[d.getMonth()].toLowerCase();
+  return `${prevYear} (1 ene – ${d.getDate()} ${mesShort})`;
 }
 
 // Footer al pie del heatmap: "Mayo 2026 en curso · Comparativo vs Mayo 1–9 2025"
@@ -510,7 +614,6 @@ function buildPartialFooter(data: VentasResumen, year: number): string | null {
 }
 
 // Chip pequeño debajo del KPI "vs prev year" cuando hay corte day-by-day.
-// Ej: "Ajustado al 9 may"
 function buildPartialKpiNote(data: VentasResumen): string | null {
   if (!data.es_periodo_parcial || !data.fecha_corte) return null;
   const d = parseIsoDateResumen(data.fecha_corte);
