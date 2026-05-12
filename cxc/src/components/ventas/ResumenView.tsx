@@ -4,9 +4,9 @@ import { useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar } from "lucide-react";
+import { Calendar, Info } from "lucide-react";
 import type { VentasResumen, Multifashion } from "./types";
-import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, deltaSymbol, heatmapClasses } from "@/lib/ventas/format";
+import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, deltaSymbol, kpiDeltaSymbol, heatmapClasses } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 
@@ -44,7 +44,8 @@ export function ResumenView({
 
   // Disclaimer/footer cuando el año en curso tiene mes parcial — same-period
   // day-by-day ya aplicado en la RPC ventas_dashboard_prev_same_period.
-  const partialFooter = buildPartialFooter(data, selectedYear);
+  // El texto se adapta a la granularidad activa (mensual vs trimestral).
+  const partialFooter = buildPartialFooter(data, selectedYear, granularity);
   const partialKpiNote = buildPartialKpiNote(data);
   const datePillLabel = buildDatePillLabel(data);
   // Rango formateado del prev YTD ("1 ene – 9 may 2025") para los tooltips
@@ -94,14 +95,14 @@ export function ResumenView({
   if (isUtil) {
     kpi1Label = isClosedYear ? `UTILIDAD ${selectedYear}` : "UTILIDAD YTD";
     kpi1Value = fmtMoney(k.utilidadYTD);
-    kpi1Sub   = `${periodoLabel} · ${deltaSymbol(utilidadDelta)} ${fmtPct(utilidadDelta)} vs ${prevYear}`;
+    kpi1Sub   = `${periodoLabel} · ${kpiDeltaSymbol(utilidadDelta)} ${fmtPct(utilidadDelta)} vs ${prevYear}`;
     kpi2Label = "MARGEN PROMEDIO";
     kpi2Value = `${(k.margenYTD * 100).toFixed(1)}%`;
     kpi2Sub   = `${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
   } else {
     kpi1Label = isClosedYear ? `VENTAS NETAS ${selectedYear}` : "VENTAS NETAS YTD";
     kpi1Value = fmtMoney(k.ventasNetasYTD);
-    kpi1Sub   = `${periodoLabel} · ${deltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`;
+    kpi1Sub   = `${periodoLabel} · ${kpiDeltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`;
     kpi2Label = isClosedYear ? `UTILIDAD ${selectedYear}` : "UTILIDAD YTD";
     kpi2Value = fmtMoney(k.utilidadYTD);
     kpi2Sub   = `Margen ${(k.margenYTD * 100).toFixed(1)}% · ${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
@@ -303,11 +304,16 @@ function HeatCell({ cell, prevYear, metricLabel }: { cell: Cell; prevYear: numbe
       </td>
     );
   }
+  // Bug C: prev=0 → comparativo no aplica. La celda muestra "n/a" gris
+  // (NO zona neutra ±5% que confundiría con "no cambió"). El monto cur
+  // queda visible via tooltip. Aplica cuando hay cur > 0 pero prev = 0/null.
+  const isNaComparison = !cell.prevValue;
   const prevPeriod = cell.periodLabel.replace(String(prevYear + 1), String(prevYear));
   return (
     <td className={cn(
       "whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono text-xs tabular-nums transition",
-      cls.bg
+      // Cuando no hay comparativo, bg blanco explícito (no zona neutra del heatmap).
+      isNaComparison ? "bg-white" : cls.bg
     )}>
       <TooltipProvider delayDuration={120}>
         <Tooltip>
@@ -316,12 +322,19 @@ function HeatCell({ cell, prevYear, metricLabel }: { cell: Cell; prevYear: numbe
               type="button"
               className="block w-full cursor-help px-2.5 py-2.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
             >
-              <span className="inline-flex items-baseline gap-1.5">
-                {formatDeltaRatio(cell.delta).arrow && (
-                  <span className={cn("text-[10px]", cls.fg)}>{formatDeltaRatio(cell.delta).arrow}</span>
-                )}
-                <span className="text-stone-950">{fmtMoneyCompact(cell.value)}</span>
-              </span>
+              {isNaComparison ? (
+                <span className="inline-flex items-baseline gap-1">
+                  <span className="text-stone-400">{fmtMoneyCompact(cell.value)}</span>
+                  <span className="text-[9px] font-medium text-stone-400">n/a</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-baseline gap-1.5">
+                  {formatDeltaRatio(cell.delta).arrow && (
+                    <span className={cn("text-[10px]", cls.fg)}>{formatDeltaRatio(cell.delta).arrow}</span>
+                  )}
+                  <span className="text-stone-950">{fmtMoneyCompact(cell.value)}</span>
+                </span>
+              )}
             </button>
           </TooltipTrigger>
           <TooltipContent side="bottom" align="end" sideOffset={4} collisionPadding={12} className="min-w-[200px] border-0 bg-stone-950 p-3 text-white shadow-lg">
@@ -583,6 +596,7 @@ function MultifashionNameWithBreakdown({
             <span className="underline decoration-dotted decoration-stone-300 underline-offset-4">
               {nombre}
             </span>
+            <Info className="h-3 w-3 text-stone-400" />
           </button>
         </TooltipTrigger>
         <TooltipContent side="right" align="start" sideOffset={4} collisionPadding={12} className="min-w-[240px] border-0 bg-stone-950 p-3 text-white shadow-lg">
@@ -657,12 +671,23 @@ function buildPrevYtdRange(data: VentasResumen, prevYear: number): string {
   return `${prevYear} (1 ene – ${d.getDate()} ${mesShort})`;
 }
 
-// Footer al pie del heatmap: "Mayo 2026 en curso · Comparativo vs Mayo 1–9 2025"
+// Footer al pie del heatmap. Texto adaptado según granularidad activa:
+//   mensual:    "Mayo 2026 en curso · Comparativo vs Mayo 1–9 2025"
+//   trimestral: "Q2 2026 parcial · cierra al 9 may · Comparativo vs Q2 2025 mismo período"
 // Solo cuando el año en curso tiene mes parcial.
-function buildPartialFooter(data: VentasResumen, year: number): string | null {
+function buildPartialFooter(
+  data: VentasResumen,
+  year: number,
+  granularity: Granularity,
+): string | null {
   if (!data.es_periodo_parcial || !data.fecha_corte || !data.dia_corte_anio_anterior) return null;
   const cur = parseIsoDateResumen(data.fecha_corte);
   const prev = parseIsoDateResumen(data.dia_corte_anio_anterior);
+  if (granularity === "trimestral") {
+    const q = Math.ceil((cur.getMonth() + 1) / 3);
+    const curMesShort = MONTHS[cur.getMonth()].toLowerCase();
+    return `Q${q} ${year} parcial · cierra al ${cur.getDate()} ${curMesShort} · Comparativo vs Q${q} ${prev.getFullYear()} mismo período`;
+  }
   const curMonth = MES_FULL_RESUMEN[cur.getMonth()];
   const prevMonth = MES_FULL_RESUMEN[prev.getMonth()];
   return `${curMonth} ${year} en curso · Comparativo vs ${prevMonth} 1–${prev.getDate()} ${prev.getFullYear()}`;
