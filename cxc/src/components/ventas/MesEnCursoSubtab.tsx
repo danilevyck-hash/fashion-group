@@ -133,10 +133,10 @@ export function MesEnCursoSubtab({ selectedYear }: MesEnCursoSubtabProps) {
 
   return (
     <div className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
-      {/* Header */}
+      {/* Header — `dia_actual` = MAX(día) con data retail, no día calendario. */}
       <div>
         <h3 className="font-display text-base font-semibold text-stone-950">
-          {mes_label} {anio} · día {data.dia_actual} de {data.dias_en_mes}
+          {mes_label} {anio} · al día {data.dia_actual} (data más reciente)
         </h3>
         <p className="mt-0.5 text-[11px] text-stone-500">
           Retail mostrador. Mayoreo se reporta en Clientes.

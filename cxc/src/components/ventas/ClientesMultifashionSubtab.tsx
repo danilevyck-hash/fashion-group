@@ -1,42 +1,60 @@
 "use client";
 
-// Sub-tab "Clientes" de Multifashion. Solo wholesale (is_wholesale=true).
-// Hoy típicamente 1 cliente (LA FRONTERA DUTY FREE). Futuros aparecen
-// automáticos cuando se agregan a clientes_master (trigger SQL ya
-// mantiene is_wholesale al día).
+// Sub-tab "Clientes" de Multifashion.
+// Dos secciones:
+//   1. Wholesale: clientes con is_wholesale=true (típicamente LA FRONTERA).
+//   2. Retail recurrentes: top 30 clientes retail (no wholesale, no
+//      CONTADO/CONSUMIDOR FINAL) con ≥ 2 tickets en el año.
+//
+// Ambos comparten visual (Card por cliente + sparkline mensual).
 
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Package, UserCircle } from "lucide-react";
+import { Package, UserCircle, Users } from "lucide-react";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 
-interface WholesaleMesRow {
+// ─── Types ─────────────────────────────────────────────────────────────────
+
+interface MesRow {
   mes_idx: number;
   mes_label: string;
   ventas: number;
   tickets: number;
 }
 
-interface WholesaleClienteRow {
+interface ClienteRow {
   nombre: string;
   total_ytd: number;
   tickets_ytd: number;
+  /** retail recurrentes la trae directo; wholesale lo calculamos client-side. */
+  ticket_prom?: number;
   ultima_compra: string | null;
-  meses: WholesaleMesRow[];
+  meses: MesRow[];
 }
 
-interface WholesaleClientesResp {
+interface WholesaleResp {
   anio: number;
   total_clientes: number;
   total_ventas: number;
   total_tickets: number;
-  clientes: WholesaleClienteRow[];
+  clientes: ClienteRow[];
+}
+
+interface RetailResp {
+  anio: number;
+  limit: number;
+  total_clientes: number;
+  total_ventas: number;
+  total_tickets: number;
+  clientes: ClienteRow[];
 }
 
 interface ClientesMultifashionSubtabProps {
   selectedYear: number;
 }
+
+// ─── Helpers ───────────────────────────────────────────────────────────────
 
 function parseIsoDateLocal(iso: string): Date {
   const [y, m, d] = iso.split("-").map(Number);
@@ -52,8 +70,11 @@ function formatFechaLarga(iso: string): string {
   return `${d.getDate()} de ${MES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+// ─── Component ─────────────────────────────────────────────────────────────
+
 export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashionSubtabProps) {
-  const [data, setData] = useState<WholesaleClientesResp | null>(null);
+  const [wholesale, setWholesale] = useState<WholesaleResp | null>(null);
+  const [retail, setRetail] = useState<RetailResp | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -61,31 +82,47 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
     const ctrl = new AbortController();
     setLoading(true);
     setError(null);
-    fetch(`/api/multifashion/clientes-wholesale?year=${selectedYear}`, {
-      cache: "no-store",
-      signal: ctrl.signal,
-    })
-      .then(async r => {
+
+    Promise.all([
+      fetch(`/api/multifashion/clientes-wholesale?year=${selectedYear}`, {
+        cache: "no-store",
+        signal: ctrl.signal,
+      }).then(async r => {
         if (!r.ok) {
           const body = await r.json().catch(() => ({}));
-          throw new Error(body?.error ?? `HTTP ${r.status}`);
+          throw new Error(body?.error ?? `wholesale HTTP ${r.status}`);
         }
-        return r.json() as Promise<WholesaleClientesResp>;
+        return r.json() as Promise<WholesaleResp>;
+      }),
+      fetch(`/api/multifashion/retail-recurrentes?year=${selectedYear}`, {
+        cache: "no-store",
+        signal: ctrl.signal,
+      }).then(async r => {
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          throw new Error(body?.error ?? `retail HTTP ${r.status}`);
+        }
+        return r.json() as Promise<RetailResp>;
+      }),
+    ])
+      .then(([ws, rt]) => {
+        setWholesale(ws);
+        setRetail(rt);
       })
-      .then(setData)
       .catch(err => {
         if (err?.name === "AbortError") return;
-        console.error("[clientes-wholesale] fetch failed", err);
+        console.error("[clientes-multifashion] fetch failed", err);
         setError(err instanceof Error ? err.message : "error inesperado");
       })
       .finally(() => setLoading(false));
+
     return () => ctrl.abort();
   }, [selectedYear]);
 
-  if (loading && !data) {
+  if (loading && !wholesale && !retail) {
     return (
       <Card className="flex min-h-[200px] items-center justify-center p-12 text-sm text-stone-500">
-        Cargando clientes wholesale…
+        Cargando clientes…
       </Card>
     );
   }
@@ -96,59 +133,169 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
       </Card>
     );
   }
-  if (!data) return null;
 
-  if (data.clientes.length === 0) {
-    return (
-      <Card className="flex min-h-[200px] flex-col items-center justify-center gap-3 p-12 text-center">
-        <UserCircle className="h-10 w-10 text-stone-400" strokeWidth={1.5} />
-        <p className="text-sm text-stone-500">
-          No hay clientes wholesale registrados en {selectedYear}.
-        </p>
-      </Card>
-    );
-  }
-
-  // Pico mensual global para escalar las sparklines
+  // Pico mensual común (escala visual unificada entre ambas secciones)
   const peakMes = Math.max(
-    ...data.clientes.flatMap(c => c.meses.map(m => m.ventas)),
-    1
+    ...(wholesale?.clientes ?? []).flatMap(c => c.meses.map(m => m.ventas)),
+    ...(retail?.clientes ?? []).flatMap(c => c.meses.map(m => m.ventas)),
+    1,
   );
 
   return (
-    <div className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
-      {/* Header agregado */}
-      <Card className="flex flex-wrap items-center gap-4 p-4">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-amber-100 bg-amber-50 text-amber-700">
-          <Package className="h-5 w-5" />
-        </div>
-        <div className="flex-1 min-w-[160px]">
-          <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">
-            Mayoreo {selectedYear}
-          </p>
-          <p className="mt-0.5 font-mono text-xl font-medium text-stone-950 tabular-nums">
-            {fmtMoney(data.total_ventas)}
-          </p>
-        </div>
-        <div className="text-right text-xs text-stone-500">
-          <p>
-            <span className="font-mono tabular-nums text-stone-700">{data.total_clientes}</span>{" "}
-            {data.total_clientes === 1 ? "cliente" : "clientes"}
-          </p>
-          <p className="mt-0.5">
-            <span className="font-mono tabular-nums text-stone-700">{data.total_tickets.toLocaleString()}</span>{" "}
-            tickets
-          </p>
-        </div>
-      </Card>
+    <div className={cn("space-y-8", loading && "opacity-60 pointer-events-none transition-opacity")}>
+      {/* ═════════════════════════════════════════════════════════════════ */}
+      {/* Sección 1: Wholesale                                              */}
+      {/* ═════════════════════════════════════════════════════════════════ */}
+      <section className="space-y-4">
+        <SectionHeader
+          title="Wholesale"
+          subtitle="Clientes mayoreo (DEFAULT vendedor + cliente identificado en directorio)"
+          icon={<Package className="h-5 w-5" />}
+          iconTone="amber"
+        />
+        {wholesale && wholesale.clientes.length > 0 ? (
+          <>
+            <SectionAggregateCard
+              tone="amber"
+              icon={<Package className="h-5 w-5" />}
+              label={`Mayoreo ${selectedYear}`}
+              total={wholesale.total_ventas}
+              clientes={wholesale.total_clientes}
+              tickets={wholesale.total_tickets}
+            />
+            <div className="space-y-3">
+              {wholesale.clientes.map((c, idx) => (
+                <ClienteCard
+                  key={`ws-${c.nombre}`}
+                  rank={idx + 1}
+                  cliente={c}
+                  peakMes={peakMes}
+                  year={selectedYear}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <Card className="flex min-h-[160px] flex-col items-center justify-center gap-3 p-10 text-center">
+            <UserCircle className="h-10 w-10 text-stone-400" strokeWidth={1.5} />
+            <p className="text-sm text-stone-500">
+              No hay clientes wholesale registrados en {selectedYear}.
+            </p>
+          </Card>
+        )}
+      </section>
 
-      {/* Lista de clientes */}
-      <section className="space-y-3">
-        {data.clientes.map((c, idx) => (
-          <ClienteCard key={c.nombre} rank={idx + 1} cliente={c} peakMes={peakMes} year={selectedYear} />
-        ))}
+      {/* ═════════════════════════════════════════════════════════════════ */}
+      {/* Sección 2: Retail recurrentes                                     */}
+      {/* ═════════════════════════════════════════════════════════════════ */}
+      <section className="space-y-4">
+        <SectionHeader
+          title="Retail recurrentes"
+          subtitle={`Top ${retail?.limit ?? 30} clientes retail con ≥ 2 visitas en ${selectedYear}`}
+          icon={<Users className="h-5 w-5" />}
+          iconTone="teal"
+        />
+        {retail && retail.clientes.length > 0 ? (
+          <>
+            <SectionAggregateCard
+              tone="teal"
+              icon={<Users className="h-5 w-5" />}
+              label={`Retail recurrentes ${selectedYear}`}
+              total={retail.total_ventas}
+              clientes={retail.total_clientes}
+              tickets={retail.total_tickets}
+              note="Suma de los clientes mostrados, no del retail total."
+            />
+            <div className="space-y-3">
+              {retail.clientes.map((c, idx) => (
+                <ClienteCard
+                  key={`rt-${c.nombre}`}
+                  rank={idx + 1}
+                  cliente={c}
+                  peakMes={peakMes}
+                  year={selectedYear}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <Card className="flex min-h-[160px] flex-col items-center justify-center gap-3 p-10 text-center">
+            <Users className="h-10 w-10 text-stone-400" strokeWidth={1.5} />
+            <p className="text-sm text-stone-500">
+              No hay clientes retail recurrentes (con ≥ 2 visitas en {selectedYear}).
+            </p>
+          </Card>
+        )}
       </section>
     </div>
+  );
+}
+
+// ─── Sub-components ────────────────────────────────────────────────────────
+
+function SectionHeader({
+  title, subtitle, icon, iconTone,
+}: {
+  title: string;
+  subtitle: string;
+  icon: React.ReactNode;
+  iconTone: "amber" | "teal";
+}) {
+  const toneClass = iconTone === "amber"
+    ? "border-amber-100 bg-amber-50 text-amber-700"
+    : "border-teal-100 bg-teal-50 text-teal-700";
+  return (
+    <div className="flex items-center gap-3">
+      <div className={cn("flex h-9 w-9 items-center justify-center rounded-lg border", toneClass)}>
+        {icon}
+      </div>
+      <div>
+        <h3 className="font-display text-base font-semibold text-stone-950">{title}</h3>
+        <p className="mt-0.5 text-[11px] text-stone-500">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function SectionAggregateCard({
+  tone, icon, label, total, clientes, tickets, note,
+}: {
+  tone: "amber" | "teal";
+  icon: React.ReactNode;
+  label: string;
+  total: number;
+  clientes: number;
+  tickets: number;
+  note?: string;
+}) {
+  const toneClass = tone === "amber"
+    ? "border-amber-100 bg-amber-50 text-amber-700"
+    : "border-teal-100 bg-teal-50 text-teal-700";
+  return (
+    <Card className="flex flex-wrap items-center gap-4 p-4">
+      <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg border", toneClass)}>
+        {icon}
+      </div>
+      <div className="flex-1 min-w-[160px]">
+        <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">
+          {label}
+        </p>
+        <p className="mt-0.5 font-mono text-xl font-medium text-stone-950 tabular-nums">
+          {fmtMoney(total)}
+        </p>
+        {note && <p className="mt-0.5 text-[10.5px] text-stone-400">{note}</p>}
+      </div>
+      <div className="text-right text-xs text-stone-500">
+        <p>
+          <span className="font-mono tabular-nums text-stone-700">{clientes}</span>{" "}
+          {clientes === 1 ? "cliente" : "clientes"}
+        </p>
+        <p className="mt-0.5">
+          <span className="font-mono tabular-nums text-stone-700">{tickets.toLocaleString()}</span>{" "}
+          tickets
+        </p>
+      </div>
+    </Card>
   );
 }
 
@@ -156,11 +303,13 @@ function ClienteCard({
   rank, cliente, peakMes, year,
 }: {
   rank: number;
-  cliente: WholesaleClienteRow;
+  cliente: ClienteRow;
   peakMes: number;
   year: number;
 }) {
-  const ticketProm = cliente.tickets_ytd > 0 ? cliente.total_ytd / cliente.tickets_ytd : 0;
+  const ticketProm = cliente.ticket_prom != null
+    ? cliente.ticket_prom
+    : (cliente.tickets_ytd > 0 ? cliente.total_ytd / cliente.tickets_ytd : 0);
 
   return (
     <Card className="p-4">
@@ -185,7 +334,7 @@ function ClienteCard({
         </p>
       )}
 
-      {/* Mini-tabla mensual con sparkline visual (bars con bg height) */}
+      {/* Mini-tabla mensual con sparkline visual */}
       <div className="mt-4">
         <div className="grid grid-cols-12 gap-1">
           {cliente.meses.map(m => {
@@ -193,7 +342,6 @@ function ClienteCard({
             const hasData = m.ventas > 0;
             return (
               <div key={m.mes_idx} className="flex flex-col items-center gap-1">
-                {/* Bar */}
                 <div className="relative flex h-14 w-full items-end justify-center rounded-sm bg-stone-50">
                   {hasData && (
                     <div
@@ -215,7 +363,7 @@ function ClienteCard({
           })}
         </div>
         <p className="mt-2 text-[10.5px] text-stone-500">
-          Histórico mensual {year}. Escala relativa al mes pico del cliente más alto.
+          Histórico mensual {year}. Escala compartida entre wholesale y retail.
         </p>
       </div>
     </Card>
