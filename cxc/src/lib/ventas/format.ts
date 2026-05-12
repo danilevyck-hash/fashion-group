@@ -27,6 +27,21 @@ export function deltaSymbol(d: number | null | undefined): "▲" | "—" | "▼"
 }
 
 /**
+ * Símbolo de delta para KPI subtitles (sin zona neutra ±5%). Para subtítulos
+ * de cards principales queremos comunicar dirección incluso en cambios chicos.
+ *   d > 0 → ▲
+ *   d < 0 → ▼
+ *   d = 0 ó null → —
+ * Bug B (em dash en KPI Utilidad): `deltaSymbol` (threshold) hacía que -2%
+ * se renderizara "— -2%". `kpiDeltaSymbol` emite "▼ -2%" para signo claro.
+ */
+export function kpiDeltaSymbol(d: number | null | undefined): "▲" | "—" | "▼" {
+  if (d == null || d === 0) return "—";
+  if (d > 0) return "▲";
+  return "▼";
+}
+
+/**
  * 3-level diverging heatmap, colorblind-safe (pairs always with ▲/—/▼ symbol).
  * Returns Tailwind class fragments — no inline color values.
  */

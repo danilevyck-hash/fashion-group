@@ -23,12 +23,14 @@ export function VentasShell({
   year: initialYear,
   availableYears,
   resumen: initialResumen,
-  clientes,
-  multi,
+  clientes: initialClientes,
+  multi: initialMulti,
 }: VentasShellProps) {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(initialYear);
   const [resumen, setResumen] = useState<VentasResumen | null>(initialResumen);
+  const [clientes, setClientes] = useState<Clientes | null>(initialClientes);
+  const [multi, setMulti] = useState<Multifashion | null>(initialMulti);
   const [, startTransition] = useTransition();
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -39,17 +41,33 @@ export function VentasShell({
     setLoading(true);
     setFetchError(null);
     try {
-      const res = await fetch(`/api/ventas/resumen?year=${year}`, { cache: "no-store" });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body?.error ?? `HTTP ${res.status}`);
-      }
-      const data = (await res.json()) as VentasResumen;
+      // Refetch los 3 datasets en paralelo. El selector global de año
+      // debe propagarse a TODOS los tabs (Resumen, Clientes, Multifashion).
+      const [resumenRes, clientesRes, multiRes] = await Promise.all([
+        fetch(`/api/ventas/resumen?year=${year}`, { cache: "no-store" }),
+        fetch(`/api/ventas/clientes-12m?year=${year}`, { cache: "no-store" }),
+        fetch(`/api/multifashion/overview?year=${year}`, { cache: "no-store" }),
+      ]);
+
+      const errors: string[] = [];
+      if (!resumenRes.ok) errors.push(`resumen: HTTP ${resumenRes.status}`);
+      if (!clientesRes.ok) errors.push(`clientes: HTTP ${clientesRes.status}`);
+      if (!multiRes.ok) errors.push(`multifashion: HTTP ${multiRes.status}`);
+      if (errors.length) throw new Error(errors.join(" · "));
+
+      const [resumenData, clientesData, multiData] = await Promise.all([
+        resumenRes.json() as Promise<VentasResumen>,
+        clientesRes.json() as Promise<Clientes>,
+        multiRes.json() as Promise<Multifashion>,
+      ]);
+
       startTransition(() => {
-        setResumen(data);
+        setResumen(resumenData);
+        setClientes(clientesData);
+        setMulti(multiData);
       });
     } catch (err) {
-      console.error("[ventas] resumen refetch failed", err);
+      console.error("[ventas] year change refetch failed", err);
       setFetchError(err instanceof Error ? err.message : "error inesperado");
     } finally {
       setLoading(false);
@@ -140,10 +158,26 @@ export function VentasShell({
           ) : <ErrorState scope="resumen" />}
         </TabsContent>
         <TabsContent value="clientes" className="mt-5">
-          {clientes ? <ClientesView data={clientes} /> : <ErrorState scope="clientes" />}
+          {clientes ? (
+            // key={selectedYear} fuerza remount al cambiar año — resetea state
+            // interno (search, pill, sort) que asume el universo del año cargado.
+            <ClientesView
+              key={selectedYear}
+              data={clientes}
+              selectedYear={selectedYear}
+              isClosedYear={isClosedYear}
+            />
+          ) : <ErrorState scope="clientes" />}
         </TabsContent>
         <TabsContent value="multifashion" className="mt-5">
-          {multi ? <MultifashionView data={multi} /> : <ErrorState scope="multifashion" />}
+          {multi ? (
+            <MultifashionView
+              key={selectedYear}
+              data={multi}
+              selectedYear={selectedYear}
+              isClosedYear={isClosedYear}
+            />
+          ) : <ErrorState scope="multifashion" />}
         </TabsContent>
       </Tabs>
     </main>

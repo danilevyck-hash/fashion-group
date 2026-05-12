@@ -12,7 +12,13 @@ import { VendedorasSubtab } from "./VendedorasSubtab";
 const SUBTAB_TRIGGER_CLASS =
   "gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-3 py-2 text-xs text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none";
 
-export function MultifashionView({ data }: { data: Multifashion }) {
+interface MultifashionViewProps {
+  data: Multifashion;
+  selectedYear: number;
+  isClosedYear: boolean;
+}
+
+export function MultifashionView({ data, selectedYear, isClosedYear }: MultifashionViewProps) {
   return (
     <Tabs defaultValue="overview" className="w-full">
       <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-stone-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
@@ -31,13 +37,17 @@ export function MultifashionView({ data }: { data: Multifashion }) {
       </TabsList>
 
       <TabsContent value="overview" className="mt-5">
-        <OverviewSubtab data={data} />
+        <OverviewSubtab data={data} selectedYear={selectedYear} isClosedYear={isClosedYear} />
       </TabsContent>
       <TabsContent value="mes" className="mt-5">
-        <PlaceholderSubtab icon={CalendarRange} label="Mes en curso" />
+        {isClosedYear ? (
+          <PlaceholderSubtab icon={CalendarRange} label={`Año ${selectedYear} cerrado · no hay mes en curso`} />
+        ) : (
+          <PlaceholderSubtab icon={CalendarRange} label="Mes en curso" />
+        )}
       </TabsContent>
       <TabsContent value="vendedoras" className="mt-5">
-        <VendedorasSubtab data={data} />
+        <VendedorasSubtab data={data} selectedYear={selectedYear} isClosedYear={isClosedYear} />
       </TabsContent>
       <TabsContent value="clientes" className="mt-5">
         <PlaceholderSubtab icon={UserCircle} label="Clientes" />
@@ -67,10 +77,13 @@ function buildPartialMonthDisclaimer(row: RetailMonthly): string | null {
 }
 
 // "Ene–May 2026 · ajustado al día de corte (9 may)" (cuando hay mes parcial)
-// Si no hay mes parcial (año cerrado / sin data), devuelve "Ene–May 2026".
-function buildRetailYtdSub(meses: RetailMonthly[], year: number): string {
+// "Ene–Dic 2025"                                    (año cerrado, todos los meses con data)
+// "Ene–<últimoMes> 2026"                            (año actual sin mes parcial)
+function buildRetailYtdSub(meses: RetailMonthly[], year: number, isClosedYear: boolean): string {
   const partial = meses.find(m => m.es_periodo_parcial);
-  // Último mes con data del año actual (cur >0 o tickets >0)
+  if (isClosedYear) {
+    return `Ene–Dic ${year}`;
+  }
   let lastMes = 0;
   meses.forEach((m, i) => { if (m.tickets > 0 || m.ventas > 0) lastMes = i + 1; });
   const rangeLabel = lastMes > 0
@@ -84,6 +97,19 @@ function buildRetailYtdSub(meses: RetailMonthly[], year: number): string {
   return rangeLabel;
 }
 
+// "Año cerrado · alcanzó 92% de meta" con color semantic.
+// >=100% verde "supera meta", >=85% ámbar "cerca", <85% rojo "lejos".
+function buildClosedYearMetaSummary(pctMeta: number): { label: string; tone: string; arrow: string } {
+  const pct = (pctMeta * 100).toFixed(1);
+  if (pctMeta >= 1.0) {
+    return { label: `Año cerrado · alcanzó ${pct}% de meta`, tone: "text-emerald-700", arrow: "▲" };
+  }
+  if (pctMeta >= 0.85) {
+    return { label: `Año cerrado · alcanzó ${pct}% de meta`, tone: "text-amber-700", arrow: "—" };
+  }
+  return { label: `Año cerrado · alcanzó ${pct}% de meta`, tone: "text-red-700", arrow: "▼" };
+}
+
 // "▲ +1.2 pts vs 2025" — margen retail vs margenPrev retail (mismo período).
 function buildMargenSub(margen: number, margenPrev: number, prevYear: number): string {
   const deltaPts = (margen - margenPrev) * 100;
@@ -94,24 +120,35 @@ function buildMargenSub(margen: number, margenPrev: number, prevYear: number): s
   return `${sign}${Math.abs(deltaPts).toFixed(1)} pts vs ${prevYear}`;
 }
 
-function OverviewSubtab({ data }: { data: Multifashion }) {
+function OverviewSubtab({
+  data, selectedYear, isClosedYear,
+}: {
+  data: Multifashion;
+  selectedYear: number;
+  isClosedYear: boolean;
+}) {
   const { retail, wholesale, total } = data;
-  const year = new Date().getFullYear();
+  const year = selectedYear;
   const prevYear = year - 1;
 
   // Progress bar usa TOTAL (retail + wholesale) porque la meta anual del
   // negocio históricamente incluye todo.
-  const pctMeta = total.ytdVentas / data.metaAnual;
+  const pctMeta = data.metaAnual > 0 ? total.ytdVentas / data.metaAnual : 0;
   const proyeccion = data.expectedTodayPct > 0
     ? total.ytdVentas / data.expectedTodayPct
     : 0;
+  const closedSummary = isClosedYear ? buildClosedYearMetaSummary(pctMeta) : null;
 
   // Disclaimer del mes parcial para el footer de la tabla retail.
-  const partialMonth = retail.meses.find(m => m.es_periodo_parcial);
+  // Para años cerrados no aplica (no hay mes parcial).
+  const partialMonth = isClosedYear ? null : retail.meses.find(m => m.es_periodo_parcial);
   const partialDisclaimer = partialMonth ? buildPartialMonthDisclaimer(partialMonth) : null;
 
-  const retailYtdSub = buildRetailYtdSub(retail.meses, year);
+  const retailYtdSub = buildRetailYtdSub(retail.meses, year, isClosedYear);
   const margenSub = buildMargenSub(retail.margen, retail.margenPrev, prevYear);
+
+  // Labels KPI: "YTD" para año en curso, "{year}" para año cerrado.
+  const ytdSuffix = isClosedYear ? String(year) : "YTD";
 
   // Label del card Mayoreo: top cliente cuando hay 1, "N clientes wholesale" si >1.
   const wholesaleClienteLabel = wholesale.totalClientes > 1
@@ -141,8 +178,8 @@ function OverviewSubtab({ data }: { data: Multifashion }) {
 
       {/* 2. 4 KPI cards — RETAIL ONLY */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-        <RetailKpi label="VENTAS RETAIL YTD" value={fmtMoney(retail.ytdVentas)} sub={retailYtdSub} />
-        <RetailKpi label="TICKETS RETAIL YTD" value={retail.ytdTickets.toLocaleString()} sub="boletas emitidas" />
+        <RetailKpi label={`VENTAS RETAIL ${ytdSuffix}`} value={fmtMoney(retail.ytdVentas)} sub={retailYtdSub} />
+        <RetailKpi label={`TICKETS RETAIL ${ytdSuffix}`} value={retail.ytdTickets.toLocaleString()} sub="boletas emitidas" />
         <RetailKpi label="TICKET PROMEDIO RETAIL" value={"$" + retail.ticketProm.toFixed(2)} sub="por boleta" />
         <RetailKpi label="MARGEN BRUTO RETAIL" value={(retail.margen * 100).toFixed(1) + "%"} sub={margenSub} />
       </div>
@@ -179,25 +216,36 @@ function OverviewSubtab({ data }: { data: Multifashion }) {
             className="h-full rounded-full bg-teal-700 transition-[width] duration-300"
             style={{ width: `${Math.min(100, pctMeta * 100)}%` }}
           />
-          <div
-            className="absolute -top-1 -bottom-1 w-0.5 bg-stone-950"
-            style={{ left: `${data.expectedTodayPct * 100}%` }}
-          />
-          <div
-            className="absolute whitespace-nowrap font-mono text-[10px] text-stone-950"
-            style={{ top: -22, left: `${data.expectedTodayPct * 100}%`, transform: "translateX(-50%)" }}
-          >
-            esperado hoy · {(data.expectedTodayPct * 100).toFixed(0)}%
-          </div>
+          {/* "Esperado hoy" marker — solo aplica al año en curso. */}
+          {!isClosedYear && (
+            <>
+              <div
+                className="absolute -top-1 -bottom-1 w-0.5 bg-stone-950"
+                style={{ left: `${data.expectedTodayPct * 100}%` }}
+              />
+              <div
+                className="absolute whitespace-nowrap font-mono text-[10px] text-stone-950"
+                style={{ top: -22, left: `${data.expectedTodayPct * 100}%`, transform: "translateX(-50%)" }}
+              >
+                esperado hoy · {(data.expectedTodayPct * 100).toFixed(0)}%
+              </div>
+            </>
+          )}
         </div>
-        <p className="mt-3.5 text-xs text-stone-500">
-          Proyección de cierre <span className="font-mono font-medium text-stone-950 tabular-nums">{fmtMoney(proyeccion)}</span>
-          {" · "}
-          {proyeccion >= data.metaAnual
-            ? <span className="text-emerald-600">▲ supera meta</span>
-            : <span className="text-amber-700">▼ por debajo de meta</span>}
-          {" · incluye retail + mayoreo"}
-        </p>
+        {isClosedYear && closedSummary ? (
+          <p className={cn("mt-3.5 text-xs font-medium", closedSummary.tone)}>
+            {closedSummary.arrow} {closedSummary.label}
+          </p>
+        ) : (
+          <p className="mt-3.5 text-xs text-stone-500">
+            Proyección de cierre <span className="font-mono font-medium text-stone-950 tabular-nums">{fmtMoney(proyeccion)}</span>
+            {" · "}
+            {proyeccion >= data.metaAnual
+              ? <span className="text-emerald-600">▲ supera meta</span>
+              : <span className="text-amber-700">▼ por debajo de meta</span>}
+            {" · incluye retail + mayoreo"}
+          </p>
+        )}
       </Card>
 
       {/* 5. Tabla detalle mensual retail + fila resumen wholesale */}

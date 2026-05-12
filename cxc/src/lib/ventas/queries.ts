@@ -238,38 +238,52 @@ interface ClientesEmpresaRow {
  * Orden default: ultima_compra DESC NULLS LAST.
  */
 export async function fetchClientes({
-  year: _year,
+  year,
   empresaKey,
 }: {
   year: number;
   empresaKey?: string | null;
 }): Promise<Clientes> {
-  void _year;
-
   const isTodas = !empresaKey || empresaKey === "todas";
+  const currentYear = new Date().getFullYear();
+  const isClosedYear = year < currentYear;
 
-  // Universo: devolvemos TODOS los clientes activos en últimos 12m
-  // (la materialized view ya filtra a active_pairs con fecha >= cutoff 12m).
-  // El filtro condicional por compras_ytd > 0 se aplica client-side en
-  // ClientesView según el sort actual: vista YTD strict por default,
-  // vista 12m rolling cuando sort === "ultima".
-  const query = isTodas
-    ? supabaseServer
-        .from("clientes_agregado_12m_vw")
-        .select("*")
-        .order("ultima_compra", { ascending: false, nullsFirst: false })
-        .limit(5000)
-    : supabaseServer
-        .from("clientes_empresa_12m_vw")
-        .select("*")
-        .eq("empresa", empresaKey)
-        .order("ultima_compra", { ascending: false, nullsFirst: false })
-        .limit(5000);
+  let data: ClientesEmpresaRow[] | null;
+  let error: { message: string } | null;
+  let viewLabel: string;
 
-  const { data, error } = await query;
+  if (isClosedYear) {
+    // Año cerrado: usar RPC clientes_anio(p_year, p_empresa). Filtra
+    // clientes con compras en p_year (no rolling 12m) y delta vs p_year-1.
+    viewLabel = `clientes_anio(${year}, ${empresaKey ?? "todas"})`;
+    const res = await supabaseServer.rpc("clientes_anio", {
+      p_year: year,
+      p_empresa: isTodas ? null : empresaKey,
+    });
+    data = (res.data as ClientesEmpresaRow[] | null) ?? null;
+    error = res.error ? { message: res.error.message } : null;
+  } else {
+    // Año en curso: vista 12m rolling existente (materialized views).
+    viewLabel = isTodas ? "clientes_agregado_12m_vw" : `clientes_empresa_12m_vw(${empresaKey})`;
+    const query = isTodas
+      ? supabaseServer
+          .from("clientes_agregado_12m_vw")
+          .select("*")
+          .order("ultima_compra", { ascending: false, nullsFirst: false })
+          .limit(5000)
+      : supabaseServer
+          .from("clientes_empresa_12m_vw")
+          .select("*")
+          .eq("empresa", empresaKey)
+          .order("ultima_compra", { ascending: false, nullsFirst: false })
+          .limit(5000);
+    const res = await query;
+    data = (res.data as ClientesEmpresaRow[] | null) ?? null;
+    error = res.error ? { message: res.error.message } : null;
+  }
+
   if (error) {
-    const view = isTodas ? "clientes_agregado_12m_vw" : `clientes_empresa_12m_vw(${empresaKey})`;
-    throw new Error(`${view}: ${error.message}`);
+    throw new Error(`${viewLabel}: ${error.message}`);
   }
 
   const rows = ((data as ClientesEmpresaRow[] | null) ?? []).map((r, i) => {

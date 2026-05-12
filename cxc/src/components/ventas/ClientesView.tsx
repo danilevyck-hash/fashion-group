@@ -54,19 +54,27 @@ const EMPRESA_PILLS: { id: string; label: string }[] = [
 // huérfanos en una fila agregada.
 const SKIP_OTROS_FOR = new Set(["confecciones_boston", "american_classic"]);
 
-export function ClientesView({ data: initialData }: { data: Clientes }) {
+interface ClientesViewProps {
+  data: Clientes;
+  /** Año del selector global. Para año en curso: vista rolling 12m
+   *  (chip "Vista 12m"). Para año cerrado: vista YTD anual (chip "Año 2025"). */
+  selectedYear: number;
+  isClosedYear: boolean;
+}
+
+export function ClientesView({ data: initialData, selectedYear, isClosedYear }: ClientesViewProps) {
   const [search, setSearch] = useState("");
   const [empresa, setEmpresa] = useState("todas");
   const [data, setData] = useState<Clientes>(initialData);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
-  const [sortBy, setSortBy] = useState<SortKey>("ultima");
+  // Sort default: año cerrado → ordenar por compras YTD (vista anual);
+  // año en curso → última compra (vista rolling 12m).
+  const [sortBy, setSortBy] = useState<SortKey>(isClosedYear ? "ytd" : "ultima");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [otrosOpen, setOtrosOpen] = useState(false);
-  // Cliente seleccionado para el ClienteSheet en mobile. null = sheet cerrado.
   const [sheetCliente, setSheetCliente] = useState<Cliente | null>(null);
-  // Sheet picker de ordenamiento (mobile).
   const [sortOpen, setSortOpen] = useState(false);
 
   // Pill click → refetch desde server (la branching cliente/empresa vive en queries.ts)
@@ -76,9 +84,10 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
     setLoading(true);
     setFetchError(null);
     try {
-      const res = await fetch(`/api/ventas/clientes-12m?empresa=${encodeURIComponent(next)}`, {
-        cache: "no-store",
-      });
+      const res = await fetch(
+        `/api/ventas/clientes-12m?empresa=${encodeURIComponent(next)}&year=${selectedYear}`,
+        { cache: "no-store" }
+      );
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.error ?? `HTTP ${res.status}`);
@@ -131,7 +140,33 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
   // los clientes activos en los últimos 12 meses, incluyendo los que no
   // compraron aún en el año en curso. Para cualquier otro sort, la lista
   // se restringe a clientes con compras YTD > 0 (vista "estricta del año").
-  const is12mView = sortBy === "ultima";
+  //
+  // Para años cerrados, la vista rolling 12m no aplica — la RPC clientes_anio
+  // ya filtra al año específico. Forzamos is12mView=false.
+  const is12mView = !isClosedYear && sortBy === "ultima";
+
+  // Etiquetas de chip "Vista": para año cerrado siempre "Año {year}";
+  // para año en curso, mantiene el toggle 12m / YTD según sort.
+  const vistaChipLabel = isClosedYear
+    ? `Año ${selectedYear}`
+    : (is12mView ? "Vista 12m" : `YTD ${selectedYear}`);
+  const vistaChipLong = isClosedYear
+    ? `Año ${selectedYear}`
+    : (is12mView ? "Últimos 12 meses" : `YTD ${selectedYear}`);
+  const vistaSubtitleText = isClosedYear
+    ? `clientes con compras en ${selectedYear}`
+    : (is12mView ? "últimos 12 meses" : `Compras YTD ${selectedYear}`);
+  const vistaSubtitleTextShort = isClosedYear
+    ? `año ${selectedYear}`
+    : (is12mView ? "últimos 12m" : `YTD ${selectedYear}`);
+  const vistaChipTitle = isClosedYear
+    ? `Vista anual: clientes con compras en ${selectedYear} y delta vs ${selectedYear - 1}.`
+    : (is12mView
+        ? "Sort por última compra expande la lista al universo rolling de 12 meses (incluye clientes sin compras YTD)."
+        : "Vista estricta del año fiscal en curso: sólo clientes con compras YTD > 0.");
+  // Color del chip: teal cuando 12m rolling (señal "expandido"), stone para
+  // YTD strict o año cerrado.
+  const vistaChipTone = is12mView ? "bg-teal-50 text-teal-700" : "bg-stone-100 text-stone-700";
 
   // Universo según sort. Esto define qué huérfanos se agrupan en "Otros".
   const universe = useMemo(() => {
@@ -263,20 +298,13 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
           {/* Counter + chip de vista — desktop: una línea. Mobile: apilado debajo. */}
           <div className="ml-auto hidden flex-wrap items-center justify-end gap-2 whitespace-nowrap text-xs text-stone-500 md:flex">
             <p>
-              <span className="font-mono text-stone-950">{filtered.length}</span> clientes activos · {is12mView ? "últimos 12 meses" : `Compras YTD ${new Date().getFullYear()}`} · ordenados por {SORT_LABELS[sortBy]}
+              <span className="font-mono text-stone-950">{filtered.length}</span> clientes activos · {vistaSubtitleText} · ordenados por {SORT_LABELS[sortBy]}
             </p>
             <span
-              className={cn(
-                "rounded-md px-2 py-0.5 text-xs font-medium",
-                is12mView
-                  ? "bg-teal-50 text-teal-700"
-                  : "bg-stone-100 text-stone-700"
-              )}
-              title={is12mView
-                ? "Sort por última compra expande la lista al universo rolling de 12 meses (incluye clientes sin compras YTD)."
-                : "Vista estricta del año fiscal en curso: sólo clientes con compras YTD > 0."}
+              className={cn("rounded-md px-2 py-0.5 text-xs font-medium", vistaChipTone)}
+              title={vistaChipTitle}
             >
-              Vista: {is12mView ? "Últimos 12 meses" : `YTD ${new Date().getFullYear()}`}
+              Vista: {vistaChipLong}
             </span>
           </div>
         </div>
@@ -286,15 +314,12 @@ export function ClientesView({ data: initialData }: { data: Clientes }) {
             al texto y dé sensación de amontonamiento. */}
         <div className="md:hidden">
           <div className="text-[11px] text-stone-500">
-            <span className="font-mono text-stone-950">{filtered.length}</span> clientes · {is12mView ? "últimos 12m" : `YTD ${new Date().getFullYear()}`}
+            <span className="font-mono text-stone-950">{filtered.length}</span> clientes · {vistaSubtitleTextShort}
           </div>
           <span
-            className={cn(
-              "mt-1.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium",
-              is12mView ? "bg-teal-50 text-teal-700" : "bg-stone-100 text-stone-700"
-            )}
+            className={cn("mt-1.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium", vistaChipTone)}
           >
-            {is12mView ? "Vista 12m" : `YTD ${new Date().getFullYear()}`}
+            {vistaChipLabel}
           </span>
         </div>
 

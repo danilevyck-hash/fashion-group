@@ -103,10 +103,17 @@ type SortDir = "asc" | "desc";
 
 interface VendedorasSubtabProps {
   data: Multifashion;
+  /** Año del selector global de Ventas. Se propaga a las queries de
+   *  multifashion_vendedoras_v3 vía URLSearchParams. */
+  selectedYear: number;
+  /** true cuando selectedYear < año calendario actual. Cambia defaults
+   *  del selector (Mes/Trimestre) a opciones del año cerrado y oculta
+   *  YTD parcial. */
+  isClosedYear: boolean;
 }
 
-export function VendedorasSubtab({ data }: VendedorasSubtabProps) {
-  const year = new Date().getFullYear();
+export function VendedorasSubtab({ data, selectedYear, isClosedYear }: VendedorasSubtabProps) {
+  const year = selectedYear;
 
   // Meses con data RETAIL en el año actual (para el dropdown). 1..12.
   // Wholesale se reporta en Overview, no entra al ranking de vendedoras.
@@ -118,10 +125,11 @@ export function VendedorasSubtab({ data }: VendedorasSubtabProps) {
     return out;
   }, [data.retail.meses]);
 
-  // Último mes con data — default para "Mes".
+  // Último mes con data — default para "Mes". Para años cerrados es Dic
+  // (todos los meses tienen data); para año en curso es el mes parcial.
   const mesDefault = mesesConData.length > 0
     ? mesesConData[mesesConData.length - 1]
-    : new Date().getMonth() + 1;
+    : (isClosedYear ? 12 : new Date().getMonth() + 1);
   const trimDefault = Math.max(1, Math.ceil(mesDefault / 3));
 
   const [periodo, setPeriodo] = useState<VendedorasPeriodoTipo>("mes");
