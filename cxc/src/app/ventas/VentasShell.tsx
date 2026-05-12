@@ -66,10 +66,17 @@ export function VentasShell({
   };
 
   const isClosedYear = selectedYear < currentYear;
+  // resumen.mesActual (1-indexed) = último mes con data en el año en curso.
+  // Semánticamente es el "mes en curso" (data parcial cargada). El mes
+  // cerrado inmediatamente anterior es mesActual - 1.
+  //   mesActual = 5 (May) → "cierre Abr (mes en curso May)"
+  //   mesActual = 1 (solo Ene)  → "mes en curso Ene" (no hay cerrado en este año)
   const mesesLabel = isClosedYear
     ? "año cerrado"
     : (resumen && resumen.mesActual > 0
-        ? `cierre ${MES_SHORT[resumen.mesActual - 1]} (mes en curso ${MES_SHORT[Math.min(11, resumen.mesActual)]})`
+        ? (resumen.mesActual >= 2
+            ? `cierre ${MES_SHORT[resumen.mesActual - 2]} (mes en curso ${MES_SHORT[resumen.mesActual - 1]})`
+            : `mes en curso ${MES_SHORT[resumen.mesActual - 1]}`)
         : "sin cierres aún");
 
   return (
