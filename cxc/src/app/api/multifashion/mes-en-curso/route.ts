@@ -28,7 +28,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
 
-  const { data, error } = await supabaseServer.rpc("multifashion_dia_a_dia", {
+  // v4 rename para forzar a PostgREST/Vercel a salir del caché stale
+  // de la v3 (mismo patrón aplicado antes a multifashion_vendedoras y
+  // multifashion_mensual). Ver migration 20260517000000.
+  const { data, error } = await supabaseServer.rpc("multifashion_dia_a_dia_v4", {
     p_year: year,
     p_mes: mes,
   });
