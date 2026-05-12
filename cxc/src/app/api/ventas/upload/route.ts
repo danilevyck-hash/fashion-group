@@ -29,16 +29,39 @@ interface RawRow {
   total: number;
   utilidad: number;
   pct_utilidad: number | null;
-  /** true cuando empresa='american_classic' Y vendedor='DEFAULT' (TRIM+UPPER).
-   *  Marca ventas wholesale de Multifashion (ej. LA FRONTERA DUTY FREE).
-   *  Para B2B siempre false. Ver migration 20260512100000. */
+  /** true cuando empresa='american_classic' Y vendedor='DEFAULT' (TRIM+UPPER)
+   *  Y cliente existe en clientes_master con deleted=false.
+   *
+   *  Razón: en Multifashion 'DEFAULT' marca ticket sin vendedor asignado,
+   *  pero solo cuenta como mayoreo si el cliente está identificado en el
+   *  master (ej. LA FRONTERA DUTY FREE). DEFAULT con cliente=CONTADO sigue
+   *  siendo retail mostrador anónimo.
+   *
+   *  Para B2B siempre false. Trigger refresh_wholesale_flag_on_master_change
+   *  re-evalúa cuando se agrega/edita/borra un cliente en clientes_master. */
   is_wholesale: boolean;
 }
 
 // Helper: ¿es venta wholesale Multifashion? Solo aplica a american_classic.
-function isWholesaleSale(empresa: string, vendedor: string): boolean {
+//
+// Regla: vendedor='DEFAULT' (TRIM+UPPER) Y cliente existe en clientes_master
+// (deleted=false). El Set recibe nombres ya normalizados a TRIM+UPPER —
+// debe construirse antes de llamar al parser.
+//
+// TODO: edge case de puntuación. "BOUTI S.A." en master vs "BOUTI SA" en
+// CSV no matchean con TRIM+UPPER puro. Resolver aplicando la misma
+// normalización agresiva que clientes_anio (REGEXP_REPLACE [.,] '', '\s+' ' ').
+function isWholesaleSale(
+  empresa: string,
+  vendedor: string,
+  cliente: string,
+  clienteMasterSet: Set<string>,
+): boolean {
   if (empresa !== "american_classic") return false;
-  return (vendedor ?? "").trim().toUpperCase() === "DEFAULT";
+  const isDefault = (vendedor ?? "").trim().toUpperCase() === "DEFAULT";
+  if (!isDefault) return false;
+  const clienteKey = (cliente ?? "").trim().toUpperCase();
+  return clienteMasterSet.has(clienteKey);
 }
 
 interface FilteredCounts {
@@ -146,7 +169,7 @@ function canonicalTipo(raw: string): string | null {
 
 // ─── CSV parser ───────────────────────────────────────────────────────────────
 
-function parseCSV(text: string, empresa: string): ParseResult {
+function parseCSV(text: string, empresa: string, clienteMasterSet: Set<string>): ParseResult {
   const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 2) {
     throw new Error("No se encontraron filas válidas. Verifica que el archivo tenga datos.");
@@ -214,6 +237,7 @@ function parseCSV(text: string, empresa: string): ParseResult {
     const itbms = toNum(get("IMPUESTO") || get("ITBMS"));
 
     const vendedor = get("VENDEDOR");
+    const cliente = normalizeName(get("CLIENTE") || "");
     rows.push({
       empresa,
       fecha: fechaISO,
@@ -224,7 +248,7 @@ function parseCSV(text: string, empresa: string): ParseResult {
       n_sistema: get("N.SISTEMA") || get("N.INTERNO"),
       n_fiscal: get("N.FISCAL"),
       vendedor,
-      cliente: normalizeName(get("CLIENTE") || ""),
+      cliente,
       cliente_codigo,
       costo,
       descuento: toNum(get("DESCUENTO")),
@@ -233,7 +257,7 @@ function parseCSV(text: string, empresa: string): ParseResult {
       total,
       utilidad: toNum(get("UTILIDAD")),
       pct_utilidad: (() => { const v = Math.abs(toNum(get("% UTILIDAD") || get("%  UTILIDAD"))); return v > 999.99 ? null : v; })(),
-      is_wholesale: isWholesaleSale(empresa, vendedor),
+      is_wholesale: isWholesaleSale(empresa, vendedor, cliente, clienteMasterSet),
     });
   }
 
@@ -242,7 +266,7 @@ function parseCSV(text: string, empresa: string): ParseResult {
 
 // ─── Excel parser ─────────────────────────────────────────────────────────────
 
-function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
+function parseExcel(buffer: ArrayBuffer, empresa: string, clienteMasterSet: Set<string>): ParseResult {
   const wb = XLSX.read(buffer, { type: "array", cellDates: false });
   const ws = wb.Sheets[wb.SheetNames[0]];
   // Use raw: false so numbers are formatted strings; header:1 gives array-of-arrays
@@ -313,6 +337,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
     const itbmsKey = headers.includes("IMPUESTO") ? "IMPUESTO" : "ITBMS";
 
     const vendedor = get("VENDEDOR");
+    const cliente = normalizeName(get("CLIENTE") || "");
     rows.push({
       empresa,
       fecha: fechaISO,
@@ -323,7 +348,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
       n_sistema: get("N.SISTEMA") || get("N.INTERNO"),
       n_fiscal: get("N.FISCAL"),
       vendedor,
-      cliente: normalizeName(get("CLIENTE") || ""),
+      cliente,
       cliente_codigo,
       costo,
       descuento: getNum("DESCUENTO"),
@@ -332,7 +357,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
       total,
       utilidad: getNum("UTILIDAD"),
       pct_utilidad,
-      is_wholesale: isWholesaleSale(empresa, vendedor),
+      is_wholesale: isWholesaleSale(empresa, vendedor, cliente, clienteMasterSet),
     });
   }
 
@@ -353,6 +378,14 @@ export async function POST(req: NextRequest) {
   let filtered: FilteredCounts;
   let warnings: string[] = [];
   let detectedFormat: "us_thousands" | "no_thousands" = "no_thousands";
+  // Pre-fetch clientes_master para:
+  //   - codigoToId: match cliente_id post-parse (existente).
+  //   - clienteMasterSet: regla is_wholesale en parser (vendedor=DEFAULT
+  //     Y cliente identificado en master). Sin esta lookup el parser
+  //     marcaría como wholesale cualquier DEFAULT, incluyendo CONTADO
+  //     retail mostrador.
+  const codigoToId = new Map<string, string>();
+  const clienteMasterSet = new Set<string>();
 
   try {
     const form = await req.formData();
@@ -386,12 +419,35 @@ export async function POST(req: NextRequest) {
       console.warn("[ventas/upload] archive exception (non-blocking):", archEx);
     }
 
+    // Cargar clientes_master (id, codigo, nombre con deleted=false).
+    // Una sola query, dos índices en memoria: codigoToId para el match
+    // posterior, clienteMasterSet (TRIM+UPPER de nombre) para evaluar
+    // is_wholesale durante el parse.
+    //
+    // TODO: edge case puntuación. "BOUTI S.A." en master vs "BOUTI SA"
+    // en CSV no matchea con TRIM+UPPER. Aplicar normalización agresiva
+    // (REGEXP_REPLACE [.,] '', '\s+' ' ') si se vuelve un problema real.
+    {
+      const { data: clientes, error: cErr } = await supabaseServer
+        .from("clientes_master")
+        .select("id, codigo, nombre")
+        .eq("deleted", false);
+      if (cErr) {
+        console.error("[ventas/upload] error cargando clientes_master:", cErr.message);
+        return NextResponse.json({ error: `No se pudo cargar clientes_master: ${cErr.message}` }, { status: 500 });
+      }
+      for (const c of clientes ?? []) {
+        if (c.codigo) codigoToId.set(c.codigo, c.id);
+        if (c.nombre) clienteMasterSet.add(c.nombre.trim().toUpperCase());
+      }
+    }
+
     const fileName = file.name.toLowerCase();
     const isExcel = fileName.endsWith(".xlsx") || fileName.endsWith(".xls");
 
     if (isExcel) {
       const buffer = await file.arrayBuffer();
-      ({ rows, filtered, warnings, detectedFormat } = parseExcel(buffer, empresa));
+      ({ rows, filtered, warnings, detectedFormat } = parseExcel(buffer, empresa, clienteMasterSet));
     } else {
       // Decode CSV: try UTF-8 first, fall back to latin-1 if replacement chars found
       const buffer = await file.arrayBuffer();
@@ -404,7 +460,7 @@ export async function POST(req: NextRequest) {
       if (hadEncodingIssue && text.includes("\uFFFD")) {
         throw new Error("El archivo tiene caracteres especiales. Guárdalo como UTF-8 e intenta de nuevo.");
       }
-      ({ rows, filtered, warnings, detectedFormat } = parseCSV(text, empresa));
+      ({ rows, filtered, warnings, detectedFormat } = parseCSV(text, empresa, clienteMasterSet));
     }
   } catch (err) {
     console.error("[ventas/upload] parse error", err);
@@ -427,23 +483,8 @@ export async function POST(req: NextRequest) {
   const duplicatesRemoved = rows.length - dedupMap.size;
   rows = [...dedupMap.values()];
 
-  // Match cliente_id por codigo contra clientes_master (Sprint 1 Fase 3).
-  // Solo match exacto por codigo. Sin matching por nombre, sin transformaciones.
-  const codigoToId = new Map<string, string>();
-  {
-    const { data: clientes, error: cErr } = await supabaseServer
-      .from("clientes_master")
-      .select("id, codigo")
-      .eq("deleted", false);
-    if (cErr) {
-      console.error("[ventas/upload] error cargando clientes_master:", cErr.message);
-      return NextResponse.json({ error: `No se pudo cargar clientes_master: ${cErr.message}` }, { status: 500 });
-    }
-    for (const c of clientes ?? []) {
-      if (c.codigo) codigoToId.set(c.codigo, c.id);
-    }
-  }
-
+  // Match cliente_id por codigo contra clientes_master. codigoToId se
+  // populó arriba (junto con clienteMasterSet) en una sola query.
   let matchedCount = 0;
   const unmatchedCodigos = new Map<string, number>();   // codigo → veces sin match
   let nullCodigoCount = 0;                              // filas sin CODIGO en CSV
