@@ -29,6 +29,16 @@ interface RawRow {
   total: number;
   utilidad: number;
   pct_utilidad: number | null;
+  /** true cuando empresa='american_classic' Y vendedor='DEFAULT' (TRIM+UPPER).
+   *  Marca ventas wholesale de Multifashion (ej. LA FRONTERA DUTY FREE).
+   *  Para B2B siempre false. Ver migration 20260512100000. */
+  is_wholesale: boolean;
+}
+
+// Helper: ¿es venta wholesale Multifashion? Solo aplica a american_classic.
+function isWholesaleSale(empresa: string, vendedor: string): boolean {
+  if (empresa !== "american_classic") return false;
+  return (vendedor ?? "").trim().toUpperCase() === "DEFAULT";
 }
 
 interface FilteredCounts {
@@ -203,6 +213,7 @@ function parseCSV(text: string, empresa: string): ParseResult {
     // IMPUESTO en formato nuevo, ITBMS en formato viejo.
     const itbms = toNum(get("IMPUESTO") || get("ITBMS"));
 
+    const vendedor = get("VENDEDOR");
     rows.push({
       empresa,
       fecha: fechaISO,
@@ -212,7 +223,7 @@ function parseCSV(text: string, empresa: string): ParseResult {
       tipo,
       n_sistema: get("N.SISTEMA") || get("N.INTERNO"),
       n_fiscal: get("N.FISCAL"),
-      vendedor: get("VENDEDOR"),
+      vendedor,
       cliente: normalizeName(get("CLIENTE") || ""),
       cliente_codigo,
       costo,
@@ -222,6 +233,7 @@ function parseCSV(text: string, empresa: string): ParseResult {
       total,
       utilidad: toNum(get("UTILIDAD")),
       pct_utilidad: (() => { const v = Math.abs(toNum(get("% UTILIDAD") || get("%  UTILIDAD"))); return v > 999.99 ? null : v; })(),
+      is_wholesale: isWholesaleSale(empresa, vendedor),
     });
   }
 
@@ -300,6 +312,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
     // IMPUESTO formato nuevo, ITBMS formato viejo
     const itbmsKey = headers.includes("IMPUESTO") ? "IMPUESTO" : "ITBMS";
 
+    const vendedor = get("VENDEDOR");
     rows.push({
       empresa,
       fecha: fechaISO,
@@ -309,7 +322,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
       tipo,
       n_sistema: get("N.SISTEMA") || get("N.INTERNO"),
       n_fiscal: get("N.FISCAL"),
-      vendedor: get("VENDEDOR"),
+      vendedor,
       cliente: normalizeName(get("CLIENTE") || ""),
       cliente_codigo,
       costo,
@@ -319,6 +332,7 @@ function parseExcel(buffer: ArrayBuffer, empresa: string): ParseResult {
       total,
       utilidad: getNum("UTILIDAD"),
       pct_utilidad,
+      is_wholesale: isWholesaleSale(empresa, vendedor),
     });
   }
 

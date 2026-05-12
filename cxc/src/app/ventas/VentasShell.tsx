@@ -122,6 +122,7 @@ export function VentasShell({
           {resumen ? (
             <ResumenView
               data={resumen}
+              multi={multi}
               availableYears={availableYears}
               selectedYear={selectedYear}
               isClosedYear={isClosedYear}

@@ -176,22 +176,49 @@ export type VendedorasPeriodo = {
   dia_corte_anio_anterior: string | null;
 };
 
+export type WholesaleMonthly = {
+  mes: string;
+  ventas: number;
+  tickets: number;
+};
+
+export type MultifashionRetail = {
+  ytdVentas: number;
+  ytdTickets: number;
+  ticketProm: number;
+  margen: number;
+  /** Margen retail YTD del año anterior — mismo período (mes <= p_mes).
+   *  Usado por la UI para "Δ X pts vs 2025" en el card Margen Bruto. */
+  margenPrev: number;
+  meses: RetailMonthly[];
+};
+
+export type MultifashionWholesale = {
+  ytdVentas: number;
+  ytdTickets: number;
+  /** Cliente con más ventas wholesale en el año en curso (ej. "LA FRONTERA
+   *  DUTY FREE"). null cuando no hay wholesale data del año. */
+  topClienteName: string | null;
+  /** Cantidad de clientes distintos con ventas wholesale en el año. */
+  totalClientes: number;
+  meses: WholesaleMonthly[];
+};
+
+export type MultifashionTotal = {
+  ytdVentas: number;
+  ytdTickets: number;
+};
+
 export type Multifashion = {
   tienda: string;
   ubicacion: string;
   manager: string;
   metaAnual: number;
-  ytdVentas: number;
-  ytdTickets: number;
-  ticketProm: number;
-  margen: number;
-  /** 0..1 fraction of year elapsed at "today" — used for progress marker */
+  /** 0..1 fraction of year elapsed at "today" — used for progress marker.
+   *  Calculado contra TOTAL (retail + wholesale) porque la meta anual del
+   *  negocio se mide históricamente sobre el total. */
   expectedTodayPct: number;
-  meses: RetailMonthly[];
-  vendedoras: Vendedora[];
-  abrVentas: number;
-  abrTicketProm: number;
-  abrComisiones: number;
-  /** Bono adicional pagado a la TOP vendedora cuando supera mes anterior */
-  bonoTop: number;
+  retail: MultifashionRetail;
+  wholesale: MultifashionWholesale;
+  total: MultifashionTotal;
 };
