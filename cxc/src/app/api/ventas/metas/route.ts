@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { requireAuth } from "@/lib/require-auth";
+import { requireAuth, getSession } from "@/lib/require-auth";
 import { getVentasMensuales, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { logActivity } from "@/lib/log-activity";
 
 export const dynamic = "force-dynamic";
 
@@ -117,6 +118,7 @@ export async function POST(req: NextRequest) {
   const authError = requireAuth(req, ["admin"]);
   if (authError) return authError;
 
+  const session = getSession(req);
   const body = await req.json();
   const metasInput: { empresa: string; anio: number; meta: number }[] = body.metas;
 
@@ -124,11 +126,41 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Sin datos" }, { status: 400 });
   }
 
+  // Validación: meta > 0, año razonable (>= 2020 y <= currentYear + 5)
+  const currentYear = new Date().getFullYear();
+  for (const m of metasInput) {
+    if (typeof m.meta !== "number" || m.meta <= 0) {
+      return NextResponse.json(
+        { error: `Meta inválida para ${m.empresa}: debe ser > 0` },
+        { status: 400 }
+      );
+    }
+    if (typeof m.anio !== "number" || m.anio < 2020 || m.anio > currentYear + 5) {
+      return NextResponse.json(
+        { error: `Año inválido: ${m.anio} (rango 2020 .. ${currentYear + 5})` },
+        { status: 400 }
+      );
+    }
+  }
+
+  // Capturar valores previos para audit log (antes/después por empresa+año)
+  const empresasUnicas = [...new Set(metasInput.map(m => m.empresa))];
+  const aniosUnicos = [...new Set(metasInput.map(m => m.anio))];
+  const { data: previos } = await supabaseServer
+    .from("ventas_metas")
+    .select("empresa, anio, meta")
+    .in("empresa", empresasUnicas)
+    .in("anio", aniosUnicos);
+  const previosMap = new Map<string, number>();
+  for (const p of previos ?? []) {
+    previosMap.set(`${p.empresa}|${p.anio}`, Number(p.meta) || 0);
+  }
+
   // Upsert one row per empresa per year (annual meta)
   const records = metasInput.map(m => ({
     empresa: m.empresa,
     anio: m.anio,
-    meta: m.meta ?? 0,
+    meta: m.meta,
   }));
 
   const { error } = await supabaseServer
@@ -139,6 +171,96 @@ export async function POST(req: NextRequest) {
     console.error("[ventas/metas POST]", error.code, error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Audit log: una entrada por meta cambiada con antes/después
+  const cambios = metasInput.map(m => {
+    const prev = previosMap.get(`${m.empresa}|${m.anio}`) ?? null;
+    return {
+      empresa: m.empresa,
+      anio: m.anio,
+      meta_anterior: prev,
+      meta_nueva: m.meta,
+      diff: prev != null ? m.meta - prev : null,
+    };
+  });
+  await logActivity(
+    session?.role || "unknown",
+    "metas_upsert",
+    "ventas_metas",
+    { cambios },
+    session?.userName
+  );
+
+  return NextResponse.json({ ok: true, cambios: cambios.length });
+}
+
+// ─── DELETE: Remove meta for (empresa, anio) ─────────────────────────────────
+// Validación: NO permitir borrar si ya hay data en ventas_raw para ese
+// año. La meta es lo que da contexto a la data — borrarla deja números
+// huérfanos sin baseline.
+
+export async function DELETE(req: NextRequest) {
+  const authError = requireAuth(req, ["admin"]);
+  if (authError) return authError;
+
+  const session = getSession(req);
+  const sp = req.nextUrl.searchParams;
+  const empresa = sp.get("empresa");
+  const anioParam = sp.get("anio");
+  const anio = anioParam ? parseInt(anioParam, 10) : null;
+
+  if (!empresa || anio == null || !Number.isFinite(anio)) {
+    return NextResponse.json({ error: "empresa y anio requeridos" }, { status: 400 });
+  }
+
+  // ¿Hay data de ventas en ese año? Si sí, bloquear el delete.
+  // Convertimos display name → key para buscar en ventas_raw.
+  const empresaKey = Object.entries(EMPRESA_KEY_TO_NAME)
+    .find(([, name]) => name === empresa)?.[0];
+  if (empresaKey) {
+    const { count: dataCount } = await supabaseServer
+      .from("ventas_raw")
+      .select("*", { count: "exact", head: true })
+      .eq("empresa", empresaKey)
+      .eq("anio", anio);
+    if ((dataCount ?? 0) > 0) {
+      return NextResponse.json(
+        {
+          error: `No se puede borrar la meta de ${empresa} ${anio}: existen ${dataCount} ventas registradas en ese año.`,
+          ventas_count: dataCount,
+        },
+        { status: 409 }
+      );
+    }
+  }
+
+  // Capturar valor previo para audit
+  const { data: prev } = await supabaseServer
+    .from("ventas_metas")
+    .select("meta")
+    .eq("empresa", empresa)
+    .eq("anio", anio)
+    .maybeSingle();
+  const metaPrev = prev ? Number(prev.meta) || 0 : null;
+
+  const { error } = await supabaseServer
+    .from("ventas_metas")
+    .delete()
+    .eq("empresa", empresa)
+    .eq("anio", anio);
+
+  if (error) {
+    console.error("[ventas/metas DELETE]", error.code, error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  await logActivity(
+    session?.role || "unknown",
+    "metas_delete",
+    "ventas_metas",
+    { empresa, anio, meta_anterior: metaPrev },
+    session?.userName
+  );
 
   return NextResponse.json({ ok: true });
 }

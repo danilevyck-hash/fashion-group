@@ -61,7 +61,8 @@ export default function VentasMetasPage() {
   const router = useRouter();
   const { authChecked, role } = useAuth({ moduleKey: "ventas", allowedRoles: ["admin"] });
 
-  const [anio, setAnio] = useState(2026);
+  const [anio, setAnio] = useState(new Date().getFullYear());
+  const [availableYears, setAvailableYears] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -106,6 +107,27 @@ export default function VentasMetasPage() {
   useEffect(() => {
     if (authChecked) fetchMetas();
   }, [authChecked, fetchMetas]);
+
+  // Cargar lista de años dinámica desde ventas_raw + currentYear + 1 (para
+  // poder definir meta del año siguiente sin tocar SQL). El endpoint
+  // /api/ventas/años ya devuelve min..max de ventas_raw + año actual.
+  useEffect(() => {
+    if (!authChecked) return;
+    fetch("/api/ventas/años")
+      .then(r => r.ok ? r.json() : [])
+      .then((years: number[]) => {
+        const currentYear = new Date().getFullYear();
+        const set = new Set<number>(years);
+        set.add(currentYear);
+        set.add(currentYear + 1); // permitir definir meta del año próximo
+        setAvailableYears([...set].sort((a, b) => b - a));
+      })
+      .catch(() => {
+        // Fallback: año actual + próximo
+        const cy = new Date().getFullYear();
+        setAvailableYears([cy + 1, cy, cy - 1, cy - 2]);
+      });
+  }, [authChecked]);
 
   const loadSuggested = () => {
     const newDraft = { ...draft };
@@ -175,7 +197,7 @@ export default function VentasMetasPage() {
               onChange={e => setAnio(Number(e.target.value))}
               className="text-xs border border-gray-200 rounded-md px-3 py-2 min-h-[44px] bg-white font-medium"
             >
-              {[2027, 2026, 2025, 2024].map(y => (
+              {(availableYears.length > 0 ? availableYears : [anio]).map(y => (
                 <option key={y} value={y}>{y}</option>
               ))}
             </select>
