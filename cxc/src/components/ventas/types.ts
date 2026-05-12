@@ -102,6 +102,13 @@ export type RetailMonthly = {
   tickets: number;
   ticketProm: number;
   vs2025: number | null;
+  /** true sólo en el mes que contiene CURRENT_DATE (calendario, no data). */
+  es_periodo_parcial?: boolean;
+  /** YYYY-MM-DD. MAX(fecha) con data del mes actual cuando es_periodo_parcial=true. */
+  fecha_corte?: string | null;
+  /** YYYY-MM-DD. Día tope aplicado al mes del año anterior para mantener
+   *  same-period day-by-day. Sólo cuando es_periodo_parcial=true. */
+  dia_corte_anio_anterior?: string | null;
 };
 
 export type Vendedora = {

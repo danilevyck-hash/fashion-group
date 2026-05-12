@@ -46,9 +46,33 @@ export function MultifashionView({ data }: { data: Multifashion }) {
   );
 }
 
+const MES_FULL_OVERVIEW = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+// Parsea ISO YYYY-MM-DD como fecha local (evita shift UTC).
+function parseIsoDateOverview(iso: string): Date {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+// "Mayo 2026 en curso · Comparativo vs Mayo 1–9 2025"
+function buildPartialMonthDisclaimer(row: RetailMonthly): string | null {
+  if (!row.fecha_corte || !row.dia_corte_anio_anterior) return null;
+  const cur = parseIsoDateOverview(row.fecha_corte);
+  const prev = parseIsoDateOverview(row.dia_corte_anio_anterior);
+  const curMonthName = MES_FULL_OVERVIEW[cur.getMonth()];
+  const prevMonthName = MES_FULL_OVERVIEW[prev.getMonth()];
+  return `${curMonthName} ${cur.getFullYear()} en curso · Comparativo vs ${prevMonthName} 1–${prev.getDate()} ${prev.getFullYear()}`;
+}
+
 function OverviewSubtab({ data }: { data: Multifashion }) {
   const pctMeta = data.ytdVentas / data.metaAnual;
   const proyeccion = data.ytdVentas / data.expectedTodayPct;
+  // Detectar el mes parcial (a lo más uno en el calendario) para el disclaimer.
+  const partialMonth = data.meses.find(m => m.es_periodo_parcial);
+  const partialDisclaimer = partialMonth ? buildPartialMonthDisclaimer(partialMonth) : null;
 
   return (
     <div className="space-y-5">
@@ -134,6 +158,11 @@ function OverviewSubtab({ data }: { data: Multifashion }) {
               </tbody>
             </table>
           </div>
+          {partialDisclaimer && (
+            <p className="border-t border-stone-200 bg-stone-50 px-3.5 py-2 text-xs text-stone-500">
+              {partialDisclaimer}
+            </p>
+          )}
         </Card>
       </section>
 
