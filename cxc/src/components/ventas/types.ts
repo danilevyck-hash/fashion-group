@@ -46,6 +46,16 @@ export type VentasResumen = {
   mesActual: number;
   kpis: ResumenKpis;
   empresas: EmpresaMonthlySales[];
+  /** true cuando el `year` coincide con el año calendario actual y el
+   *  mes en curso tiene el comparativo prev recortado day-by-day. */
+  es_periodo_parcial: boolean;
+  /** YYYY-MM-DD. Día actual del calendario cuando es_periodo_parcial.
+   *  null cuando se mira un año cerrado. */
+  fecha_corte: string | null;
+  /** YYYY-MM-DD. Día tope aplicado al mes en curso del año anterior
+   *  (mismo offset desde el inicio del mes que fecha_corte). null
+   *  cuando se mira un año cerrado. */
+  dia_corte_anio_anterior: string | null;
 };
 
 export type Cliente = {

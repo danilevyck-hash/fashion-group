@@ -57,15 +57,34 @@ function buildEmpresa(key: string): Empresa {
 export async function fetchVentasResumen({ year }: { year: number }): Promise<VentasResumen> {
   const [curRes, prevRes, metaRes] = await Promise.all([
     supabaseServer.rpc("ventas_dashboard_summary", { p_anio: year }),
-    supabaseServer.rpc("ventas_dashboard_summary", { p_anio: year - 1 }),
+    // Prev year usa same-period day-by-day: el mes que está en curso en
+    // el calendario actual se recorta al mismo offset de días en el año
+    // anterior, y los meses posteriores no se emiten. Si `year` no es el
+    // año actual del calendario, devuelve full-mes-vs-full-mes (no
+    // aplica recorte).
+    supabaseServer.rpc("ventas_dashboard_prev_same_period", { p_year: year }),
     supabaseServer.rpc("get_app_setting", { p_key: "multifashion_meta_anual_2026" }),
   ]);
 
-  if (curRes.error) throw new Error(`ventas_dashboard_summary(${year}): ${curRes.error.message}`);
-  if (prevRes.error) throw new Error(`ventas_dashboard_summary(${year - 1}): ${prevRes.error.message}`);
+  if (curRes.error)  throw new Error(`ventas_dashboard_summary(${year}): ${curRes.error.message}`);
+  if (prevRes.error) throw new Error(`ventas_dashboard_prev_same_period(${year}): ${prevRes.error.message}`);
 
   const cur = (curRes.data as DashboardSummaryRow[] | null) ?? [];
-  const prev = (prevRes.data as DashboardSummaryRow[] | null) ?? [];
+
+  // El RPC nuevo devuelve { rows, es_periodo_parcial, fecha_corte, dia_corte_anio_anterior }
+  type PrevResp = {
+    rows: DashboardSummaryRow[];
+    es_periodo_parcial: boolean;
+    fecha_corte: string | null;
+    dia_corte_anio_anterior: string | null;
+  };
+  const prevPayload = (prevRes.data as PrevResp | null) ?? {
+    rows: [],
+    es_periodo_parcial: false,
+    fecha_corte: null,
+    dia_corte_anio_anterior: null,
+  };
+  const prev = prevPayload.rows ?? [];
 
   const metaAnualMultifashion = Number(metaRes.data ?? 800000) || 800000;
 
@@ -182,6 +201,9 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
       metaAnualMultifashion,
     },
     empresas,
+    es_periodo_parcial:      prevPayload.es_periodo_parcial,
+    fecha_corte:             prevPayload.fecha_corte,
+    dia_corte_anio_anterior: prevPayload.dia_corte_anio_anterior,
   };
 }
 
