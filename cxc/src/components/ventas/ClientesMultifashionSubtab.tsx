@@ -1,16 +1,19 @@
 "use client";
 
-// Sub-tab "Clientes" de Multifashion.
+// Sub-tab "Clientes" de Multifashion — layout tabla compacta.
+//
 // Dos secciones:
-//   1. Wholesale: clientes con is_wholesale=true (típicamente LA FRONTERA).
-//   2. Retail recurrentes: top 30 clientes retail (no wholesale, no
+//   1. Wholesale: clientes con is_wholesale=true (LA FRONTERA típico).
+//   2. Retail recurrentes: top 50 clientes retail (no wholesale, no
 //      CONTADO/CONSUMIDOR FINAL) con ≥ 2 tickets en el año.
 //
-// Ambos comparten visual (Card por cliente + sparkline mensual).
+// Filas finas (~36-44px). Sparkline NO visible por defecto; click en una
+// row la expande mostrando histórico mensual. Solo un cliente expandido
+// a la vez (se colapsa el anterior). Click de nuevo colapsa.
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Package, UserCircle, Users } from "lucide-react";
+import { Package, Users, ChevronDown } from "lucide-react";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 
@@ -27,7 +30,6 @@ interface ClienteRow {
   nombre: string;
   total_ytd: number;
   tickets_ytd: number;
-  /** retail recurrentes la trae directo; wholesale lo calculamos client-side. */
   ticket_prom?: number;
   ultima_compra: string | null;
   meses: MesRow[];
@@ -61,13 +63,11 @@ function parseIsoDateLocal(iso: string): Date {
   return new Date(y, m - 1, d);
 }
 
-function formatFechaLarga(iso: string): string {
+function formatFechaShort(iso: string | null): string {
+  if (!iso) return "—";
   const d = parseIsoDateLocal(iso);
-  const MES = [
-    "enero", "febrero", "marzo", "abril", "mayo", "junio",
-    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
-  ];
-  return `${d.getDate()} de ${MES[d.getMonth()]} ${d.getFullYear()}`;
+  const MES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  return `${d.getDate()} ${MES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────
@@ -77,11 +77,14 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
   const [retail, setRetail] = useState<RetailResp | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Solo un cliente expandido a la vez (string global = sectionPrefix + nombre).
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     const ctrl = new AbortController();
     setLoading(true);
     setError(null);
+    setExpandedId(null);
 
     Promise.all([
       fetch(`/api/multifashion/clientes-wholesale?year=${selectedYear}`, {
@@ -119,6 +122,17 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
     return () => ctrl.abort();
   }, [selectedYear]);
 
+  // Pico mensual compartido (escala visual unificada entre ambas secciones).
+  const peakMes = useMemo(() => Math.max(
+    ...(wholesale?.clientes ?? []).flatMap(c => c.meses.map(m => m.ventas)),
+    ...(retail?.clientes ?? []).flatMap(c => c.meses.map(m => m.ventas)),
+    1,
+  ), [wholesale, retail]);
+
+  const toggleRow = (id: string) => {
+    setExpandedId(prev => prev === id ? null : id);
+  };
+
   if (loading && !wholesale && !retail) {
     return (
       <Card className="flex min-h-[200px] items-center justify-center p-12 text-sm text-stone-500">
@@ -134,238 +148,205 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
     );
   }
 
-  // Pico mensual común (escala visual unificada entre ambas secciones)
-  const peakMes = Math.max(
-    ...(wholesale?.clientes ?? []).flatMap(c => c.meses.map(m => m.ventas)),
-    ...(retail?.clientes ?? []).flatMap(c => c.meses.map(m => m.ventas)),
-    1,
-  );
-
   return (
     <div className={cn("space-y-8", loading && "opacity-60 pointer-events-none transition-opacity")}>
-      {/* ═════════════════════════════════════════════════════════════════ */}
-      {/* Sección 1: Wholesale                                              */}
-      {/* ═════════════════════════════════════════════════════════════════ */}
-      <section className="space-y-4">
-        <SectionHeader
-          title="Wholesale"
-          subtitle="Clientes mayoreo (DEFAULT vendedor + cliente identificado en directorio)"
-          icon={<Package className="h-5 w-5" />}
-          iconTone="amber"
-        />
-        {wholesale && wholesale.clientes.length > 0 ? (
-          <>
-            <SectionAggregateCard
-              tone="amber"
-              icon={<Package className="h-5 w-5" />}
-              label={`Mayoreo ${selectedYear}`}
-              total={wholesale.total_ventas}
-              clientes={wholesale.total_clientes}
-              tickets={wholesale.total_tickets}
-            />
-            <div className="space-y-3">
-              {wholesale.clientes.map((c, idx) => (
-                <ClienteCard
-                  key={`ws-${c.nombre}`}
-                  rank={idx + 1}
-                  cliente={c}
-                  peakMes={peakMes}
-                  year={selectedYear}
-                />
-              ))}
-            </div>
-          </>
-        ) : (
-          <Card className="flex min-h-[160px] flex-col items-center justify-center gap-3 p-10 text-center">
-            <UserCircle className="h-10 w-10 text-stone-400" strokeWidth={1.5} />
-            <p className="text-sm text-stone-500">
-              No hay clientes wholesale registrados en {selectedYear}.
-            </p>
-          </Card>
-        )}
-      </section>
+      {/* Sección 1: Wholesale */}
+      <ClientesSection
+        prefix="ws"
+        title="Wholesale"
+        subtitle={wholesale
+          ? `${wholesale.total_clientes} ${wholesale.total_clientes === 1 ? "cliente" : "clientes"} · ${fmtMoney(wholesale.total_ventas)} · ${wholesale.total_tickets.toLocaleString()} tickets`
+          : "—"}
+        icon={<Package className="h-4 w-4" />}
+        iconTone="amber"
+        clientes={wholesale?.clientes ?? []}
+        peakMes={peakMes}
+        expandedId={expandedId}
+        onToggleRow={toggleRow}
+        emptyText={`No hay clientes wholesale registrados en ${selectedYear}.`}
+      />
 
-      {/* ═════════════════════════════════════════════════════════════════ */}
-      {/* Sección 2: Retail recurrentes                                     */}
-      {/* ═════════════════════════════════════════════════════════════════ */}
-      <section className="space-y-4">
-        <SectionHeader
-          title="Retail recurrentes"
-          subtitle={`Top ${retail?.limit ?? 30} clientes retail con ≥ 2 visitas en ${selectedYear}`}
-          icon={<Users className="h-5 w-5" />}
-          iconTone="teal"
-        />
-        {retail && retail.clientes.length > 0 ? (
-          <>
-            <SectionAggregateCard
-              tone="teal"
-              icon={<Users className="h-5 w-5" />}
-              label={`Retail recurrentes ${selectedYear}`}
-              total={retail.total_ventas}
-              clientes={retail.total_clientes}
-              tickets={retail.total_tickets}
-              note="Suma de los clientes mostrados, no del retail total."
-            />
-            <div className="space-y-3">
-              {retail.clientes.map((c, idx) => (
-                <ClienteCard
-                  key={`rt-${c.nombre}`}
-                  rank={idx + 1}
-                  cliente={c}
-                  peakMes={peakMes}
-                  year={selectedYear}
-                />
-              ))}
-            </div>
-          </>
-        ) : (
-          <Card className="flex min-h-[160px] flex-col items-center justify-center gap-3 p-10 text-center">
-            <Users className="h-10 w-10 text-stone-400" strokeWidth={1.5} />
-            <p className="text-sm text-stone-500">
-              No hay clientes retail recurrentes (con ≥ 2 visitas en {selectedYear}).
-            </p>
-          </Card>
-        )}
-      </section>
+      {/* Sección 2: Retail recurrentes */}
+      <ClientesSection
+        prefix="rt"
+        title="Retail recurrentes"
+        subtitle={retail
+          ? `Top ${retail.limit} · ≥ 2 visitas en ${selectedYear} · ${fmtMoney(retail.total_ventas)} · ${retail.total_tickets.toLocaleString()} tickets`
+          : "—"}
+        icon={<Users className="h-4 w-4" />}
+        iconTone="teal"
+        clientes={retail?.clientes ?? []}
+        peakMes={peakMes}
+        expandedId={expandedId}
+        onToggleRow={toggleRow}
+        emptyText={`No hay clientes retail recurrentes (con ≥ 2 visitas en ${selectedYear}).`}
+      />
     </div>
   );
 }
 
 // ─── Sub-components ────────────────────────────────────────────────────────
 
-function SectionHeader({
-  title, subtitle, icon, iconTone,
+function ClientesSection({
+  prefix, title, subtitle, icon, iconTone,
+  clientes, peakMes, expandedId, onToggleRow, emptyText,
 }: {
+  prefix: "ws" | "rt";
   title: string;
   subtitle: string;
   icon: React.ReactNode;
   iconTone: "amber" | "teal";
+  clientes: ClienteRow[];
+  peakMes: number;
+  expandedId: string | null;
+  onToggleRow: (id: string) => void;
+  emptyText: string;
 }) {
-  const toneClass = iconTone === "amber"
+  const toneIcon = iconTone === "amber"
     ? "border-amber-100 bg-amber-50 text-amber-700"
     : "border-teal-100 bg-teal-50 text-teal-700";
+
   return (
-    <div className="flex items-center gap-3">
-      <div className={cn("flex h-9 w-9 items-center justify-center rounded-lg border", toneClass)}>
-        {icon}
+    <section className="space-y-3">
+      {/* Header inline compacto */}
+      <div className="flex items-center gap-2.5">
+        <div className={cn("flex h-7 w-7 items-center justify-center rounded-md border", toneIcon)}>
+          {icon}
+        </div>
+        <div>
+          <h3 className="font-display text-sm font-semibold text-stone-950">{title}</h3>
+          <p className="text-[11px] text-stone-500">{subtitle}</p>
+        </div>
       </div>
-      <div>
-        <h3 className="font-display text-base font-semibold text-stone-950">{title}</h3>
-        <p className="mt-0.5 text-[11px] text-stone-500">{subtitle}</p>
-      </div>
-    </div>
+
+      {clientes.length === 0 ? (
+        <Card className="flex items-center justify-center py-8 text-xs text-stone-500">
+          {emptyText}
+        </Card>
+      ) : (
+        <Card className="overflow-hidden p-0">
+          {/* Header de tabla */}
+          <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem] items-center gap-3 border-b border-stone-200 bg-stone-50 px-3.5 py-2 text-[10.5px] font-medium uppercase tracking-[0.04em] text-stone-500">
+            <span className="text-right">#</span>
+            <span>Cliente</span>
+            <span className="text-right">Total YTD</span>
+            <span className="text-right">Tickets</span>
+            <span className="text-right">T. prom</span>
+            <span className="text-right">Última</span>
+            <span />
+          </div>
+
+          {clientes.map((c, idx) => {
+            const id = `${prefix}-${c.nombre}`;
+            const isExpanded = expandedId === id;
+            return (
+              <ClienteRow
+                key={id}
+                id={id}
+                rank={idx + 1}
+                cliente={c}
+                peakMes={peakMes}
+                isExpanded={isExpanded}
+                onToggle={onToggleRow}
+              />
+            );
+          })}
+        </Card>
+      )}
+    </section>
   );
 }
 
-function SectionAggregateCard({
-  tone, icon, label, total, clientes, tickets, note,
+function ClienteRow({
+  id, rank, cliente, peakMes, isExpanded, onToggle,
 }: {
-  tone: "amber" | "teal";
-  icon: React.ReactNode;
-  label: string;
-  total: number;
-  clientes: number;
-  tickets: number;
-  note?: string;
-}) {
-  const toneClass = tone === "amber"
-    ? "border-amber-100 bg-amber-50 text-amber-700"
-    : "border-teal-100 bg-teal-50 text-teal-700";
-  return (
-    <Card className="flex flex-wrap items-center gap-4 p-4">
-      <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg border", toneClass)}>
-        {icon}
-      </div>
-      <div className="flex-1 min-w-[160px]">
-        <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">
-          {label}
-        </p>
-        <p className="mt-0.5 font-mono text-xl font-medium text-stone-950 tabular-nums">
-          {fmtMoney(total)}
-        </p>
-        {note && <p className="mt-0.5 text-[10.5px] text-stone-400">{note}</p>}
-      </div>
-      <div className="text-right text-xs text-stone-500">
-        <p>
-          <span className="font-mono tabular-nums text-stone-700">{clientes}</span>{" "}
-          {clientes === 1 ? "cliente" : "clientes"}
-        </p>
-        <p className="mt-0.5">
-          <span className="font-mono tabular-nums text-stone-700">{tickets.toLocaleString()}</span>{" "}
-          tickets
-        </p>
-      </div>
-    </Card>
-  );
-}
-
-function ClienteCard({
-  rank, cliente, peakMes, year,
-}: {
+  id: string;
   rank: number;
   cliente: ClienteRow;
   peakMes: number;
-  year: number;
+  isExpanded: boolean;
+  onToggle: (id: string) => void;
 }) {
   const ticketProm = cliente.ticket_prom != null
     ? cliente.ticket_prom
     : (cliente.tickets_ytd > 0 ? cliente.total_ytd / cliente.tickets_ytd : 0);
 
   return (
-    <Card className="p-4">
-      {/* Header de cliente */}
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="flex items-center gap-2.5">
-          <span className="font-mono text-[10.5px] text-stone-500 tabular-nums">#{rank}</span>
-          <h3 className="font-display text-base font-semibold text-stone-950">{cliente.nombre}</h3>
-        </div>
-        <div className="text-right">
-          <p className="font-mono text-lg font-medium text-stone-950 tabular-nums">{fmtMoney(cliente.total_ytd)}</p>
-          <p className="text-[11px] text-stone-500">
-            {cliente.tickets_ytd} {cliente.tickets_ytd === 1 ? "ticket" : "tickets"} · ${ticketProm.toFixed(2)} promedio
-          </p>
+    <div className="border-t border-stone-200">
+      <button
+        type="button"
+        onClick={() => onToggle(id)}
+        aria-expanded={isExpanded}
+        className={cn(
+          "grid w-full grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem] items-center gap-3 px-3.5 py-2.5 text-left text-sm transition",
+          "hover:bg-stone-50/60",
+          isExpanded && "bg-stone-50/80",
+        )}
+      >
+        <span className="text-right font-mono text-[11px] text-stone-500 tabular-nums">{rank}</span>
+        <span className="truncate font-medium text-stone-900">{cliente.nombre}</span>
+        <span className="text-right font-mono text-stone-950 tabular-nums">{fmtMoney(cliente.total_ytd)}</span>
+        <span className="text-right font-mono text-stone-700 tabular-nums">{cliente.tickets_ytd.toLocaleString()}</span>
+        <span className="text-right font-mono text-stone-700 tabular-nums">${ticketProm.toFixed(2)}</span>
+        <span className="text-right font-mono text-xs text-stone-500 tabular-nums">{formatFechaShort(cliente.ultima_compra)}</span>
+        <ChevronDown className={cn(
+          "h-3.5 w-3.5 text-stone-400 transition-transform",
+          isExpanded && "rotate-180",
+        )} />
+      </button>
+
+      {/* Detalle expandible — sparkline mensual */}
+      <div
+        className={cn(
+          "grid overflow-hidden transition-[grid-template-rows] duration-200 ease-out",
+          isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]",
+        )}
+      >
+        <div className="min-h-0">
+          {isExpanded && <ClienteSparkline cliente={cliente} peakMes={peakMes} />}
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* Última compra */}
-      {cliente.ultima_compra && (
-        <p className="mt-1 text-[11px] text-stone-500">
-          Última compra: <span className="text-stone-700">{formatFechaLarga(cliente.ultima_compra)}</span>
-        </p>
-      )}
-
-      {/* Mini-tabla mensual con sparkline visual */}
-      <div className="mt-4">
-        <div className="grid grid-cols-12 gap-1">
-          {cliente.meses.map(m => {
-            const heightPct = peakMes > 0 ? (m.ventas / peakMes) * 100 : 0;
-            const hasData = m.ventas > 0;
-            return (
-              <div key={m.mes_idx} className="flex flex-col items-center gap-1">
-                <div className="relative flex h-14 w-full items-end justify-center rounded-sm bg-stone-50">
-                  {hasData && (
-                    <div
-                      className="w-full rounded-sm bg-teal-700/80 transition-all"
-                      style={{ height: `${Math.max(4, heightPct)}%` }}
-                      title={`${m.mes_label}: ${fmtMoney(m.ventas)}`}
-                    />
-                  )}
-                </div>
-                <p className="text-[9.5px] font-medium uppercase text-stone-500">{m.mes_label}</p>
-                <p className={cn(
-                  "font-mono text-[10px] tabular-nums",
-                  hasData ? "text-stone-700" : "text-stone-300"
-                )}>
-                  {hasData ? fmtMoneyCompact(m.ventas) : "—"}
-                </p>
+function ClienteSparkline({
+  cliente, peakMes,
+}: {
+  cliente: ClienteRow;
+  peakMes: number;
+}) {
+  return (
+    <div className="bg-stone-50/40 px-4 py-4">
+      <div className="grid grid-cols-12 gap-1">
+        {cliente.meses.map(m => {
+          const heightPct = peakMes > 0 ? (m.ventas / peakMes) * 100 : 0;
+          const hasData = m.ventas > 0;
+          return (
+            <div key={m.mes_idx} className="flex flex-col items-center gap-1">
+              <div className="relative flex h-12 w-full items-end justify-center rounded-sm bg-stone-100">
+                {hasData && (
+                  <div
+                    className="w-full rounded-sm bg-teal-700/80 transition-all"
+                    style={{ height: `${Math.max(4, heightPct)}%` }}
+                    title={`${m.mes_label}: ${fmtMoney(m.ventas)}`}
+                  />
+                )}
               </div>
-            );
-          })}
-        </div>
-        <p className="mt-2 text-[10.5px] text-stone-500">
-          Histórico mensual {year}. Escala compartida entre wholesale y retail.
-        </p>
+              <p className="text-[9.5px] font-medium uppercase text-stone-500">{m.mes_label}</p>
+              <p className={cn(
+                "font-mono text-[10px] tabular-nums",
+                hasData ? "text-stone-700" : "text-stone-300",
+              )}>
+                {hasData ? fmtMoneyCompact(m.ventas) : "—"}
+              </p>
+            </div>
+          );
+        })}
       </div>
-    </Card>
+      <p className="mt-2 text-[10.5px] text-stone-500">
+        Histórico mensual. Escala compartida entre wholesale y retail.
+      </p>
+    </div>
   );
 }

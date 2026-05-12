@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   if (!Number.isFinite(year) || year < 2000 || year > 2100) {
     return NextResponse.json({ error: "year inválido" }, { status: 400 });
   }
-  const limit = limitParam ? parseInt(limitParam, 10) : 30;
+  const limit = limitParam ? parseInt(limitParam, 10) : 50;
   if (!Number.isFinite(limit) || limit < 1 || limit > 500) {
     return NextResponse.json({ error: "limit inválido (1..500)" }, { status: 400 });
   }
