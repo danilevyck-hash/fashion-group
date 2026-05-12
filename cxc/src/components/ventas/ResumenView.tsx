@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "lucide-react";
-import type { VentasResumen } from "./types";
+import type { VentasResumen, Multifashion } from "./types";
 import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, deltaSymbol, heatmapClasses } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,9 @@ type Cell = { value: number | null; delta: number | null; prevValue: number; per
 
 interface ResumenViewProps {
   data: VentasResumen;
+  /** Datos retail/wholesale de Multifashion. Cuando está disponible, la fila
+   *  "Multifashion" del heatmap muestra tooltip con desglose retail / mayoreo. */
+  multi: Multifashion | null;
   availableYears: number[];
   selectedYear: number;
   isClosedYear: boolean;
@@ -25,7 +28,7 @@ interface ResumenViewProps {
 }
 
 export function ResumenView({
-  data, availableYears, selectedYear, isClosedYear, loading, error, onYearChange,
+  data, multi, availableYears, selectedYear, isClosedYear, loading, error, onYearChange,
 }: ResumenViewProps) {
   const [granularity, setGranularity] = useState<Granularity>("mensual");
   const [viewMode, setViewMode] = useState<ViewMode>("ventas");
@@ -203,9 +206,15 @@ export function ResumenView({
                     "sticky left-0 z-10 whitespace-nowrap border-b border-stone-200 px-3.5 py-2.5 text-sm text-stone-950",
                     r.empresa.id === "multi" ? "bg-teal-50" : "bg-white"
                   )}>
-                    <span className="inline-flex items-center gap-1.5">
-                      {r.empresa.nombre}
-                    </span>
+                    {r.empresa.id === "multi" && multi && multi.wholesale.ytdVentas > 0 ? (
+                      <MultifashionNameWithBreakdown
+                        nombre={r.empresa.nombre}
+                        retailYtd={multi.retail.ytdVentas}
+                        wholesale={multi.wholesale}
+                      />
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5">{r.empresa.nombre}</span>
+                    )}
                   </td>
                   {r.cells.map((c, ci) => (
                     <HeatCell key={ci} cell={c} prevYear={prevYear} metricLabel={metricLabel} />
@@ -546,6 +555,52 @@ function TotalGroupAnnualCell({
         </Tooltip>
       </TooltipProvider>
     </td>
+  );
+}
+
+/** Sticky-left "Multifashion" label envuelto en tooltip que muestra el
+ *  desglose retail vs mayoreo cuando hay data wholesale del año. La
+ *  celda numérica del heatmap (el total YTD agregado) no cambia — sigue
+ *  mostrando retail + mayoreo combinados. */
+function MultifashionNameWithBreakdown({
+  nombre, retailYtd, wholesale,
+}: {
+  nombre: string;
+  retailYtd: number;
+  wholesale: { ytdVentas: number; topClienteName: string | null; totalClientes: number };
+}) {
+  const clienteLabel = wholesale.totalClientes > 1
+    ? `${wholesale.totalClientes} clientes wholesale`
+    : (wholesale.topClienteName ?? "—");
+  return (
+    <TooltipProvider delayDuration={120}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="inline-flex cursor-help items-center gap-1.5 text-left outline-none focus-visible:underline"
+          >
+            <span className="underline decoration-dotted decoration-stone-300 underline-offset-4">
+              {nombre}
+            </span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right" align="start" sideOffset={4} collisionPadding={12} className="min-w-[240px] border-0 bg-stone-950 p-3 text-white shadow-lg">
+          <div className="text-[11px] font-medium text-white">{nombre}</div>
+          <div className="mt-1.5 flex justify-between gap-6 text-[11px]">
+            <span className="text-stone-300">Retail</span>
+            <span className="font-mono text-white tabular-nums">{fmtMoney(retailYtd)}</span>
+          </div>
+          <div className="mt-1 flex justify-between gap-6 text-[11px]">
+            <span className="text-stone-300">Mayoreo</span>
+            <span className="font-mono text-white tabular-nums">{fmtMoney(wholesale.ytdVentas)}</span>
+          </div>
+          <div className="mt-1.5 border-t border-white/10 pt-1.5 text-[10.5px] text-stone-400">
+            {clienteLabel}
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }
 

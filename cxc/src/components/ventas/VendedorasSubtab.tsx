@@ -108,14 +108,15 @@ interface VendedorasSubtabProps {
 export function VendedorasSubtab({ data }: VendedorasSubtabProps) {
   const year = new Date().getFullYear();
 
-  // Meses con data en el año actual (para el dropdown). 1..12.
+  // Meses con data RETAIL en el año actual (para el dropdown). 1..12.
+  // Wholesale se reporta en Overview, no entra al ranking de vendedoras.
   const mesesConData = useMemo(() => {
     const out: number[] = [];
-    data.meses.forEach((m, i) => {
+    data.retail.meses.forEach((m, i) => {
       if (m.tickets > 0 || m.ventas > 0) out.push(i + 1);
     });
     return out;
-  }, [data.meses]);
+  }, [data.retail.meses]);
 
   // Último mes con data — default para "Mes".
   const mesDefault = mesesConData.length > 0
@@ -247,6 +248,9 @@ export function VendedorasSubtab({ data }: VendedorasSubtabProps) {
             </span>
           </p>
         )}
+        <p className="mt-1 text-[11px] text-stone-400">
+          Ventas retail mostrador. Mayoreo se reporta en Overview.
+        </p>
         {resp?.es_periodo_parcial && resp.fecha_corte && diaCortePrevio && (
           <p className="mt-1 text-xs text-stone-500">
             Actualizado al {formatFechaCortePA(resp.fecha_corte)} ·{" "}
