@@ -4,7 +4,8 @@ import { useState, useTransition, useCallback } from "react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, Plus, ShoppingBag, TrendingUp, Contact } from "lucide-react";
+import { Download, Plus, ShoppingBag, TrendingUp, Contact, Target } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ResumenView } from "@/components/ventas/ResumenView";
 import { ClientesView } from "@/components/ventas/ClientesView";
 import { MultifashionView } from "@/components/ventas/MultifashionView";
@@ -109,9 +110,28 @@ export function VentasShell({
             8 empresas · año fiscal {selectedYear} · {mesesLabel}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Bug #1 fix: selector año visible desde cualquier tab (antes solo
+              en Resumen). State global ya existía — solo cambio de placement. */}
+          <Select value={String(selectedYear)} onValueChange={v => onYearChange(parseInt(v, 10))}>
+            <SelectTrigger className="h-9 w-auto min-w-[88px] gap-1.5 text-xs font-mono tabular-nums" disabled={loading}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {availableYears.map(y => (
+                <SelectItem key={y} value={String(y)} className="font-mono tabular-nums">
+                  {y}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="outline" size="sm" onClick={onExportExcel} disabled={!resumen}>
             <Download className="mr-1.5 h-3.5 w-3.5" /> Excel
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/ventas/metas">
+              <Target className="mr-1.5 h-3.5 w-3.5" /> Configurar metas
+            </Link>
           </Button>
           <Button size="sm" asChild>
             <Link href="/upload?tab=ventas">

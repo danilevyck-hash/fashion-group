@@ -369,7 +369,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
               </tr>
             </thead>
             <tbody>
-              {filtered.map(c => {
+              {filtered.map((c, idx) => {
                 if (c.isOtrosAggregate) {
                   return (
                     <OtrosRow
@@ -379,10 +379,16 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                     />
                   );
                 }
+                // Bug #5: el rank original de la materialized view era el
+                // orden por compras_ytd DESC global. Como el usuario puede
+                // sortear por nombre/empresa/última compra, esos IDs salían
+                // desordenados (1, 7, 4, ...). Renumeramos 1..N según el
+                // orden visual actual (idx + 1).
                 return (
                   <ClienteRow
                     key={`${c.empresaKey}-${c.id}-${c.rank}`}
                     c={c}
+                    displayRank={idx + 1}
                     histState={histStateFor(c)}
                     empresaScope={empresa}
                     onTriggerHistorial={() => loadHistorial(c.id, c.empresaKey)}
@@ -465,12 +471,17 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
 
 function ClienteRow({
   c,
+  displayRank,
   histState,
   empresaScope,
   onTriggerHistorial,
   onMobileTap,
 }: {
   c: Cliente;
+  /** Rank visual 1..N según el sort actual. Reemplaza c.rank (DB rank
+   *  global por compras_ytd DESC) que se veía desordenado cuando el
+   *  usuario cambiaba el sort. */
+  displayRank: number;
   histState: HistorialState;
   empresaScope: string;
   onTriggerHistorial: () => void;
@@ -491,7 +502,7 @@ function ClienteRow({
 
   return (
     <tr className="cursor-pointer transition hover:bg-stone-50">
-      <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">{c.rank}</td>
+      <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">{displayRank}</td>
       <td className="border-b border-stone-200 px-3.5 py-3 text-sm text-stone-950">
         {/* Desktop (md+): HoverCard con popover. Mobile (< md): el mismo
             botón dispara onMobileTap → abre ClienteSheet en el padre. */}
