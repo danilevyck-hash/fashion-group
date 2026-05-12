@@ -327,11 +327,11 @@ export async function fetchMultifashion({
   year: number;
   mes: number;
 }): Promise<Multifashion> {
-  const { data, error } = await supabaseServer.rpc("multifashion_mensual", {
+  const { data, error } = await supabaseServer.rpc("multifashion_mensual_v2", {
     p_year: year,
     p_mes: mes,
   });
-  if (error) throw new Error(`multifashion_mensual: ${error.message}`);
+  if (error) throw new Error(`multifashion_mensual_v2: ${error.message}`);
 
   // El RPC ya devuelve el shape exacto Multifashion (jsonb).
   return data as Multifashion;
