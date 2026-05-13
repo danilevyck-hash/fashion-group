@@ -191,8 +191,12 @@ export function VentasShell({
         </TabsContent>
         <TabsContent value="multifashion" className="mt-5">
           {multi ? (
+            // Sin `key={selectedYear}`: el sub-tab activo (Overview / Detalle
+            // mensual / Vendedoras / Clientes) debe persistir al cambiar año.
+            // La data se actualiza vía props (multi) y los sub-tabs hacen su
+            // propio refetch cuando year cambia. ClientesView arriba sí usa
+            // key= porque su búsqueda/filtro asume el universo del año.
             <MultifashionView
-              key={selectedYear}
               data={multi}
               selectedYear={selectedYear}
               isClosedYear={isClosedYear}

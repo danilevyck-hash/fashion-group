@@ -107,11 +107,25 @@ function calcDeltaPct(cur: number, comp: ComparativoBlock): number | null {
   return (cur - comp.ventas) / comp.ventas;
 }
 
+// Un delta de < 1% absoluto es ruido — lo tratamos como "≈0%" sin signo ni
+// color. Evita flechas verde/rojo engañosas cuando el cambio es despreciable.
+function isDeltaNegligible(delta: number | null): boolean {
+  return delta != null && Math.abs(delta) < 0.01;
+}
+
 function deltaTone(delta: number | null): string {
   if (delta == null) return "text-stone-500";
+  if (isDeltaNegligible(delta)) return "text-stone-500";
   if (delta > 0.05)  return "text-emerald-700";
   if (delta < -0.05) return "text-red-700";
   return "text-stone-500";
+}
+
+// Hint para mostrar el delta debajo del chart: "▲ +X%" / "▼ −X%" / "≈0%"
+function renderDeltaInline(delta: number): string {
+  if (isDeltaNegligible(delta)) return "≈0%";
+  const arrow = delta >= 0 ? "▲" : "▼";
+  return `${arrow} ${fmtPct(delta)}`;
 }
 
 export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
@@ -195,6 +209,21 @@ export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
   const deltaMoM = calcDeltaPct(totales.ventas, mes_anterior);
   const deltaYoy = calcDeltaPct(totales.ventas, yoy);
 
+  // Mostrar línea dashed del mes anterior sólo si el comparativo es viable
+  // (mismo guard que aplicamos en el KPI "VS Mes Anterior"). Si la base es
+  // muy baja o nula, la línea no aporta y enrarece el chart.
+  const showPrevLine = mes_anterior.tiene_data && mes_anterior.ventas >= 100;
+
+  // chartData: clampea ventas/mes_anterior negativos a 0 para que el YAxis
+  // domain [0, dataMax] no termine con la zona baja del chart desperdiciada
+  // cuando hay NCs heavy. Sólo afecta visualización; los totales del banner
+  // siguen siendo los reales (con netos negativos descontados).
+  const chartData = dias.map(d => ({
+    dia:                 d.dia,
+    ventas:              Math.max(0, d.ventas),
+    ventas_mes_anterior: showPrevLine ? Math.max(0, d.ventas_mes_anterior) : 0,
+  }));
+
   const headerTitle = is_mes_actual
     ? `${mes_label} ${year} · al día ${data.dia_actual} (data más reciente)`
     : `${mes_label} ${year}`;
@@ -256,7 +285,7 @@ export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
             <>
               <div className="h-[260px] w-full">
                 <ResponsiveContainer>
-                  <ComposedChart data={dias} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <ComposedChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                     <XAxis
                       dataKey="dia"
                       tick={{ fontSize: 10, fill: "#78716c" }}
@@ -264,39 +293,52 @@ export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
                       tickLine={false}
                     />
                     <YAxis
+                      domain={[0, "dataMax"]}
+                      allowDataOverflow={false}
                       tick={{ fontSize: 10, fill: "#78716c" }}
                       axisLine={{ stroke: "#e7e5e4" }}
                       tickLine={false}
                       tickFormatter={(v: number) => fmtMoneyCompact(v)}
                     />
                     <RTooltip
-                      contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #e7e5e4" }}
-                      formatter={(value, name) => {
-                        const v = typeof value === "number" ? value : Number(value) || 0;
-                        if (name === "ventas") return [fmtMoney(v), `${mes_label} ${year}`];
-                        if (name === "ventas_mes_anterior") return [fmtMoney(v), "Mes anterior"];
-                        return [String(value), String(name)];
-                      }}
-                      labelFormatter={(label) => `Día ${label}`}
+                      cursor={{ fill: "rgba(0,0,0,0.03)" }}
+                      content={(p) => (
+                        <ChartTooltip
+                          active={p.active}
+                          payload={p.payload as ReadonlyArray<unknown> | undefined}
+                          label={typeof p.label === "number" || typeof p.label === "string" ? p.label : undefined}
+                          isMesActual={is_mes_actual}
+                          diaActual={data.dia_actual}
+                          showPrevLine={showPrevLine}
+                          mesLabel={mes_label}
+                          year={year}
+                        />
+                      )}
                     />
                     <Bar dataKey="ventas" fill="#0d9488" radius={[2, 2, 0, 0]} />
-                    <Line
-                      type="monotone"
-                      dataKey="ventas_mes_anterior"
-                      stroke="#a8a29e"
-                      strokeWidth={1.5}
-                      strokeDasharray="3 3"
-                      dot={false}
-                    />
+                    {showPrevLine && (
+                      <Line
+                        type="monotone"
+                        dataKey="ventas_mes_anterior"
+                        stroke="#a8a29e"
+                        strokeWidth={1.5}
+                        strokeDasharray="3 3"
+                        dot={false}
+                      />
+                    )}
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
               <p className="mt-2 px-1 text-[10.5px] text-stone-500">
                 <span className="inline-block w-2 h-2 mr-1 bg-teal-700 rounded-sm" />
                 {mes_label} {year}
-                {" · "}
-                <span className="inline-block w-2 h-[2px] mr-1 bg-stone-400" />
-                Mes anterior
+                {showPrevLine && (
+                  <>
+                    {" · "}
+                    <span className="inline-block w-2 h-[2px] mr-1 bg-stone-400" />
+                    Mes anterior
+                  </>
+                )}
               </p>
             </>
           ) : (
@@ -359,7 +401,7 @@ export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
           <Card className="flex items-center gap-3 border-stone-200 bg-stone-50 p-4">
             <Info className="h-4 w-4 text-stone-400" />
             <p className="text-xs text-stone-500">
-              Hora pico no disponible: <span className="font-mono">ventas_raw.fecha</span> guarda solo fecha (date), sin componente horario.
+              Hora pico no disponible (la venta solo registra fecha, no hora).
             </p>
           </Card>
         </section>
@@ -369,18 +411,91 @@ export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
       {(deltaMoM != null || deltaYoy != null) && hasData && (
         <p className="text-[11px] text-stone-500">
           {deltaMoM != null && (
-            <span>
-              vs mes anterior {deltaMoM >= 0 ? "▲" : "▼"} {fmtPct(deltaMoM)}
-            </span>
+            <span>vs mes anterior {renderDeltaInline(deltaMoM)}</span>
           )}
           {deltaMoM != null && deltaYoy != null && <span className="mx-2 text-stone-300">·</span>}
           {deltaYoy != null && (
             <span>
-              vs {year - 1} {deltaYoy >= 0 ? "▲" : "▼"} {fmtPct(deltaYoy)}
+              vs {year - 1} {renderDeltaInline(deltaYoy)}
             </span>
           )}
         </p>
       )}
+    </div>
+  );
+}
+
+// Tooltip con semántica de día. Reglas:
+//   - Día futuro (is_mes_actual && día > dia_actual): NO mostrar "$0.00"
+//     del mes actual. Si hay valor de mes anterior, mostrarlo. Si no, "pendiente".
+//   - Día pasado con ventas=0: mostrar "Sin operación" en vez de "$0.00".
+//   - Día con ventas > 0: monto formateado normal.
+//   - Línea mes anterior se incluye sólo si showPrevLine y el valor > 0.
+//
+// `payload` se tipa como unknown porque recharts expone tipos complejos
+// (TooltipPayload con dataKey función y value variante). Narrow defensivo
+// abajo: si el item no tiene dataKey/value útiles, devuelve 0.
+function readDataKey(item: unknown, key: string): number {
+  if (typeof item !== "object" || item === null) return 0;
+  const rec = item as Record<string, unknown>;
+  if (rec.dataKey !== key) return 0;
+  const v = rec.value;
+  return typeof v === "number" ? v : 0;
+}
+
+function matchesKey(item: unknown, key: string): boolean {
+  if (typeof item !== "object" || item === null) return false;
+  return (item as Record<string, unknown>).dataKey === key;
+}
+
+function ChartTooltip({
+  active, payload, label,
+  isMesActual, diaActual, showPrevLine, mesLabel, year,
+}: {
+  active?: boolean;
+  payload?: ReadonlyArray<unknown>;
+  label?: string | number;
+  isMesActual: boolean;
+  diaActual: number;
+  showPrevLine: boolean;
+  mesLabel: string;
+  year: number;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const day = typeof label === "number" ? label : parseInt(String(label ?? ""), 10);
+  if (!Number.isFinite(day)) return null;
+
+  const ventasItem = payload.find(p => matchesKey(p, "ventas"));
+  const prevItem   = payload.find(p => matchesKey(p, "ventas_mes_anterior"));
+  const ventas = readDataKey(ventasItem, "ventas");
+  const prev   = readDataKey(prevItem,   "ventas_mes_anterior");
+  const isFuture = isMesActual && day > diaActual;
+
+  const rows: { label: string; value: string; tone?: string }[] = [];
+
+  if (!isFuture) {
+    if (ventas === 0) {
+      rows.push({ label: `${mesLabel} ${year}`, value: "Sin operación", tone: "text-stone-400" });
+    } else {
+      rows.push({ label: `${mesLabel} ${year}`, value: fmtMoney(ventas) });
+    }
+  }
+  if (showPrevLine && prev > 0) {
+    rows.push({ label: "Mes anterior", value: fmtMoney(prev), tone: "text-stone-600" });
+  }
+  if (rows.length === 0) {
+    rows.push({ label: "Pendiente", value: "—", tone: "text-stone-400" });
+  }
+
+  return (
+    <div className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-[11px] shadow-sm">
+      <div className="mb-1 font-medium text-stone-700">Día {day}</div>
+      {rows.map((r, i) => (
+        <div key={i} className="flex items-center justify-between gap-4">
+          <span className="text-stone-500">{r.label}</span>
+          <span className={cn("font-mono tabular-nums text-stone-950", r.tone)}>{r.value}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -448,8 +563,15 @@ function DeltaKpi({
   subTieneData: string;
 }) {
   const tone = deltaTone(delta);
-  const arrow = delta == null ? null : delta >= 0 ? "▲" : "▼";
-  const value = delta == null ? "—" : `${arrow} ${fmtPct(delta)}`;
+  let value: string;
+  if (delta == null) {
+    value = "—";
+  } else if (isDeltaNegligible(delta)) {
+    value = "≈0%";
+  } else {
+    const arrow = delta >= 0 ? "▲" : "▼";
+    value = `${arrow} ${fmtPct(delta)}`;
+  }
   const sub = !comp.tiene_data
     ? "sin data en período"
     : comp.ventas < 100
