@@ -5,13 +5,90 @@ import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Calendar, Info } from "lucide-react";
 import type { VentasResumen, Multifashion } from "./types";
-import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, deltaSymbol, kpiDeltaSymbol, heatmapClasses } from "@/lib/ventas/format";
+import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, kpiDeltaSymbol, heatmapClasses } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 
 type Granularity = "mensual" | "trimestral";
-type ViewMode = "ventas" | "utilidad";
-type Cell = { value: number | null; delta: number | null; prevValue: number; periodLabel: string };
+type ViewMode = "ventas" | "utilidad" | "margen";
+
+// Una celda de la matriz carga las 4 fuentes siempre: ventas y utilidad
+// para el período actual + año previo. Margen se deriva. Esto habilita el
+// tooltip enriquecido (3 métricas a la vez) y el toggle margen sin requerir
+// volver a buildear cells por mode.
+type Cell = {
+  ventas: number | null;
+  ventasPrev: number;
+  utilidad: number | null;
+  utilidadPrev: number;
+  periodLabel: string;
+};
+
+// Aggregate: misma forma que Cell pero sin label (se construye on the fly
+// para los totales de columna y los totales YTD).
+type Agg = Omit<Cell, "periodLabel">;
+
+// Threshold para mostrar margen: por debajo de $100 de ventas el ratio
+// utilidad/ventas no es informativo (mismo guard que Detalle Mensual).
+const MARGEN_VENTAS_MIN = 100;
+
+function marginRatio(ventas: number, utilidad: number): number | null {
+  if (ventas < MARGEN_VENTAS_MIN) return null;
+  return utilidad / ventas;
+}
+
+// Devuelve el valor de la celda en el modo activo. Para margen: ratio 0..1
+// o null si no hay base suficiente. Para ventas/utilidad: número o null.
+function cellValue(c: Pick<Cell, "ventas" | "utilidad">, mode: ViewMode): number | null {
+  if (c.ventas == null || c.utilidad == null) {
+    return mode === "margen" ? null : (mode === "utilidad" ? c.utilidad : c.ventas);
+  }
+  if (mode === "margen")   return marginRatio(c.ventas, c.utilidad);
+  if (mode === "utilidad") return c.utilidad;
+  return c.ventas;
+}
+
+function cellPrevValue(c: Pick<Cell, "ventasPrev" | "utilidadPrev">, mode: ViewMode): number {
+  if (mode === "margen") return marginRatio(c.ventasPrev, c.utilidadPrev) ?? 0;
+  if (mode === "utilidad") return c.utilidadPrev;
+  return c.ventasPrev;
+}
+
+// Delta entre cur y prev en el modo activo:
+//   - 'margen': diferencia de ratios (decimal), p. ej. -0.038 = -3.8 pts.
+//   - 'ventas'/'utilidad': ratio normal (cur-prev)/prev.
+// null cuando no es comparable (sin cur, o sin base prev suficiente).
+function cellDelta(c: Cell, mode: ViewMode): number | null {
+  const cur = cellValue(c, mode);
+  if (cur == null) return null;
+  if (mode === "margen") {
+    const prevMargen = marginRatio(c.ventasPrev, c.utilidadPrev);
+    if (prevMargen == null) return null;
+    return cur - prevMargen;
+  }
+  const prev = cellPrevValue(c, mode);
+  if (prev <= 0) return null;
+  return (cur - prev) / prev;
+}
+
+// "n/a" en la celda: cuando hay valor actual pero no hay base comparativa.
+function isNaComparison(c: Pick<Cell, "ventasPrev" | "utilidadPrev">, mode: ViewMode): boolean {
+  if (mode === "margen") return marginRatio(c.ventasPrev, c.utilidadPrev) == null;
+  return cellPrevValue(c, mode) <= 0;
+}
+
+// Renderiza el valor primario de una celda según mode. Margen: "42.3%".
+// Ventas/utilidad: $X compacto.
+function renderCellValue(v: number | null, mode: ViewMode): string {
+  if (v == null) return "—";
+  if (mode === "margen") return (v * 100).toFixed(1) + "%";
+  return fmtMoneyCompact(v);
+}
+
+function deltaModeFor(mode: ViewMode): "pct" | "pts" {
+  return mode === "margen" ? "pts" : "pct";
+}
+
 
 interface ResumenViewProps {
   data: VentasResumen;
@@ -35,7 +112,7 @@ export function ResumenView({
   const k = data.kpis;
   const prevYear = selectedYear - 1;
   const isUtil = viewMode === "utilidad";
-  const metricLabel = isUtil ? "Utilidad" : "Ventas";
+  const isMargen = viewMode === "margen";
 
   const onToggleMode = (mode: ViewMode) => {
     startTransition(() => setViewMode(mode));
@@ -53,30 +130,49 @@ export function ResumenView({
 
   const cols = granularity === "mensual" ? MONTHS : QUARTERS;
   const rows = data.empresas.map(e => {
-    const cur  = isUtil ? e.utilidad2026 : e.ventas2026;
-    const prev = isUtil ? e.utilidad2025 : e.ventas2025;
     // Prev YTD per empresa recortado: la RPC ya devuelve prev[cur_mes]
     // con el cutoff per-empresa aplicado, y omite meses posteriores. Sumar
     // todo el array con null→0 da el YTD ajustado para esa empresa.
-    const prevYtd = prev.reduce<number>((s, v) => s + (v ?? 0), 0);
     return {
-      ...buildRow(cur, prev, granularity, e.empresa, selectedYear),
-      prevYtd,
-      margenPct: e.margenPct,
+      ...buildRow(
+        e.ventas2026, e.ventas2025,
+        e.utilidad2026, e.utilidad2025,
+        granularity, e.empresa, selectedYear,
+      ),
+      // margenPct/margenPctPrev YTD canónicos (filtrados por costo>0 en RPC)
+      // — los usamos como fuente de verdad en EmpresaTotalCell para que el
+      // valor coincida con el KPI "MARGEN PROMEDIO" del banner.
+      margenPct:     e.margenPct,
       margenPctPrev: e.margenPctPrev,
     };
   });
-  const totalCols = cols.map((_, ci) => {
-    let v = 0, hasAny = false;
-    rows.forEach(r => { if (r.cells[ci].value != null) { v += r.cells[ci].value!; hasAny = true; } });
-    return hasAny ? v : null;
+  // Aggregates por columna (mes o trim): suma ventas + utilidad de todas
+  // las empresas. Cuando ninguna empresa tiene data en ese período, el
+  // ventas/utilidad agregados quedan null para que la celda muestre "—".
+  const totalColAggs: Agg[] = cols.map((_, ci) => {
+    let ventas = 0, ventasPrev = 0, util = 0, utilPrev = 0;
+    let hasVentas = false, hasUtil = false;
+    rows.forEach(r => {
+      const c = r.cells[ci];
+      if (c.ventas != null) { ventas += c.ventas; hasVentas = true; }
+      ventasPrev += c.ventasPrev;
+      if (c.utilidad != null) { util += c.utilidad; hasUtil = true; }
+      utilPrev += c.utilidadPrev;
+    });
+    return {
+      ventas:       hasVentas ? ventas : null,
+      ventasPrev,
+      utilidad:     hasUtil ? util : null,
+      utilidadPrev: utilPrev,
+    };
   });
-  const totalColsPrev = cols.map((_, ci) =>
-    rows.reduce((s, r) => s + (r.cells[ci].prevValue || 0), 0)
-  );
-  const totalYtd = rows.reduce((s, r) => s + r.total, 0);
-  const totalPrevYtd = rows.reduce((s, r) => s + r.prevYtd, 0);
-  const totalYtdDelta = totalPrevYtd > 0 ? (totalYtd - totalPrevYtd) / totalPrevYtd : null;
+  // YTD del Total Grupo: suma todas las empresas, ventas + utilidad.
+  const totalYtdAgg: Agg = {
+    ventas:       rows.reduce((s, r) => s + r.ventasTotal, 0),
+    ventasPrev:   rows.reduce((s, r) => s + r.ventasPrevTotal, 0),
+    utilidad:     rows.reduce((s, r) => s + r.utilidadTotal, 0),
+    utilidadPrev: rows.reduce((s, r) => s + r.utilidadPrevTotal, 0),
+  };
 
   // KPIs según modo
   const ventasDelta   = k.ventas2025YTD   > 0 ? (k.ventasNetasYTD - k.ventas2025YTD) / k.ventas2025YTD : null;
@@ -91,7 +187,11 @@ export function ResumenView({
   let kpi1Label: string, kpi1Value: string, kpi1Sub: string;
   let kpi2Label: string, kpi2Value: string, kpi2Sub: string;
 
-  if (isUtil) {
+  // En modo Margen mostramos el par Utilidad + Margen Promedio, el mismo
+  // contexto que en modo Utilidad. Las KPIs no cambian su lógica de cálculo
+  // (siguen siendo ponderadas por ventas) — solo la selección de cuál
+  // exponer en pantalla.
+  if (isUtil || isMargen) {
     kpi1Label = isClosedYear ? `UTILIDAD ${selectedYear}` : "UTILIDAD YTD";
     kpi1Value = fmtMoney(k.utilidadYTD);
     kpi1Sub   = `${periodoLabel} · ${kpiDeltaSymbol(utilidadDelta)} ${fmtPct(utilidadDelta)} vs ${prevYear}`;
@@ -125,7 +225,8 @@ export function ResumenView({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <p className="text-xs text-stone-500">
-            Mostrando {isUtil ? "utilidad " : ""}{granularity === "mensual" ? "mes a mes" : "por trimestre"} · comparando vs {prevYear}
+            Mostrando {isMargen ? "margen " : isUtil ? "utilidad " : ""}
+            {granularity === "mensual" ? "mes a mes" : "por trimestre"} · comparando vs {prevYear}
           </p>
           {datePillLabel && (
             <span className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2.5 py-0.5 text-[11px] font-medium text-stone-600">
@@ -136,7 +237,7 @@ export function ResumenView({
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-full bg-stone-100 p-0.5 text-xs">
-            {(["ventas", "utilidad"] as const).map(m => (
+            {(["ventas", "utilidad", "margen"] as const).map(m => (
               <button
                 key={m}
                 onClick={() => onToggleMode(m)}
@@ -147,7 +248,7 @@ export function ResumenView({
                     : "text-stone-500 hover:text-stone-700"
                 )}
               >
-                {m === "ventas" ? "Ventas" : "Utilidad"}
+                {m === "ventas" ? "Ventas" : m === "utilidad" ? "Utilidad" : "Margen %"}
               </button>
             ))}
           </div>
@@ -207,12 +308,16 @@ export function ResumenView({
                     )}
                   </td>
                   {r.cells.map((c, ci) => (
-                    <HeatCell key={ci} cell={c} prevYear={prevYear} metricLabel={metricLabel} />
+                    <HeatCell key={ci} cell={c} mode={viewMode} prevYear={prevYear} />
                   ))}
                   <EmpresaTotalCell
-                    total={r.total}
-                    prevYtd={r.prevYtd}
-                    metricLabel={metricLabel}
+                    ventasTotal={r.ventasTotal}
+                    ventasPrevTotal={r.ventasPrevTotal}
+                    utilidadTotal={r.utilidadTotal}
+                    utilidadPrevTotal={r.utilidadPrevTotal}
+                    margenPctYtd={r.margenPct}
+                    margenPctPrevYtd={r.margenPctPrev}
+                    mode={viewMode}
                     selectedYear={selectedYear}
                     prevYear={prevYear}
                     prevYtdRange={prevYtdRange}
@@ -221,21 +326,18 @@ export function ResumenView({
               ))}
               <tr className="bg-stone-950 text-white">
                 <td className="sticky left-0 z-10 bg-stone-950 px-3.5 py-3 text-xs font-medium uppercase tracking-widest">Total Grupo</td>
-                {totalCols.map((v, ci) => (
+                {totalColAggs.map((agg, ci) => (
                   <TotalGroupCell
                     key={ci}
-                    value={v}
-                    prevValue={totalColsPrev[ci]}
+                    agg={agg}
+                    mode={viewMode}
                     periodLabel={`${cols[ci]} ${selectedYear}`}
                     prevYear={prevYear}
-                    metricLabel={metricLabel}
                   />
                 ))}
                 <TotalGroupAnnualCell
-                  totalYtd={totalYtd}
-                  totalPrevYtd={totalPrevYtd}
-                  delta={totalYtdDelta}
-                  metricLabel={metricLabel}
+                  agg={totalYtdAgg}
+                  mode={viewMode}
                   selectedYear={selectedYear}
                   prevYear={prevYear}
                   prevYtdRange={prevYtdRange}
@@ -251,11 +353,21 @@ export function ResumenView({
         )}
       </Card>
 
-      {/* Legend */}
+      {/* Legend — thresholds varían según mode (pct vs pts) */}
       <div className="flex flex-wrap items-center gap-4 text-[11px] text-stone-500">
-        <LegendItem swatch="bg-teal-100" label={`▲ vs ${prevYear} mayor a +5%`} />
-        <LegendItem swatch="bg-white border border-stone-200" label="entre ±5%" />
-        <LegendItem swatch="bg-orange-200" label="▼ menor a −5%" />
+        {isMargen ? (
+          <>
+            <LegendItem swatch="bg-teal-100" label={`▲ vs ${prevYear} mayor a +0.5 pts`} />
+            <LegendItem swatch="bg-white border border-stone-200" label="entre ±0.5 pts" />
+            <LegendItem swatch="bg-orange-200" label="▼ menor a −0.5 pts" />
+          </>
+        ) : (
+          <>
+            <LegendItem swatch="bg-teal-100" label={`▲ vs ${prevYear} mayor a +5%`} />
+            <LegendItem swatch="bg-white border border-stone-200" label="entre ±5%" />
+            <LegendItem swatch="bg-orange-200" label="▼ menor a −5%" />
+          </>
+        )}
         {!isClosedYear && (
           <span className="inline-flex items-center gap-1.5"><span className="text-stone-400">—</span>sin data</span>
         )}
@@ -281,9 +393,14 @@ function KpiCard({ label, value, sub, note, accent = false }: { label: string; v
   );
 }
 
-function HeatCell({ cell, prevYear, metricLabel }: { cell: Cell; prevYear: number; metricLabel: string }) {
-  const cls = heatmapClasses(cell.delta);
-  if (cell.value == null) {
+function HeatCell({ cell, mode, prevYear }: { cell: Cell; mode: ViewMode; prevYear: number }) {
+  const cur   = cellValue(cell, mode);
+  const delta = cellDelta(cell, mode);
+  const dMode = deltaModeFor(mode);
+  const cls   = heatmapClasses(delta, dMode);
+  const fmt   = formatDeltaRatio(delta, dMode);
+
+  if (cur == null) {
     return (
       <td className={cn(
         "whitespace-nowrap border-b border-stone-200 px-2.5 py-2.5 text-right font-mono text-xs tabular-nums",
@@ -293,16 +410,16 @@ function HeatCell({ cell, prevYear, metricLabel }: { cell: Cell; prevYear: numbe
       </td>
     );
   }
-  // Bug C: prev=0 → comparativo no aplica. La celda muestra "n/a" gris
-  // (NO zona neutra ±5% que confundiría con "no cambió"). El monto cur
-  // queda visible via tooltip. Aplica cuando hay cur > 0 pero prev = 0/null.
-  const isNaComparison = !cell.prevValue;
+
+  // "n/a" cuando hay valor actual pero la base prev no permite comparar
+  // (ventas prev = 0 en modo ventas/utilidad; ventas prev < $100 en margen).
+  const isNa = isNaComparison(cell, mode);
   const prevPeriod = cell.periodLabel.replace(String(prevYear + 1), String(prevYear));
+
   return (
     <td className={cn(
       "whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono text-xs tabular-nums transition",
-      // Cuando no hay comparativo, bg blanco explícito (no zona neutra del heatmap).
-      isNaComparison ? "bg-white" : cls.bg
+      isNa ? "bg-white" : cls.bg
     )}>
       <TooltipProvider delayDuration={120}>
         <Tooltip>
@@ -311,48 +428,101 @@ function HeatCell({ cell, prevYear, metricLabel }: { cell: Cell; prevYear: numbe
               type="button"
               className="block w-full cursor-help px-2.5 py-2.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
             >
-              {isNaComparison ? (
+              {isNa ? (
                 <span className="inline-flex items-baseline gap-1">
-                  <span className="text-stone-400">{fmtMoneyCompact(cell.value)}</span>
+                  <span className="text-stone-400">{renderCellValue(cur, mode)}</span>
                   <span className="text-[9px] font-medium text-stone-400">n/a</span>
                 </span>
               ) : (
                 <span className="inline-flex items-baseline gap-1.5">
-                  {formatDeltaRatio(cell.delta).arrow && (
-                    <span className={cn("text-[10px]", cls.fg)}>{formatDeltaRatio(cell.delta).arrow}</span>
-                  )}
-                  <span className="text-stone-950">{fmtMoneyCompact(cell.value)}</span>
+                  {fmt.arrow && <span className={cn("text-[10px]", cls.fg)}>{fmt.arrow}</span>}
+                  <span className="text-stone-950">{renderCellValue(cur, mode)}</span>
                 </span>
               )}
             </button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" align="end" sideOffset={4} collisionPadding={12} className="min-w-[200px] border-0 bg-stone-950 p-3 text-white shadow-lg">
-            <div className="flex justify-between gap-6 text-[11px] text-stone-300">
-              <span>{metricLabel} {prevPeriod}</span>
-              <span className="font-mono text-white tabular-nums">
-                {cell.prevValue ? fmtMoney(cell.prevValue) : "—"}
-              </span>
-            </div>
-            <div className="mt-1 flex justify-between gap-6 text-[11px]">
-              <span className="text-stone-300">{metricLabel} {cell.periodLabel}</span>
-              <span className="font-mono font-medium text-white tabular-nums">{fmtMoney(cell.value)}</span>
-            </div>
-            <div className="mt-2 flex justify-end border-t border-white/10 pt-1.5">
-              <span className={cn(
-                "font-mono text-[11px] font-medium",
-                cell.delta == null ? "text-stone-300" :
-                cell.delta > 0.05  ? "text-teal-300" :
-                cell.delta < -0.05 ? "text-orange-300" : "text-stone-300"
-              )}>
-                {cell.delta == null
-                  ? "sin comparativo"
-                  : `${deltaSymbol(cell.delta)} ${fmtPct(cell.delta)} vs ${prevYear}`}
-              </span>
-            </div>
+          <TooltipContent
+            side="bottom" align="end" sideOffset={4} collisionPadding={12}
+            className="min-w-[260px] border-0 bg-stone-950 p-3 text-white shadow-lg"
+          >
+            <CellEnrichedTooltip
+              cell={cell}
+              dark
+              curPeriod={cell.periodLabel}
+              prevPeriod={prevPeriod}
+              highlightMode={mode}
+            />
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
     </td>
+  );
+}
+
+/**
+ * Tooltip de celda enriquecido: muestra Ventas, Utilidad y Margen del período
+ * actual + previo + delta. El mode activo se destaca con texto blanco; los
+ * otros dos van en stone-300. Aplica a HeatCell, TotalGroupCell, EmpresaTotalCell
+ * y TotalGroupAnnualCell, con variante `dark` (tooltip negro) o light.
+ */
+function CellEnrichedTooltip({
+  cell, curPeriod, prevPeriod, highlightMode, dark,
+}: {
+  cell: Pick<Cell, "ventas" | "ventasPrev" | "utilidad" | "utilidadPrev">;
+  curPeriod: string;
+  prevPeriod: string;
+  highlightMode: ViewMode;
+  dark: boolean;
+}) {
+  const rows: Array<{ mode: ViewMode; label: string }> = [
+    { mode: "ventas",   label: "Ventas" },
+    { mode: "utilidad", label: "Utilidad" },
+    { mode: "margen",   label: "Margen" },
+  ];
+
+  const muted = dark ? "text-stone-400" : "text-stone-500";
+  const labelMuted = dark ? "text-stone-300" : "text-stone-500";
+  const valueText = dark ? "text-white" : "text-stone-950";
+  const divider = dark ? "border-white/10" : "border-stone-200";
+
+  return (
+    <div className="space-y-2 text-[11px]">
+      <div className={cn("flex justify-between gap-6 pb-1 border-b", divider)}>
+        <span className={muted}>{prevPeriod}</span>
+        <span className={cn("font-medium", dark ? "text-stone-200" : "text-stone-700")}>{curPeriod}</span>
+      </div>
+      {rows.map(({ mode, label }) => {
+        const cur  = cellValue(cell, mode);
+        const prev = cellPrevValue(cell, mode);
+        const delta = cellDelta(cell as Cell, mode);
+        const isHighlight = mode === highlightMode;
+        const fmt = formatDeltaRatio(delta, deltaModeFor(mode));
+        const isNa = isNaComparison(cell, mode);
+        const tone = !isHighlight
+          ? muted
+          : fmt.tone === "emerald" ? (dark ? "text-teal-300" : "text-emerald-700")
+          : fmt.tone === "orange"  ? (dark ? "text-orange-300" : "text-orange-700")
+          : (dark ? "text-stone-300" : "text-stone-500");
+        return (
+          <div key={mode} className="grid grid-cols-[auto_1fr_1fr_auto] items-baseline gap-x-3">
+            <span className={cn(isHighlight ? (dark ? "text-white font-medium" : "text-stone-950 font-medium") : labelMuted)}>
+              {label}
+            </span>
+            <span className={cn("text-right font-mono tabular-nums", isHighlight ? valueText : muted)}>
+              {prev > 0 ? renderCellValue(prev, mode) : "—"}
+            </span>
+            <span className={cn("text-right font-mono tabular-nums", isHighlight ? valueText : muted)}>
+              {cur != null ? renderCellValue(cur, mode) : "—"}
+            </span>
+            <span className={cn("min-w-[64px] text-right font-mono", tone)}>
+              {delta == null
+                ? (isNa && cur != null ? "n/a" : "—")
+                : `${fmt.arrow ?? ""}${fmt.arrow ? " " : ""}${fmt.displayValue}`}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -363,18 +533,51 @@ function HeatCell({ cell, prevYear, metricLabel }: { cell: Cell; prevYear: numbe
  * ventas_dashboard_prev_same_period.
  */
 function EmpresaTotalCell({
-  total, prevYtd, metricLabel, selectedYear, prevYear, prevYtdRange,
+  ventasTotal, ventasPrevTotal, utilidadTotal, utilidadPrevTotal,
+  margenPctYtd, margenPctPrevYtd,
+  mode, selectedYear, prevYear, prevYtdRange,
 }: {
-  total: number;
-  prevYtd: number;
-  metricLabel: string;
+  ventasTotal: number;
+  ventasPrevTotal: number;
+  utilidadTotal: number;
+  utilidadPrevTotal: number;
+  /** Margen YTD canónico (filtrado por costo>0 en RPC). En modo margen es la
+   *  fuente de verdad para esta celda; coincide con el KPI del banner. */
+  margenPctYtd: number;
+  margenPctPrevYtd: number;
+  mode: ViewMode;
   selectedYear: number;
   prevYear: number;
   prevYtdRange: string;
 }) {
-  const delta = prevYtd > 0 ? (total - prevYtd) / prevYtd : null;
-  const fmt = formatDeltaRatio(delta);
-  const tone = deltaTextTone(delta);
+  // Para tooltip enriquecido usamos los totales agregados; para el valor
+  // visible en margen mode usamos el margenPct canónico de la RPC.
+  const enrichedCell: Pick<Cell, "ventas" | "ventasPrev" | "utilidad" | "utilidadPrev"> = {
+    ventas: ventasTotal,
+    ventasPrev: ventasPrevTotal,
+    utilidad: utilidadTotal,
+    utilidadPrev: utilidadPrevTotal,
+  };
+
+  let cur: number;
+  let delta: number | null;
+  let displayValue: string;
+  if (mode === "margen") {
+    cur = margenPctYtd;
+    delta = margenPctPrevYtd > 0 ? margenPctYtd - margenPctPrevYtd : null;
+    displayValue = (cur * 100).toFixed(1) + "%";
+  } else if (mode === "utilidad") {
+    cur = utilidadTotal;
+    delta = utilidadPrevTotal > 0 ? (utilidadTotal - utilidadPrevTotal) / utilidadPrevTotal : null;
+    displayValue = fmtMoney(cur);
+  } else {
+    cur = ventasTotal;
+    delta = ventasPrevTotal > 0 ? (ventasTotal - ventasPrevTotal) / ventasPrevTotal : null;
+    displayValue = fmtMoney(cur);
+  }
+  const dMode = deltaModeFor(mode);
+  const fmt = formatDeltaRatio(delta, dMode);
+  const tone = deltaTextTone(delta, dMode);
 
   return (
     <td className="whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono tabular-nums">
@@ -385,33 +588,23 @@ function EmpresaTotalCell({
               type="button"
               className="block w-full cursor-help px-3.5 py-2.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
             >
-              <span className="block text-sm font-medium text-stone-950">{fmtMoney(total)}</span>
+              <span className="block text-sm font-medium text-stone-950">{displayValue}</span>
               <span className={cn("mt-0.5 block text-[10.5px]", tone)}>
                 {fmt.arrow ? `${fmt.arrow} ` : ""}{fmt.displayValue}{delta != null ? ` vs ${prevYear}` : ""}
               </span>
             </button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" align="end" sideOffset={4} collisionPadding={12} className="min-w-[240px] border-0 bg-stone-950 p-3 text-white shadow-lg">
-            <div className="flex justify-between gap-6 text-[11px]">
-              <span className="text-stone-300">{metricLabel} YTD {selectedYear}</span>
-              <span className="font-mono font-medium text-white tabular-nums">{fmtMoney(total)}</span>
-            </div>
-            <div className="mt-1 flex justify-between gap-6 text-[11px] text-stone-300">
-              <span>{metricLabel} YTD {prevYtdRange}</span>
-              <span className="font-mono text-white tabular-nums">{prevYtd > 0 ? fmtMoney(prevYtd) : "—"}</span>
-            </div>
-            <div className="mt-2 flex justify-end border-t border-white/10 pt-1.5">
-              <span className={cn(
-                "font-mono text-[11px] font-medium",
-                delta == null ? "text-stone-300" :
-                delta > 0.05  ? "text-teal-300" :
-                delta < -0.05 ? "text-orange-300" : "text-stone-300"
-              )}>
-                {delta == null
-                  ? "sin comparativo"
-                  : `${deltaSymbol(delta)} ${fmtPct(delta)} vs ${prevYear}`}
-              </span>
-            </div>
+          <TooltipContent
+            side="bottom" align="end" sideOffset={4} collisionPadding={12}
+            className="min-w-[280px] border-0 bg-stone-950 p-3 text-white shadow-lg"
+          >
+            <CellEnrichedTooltip
+              cell={enrichedCell}
+              dark
+              curPeriod={`YTD ${selectedYear}`}
+              prevPeriod={`YTD ${prevYtdRange}`}
+              highlightMode={mode}
+            />
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -426,26 +619,30 @@ function EmpresaTotalCell({
  * Total grupo vive en TotalGroupAnnualCell con layout monto+chip apilado.
  */
 function TotalGroupCell({
-  value, prevValue, periodLabel, prevYear, metricLabel,
+  agg, mode, periodLabel, prevYear,
 }: {
-  value: number | null;
-  prevValue: number;
+  agg: Agg;
+  mode: ViewMode;
   periodLabel: string;
   prevYear: number;
-  metricLabel: string;
 }) {
-  if (value == null) {
+  const cur = cellValue(agg, mode);
+  if (cur == null) {
     return (
       <td className="whitespace-nowrap px-2.5 py-3 text-right font-mono text-xs tabular-nums">
         <span className="text-stone-500">—</span>
       </td>
     );
   }
-  const delta = prevValue > 0 ? (value - prevValue) / prevValue : null;
+  // Construyo un Cell mínimo para reusar el tooltip enriquecido.
+  const cellLike: Cell = { ...agg, periodLabel };
+  const delta = cellDelta(cellLike, mode);
+  const dMode = deltaModeFor(mode);
+  const fmt = formatDeltaRatio(delta, dMode);
   const arrowTone =
-    delta == null     ? "text-stone-300"  :
-    delta > 0.05      ? "text-emerald-400" :
-    delta < -0.05     ? "text-orange-400"  : "text-stone-300";
+    delta == null              ? "text-stone-300"  :
+    fmt.tone === "emerald"     ? "text-emerald-400" :
+    fmt.tone === "orange"      ? "text-orange-400"  : "text-stone-300";
   const prevPeriod = periodLabel.replace(String(prevYear + 1), String(prevYear));
 
   return (
@@ -458,36 +655,22 @@ function TotalGroupCell({
               className="block w-full cursor-help px-2.5 py-3 text-right outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40"
             >
               <span className="inline-flex items-baseline gap-1.5">
-                {formatDeltaRatio(delta).arrow && (
-                  <span className={cn("text-[10px]", arrowTone)}>{formatDeltaRatio(delta).arrow}</span>
-                )}
-                <span className="text-white">{fmtMoneyCompact(value)}</span>
+                {fmt.arrow && <span className={cn("text-[10px]", arrowTone)}>{fmt.arrow}</span>}
+                <span className="text-white">{renderCellValue(cur, mode)}</span>
               </span>
             </button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" align="end" sideOffset={4} collisionPadding={12} className="min-w-[220px] border-0 bg-white p-3 text-stone-950 shadow-lg">
-            <div className="flex justify-between gap-6 text-[11px] text-stone-500">
-              <span>{metricLabel} {prevPeriod}</span>
-              <span className="font-mono text-stone-950 tabular-nums">
-                {prevValue ? fmtMoney(prevValue) : "—"}
-              </span>
-            </div>
-            <div className="mt-1 flex justify-between gap-6 text-[11px]">
-              <span className="text-stone-500">{metricLabel} {periodLabel}</span>
-              <span className="font-mono font-medium text-stone-950 tabular-nums">{fmtMoney(value)}</span>
-            </div>
-            <div className="mt-2 flex justify-end border-t border-stone-200 pt-1.5">
-              <span className={cn(
-                "font-mono text-[11px] font-medium",
-                delta == null ? "text-stone-500" :
-                delta > 0.05  ? "text-emerald-700" :
-                delta < -0.05 ? "text-orange-700"  : "text-stone-500"
-              )}>
-                {delta == null
-                  ? "sin comparativo"
-                  : `${deltaSymbol(delta)} ${fmtPct(delta)} vs ${prevYear}`}
-              </span>
-            </div>
+          <TooltipContent
+            side="bottom" align="end" sideOffset={4} collisionPadding={12}
+            className="min-w-[260px] border-0 bg-white p-3 text-stone-950 shadow-lg"
+          >
+            <CellEnrichedTooltip
+              cell={agg}
+              dark={false}
+              curPeriod={periodLabel}
+              prevPeriod={prevPeriod}
+              highlightMode={mode}
+            />
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -501,21 +684,26 @@ function TotalGroupCell({
  * oscuro y tooltip con bg blanco.
  */
 function TotalGroupAnnualCell({
-  totalYtd, totalPrevYtd, delta, metricLabel, selectedYear, prevYear, prevYtdRange,
+  agg, mode, selectedYear, prevYear, prevYtdRange,
 }: {
-  totalYtd: number;
-  totalPrevYtd: number;
-  delta: number | null;
-  metricLabel: string;
+  agg: Agg;
+  mode: ViewMode;
   selectedYear: number;
   prevYear: number;
   prevYtdRange: string;
 }) {
-  const fmt = formatDeltaRatio(delta);
+  const cellLike: Cell = { ...agg, periodLabel: `YTD ${selectedYear}` };
+  const cur = cellValue(agg, mode);
+  const delta = cellDelta(cellLike, mode);
+  const dMode = deltaModeFor(mode);
+  const fmt = formatDeltaRatio(delta, dMode);
   const arrowTone =
-    delta == null   ? "text-stone-300"  :
-    delta > 0.05    ? "text-emerald-300" :
-    delta < -0.05   ? "text-orange-300"  : "text-stone-300";
+    delta == null            ? "text-stone-300"  :
+    fmt.tone === "emerald"   ? "text-emerald-300" :
+    fmt.tone === "orange"    ? "text-orange-300"  : "text-stone-300";
+  const displayValue = cur == null
+    ? "—"
+    : mode === "margen" ? (cur * 100).toFixed(1) + "%" : fmtMoney(cur);
 
   return (
     <td className="whitespace-nowrap p-0 text-right font-mono text-sm font-semibold tabular-nums">
@@ -526,33 +714,23 @@ function TotalGroupAnnualCell({
               type="button"
               className="block w-full cursor-help px-3.5 py-3 text-right outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40"
             >
-              <span className="block text-white">{fmtMoney(totalYtd)}</span>
+              <span className="block text-white">{displayValue}</span>
               <span className={cn("mt-0.5 block text-[10.5px] font-medium", arrowTone)}>
                 {fmt.arrow ? `${fmt.arrow} ` : ""}{fmt.displayValue}{delta != null ? ` vs ${prevYear}` : ""}
               </span>
             </button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" align="end" sideOffset={4} collisionPadding={12} className="min-w-[240px] border-0 bg-white p-3 text-stone-950 shadow-lg">
-            <div className="flex justify-between gap-6 text-[11px]">
-              <span className="text-stone-500">{metricLabel} YTD {selectedYear}</span>
-              <span className="font-mono font-medium text-stone-950 tabular-nums">{fmtMoney(totalYtd)}</span>
-            </div>
-            <div className="mt-1 flex justify-between gap-6 text-[11px] text-stone-500">
-              <span>{metricLabel} YTD {prevYtdRange}</span>
-              <span className="font-mono text-stone-950 tabular-nums">{totalPrevYtd > 0 ? fmtMoney(totalPrevYtd) : "—"}</span>
-            </div>
-            <div className="mt-2 flex justify-end border-t border-stone-200 pt-1.5">
-              <span className={cn(
-                "font-mono text-[11px] font-medium",
-                delta == null ? "text-stone-500" :
-                delta > 0.05  ? "text-emerald-700" :
-                delta < -0.05 ? "text-orange-700"  : "text-stone-500"
-              )}>
-                {delta == null
-                  ? "sin comparativo"
-                  : `${deltaSymbol(delta)} ${fmtPct(delta)} vs ${prevYear}`}
-              </span>
-            </div>
+          <TooltipContent
+            side="bottom" align="end" sideOffset={4} collisionPadding={12}
+            className="min-w-[280px] border-0 bg-white p-3 text-stone-950 shadow-lg"
+          >
+            <CellEnrichedTooltip
+              cell={agg}
+              dark={false}
+              curPeriod={`YTD ${selectedYear}`}
+              prevPeriod={`YTD ${prevYtdRange}`}
+              highlightMode={mode}
+            />
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>
@@ -632,10 +810,12 @@ function parseIsoDateResumen(iso: string): Date {
 }
 
 // Mapping tonal para delta texto (light bg, estilo Clientes tab).
-function deltaTextTone(delta: number | null): string {
+// El threshold se ajusta según mode: 0.05 (5%) para pct, 0.005 (0.5 pts) para pts.
+function deltaTextTone(delta: number | null, mode: "pct" | "pts" = "pct"): string {
   if (delta == null) return "text-stone-500";
-  if (delta > 0.05)  return "text-emerald-700";
-  if (delta < -0.05) return "text-red-600";
+  const threshold = mode === "pts" ? 0.005 : 0.05;
+  if (delta > threshold)  return "text-emerald-700";
+  if (delta < -threshold) return "text-red-600";
   return "text-stone-500";
 }
 
@@ -691,31 +871,61 @@ function buildPartialKpiNote(data: VentasResumen): string | null {
 }
 
 function buildRow(
-  vCur: (number | null)[],
-  vPrev: (number | null)[],
+  ventasCur:  (number | null)[],
+  ventasPrev: (number | null)[],
+  utilCur:    (number | null)[],
+  utilPrev:   (number | null)[],
   granularity: Granularity,
   empresa: { id: string; nombre: string },
-  year: number
-): { empresa: typeof empresa; cells: Cell[]; total: number } {
+  year: number,
+): {
+  empresa: typeof empresa;
+  cells: Cell[];
+  // Sumas YTD (sobre las 12 entradas) para totales y aggregates.
+  ventasTotal: number;
+  ventasPrevTotal: number;
+  utilidadTotal: number;
+  utilidadPrevTotal: number;
+} {
   if (granularity === "mensual") {
-    const cells: Cell[] = vCur.map((v, i) => {
-      const prev = vPrev[i] ?? 0;
-      const delta = v == null ? null : prev > 0 ? (v - prev) / prev : null;
-      return { value: v, delta, prevValue: prev, periodLabel: `${MONTHS[i]} ${year}` };
-    });
-    return { empresa, cells, total: cells.reduce((s, c) => s + (c.value || 0), 0) };
+    const cells: Cell[] = ventasCur.map((v, i) => ({
+      ventas:       v,
+      ventasPrev:   ventasPrev[i] ?? 0,
+      utilidad:     utilCur[i],
+      utilidadPrev: utilPrev[i]   ?? 0,
+      periodLabel: `${MONTHS[i]} ${year}`,
+    }));
+    return {
+      empresa,
+      cells,
+      ventasTotal:       sumYtd(ventasCur),
+      ventasPrevTotal:   sumYtd(ventasPrev),
+      utilidadTotal:     sumYtd(utilCur),
+      utilidadPrevTotal: sumYtd(utilPrev),
+    };
   }
   const groups = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]];
   const cells: Cell[] = groups.map((q, qi) => {
-    const has = q.some(i => vCur[i] != null);
-    const v = q.reduce((s, i) => vCur[i] == null ? s : s + (vCur[i] as number), 0);
-    const prev = q.reduce((s, i) => s + (vPrev[i] || 0), 0);
+    const hasVentas   = q.some(i => ventasCur[i] != null);
+    const hasUtilidad = q.some(i => utilCur[i]   != null);
     return {
-      value: has ? v : null,
-      delta: !has ? null : prev > 0 ? (v - prev) / prev : null,
-      prevValue: prev,
+      ventas:        hasVentas   ? q.reduce((s, i) => s + (ventasCur[i] ?? 0), 0) : null,
+      ventasPrev:                 q.reduce((s, i) => s + (ventasPrev[i] ?? 0), 0),
+      utilidad:      hasUtilidad ? q.reduce((s, i) => s + (utilCur[i]   ?? 0), 0) : null,
+      utilidadPrev:               q.reduce((s, i) => s + (utilPrev[i]  ?? 0), 0),
       periodLabel: `${QUARTERS[qi]} ${year}`,
     };
   });
-  return { empresa, cells, total: cells.reduce((s, c) => s + (c.value || 0), 0) };
+  return {
+    empresa,
+    cells,
+    ventasTotal:       sumYtd(ventasCur),
+    ventasPrevTotal:   sumYtd(ventasPrev),
+    utilidadTotal:     sumYtd(utilCur),
+    utilidadPrevTotal: sumYtd(utilPrev),
+  };
+}
+
+function sumYtd(arr: (number | null)[]): number {
+  return arr.reduce<number>((s, v) => s + (v ?? 0), 0);
 }

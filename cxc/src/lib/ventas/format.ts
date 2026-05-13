@@ -44,10 +44,19 @@ export function kpiDeltaSymbol(d: number | null | undefined): "▲" | "—" | "�
 /**
  * 3-level diverging heatmap, colorblind-safe (pairs always with ▲/—/▼ symbol).
  * Returns Tailwind class fragments — no inline color values.
+ *
+ * @param d     Delta value. En modo 'pct' es ratio (0.05 = 5%); en 'pts' es
+ *              diferencia de ratios (0.005 = 0.5 pts).
+ * @param mode  'pct' (default) usa threshold ±5%. 'pts' usa ±0.5 pts (matchea
+ *              el "≈0 pts" del formatDelta para que celda gris = sin flecha).
  */
-export function heatmapClasses(d: number | null | undefined): { bg: string; fg: string } {
-  if (d == null)        return { bg: "bg-transparent", fg: "text-stone-400" };
-  if (d > 0.05)         return { bg: "bg-teal-100",    fg: "text-teal-800" };
-  if (d < -0.05)        return { bg: "bg-orange-200",  fg: "text-orange-900" };
-  return                       { bg: "bg-transparent", fg: "text-stone-500" };
+export function heatmapClasses(
+  d: number | null | undefined,
+  mode: "pct" | "pts" = "pct",
+): { bg: string; fg: string } {
+  if (d == null) return { bg: "bg-transparent", fg: "text-stone-400" };
+  const threshold = mode === "pts" ? 0.005 : 0.05;
+  if (d > threshold)  return { bg: "bg-teal-100",    fg: "text-teal-800" };
+  if (d < -threshold) return { bg: "bg-orange-200",  fg: "text-orange-900" };
+  return                     { bg: "bg-transparent", fg: "text-stone-500" };
 }
