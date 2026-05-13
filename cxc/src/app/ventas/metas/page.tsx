@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast } from "@/components/ui";
+import { cn } from "@/lib/utils";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -21,23 +22,29 @@ const EMPRESAS = [
 
 const MES_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
-const SUGGESTED_METAS: Record<string, number> = {
-  "Vistana International": 2_900_000,
-  "Fashion Wear": 4_200_000,
-  "Fashion Shoes": 2_700_000,
-  "Active Shoes": 500_000,
-  "Active Wear": 220_000,
-  "Joystep": 250_000,
-  "Confecciones Boston": 720_000,
-  "Multifashion": 800_000,
-};
-
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface MetaResponse {
   empresa: string;
   meta_anual: number;
   distribucion: number[];
+}
+
+interface MetaSugeridaRow {
+  empresa: string;             // key snake_case
+  nombre: string;              // display name
+  ventas_prev_year: number;
+  ritmo_historico: number | null;
+  historia_disponible: number;
+  factor_final: number | null;
+  meta_sugerida: number | null;
+  meta_manual_actual: number | null;
+}
+
+interface ProyeccionRow {
+  empresa: string;
+  nombre: string;
+  ritmo_actual: number | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -68,6 +75,9 @@ export default function VentasMetasPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [distribucion, setDistribucion] = useState<Record<string, number[]>>({});
+  // Sugerencias auto-calculadas + zona crítica desde RPCs nuevas.
+  const [sugeridas, setSugeridas] = useState<Record<string, MetaSugeridaRow>>({});
+  const [ritmosActuales, setRitmosActuales] = useState<Record<string, number | null>>({});
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -77,27 +87,50 @@ export default function VentasMetasPage() {
   const fetchMetas = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/ventas/metas?anio=${anio}`);
-      if (!res.ok) throw new Error("Error");
-      const data = await res.json();
+      // Paralelizar: metas guardadas, sugeridas (RPC ventas_meta_sugerida_v1)
+      // y proyección (para ritmo_actual → flag zona crítica).
+      const [metasRes, sugRes, proyRes] = await Promise.all([
+        fetch(`/api/ventas/metas?anio=${anio}`),
+        fetch(`/api/ventas/metas-sugeridas?anio=${anio}`),
+        fetch(`/api/ventas/proyeccion-cierre?anio=${anio}`),
+      ]);
+      if (!metasRes.ok) throw new Error("Error metas");
+      const data = await metasRes.json();
       const metas: MetaResponse[] = data.metas ?? [];
 
       const newDraft: Record<string, string> = {};
       const newDist: Record<string, number[]> = {};
-
       for (const m of metas) {
         newDraft[m.empresa] = m.meta_anual > 0 ? String(m.meta_anual) : "";
         newDist[m.empresa] = m.distribucion;
       }
-
-      // Ensure all empresas are in the draft
       for (const emp of EMPRESAS) {
         if (!(emp in newDraft)) newDraft[emp] = "";
         if (!(emp in newDist)) newDist[emp] = Array(12).fill(1 / 12);
       }
-
       setDraft(newDraft);
       setDistribucion(newDist);
+
+      // Sugeridas — keyeadas por display name para matchear con EMPRESAS[]
+      if (sugRes.ok) {
+        const sug = await sugRes.json();
+        const map: Record<string, MetaSugeridaRow> = {};
+        for (const r of (sug.empresas ?? []) as MetaSugeridaRow[]) map[r.nombre] = r;
+        setSugeridas(map);
+      } else {
+        // Migration aún no aplicada — graceful degrade, sin sugerencias.
+        setSugeridas({});
+      }
+
+      // Proyección — extraer ritmo_actual por empresa display name.
+      if (proyRes.ok) {
+        const proy = await proyRes.json();
+        const rmap: Record<string, number | null> = {};
+        for (const e of (proy.empresas ?? []) as ProyeccionRow[]) rmap[e.nombre] = e.ritmo_actual;
+        setRitmosActuales(rmap);
+      } else {
+        setRitmosActuales({});
+      }
     } catch {
       showToast("Error al cargar metas");
     }
@@ -131,10 +164,19 @@ export default function VentasMetasPage() {
 
   const loadSuggested = () => {
     const newDraft = { ...draft };
-    for (const [empresa, meta] of Object.entries(SUGGESTED_METAS)) {
-      newDraft[empresa] = String(meta);
+    for (const emp of EMPRESAS) {
+      const sug = sugeridas[emp];
+      if (sug?.meta_sugerida != null && sug.meta_sugerida > 0) {
+        newDraft[emp] = String(Math.round(sug.meta_sugerida));
+      }
     }
     setDraft(newDraft);
+  };
+
+  const applyOne = (empresa: string) => {
+    const sug = sugeridas[empresa];
+    if (sug?.meta_sugerida == null) return;
+    setDraft(prev => ({ ...prev, [empresa]: String(Math.round(sug.meta_sugerida!)) }));
   };
 
   const handleSave = async () => {
@@ -210,7 +252,7 @@ export default function VentasMetasPage() {
             onClick={loadSuggested}
             className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all min-h-[44px]"
           >
-            Cargar metas sugeridas
+            Aplicar todas las sugerencias
           </button>
           <button
             onClick={handleSave}
@@ -251,11 +293,32 @@ export default function VentasMetasPage() {
                   const rawVal = draft[empresa] ?? "";
                   const metaAnual = parseFloat(rawVal) || 0;
                   const dist = distribucion[empresa] ?? Array(12).fill(1 / 12);
+                  const sug = sugeridas[empresa];
+                  const sugMeta = sug?.meta_sugerida ?? null;
+                  // C1: badge "✓ Aplicada" cuando la meta actual coincide
+                  // con la sugerida (tolerancia ±$1 para round-trip).
+                  const aplicada = sugMeta != null && metaAnual > 0
+                    && Math.abs(metaAnual - sugMeta) < 1;
+                  // C2: zona crítica cuando el ritmo actual (cur YTD vs prev
+                  // YTD same-period) cayó >15% → ratio < 0.85.
+                  const ritmoActual = ritmosActuales[empresa];
+                  const zonaCritica = ritmoActual != null && ritmoActual < 0.85;
 
                   return (
-                    <tr key={empresa} className="border-b border-gray-50 hover:bg-gray-50/50">
-                      <td className="px-3 py-2 font-medium text-gray-700 sticky left-0 bg-white whitespace-nowrap z-10">
+                    <tr key={empresa} className={cn(
+                      "border-b border-gray-50 hover:bg-gray-50/50",
+                      zonaCritica && "bg-amber-50/60 hover:bg-amber-50/80",
+                    )}>
+                      <td className={cn(
+                        "px-3 py-2 font-medium text-gray-700 sticky left-0 whitespace-nowrap z-10",
+                        zonaCritica ? "bg-amber-50" : "bg-white",
+                      )}>
                         {empresa}
+                        {zonaCritica && (
+                          <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-widest text-amber-800">
+                            zona crítica
+                          </span>
+                        )}
                       </td>
                       <td className="px-3 py-2">
                         <div className="relative">
@@ -274,6 +337,36 @@ export default function VentasMetasPage() {
                         </div>
                         {metaAnual > 0 && (
                           <p className="text-[10px] text-gray-400 text-right mt-0.5">{fmtCurrency(metaAnual)}</p>
+                        )}
+                        {/* C1: meta sugerida + botón Aplicar + ✓ Aplicada */}
+                        {sugMeta != null && (
+                          <div className="mt-1 flex items-center justify-end gap-2 text-[10px]">
+                            <span className="text-gray-500">
+                              Sugerida: <span className="font-mono tabular-nums text-gray-700">{fmtCurrency(sugMeta)}</span>
+                            </span>
+                            {aplicada ? (
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 font-medium text-emerald-700">
+                                ✓ Aplicada
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => applyOne(empresa)}
+                                className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 font-medium text-gray-700 hover:bg-gray-50 active:scale-[0.97]"
+                              >
+                                Aplicar
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {sug && sugMeta == null && sug.historia_disponible === 0 && (
+                          <p className="mt-1 text-[10px] text-gray-400 text-right">requiere meta manual</p>
+                        )}
+                        {/* C2: warning amber con explicación accionable */}
+                        {zonaCritica && ritmoActual != null && (
+                          <p className="mt-1 text-[10px] text-amber-700 text-right">
+                            ⚠ Ritmo real {(ritmoActual * 100 - 100).toFixed(0)}% YTD. Sugerencia conservadora, considerá ajustar manual.
+                          </p>
                         )}
                       </td>
                       {dist.map((w, i) => {

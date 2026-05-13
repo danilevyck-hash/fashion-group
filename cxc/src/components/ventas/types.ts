@@ -40,6 +40,57 @@ export type ResumenKpis = {
   metaAnualMultifashion: number;
 };
 
+/** Bloque por empresa que devuelve ventas_meta_sugerida_v1 (RPC). */
+export type MetaSugeridaEmpresa = {
+  empresa: string;                 // empresa key snake_case
+  nombre: string;                  // display name ("Vistana International")
+  ventas_prev_year: number;
+  ritmo_historico: number | null;  // 0.05 = +5% crecimiento promedio histórico
+  historia_disponible: number;     // 0..3 (cuántos crecimientos efectivos)
+  factor_final: number | null;     // ratio clampeado [0.90, 1.25]
+  meta_sugerida: number | null;    // ventas_prev_year * factor_final
+  meta_manual_actual: number | null; // de ventas_metas (NULL si no hay)
+};
+
+/** Bloque por empresa que devuelve ventas_proyeccion_cierre_v1. */
+export type ProyeccionEmpresa = {
+  empresa: string;
+  nombre: string;
+  ventas_ytd: number;
+  ventas_prev_ytd_sp: number;   // YTD prev year same-period
+  ventas_prev_year: number;     // full prev year (base de proyección)
+  ritmo_actual: number | null;  // ratio: 1.05 = +5% YTD vs prev YTD
+  ritmo_historico: number | null;
+  historia_disponible: number;
+  factor_final: number | null;
+  proyeccion_cierre: number;
+  proyeccion_restante: number;  // max(0, proyeccion - ytd)
+  meta_anual: number | null;
+  gap_vs_meta: number | null;
+  es_fallback_lineal: boolean;
+  status: "verde" | "amarillo" | "rojo" | "gris";
+};
+
+/** Totales agregados del grupo. Alimenta la barra de proyección del grupo. */
+export type ProyeccionGrupo = {
+  ventas_ytd: number;
+  proyeccion_cierre: number;
+  proyeccion_restante: number;
+  meta_total: number;
+  gap_vs_meta: number | null;
+  status: "verde" | "amarillo" | "rojo" | "gris";
+};
+
+export type ProyeccionResp = {
+  anio: number;
+  fecha_corte: string | null;
+  mes_corte: number;          // 0 si sin data
+  peso_ritmo: number;         // mes_corte / 12
+  peso_historico: number;     // 1 - peso_ritmo
+  empresas: ProyeccionEmpresa[];
+  totales_grupo: ProyeccionGrupo;
+};
+
 export type VentasResumen = {
   year: number;
   /** Last closed month index (0-11). e.g. 4 = Ene-Abr cerrados */
@@ -56,6 +107,9 @@ export type VentasResumen = {
    *  (mismo offset desde el inicio del mes que fecha_corte). null
    *  cuando se mira un año cerrado. */
   dia_corte_anio_anterior: string | null;
+  /** Proyección de cierre del año actual (por empresa + grupo). null si
+   *  la RPC falló o el año seleccionado no tiene data. */
+  proyeccion: ProyeccionResp | null;
 };
 
 export type Cliente = {

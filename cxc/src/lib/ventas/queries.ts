@@ -21,6 +21,7 @@ import type {
   Empresa,
   EmpresaMonthlySales,
   MonthlySeries,
+  ProyeccionResp,
 } from "@/components/ventas/types";
 
 interface DashboardSummaryRow {
@@ -55,7 +56,7 @@ function buildEmpresa(key: string): Empresa {
  * construye el shape VentasResumen mapeando empresa key → ventas_id.
  */
 export async function fetchVentasResumen({ year }: { year: number }): Promise<VentasResumen> {
-  const [curRes, prevRes, metaRes] = await Promise.all([
+  const [curRes, prevRes, metaRes, proyRes] = await Promise.all([
     supabaseServer.rpc("ventas_dashboard_summary", { p_anio: year }),
     // Prev year usa same-period day-by-day: el mes que está en curso en
     // el calendario actual se recorta al mismo offset de días en el año
@@ -64,6 +65,11 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // aplica recorte).
     supabaseServer.rpc("ventas_dashboard_prev_same_period", { p_year: year }),
     supabaseServer.rpc("get_app_setting", { p_key: "multifashion_meta_anual_2026" }),
+    // Proyección de cierre por empresa + agregado del grupo. La RPC
+    // computa ritmo histórico (pesos 3-2-1) + ritmo actual (YTD vs prev
+    // same-period) y los pondera por mes_corte/12. Devuelve también el
+    // status de semáforo vs meta_anual de ventas_metas.
+    supabaseServer.rpc("ventas_proyeccion_cierre_v1", { p_anio: year }),
   ]);
 
   if (curRes.error)  throw new Error(`ventas_dashboard_summary(${year}): ${curRes.error.message}`);
@@ -187,6 +193,15 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   const multiRow = empresas.find(e => e.empresa.id === "multi");
   const multifashionYTD = multiRow ? sumYTD(multiRow.ventas2026) : 0;
 
+  // Proyección de cierre: graceful fallback si la RPC falla (ej. migration
+  // pendiente o year sin data). No bloquea el resto del Resumen.
+  let proyeccion: ProyeccionResp | null = null;
+  if (proyRes.error) {
+    console.error("[ventas/proyeccion_cierre_v1]", proyRes.error.message);
+  } else if (proyRes.data) {
+    proyeccion = proyRes.data as ProyeccionResp;
+  }
+
   return {
     year,
     mesActual,
@@ -204,6 +219,7 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     es_periodo_parcial:      prevPayload.es_periodo_parcial,
     fecha_corte:             prevPayload.fecha_corte,
     dia_corte_anio_anterior: prevPayload.dia_corte_anio_anterior,
+    proyeccion,
   };
 }
 

@@ -100,8 +100,12 @@ export function VentasShell({
 
   return (
     <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
-      {/* Page head */}
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      {/* Page head — `relative z-20` para garantizar stacking context propio
+          encima del TabsList (que tiene overflow-x-auto y crea su propio
+          stacking en algunos browsers, tapando los buttons del header en
+          viewports angostos). Sin esto, Excel/Configurar metas/Cargar archivo
+          no respondían a click en producción. */}
+      <header className="relative z-20 mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-stone-950 md:text-4xl">
             Ventas

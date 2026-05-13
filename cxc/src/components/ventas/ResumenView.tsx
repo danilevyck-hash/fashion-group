@@ -4,10 +4,38 @@ import { useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Calendar, Info } from "lucide-react";
-import type { VentasResumen, Multifashion } from "./types";
+import type {
+  VentasResumen, Multifashion, ProyeccionResp, ProyeccionEmpresa, ProyeccionGrupo,
+} from "./types";
 import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, kpiDeltaSymbol, heatmapClasses } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
+
+// Mapeo ventas_id (short) → empresa key snake_case usado por la RPC de
+// proyección. Inline para evitar importar server-only de empresa-mapping.
+const VENTAS_ID_TO_EMPRESA_KEY: Record<string, string> = {
+  vistana: "vistana",
+  fwear: "fashion_wear",
+  fshoes: "fashion_shoes",
+  ashoes: "active_shoes",
+  awear: "active_wear",
+  joystep: "joystep",
+  boston: "confecciones_boston",
+  multi: "american_classic",
+};
+
+function findProyeccionForEmpresa(p: ProyeccionResp, ventasId: string): ProyeccionEmpresa | null {
+  const empresaKey = VENTAS_ID_TO_EMPRESA_KEY[ventasId] ?? ventasId;
+  return p.empresas.find(e => e.empresa === empresaKey) ?? null;
+}
+
+// Mapeo status → clases del semáforo (badge + texto delta).
+function statusBadge(status: ProyeccionEmpresa["status"] | ProyeccionGrupo["status"]) {
+  if (status === "verde")    return { dot: "bg-emerald-500", text: "text-emerald-700", label: "En meta" };
+  if (status === "amarillo") return { dot: "bg-amber-500",   text: "text-amber-700",   label: "Cerca" };
+  if (status === "rojo")     return { dot: "bg-red-500",     text: "text-red-700",     label: "Bajo meta" };
+  return { dot: "bg-stone-300", text: "text-stone-500", label: "Sin meta" };
+}
 
 type Granularity = "mensual" | "trimestral";
 type ViewMode = "ventas" | "utilidad" | "margen";
@@ -206,12 +234,23 @@ export function ResumenView({
       )}
 
       {/* KPI cards — 3 cols siempre (Ventas + Utilidad + Margen). El toggle
-          de la matriz no afecta el banner. */}
+          de la matriz no afecta el banner. La nota "Ajustado al día de
+          corte" se renderiza UNA sola vez debajo del banner (no 3 veces). */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <KpiCard label={kpiVentasLabel}   value={kpiVentasValue}   sub={kpiVentasSub}   note={partialKpiNote} />
-        <KpiCard label={kpiUtilidadLabel} value={kpiUtilidadValue} sub={kpiUtilidadSub} note={partialKpiNote} />
-        <KpiCard label={kpiMargenLabel}   value={kpiMargenValue}   sub={kpiMargenSub}   note={partialKpiNote} />
+        <KpiCard label={kpiVentasLabel}   value={kpiVentasValue}   sub={kpiVentasSub} />
+        <KpiCard label={kpiUtilidadLabel} value={kpiUtilidadValue} sub={kpiUtilidadSub} />
+        <KpiCard label={kpiMargenLabel}   value={kpiMargenValue}   sub={kpiMargenSub} />
       </div>
+      {partialKpiNote && (
+        <p className="-mt-3 text-[11px] text-stone-400">{partialKpiNote}</p>
+      )}
+
+      {/* B2 — Barra de proyección de cierre del grupo. Estilo idéntico al
+          progress de Multifashion Overview: barra de avance con segmento
+          real YTD + segmento proyección + marker de meta + sub-texto. */}
+      {data.proyeccion && data.proyeccion.totales_grupo.ventas_ytd > 0 && (
+        <GroupProjectionBar proyeccion={data.proyeccion} prevYear={prevYear} selectedYear={selectedYear} />
+      )}
 
       {/* Toolbar — subtitle + date pill (left) · controls (right) */}
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -280,6 +319,12 @@ export function ResumenView({
                   </th>
                 ))}
                 <th className="px-3.5 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-stone-950">Total</th>
+                {/* B3 — Columna nueva: proyección de cierre por empresa.
+                    Sólo aparece cuando hay proyección disponible (RPC v1
+                    aplicada y año con data). */}
+                {data.proyeccion && (
+                  <th className="px-3.5 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-stone-950">Proyección</th>
+                )}
               </tr>
             </thead>
             <tbody>
@@ -314,6 +359,11 @@ export function ResumenView({
                     prevYear={prevYear}
                     prevYtdRange={prevYtdRange}
                   />
+                  {data.proyeccion && (
+                    <EmpresaProjectionCell
+                      proyeccion={findProyeccionForEmpresa(data.proyeccion, r.empresa.id)}
+                    />
+                  )}
                 </tr>
               ))}
               <tr className="bg-stone-950 text-white">
@@ -334,6 +384,9 @@ export function ResumenView({
                   prevYear={prevYear}
                   prevYtdRange={prevYtdRange}
                 />
+                {data.proyeccion && (
+                  <TotalGroupProjectionCell totales={data.proyeccion.totales_grupo} />
+                )}
               </tr>
             </tbody>
           </table>
@@ -382,6 +435,150 @@ function KpiCard({ label, value, sub, note, accent = false }: { label: string; v
       {sub && <p className={cn("mt-1.5 text-xs", accent ? "text-teal-800" : "text-stone-500")}>{sub}</p>}
       {note && <p className="mt-1 text-[11px] text-stone-400">{note}</p>}
     </Card>
+  );
+}
+
+/**
+ * B2 — Barra de proyección del grupo. Estilo del Multifashion Overview:
+ *   - Segmento Real YTD (sólido teal-700) + segmento proyección restante
+ *     (teal-300 más claro) sobre fondo stone-100.
+ *   - Vertical marker en la posición de la meta del grupo (si meta > 0).
+ *   - Sub-texto con porcentaje + monto proyectado vs meta.
+ */
+function GroupProjectionBar({
+  proyeccion, prevYear, selectedYear,
+}: {
+  proyeccion: ProyeccionResp;
+  prevYear: number;
+  selectedYear: number;
+}) {
+  const g = proyeccion.totales_grupo;
+  const badge = statusBadge(g.status);
+  // Escala del bar: usa max(meta, proyeccion) para que el marker de meta
+  // y el extremo de la proyección sean visualmente coherentes.
+  const scaleMax = Math.max(g.meta_total, g.proyeccion_cierre, g.ventas_ytd, 1);
+  const pctRealYtd = (g.ventas_ytd / scaleMax) * 100;
+  const pctProyTotal = (g.proyeccion_cierre / scaleMax) * 100;
+  const pctMeta = g.meta_total > 0 ? (g.meta_total / scaleMax) * 100 : null;
+  const pctVsMeta = g.meta_total > 0 ? (g.proyeccion_cierre / g.meta_total) * 100 : null;
+
+  return (
+    <Card className="p-4">
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">
+            Proyección cierre del grupo
+          </p>
+          <p className="mt-1 text-xs text-stone-700">
+            <span className="font-mono font-medium tabular-nums text-stone-950">{fmtMoney(g.ventas_ytd)}</span> real
+            {" + "}
+            <span className="font-mono tabular-nums text-stone-700">{fmtMoney(g.proyeccion_restante)}</span> proyectado
+          </p>
+        </div>
+        <span className={cn("inline-flex items-center gap-1.5 rounded-full border border-stone-200 px-2 py-0.5 text-[10.5px] font-medium", badge.text)}>
+          <span className={cn("h-1.5 w-1.5 rounded-full", badge.dot)} />
+          {badge.label}
+        </span>
+      </div>
+      <div className="relative h-3 rounded-full bg-stone-100">
+        {/* Segmento proyección (incluye real YTD), color más claro */}
+        <div
+          className="absolute inset-y-0 left-0 rounded-full bg-teal-300 transition-[width] duration-300"
+          style={{ width: `${Math.min(100, pctProyTotal)}%` }}
+        />
+        {/* Segmento real YTD encima, color más oscuro */}
+        <div
+          className="absolute inset-y-0 left-0 rounded-full bg-teal-700 transition-[width] duration-300"
+          style={{ width: `${Math.min(100, pctRealYtd)}%` }}
+        />
+        {/* Marker de meta */}
+        {pctMeta != null && (
+          <>
+            <div
+              className="absolute -top-1 -bottom-1 w-0.5 bg-stone-950"
+              style={{ left: `${Math.min(100, pctMeta)}%` }}
+            />
+            <div
+              className="absolute whitespace-nowrap font-mono text-[10px] text-stone-950"
+              style={{ top: -22, left: `${Math.min(100, pctMeta)}%`, transform: "translateX(-50%)" }}
+            >
+              meta · {fmtMoneyCompact(g.meta_total)}
+            </div>
+          </>
+        )}
+      </div>
+      <p className="mt-3 text-xs text-stone-500">
+        {pctVsMeta != null ? (
+          <>
+            <span className="font-mono font-medium text-stone-950 tabular-nums">{pctVsMeta.toFixed(1)}%</span> de meta
+            {" · "}
+            proyección{" "}
+            <span className="font-mono font-medium tabular-nums text-stone-950">{fmtMoney(g.proyeccion_cierre)}</span>
+            {" vs meta "}
+            <span className="font-mono tabular-nums text-stone-700">{fmtMoney(g.meta_total)}</span>
+          </>
+        ) : (
+          <>
+            Sin meta configurada para {selectedYear}.{" "}
+            <span className="text-stone-700">Proyección {fmtMoney(g.proyeccion_cierre)}</span>
+          </>
+        )}
+      </p>
+      {/* Sub-detalle: ritmo actual vs prev year (peso del histórico vs actual) */}
+      {proyeccion.mes_corte > 0 && (
+        <p className="mt-1 text-[10.5px] text-stone-400">
+          Mezcla {(proyeccion.peso_ritmo * 100).toFixed(0)}% ritmo {selectedYear} YTD
+          {" · "}
+          {(proyeccion.peso_historico * 100).toFixed(0)}% ritmo histórico {prevYear - 2}–{prevYear}
+        </p>
+      )}
+    </Card>
+  );
+}
+
+/** B3 — Celda de proyección por empresa (al lado del Total YTD).
+ *  Layout: monto principal + status dot/badge + Δ vs meta. */
+function EmpresaProjectionCell({ proyeccion }: { proyeccion: ProyeccionEmpresa | null }) {
+  if (!proyeccion) {
+    return (
+      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-xs tabular-nums text-stone-400">
+        —
+      </td>
+    );
+  }
+  const badge = statusBadge(proyeccion.status);
+  const gap = proyeccion.gap_vs_meta;
+  // Δ vs meta como pct relativo a la meta — más legible que un dollar gap solo.
+  const gapPct = proyeccion.meta_anual && proyeccion.meta_anual > 0 && gap != null
+    ? gap / proyeccion.meta_anual : null;
+  return (
+    <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-xs tabular-nums">
+      <div className="flex items-center justify-end gap-1.5">
+        <span className={cn("h-1.5 w-1.5 rounded-full", badge.dot)} />
+        <span className="text-sm font-medium text-stone-950">{fmtMoneyCompact(proyeccion.proyeccion_cierre)}</span>
+      </div>
+      <p className={cn("mt-0.5 text-[10.5px]", gap == null ? "text-stone-400" : gap >= 0 ? "text-emerald-700" : "text-red-600")}>
+        {gap == null
+          ? proyeccion.es_fallback_lineal ? "lineal" : "sin meta"
+          : `${gap >= 0 ? "+" : ""}${fmtMoneyCompact(gap)}${gapPct != null ? ` (${(gapPct * 100).toFixed(0)}%)` : ""}`}
+      </p>
+    </td>
+  );
+}
+
+function TotalGroupProjectionCell({ totales }: { totales: ProyeccionGrupo }) {
+  const badge = statusBadge(totales.status);
+  const gap = totales.gap_vs_meta;
+  return (
+    <td className="whitespace-nowrap px-3.5 py-3 text-right font-mono text-sm font-semibold tabular-nums">
+      <div className="flex items-center justify-end gap-1.5">
+        <span className={cn("h-1.5 w-1.5 rounded-full", badge.dot)} />
+        <span className="block text-white">{fmtMoneyCompact(totales.proyeccion_cierre)}</span>
+      </div>
+      <p className={cn("mt-0.5 text-[10.5px] font-medium", gap == null ? "text-stone-300" : gap >= 0 ? "text-emerald-300" : "text-orange-300")}>
+        {gap == null ? "sin meta" : `${gap >= 0 ? "+" : ""}${fmtMoneyCompact(gap)}`}
+      </p>
+    </td>
   );
 }
 
@@ -478,10 +675,16 @@ function CellEnrichedTooltip({
   const divider = dark ? "border-white/10" : "border-stone-200";
 
   return (
-    <div className="space-y-2 text-[11px]">
-      <div className={cn("flex justify-between gap-6 pb-1 border-b", divider)}>
-        <span className={muted}>{prevPeriod}</span>
-        <span className={cn("font-medium", dark ? "text-stone-200" : "text-stone-700")}>{curPeriod}</span>
+    <div className="space-y-1.5 text-[11px]">
+      {/* B4 — header row con labels explícitos sobre cada columna.
+          Antes el tooltip mostraba el período sólo arriba (prev/cur en
+          extremos) lo que era ambiguo en modo Margen donde la lectura
+          requería ubicar a qué columna corresponde cada %. */}
+      <div className={cn("grid grid-cols-[auto_1fr_1fr_auto] items-baseline gap-x-3 pb-1.5 border-b", divider)}>
+        <span className={cn("text-[10px] font-medium uppercase tracking-widest", muted)}>Métrica</span>
+        <span className={cn("text-right text-[10px] font-medium uppercase tracking-widest", muted)}>{prevPeriod}</span>
+        <span className={cn("text-right text-[10px] font-medium uppercase tracking-widest", dark ? "text-stone-200" : "text-stone-700")}>{curPeriod}</span>
+        <span className={cn("min-w-[64px] text-right text-[10px] font-medium uppercase tracking-widest", muted)}>Δ</span>
       </div>
       {rows.map(({ mode, label }) => {
         const cur  = cellValue(cell, mode);
