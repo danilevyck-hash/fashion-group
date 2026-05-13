@@ -7,7 +7,7 @@ import { Calendar, Info } from "lucide-react";
 import type {
   VentasResumen, Multifashion, ProyeccionResp, ProyeccionEmpresa, ProyeccionGrupo,
 } from "./types";
-import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct } from "@/lib/ventas/format";
+import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, kpiDeltaSymbol } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 
@@ -195,9 +195,28 @@ export function ResumenView({
     utilidadPrev: rows.reduce((s, r) => s + r.utilidadPrevTotal, 0),
   };
 
-  // La columna "Proyección" en la tabla + el hero arriba sólo aplican al
+  // La columna "Proyección" en la tabla + el hero al final sólo aplican al
   // año en curso. Año cerrado = ya cerró, no hay nada que proyectar.
   const showProyeccionCol = !isClosedYear && !!data.proyeccion;
+
+  // KPIs YTD del grupo — deltas vs prev year same-period.
+  //   ventasDelta   = ratio decimal (0.05 = +5%)
+  //   utilidadDelta = ratio decimal
+  //   margenDeltaPts = puntos porcentuales (margenYTD y margen2025YTD son ratios 0..1)
+  const ventasDelta    = k.ventas2025YTD   > 0 ? (k.ventasNetasYTD - k.ventas2025YTD)  / k.ventas2025YTD   : null;
+  const utilidadDelta  = k.utilidad2025YTD > 0 ? (k.utilidadYTD    - k.utilidad2025YTD) / k.utilidad2025YTD : null;
+  const margenDeltaPts = (k.margenYTD - k.margen2025YTD) * 100;
+  const margenSign     = margenDeltaPts >= 0 ? "▲ +" : "▼ ";
+
+  const periodoLabel = isClosedYear
+    ? "Año completo"
+    : `${MONTHS[0]}–${MONTHS[Math.max(0, data.mesActual - 1)]} ${selectedYear}`;
+
+  const kpiVentasLabel   = isClosedYear ? `VENTAS NETAS ${selectedYear}` : "VENTAS NETAS YTD";
+  const kpiUtilidadLabel = isClosedYear ? `UTILIDAD ${selectedYear}`     : "UTILIDAD YTD";
+  const kpiVentasSub   = `${periodoLabel} · ${kpiDeltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`;
+  const kpiUtilidadSub = `${periodoLabel} · ${kpiDeltaSymbol(utilidadDelta)} ${fmtPct(utilidadDelta)} vs ${prevYear}`;
+  const kpiMargenSub   = `${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
 
   return (
     <div className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
@@ -207,18 +226,29 @@ export function ResumenView({
         </div>
       )}
 
-      {/* Hero — Proyección de cierre como medidor principal, comparada vs
-          el cierre real del año anterior (no vs meta). La meta queda como
-          referencia en /ventas/metas. Sólo años en curso. */}
-      {!isClosedYear && data.proyeccion && data.proyeccion.totales_grupo.ventas_ytd > 0 && (
-        <ProyeccionHero proyeccion={data.proyeccion} selectedYear={selectedYear} prevYear={prevYear} />
-      )}
-
-      {/* Lista de empresas ordenada por impacto vs 2025 (cerradas vs proyectadas).
-          Negativos arriba (mayor caída primero), positivos al final, sin-historia
-          al pie. Densa, sin fondos coloreados — solo color en el delta. */}
-      {!isClosedYear && data.proyeccion && data.proyeccion.empresas.length > 0 && (
-        <EmpresasPorImpacto empresas={data.proyeccion.empresas} prevYear={prevYear} />
+      {/* KPI cards YTD del grupo — 3 cols (Ventas Netas / Utilidad / Margen).
+          Comparativo same-period vs prev year (ya viene aplicado desde la RPC
+          ventas_dashboard_prev_same_period). El toggle de la matriz no afecta
+          el banner: siempre muestra el panorama completo. */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <KpiCard
+          label={kpiVentasLabel}
+          value={fmtMoney(k.ventasNetasYTD)}
+          sub={kpiVentasSub}
+        />
+        <KpiCard
+          label={kpiUtilidadLabel}
+          value={fmtMoney(k.utilidadYTD)}
+          sub={kpiUtilidadSub}
+        />
+        <KpiCard
+          label="MARGEN PROMEDIO"
+          value={`${(k.margenYTD * 100).toFixed(1)}%`}
+          sub={kpiMargenSub}
+        />
+      </div>
+      {partialKpiNote && (
+        <p className="-mt-3 text-[11px] text-stone-400">{partialKpiNote}</p>
       )}
 
       {/* Toolbar — subtitle + date pill (left) · controls (right) */}
@@ -381,7 +411,25 @@ export function ResumenView({
           <span className="inline-flex items-center gap-1.5"><span className="text-stone-400">—</span>sin data</span>
         )}
       </div>
+
+      {/* Hero proyección de cierre — al final como conclusión, no premisa.
+          La matriz mes-a-mes es lo central; este hero resume el cierre
+          proyectado del año en curso comparado vs el cierre real prev. */}
+      {!isClosedYear && data.proyeccion && data.proyeccion.totales_grupo.ventas_ytd > 0 && (
+        <ProyeccionHero proyeccion={data.proyeccion} selectedYear={selectedYear} prevYear={prevYear} />
+      )}
     </div>
+  );
+}
+
+/** KPI card — label uppercase + monto Geist Mono + sub con delta vs prev year. */
+function KpiCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <Card className="border-stone-200 bg-white p-4">
+      <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">{label}</p>
+      <p className="mt-1.5 font-mono text-[26px] font-medium leading-tight tracking-tight tabular-nums text-stone-950">{value}</p>
+      {sub && <p className="mt-1.5 text-xs text-stone-500">{sub}</p>}
+    </Card>
   );
 }
 
@@ -492,94 +540,6 @@ function ProyeccionHero({
     </section>
   );
 }
-
-/**
- * Lista de empresas ordenada por impacto vs cierre del año anterior:
- * negativos primero (mayor caída arriba), divisor "Creciendo", positivos
- * después, sin-historia al final. Sin fondos coloreados — solo el delta
- * tiene color.
- */
-function EmpresasPorImpacto({
-  empresas, prevYear,
-}: {
-  empresas: ProyeccionEmpresa[];
-  prevYear: number;
-}) {
-  // Particionar:
-  //   negativas: tienen comparativo y delta < 0 (orden ASC → mayor caída primero)
-  //   positivas: tienen comparativo y delta >= 0 (orden DESC → mayor crecimiento primero)
-  //   sin_historia: sin comparativo viable (cierre 0 o delta NULL)
-  const negativas: ProyeccionEmpresa[] = [];
-  const positivas: ProyeccionEmpresa[] = [];
-  const sinHistoria: ProyeccionEmpresa[] = [];
-  for (const e of empresas) {
-    if (e.cierre_anio_anterior <= 0 || e.delta_vs_anio_anterior == null) {
-      sinHistoria.push(e);
-    } else if (e.delta_vs_anio_anterior < 0) {
-      negativas.push(e);
-    } else {
-      positivas.push(e);
-    }
-  }
-  negativas.sort((a, b) => (a.delta_vs_anio_anterior ?? 0) - (b.delta_vs_anio_anterior ?? 0));
-  positivas.sort((a, b) => (b.delta_vs_anio_anterior ?? 0) - (a.delta_vs_anio_anterior ?? 0));
-
-  return (
-    <section className="space-y-2">
-      <h3 className="text-[11px] font-medium uppercase tracking-widest text-stone-500">
-        Por empresa · ordenadas por impacto
-      </h3>
-      <Card className="overflow-hidden p-0">
-        <ul className="divide-y divide-stone-100">
-          {negativas.map(e => <EmpresaImpactoRow key={e.empresa} e={e} prevYear={prevYear} />)}
-          {positivas.length > 0 && (
-            <li className="bg-stone-50 px-4 py-1.5 text-[10px] font-medium uppercase tracking-widest text-stone-500">
-              Creciendo vs {prevYear}
-            </li>
-          )}
-          {positivas.map(e => <EmpresaImpactoRow key={e.empresa} e={e} prevYear={prevYear} />)}
-          {sinHistoria.length > 0 && (
-            <li className="bg-stone-50 px-4 py-1.5 text-[10px] font-medium uppercase tracking-widest text-stone-500">
-              Sin historial comparable
-            </li>
-          )}
-          {sinHistoria.map(e => <EmpresaImpactoRow key={e.empresa} e={e} prevYear={prevYear} />)}
-        </ul>
-      </Card>
-    </section>
-  );
-}
-
-function EmpresaImpactoRow({ e, prevYear }: { e: ProyeccionEmpresa; prevYear: number }) {
-  const delta  = e.delta_vs_anio_anterior;
-  const dPct   = e.delta_vs_anio_anterior_pct;
-  const tone   = delta == null
-    ? "text-stone-400"
-    : delta < 0 ? "text-red-700" : delta > 0 ? "text-emerald-700" : "text-stone-500";
-  return (
-    <li className="grid grid-cols-[1fr_110px_130px] items-baseline gap-3 px-4 py-2.5 text-sm hover:bg-stone-50/60">
-      <span className="truncate text-stone-950">{e.nombre}</span>
-      <span className="text-right font-mono tabular-nums text-stone-700">{fmtMoneyCompact(e.proyeccion_cierre)}</span>
-      <span className={cn("text-right font-mono tabular-nums", tone)}>
-        {delta == null
-          ? <span className="text-stone-400">sin comparativo</span>
-          : (
-            <>
-              {delta >= 0 ? "+" : "−"}{fmtMoneyCompact(Math.abs(delta))}
-              {dPct != null && (
-                <span className="ml-1 text-[11px] text-stone-400">
-                  ({dPct >= 0 ? "+" : ""}{(dPct * 100).toFixed(1)}%)
-                </span>
-              )}
-            </>
-          )}
-      </span>
-    </li>
-  );
-  // prevYear no se usa visualmente, queda para futuras necesidades del row.
-  void prevYear;
-}
-
 
 /** Celda de proyección por empresa (al lado del Total YTD).
  *  v5: monto principal + Δ absoluto vs cierre del año anterior. Sin dots de
