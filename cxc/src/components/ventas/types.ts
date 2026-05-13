@@ -52,7 +52,7 @@ export type MetaSugeridaEmpresa = {
   meta_manual_actual: number | null; // de ventas_metas (NULL si no hay)
 };
 
-/** Bloque por empresa que devuelve ventas_proyeccion_cierre_v1. */
+/** Bloque por empresa que devuelve ventas_proyeccion_cierre_v3. */
 export type ProyeccionEmpresa = {
   empresa: string;
   nombre: string;
@@ -62,6 +62,11 @@ export type ProyeccionEmpresa = {
   ritmo_actual: number | null;  // ratio: 1.05 = +5% YTD vs prev YTD
   ritmo_historico: number | null;
   historia_disponible: number;
+  /** v3: fracción del año previo cumplida al día de corte same-period.
+   *  Solo populated en rama 'estacional'; null en mixto/fallback. */
+  frac_ytd_estacional: number | null;
+  /** v3: 'estacional' (linear por frac_ytd), 'mixto' (v2), 'fallback_lineal'. */
+  algoritmo: "estacional" | "mixto" | "fallback_lineal";
   factor_final: number | null;
   proyeccion_cierre: number;
   proyeccion_restante: number;  // max(0, proyeccion - ytd)

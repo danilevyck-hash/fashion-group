@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast } from "@/components/ui";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -78,6 +79,10 @@ export default function VentasMetasPage() {
   // Sugerencias auto-calculadas + zona crítica desde RPCs nuevas.
   const [sugeridas, setSugeridas] = useState<Record<string, MetaSugeridaRow>>({});
   const [ritmosActuales, setRitmosActuales] = useState<Record<string, number | null>>({});
+  // Distribución mensual oculta por default. Toggle global expande las 12
+  // columnas de meses (mucho ruido visual cuando el foco está en configurar
+  // la meta anual). En vista compacta cada empresa = una sola fila.
+  const [showMonthly, setShowMonthly] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -255,6 +260,12 @@ export default function VentasMetasPage() {
             Aplicar todas las sugerencias
           </button>
           <button
+            onClick={() => setShowMonthly(v => !v)}
+            className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all min-h-[44px]"
+          >
+            {showMonthly ? "Ocultar distribución mensual" : "Ver distribución mensual"}
+          </button>
+          <button
             onClick={handleSave}
             disabled={saving}
             className="text-xs bg-black text-white rounded-md px-4 py-2 hover:bg-gray-800 active:scale-[0.97] transition-all min-h-[44px] disabled:opacity-50"
@@ -275,13 +286,13 @@ export default function VentasMetasPage() {
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b border-gray-200">
-                  <th className="text-left px-3 py-2 font-medium text-gray-500 sticky left-0 bg-white z-20 min-w-[140px]">
+                  <th className="text-left px-3 py-2 font-medium text-gray-500 sticky left-0 bg-white z-20 min-w-[180px]">
                     Empresa
                   </th>
-                  <th className="text-right px-3 py-2 font-medium text-gray-500 min-w-[120px]">
-                    Meta Anual
+                  <th className="text-right px-3 py-2 font-medium text-gray-500 min-w-[420px]">
+                    Meta anual
                   </th>
-                  {MES_NAMES.map(m => (
+                  {showMonthly && MES_NAMES.map(m => (
                     <th key={m} className="text-right px-1.5 py-2 font-medium text-gray-500 whitespace-nowrap min-w-[55px]">
                       {m}
                     </th>
@@ -295,14 +306,16 @@ export default function VentasMetasPage() {
                   const dist = distribucion[empresa] ?? Array(12).fill(1 / 12);
                   const sug = sugeridas[empresa];
                   const sugMeta = sug?.meta_sugerida ?? null;
-                  // C1: badge "✓ Aplicada" cuando la meta actual coincide
-                  // con la sugerida (tolerancia ±$1 para round-trip).
+                  // Badge "✓ Aplicada" cuando la meta actual coincide con la
+                  // sugerida (tolerancia ±$1 para round-trip).
                   const aplicada = sugMeta != null && metaAnual > 0
                     && Math.abs(metaAnual - sugMeta) < 1;
-                  // C2: zona crítica cuando el ritmo actual (cur YTD vs prev
-                  // YTD same-period) cayó >15% → ratio < 0.85.
+                  // Zona crítica = ritmo actual cayó >15% YTD.
                   const ritmoActual = ritmosActuales[empresa];
                   const zonaCritica = ritmoActual != null && ritmoActual < 0.85;
+                  const zonaTooltipMsg = zonaCritica && ritmoActual != null
+                    ? `Ritmo real ${(ritmoActual * 100 - 100).toFixed(0)}% YTD. Sugerencia conservadora, considerá ajustar manual.`
+                    : "";
 
                   return (
                     <tr key={empresa} className={cn(
@@ -313,63 +326,72 @@ export default function VentasMetasPage() {
                         "px-3 py-2 font-medium text-gray-700 sticky left-0 whitespace-nowrap z-10",
                         zonaCritica ? "bg-amber-50" : "bg-white",
                       )}>
-                        {empresa}
-                        {zonaCritica && (
-                          <span className="ml-1.5 inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-widest text-amber-800">
-                            zona crítica
-                          </span>
-                        )}
+                        <span className="inline-flex items-center gap-1.5">
+                          {empresa}
+                          {zonaCritica && (
+                            <TooltipProvider delayDuration={120}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span className="inline-flex cursor-help items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-widest text-amber-800">
+                                    zona crítica
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent side="right" align="start" className="max-w-[260px] text-xs">
+                                  {zonaTooltipMsg}
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </span>
                       </td>
+                      {/* Línea horizontal compacta: input + meta formatted +
+                          · Sugerida $X [Aplicar | ✓ Aplicada] */}
                       <td className="px-3 py-2">
-                        <div className="relative">
-                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                          <input
-                            type="text"
-                            inputMode="numeric"
-                            value={rawVal}
-                            onChange={e => {
-                              const v = e.target.value.replace(/[^0-9]/g, "");
-                              updateDraft(empresa, v);
-                            }}
-                            placeholder="0"
-                            className="w-full text-right text-xs border border-gray-200 rounded px-2 py-1.5 pl-5 tabular-nums min-h-[36px]"
-                          />
-                        </div>
-                        {metaAnual > 0 && (
-                          <p className="text-[10px] text-gray-400 text-right mt-0.5">{fmtCurrency(metaAnual)}</p>
-                        )}
-                        {/* C1: meta sugerida + botón Aplicar + ✓ Aplicada */}
-                        {sugMeta != null && (
-                          <div className="mt-1 flex items-center justify-end gap-2 text-[10px]">
-                            <span className="text-gray-500">
-                              Sugerida: <span className="font-mono tabular-nums text-gray-700">{fmtCurrency(sugMeta)}</span>
-                            </span>
-                            {aplicada ? (
-                              <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 font-medium text-emerald-700">
-                                ✓ Aplicada
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => applyOne(empresa)}
-                                className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 font-medium text-gray-700 hover:bg-gray-50 active:scale-[0.97]"
-                              >
-                                Aplicar
-                              </button>
-                            )}
+                        <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[11px]">
+                          <span className="text-gray-500">Meta:</span>
+                          <div className="relative">
+                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={rawVal}
+                              onChange={e => {
+                                const v = e.target.value.replace(/[^0-9]/g, "");
+                                updateDraft(empresa, v);
+                              }}
+                              placeholder="0"
+                              className="w-32 text-right text-xs border border-gray-200 rounded px-2 py-1.5 pl-5 tabular-nums min-h-[36px]"
+                            />
                           </div>
-                        )}
-                        {sug && sugMeta == null && sug.historia_disponible === 0 && (
-                          <p className="mt-1 text-[10px] text-gray-400 text-right">requiere meta manual</p>
-                        )}
-                        {/* C2: warning amber con explicación accionable */}
-                        {zonaCritica && ritmoActual != null && (
-                          <p className="mt-1 text-[10px] text-amber-700 text-right">
-                            ⚠ Ritmo real {(ritmoActual * 100 - 100).toFixed(0)}% YTD. Sugerencia conservadora, considerá ajustar manual.
-                          </p>
-                        )}
+                          {metaAnual > 0 && (
+                            <span className="font-mono tabular-nums text-gray-700">{fmtCurrency(metaAnual)}</span>
+                          )}
+                          {sugMeta != null && (
+                            <>
+                              <span className="text-gray-300">·</span>
+                              <span className="text-gray-500">Sugerida</span>
+                              <span className="font-mono tabular-nums text-gray-700">{fmtCurrency(sugMeta)}</span>
+                              {aplicada ? (
+                                <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
+                                  ✓ Aplicada
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => applyOne(empresa)}
+                                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-700 hover:bg-gray-50 active:scale-[0.97]"
+                                >
+                                  Aplicar
+                                </button>
+                              )}
+                            </>
+                          )}
+                          {sug && sugMeta == null && sug.historia_disponible === 0 && (
+                            <span className="text-gray-400">· requiere meta manual</span>
+                          )}
+                        </div>
                       </td>
-                      {dist.map((w, i) => {
+                      {showMonthly && dist.map((w, i) => {
                         const monthMeta = metaAnual * w;
                         return (
                           <td key={i} className="text-right px-1.5 py-2 tabular-nums text-gray-500">
@@ -389,7 +411,7 @@ export default function VentasMetasPage() {
                       EMPRESAS.reduce((s, emp) => s + (parseFloat(draft[emp] ?? "") || 0), 0)
                     )}
                   </td>
-                  {MES_NAMES.map((_, i) => {
+                  {showMonthly && MES_NAMES.map((_, i) => {
                     const monthTotal = EMPRESAS.reduce((s, emp) => {
                       const meta = parseFloat(draft[emp] ?? "") || 0;
                       const w = (distribucion[emp] ?? Array(12).fill(1 / 12))[i];
