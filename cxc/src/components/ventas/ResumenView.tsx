@@ -7,7 +7,7 @@ import { Calendar, Info } from "lucide-react";
 import type {
   VentasResumen, Multifashion, ProyeccionResp, ProyeccionEmpresa, ProyeccionGrupo,
 } from "./types";
-import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, kpiDeltaSymbol, heatmapClasses } from "@/lib/ventas/format";
+import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 
@@ -29,13 +29,6 @@ function findProyeccionForEmpresa(p: ProyeccionResp, ventasId: string): Proyecci
   return p.empresas.find(e => e.empresa === empresaKey) ?? null;
 }
 
-// Mapeo status → clases del semáforo (badge + texto delta).
-function statusBadge(status: ProyeccionEmpresa["status"] | ProyeccionGrupo["status"]) {
-  if (status === "verde")    return { dot: "bg-emerald-500", text: "text-emerald-700", label: "En meta" };
-  if (status === "amarillo") return { dot: "bg-amber-500",   text: "text-amber-700",   label: "Cerca" };
-  if (status === "rojo")     return { dot: "bg-red-500",     text: "text-red-700",     label: "Bajo meta" };
-  return { dot: "bg-stone-300", text: "text-stone-500", label: "Sin meta" };
-}
 
 type Granularity = "mensual" | "trimestral";
 type ViewMode = "ventas" | "utilidad" | "margen";
@@ -202,32 +195,9 @@ export function ResumenView({
     utilidadPrev: rows.reduce((s, r) => s + r.utilidadPrevTotal, 0),
   };
 
-  // KPIs según modo
-  const ventasDelta   = k.ventas2025YTD   > 0 ? (k.ventasNetasYTD - k.ventas2025YTD) / k.ventas2025YTD : null;
-  const utilidadDelta = k.utilidad2025YTD > 0 ? (k.utilidadYTD    - k.utilidad2025YTD) / k.utilidad2025YTD : null;
-  const margenDeltaPts = (k.margenYTD - k.margen2025YTD) * 100;
-  const margenSign = margenDeltaPts >= 0 ? "▲ +" : "▼ ";
-
-  const periodoLabel = isClosedYear
-    ? "Año completo"
-    : `${MONTHS[0]}–${MONTHS[Math.max(0, data.mesActual - 1)]} ${selectedYear}`;
-
-  // La columna "Proyección" en la tabla + la barra del grupo arriba sólo
-  // aplican al año en curso. Año cerrado = ya cerró, no hay nada que proyectar.
+  // La columna "Proyección" en la tabla + el hero arriba sólo aplican al
+  // año en curso. Año cerrado = ya cerró, no hay nada que proyectar.
   const showProyeccionCol = !isClosedYear && !!data.proyeccion;
-
-  // El banner muestra siempre los 3 KPIs YTD (Ventas, Utilidad, Margen)
-  // sin importar el viewMode. El toggle afecta sólo la matriz; el banner
-  // expone el panorama completo siempre.
-  const kpiVentasLabel   = isClosedYear ? `VENTAS NETAS ${selectedYear}` : "VENTAS NETAS YTD";
-  const kpiVentasValue   = fmtMoney(k.ventasNetasYTD);
-  const kpiVentasSub     = `${periodoLabel} · ${kpiDeltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`;
-  const kpiUtilidadLabel = isClosedYear ? `UTILIDAD ${selectedYear}` : "UTILIDAD YTD";
-  const kpiUtilidadValue = fmtMoney(k.utilidadYTD);
-  const kpiUtilidadSub   = `${periodoLabel} · ${kpiDeltaSymbol(utilidadDelta)} ${fmtPct(utilidadDelta)} vs ${prevYear}`;
-  const kpiMargenLabel   = "MARGEN PROMEDIO";
-  const kpiMargenValue   = `${(k.margenYTD * 100).toFixed(1)}%`;
-  const kpiMargenSub     = `${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
 
   return (
     <div className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
@@ -237,24 +207,18 @@ export function ResumenView({
         </div>
       )}
 
-      {/* KPI cards — 3 cols siempre (Ventas + Utilidad + Margen). El toggle
-          de la matriz no afecta el banner. La nota "Ajustado al día de
-          corte" se renderiza UNA sola vez debajo del banner (no 3 veces). */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-        <KpiCard label={kpiVentasLabel}   value={kpiVentasValue}   sub={kpiVentasSub} />
-        <KpiCard label={kpiUtilidadLabel} value={kpiUtilidadValue} sub={kpiUtilidadSub} />
-        <KpiCard label={kpiMargenLabel}   value={kpiMargenValue}   sub={kpiMargenSub} />
-      </div>
-      {partialKpiNote && (
-        <p className="-mt-3 text-[11px] text-stone-400">{partialKpiNote}</p>
+      {/* Hero — Proyección de cierre como medidor principal, comparada vs
+          el cierre real del año anterior (no vs meta). La meta queda como
+          referencia en /ventas/metas. Sólo años en curso. */}
+      {!isClosedYear && data.proyeccion && data.proyeccion.totales_grupo.ventas_ytd > 0 && (
+        <ProyeccionHero proyeccion={data.proyeccion} selectedYear={selectedYear} prevYear={prevYear} />
       )}
 
-      {/* Barra de proyección de cierre del grupo. Sólo años en curso —
-          un año cerrado no tiene "cierre proyectado" (ya cerró). El backend
-          sigue calculando la proyección por si otros consumidores la usan;
-          aquí simplemente se oculta el render. */}
-      {!isClosedYear && data.proyeccion && data.proyeccion.totales_grupo.ventas_ytd > 0 && (
-        <GroupProjectionBar proyeccion={data.proyeccion} selectedYear={selectedYear} />
+      {/* Lista de empresas ordenada por impacto vs 2025 (cerradas vs proyectadas).
+          Negativos arriba (mayor caída primero), positivos al final, sin-historia
+          al pie. Densa, sin fondos coloreados — solo color en el delta. */}
+      {!isClosedYear && data.proyeccion && data.proyeccion.empresas.length > 0 && (
+        <EmpresasPorImpacto empresas={data.proyeccion.empresas} prevYear={prevYear} />
       )}
 
       {/* Toolbar — subtitle + date pill (left) · controls (right) */}
@@ -402,21 +366,17 @@ export function ResumenView({
         )}
       </Card>
 
-      {/* Legend — thresholds varían según mode (pct vs pts) */}
+      {/* Legend simple — solo arrow + dirección del delta. Sin swatch
+          (la matriz ya no tiene fondos heatmap). */}
       <div className="flex flex-wrap items-center gap-4 text-[11px] text-stone-500">
-        {isMargen ? (
-          <>
-            <LegendItem swatch="bg-teal-100" label={`▲ vs ${prevYear} mayor a +0.5 pts`} />
-            <LegendItem swatch="bg-white border border-stone-200" label="entre ±0.5 pts" />
-            <LegendItem swatch="bg-orange-200" label="▼ menor a −0.5 pts" />
-          </>
-        ) : (
-          <>
-            <LegendItem swatch="bg-teal-100" label={`▲ vs ${prevYear} mayor a +5%`} />
-            <LegendItem swatch="bg-white border border-stone-200" label="entre ±5%" />
-            <LegendItem swatch="bg-orange-200" label="▼ menor a −5%" />
-          </>
-        )}
+        <span className="inline-flex items-center gap-1.5">
+          <span className="text-emerald-700">▲</span>
+          {isMargen ? `vs ${prevYear} mayor a +0.5 pts` : `vs ${prevYear} mayor a +5%`}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="text-red-700">▼</span>
+          {isMargen ? "menor a −0.5 pts" : "menor a −5%"}
+        </span>
         {!isClosedYear && (
           <span className="inline-flex items-center gap-1.5"><span className="text-stone-400">—</span>sin data</span>
         )}
@@ -425,162 +385,205 @@ export function ResumenView({
   );
 }
 
-function KpiCard({ label, value, sub, note, accent = false }: { label: string; value: string; sub?: string; note?: string | null; accent?: boolean }) {
+/**
+ * Hero del Resumen — proyección de cierre del año en curso como medidor
+ * principal, comparado con el cierre real del año anterior (no vs meta).
+ *
+ * Layout:
+ *   [label uppercase tracking-wide]
+ *   [monto grande Geist Mono]   [delta text-secondary]
+ *   [subtítulo con cierre prev + YTD actual + %]
+ *   [barra simple: real YTD sólido + proyección restante claro + marker prev]
+ */
+function ProyeccionHero({
+  proyeccion, selectedYear, prevYear,
+}: {
+  proyeccion: ProyeccionResp;
+  selectedYear: number;
+  prevYear: number;
+}) {
+  const g = proyeccion.totales_grupo;
+  const proy   = g.proyeccion_cierre;
+  const ytd    = g.ventas_ytd;
+  const cierre = g.cierre_anio_anterior_total;
+  const delta  = g.delta_vs_anio_anterior_total;
+  const dPct   = g.delta_vs_anio_anterior_pct;
+
+  // Color del delta: rojo negativo, verde positivo, neutro si ~0 o NULL.
+  const deltaTone = delta == null || Math.abs(delta) < 1
+    ? "text-stone-500"
+    : delta < 0 ? "text-red-700" : "text-emerald-700";
+
+  // Barra: escala = max(proy, cierre) para que el marker de cierre quede
+  // dentro y el excedente (si proy > cierre) se vea como tramo verde.
+  const scaleMax = Math.max(proy, cierre, ytd, 1);
+  const pctYtd      = (ytd / scaleMax) * 100;
+  const pctProy     = (proy / scaleMax) * 100;
+  const pctCierre   = cierre > 0 ? (cierre / scaleMax) * 100 : null;
+  const excedente   = cierre > 0 && proy > cierre;
+
+  // % del año transcurrido (basado en mes_corte).
+  const pctYearElapsed = proyeccion.mes_corte > 0 ? proyeccion.mes_corte / 12 : 0;
+
+  // Texto del delta: "22.3% bajo 2025" o "8.9% sobre 2025" etc.
+  const deltaText = dPct == null
+    ? null
+    : (dPct >= 0 ? `${(dPct * 100).toFixed(1)}% sobre ${prevYear}` : `${(Math.abs(dPct) * 100).toFixed(1)}% bajo ${prevYear}`);
+
   return (
-    <Card className={cn(
-      "p-4",
-      accent ? "border-teal-100 bg-teal-50" : "border-stone-200 bg-white"
-    )}>
-      <p className={cn("text-[10.5px] font-medium uppercase tracking-widest", accent ? "text-teal-800" : "text-stone-500")}>{label}</p>
-      <p className={cn(
-        "mt-1.5 font-mono text-[26px] font-medium leading-tight tracking-tight tabular-nums",
-        accent ? "text-teal-900" : "text-stone-950"
-      )}>{value}</p>
-      {sub && <p className={cn("mt-1.5 text-xs", accent ? "text-teal-800" : "text-stone-500")}>{sub}</p>}
-      {note && <p className="mt-1 text-[11px] text-stone-400">{note}</p>}
-    </Card>
+    <section className="space-y-3">
+      <p className="text-[11px] font-medium uppercase tracking-widest text-stone-500">
+        Proyección de cierre {selectedYear}
+      </p>
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <span className="font-mono text-4xl font-medium leading-none tracking-tight tabular-nums text-stone-950 md:text-[40px]">
+          {fmtMoneyCompact(proy)}
+        </span>
+        {deltaText && (
+          <span className={cn("text-sm", deltaTone)}>{deltaText}</span>
+        )}
+      </div>
+      <p className="text-xs text-stone-500">
+        {prevYear} cerró en <span className="font-mono font-medium tabular-nums text-stone-700">{fmtMoneyCompact(cierre)}</span>
+        <span className="mx-1.5 text-stone-300">·</span>
+        YTD {selectedYear} <span className="font-mono font-medium tabular-nums text-stone-700">{fmtMoneyCompact(ytd)}</span>
+        {pctYearElapsed > 0 && (
+          <span className="text-stone-400"> ({(pctYearElapsed * 100).toFixed(0)}% del año)</span>
+        )}
+      </p>
+
+      {/* Barra simple: real YTD + proyección restante. Marker en cierre 2025. */}
+      <div className="relative pt-5">
+        <div className="relative h-2 w-full overflow-hidden rounded-full bg-stone-100">
+          <div className="absolute inset-y-0 left-0 bg-teal-700" style={{ width: `${pctYtd}%` }} />
+          {pctProy > pctYtd && (
+            <div
+              className="absolute inset-y-0 bg-teal-200"
+              style={{
+                left: `${pctYtd}%`,
+                width: `${(pctCierre != null ? Math.min(pctCierre, pctProy) : pctProy) - pctYtd}%`,
+              }}
+            />
+          )}
+          {/* Excedente verde más allá del cierre 2025 (si proy > cierre) */}
+          {excedente && pctCierre != null && (
+            <div
+              className="absolute inset-y-0 bg-emerald-600"
+              style={{ left: `${pctCierre}%`, width: `${pctProy - pctCierre}%` }}
+            />
+          )}
+        </div>
+        {/* Marker vertical en cierre prev year con label */}
+        {pctCierre != null && (
+          <>
+            <div
+              className="absolute h-2 w-0.5 bg-stone-950"
+              style={{ left: `${pctCierre}%`, top: 20, transform: "translateX(-50%)" }}
+            />
+            <span
+              className="absolute font-mono text-[10px] tabular-nums text-stone-500"
+              style={{ left: `${pctCierre}%`, top: 0, transform: "translateX(-50%)" }}
+            >
+              {prevYear} {fmtMoneyCompact(cierre)}
+            </span>
+          </>
+        )}
+      </div>
+    </section>
   );
 }
 
 /**
- * B2 — Barra de proyección del grupo. Estilo del Multifashion Overview:
- *   - Segmento Real YTD (sólido teal-700) + segmento proyección restante
- *     (teal-300 más claro) sobre fondo stone-100.
- *   - Vertical marker en la posición de la meta del grupo (si meta > 0).
- *   - Sub-texto con porcentaje + monto proyectado vs meta.
+ * Lista de empresas ordenada por impacto vs cierre del año anterior:
+ * negativos primero (mayor caída arriba), divisor "Creciendo", positivos
+ * después, sin-historia al final. Sin fondos coloreados — solo el delta
+ * tiene color.
  */
-function GroupProjectionBar({
-  proyeccion, selectedYear,
+function EmpresasPorImpacto({
+  empresas, prevYear,
 }: {
-  proyeccion: ProyeccionResp;
-  selectedYear: number;
+  empresas: ProyeccionEmpresa[];
+  prevYear: number;
 }) {
-  const g = proyeccion.totales_grupo;
-  const ytd  = g.ventas_ytd;
-  const proy = g.proyeccion_cierre;
-  const meta = g.meta_total;
-  const tieneMeta = meta > 0;
-  const proyRestante = Math.max(0, proy - ytd);
-
-  // El "ancho lógico" de la barra representa max(meta, proy) — si la
-  // proyección excede la meta, el marker de meta queda dentro y el
-  // excedente verde se dibuja a la derecha. Sin meta, escala al proy.
-  const scaleMax = tieneMeta ? Math.max(meta, proy) : Math.max(proy, ytd, 1);
-  const pctYtd  = (ytd  / scaleMax) * 100;
-  const pctProy = (proy / scaleMax) * 100;
-  const pctMeta = tieneMeta ? (meta / scaleMax) * 100 : null;
-  const pctVsMeta = tieneMeta ? (proy / meta) * 100 : null;
-  const excedente = tieneMeta && proy > meta;
-
-  // Label de status derivado del posicionamiento de proy vs meta. El
-  // color del label sigue al status calculado por el backend (que también
-  // considera ritmo_actual), para que aparezca rojo cuando el ritmo cae
-  // fuerte aún cumpliendo meta.
-  let statusLabel: string | null = null;
-  if (tieneMeta) {
-    if (proy >= meta)           statusLabel = "SOBRE META";
-    else if (proy >= meta * 0.95) statusLabel = "EN META";
-    else                          statusLabel = "BAJO META";
+  // Particionar:
+  //   negativas: tienen comparativo y delta < 0 (orden ASC → mayor caída primero)
+  //   positivas: tienen comparativo y delta >= 0 (orden DESC → mayor crecimiento primero)
+  //   sin_historia: sin comparativo viable (cierre 0 o delta NULL)
+  const negativas: ProyeccionEmpresa[] = [];
+  const positivas: ProyeccionEmpresa[] = [];
+  const sinHistoria: ProyeccionEmpresa[] = [];
+  for (const e of empresas) {
+    if (e.cierre_anio_anterior <= 0 || e.delta_vs_anio_anterior == null) {
+      sinHistoria.push(e);
+    } else if (e.delta_vs_anio_anterior < 0) {
+      negativas.push(e);
+    } else {
+      positivas.push(e);
+    }
   }
-  const statusTone =
-    g.status === "verde"    ? "text-emerald-700" :
-    g.status === "amarillo" ? "text-amber-700"   :
-    g.status === "rojo"     ? "text-red-700"     :
-                              "text-stone-500";
-
-  const gap = tieneMeta ? proy - meta : null;
-  const gapLabel = gap == null
-    ? null
-    : gap >= 0
-      ? `Excedente ${fmtMoneyCompact(gap)} (sobre meta)`
-      : `Gap ${fmtMoneyCompact(Math.abs(gap))} (bajo meta)`;
+  negativas.sort((a, b) => (a.delta_vs_anio_anterior ?? 0) - (b.delta_vs_anio_anterior ?? 0));
+  positivas.sort((a, b) => (b.delta_vs_anio_anterior ?? 0) - (a.delta_vs_anio_anterior ?? 0));
 
   return (
-    <Card className="p-4">
-      {/* Header — 1 línea */}
-      <p className="mb-3 text-[11px] leading-5">
-        <span className="font-medium uppercase tracking-widest text-stone-500">Proyección cierre grupo</span>
-        <Sep />
-        {tieneMeta ? (
-          <>
-            <span className="font-mono font-medium tabular-nums text-stone-950">{fmtMoneyCompact(proy)}</span>
-            <span className="text-stone-500"> proyectado </span>
-            <span className="text-stone-400">vs</span>
-            <span className="font-mono tabular-nums text-stone-700"> {fmtMoneyCompact(meta)}</span>
-            <span className="text-stone-500"> meta</span>
-            <Sep />
-            <span className={cn("font-mono font-medium tabular-nums", statusTone)}>{pctVsMeta!.toFixed(1)}%</span>
-            <Sep />
-            <span className={cn("text-[10px] font-semibold uppercase tracking-widest", statusTone)}>{statusLabel}</span>
-          </>
-        ) : (
-          <>
-            <span className="text-stone-500">Sin meta configurada para {selectedYear}</span>
-            <Sep />
-            <span className="text-stone-500">proyección </span>
-            <span className="font-mono font-medium tabular-nums text-stone-950">{fmtMoneyCompact(proy)}</span>
-          </>
-        )}
-      </p>
-
-      {/* Barra */}
-      <div className="relative h-3 w-full overflow-hidden rounded-full bg-stone-200">
-        {/* Real YTD — sólido */}
-        <div
-          className="absolute inset-y-0 left-0 bg-teal-700 transition-[width] duration-300"
-          style={{ width: `${pctYtd}%` }}
-        />
-        {/* Proyección restante (hasta la meta o hasta proy si no hay meta) */}
-        {pctProy > pctYtd && (
-          <div
-            className="absolute inset-y-0 bg-teal-300 transition-[width] duration-300"
-            style={{
-              left: `${pctYtd}%`,
-              width: `${(tieneMeta ? Math.min(pctMeta!, pctProy) : pctProy) - pctYtd}%`,
-            }}
-          />
-        )}
-        {/* Excedente verde — sólo si proy > meta */}
-        {excedente && pctMeta != null && (
-          <div
-            className="absolute inset-y-0 bg-emerald-500 transition-[width] duration-300"
-            style={{ left: `${pctMeta}%`, width: `${pctProy - pctMeta}%` }}
-          />
-        )}
-      </div>
-      {/* Marker de meta — fuera del overflow-hidden para que la etiqueta no se recorte */}
-      {pctMeta != null && (
-        <div className="relative">
-          <div
-            className="absolute -top-3 h-3 w-0.5 bg-stone-950"
-            style={{ left: `${pctMeta}%`, transform: "translateX(-50%)" }}
-          />
-        </div>
-      )}
-
-      {/* Etiquetas debajo */}
-      <p className="mt-3 text-[11px] text-stone-500">
-        Real <span className="font-mono font-medium tabular-nums text-stone-950">{fmtMoneyCompact(ytd)}</span>
-        <Sep />
-        Proyectado <span className="font-mono tabular-nums text-stone-700">{fmtMoneyCompact(proyRestante)}</span>
-        {gapLabel && (
-          <>
-            <Sep />
-            <span className={statusTone}>{gapLabel}</span>
-          </>
-        )}
-      </p>
-    </Card>
+    <section className="space-y-2">
+      <h3 className="text-[11px] font-medium uppercase tracking-widest text-stone-500">
+        Por empresa · ordenadas por impacto
+      </h3>
+      <Card className="overflow-hidden p-0">
+        <ul className="divide-y divide-stone-100">
+          {negativas.map(e => <EmpresaImpactoRow key={e.empresa} e={e} prevYear={prevYear} />)}
+          {positivas.length > 0 && (
+            <li className="bg-stone-50 px-4 py-1.5 text-[10px] font-medium uppercase tracking-widest text-stone-500">
+              Creciendo vs {prevYear}
+            </li>
+          )}
+          {positivas.map(e => <EmpresaImpactoRow key={e.empresa} e={e} prevYear={prevYear} />)}
+          {sinHistoria.length > 0 && (
+            <li className="bg-stone-50 px-4 py-1.5 text-[10px] font-medium uppercase tracking-widest text-stone-500">
+              Sin historial comparable
+            </li>
+          )}
+          {sinHistoria.map(e => <EmpresaImpactoRow key={e.empresa} e={e} prevYear={prevYear} />)}
+        </ul>
+      </Card>
+    </section>
   );
 }
 
-// Separador visual reutilizable entre fragmentos inline del header/footer.
-function Sep() {
-  return <span className="mx-1.5 text-stone-300">·</span>;
+function EmpresaImpactoRow({ e, prevYear }: { e: ProyeccionEmpresa; prevYear: number }) {
+  const delta  = e.delta_vs_anio_anterior;
+  const dPct   = e.delta_vs_anio_anterior_pct;
+  const tone   = delta == null
+    ? "text-stone-400"
+    : delta < 0 ? "text-red-700" : delta > 0 ? "text-emerald-700" : "text-stone-500";
+  return (
+    <li className="grid grid-cols-[1fr_110px_130px] items-baseline gap-3 px-4 py-2.5 text-sm hover:bg-stone-50/60">
+      <span className="truncate text-stone-950">{e.nombre}</span>
+      <span className="text-right font-mono tabular-nums text-stone-700">{fmtMoneyCompact(e.proyeccion_cierre)}</span>
+      <span className={cn("text-right font-mono tabular-nums", tone)}>
+        {delta == null
+          ? <span className="text-stone-400">sin comparativo</span>
+          : (
+            <>
+              {delta >= 0 ? "+" : "−"}{fmtMoneyCompact(Math.abs(delta))}
+              {dPct != null && (
+                <span className="ml-1 text-[11px] text-stone-400">
+                  ({dPct >= 0 ? "+" : ""}{(dPct * 100).toFixed(1)}%)
+                </span>
+              )}
+            </>
+          )}
+      </span>
+    </li>
+  );
+  // prevYear no se usa visualmente, queda para futuras necesidades del row.
+  void prevYear;
 }
 
-/** B3 — Celda de proyección por empresa (al lado del Total YTD).
- *  Layout: monto principal + status dot/badge + Δ vs meta. */
+
+/** Celda de proyección por empresa (al lado del Total YTD).
+ *  v5: monto principal + Δ absoluto vs cierre del año anterior. Sin dots de
+ *  status, sin comparativo con meta. */
 function EmpresaProjectionCell({ proyeccion }: { proyeccion: ProyeccionEmpresa | null }) {
   if (!proyeccion) {
     return (
@@ -589,37 +592,34 @@ function EmpresaProjectionCell({ proyeccion }: { proyeccion: ProyeccionEmpresa |
       </td>
     );
   }
-  const badge = statusBadge(proyeccion.status);
-  const gap = proyeccion.gap_vs_meta;
-  // Δ vs meta como pct relativo a la meta — más legible que un dollar gap solo.
-  const gapPct = proyeccion.meta_anual && proyeccion.meta_anual > 0 && gap != null
-    ? gap / proyeccion.meta_anual : null;
+  const delta = proyeccion.delta_vs_anio_anterior;
   return (
     <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3.5 text-right font-mono text-xs tabular-nums">
-      <div className="flex items-center justify-end gap-1.5">
-        <span className={cn("h-1.5 w-1.5 rounded-full", badge.dot)} />
-        <span className="text-sm font-medium text-stone-950">{fmtMoneyCompact(proyeccion.proyeccion_cierre)}</span>
-      </div>
-      <p className={cn("mt-0.5 text-[10.5px]", gap == null ? "text-stone-400" : gap >= 0 ? "text-emerald-700" : "text-red-600")}>
-        {gap == null
-          ? proyeccion.es_fallback_lineal ? "lineal" : "sin meta"
-          : `${gap >= 0 ? "+" : ""}${fmtMoneyCompact(gap)}${gapPct != null ? ` (${(gapPct * 100).toFixed(0)}%)` : ""}`}
+      <span className="block text-sm font-medium text-stone-950">{fmtMoneyCompact(proyeccion.proyeccion_cierre)}</span>
+      <p className={cn(
+        "mt-0.5 text-[10.5px]",
+        delta == null ? "text-stone-400" : delta < 0 ? "text-red-700" : delta > 0 ? "text-emerald-700" : "text-stone-500",
+      )}>
+        {delta == null
+          ? "sin comparativo"
+          : `${delta >= 0 ? "+" : "−"}${fmtMoneyCompact(Math.abs(delta))}`}
       </p>
     </td>
   );
 }
 
 function TotalGroupProjectionCell({ totales }: { totales: ProyeccionGrupo }) {
-  const badge = statusBadge(totales.status);
-  const gap = totales.gap_vs_meta;
+  const delta = totales.delta_vs_anio_anterior_total;
   return (
     <td className="whitespace-nowrap px-3.5 py-3.5 text-right font-mono text-sm font-semibold tabular-nums">
-      <div className="flex items-center justify-end gap-1.5">
-        <span className={cn("h-1.5 w-1.5 rounded-full", badge.dot)} />
-        <span className="block text-white">{fmtMoneyCompact(totales.proyeccion_cierre)}</span>
-      </div>
-      <p className={cn("mt-0.5 text-[10.5px] font-medium", gap == null ? "text-stone-300" : gap >= 0 ? "text-emerald-300" : "text-orange-300")}>
-        {gap == null ? "sin meta" : `${gap >= 0 ? "+" : ""}${fmtMoneyCompact(gap)}`}
+      <span className="block text-white">{fmtMoneyCompact(totales.proyeccion_cierre)}</span>
+      <p className={cn(
+        "mt-0.5 text-[10.5px] font-medium",
+        delta == null ? "text-stone-300" : delta < 0 ? "text-red-300" : delta > 0 ? "text-emerald-300" : "text-stone-300",
+      )}>
+        {delta == null
+          ? "sin comparativo"
+          : `${delta >= 0 ? "+" : "−"}${fmtMoneyCompact(Math.abs(delta))}`}
       </p>
     </td>
   );
@@ -629,30 +629,29 @@ function HeatCell({ cell, mode, prevYear }: { cell: Cell; mode: ViewMode; prevYe
   const cur   = cellValue(cell, mode);
   const delta = cellDelta(cell, mode);
   const dMode = deltaModeFor(mode);
-  const cls   = heatmapClasses(delta, dMode);
+  // v5: matriz limpia sin fondos coloreados. El delta solo afecta el color
+  // del texto/arrow, no del bg. Tone derivado inline: rojo si delta < umbral,
+  // verde si delta > umbral, stone si neutro.
   const fmt   = formatDeltaRatio(delta, dMode);
+  const tone  = delta == null ? "text-stone-500"
+              : fmt.tone === "emerald" ? "text-emerald-700"
+              : fmt.tone === "orange"  ? "text-red-700"
+              : "text-stone-500";
 
   if (cur == null) {
     return (
-      <td className={cn(
-        "whitespace-nowrap border-b border-stone-200 px-2.5 py-3.5 text-right font-mono text-xs tabular-nums",
-        cls.bg
-      )}>
+      <td className="whitespace-nowrap border-b border-stone-200 px-2.5 py-3.5 text-right font-mono text-xs tabular-nums">
         <span className="text-stone-400">—</span>
       </td>
     );
   }
 
-  // "n/a" cuando hay valor actual pero la base prev no permite comparar
-  // (ventas prev = 0 en modo ventas/utilidad; ventas prev < $100 en margen).
+  // "n/a" cuando hay valor actual pero la base prev no permite comparar.
   const isNa = isNaComparison(cell, mode);
   const prevPeriod = cell.periodLabel.replace(String(prevYear + 1), String(prevYear));
 
   return (
-    <td className={cn(
-      "whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono text-xs tabular-nums transition",
-      isNa ? "bg-white" : cls.bg
-    )}>
+    <td className="whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono text-xs tabular-nums">
       <TooltipProvider delayDuration={120}>
         <Tooltip>
           <TooltipTrigger asChild>
@@ -667,7 +666,7 @@ function HeatCell({ cell, mode, prevYear }: { cell: Cell; mode: ViewMode; prevYe
                 </span>
               ) : (
                 <span className="inline-flex items-baseline gap-1.5">
-                  {fmt.arrow && <span className={cn("text-[10px]", cls.fg)}>{fmt.arrow}</span>}
+                  {fmt.arrow && <span className={cn("text-[10px]", tone)}>{fmt.arrow}</span>}
                   <span className="text-stone-950">{renderCellValue(cur, mode)}</span>
                 </span>
               )}
@@ -1020,15 +1019,6 @@ function MultifashionNameWithBreakdown({
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
-  );
-}
-
-function LegendItem({ swatch, label }: { swatch: string; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5">
-      <span className={cn("inline-block h-3.5 w-3.5 rounded-sm", swatch)} />
-      {label}
-    </span>
   );
 }
 
