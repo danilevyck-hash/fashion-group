@@ -8,7 +8,6 @@ import { fmt } from "@/lib/format";
 import { COMPANIES, B2B_COMPANIES } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
-import { VENDOR_MAP } from "@/lib/vendors";
 import AppHeader from "@/components/AppHeader";
 import { Toast, PullToRefresh } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
@@ -26,31 +25,6 @@ import { useUndoAction } from "@/lib/hooks/useUndoAction";
 type RiskFilter = "all" | "current" | "watch" | "overdue";
 type SortKey = "name" | "current" | "watch" | "overdue" | "total" | "follow_up";
 type SortDir = "asc" | "desc";
-
-function buildWhatsAppMsg(client: ConsolidatedClient) {
-  const contactName = client.contacto || "cliente";
-  const d91_plus = client.d91_120 + client.d121_plus;
-  const lines = [
-    `Estimado/a ${contactName},`,
-    ``,
-    `Le escribimos de Fashion Group para darle seguimiento a su cuenta por cobrar.`,
-    ``,
-    `Saldo pendiente: *$${fmt(client.total)}*`,
-  ];
-  if (d91_plus > 0) {
-    lines.push(`Facturas vencidas: *$${fmt(d91_plus)}* (más de 90 días)`);
-  }
-  lines.push(``);
-  lines.push(`Detalle por antigüedad:`);
-  lines.push(`- 0-30 días: $${fmt(client.d0_30)}`);
-  lines.push(`- 31-60 días: $${fmt(client.d31_60)}`);
-  lines.push(`- 61-90 días: $${fmt(client.d61_90)}`);
-  lines.push(`- 91+ días: $${fmt(d91_plus)}`);
-  lines.push(``);
-  lines.push(`Agradecemos su pronta gestión. Quedamos atentos.`);
-  lines.push(`Fashion Group Panamá`);
-  return lines.join("\n");
-}
 
 function buildEmailSubject(client: ConsolidatedClient) {
   return `Estado de Cuenta - ${client.nombre_normalized} - Fashion Group`;
@@ -102,27 +76,6 @@ function exportCSV(data: ConsolidatedClient[], label?: string, riskLabel?: strin
   a.download = `CXC${suffix}_${date}.csv`;
   a.click();
   URL.revokeObjectURL(url);
-}
-
-function buildVendorMsg(vendorName: string, companyName: string, brand: string, criticalClients: { name: string; total: number; overdue: number; watch: number }[]) {
-  const lines = [
-    `Hola ${vendorName}, te envio el reporte de cobros pendientes de *${companyName} (${brand})*:`,
-    ``,
-    `*Clientes criticos (${criticalClients.length}):*`,
-    ``,
-  ];
-  for (const c of criticalClients) {
-    let status = "";
-    if (c.overdue > 0) status = `Vencido: $${fmt(c.overdue)}`;
-    else if (c.watch > 0) status = `Vigilancia: $${fmt(c.watch)}`;
-    lines.push(`- *${c.name}*: Total $${fmt(c.total)}${status ? " | " + status : ""}`);
-  }
-  lines.push(``);
-  const totalPending = criticalClients.reduce((s, c) => s + c.total, 0);
-  lines.push(`*Total pendiente de cobro: $${fmt(totalPending)}*`);
-  lines.push(``);
-  lines.push(`Favor dar seguimiento a estos clientes. Gracias.`);
-  return lines.join("\n");
 }
 
 // ── Main Component ───────────────────────────────────────
@@ -366,37 +319,8 @@ function AdminDashboardInner() {
     if (q) setSearch(q);
   }, [authChecked, loadData]);
 
-  // ── Smart suggestions (must be before conditional returns to respect hook rules) ──
-  const cxcSuggestions = useMemo<SmartSuggestion[]>(() => {
-    const suggestions: SmartSuggestion[] = [];
-    const now = Date.now();
-    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
-
-    for (const client of clients) {
-      if (client.total < 10000) continue;
-      const log = contactLog[client.nombre_normalized];
-      const lastContactMs = log?.date ? new Date(log.date).getTime() : 0;
-      const daysSinceContact = lastContactMs ? Math.floor((now - lastContactMs) / (24 * 60 * 60 * 1000)) : null;
-
-      if (!lastContactMs || (now - lastContactMs) >= SEVEN_DAYS) {
-        const daysLabel = daysSinceContact ? `${daysSinceContact} días` : "más de 7 días";
-        suggestions.push({
-          id: `cxc-contact-${client.nombre_normalized}`,
-          message: `Llevas ${daysLabel} sin contactar a ${client.nombre_normalized} y deben $${fmt(client.total)}. ¿Enviar WhatsApp?`,
-          actionLabel: "Enviar WhatsApp",
-          onAction: () => openWhatsApp(client),
-        });
-      }
-    }
-    suggestions.sort((a, b) => {
-      const ca = clients.find(c => a.id.includes(c.nombre_normalized));
-      const cb = clients.find(c => b.id.includes(c.nombre_normalized));
-      return (cb?.total || 0) - (ca?.total || 0);
-    });
-    return suggestions;
-  }, [clients, contactLog]);
-
   // Hook still called to maintain hook order, but SuggestionCard removed from render
+  const cxcSuggestions = useMemo<SmartSuggestion[]>(() => [], []);
   useSmartSuggestions(cxcSuggestions);
 
   if (!authChecked) return null;
@@ -419,73 +343,6 @@ function AdminDashboardInner() {
 
   // ── Actions ──────────────────────────────────────────
 
-  function normalizePhone(raw: string): string {
-    const digits = raw.replace(/[^0-9]/g, "");
-    if (!digits) return "";
-    // Already has Panama country code (507 + 8-digit number = 11 digits)
-    if (digits.startsWith("507") && digits.length >= 11) return digits;
-    // 8-digit Panamanian mobile → prepend country code
-    if (digits.length === 8) return "507" + digits;
-    // Other format (international, etc.) → use as-is
-    return digits;
-  }
-
-  function openWhatsApp(client: ConsolidatedClient) {
-    const phone = normalizePhone(client.celular || client.telefono);
-    if (!phone) { showToast("No hay WhatsApp registrado para este cliente"); return; }
-    const msg = encodeURIComponent(buildWhatsAppMsg(client));
-    try { window.open(`https://wa.me/${phone}?text=${msg}`, "_blank"); } catch { showToast("No se pudo abrir WhatsApp"); }
-  }
-
-  function copyCollectionMsg(client: ConsolidatedClient) {
-    const msg = buildWhatsAppMsg(client);
-    navigator.clipboard.writeText(msg).then(() => {
-      showToast("Mensaje copiado al portapapeles");
-    }).catch(() => {
-      showToast("Error al copiar");
-    });
-  }
-
-  function sendVendorWhatsApp(companyKey: string) {
-    const co = cxcCompanies.find((c) => c.key === companyKey);
-    if (!co?.vendedorPhone || !co?.vendedor) { showToast("Esta empresa no tiene vendedor asignado."); return; }
-
-    const vendorClients = VENDOR_MAP[companyKey] || {};
-    const vendorClientNames = new Set(
-      Object.entries(vendorClients)
-        .filter(([, v]) => v === co.vendedor!.toUpperCase())
-        .map(([name]) => name)
-    );
-
-    const critical = clients
-      .filter((c) => {
-        if (!vendorClientNames.has(c.nombre_normalized)) return false;
-        const d = c.companies[companyKey];
-        if (!d || d.total <= 0) return false;
-        const watch = d.d91_120;
-        const overdue = d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365;
-        return watch > 0 || overdue > 0;
-      })
-      .map((c) => {
-        const d = c.companies[companyKey];
-        return {
-          name: c.nombre_normalized,
-          total: d.total,
-          watch: d.d91_120,
-          overdue: d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365,
-        };
-      })
-      .sort((a, b) => b.total - a.total);
-
-    if (critical.length === 0) {
-      showToast("No hay clientes criticos de " + co.vendedor + " en " + co.name);
-      return;
-    }
-
-    const msg = encodeURIComponent(buildVendorMsg(co.vendedor, co.name, co.brand, critical));
-    window.open(`https://wa.me/${co.vendedorPhone}?text=${msg}`, "_blank");
-  }
-
   function openEmail(client: ConsolidatedClient) {
     if (!client.correo) { showToast("Este cliente no tiene correo registrado. Edite el contacto primero."); return; }
     const subject = encodeURIComponent(buildEmailSubject(client));
@@ -497,7 +354,7 @@ function AdminDashboardInner() {
     const prevEntry = contactLog[clientName];
     const now = new Date().toISOString();
     const methodLabel: Record<string, string> = {
-      whatsapp: "WhatsApp", email: "Email", llamada: "Llamada", visita: "Visita",
+      email: "Email", llamada: "Llamada", visita: "Visita",
     };
 
     // Optimistic: badge transita a "0d" inmediatamente
@@ -733,8 +590,6 @@ function AdminDashboardInner() {
         sortArrow={sortArrow}
         userRole={userRole}
         contactLog={contactLog}
-        onOpenWhatsApp={openWhatsApp}
-        onCopyCollectionMsg={copyCollectionMsg}
         onOpenEmail={openEmail}
         onSaveEdit={handleSaveEdit}
         onQuickMarkContacted={handleQuickMarkContacted}
