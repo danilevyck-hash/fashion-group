@@ -1,6 +1,15 @@
-// Endpoint del sub-tab "Mes en curso" de Multifashion.
-// Wrapper de la RPC multifashion_dia_a_dia(p_year, p_mes).
-// Default mes: mes actual del calendario si year = currentYear, sino 12.
+// Endpoint del sub-tab "Detalle mensual" de Multifashion.
+// Wrapper de la RPC multifashion_detalle_mensual_v1(p_year, p_mes).
+//
+// Soporta cualquier mes histórico (no solo mes en curso). Reemplaza al
+// endpoint /api/multifashion/mes-en-curso anterior.
+//
+// Query params:
+//   year  int  default: año calendario actual
+//   mes   int  default: si year=currentYear → mes actual, si no → 12
+//
+// La RPC v1 es independiente de multifashion_dia_a_dia_v4, que sigue viva
+// pero solo cubre el mes en curso. v1 cubre mes en curso + histórico + YoY.
 
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
@@ -28,15 +37,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
 
-  // v4 rename para forzar a PostgREST/Vercel a salir del caché stale
-  // de la v3 (mismo patrón aplicado antes a multifashion_vendedoras y
-  // multifashion_mensual). Ver migration 20260517000000.
-  const { data, error } = await supabaseServer.rpc("multifashion_dia_a_dia_v4", {
+  const { data, error } = await supabaseServer.rpc("multifashion_detalle_mensual_v1", {
     p_year: year,
     p_mes: mes,
   });
   if (error) {
-    console.error("[multifashion/mes-en-curso] rpc error", error);
+    console.error("[multifashion/detalle-mensual] rpc error", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

@@ -3,12 +3,11 @@
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, CalendarRange, Users, UserCircle, Package } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
 import type { Multifashion, RetailMonthly, WholesaleMonthly } from "./types";
 import { fmtMoney, fmtPct, deltaSymbol, MONTHS } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 import { VendedorasSubtab } from "./VendedorasSubtab";
-import { MesEnCursoSubtab } from "./MesEnCursoSubtab";
+import { DetalleMensualSubtab } from "./DetalleMensualSubtab";
 import { ClientesMultifashionSubtab } from "./ClientesMultifashionSubtab";
 
 const SUBTAB_TRIGGER_CLASS =
@@ -28,7 +27,7 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
           <TrendingUp className="h-3 w-3" /> Overview
         </TabsTrigger>
         <TabsTrigger value="mes" className={SUBTAB_TRIGGER_CLASS}>
-          <CalendarRange className="h-3 w-3" /> Mes en curso
+          <CalendarRange className="h-3 w-3" /> Detalle mensual
         </TabsTrigger>
         <TabsTrigger value="vendedoras" className={SUBTAB_TRIGGER_CLASS}>
           <Users className="h-3 w-3" /> Vendedoras
@@ -42,11 +41,7 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
         <OverviewSubtab data={data} selectedYear={selectedYear} isClosedYear={isClosedYear} />
       </TabsContent>
       <TabsContent value="mes" className="mt-5">
-        {isClosedYear ? (
-          <PlaceholderSubtab icon={CalendarRange} label={`Año ${selectedYear} cerrado · no hay mes en curso`} />
-        ) : (
-          <MesEnCursoSubtab selectedYear={selectedYear} />
-        )}
+        <DetalleMensualSubtab year={selectedYear} />
       </TabsContent>
       <TabsContent value="vendedoras" className="mt-5">
         <VendedorasSubtab data={data} selectedYear={selectedYear} isClosedYear={isClosedYear} />
@@ -288,17 +283,6 @@ function OverviewSubtab({
       </section>
 
     </div>
-  );
-}
-
-function PlaceholderSubtab({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
-  return (
-    <Card className="flex min-h-[200px] flex-col items-center justify-center gap-3 p-12 text-center">
-      <Icon className="h-10 w-10 text-stone-400" strokeWidth={1.5} />
-      <p className="text-sm text-stone-500">
-        <span className="font-medium text-stone-600">{label}</span> · Próximamente
-      </p>
-    </Card>
   );
 }
 
