@@ -52,34 +52,70 @@ async function tableMaxFecha(table: "cxc_rows" | "ventas_raw"): Promise<string |
 
 // ── Checks ───────────────────────────────────────────────────────────────────
 
-// CHECK 1: cxc_rows con fecha o fecha_vencimiento NULL en comprobantes que NO
-// son legítimos (Saldo Anterior y NCs pueden venir sin fecha; el resto no).
-async function checkCxcFechaNull(): Promise<CheckResult> {
+// CHECK 1a: cxc_rows con fecha de emisión NULL. Solo "Saldo Anterior" es
+// legítimamente sin fecha — el resto (Facturas, NDs, NCs, Recibos) siempre
+// trae fecha en Switch.
+async function checkCxcFechaEmisionNull(): Promise<CheckResult> {
   const { data, error } = await supabaseServer
     .from("cxc_rows")
-    .select("comprobante, n_sistema, n_fiscal, fecha, fecha_vencimiento")
-    .or("fecha.is.null,fecha_vencimiento.is.null")
-    .not("comprobante", "in", '("Saldo Anterior","Nota de Crédito")')
+    .select("comprobante, n_sistema, n_fiscal, fecha")
+    .is("fecha", null)
+    .not("comprobante", "in", '("Saldo Anterior")')
     .limit(100);
 
   if (error) {
-    return checkError("cxc_fecha_null", "cxc_rows", error.message);
+    return checkError("cxc_fecha_emision_null", "cxc_rows", error.message);
   }
 
   const count = data?.length ?? 0;
   const severity: Severity = count === 0 ? "ok" : count <= 5 ? "warning" : "critical";
   const top = (data ?? []).slice(0, 10).map(r => ({
     comprobante: r.comprobante, n_sistema: r.n_sistema, n_fiscal: r.n_fiscal,
-    fecha: r.fecha, fecha_vencimiento: r.fecha_vencimiento,
   }));
 
   return {
-    check_name: "cxc_fecha_null",
+    check_name: "cxc_fecha_emision_null",
     table_name: "cxc_rows",
     severity,
     rows_affected: count,
     threshold_exceeded: count > 5,
-    details: { sample: top, threshold: { warning: ">=1", critical: ">5" } },
+    details: { sample: top, threshold: { warning: "1-5", critical: ">5" }, excluded: ["Saldo Anterior"] },
+  };
+}
+
+// CHECK 1b: cxc_rows con fecha_vencimiento NULL. NCs y Recibos no tienen
+// vencimiento por naturaleza (NC compensa, Recibo es pago). Saldo Anterior
+// también queda sin vencimiento. Cualquier otro comprobante sin vencimiento
+// es anómalo.
+async function checkCxcFechaVencimientoNull(): Promise<CheckResult> {
+  const { data, error } = await supabaseServer
+    .from("cxc_rows")
+    .select("comprobante, n_sistema, n_fiscal, fecha_vencimiento")
+    .is("fecha_vencimiento", null)
+    .not("comprobante", "in", '("Saldo Anterior","Nota de Crédito","Recibo")')
+    .limit(100);
+
+  if (error) {
+    return checkError("cxc_fecha_vencimiento_null", "cxc_rows", error.message);
+  }
+
+  const count = data?.length ?? 0;
+  const severity: Severity = count === 0 ? "ok" : count <= 5 ? "warning" : "critical";
+  const top = (data ?? []).slice(0, 10).map(r => ({
+    comprobante: r.comprobante, n_sistema: r.n_sistema, n_fiscal: r.n_fiscal,
+  }));
+
+  return {
+    check_name: "cxc_fecha_vencimiento_null",
+    table_name: "cxc_rows",
+    severity,
+    rows_affected: count,
+    threshold_exceeded: count > 5,
+    details: {
+      sample: top,
+      threshold: { warning: "1-5", critical: ">5" },
+      excluded: ["Saldo Anterior", "Nota de Crédito", "Recibo"],
+    },
   };
 }
 
@@ -168,27 +204,53 @@ async function checkChequesCriticosNull(): Promise<CheckResult> {
   };
 }
 
-// CHECK 5: Préstamos con saldo anómalo (> $100 negativo). Margen de
-// tolerancia para evitar falsos positivos por redondeo.
+// CHECK 5: Préstamos con saldo anómalo (más de $100 negativo). prestamos_empleados
+// no tiene columna saldo — se deriva de prestamos_movimientos aprobados.
+// Préstamo/Responsabilidad suman al saldo, Pago/Abono/Pago_responsabilidad restan.
+// Saldo < -100 = el empleado pagó más de lo prestado (margen $100 para redondeo).
+const PRESTAMO_CONCEPTOS = new Set(["Préstamo", "Responsabilidad por daño"]);
+const PAGO_CONCEPTOS = new Set(["Pago", "Abono extra", "Pago de responsabilidad"]);
+
 async function checkPrestamosSaldoAnomalo(): Promise<CheckResult> {
-  const { count, error } = await supabaseServer
-    .from("prestamos_empleados")
-    .select("id", { count: "exact", head: true })
-    .lt("saldo", -100);
+  const { data, error } = await supabaseServer
+    .from("prestamos_movimientos")
+    .select("empleado_id, concepto, monto, estado, deleted")
+    .eq("estado", "aprobado");
 
   if (error) {
-    // Tabla puede tener otro nombre — devolver info en lugar de fallar.
-    return checkError("prestamos_saldo_anomalo", "prestamos_empleados", error.message);
+    return checkError("prestamos_saldo_anomalo", "prestamos_movimientos", error.message);
   }
 
-  const c = count ?? 0;
+  const saldoPorEmpleado = new Map<string, number>();
+  for (const m of data ?? []) {
+    if (m.deleted === true) continue;
+    const empId = m.empleado_id as string | null;
+    if (!empId) continue;
+    const monto = Number(m.monto) || 0;
+    const prev = saldoPorEmpleado.get(empId) ?? 0;
+    if (PRESTAMO_CONCEPTOS.has(m.concepto)) {
+      saldoPorEmpleado.set(empId, prev + monto);
+    } else if (PAGO_CONCEPTOS.has(m.concepto)) {
+      saldoPorEmpleado.set(empId, prev - monto);
+    }
+  }
+
+  const anomalos: { empleado_id: string; saldo: number }[] = [];
+  for (const [empId, saldo] of saldoPorEmpleado) {
+    if (saldo < -100) anomalos.push({ empleado_id: empId, saldo: Math.round(saldo * 100) / 100 });
+  }
+
+  const c = anomalos.length;
   return {
     check_name: "prestamos_saldo_anomalo",
-    table_name: "prestamos_empleados",
+    table_name: "prestamos_movimientos",
     severity: c === 0 ? "ok" : "info",
     rows_affected: c,
     threshold_exceeded: c > 0,
-    details: { threshold: { info: ">0", margin: "saldo < -100" } },
+    details: {
+      sample: anomalos.slice(0, 10),
+      threshold: { info: ">0", margin: "saldo < -100 (pagaron más de lo prestado)" },
+    },
   };
 }
 
@@ -302,17 +364,25 @@ async function checkCxcSinVentaCorrespondiente(): Promise<CheckResult> {
 
   gaps.sort((a, b) => b.gap_days - a.gap_days);
   const count = gaps.length;
-  const severity: Severity = count <= 5 ? (count === 0 ? "ok" : "info") : count <= 20 ? "warning" : "critical";
+  // Recalibrado: en una operación con 6 B2B y ~100 clientes activos, 50-100 NDs/
+  // intereses/refacturación sin contraparte en ventas es esperado. Solo volumen
+  // muy alto (>150) sugiere problema real de pipeline.
+  const severity: Severity =
+    count === 0 ? "ok" :
+    count <= 20 ? "ok" :
+    count <= 50 ? "info" :
+    count <= 150 ? "warning" :
+    "critical";
 
   return {
     check_name: "cxc_sin_venta_correspondiente",
     table_name: "cxc_rows,ventas_raw",
     severity,
     rows_affected: count,
-    threshold_exceeded: count > 5,
+    threshold_exceeded: count > 20,
     details: {
       top_10: gaps.slice(0, 10),
-      threshold: { info: "1-5", warning: "6-20", critical: ">20", filter: "gap > 30 días" },
+      threshold: { ok: "0-20", info: "21-50", warning: "51-150", critical: ">150", filter: "gap > 30 días" },
     },
   };
 }
@@ -350,11 +420,14 @@ async function checkCxcUploadsZombie(): Promise<CheckResult> {
 
 // ── Error wrapper ────────────────────────────────────────────────────────────
 
+// Un check que no puede correr (query falló, schema cambió) NO debe alertar
+// como critical — eso confunde "data corrupta" con "monitor roto". Queda como
+// warning en el dashboard para que se arregle, pero no dispara email.
 function checkError(name: string, table: string, message: string): CheckResult {
   return {
     check_name: name,
     table_name: table,
-    severity: "critical",
+    severity: "warning",
     rows_affected: 0,
     threshold_exceeded: true,
     details: { error: message, hint: "el check no pudo correr — revisar query o schema" },
@@ -365,7 +438,8 @@ function checkError(name: string, table: string, message: string): CheckResult {
 
 export async function runAllChecks(): Promise<CheckResult[]> {
   const grouped = await Promise.all([
-    checkCxcFechaNull(),
+    checkCxcFechaEmisionNull(),
+    checkCxcFechaVencimientoNull(),
     checkCxcDiasVencidosSinFecha(),
     checkUploadDesync(),
     checkChequesCriticosNull(),

@@ -20,28 +20,32 @@ Shoes (factura en CXC sin venta correspondiente) y el RPC home roto.
 | Dashboard | `src/app/admin/data-health/page.tsx` |
 | Cron schedule | `vercel.json` → `0 12 * * *` (7am Panamá) |
 
-## Los 9 checks
+## Los checks
 
 | # | check_name | Tabla | Severity por threshold |
 |---|---|---|---|
-| 1 | `cxc_fecha_null` | cxc_rows | 0=ok, 1-5=warning, >5=critical |
+| 1a | `cxc_fecha_emision_null` | cxc_rows | 0=ok, 1-5=warning, >5=critical (excluye `Saldo Anterior`) |
+| 1b | `cxc_fecha_vencimiento_null` | cxc_rows | 0=ok, 1-5=warning, >5=critical (excluye `Saldo Anterior`, `Nota de Crédito`, `Recibo`) |
 | 2 | `cxc_dias_vencidos_sin_fecha` | cxc_rows | 0=ok, >0=warning |
 | 3 | `upload_desync_cxc_ventas` | cxc_uploads, ventas_raw | <7d=ok, 7-14=warning, >14=critical |
 | 4 | `cheques_criticos_null` | cheques | 0=ok, >0=warning |
-| 5 | `prestamos_saldo_anomalo` | prestamos_empleados | 0=ok, >0=info (margen -100) |
+| 5 | `prestamos_saldo_anomalo` | prestamos_movimientos | 0=ok, >0=info (saldo<-100, derivado de movs aprobados) |
 | 6 | `ventas_cliente_vacio` | ventas_raw | 0=ok, >0=warning |
 | 7a | `last_upload_age_cxc` | cxc_rows | <7d=ok, 7-14=warning, >14=critical |
 | 7b | `last_upload_age_ventas` | ventas_raw | igual |
-| 8 | `cxc_sin_venta_correspondiente` | cxc_rows + ventas_raw | 0=ok, 1-5=info, 6-20=warning, >20=critical (filtro gap > 30d) |
+| 8 | `cxc_sin_venta_correspondiente` | cxc_rows + ventas_raw | 0-20=ok, 21-50=info, 51-150=warning, >150=critical (filtro gap > 30d) |
 | 9 | `cxc_uploads_zombie` | cxc_uploads | 0=ok, >0=warning |
+
+**Errores técnicos**: si un check no puede correr (query falla, schema cambió), queda como `warning` con `details.error` — no `critical`. Esto evita confundir "monitor roto" con "data corrupta" y no dispara email.
 
 ## Reaccionar a una alerta
 
 ### CRITICAL — email + dashboard rojo
-- **cxc_fecha_null > 5**: Switch cambió formato de fecha o el parser regresionó. Revisar `src/lib/cxc-fecha.ts` y los rejects del último upload.
+- **cxc_fecha_emision_null > 5**: Switch cambió formato de fecha en el campo principal o el parser regresionó. Revisar `src/lib/cxc-fecha.ts` y los rejects del último upload.
+- **cxc_fecha_vencimiento_null > 5**: anómalo — facturas/NDs sin vencimiento (NCs y Recibos ya están excluidos). Probablemente bug nuevo en el parser de `parseFechaFlexible` o un comprobante nuevo en Switch que no está en la lista de exclusión.
 - **upload_desync > 14**: alguien dejó de subir uno de los dos CSVs hace tiempo. Pingear a quien hace los uploads.
 - **last_upload_age > 14**: nadie ha actualizado data en 2+ semanas. Recordatorio.
-- **cxc_sin_venta_correspondiente > 20**: hay un patrón sistémico — probablemente un cliente_codigo que existe en CXC pero no en ventas. Caso típico: Quality Shoes / cliente nuevo creado fuera del flow de ventas.
+- **cxc_sin_venta_correspondiente > 150**: pipeline roto — clientes en CXC sin contraparte en ventas a gran escala. Buscar problemas en el upload de ventas o clientes_master desincronizado. Caso típico: Quality Shoes.
 
 ### WARNING — solo dashboard
 - **cxc_uploads_zombie > 0**: header de upload sin filas. Limpiar con `DELETE FROM cxc_uploads WHERE id = ...`. Si recurrente, hay un crash silencioso en el upload.
@@ -49,7 +53,8 @@ Shoes (factura en CXC sin venta correspondiente) y el RPC home roto.
 - **ventas_cliente_vacio > 0**: filas en ventas_raw con cliente vacío (debería ser imposible — el parser no las dejaría pasar).
 
 ### INFO — log nada más
-- **prestamos_saldo_anomalo > 0**: empleado con saldo más negativo que -$100. Casi siempre es un préstamo mal capturado o devolución duplicada.
+- **prestamos_saldo_anomalo > 0**: empleado con saldo más negativo que -$100 (calculado como `SUM(Préstamo+Responsabilidad) - SUM(Pago+Abono+Pago_responsabilidad)` sobre movimientos aprobados no deleted). Casi siempre es un préstamo mal capturado o devolución duplicada.
+- **cxc_sin_venta_correspondiente entre 21-50**: volumen normal de NDs/intereses/refacturación sin contraparte directa en ventas_raw. Vale la pena revisar el top_10 del details para descartar caso sistémico.
 
 ## Cómo agregar un check nuevo
 
@@ -121,10 +126,17 @@ ORDER BY checked_at DESC LIMIT 1;
 
 ## Troubleshooting de falsos positivos
 
-- **`cxc_fecha_null` reporta "Saldo Anterior" o "Nota de Crédito"**: el filtro `comprobante NOT IN ('Saldo Anterior','Nota de Crédito')` ya los excluye. Si aparecen es porque vienen con casing distinto ("SALDO ANTERIOR", "Nota De Credito"). Normalizar en el parser o agregar al filtro.
+- **`cxc_fecha_vencimiento_null` reporta Recibo / NC / Saldo Anterior**: el filtro `NOT IN ('Saldo Anterior','Nota de Crédito','Recibo')` ya los excluye. Si aparecen es por casing distinto en Switch ("RECIBO", "Nota De Credito"). Normalizar en el parser o agregar variantes al filtro.
 - **`cxc_sin_venta_correspondiente` reporta clientes obvios**: ajustar el filtro `gap > 30 días` si es demasiado sensible. O agregar `WHERE cliente_codigo NOT IN (lista de excepciones)` para clientes legítimamente fuera del flow.
 - **`upload_desync` siempre warning**: probablemente la rutina humana es CXC lunes / Ventas miércoles. Si es esperado, subir el threshold a >=14d o bajarlo a "info".
-- **Check tira `severity: critical` con `details.error`**: la query falló (probablemente schema cambió). El check name + table_name del row de error indica qué arreglar.
+- **Check con `severity: warning` y `details.error`**: la query falló (probablemente schema cambió). El check name + table_name del row indica qué arreglar. No es data corrupta — es el monitor roto.
+
+### Histórico de calibraciones
+
+- 2026-05-13: thresholds de `cxc_sin_venta_correspondiente` recalibrados de `0=ok, 1-5=info, 6-20=warning, >20=critical` a `0-20=ok, 21-50=info, 51-150=warning, >150=critical`. Razón: NDs/intereses/refacturación normal alcanzan ~50-100 sin ser anómalos. Solo volumen >150 sugiere pipeline roto.
+- 2026-05-13: `cxc_fecha_null` split en `cxc_fecha_emision_null` (excluye solo `Saldo Anterior`) y `cxc_fecha_vencimiento_null` (excluye `Saldo Anterior`, `Nota de Crédito`, `Recibo`). Razón: Recibos son pagos sin vencimiento por naturaleza — quedaban marcados como anómalos.
+- 2026-05-13: `prestamos_saldo_anomalo` reescrito para calcular saldo en runtime desde `prestamos_movimientos` (no existe columna `saldo` en `prestamos_empleados`). Razón: el query original siempre fallaba y el check tiraba CRITICAL por error técnico.
+- 2026-05-13: `checkError` cambiado de `critical` a `warning`. Razón: un check técnicamente roto NO es data corrupta — separar señales para no disparar email cuando el monitor se rompe.
 
 ## Email de alerta
 
