@@ -20,9 +20,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth, getSession } from "@/lib/require-auth";
 import { logActivity } from "@/lib/log-activity";
+import {
+  parseFechaFromCSVOrNFiscal,
+  parseFechaFlexible,
+  isLegitFechaNull,
+  isLegitFechaVencimientoNull,
+} from "@/lib/cxc-fecha";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+// Umbrales de validación post-parse para uploads (AJUSTE 6).
+// Una vez reparada la baseline histórica, esperamos máximo ~2.5% de NULL
+// legítimas (Saldo Anterior + NCs sin fecha). Estos umbrales aplican
+// SÓLO a NULLs no-legítimas (Facturas, NDs, Recibos sin fecha).
+const NULL_FECHA_WARN_PCT = 2;
+const NULL_FECHA_REJECT_PCT = 10;
 
 interface RawRow {
   upload_id: string;
@@ -44,18 +57,12 @@ interface ParseResult {
   rows: Omit<RawRow, "upload_id" | "cliente_id" | "company_key">[];
   filtered: { sinCodigo: number; sinComprobante: number };
   warnings: string[];
+  nullFechaIlegitimas: number;
+  nullVenceIlegitimas: number;
+  fechaRecuperadaDesdeNFiscal: number;
 }
 
 const REQUIRED_HEADERS = ["FECHA", "CODIGO", "COMPROBANTE", "DEBITOS", "CREDITOS", "SALDO"];
-
-// "DD-MM-YYYY" → "YYYY-MM-DD"
-function parseFechaDDMMYYYY(raw: string): string | null {
-  const s = (raw ?? "").trim();
-  if (!s) return null;
-  const m = s.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-  if (!m) return null;
-  return `${m[3]}-${m[2]}-${m[1]}`;
-}
 
 function toNum(v: unknown): number {
   if (v === null || v === undefined || v === "") return 0;
@@ -115,6 +122,9 @@ function parseCsv(text: string): ParseResult {
 
   const rows: ParseResult["rows"] = [];
   const filtered = { sinCodigo: 0, sinComprobante: 0 };
+  let nullFechaIlegitimas = 0;
+  let nullVenceIlegitimas = 0;
+  let fechaRecuperadaDesdeNFiscal = 0;
 
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i].split(";");
@@ -126,24 +136,40 @@ function parseCsv(text: string): ParseResult {
     const comprobante = cleanText(get(iComprobante));
     if (!comprobante) { filtered.sinComprobante++; continue; }
 
+    const n_fiscal = cleanText(get(iNFiscal));
+    const rawFecha = get(iFecha);
+    const rawVence = get(iVence);
+
+    // Pipeline: CSV con múltiples formatos → fallback a n_fiscal.
+    const fecha = parseFechaFromCSVOrNFiscal(rawFecha, n_fiscal);
+    const fecha_vencimiento = parseFechaFlexible(rawVence);
+
+    // Tracking de warnings (sólo casos no-legítimos).
+    if (fecha === null && !isLegitFechaNull(comprobante)) nullFechaIlegitimas++;
+    if (fecha_vencimiento === null && !isLegitFechaVencimientoNull(comprobante)) nullVenceIlegitimas++;
+    if (fecha !== null && parseFechaFlexible(rawFecha) === null) fechaRecuperadaDesdeNFiscal++;
+
     rows.push({
       cliente_codigo,
-      fecha: parseFechaDDMMYYYY(get(iFecha)),
+      fecha,
       comprobante,
       n_sistema: cleanText(get(iNSistema)),
-      n_fiscal:  cleanText(get(iNFiscal)),
+      n_fiscal,
       debito:    toNum(get(iDebitos)),
       credito:   toNum(get(iCreditos)),
       saldo:     toNum(get(iSaldo)),
-      fecha_vencimiento: parseFechaDDMMYYYY(get(iVence)),
+      fecha_vencimiento,
       dias_vencidos: iDias >= 0 ? toIntOrNull(get(iDias)) : null,
     });
   }
 
   const warnings: string[] = [];
   if (rows.length === 0) warnings.push("No se encontraron filas válidas.");
+  if (fechaRecuperadaDesdeNFiscal > 0) {
+    warnings.push(`${fechaRecuperadaDesdeNFiscal} fechas recuperadas desde n_fiscal (CSV ilegible).`);
+  }
 
-  return { rows, filtered, warnings };
+  return { rows, filtered, warnings, nullFechaIlegitimas, nullVenceIlegitimas, fechaRecuperadaDesdeNFiscal };
 }
 
 export async function POST(req: NextRequest) {
@@ -204,6 +230,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No se encontraron filas válidas en el archivo." }, { status: 400 });
   }
 
+  // PARTE E — validación preventiva contra futuros bugs de parser.
+  // % de NULL ilegítimas (no contamos NCs/Saldo Anterior/Recibos sin fecha).
+  const pctNullFecha = (parsed.nullFechaIlegitimas / parsed.rows.length) * 100;
+  if (pctNullFecha > NULL_FECHA_REJECT_PCT) {
+    return NextResponse.json({
+      error: `Upload rechazado: ${pctNullFecha.toFixed(1)}% de filas (${parsed.nullFechaIlegitimas} de ${parsed.rows.length}) sin fecha legible en facturas/NDs/recibos. Revisar CSV fuente — Switch puede haber cambiado el formato de fecha.`,
+      pct_null_fecha: Math.round(pctNullFecha * 10) / 10,
+      rows_sin_fecha_no_legitimas: parsed.nullFechaIlegitimas,
+    }, { status: 400 });
+  }
+  if (pctNullFecha > NULL_FECHA_WARN_PCT) {
+    parsed.warnings.push(`Warning: ${pctNullFecha.toFixed(1)}% de filas (${parsed.nullFechaIlegitimas}) sin fecha legible en facturas/NDs. Revisar CSV.`);
+  }
+
   // ── 5. Match cliente_id por codigo ────────────────────────────────────────
   const codigoToId = new Map<string, string>();
   {
@@ -240,7 +280,7 @@ export async function POST(req: NextRequest) {
 
   const { data: uploadHeader, error: hdrErr } = await supabaseServer
     .from("cxc_uploads")
-    .insert({ company_key: companyKey, filename, row_count: parsed.rows.length })
+    .insert({ company_key: companyKey, filename, row_count: parsed.rows.length, parser_version: "v2" })
     .select("id")
     .single();
   if (hdrErr || !uploadHeader) {
@@ -289,12 +329,17 @@ export async function POST(req: NextRequest) {
 
   await logActivity(
     session?.role || "unknown",
-    "cxc_upload",
+    pctNullFecha > NULL_FECHA_WARN_PCT ? "upload_cxc_warning_fechas_null" : "cxc_upload",
     "cxc",
     {
       companyKey, filename, count: inserted, uploadId,
       filtered: parsed.filtered, warnings: parsed.warnings,
       matched, unmatched: payload.length - matched,
+      pct_null_fecha: Math.round(pctNullFecha * 10) / 10,
+      null_fecha_ilegitimas: parsed.nullFechaIlegitimas,
+      null_vence_ilegitimas: parsed.nullVenceIlegitimas,
+      fecha_recuperada_desde_n_fiscal: parsed.fechaRecuperadaDesdeNFiscal,
+      parser_version: "v2",
     },
     session?.userName,
   );
