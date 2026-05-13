@@ -184,28 +184,18 @@ export function ResumenView({
     ? "Año completo"
     : `${MONTHS[0]}–${MONTHS[Math.max(0, data.mesActual - 1)]} ${selectedYear}`;
 
-  let kpi1Label: string, kpi1Value: string, kpi1Sub: string;
-  let kpi2Label: string, kpi2Value: string, kpi2Sub: string;
-
-  // En modo Margen mostramos el par Utilidad + Margen Promedio, el mismo
-  // contexto que en modo Utilidad. Las KPIs no cambian su lógica de cálculo
-  // (siguen siendo ponderadas por ventas) — solo la selección de cuál
-  // exponer en pantalla.
-  if (isUtil || isMargen) {
-    kpi1Label = isClosedYear ? `UTILIDAD ${selectedYear}` : "UTILIDAD YTD";
-    kpi1Value = fmtMoney(k.utilidadYTD);
-    kpi1Sub   = `${periodoLabel} · ${kpiDeltaSymbol(utilidadDelta)} ${fmtPct(utilidadDelta)} vs ${prevYear}`;
-    kpi2Label = "MARGEN PROMEDIO";
-    kpi2Value = `${(k.margenYTD * 100).toFixed(1)}%`;
-    kpi2Sub   = `${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
-  } else {
-    kpi1Label = isClosedYear ? `VENTAS NETAS ${selectedYear}` : "VENTAS NETAS YTD";
-    kpi1Value = fmtMoney(k.ventasNetasYTD);
-    kpi1Sub   = `${periodoLabel} · ${kpiDeltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`;
-    kpi2Label = isClosedYear ? `UTILIDAD ${selectedYear}` : "UTILIDAD YTD";
-    kpi2Value = fmtMoney(k.utilidadYTD);
-    kpi2Sub   = `Margen ${(k.margenYTD * 100).toFixed(1)}% · ${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
-  }
+  // El banner muestra siempre los 3 KPIs YTD (Ventas, Utilidad, Margen)
+  // sin importar el viewMode. El toggle afecta sólo la matriz; el banner
+  // expone el panorama completo siempre.
+  const kpiVentasLabel   = isClosedYear ? `VENTAS NETAS ${selectedYear}` : "VENTAS NETAS YTD";
+  const kpiVentasValue   = fmtMoney(k.ventasNetasYTD);
+  const kpiVentasSub     = `${periodoLabel} · ${kpiDeltaSymbol(ventasDelta)} ${fmtPct(ventasDelta)} vs ${prevYear}`;
+  const kpiUtilidadLabel = isClosedYear ? `UTILIDAD ${selectedYear}` : "UTILIDAD YTD";
+  const kpiUtilidadValue = fmtMoney(k.utilidadYTD);
+  const kpiUtilidadSub   = `${periodoLabel} · ${kpiDeltaSymbol(utilidadDelta)} ${fmtPct(utilidadDelta)} vs ${prevYear}`;
+  const kpiMargenLabel   = "MARGEN PROMEDIO";
+  const kpiMargenValue   = `${(k.margenYTD * 100).toFixed(1)}%`;
+  const kpiMargenSub     = `${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
 
   return (
     <div className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
@@ -215,10 +205,12 @@ export function ResumenView({
         </div>
       )}
 
-      {/* KPI cards — 2 cols, swap content por viewMode */}
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <KpiCard label={kpi1Label} value={kpi1Value} sub={kpi1Sub} note={partialKpiNote} />
-        <KpiCard label={kpi2Label} value={kpi2Value} sub={kpi2Sub} note={partialKpiNote} />
+      {/* KPI cards — 3 cols siempre (Ventas + Utilidad + Margen). El toggle
+          de la matriz no afecta el banner. */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <KpiCard label={kpiVentasLabel}   value={kpiVentasValue}   sub={kpiVentasSub}   note={partialKpiNote} />
+        <KpiCard label={kpiUtilidadLabel} value={kpiUtilidadValue} sub={kpiUtilidadSub} note={partialKpiNote} />
+        <KpiCard label={kpiMargenLabel}   value={kpiMargenValue}   sub={kpiMargenSub}   note={partialKpiNote} />
       </div>
 
       {/* Toolbar — subtitle + date pill (left) · controls (right) */}
