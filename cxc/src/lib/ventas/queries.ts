@@ -65,12 +65,11 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // aplica recorte).
     supabaseServer.rpc("ventas_dashboard_prev_same_period", { p_year: year }),
     supabaseServer.rpc("get_app_setting", { p_key: "multifashion_meta_anual_2026" }),
-    // Proyección de cierre por empresa + agregado del grupo. v3 usa el
-    // algoritmo estacional cuando mes_corte >= 3 (ventas_ytd / frac_ytd
-    // donde frac_ytd = estacionalidad real del prev_year same-period).
-    // Si la empresa no tiene base histórica o estamos muy temprano en el
-    // año, cae al mixto v2 con clamps [0.90, 1.25].
-    supabaseServer.rpc("ventas_proyeccion_cierre_v3", { p_anio: year }),
+    // Proyección de cierre por empresa + agregado del grupo. v4 además
+    // auto-aplica la meta sugerida cuando no hay override manual en
+    // ventas_metas (meta_efectiva = COALESCE(manual, sugerida)). El
+    // status del semáforo y gap_vs_meta usan la efectiva.
+    supabaseServer.rpc("ventas_proyeccion_cierre_v4", { p_anio: year }),
   ]);
 
   if (curRes.error)  throw new Error(`ventas_dashboard_summary(${year}): ${curRes.error.message}`);

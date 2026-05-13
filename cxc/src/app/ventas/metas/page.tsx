@@ -167,21 +167,22 @@ export default function VentasMetasPage() {
       });
   }, [authChecked]);
 
-  const loadSuggested = () => {
-    const newDraft = { ...draft };
-    for (const emp of EMPRESAS) {
-      const sug = sugeridas[emp];
-      if (sug?.meta_sugerida != null && sug.meta_sugerida > 0) {
-        newDraft[emp] = String(Math.round(sug.meta_sugerida));
+  // Limpia el override manual de una empresa (DELETE en ventas_metas).
+  // Después del refetch, esa empresa vuelve a usar la sugerida automática.
+  const clearOverride = async (empresa: string) => {
+    try {
+      const url = `/api/ventas/metas?empresa=${encodeURIComponent(empresa)}&anio=${anio}`;
+      const res = await fetch(url, { method: "DELETE" });
+      if (res.ok) {
+        showToast("Override eliminado · usando sugerida");
+        fetchMetas();
+      } else {
+        const body = await res.json().catch(() => ({}));
+        showToast(body?.error ?? "No se pudo eliminar el override");
       }
+    } catch {
+      showToast("Error de conexión");
     }
-    setDraft(newDraft);
-  };
-
-  const applyOne = (empresa: string) => {
-    const sug = sugeridas[empresa];
-    if (sug?.meta_sugerida == null) return;
-    setDraft(prev => ({ ...prev, [empresa]: String(Math.round(sug.meta_sugerida!)) }));
   };
 
   const handleSave = async () => {
@@ -236,7 +237,7 @@ export default function VentasMetasPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-xl font-semibold">Metas de Ventas</h1>
-            <p className="text-xs text-gray-500 mt-1">Define la meta anual por empresa. La distribucion mensual se calcula automaticamente.</p>
+            <p className="text-xs text-gray-500 mt-1">Por default cada empresa usa la meta sugerida automática (basada en histórico). Definir un valor manual sobrescribe esa sugerida solo para esa empresa.</p>
           </div>
           <div className="flex items-center gap-2">
             <select
@@ -254,12 +255,6 @@ export default function VentasMetasPage() {
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-2 mb-6">
           <button
-            onClick={loadSuggested}
-            className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all min-h-[44px]"
-          >
-            Aplicar todas las sugerencias
-          </button>
-          <button
             onClick={() => setShowMonthly(v => !v)}
             className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all min-h-[44px]"
           >
@@ -270,7 +265,7 @@ export default function VentasMetasPage() {
             disabled={saving}
             className="text-xs bg-black text-white rounded-md px-4 py-2 hover:bg-gray-800 active:scale-[0.97] transition-all min-h-[44px] disabled:opacity-50"
           >
-            {saving ? "Guardando..." : "Guardar"}
+            {saving ? "Guardando overrides..." : "Guardar overrides"}
           </button>
         </div>
 
@@ -286,14 +281,14 @@ export default function VentasMetasPage() {
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-white z-10">
                 <tr className="border-b border-gray-200">
-                  <th className="text-left px-3 py-2 font-medium text-gray-500 sticky left-0 bg-white z-20 min-w-[180px]">
+                  <th className="text-left px-3 py-3 font-medium text-gray-500 sticky left-0 bg-white z-20 min-w-[180px]">
                     Empresa
                   </th>
-                  <th className="text-right px-3 py-2 font-medium text-gray-500 min-w-[420px]">
+                  <th className="text-right px-3 py-3 font-medium text-gray-500 min-w-[480px]">
                     Meta anual
                   </th>
                   {showMonthly && MES_NAMES.map(m => (
-                    <th key={m} className="text-right px-1.5 py-2 font-medium text-gray-500 whitespace-nowrap min-w-[55px]">
+                    <th key={m} className="text-right px-1.5 py-3 font-medium text-gray-500 whitespace-nowrap min-w-[55px]">
                       {m}
                     </th>
                   ))}
@@ -306,10 +301,13 @@ export default function VentasMetasPage() {
                   const dist = distribucion[empresa] ?? Array(12).fill(1 / 12);
                   const sug = sugeridas[empresa];
                   const sugMeta = sug?.meta_sugerida ?? null;
-                  // Badge "✓ Aplicada" cuando la meta actual coincide con la
-                  // sugerida (tolerancia ±$1 para round-trip).
-                  const aplicada = sugMeta != null && metaAnual > 0
-                    && Math.abs(metaAnual - sugMeta) < 1;
+                  // Si en backend hay un override real para esta empresa, lo
+                  // marcamos como tal — el botón "Limpiar override" sólo
+                  // aparece cuando hay algo que limpiar.
+                  const hasManualOverride = (sug?.meta_manual_actual ?? 0) > 0;
+                  // Distribución para el cómputo mensual usa la meta efectiva
+                  // (manual override si el draft tiene valor > 0, sino sugerida).
+                  const metaEfectivaParaDist = metaAnual > 0 ? metaAnual : (sugMeta ?? 0);
                   // Zona crítica = ritmo actual cayó >15% YTD.
                   const ritmoActual = ritmosActuales[empresa];
                   const zonaCritica = ritmoActual != null && ritmoActual < 0.85;
@@ -323,7 +321,7 @@ export default function VentasMetasPage() {
                       zonaCritica && "bg-amber-50/60 hover:bg-amber-50/80",
                     )}>
                       <td className={cn(
-                        "px-3 py-2 font-medium text-gray-700 sticky left-0 whitespace-nowrap z-10",
+                        "px-3 py-3.5 font-medium text-gray-700 sticky left-0 whitespace-nowrap z-10",
                         zonaCritica ? "bg-amber-50" : "bg-white",
                       )}>
                         <span className="inline-flex items-center gap-1.5">
@@ -344,9 +342,10 @@ export default function VentasMetasPage() {
                           )}
                         </span>
                       </td>
-                      {/* Línea horizontal compacta: input + meta formatted +
-                          · Sugerida $X [Aplicar | ✓ Aplicada] */}
-                      <td className="px-3 py-2">
+                      {/* Línea horizontal compacta: input (con placeholder
+                          dinámico que muestra la sugerida) + override badge +
+                          referencia + Limpiar */}
+                      <td className="px-3 py-3.5">
                         <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[11px]">
                           <span className="text-gray-500">Meta:</span>
                           <div className="relative">
@@ -359,30 +358,34 @@ export default function VentasMetasPage() {
                                 const v = e.target.value.replace(/[^0-9]/g, "");
                                 updateDraft(empresa, v);
                               }}
-                              placeholder="0"
-                              className="w-32 text-right text-xs border border-gray-200 rounded px-2 py-1.5 pl-5 tabular-nums min-h-[36px]"
+                              placeholder={sugMeta != null ? `${Math.round(sugMeta).toLocaleString()} (sugerida)` : "0"}
+                              className={cn(
+                                "w-44 text-right text-xs border rounded px-2 py-1.5 pl-5 tabular-nums min-h-[36px]",
+                                hasManualOverride ? "border-stone-300 bg-white" : "border-gray-200 bg-gray-50/60 placeholder:text-gray-400",
+                              )}
                             />
                           </div>
-                          {metaAnual > 0 && (
+                          {hasManualOverride && metaAnual > 0 && (
                             <span className="font-mono tabular-nums text-gray-700">{fmtCurrency(metaAnual)}</span>
+                          )}
+                          {hasManualOverride && (
+                            <button
+                              type="button"
+                              onClick={() => clearOverride(empresa)}
+                              className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-700 hover:bg-gray-50 active:scale-[0.97]"
+                            >
+                              Limpiar override
+                            </button>
                           )}
                           {sugMeta != null && (
                             <>
                               <span className="text-gray-300">·</span>
                               <span className="text-gray-500">Sugerida</span>
                               <span className="font-mono tabular-nums text-gray-700">{fmtCurrency(sugMeta)}</span>
-                              {aplicada ? (
+                              {!hasManualOverride && (
                                 <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
-                                  ✓ Aplicada
+                                  En uso
                                 </span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => applyOne(empresa)}
-                                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-700 hover:bg-gray-50 active:scale-[0.97]"
-                                >
-                                  Aplicar
-                                </button>
                               )}
                             </>
                           )}
@@ -392,10 +395,10 @@ export default function VentasMetasPage() {
                         </div>
                       </td>
                       {showMonthly && dist.map((w, i) => {
-                        const monthMeta = metaAnual * w;
+                        const monthMeta = metaEfectivaParaDist * w;
                         return (
-                          <td key={i} className="text-right px-1.5 py-2 tabular-nums text-gray-500">
-                            {metaAnual > 0 ? fmtK(monthMeta) : <span className="text-gray-300">—</span>}
+                          <td key={i} className="text-right px-1.5 py-3.5 tabular-nums text-gray-500">
+                            {monthMeta > 0 ? fmtK(monthMeta) : <span className="text-gray-300">—</span>}
                           </td>
                         );
                       })}
@@ -403,22 +406,29 @@ export default function VentasMetasPage() {
                   );
                 })}
 
-                {/* Total row */}
+                {/* Total row — suma metas efectivas (override si existe,
+                    sino sugerida) para que el TOTAL refleje el real baseline. */}
                 <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-                  <td className="px-3 py-2 sticky left-0 bg-gray-50 z-10">TOTAL</td>
-                  <td className="text-right px-3 py-2 tabular-nums">
+                  <td className="px-3 py-3.5 sticky left-0 bg-gray-50 z-10">TOTAL</td>
+                  <td className="text-right px-3 py-3.5 tabular-nums">
                     {fmtCurrency(
-                      EMPRESAS.reduce((s, emp) => s + (parseFloat(draft[emp] ?? "") || 0), 0)
+                      EMPRESAS.reduce((s, emp) => {
+                        const override = parseFloat(draft[emp] ?? "") || 0;
+                        const sug = sugeridas[emp]?.meta_sugerida ?? 0;
+                        return s + (override > 0 ? override : sug);
+                      }, 0)
                     )}
                   </td>
                   {showMonthly && MES_NAMES.map((_, i) => {
                     const monthTotal = EMPRESAS.reduce((s, emp) => {
-                      const meta = parseFloat(draft[emp] ?? "") || 0;
+                      const override = parseFloat(draft[emp] ?? "") || 0;
+                      const sug = sugeridas[emp]?.meta_sugerida ?? 0;
+                      const efectiva = override > 0 ? override : sug;
                       const w = (distribucion[emp] ?? Array(12).fill(1 / 12))[i];
-                      return s + meta * w;
+                      return s + efectiva * w;
                     }, 0);
                     return (
-                      <td key={i} className="text-right px-1.5 py-2 tabular-nums text-gray-600">
+                      <td key={i} className="text-right px-1.5 py-3.5 tabular-nums text-gray-600">
                         {monthTotal > 0 ? fmtK(monthTotal) : "—"}
                       </td>
                     );

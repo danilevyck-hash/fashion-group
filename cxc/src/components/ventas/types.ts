@@ -52,7 +52,7 @@ export type MetaSugeridaEmpresa = {
   meta_manual_actual: number | null; // de ventas_metas (NULL si no hay)
 };
 
-/** Bloque por empresa que devuelve ventas_proyeccion_cierre_v3. */
+/** Bloque por empresa que devuelve ventas_proyeccion_cierre_v4. */
 export type ProyeccionEmpresa = {
   empresa: string;
   nombre: string;
@@ -70,6 +70,14 @@ export type ProyeccionEmpresa = {
   factor_final: number | null;
   proyeccion_cierre: number;
   proyeccion_restante: number;  // max(0, proyeccion - ytd)
+  /** v4: tres niveles de meta para que la UI pueda mostrar el origen.
+   *  meta_anual_manual    : valor de ventas_metas (null si no hay override).
+   *  meta_sugerida        : calculo automático sobre histórico (null si sin historia).
+   *  meta_efectiva        : COALESCE(manual, sugerida) — la que el sistema considera vigente.
+   *  meta_anual           : alias = meta_efectiva (retrocompat con frontend v3). */
+  meta_anual_manual: number | null;
+  meta_sugerida: number | null;
+  meta_efectiva: number | null;
   meta_anual: number | null;
   gap_vs_meta: number | null;
   es_fallback_lineal: boolean;

@@ -194,10 +194,12 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ ok: true, cambios: cambios.length });
 }
 
-// ─── DELETE: Remove meta for (empresa, anio) ─────────────────────────────────
-// Validación: NO permitir borrar si ya hay data en ventas_raw para ese
-// año. La meta es lo que da contexto a la data — borrarla deja números
-// huérfanos sin baseline.
+// ─── DELETE: Remove meta override for (empresa, anio) ────────────────────────
+// Elimina el override manual. Con auto-aplicado de sugeridas (RPC
+// ventas_proyeccion_cierre_v4) eliminar la fila NO deja la empresa sin
+// baseline — el sistema vuelve a usar la meta sugerida automática. Por
+// eso ya no bloqueamos cuando hay ventas registradas.
+// Se mantiene el audit log para trazabilidad.
 
 export async function DELETE(req: NextRequest) {
   const authError = requireAuth(req, ["admin"]);
@@ -211,27 +213,6 @@ export async function DELETE(req: NextRequest) {
 
   if (!empresa || anio == null || !Number.isFinite(anio)) {
     return NextResponse.json({ error: "empresa y anio requeridos" }, { status: 400 });
-  }
-
-  // ¿Hay data de ventas en ese año? Si sí, bloquear el delete.
-  // Convertimos display name → key para buscar en ventas_raw.
-  const empresaKey = Object.entries(EMPRESA_KEY_TO_NAME)
-    .find(([, name]) => name === empresa)?.[0];
-  if (empresaKey) {
-    const { count: dataCount } = await supabaseServer
-      .from("ventas_raw")
-      .select("*", { count: "exact", head: true })
-      .eq("empresa", empresaKey)
-      .eq("anio", anio);
-    if ((dataCount ?? 0) > 0) {
-      return NextResponse.json(
-        {
-          error: `No se puede borrar la meta de ${empresa} ${anio}: existen ${dataCount} ventas registradas en ese año.`,
-          ventas_count: dataCount,
-        },
-        { status: 409 }
-      );
-    }
   }
 
   // Capturar valor previo para audit

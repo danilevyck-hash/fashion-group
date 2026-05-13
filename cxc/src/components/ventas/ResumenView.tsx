@@ -315,19 +315,19 @@ export function ResumenView({
           <table className="w-full border-collapse" style={{ minWidth: granularity === "mensual" ? 1100 : 700 }}>
             <thead>
               <tr className="bg-stone-100 text-left">
-                <th className="sticky left-0 z-10 min-w-[180px] bg-stone-100 px-3.5 py-2.5 text-[11px] font-medium uppercase tracking-wider text-stone-500">
+                <th className="sticky left-0 z-10 min-w-[180px] bg-stone-100 px-3.5 py-3.5 text-[11px] font-medium uppercase tracking-wider text-stone-500">
                   Empresa
                 </th>
                 {cols.map(c => (
-                  <th key={c} className="px-2.5 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider text-stone-500">
+                  <th key={c} className="px-2.5 py-3.5 text-right text-[11px] font-medium uppercase tracking-wider text-stone-500">
                     {c}
                   </th>
                 ))}
-                <th className="px-3.5 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-stone-950">Total</th>
+                <th className="px-3.5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-stone-950">Total</th>
                 {/* Columna "Proyección": sólo años en curso con data de
                     proyección disponible (no aplica a años cerrados). */}
                 {showProyeccionCol && (
-                  <th className="px-3.5 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-stone-950">Proyección</th>
+                  <th className="px-3.5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-stone-950">Proyección</th>
                 )}
               </tr>
             </thead>
@@ -335,7 +335,7 @@ export function ResumenView({
               {rows.map(r => (
                 <tr key={r.empresa.id} className={r.empresa.id === "multi" ? "bg-teal-50/60" : ""}>
                   <td className={cn(
-                    "sticky left-0 z-10 whitespace-nowrap border-b border-stone-200 px-3.5 py-2.5 text-sm text-stone-950",
+                    "sticky left-0 z-10 whitespace-nowrap border-b border-stone-200 px-3.5 py-3.5 text-sm text-stone-950",
                     r.empresa.id === "multi" ? "bg-teal-50" : "bg-white"
                   )}>
                     {r.empresa.id === "multi" && multi && multi.wholesale.ytdVentas > 0 ? (
@@ -371,7 +371,7 @@ export function ResumenView({
                 </tr>
               ))}
               <tr className="bg-stone-950 text-white">
-                <td className="sticky left-0 z-10 bg-stone-950 px-3.5 py-3 text-xs font-medium uppercase tracking-widest">Total Grupo</td>
+                <td className="sticky left-0 z-10 bg-stone-950 px-3.5 py-3.5 text-xs font-medium uppercase tracking-widest">Total Grupo</td>
                 {totalColAggs.map((agg, ci) => (
                   <TotalGroupCell
                     key={ci}
@@ -584,7 +584,7 @@ function Sep() {
 function EmpresaProjectionCell({ proyeccion }: { proyeccion: ProyeccionEmpresa | null }) {
   if (!proyeccion) {
     return (
-      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-xs tabular-nums text-stone-400">
+      <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3.5 text-right font-mono text-xs tabular-nums text-stone-400">
         —
       </td>
     );
@@ -595,7 +595,7 @@ function EmpresaProjectionCell({ proyeccion }: { proyeccion: ProyeccionEmpresa |
   const gapPct = proyeccion.meta_anual && proyeccion.meta_anual > 0 && gap != null
     ? gap / proyeccion.meta_anual : null;
   return (
-    <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-xs tabular-nums">
+    <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3.5 text-right font-mono text-xs tabular-nums">
       <div className="flex items-center justify-end gap-1.5">
         <span className={cn("h-1.5 w-1.5 rounded-full", badge.dot)} />
         <span className="text-sm font-medium text-stone-950">{fmtMoneyCompact(proyeccion.proyeccion_cierre)}</span>
@@ -613,7 +613,7 @@ function TotalGroupProjectionCell({ totales }: { totales: ProyeccionGrupo }) {
   const badge = statusBadge(totales.status);
   const gap = totales.gap_vs_meta;
   return (
-    <td className="whitespace-nowrap px-3.5 py-3 text-right font-mono text-sm font-semibold tabular-nums">
+    <td className="whitespace-nowrap px-3.5 py-3.5 text-right font-mono text-sm font-semibold tabular-nums">
       <div className="flex items-center justify-end gap-1.5">
         <span className={cn("h-1.5 w-1.5 rounded-full", badge.dot)} />
         <span className="block text-white">{fmtMoneyCompact(totales.proyeccion_cierre)}</span>
@@ -635,7 +635,7 @@ function HeatCell({ cell, mode, prevYear }: { cell: Cell; mode: ViewMode; prevYe
   if (cur == null) {
     return (
       <td className={cn(
-        "whitespace-nowrap border-b border-stone-200 px-2.5 py-2.5 text-right font-mono text-xs tabular-nums",
+        "whitespace-nowrap border-b border-stone-200 px-2.5 py-3.5 text-right font-mono text-xs tabular-nums",
         cls.bg
       )}>
         <span className="text-stone-400">—</span>
@@ -658,7 +658,7 @@ function HeatCell({ cell, mode, prevYear }: { cell: Cell; mode: ViewMode; prevYe
           <TooltipTrigger asChild>
             <button
               type="button"
-              className="block w-full cursor-help px-2.5 py-2.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
+              className="block w-full cursor-help px-2.5 py-3.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
             >
               {isNa ? (
                 <span className="inline-flex items-baseline gap-1">
@@ -824,7 +824,7 @@ function EmpresaTotalCell({
           <TooltipTrigger asChild>
             <button
               type="button"
-              className="block w-full cursor-help px-3.5 py-2.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
+              className="block w-full cursor-help px-3.5 py-3.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
             >
               <span className="block text-sm font-medium text-stone-950">{displayValue}</span>
               <span className={cn("mt-0.5 block text-[10.5px]", tone)}>
@@ -867,7 +867,7 @@ function TotalGroupCell({
   const cur = cellValue(agg, mode);
   if (cur == null) {
     return (
-      <td className="whitespace-nowrap px-2.5 py-3 text-right font-mono text-xs tabular-nums">
+      <td className="whitespace-nowrap px-2.5 py-3.5 text-right font-mono text-xs tabular-nums">
         <span className="text-stone-500">—</span>
       </td>
     );
@@ -890,7 +890,7 @@ function TotalGroupCell({
           <TooltipTrigger asChild>
             <button
               type="button"
-              className="block w-full cursor-help px-2.5 py-3 text-right outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40"
+              className="block w-full cursor-help px-2.5 py-3.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40"
             >
               <span className="inline-flex items-baseline gap-1.5">
                 {fmt.arrow && <span className={cn("text-[10px]", arrowTone)}>{fmt.arrow}</span>}
@@ -950,7 +950,7 @@ function TotalGroupAnnualCell({
           <TooltipTrigger asChild>
             <button
               type="button"
-              className="block w-full cursor-help px-3.5 py-3 text-right outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40"
+              className="block w-full cursor-help px-3.5 py-3.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40"
             >
               <span className="block text-white">{displayValue}</span>
               <span className={cn("mt-0.5 block text-[10.5px] font-medium", arrowTone)}>
