@@ -20,8 +20,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "anio inválido" }, { status: 400 });
   }
 
-  // _v4: meta_efectiva = COALESCE(manual override, sugerida automática).
-  const { data, error } = await supabaseServer.rpc("ventas_proyeccion_cierre_v4", { p_anio: anio });
+  // _v5: agrega cierre_anio_anterior + delta_vs_anio_anterior (% y absoluto).
+  const { data, error } = await supabaseServer.rpc("ventas_proyeccion_cierre_v5", { p_anio: anio });
   if (error) {
     console.error("[ventas/proyeccion-cierre]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });

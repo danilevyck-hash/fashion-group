@@ -52,13 +52,20 @@ export type MetaSugeridaEmpresa = {
   meta_manual_actual: number | null; // de ventas_metas (NULL si no hay)
 };
 
-/** Bloque por empresa que devuelve ventas_proyeccion_cierre_v4. */
+/** Bloque por empresa que devuelve ventas_proyeccion_cierre_v5. */
 export type ProyeccionEmpresa = {
   empresa: string;
   nombre: string;
   ventas_ytd: number;
   ventas_prev_ytd_sp: number;   // YTD prev year same-period
   ventas_prev_year: number;     // full prev year (base de proyección)
+  /** v5: alias semánticamente claro de ventas_prev_year. La UI nueva consume
+   *  este campo para comparar proyección 2026 vs cierre real 2025. */
+  cierre_anio_anterior: number;
+  /** v5: proyeccion_cierre - cierre_anio_anterior. null si cierre = 0. */
+  delta_vs_anio_anterior: number | null;
+  /** v5: delta / cierre. null si cierre = 0. Decimal: 0.05 = +5%. */
+  delta_vs_anio_anterior_pct: number | null;
   ritmo_actual: number | null;  // ratio: 1.05 = +5% YTD vs prev YTD
   ritmo_historico: number | null;
   historia_disponible: number;
@@ -84,13 +91,20 @@ export type ProyeccionEmpresa = {
   status: "verde" | "amarillo" | "rojo" | "gris";
 };
 
-/** Totales agregados del grupo. Alimenta la barra de proyección del grupo. */
+/** Totales agregados del grupo. Alimenta el hero del Resumen + la lista
+ *  por empresa ordenada por impacto. */
 export type ProyeccionGrupo = {
   ventas_ytd: number;
   proyeccion_cierre: number;
   proyeccion_restante: number;
   meta_total: number;
   gap_vs_meta: number | null;
+  /** v5: cierre real del año anterior completo (suma de empresas). */
+  cierre_anio_anterior_total: number;
+  /** v5: proyeccion_cierre - cierre_anio_anterior_total. */
+  delta_vs_anio_anterior_total: number | null;
+  /** v5: delta / cierre (decimal). */
+  delta_vs_anio_anterior_pct: number | null;
   status: "verde" | "amarillo" | "rojo" | "gris";
 };
 

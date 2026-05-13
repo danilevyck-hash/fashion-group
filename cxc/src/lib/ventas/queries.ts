@@ -65,11 +65,11 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // aplica recorte).
     supabaseServer.rpc("ventas_dashboard_prev_same_period", { p_year: year }),
     supabaseServer.rpc("get_app_setting", { p_key: "multifashion_meta_anual_2026" }),
-    // Proyección de cierre por empresa + agregado del grupo. v4 además
-    // auto-aplica la meta sugerida cuando no hay override manual en
-    // ventas_metas (meta_efectiva = COALESCE(manual, sugerida)). El
-    // status del semáforo y gap_vs_meta usan la efectiva.
-    supabaseServer.rpc("ventas_proyeccion_cierre_v4", { p_anio: year }),
+    // Proyección de cierre por empresa + agregado del grupo. v5 agrega
+    // cierre_anio_anterior + delta_vs_anio_anterior por empresa y grupo.
+    // El hero del Resumen muestra realidad vs realidad (2026 proyectado
+    // vs 2025 cierre), la meta queda como referencia en /ventas/metas.
+    supabaseServer.rpc("ventas_proyeccion_cierre_v5", { p_anio: year }),
   ]);
 
   if (curRes.error)  throw new Error(`ventas_dashboard_summary(${year}): ${curRes.error.message}`);
