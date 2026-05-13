@@ -20,12 +20,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth, getSession } from "@/lib/require-auth";
 import { logActivity } from "@/lib/log-activity";
+import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import {
   parseFechaFromCSVOrNFiscal,
   parseFechaFlexible,
   isLegitFechaNull,
   isLegitFechaVencimientoNull,
 } from "@/lib/cxc-fecha";
+
+// Empresas autorizadas a subir CXC. Retail (Boston, Multifashion) NO lleva
+// CXC en Switch — sus tickets son al contado/mostrador y no generan
+// detallessaldos. Hardcodear el guard acá previene uploads accidentales que
+// dejan headers zombie en cxc_uploads.
+const ALLOWED_CXC_EMPRESAS: ReadonlySet<string> = new Set(B2B_EMPRESA_KEYS);
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -193,6 +200,23 @@ export async function POST(req: NextRequest) {
   if (!file)       return NextResponse.json({ error: "file requerido" }, { status: 400 });
   if (file.size > 20 * 1024 * 1024) {
     return NextResponse.json({ error: "Archivo demasiado grande (máx 20MB)" }, { status: 400 });
+  }
+
+  // ── 1.5. Guard de empresa: solo B2B ───────────────────────────────────────
+  // Retail (Boston, Multifashion) no lleva CXC. Si el form-data viene con
+  // una empresa fuera de la lista B2B, rechazar antes de archivar a Storage
+  // o crear cualquier registro en cxc_uploads.
+  if (!ALLOWED_CXC_EMPRESAS.has(companyKey)) {
+    await logActivity(
+      session?.role || "unknown",
+      "upload_cxc_rejected_retail",
+      "cxc",
+      { attempted_empresa: companyKey, filename, user_id: session?.userId ?? null },
+      session?.userName,
+    );
+    return NextResponse.json({
+      error: `CXC solo soporta empresas B2B. La empresa '${companyKey}' no puede subir antigüedad de saldos. Empresas válidas: ${B2B_EMPRESA_KEYS.join(", ")}.`,
+    }, { status: 400 });
   }
 
   // ── 2. Archive a Storage (no bloqueante) ──────────────────────────────────
