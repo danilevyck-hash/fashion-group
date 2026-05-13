@@ -20,7 +20,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "anio inválido" }, { status: 400 });
   }
 
-  const { data, error } = await supabaseServer.rpc("ventas_proyeccion_cierre_v1", { p_anio: anio });
+  // _v2: cap ritmo histórico + status considera ritmo_actual.
+  const { data, error } = await supabaseServer.rpc("ventas_proyeccion_cierre_v2", { p_anio: anio });
   if (error) {
     console.error("[ventas/proyeccion-cierre]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });

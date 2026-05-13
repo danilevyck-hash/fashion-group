@@ -26,7 +26,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "anio inválido" }, { status: 400 });
   }
 
-  const { data, error } = await supabaseServer.rpc("ventas_meta_sugerida_v1", { p_anio: anio });
+  // _v2: cap del ritmo histórico a [-0.30, +0.50] antes del factor.
+  const { data, error } = await supabaseServer.rpc("ventas_meta_sugerida_v2", { p_anio: anio });
   if (error) {
     console.error("[ventas/metas-sugeridas]", error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
