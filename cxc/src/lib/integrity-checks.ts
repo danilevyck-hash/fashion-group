@@ -1,0 +1,401 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Sistema de monitoreo automático de data integrity.
+//
+// Se ejecuta vía cron diario (/api/cron/integrity-check) y también puede
+// dispararse manualmente desde el dashboard (/admin/data-health). Cada check
+// devuelve un CheckResult que se persiste en data_integrity_checks (append
+// only — el dashboard lee el último por check_name + el historial 30d).
+//
+// Para agregar un check nuevo: ver .claude/skills/data-integrity/SKILL.md.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { supabaseServer } from "@/lib/supabase-server";
+
+export type Severity = "ok" | "info" | "warning" | "critical";
+
+export interface CheckResult {
+  check_name: string;
+  table_name: string;
+  severity: Severity;
+  rows_affected: number;
+  threshold_exceeded: boolean;
+  details: Record<string, unknown> | null;
+}
+
+const SEVERITY_RANK: Record<Severity, number> = { ok: 0, info: 1, warning: 2, critical: 3 };
+
+export function worstSeverity(severities: Severity[]): Severity {
+  return severities.reduce<Severity>((acc, s) => (SEVERITY_RANK[s] > SEVERITY_RANK[acc] ? s : acc), "ok");
+}
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function daysBetween(a: string | Date, b: string | Date): number {
+  const ta = typeof a === "string" ? new Date(a).getTime() : a.getTime();
+  const tb = typeof b === "string" ? new Date(b).getTime() : b.getTime();
+  return Math.abs(Math.floor((ta - tb) / (1000 * 60 * 60 * 24)));
+}
+
+async function tableMaxFecha(table: "cxc_rows" | "ventas_raw"): Promise<string | null> {
+  const { data, error } = await supabaseServer
+    .from(table)
+    .select("fecha")
+    .not("fecha", "is", null)
+    .order("fecha", { ascending: false })
+    .limit(1);
+  if (error) {
+    console.error(`[integrity] tableMaxFecha ${table}:`, error.message);
+    return null;
+  }
+  return data?.[0]?.fecha ?? null;
+}
+
+// ── Checks ───────────────────────────────────────────────────────────────────
+
+// CHECK 1: cxc_rows con fecha o fecha_vencimiento NULL en comprobantes que NO
+// son legítimos (Saldo Anterior y NCs pueden venir sin fecha; el resto no).
+async function checkCxcFechaNull(): Promise<CheckResult> {
+  const { data, error } = await supabaseServer
+    .from("cxc_rows")
+    .select("comprobante, n_sistema, n_fiscal, fecha, fecha_vencimiento")
+    .or("fecha.is.null,fecha_vencimiento.is.null")
+    .not("comprobante", "in", '("Saldo Anterior","Nota de Crédito")')
+    .limit(100);
+
+  if (error) {
+    return checkError("cxc_fecha_null", "cxc_rows", error.message);
+  }
+
+  const count = data?.length ?? 0;
+  const severity: Severity = count === 0 ? "ok" : count <= 5 ? "warning" : "critical";
+  const top = (data ?? []).slice(0, 10).map(r => ({
+    comprobante: r.comprobante, n_sistema: r.n_sistema, n_fiscal: r.n_fiscal,
+    fecha: r.fecha, fecha_vencimiento: r.fecha_vencimiento,
+  }));
+
+  return {
+    check_name: "cxc_fecha_null",
+    table_name: "cxc_rows",
+    severity,
+    rows_affected: count,
+    threshold_exceeded: count > 5,
+    details: { sample: top, threshold: { warning: ">=1", critical: ">5" } },
+  };
+}
+
+// CHECK 2: dias_vencidos > 0 con fecha NULL — anomalía lógica imposible
+// (Switch no debería calcular vencimiento sin fecha base).
+async function checkCxcDiasVencidosSinFecha(): Promise<CheckResult> {
+  const { count, error } = await supabaseServer
+    .from("cxc_rows")
+    .select("id", { count: "exact", head: true })
+    .gt("dias_vencidos", 0)
+    .is("fecha", null);
+
+  if (error) {
+    return checkError("cxc_dias_vencidos_sin_fecha", "cxc_rows", error.message);
+  }
+
+  const c = count ?? 0;
+  return {
+    check_name: "cxc_dias_vencidos_sin_fecha",
+    table_name: "cxc_rows",
+    severity: c === 0 ? "ok" : "warning",
+    rows_affected: c,
+    threshold_exceeded: c > 0,
+    details: { threshold: { warning: ">0" } },
+  };
+}
+
+// CHECK 3: Desync entre la última fecha de upload de CXC vs Ventas. Si los
+// uploads se desincronizaron mucho, los reportes cruzados quedan stale.
+async function checkUploadDesync(): Promise<CheckResult> {
+  const [cxcRes, ventasRes] = await Promise.all([
+    supabaseServer.from("cxc_uploads").select("uploaded_at").order("uploaded_at", { ascending: false }).limit(1),
+    supabaseServer.from("ventas_raw").select("uploaded_at").order("uploaded_at", { ascending: false }).limit(1),
+  ]);
+
+  const cxcLast = cxcRes.data?.[0]?.uploaded_at ?? null;
+  const ventasLast = ventasRes.data?.[0]?.uploaded_at ?? null;
+
+  if (!cxcLast || !ventasLast) {
+    return {
+      check_name: "upload_desync_cxc_ventas",
+      table_name: "cxc_uploads,ventas_raw",
+      severity: "warning",
+      rows_affected: 0,
+      threshold_exceeded: true,
+      details: { cxc_last: cxcLast, ventas_last: ventasLast, reason: "missing one of the two uploads" },
+    };
+  }
+
+  const gapDays = daysBetween(cxcLast, ventasLast);
+  const severity: Severity = gapDays < 7 ? "ok" : gapDays <= 14 ? "warning" : "critical";
+
+  return {
+    check_name: "upload_desync_cxc_ventas",
+    table_name: "cxc_uploads,ventas_raw",
+    severity,
+    rows_affected: gapDays,
+    threshold_exceeded: gapDays >= 7,
+    details: {
+      cxc_last: cxcLast, ventas_last: ventasLast, gap_days: gapDays,
+      threshold: { warning: ">=7d", critical: ">14d" },
+    },
+  };
+}
+
+// CHECK 4: Cheques con campos críticos NULL (monto o fecha_deposito).
+async function checkChequesCriticosNull(): Promise<CheckResult> {
+  const { count, error } = await supabaseServer
+    .from("cheques")
+    .select("id", { count: "exact", head: true })
+    .or("monto.is.null,fecha_deposito.is.null")
+    .eq("deleted", false);
+
+  if (error) {
+    return checkError("cheques_criticos_null", "cheques", error.message);
+  }
+
+  const c = count ?? 0;
+  return {
+    check_name: "cheques_criticos_null",
+    table_name: "cheques",
+    severity: c === 0 ? "ok" : "warning",
+    rows_affected: c,
+    threshold_exceeded: c > 0,
+    details: { threshold: { warning: ">0" } },
+  };
+}
+
+// CHECK 5: Préstamos con saldo anómalo (> $100 negativo). Margen de
+// tolerancia para evitar falsos positivos por redondeo.
+async function checkPrestamosSaldoAnomalo(): Promise<CheckResult> {
+  const { count, error } = await supabaseServer
+    .from("prestamos_empleados")
+    .select("id", { count: "exact", head: true })
+    .lt("saldo", -100);
+
+  if (error) {
+    // Tabla puede tener otro nombre — devolver info en lugar de fallar.
+    return checkError("prestamos_saldo_anomalo", "prestamos_empleados", error.message);
+  }
+
+  const c = count ?? 0;
+  return {
+    check_name: "prestamos_saldo_anomalo",
+    table_name: "prestamos_empleados",
+    severity: c === 0 ? "ok" : "info",
+    rows_affected: c,
+    threshold_exceeded: c > 0,
+    details: { threshold: { info: ">0", margin: "saldo < -100" } },
+  };
+}
+
+// CHECK 6: ventas_raw con cliente vacío.
+async function checkVentasClienteVacio(): Promise<CheckResult> {
+  const { count, error } = await supabaseServer
+    .from("ventas_raw")
+    .select("id", { count: "exact", head: true })
+    .or("cliente.is.null,cliente.eq.");
+
+  if (error) {
+    return checkError("ventas_cliente_vacio", "ventas_raw", error.message);
+  }
+
+  const c = count ?? 0;
+  return {
+    check_name: "ventas_cliente_vacio",
+    table_name: "ventas_raw",
+    severity: c === 0 ? "ok" : "warning",
+    rows_affected: c,
+    threshold_exceeded: c > 0,
+    details: { threshold: { warning: ">0" } },
+  };
+}
+
+// CHECK 7: Edad del último upload (uno por módulo). Devuelve 2 results.
+async function checkLastUploadAge(): Promise<CheckResult[]> {
+  const now = new Date();
+  const results: CheckResult[] = [];
+
+  for (const [name, table] of [
+    ["last_upload_age_cxc", "cxc_rows"],
+    ["last_upload_age_ventas", "ventas_raw"],
+  ] as const) {
+    const maxFecha = await tableMaxFecha(table);
+    if (!maxFecha) {
+      results.push({
+        check_name: name, table_name: table,
+        severity: "critical", rows_affected: 0, threshold_exceeded: true,
+        details: { reason: "tabla vacía o MAX(fecha) IS NULL" },
+      });
+      continue;
+    }
+    const ageDays = daysBetween(maxFecha, now);
+    const severity: Severity = ageDays < 7 ? "ok" : ageDays <= 14 ? "warning" : "critical";
+    results.push({
+      check_name: name, table_name: table,
+      severity, rows_affected: ageDays, threshold_exceeded: ageDays >= 7,
+      details: {
+        max_fecha: maxFecha, age_days: ageDays,
+        threshold: { warning: ">=7d", critical: ">14d" },
+      },
+    });
+  }
+  return results;
+}
+
+// CHECK 8: Facturas en CXC sin venta correspondiente (caso Quality Shoes).
+// Cliente con MAX(fecha) en cxc_rows mucho más nuevo que MAX(fecha) en
+// ventas_raw → la factura está en cobranza pero no en el reporte de ventas.
+async function checkCxcSinVentaCorrespondiente(): Promise<CheckResult> {
+  // No hay RPC dedicada — corremos como SQL via supabaseServer.rpc no aplica;
+  // hacemos las dos agregaciones cliente por cliente y comparamos en JS.
+  // Para volumen razonable (~ pocos miles de cliente_codigo) es manejable.
+  const [cxcRes, ventasRes] = await Promise.all([
+    supabaseServer
+      .from("cxc_rows")
+      .select("cliente_codigo, fecha")
+      .gt("saldo", 0)
+      .not("fecha", "is", null)
+      .not("cliente_codigo", "is", null),
+    supabaseServer
+      .from("ventas_raw")
+      .select("cliente_codigo, fecha")
+      .not("cliente_codigo", "is", null),
+  ]);
+
+  if (cxcRes.error || ventasRes.error) {
+    return checkError(
+      "cxc_sin_venta_correspondiente",
+      "cxc_rows,ventas_raw",
+      cxcRes.error?.message || ventasRes.error?.message || "unknown",
+    );
+  }
+
+  const cxcMaxByCliente = new Map<string, string>();
+  for (const r of cxcRes.data ?? []) {
+    const k = r.cliente_codigo as string;
+    const f = r.fecha as string;
+    const prev = cxcMaxByCliente.get(k);
+    if (!prev || f > prev) cxcMaxByCliente.set(k, f);
+  }
+
+  const ventasMaxByCliente = new Map<string, string>();
+  for (const r of ventasRes.data ?? []) {
+    const k = r.cliente_codigo as string;
+    const f = (r.fecha as string).slice(0, 10);
+    const prev = ventasMaxByCliente.get(k);
+    if (!prev || f > prev) ventasMaxByCliente.set(k, f);
+  }
+
+  const gaps: { cliente_codigo: string; cxc_max: string; ventas_max: string | null; gap_days: number }[] = [];
+  for (const [cliente, cxcMax] of cxcMaxByCliente) {
+    const ventasMax = ventasMaxByCliente.get(cliente) ?? null;
+    const baseline = ventasMax ?? "1900-01-01";
+    if (cxcMax > baseline) {
+      const gap = daysBetween(cxcMax, baseline);
+      if (gap > 30) gaps.push({ cliente_codigo: cliente, cxc_max: cxcMax, ventas_max: ventasMax, gap_days: gap });
+    }
+  }
+
+  gaps.sort((a, b) => b.gap_days - a.gap_days);
+  const count = gaps.length;
+  const severity: Severity = count <= 5 ? (count === 0 ? "ok" : "info") : count <= 20 ? "warning" : "critical";
+
+  return {
+    check_name: "cxc_sin_venta_correspondiente",
+    table_name: "cxc_rows,ventas_raw",
+    severity,
+    rows_affected: count,
+    threshold_exceeded: count > 5,
+    details: {
+      top_10: gaps.slice(0, 10),
+      threshold: { info: "1-5", warning: "6-20", critical: ">20", filter: "gap > 30 días" },
+    },
+  };
+}
+
+// CHECK 9: Headers zombie en cxc_uploads (sin filas asociadas).
+async function checkCxcUploadsZombie(): Promise<CheckResult> {
+  const { data: uploads, error: upErr } = await supabaseServer
+    .from("cxc_uploads")
+    .select("id, company_key, uploaded_at, row_count");
+  if (upErr) {
+    return checkError("cxc_uploads_zombie", "cxc_uploads", upErr.message);
+  }
+
+  // Para cada upload, contar cxc_rows. Usamos head:true para no traer data.
+  const zombies: { id: string; company_key: string; uploaded_at: string; row_count: number }[] = [];
+  await Promise.all((uploads ?? []).map(async u => {
+    const { count, error } = await supabaseServer
+      .from("cxc_rows")
+      .select("id", { count: "exact", head: true })
+      .eq("upload_id", u.id);
+    if (error) return;
+    if ((count ?? 0) === 0) zombies.push(u as typeof zombies[number]);
+  }));
+
+  const c = zombies.length;
+  return {
+    check_name: "cxc_uploads_zombie",
+    table_name: "cxc_uploads",
+    severity: c === 0 ? "ok" : "warning",
+    rows_affected: c,
+    threshold_exceeded: c > 0,
+    details: { sample: zombies.slice(0, 10), threshold: { warning: ">0" } },
+  };
+}
+
+// ── Error wrapper ────────────────────────────────────────────────────────────
+
+function checkError(name: string, table: string, message: string): CheckResult {
+  return {
+    check_name: name,
+    table_name: table,
+    severity: "critical",
+    rows_affected: 0,
+    threshold_exceeded: true,
+    details: { error: message, hint: "el check no pudo correr — revisar query o schema" },
+  };
+}
+
+// ── Runner ───────────────────────────────────────────────────────────────────
+
+export async function runAllChecks(): Promise<CheckResult[]> {
+  const grouped = await Promise.all([
+    checkCxcFechaNull(),
+    checkCxcDiasVencidosSinFecha(),
+    checkUploadDesync(),
+    checkChequesCriticosNull(),
+    checkPrestamosSaldoAnomalo(),
+    checkVentasClienteVacio(),
+    checkLastUploadAge(),
+    checkCxcSinVentaCorrespondiente(),
+    checkCxcUploadsZombie(),
+  ]);
+
+  // checkLastUploadAge devuelve un array de 2 — el resto devuelve uno solo.
+  return grouped.flatMap(r => Array.isArray(r) ? r : [r]);
+}
+
+export async function persistCheckResults(results: CheckResult[]): Promise<void> {
+  if (results.length === 0) return;
+  const rows = results.map(r => ({
+    check_name: r.check_name,
+    table_name: r.table_name,
+    severity: r.severity,
+    rows_affected: r.rows_affected,
+    threshold_exceeded: r.threshold_exceeded,
+    details: r.details,
+  }));
+  const { error } = await supabaseServer.from("data_integrity_checks").insert(rows);
+  if (error) console.error("[integrity] persistCheckResults:", error.message);
+}
+
+export function summarize(results: CheckResult[]): { total: number; critical: number; warning: number; info: number; ok: number } {
+  const sum = { total: results.length, critical: 0, warning: 0, info: 0, ok: 0 };
+  for (const r of results) sum[r.severity]++;
+  return sum;
+}

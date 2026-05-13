@@ -25,6 +25,7 @@ import {
   Briefcase,
   BarChart3,
   Settings,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -76,6 +77,7 @@ export const ALL_MODULES: AppModule[] = [
   // Sistema
   { key: "upload",        label: "Actualizar Datos",    subtitle: "Subir archivos de Switch Soft",                      href: "/upload",         icon: RefreshCw,        roles: ["admin", "director", "secretaria"],                             group: "sistema" },
   { key: "usuarios",      label: "Usuarios",            subtitle: "Gestión de usuarios y permisos",                     href: "/admin/usuarios", icon: Users,            roles: ["admin"],                                                       group: "sistema" },
+  { key: "data-health",   label: "Data Health",         subtitle: "Monitoreo automático de integridad de datos",        href: "/admin/data-health", icon: ShieldCheck,   roles: ["admin"],                                                       group: "sistema" },
 ];
 
 /** Lista de keys de todos los módulos del sistema. */
