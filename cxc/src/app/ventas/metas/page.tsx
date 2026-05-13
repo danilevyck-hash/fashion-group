@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast } from "@/components/ui";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -20,8 +19,6 @@ const EMPRESAS = [
   "Confecciones Boston",
   "Multifashion",
 ];
-
-const MES_NAMES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -42,32 +39,11 @@ interface MetaSugeridaRow {
   meta_manual_actual: number | null;
 }
 
-interface ProyeccionRow {
-  empresa: string;
-  nombre: string;
-  ritmo_actual: number | null;
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function fmtK(n: number): string {
-  return `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function fmtCurrency(n: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(n);
-}
-
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export default function VentasMetasPage() {
   const router = useRouter();
-  const { authChecked, role } = useAuth({ moduleKey: "ventas", allowedRoles: ["admin"] });
+  const { authChecked } = useAuth({ moduleKey: "ventas", allowedRoles: ["admin"] });
 
   const [anio, setAnio] = useState(new Date().getFullYear());
   const [availableYears, setAvailableYears] = useState<number[]>([]);
@@ -75,14 +51,13 @@ export default function VentasMetasPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
-  const [distribucion, setDistribucion] = useState<Record<string, number[]>>({});
-  // Sugerencias auto-calculadas + zona crítica desde RPCs nuevas.
+  // distribucion se preserva en state para que la API GET la siga populando
+  // (se calcula del histórico de ventas_raw y se usa para auditoría server-side
+  // al guardar overrides). La UI actual no la renderiza — el cálculo mensual
+  // ahora vive sólo en la matriz mes-a-mes del Resumen.
+  const [, setDistribucion] = useState<Record<string, number[]>>({});
+  // Sugerencias auto-calculadas desde RPC ventas_meta_sugerida_v2.
   const [sugeridas, setSugeridas] = useState<Record<string, MetaSugeridaRow>>({});
-  const [ritmosActuales, setRitmosActuales] = useState<Record<string, number | null>>({});
-  // Distribución mensual oculta por default. Toggle global expande las 12
-  // columnas de meses (mucho ruido visual cuando el foco está en configurar
-  // la meta anual). En vista compacta cada empresa = una sola fila.
-  const [showMonthly, setShowMonthly] = useState(false);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -92,12 +67,12 @@ export default function VentasMetasPage() {
   const fetchMetas = useCallback(async () => {
     setLoading(true);
     try {
-      // Paralelizar: metas guardadas, sugeridas (RPC ventas_meta_sugerida_v1)
-      // y proyección (para ritmo_actual → flag zona crítica).
-      const [metasRes, sugRes, proyRes] = await Promise.all([
+      // Paralelizar: metas guardadas + sugeridas (RPC ventas_meta_sugerida_v2).
+      // La proyección/ritmo_actual ya no se consume acá — la UI de metas se
+      // enfoca exclusivamente en el comparativo vs cierre del año anterior.
+      const [metasRes, sugRes] = await Promise.all([
         fetch(`/api/ventas/metas?anio=${anio}`),
         fetch(`/api/ventas/metas-sugeridas?anio=${anio}`),
-        fetch(`/api/ventas/proyeccion-cierre?anio=${anio}`),
       ]);
       if (!metasRes.ok) throw new Error("Error metas");
       const data = await metasRes.json();
@@ -116,25 +91,13 @@ export default function VentasMetasPage() {
       setDraft(newDraft);
       setDistribucion(newDist);
 
-      // Sugeridas — keyeadas por display name para matchear con EMPRESAS[]
       if (sugRes.ok) {
         const sug = await sugRes.json();
         const map: Record<string, MetaSugeridaRow> = {};
         for (const r of (sug.empresas ?? []) as MetaSugeridaRow[]) map[r.nombre] = r;
         setSugeridas(map);
       } else {
-        // Migration aún no aplicada — graceful degrade, sin sugerencias.
         setSugeridas({});
-      }
-
-      // Proyección — extraer ritmo_actual por empresa display name.
-      if (proyRes.ok) {
-        const proy = await proyRes.json();
-        const rmap: Record<string, number | null> = {};
-        for (const e of (proy.empresas ?? []) as ProyeccionRow[]) rmap[e.nombre] = e.ritmo_actual;
-        setRitmosActuales(rmap);
-      } else {
-        setRitmosActuales({});
       }
     } catch {
       showToast("Error al cargar metas");
@@ -167,54 +130,62 @@ export default function VentasMetasPage() {
       });
   }, [authChecked]);
 
-  // Limpia el override manual de una empresa (DELETE en ventas_metas).
-  // Después del refetch, esa empresa vuelve a usar la sugerida automática.
-  const clearOverride = async (empresa: string) => {
-    try {
-      const url = `/api/ventas/metas?empresa=${encodeURIComponent(empresa)}&anio=${anio}`;
-      const res = await fetch(url, { method: "DELETE" });
-      if (res.ok) {
-        showToast("Override eliminado · usando sugerida");
-        fetchMetas();
-      } else {
-        const body = await res.json().catch(() => ({}));
-        showToast(body?.error ?? "No se pudo eliminar el override");
-      }
-    } catch {
-      showToast("Error de conexión");
-    }
-  };
-
+  // Guarda overrides + elimina los que el user dejó vacíos. Para cada
+  // empresa:
+  //   - input > 0  → upsert en ventas_metas (override manual)
+  //   - input vacío y existía override antes → DELETE (vuelve a sugerida)
+  //   - input vacío y no había override → no-op
   const handleSave = async () => {
     setSaving(true);
     try {
-      const metas = EMPRESAS.filter(emp => {
+      const toUpsert: { empresa: string; anio: number; meta: number }[] = [];
+      const toDelete: string[] = [];
+      for (const emp of EMPRESAS) {
         const val = parseFloat(draft[emp] ?? "");
-        return !isNaN(val) && val > 0;
-      }).map(emp => ({
-        empresa: emp,
-        anio,
-        meta: parseFloat(draft[emp]),
-      }));
+        const hadOverride = (sugeridas[emp]?.meta_manual_actual ?? 0) > 0;
+        if (!isNaN(val) && val > 0) {
+          toUpsert.push({ empresa: emp, anio, meta: val });
+        } else if (hadOverride) {
+          toDelete.push(emp);
+        }
+      }
 
-      if (metas.length === 0) {
-        showToast("Ingresa al menos una meta");
+      if (toUpsert.length === 0 && toDelete.length === 0) {
+        showToast("Sin cambios para guardar");
         setSaving(false);
         return;
       }
 
-      const res = await fetch("/api/ventas/metas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ metas }),
-      });
-
-      if (res.ok) {
-        showToast("Metas guardadas");
-        fetchMetas();
-      } else {
-        showToast("Error al guardar. Intenta de nuevo.");
+      // Ejecutar primero deletes (paralelos) y después el upsert batch.
+      // Si alguno de los deletes falla, igual procedemos con los upserts
+      // pero reportamos en el toast.
+      let deleteErrors = 0;
+      if (toDelete.length > 0) {
+        const results = await Promise.all(toDelete.map(emp =>
+          fetch(`/api/ventas/metas?empresa=${encodeURIComponent(emp)}&anio=${anio}`, { method: "DELETE" })
+            .then(r => r.ok).catch(() => false)
+        ));
+        deleteErrors = results.filter(ok => !ok).length;
       }
+
+      let upsertOk = true;
+      if (toUpsert.length > 0) {
+        const res = await fetch("/api/ventas/metas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ metas: toUpsert }),
+        });
+        upsertOk = res.ok;
+      }
+
+      if (upsertOk && deleteErrors === 0) {
+        showToast("Metas guardadas");
+      } else if (!upsertOk) {
+        showToast("Error al guardar overrides");
+      } else {
+        showToast(`Guardado con ${deleteErrors} error(es) al borrar overrides`);
+      }
+      fetchMetas();
     } catch {
       showToast("Error de conexion. Verifica tu internet.");
     }
@@ -229,226 +200,185 @@ export default function VentasMetasPage() {
 
   if (!authChecked) return null;
 
+  // Cálculos para el hero card del grupo:
+  //   metaTotal       = suma de meta efectiva (override > 0 si existe, sino sugerida)
+  //   cierreTotalPrev = suma de cierre real del año anterior por empresa
+  //   deltaPct        = (metaTotal - cierreTotalPrev) / cierreTotalPrev
+  const { metaTotal, cierreTotalPrev, deltaPct } = (() => {
+    let meta = 0, cierre = 0;
+    for (const emp of EMPRESAS) {
+      const sug = sugeridas[emp];
+      const sugMeta = sug?.meta_sugerida ?? 0;
+      const override = parseFloat(draft[emp] ?? "") || 0;
+      meta += override > 0 ? override : sugMeta;
+      cierre += sug?.ventas_prev_year ?? 0;
+    }
+    const dPct = cierre > 0 ? (meta - cierre) / cierre : null;
+    return { metaTotal: meta, cierreTotalPrev: cierre, deltaPct: dPct };
+  })();
+
+  const prevYear = anio - 1;
+
+  // Joystep y otras empresas sin histórico van al final.
+  const empresasOrdenadas = (() => {
+    const conHist: string[] = [];
+    const sinHist: string[] = [];
+    for (const emp of EMPRESAS) {
+      const sug = sugeridas[emp];
+      const tieneHist = (sug?.ventas_prev_year ?? 0) > 0 && sug?.meta_sugerida != null;
+      (tieneHist ? conHist : sinHist).push(emp);
+    }
+    return [...conHist, ...sinHist];
+  })();
+
   return (
     <>
       <AppHeader module="Ventas" breadcrumbs={[{ label: "Ventas", onClick: () => router.push("/ventas") }, { label: "Metas" }]} />
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+      <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-6 md:py-10">
+        {/* Header — Playfair grande + subtítulo */}
+        <div className="mb-8 flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold">Metas de Ventas</h1>
-            <p className="text-xs text-gray-500 mt-1">Por default cada empresa usa la meta sugerida automática (basada en histórico). Definir un valor manual sobrescribe esa sugerida solo para esa empresa.</p>
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-stone-950 md:text-4xl">
+              Metas
+            </h1>
+            <p className="mt-2 text-sm text-stone-500">
+              ¿Cuánto le pedís al negocio este año? El sistema sugiere un objetivo por empresa basado en tu histórico.
+            </p>
           </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={anio}
-              onChange={e => setAnio(Number(e.target.value))}
-              className="text-xs border border-gray-200 rounded-md px-3 py-2 min-h-[44px] bg-white font-medium"
-            >
-              {(availableYears.length > 0 ? availableYears : [anio]).map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={anio}
+            onChange={e => setAnio(Number(e.target.value))}
+            className="text-xs border border-stone-200 rounded-md px-3 py-2 min-h-[40px] bg-white font-mono tabular-nums font-medium"
+          >
+            {(availableYears.length > 0 ? availableYears : [anio]).map(y => (
+              <option key={y} value={y}>{y}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Actions */}
-        <div className="flex flex-wrap items-center gap-2 mb-6">
-          <button
-            onClick={() => setShowMonthly(v => !v)}
-            className="text-xs border border-gray-200 rounded-md px-4 py-2 hover:bg-gray-50 active:bg-gray-100 transition-all min-h-[44px]"
-          >
-            {showMonthly ? "Ocultar distribución mensual" : "Ver distribución mensual"}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="text-xs bg-black text-white rounded-md px-4 py-2 hover:bg-gray-800 active:scale-[0.97] transition-all min-h-[44px] disabled:opacity-50"
-          >
-            {saving ? "Guardando overrides..." : "Guardar overrides"}
-          </button>
-        </div>
+        {/* Hero card grupo — total agregado vs cierre prev year */}
+        {!loading && (
+          <section className="mb-8 rounded-lg bg-stone-50 p-6">
+            <p className="text-[11px] font-medium uppercase tracking-widest text-stone-500">
+              Total del grupo {anio}
+            </p>
+            <p className="mt-2 font-mono text-4xl font-medium leading-none tabular-nums text-stone-950 md:text-[40px]">
+              {fmtCurrencyCompact(metaTotal)}
+            </p>
+            <p className="mt-3 text-sm text-stone-500">
+              {deltaPct != null ? (
+                <>
+                  <span className={cn(
+                    "font-medium",
+                    Math.abs(deltaPct) < 0.005 ? "text-stone-700"
+                      : deltaPct > 0 ? "text-emerald-700" : "text-red-700",
+                  )}>
+                    {deltaPct >= 0 ? "+" : ""}{(deltaPct * 100).toFixed(1)}%
+                  </span>
+                  <span> vs {prevYear} cierre </span>
+                  <span className="font-mono tabular-nums text-stone-700">({fmtCurrencyCompact(cierreTotalPrev)})</span>
+                </>
+              ) : (
+                <span>Sin cierre {prevYear} para comparar</span>
+              )}
+            </p>
+          </section>
+        )}
 
-        {/* Table */}
+        {/* Lista por empresa */}
         {loading ? (
           <div className="animate-pulse space-y-2">
             {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="h-10 bg-gray-100 rounded" />
+              <div key={i} className="h-16 bg-stone-100 rounded-lg" />
             ))}
           </div>
         ) : (
-          <div className="overflow-x-auto border border-gray-200 rounded-lg">
-            <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-white z-10">
-                <tr className="border-b border-gray-200">
-                  <th className="text-left px-3 py-3 font-medium text-gray-500 sticky left-0 bg-white z-20 min-w-[180px]">
-                    Empresa
-                  </th>
-                  <th className="text-right px-3 py-3 font-medium text-gray-500 min-w-[480px]">
-                    Meta anual
-                  </th>
-                  {showMonthly && MES_NAMES.map(m => (
-                    <th key={m} className="text-right px-1.5 py-3 font-medium text-gray-500 whitespace-nowrap min-w-[55px]">
-                      {m}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {EMPRESAS.map(empresa => {
-                  const rawVal = draft[empresa] ?? "";
-                  const metaAnual = parseFloat(rawVal) || 0;
-                  const dist = distribucion[empresa] ?? Array(12).fill(1 / 12);
-                  const sug = sugeridas[empresa];
-                  const sugMeta = sug?.meta_sugerida ?? null;
-                  // Si en backend hay un override real para esta empresa, lo
-                  // marcamos como tal — el botón "Limpiar override" sólo
-                  // aparece cuando hay algo que limpiar.
-                  const hasManualOverride = (sug?.meta_manual_actual ?? 0) > 0;
-                  // Distribución para el cómputo mensual usa la meta efectiva
-                  // (manual override si el draft tiene valor > 0, sino sugerida).
-                  const metaEfectivaParaDist = metaAnual > 0 ? metaAnual : (sugMeta ?? 0);
-                  // Zona crítica = ritmo actual cayó >15% YTD.
-                  const ritmoActual = ritmosActuales[empresa];
-                  const zonaCritica = ritmoActual != null && ritmoActual < 0.85;
-                  const zonaTooltipMsg = zonaCritica && ritmoActual != null
-                    ? `Ritmo real ${(ritmoActual * 100 - 100).toFixed(0)}% YTD. Sugerencia conservadora, considerá ajustar manual.`
-                    : "";
+          <ul className="divide-y divide-stone-100 rounded-lg border border-stone-200 bg-white">
+            {empresasOrdenadas.map(empresa => {
+              const sug = sugeridas[empresa];
+              const sugMeta = sug?.meta_sugerida ?? null;
+              const cierrePrev = sug?.ventas_prev_year ?? 0;
+              const tieneHist = cierrePrev > 0 && sugMeta != null;
+              const rawVal = draft[empresa] ?? "";
+              const override = parseFloat(rawVal) || 0;
+              // Meta efectiva en este draft (lo que se va a guardar al click Save).
+              const metaEfectiva = override > 0 ? override : (sugMeta ?? 0);
+              // % vs cierre del año anterior. Si hay override, se recalcula.
+              const deltaPctEmpresa = cierrePrev > 0 && metaEfectiva > 0
+                ? (metaEfectiva - cierrePrev) / cierrePrev : null;
 
-                  return (
-                    <tr key={empresa} className={cn(
-                      "border-b border-gray-50 hover:bg-gray-50/50",
-                      zonaCritica && "bg-amber-50/60 hover:bg-amber-50/80",
-                    )}>
-                      <td className={cn(
-                        "px-3 py-3.5 font-medium text-gray-700 sticky left-0 whitespace-nowrap z-10",
-                        zonaCritica ? "bg-amber-50" : "bg-white",
+              return (
+                <li key={empresa} className="grid grid-cols-1 items-center gap-3 px-5 py-4 md:grid-cols-[1.2fr_200px_1fr] md:gap-4">
+                  {/* Col 1: nombre + cerró 2025 */}
+                  <div>
+                    <p className="text-sm font-medium text-stone-950">{empresa}</p>
+                    <p className="mt-0.5 text-[11px] text-stone-400">
+                      {tieneHist
+                        ? <>cerró {prevYear} en <span className="font-mono tabular-nums">{fmtCurrencyCompact(cierrePrev)}</span></>
+                        : "sin histórico comparable"}
+                    </p>
+                  </div>
+                  {/* Col 2: input */}
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 text-xs">$</span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={rawVal}
+                      onChange={e => {
+                        const v = e.target.value.replace(/[^0-9]/g, "");
+                        updateDraft(empresa, v);
+                      }}
+                      placeholder={sugMeta != null ? Math.round(sugMeta).toLocaleString() : ""}
+                      className="w-full text-right text-sm border border-stone-200 rounded-md px-3 py-2 pl-6 tabular-nums font-mono min-h-[40px] focus:border-stone-400 focus:outline-none placeholder:text-stone-400"
+                    />
+                  </div>
+                  {/* Col 3: sugiere +Y% (o requiere manual) */}
+                  <div className="text-right">
+                    {tieneHist && deltaPctEmpresa != null ? (
+                      <p className={cn(
+                        "font-mono text-sm tabular-nums",
+                        Math.abs(deltaPctEmpresa) < 0.005 ? "text-stone-700"
+                          : deltaPctEmpresa > 0 ? "text-emerald-700" : "text-red-700",
                       )}>
-                        <span className="inline-flex items-center gap-1.5">
-                          {empresa}
-                          {zonaCritica && (
-                            <TooltipProvider delayDuration={120}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="inline-flex cursor-help items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-widest text-amber-800">
-                                    zona crítica
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent side="right" align="start" className="max-w-[260px] text-xs">
-                                  {zonaTooltipMsg}
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
-                        </span>
-                      </td>
-                      {/* Línea horizontal compacta: input (con placeholder
-                          dinámico que muestra la sugerida) + override badge +
-                          referencia + Limpiar */}
-                      <td className="px-3 py-3.5">
-                        <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1 text-[11px]">
-                          <span className="text-gray-500">Meta:</span>
-                          <div className="relative">
-                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
-                            <input
-                              type="text"
-                              inputMode="numeric"
-                              value={rawVal}
-                              onChange={e => {
-                                const v = e.target.value.replace(/[^0-9]/g, "");
-                                updateDraft(empresa, v);
-                              }}
-                              placeholder={sugMeta != null ? `${Math.round(sugMeta).toLocaleString()} (sugerida)` : "0"}
-                              className={cn(
-                                "w-44 text-right text-xs border rounded px-2 py-1.5 pl-5 tabular-nums min-h-[36px]",
-                                hasManualOverride ? "border-stone-300 bg-white" : "border-gray-200 bg-gray-50/60 placeholder:text-gray-400",
-                              )}
-                            />
-                          </div>
-                          {hasManualOverride && metaAnual > 0 && (
-                            <span className="font-mono tabular-nums text-gray-700">{fmtCurrency(metaAnual)}</span>
-                          )}
-                          {hasManualOverride && (
-                            <button
-                              type="button"
-                              onClick={() => clearOverride(empresa)}
-                              className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-700 hover:bg-gray-50 active:scale-[0.97]"
-                            >
-                              Limpiar override
-                            </button>
-                          )}
-                          {sugMeta != null && (
-                            <>
-                              <span className="text-gray-300">·</span>
-                              <span className="text-gray-500">Sugerida</span>
-                              <span className="font-mono tabular-nums text-gray-700">{fmtCurrency(sugMeta)}</span>
-                              {!hasManualOverride && (
-                                <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700">
-                                  En uso
-                                </span>
-                              )}
-                            </>
-                          )}
-                          {sug && sugMeta == null && sug.historia_disponible === 0 && (
-                            <span className="text-gray-400">· requiere meta manual</span>
-                          )}
-                        </div>
-                      </td>
-                      {showMonthly && dist.map((w, i) => {
-                        const monthMeta = metaEfectivaParaDist * w;
-                        return (
-                          <td key={i} className="text-right px-1.5 py-3.5 tabular-nums text-gray-500">
-                            {monthMeta > 0 ? fmtK(monthMeta) : <span className="text-gray-300">—</span>}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-
-                {/* Total row — suma metas efectivas (override si existe,
-                    sino sugerida) para que el TOTAL refleje el real baseline. */}
-                <tr className="border-t-2 border-gray-200 bg-gray-50 font-semibold">
-                  <td className="px-3 py-3.5 sticky left-0 bg-gray-50 z-10">TOTAL</td>
-                  <td className="text-right px-3 py-3.5 tabular-nums">
-                    {fmtCurrency(
-                      EMPRESAS.reduce((s, emp) => {
-                        const override = parseFloat(draft[emp] ?? "") || 0;
-                        const sug = sugeridas[emp]?.meta_sugerida ?? 0;
-                        return s + (override > 0 ? override : sug);
-                      }, 0)
+                        sugiere {deltaPctEmpresa >= 0 ? "+" : ""}{(deltaPctEmpresa * 100).toFixed(1)}%
+                      </p>
+                    ) : (
+                      <p className="text-xs text-stone-400">requiere manual</p>
                     )}
-                  </td>
-                  {showMonthly && MES_NAMES.map((_, i) => {
-                    const monthTotal = EMPRESAS.reduce((s, emp) => {
-                      const override = parseFloat(draft[emp] ?? "") || 0;
-                      const sug = sugeridas[emp]?.meta_sugerida ?? 0;
-                      const efectiva = override > 0 ? override : sug;
-                      const w = (distribucion[emp] ?? Array(12).fill(1 / 12))[i];
-                      return s + efectiva * w;
-                    }, 0);
-                    return (
-                      <td key={i} className="text-right px-1.5 py-3.5 tabular-nums text-gray-600">
-                        {monthTotal > 0 ? fmtK(monthTotal) : "—"}
-                      </td>
-                    );
-                  })}
-                </tr>
-              </tbody>
-            </table>
-          </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
         )}
 
-        {/* Info */}
-        <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-          <p className="text-xs text-gray-500">
-            La distribucion mensual se calcula con base en las ventas reales de 2025.
-            Si una empresa no tiene datos para todos los meses, los meses faltantes reciben un peso promedio.
-          </p>
+        {/* Botón Guardar */}
+        <div className="mt-6 flex items-center justify-end gap-2">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="text-sm bg-black text-white rounded-md px-5 py-2.5 hover:bg-stone-800 active:scale-[0.97] transition-all min-h-[40px] disabled:opacity-50"
+          >
+            {saving ? "Guardando..." : "Guardar metas"}
+          </button>
         </div>
+
+        {/* Footer informativo */}
+        <p className="mt-8 text-[11px] text-stone-400 leading-relaxed max-w-2xl">
+          Para sobrescribir una sugerencia, escribí encima. Para volver a la sugerencia, borrá el input.
+          Las distribuciones mensuales se calculan automáticamente del histórico de ventas_raw.
+        </p>
       </div>
 
       <Toast message={toast} />
     </>
   );
+}
+
+// Versión compacta del formato moneda para el hero ($12.7M en lugar de $12,734,567).
+function fmtCurrencyCompact(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`;
+  return `$${Math.round(n).toLocaleString("en-US")}`;
 }
