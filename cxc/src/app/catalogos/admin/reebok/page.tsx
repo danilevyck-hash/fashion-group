@@ -260,6 +260,10 @@ function ProductosTab({
   });
 
   const sorted = [...filtered].sort((a, b) => {
+    // Active products first
+    if (a.active !== false && b.active === false) return -1;
+    if (a.active === false && b.active !== false) return 1;
+    // Then products with stock
     const stockA = getStock(a.id);
     const stockB = getStock(b.id);
     if (stockA > 0 && stockB === 0) return -1;
@@ -292,10 +296,11 @@ function ProductosTab({
           const stock = getStock(product.id);
           const badgeLabel = product.badge === "nuevo" ? "Nuevo" : product.badge === "oferta" ? "Oferta" : null;
 
+          const isInactive = product.active === false;
           return (
             <div
               key={product.id}
-              className={`bg-white border rounded-lg p-3 ${stock === 0 ? "opacity-40 border-gray-100" : "border-gray-200"}`}
+              className={`bg-white border rounded-lg p-3 ${isInactive ? "opacity-50 border-gray-100 bg-gray-50/50" : stock === 0 ? "opacity-60 border-gray-100" : "border-gray-200"}`}
             >
               <div className="flex items-center gap-3">
                 {/* Image */}
@@ -322,7 +327,10 @@ function ProductosTab({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-gray-900 truncate">{product.name}</p>
-                    {badgeLabel && (
+                    {isInactive && (
+                      <span className="text-[10px] font-medium bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">Inactivo</span>
+                    )}
+                    {!isInactive && badgeLabel && (
                       <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
                         product.badge === "oferta"
                           ? "bg-orange-50 text-orange-600"
@@ -331,7 +339,7 @@ function ProductosTab({
                         {badgeLabel}
                       </span>
                     )}
-                    {stock === 0 && (
+                    {!isInactive && stock === 0 && (
                       <span className="text-[10px] font-medium bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">Sin stock</span>
                     )}
                   </div>
@@ -467,9 +475,9 @@ function ImportSection({
   accentColor: string;
 }) {
   const [parsed, setParsed] = useState<CsvImportRow[] | null>(null);
-  const [preview, setPreview] = useState<{ updated: number; created: number; zeroed: number } | null>(null);
+  const [preview, setPreview] = useState<{ updated: number; created: number; deactivated: number } | null>(null);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ updated: number; created: number; zeroed: number } | null>(null);
+  const [importResult, setImportResult] = useState<{ updated: number; created: number; deactivated: number; reactivated: number } | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -484,14 +492,16 @@ function ImportSection({
   }
 
   function handleDownloadTemplate() {
-    const rows = companyProducts.map((p) => ({
-      sku: p.sku || "",
-      name: p.name,
-      price: p.price || 0,
-      quantity: getProductStock(p.id),
-      gender: p.gender || "",
-      badge: p.badge || "",
-    }));
+    const rows = companyProducts
+      .filter((p) => p.active !== false)
+      .map((p) => ({
+        sku: p.sku || "",
+        name: p.name,
+        price: p.price || 0,
+        quantity: getProductStock(p.id),
+        gender: p.gender || "",
+        badge: p.badge || "",
+      }));
     downloadCSV(rows, `Reebok_${title.replace(/\s/g, "_")}_${new Date().toISOString().slice(0, 10)}.csv`);
     showToast("Plantilla descargada");
   }
@@ -531,7 +541,12 @@ function ImportSection({
       }
 
       if (result.errors.length === 0 && result.summary) {
-        setPreview({ updated: result.summary.update, created: result.summary.create, zeroed: result.summary.zero });
+        // Only currently-active SKUs missing from file will be soft-deleted.
+        const incomingSkus = new Set(result.rows.map((r) => r.sku));
+        const willDeactivate = companyProducts.filter(
+          (p) => p.active !== false && p.sku && !incomingSkus.has(p.sku),
+        ).length;
+        setPreview({ updated: result.summary.update, created: result.summary.create, deactivated: willDeactivate });
       }
     } catch {
       showToast("Error al leer el archivo");
@@ -549,7 +564,12 @@ function ImportSection({
       });
       if (res.ok) {
         const result = await res.json();
-        setImportResult({ updated: result.updated, created: result.created, zeroed: result.zeroed });
+        setImportResult({
+          updated: result.updated,
+          created: result.created,
+          deactivated: result.deactivated ?? 0,
+          reactivated: result.reactivated ?? 0,
+        });
         setParsed(null);
         setPreview(null);
         showToast("Importacion completada");
@@ -666,7 +686,7 @@ function ImportSection({
             <div className="flex gap-4 mt-1 text-xs">
               <span className="text-blue-600">{preview.updated} a actualizar</span>
               <span className="text-green-600">{preview.created} nuevos</span>
-              <span className="text-red-500">{preview.zeroed} se pondran en 0</span>
+              <span className="text-gray-500">{preview.deactivated} se inactivaran</span>
             </div>
           </div>
 
@@ -742,7 +762,8 @@ function ImportSection({
         <div className="mt-4 bg-green-50 border border-green-200 rounded-lg px-4 py-3">
           <p className="text-sm font-medium text-green-800">Importacion completada</p>
           <p className="text-xs text-green-600 mt-1">
-            {importResult.updated} actualizados &middot; {importResult.created} nuevos &middot; {importResult.zeroed} puestos en 0
+            {importResult.updated} actualizados &middot; {importResult.created} nuevos &middot; {importResult.deactivated} inactivados
+            {importResult.reactivated > 0 ? ` · ${importResult.reactivated} reactivados` : ""}
           </p>
         </div>
       )}

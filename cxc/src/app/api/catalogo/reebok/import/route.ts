@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     // Load existing products — filter by company categories if provided
     const { data: allExisting, error: fetchErr } = await supabase
       .from("products")
-      .select("id, sku, name, price, gender, category, badge");
+      .select("id, sku, name, price, gender, category, badge, active");
 
     if (fetchErr) {
       return NextResponse.json({ error: fetchErr.message }, { status: 500 });
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       return companyCategories.includes(p.category);
     });
 
-    const existingBySku = new Map<string, { id: string; sku: string; name: string; price: number; gender: string | null; category: string; badge: string | null }>();
+    const existingBySku = new Map<string, { id: string; sku: string; name: string; price: number; gender: string | null; category: string; badge: string | null; active: boolean }>();
     for (const p of existing) {
       if (p.sku) existingBySku.set(p.sku, p);
     }
@@ -58,7 +58,8 @@ export async function POST(req: NextRequest) {
 
     let updated = 0;
     let created = 0;
-    let zeroed = 0;
+    let deactivated = 0;
+    let reactivated = 0;
 
     // Determine default category for new products
     const defaultCategory = companyCategories ? companyCategories[0] : "footwear";
@@ -67,9 +68,10 @@ export async function POST(req: NextRequest) {
     for (const item of incoming) {
       const exist = existingBySku.get(item.sku);
       const badgeValue = item.badge === "nuevo" || item.badge === "oferta" ? item.badge : null;
+      const shouldBeActive = item.quantity > 0;
 
       if (exist) {
-        // Update product fields
+        // Update product fields — active follows stock
         await reebokServer
           .from("products")
           .update({
@@ -77,6 +79,7 @@ export async function POST(req: NextRequest) {
             price: item.price,
             gender: item.gender || null,
             badge: badgeValue,
+            active: shouldBeActive,
           })
           .eq("id", exist.id);
 
@@ -88,9 +91,11 @@ export async function POST(req: NextRequest) {
             { onConflict: "product_id,size" }
           );
 
-        updated++;
+        if (exist.active === false && shouldBeActive) reactivated++;
+        else if (exist.active === true && !shouldBeActive) deactivated++;
+        else updated++;
       } else {
-        // Create new product
+        // Create new product — active only if it has stock
         const { data: newProd } = await reebokServer
           .from("products")
           .insert({
@@ -99,7 +104,7 @@ export async function POST(req: NextRequest) {
             price: item.price,
             gender: item.gender || null,
             category: defaultCategory,
-            active: true,
+            active: shouldBeActive,
             on_sale: false,
             badge: badgeValue,
           })
@@ -116,20 +121,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Zero out products NOT in file — only within the company's scope
+    // Soft-delete products NOT in file — only within the company's scope, only if currently active
     for (const [sku, prod] of existingBySku) {
-      if (!incomingSkus.has(sku)) {
+      if (!incomingSkus.has(sku) && prod.active) {
+        await reebokServer
+          .from("products")
+          .update({ active: false })
+          .eq("id", prod.id);
+
         await reebokServer
           .from("inventory")
           .upsert(
             { product_id: prod.id, size: "UNICA", quantity: 0 },
             { onConflict: "product_id,size" }
           );
-        zeroed++;
+        deactivated++;
       }
     }
 
-    return NextResponse.json({ updated, created, zeroed });
+    return NextResponse.json({ updated, created, deactivated, reactivated });
   } catch (err) {
     console.error("Import error:", err);
     return NextResponse.json({ error: "Error al importar" }, { status: 500 });
