@@ -13,6 +13,7 @@ interface CartItem {
   quantity: number;
   unit_price: number;
   category?: string;
+  is_preorder?: boolean;
 }
 
 interface Order {
@@ -112,10 +113,12 @@ export default function PedidoReebokPage() {
 
         {/* Items */}
         <div className="bg-white border-x border-[#1A2656]/10">
-          <div className="divide-y divide-gray-100">
-            {order.items.map((item, idx) => (
+          {(() => {
+            const regular = order.items.filter((i) => !i.is_preorder);
+            const preorders = order.items.filter((i) => i.is_preorder);
+            const hasPreorders = preorders.length > 0;
+            const renderItem = (item: CartItem, idx: number) => (
               <div key={idx} className="flex items-center gap-3 px-4 py-3">
-                {/* Thumbnail */}
                 <div className="w-14 h-14 rounded-lg bg-[#F5F0E8] flex-shrink-0 overflow-hidden">
                   {item.image_url ? (
                     <Image
@@ -134,14 +137,10 @@ export default function PedidoReebokPage() {
                     </div>
                   )}
                 </div>
-
-                {/* Details */}
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-[#1A2656] truncate">{item.name}</p>
                   <p className="text-xs text-[#1A2656]/40 mt-0.5">{item.sku}</p>
                 </div>
-
-                {/* Qty + Price */}
                 <div className="text-right flex-shrink-0">
                   {(() => {
                     const bs = getBultoSize(item.category || "footwear");
@@ -159,8 +158,27 @@ export default function PedidoReebokPage() {
                   })()}
                 </div>
               </div>
-            ))}
-          </div>
+            );
+
+            const sectionHeader = (label: string, color: string) => (
+              <div className={`px-4 py-2 ${color} text-white text-[10px] font-bold uppercase tracking-wider`}>
+                {label}
+              </div>
+            );
+
+            return (
+              <div className="divide-y divide-gray-100">
+                {hasPreorders && regular.length > 0 && sectionHeader("Pedido", "bg-[#1A2656]")}
+                {regular.map(renderItem)}
+                {hasPreorders && (
+                  <>
+                    {sectionHeader("Pre-orden", "bg-amber-500")}
+                    {preorders.map(renderItem)}
+                  </>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Total */}

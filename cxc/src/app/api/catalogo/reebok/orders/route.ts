@@ -55,9 +55,10 @@ export async function POST(req: NextRequest) {
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
 
   if (items?.length) {
-    const rows = items.map((i: { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number }) => ({
+    const rows = items.map((i: { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; is_preorder?: boolean }) => ({
       order_id: order.id, product_id: i.product_id, sku: i.sku || null, name: i.name || null,
       image_url: i.image_url || null, quantity: i.quantity || 1, unit_price: Number(i.unit_price) || 0,
+      is_preorder: i.is_preorder === true,
     }));
     await reebokServer.from("reebok_order_items").insert(rows);
   }

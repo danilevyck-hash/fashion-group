@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/requireRole";
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
   if (auth instanceof NextResponse) return auth;
-  const { product_id, sku, name, image_url, quantity, unit_price } = await req.json();
+  const { product_id, sku, name, image_url, quantity, unit_price, is_preorder } = await req.json();
   if (!product_id) return NextResponse.json({ error: "product_id requerido" }, { status: 400 });
 
   if (quantity <= 0) {
@@ -17,6 +17,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       .upsert({
         order_id: params.id, product_id, sku: sku || null, name: name || null,
         image_url: image_url || null, quantity, unit_price: Number(unit_price) || 0,
+        is_preorder: is_preorder === true,
       }, { onConflict: "order_id,product_id" });
     if (error) return NextResponse.json({ error: "Error al guardar" }, { status: 500 });
   }

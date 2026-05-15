@@ -8,11 +8,11 @@ import { getBultoSize } from "@/lib/reebok-bulto";
 import NewOrderModal from "@/components/reebok/NewOrderModal";
 import { Toast } from "@/components/ui";
 import CatalogHeader from "@/components/reebok/CatalogHeader";
-import CatalogFilters from "@/components/reebok/CatalogFilters";
+import CatalogFilters, { SaleFilter } from "@/components/reebok/CatalogFilters";
 import CatalogProductCard from "@/components/reebok/CatalogProductCard";
 import StickyCartBar from "@/components/reebok/StickyCartBar";
 
-interface CartItem { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category: string; }
+interface CartItem { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category: string; is_preorder?: boolean; }
 
 export default function ProductosPage() {
   return <Suspense><Productos /></Suspense>;
@@ -27,7 +27,7 @@ function Productos() {
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [gender, setGender] = useState(searchParams.get("gender") || "");
   const [category, setCategory] = useState(searchParams.get("category") || "");
-  const [saleFilter, setSaleFilter] = useState<"" | "oferta" | "nuevo">("");
+  const [saleFilter, setSaleFilter] = useState<SaleFilter>("");
   // color/size/price filters removed — kept simple
   const [sortBy, setSortBy] = useState("relevancia");
   const [toast, setToast] = useState<string | null>(null);
@@ -123,7 +123,7 @@ function Productos() {
       if (qty <= 0) return prev.filter(i => i.product_id !== productId);
       const idx = prev.findIndex(i => i.product_id === productId);
       if (idx >= 0) return prev.map((item, i) => i === idx ? { ...item, quantity: qty } : item);
-      return [...prev, { product_id: productId, sku: product.sku || "", name: product.name, image_url: product.image_url || "", quantity: qty, unit_price: product.price || 0, category: product.category }];
+      return [...prev, { product_id: productId, sku: product.sku || "", name: product.name, image_url: product.image_url || "", quantity: qty, unit_price: product.price || 0, category: product.category, is_preorder: product.badge === "proximamente" }];
     });
   }, []);
 
@@ -223,7 +223,7 @@ function Productos() {
             sizesMap[i.product_id].add(i.size);
           }
         });
-        setProducts(prods.map(p => ({ ...p, _stock: stockMap[p.id] || 0, _sizes: [...(sizesMap[p.id] || [])] })).filter(p => p._stock > 0));
+        setProducts(prods.map(p => ({ ...p, _stock: stockMap[p.id] || 0, _sizes: [...(sizesMap[p.id] || [])] })).filter(p => p._stock > 0 || p.badge === "proximamente"));
       } catch { setProducts([]); }
       setLoading(false);
     }

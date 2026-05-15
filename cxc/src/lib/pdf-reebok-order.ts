@@ -11,6 +11,7 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   category?: string;
+  is_preorder?: boolean;
 }
 
 function fmtMoney(n: number) {
@@ -106,76 +107,94 @@ export async function generateReebokOrderPdf(cart: OrderItem[]): Promise<void> {
   }, 0);
   const imgCellSize = 10; // mm
 
-  const tableBody = cart.map((item) => {
-    const bs = getBultoSize(item.category || "footwear");
-    const lineTotal = item.quantity * bs * item.unit_price;
-    const qtyLabel = `${item.quantity} bulto${item.quantity !== 1 ? "s" : ""} (${item.quantity * bs} pzas)`;
-    return [
-      { content: "", styles: { minCellWidth: 14, cellPadding: 2 } }, // photo placeholder
-      item.sku || "-",
-      item.name,
-      qtyLabel,
-      `$${fmtMoney(item.unit_price)}`,
-      `$${fmtMoney(lineTotal)}`,
-    ];
-  });
+  const regularItems = cart.filter((i) => !i.is_preorder);
+  const preorderItems = cart.filter((i) => i.is_preorder);
+  const hasPreorders = preorderItems.length > 0;
 
-  autoTable(doc, {
-    startY: y,
-    margin: { left: margin, right: margin },
-    head: [["", "SKU", "Producto", "Cantidad", "Precio Unit.", "Total"]],
-    body: tableBody,
-    headStyles: {
-      fillColor: NAVY_RGB,
-      textColor: WHITE_RGB,
-      fontStyle: "bold",
-      fontSize: 8,
-      cellPadding: 3,
-    },
-    bodyStyles: {
-      fontSize: 8,
-      cellPadding: 3,
-      textColor: [30, 30, 30],
-    },
-    alternateRowStyles: {
-      fillColor: CREAM_RGB,
-    },
-    columnStyles: {
-      0: { cellWidth: 14, halign: "center" },
-      1: { cellWidth: 28 },
-      2: { cellWidth: "auto" },
-      3: { cellWidth: 32, halign: "center" },
-      4: { cellWidth: 24, halign: "right" },
-      5: { cellWidth: 24, halign: "right" },
-    },
-    foot: [
-      [
-        { content: "", styles: { fillColor: WHITE_RGB } },
-        { content: "", styles: { fillColor: WHITE_RGB } },
-        { content: "", styles: { fillColor: WHITE_RGB } },
-        { content: "", styles: { fillColor: WHITE_RGB } },
-        { content: "TOTAL", styles: { fontStyle: "bold", halign: "right" as const, fillColor: NAVY_RGB, textColor: WHITE_RGB, fontSize: 9 } },
-        { content: `$${fmtMoney(total)}`, styles: { fontStyle: "bold", halign: "right" as const, fillColor: NAVY_RGB, textColor: WHITE_RGB, fontSize: 9 } },
-      ],
-    ],
-    didDrawCell: (data) => {
-      // Draw product images in the first column of body rows
-      if (data.section === "body" && data.column.index === 0) {
-        const item = cart[data.row.index];
-        if (!item) return;
-        const b64 = imageMap.get(item.product_id);
-        if (b64) {
-          try {
-            const x = data.cell.x + (data.cell.width - imgCellSize) / 2;
-            const yImg = data.cell.y + (data.cell.height - imgCellSize) / 2;
-            doc.addImage(b64, "JPEG", x, yImg, imgCellSize, imgCellSize);
-          } catch {
-            // If image fails, just leave it blank
+  function buildBody(items: OrderItem[]) {
+    return items.map((item) => {
+      const bs = getBultoSize(item.category || "footwear");
+      const lineTotal = item.quantity * bs * item.unit_price;
+      const qtyLabel = `${item.quantity} bulto${item.quantity !== 1 ? "s" : ""} (${item.quantity * bs} pzas)`;
+      return [
+        { content: "", styles: { minCellWidth: 14, cellPadding: 2 } },
+        item.sku || "-",
+        item.name,
+        qtyLabel,
+        `$${fmtMoney(item.unit_price)}`,
+        `$${fmtMoney(lineTotal)}`,
+      ];
+    });
+  }
+
+  const baseColumnStyles = {
+    0: { cellWidth: 14, halign: "center" as const },
+    1: { cellWidth: 28 },
+    2: { cellWidth: "auto" as const },
+    3: { cellWidth: 32, halign: "center" as const },
+    4: { cellWidth: 24, halign: "right" as const },
+    5: { cellWidth: 24, halign: "right" as const },
+  };
+
+  function drawSection(title: string, items: OrderItem[], showTotalFoot: boolean) {
+    if (items.length === 0) return;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...NAVY_RGB);
+    doc.text(title, margin, y);
+    y += 4;
+
+    autoTable(doc, {
+      startY: y,
+      margin: { left: margin, right: margin },
+      head: [["", "SKU", "Producto", "Cantidad", "Precio Unit.", "Total"]],
+      body: buildBody(items),
+      headStyles: { fillColor: NAVY_RGB, textColor: WHITE_RGB, fontStyle: "bold", fontSize: 8, cellPadding: 3 },
+      bodyStyles: { fontSize: 8, cellPadding: 3, textColor: [30, 30, 30] },
+      alternateRowStyles: { fillColor: CREAM_RGB },
+      columnStyles: baseColumnStyles,
+      foot: showTotalFoot
+        ? [
+            [
+              { content: "", styles: { fillColor: WHITE_RGB } },
+              { content: "", styles: { fillColor: WHITE_RGB } },
+              { content: "", styles: { fillColor: WHITE_RGB } },
+              { content: "", styles: { fillColor: WHITE_RGB } },
+              { content: "TOTAL", styles: { fontStyle: "bold", halign: "right" as const, fillColor: NAVY_RGB, textColor: WHITE_RGB, fontSize: 9 } },
+              { content: `$${fmtMoney(total)}`, styles: { fontStyle: "bold", halign: "right" as const, fillColor: NAVY_RGB, textColor: WHITE_RGB, fontSize: 9 } },
+            ],
+          ]
+        : undefined,
+      didDrawCell: (data) => {
+        if (data.section === "body" && data.column.index === 0) {
+          const item = items[data.row.index];
+          if (!item) return;
+          const b64 = imageMap.get(item.product_id);
+          if (b64) {
+            try {
+              const x = data.cell.x + (data.cell.width - imgCellSize) / 2;
+              const yImg = data.cell.y + (data.cell.height - imgCellSize) / 2;
+              doc.addImage(b64, "JPEG", x, yImg, imgCellSize, imgCellSize);
+            } catch {
+              // skip
+            }
           }
         }
-      }
-    },
-  });
+      },
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    y = (doc as any).lastAutoTable.finalY + 8;
+  }
+
+  if (hasPreorders && regularItems.length > 0) {
+    drawSection("Pedido", regularItems, false);
+    drawSection("Pre-orden", preorderItems, true);
+  } else if (hasPreorders) {
+    drawSection("Pre-orden", preorderItems, true);
+  } else {
+    drawSection("Pedido", regularItems, true);
+  }
 
   // --- Footer ---
   const pageHeight = doc.internal.pageSize.getHeight();

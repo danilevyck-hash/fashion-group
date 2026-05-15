@@ -1,5 +1,7 @@
 "use client";
 
+export type SaleFilter = "" | "oferta" | "nuevo" | "proximamente";
+
 interface CatalogFiltersProps {
   searchInput: string;
   onSearchChange: (v: string) => void;
@@ -7,8 +9,8 @@ interface CatalogFiltersProps {
   onGenderChange: (v: string) => void;
   category: string;
   onCategoryChange: (v: string) => void;
-  saleFilter: "" | "oferta" | "nuevo";
-  onSaleFilterChange: (v: "" | "oferta" | "nuevo") => void;
+  saleFilter: SaleFilter;
+  onSaleFilterChange: (v: SaleFilter) => void;
   sortBy: string;
   onSortByChange: (v: string) => void;
   filteredCount: number;
@@ -104,7 +106,7 @@ export default function CatalogFilters({
 
         <div className="w-px h-5 bg-[#1A2656]/10 shrink-0" />
 
-        {/* Sale/New toggle chips */}
+        {/* Sale/New/Próximamente toggle chips */}
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={() => onSaleFilterChange(saleFilter === "oferta" ? "" : "oferta")}
@@ -125,6 +127,16 @@ export default function CatalogFilters({
             }`}
           >
             Nuevo
+          </button>
+          <button
+            onClick={() => onSaleFilterChange(saleFilter === "proximamente" ? "" : "proximamente")}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition whitespace-nowrap min-h-[32px] ${
+              saleFilter === "proximamente"
+                ? "bg-amber-500 text-white shadow-sm"
+                : "bg-white text-amber-700 border border-amber-300 hover:border-amber-400"
+            }`}
+          >
+            Próximamente
           </button>
         </div>
       </div>

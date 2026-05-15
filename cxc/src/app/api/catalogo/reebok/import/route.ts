@@ -67,8 +67,12 @@ export async function POST(req: NextRequest) {
     // Update or create products from file
     for (const item of incoming) {
       const exist = existingBySku.get(item.sku);
-      const badgeValue = item.badge === "nuevo" || item.badge === "oferta" ? item.badge : null;
-      const shouldBeActive = item.quantity > 0;
+      const badgeValue =
+        item.badge === "nuevo" || item.badge === "oferta" || item.badge === "proximamente"
+          ? item.badge
+          : null;
+      // Pre-order items stay active even without stock so they appear in the catalog.
+      const shouldBeActive = item.quantity > 0 || badgeValue === "proximamente";
 
       if (exist) {
         // Update product fields — active follows stock

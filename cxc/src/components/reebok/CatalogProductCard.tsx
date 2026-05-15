@@ -30,6 +30,8 @@ interface CatalogProductCardProps {
   showBultos?: boolean; // vendor mode shows "bultos"
 }
 
+const isPreOrder = (p: Product) => p.badge === "proximamente";
+
 export default function CatalogProductCard({
   product, qty, onQtyChange, disabled, showBultos,
 }: CatalogProductCardProps) {
@@ -100,6 +102,13 @@ export default function CatalogProductCard({
             <div className="absolute top-2 left-2 z-[5]">
               <span className="inline-block bg-[#1A2656] text-white text-[9px] font-bold uppercase tracking-wider px-2 py-[3px] rounded-md">
                 Nuevo
+              </span>
+            </div>
+          )}
+          {product.badge === "proximamente" && (
+            <div className="absolute top-2 left-2 z-[5]">
+              <span className="inline-block bg-amber-500 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-[3px] rounded-md">
+                Próximamente
               </span>
             </div>
           )}
@@ -236,10 +245,12 @@ export default function CatalogProductCard({
               className={`w-full mt-2.5 py-3 rounded-lg text-sm font-semibold transition min-h-[44px] ${
                 disabled
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                  : "bg-[#1A2656] text-white hover:bg-[#0f1a3d] active:scale-[0.97]"
+                  : isPreOrder(product)
+                    ? "bg-amber-500 text-white hover:bg-amber-600 active:scale-[0.97]"
+                    : "bg-[#1A2656] text-white hover:bg-[#0f1a3d] active:scale-[0.97]"
               }`}
             >
-              Agregar
+              {isPreOrder(product) ? "Pre-ordenar" : "Agregar"}
             </button>
           )}
         </div>

@@ -12,6 +12,7 @@ interface CartItem {
   quantity: number;
   unit_price: number;
   category?: string;
+  is_preorder?: boolean;
 }
 
 interface StickyCartBarProps {
@@ -89,40 +90,59 @@ export default function StickyCartBar({
                 </svg>
               </button>
             </div>
-            {cart.map(item => {
-              const bs = getBultoSize(item.category || "footwear");
-              const lineTotal = item.quantity * bs * item.unit_price;
-              return (
-              <div key={item.product_id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
-                <div className="flex-1 min-w-0 mr-3">
-                  <span className="text-sm text-[#1A2656] truncate block font-medium">{item.name}</span>
-                  <span className="text-[10px] text-[#1A2656]/40">x{item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * bs} pzas)</span>
-                </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <div className="flex items-center gap-0.5">
-                    <button
-                      onClick={() => onQtyChange(item.product_id, item.quantity - 1, { id: item.product_id, name: item.name, sku: item.sku, price: item.unit_price, image_url: item.image_url } as Product)}
-                      className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-[#1A2656] hover:bg-gray-100 rounded-lg transition text-sm min-w-[44px] min-h-[44px]"
-                    >
-                      &minus;
-                    </button>
-                    <span className="text-sm tabular-nums text-[#1A2656] w-6 text-center font-semibold">
-                      {item.quantity}
-                    </span>
-                    <button
-                      onClick={() => onQtyChange(item.product_id, item.quantity + 1, { id: item.product_id, name: item.name, sku: item.sku, price: item.unit_price, image_url: item.image_url } as Product)}
-                      className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-[#1A2656] hover:bg-gray-100 rounded-lg transition text-sm min-w-[44px] min-h-[44px]"
-                    >
-                      +
-                    </button>
+            {(() => {
+              const regular = cart.filter(i => !i.is_preorder);
+              const preorders = cart.filter(i => i.is_preorder);
+              const hasPreorders = preorders.length > 0;
+              const renderItem = (item: CartItem) => {
+                const bs = getBultoSize(item.category || "footwear");
+                const lineTotal = item.quantity * bs * item.unit_price;
+                return (
+                  <div key={item.product_id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
+                    <div className="flex-1 min-w-0 mr-3">
+                      <span className="text-sm text-[#1A2656] truncate block font-medium">{item.name}</span>
+                      <span className="text-[10px] text-[#1A2656]/40">x{item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * bs} pzas)</span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          onClick={() => onQtyChange(item.product_id, item.quantity - 1, { id: item.product_id, name: item.name, sku: item.sku, price: item.unit_price, image_url: item.image_url } as Product)}
+                          className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-[#1A2656] hover:bg-gray-100 rounded-lg transition text-sm min-w-[44px] min-h-[44px]"
+                        >
+                          &minus;
+                        </button>
+                        <span className="text-sm tabular-nums text-[#1A2656] w-6 text-center font-semibold">
+                          {item.quantity}
+                        </span>
+                        <button
+                          onClick={() => onQtyChange(item.product_id, item.quantity + 1, { id: item.product_id, name: item.name, sku: item.sku, price: item.unit_price, image_url: item.image_url } as Product)}
+                          className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-[#1A2656] hover:bg-gray-100 rounded-lg transition text-sm min-w-[44px] min-h-[44px]"
+                        >
+                          +
+                        </button>
+                      </div>
+                      <span className="text-sm tabular-nums text-[#1A2656]/60 w-20 text-right font-medium">
+                        ${lineTotal.toFixed(2)}
+                      </span>
+                    </div>
                   </div>
-                  <span className="text-sm tabular-nums text-[#1A2656]/60 w-20 text-right font-medium">
-                    ${lineTotal.toFixed(2)}
-                  </span>
-                </div>
-              </div>
+                );
+              };
+              return (
+                <>
+                  {hasPreorders && regular.length > 0 && (
+                    <div className="px-1 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-[#1A2656]/40">Pedido</div>
+                  )}
+                  {regular.map(renderItem)}
+                  {hasPreorders && (
+                    <>
+                      <div className="px-1 pt-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-600">Pre-orden</div>
+                      {preorders.map(renderItem)}
+                    </>
+                  )}
+                </>
               );
-            })}
+            })()}
           </div>
         </div>
         <div className="px-4 py-2.5 border-t border-gray-100 flex items-center justify-between">

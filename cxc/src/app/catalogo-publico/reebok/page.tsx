@@ -6,7 +6,7 @@ import { Product } from "@/components/reebok/supabase";
 import { getBultoSize } from "@/lib/reebok-bulto";
 import { Toast } from "@/components/ui";
 import CatalogHeader from "@/components/reebok/CatalogHeader";
-import CatalogFilters from "@/components/reebok/CatalogFilters";
+import CatalogFilters, { SaleFilter } from "@/components/reebok/CatalogFilters";
 import CatalogProductCard from "@/components/reebok/CatalogProductCard";
 import StickyCartBar from "@/components/reebok/StickyCartBar";
 
@@ -18,6 +18,7 @@ interface CartItem {
   quantity: number;
   unit_price: number;
   category: string;
+  is_preorder?: boolean;
 }
 
 export default function PublicCatalogPage() {
@@ -32,7 +33,7 @@ function PublicCatalog() {
   const [search, setSearch] = useState(searchParams.get("search") || "");
   const [gender, setGender] = useState(searchParams.get("gender") || "");
   const [category, setCategory] = useState(searchParams.get("category") || "");
-  const [saleFilter, setSaleFilter] = useState<"" | "oferta" | "nuevo">((searchParams.get("filter") as "" | "oferta" | "nuevo") || "");
+  const [saleFilter, setSaleFilter] = useState<SaleFilter>((searchParams.get("filter") as SaleFilter) || "");
   // color/size/price filters removed — kept simple
   const [sortBy, setSortBy] = useState("relevancia");
   const [toast, setToast] = useState<string | null>(null);
@@ -70,6 +71,7 @@ function PublicCatalog() {
         quantity: qty,
         unit_price: product.price || 0,
         category: product.category,
+        is_preorder: product.badge === "proximamente",
       }];
     });
   }, []);
@@ -121,7 +123,7 @@ function PublicCatalog() {
         setProducts(
           prods
             .map(p => ({ ...p, _stock: stockMap[p.id] || 0, _sizes: [...(sizesMap[p.id] || [])] }))
-            .filter(p => p._stock > 0)
+            .filter(p => p._stock > 0 || p.badge === "proximamente")
         );
       } catch {
         setProducts([]);
@@ -191,12 +193,21 @@ function PublicCatalog() {
       const { short_id } = await res.json();
 
       const total = cart.reduce((s, i) => s + i.quantity * getBultoSize(i.category) * i.unit_price, 0);
-      const itemLines = cart.map(i => {
+      const formatLine = (i: CartItem) => {
         const bs = getBultoSize(i.category);
         return `${i.name} x${i.quantity} bulto${i.quantity !== 1 ? "s" : ""} (${i.quantity * bs} pzas) — $${(i.quantity * bs * i.unit_price).toFixed(2)}`;
-      }).join("\n");
+      };
+      const regular = cart.filter(i => !i.is_preorder);
+      const preorders = cart.filter(i => i.is_preorder);
+      const sections: string[] = [];
+      if (regular.length > 0) {
+        sections.push(`*PEDIDO*\n${regular.map(formatLine).join("\n")}`);
+      }
+      if (preorders.length > 0) {
+        sections.push(`*PRE-ORDEN*\n${preorders.map(formatLine).join("\n")}`);
+      }
       const link = `https://www.fashiongr.com/pedido-reebok/${short_id}`;
-      const msg = `Hola, quiero hacer un pedido de Reebok:\n\n${itemLines}\n\nTotal: $${total.toFixed(2)}\n\n${link}`;
+      const msg = `Hola, quiero hacer un pedido de Reebok:\n\n${sections.join("\n\n")}\n\nTotal: $${total.toFixed(2)}\n\n${link}`;
       const url = `https://wa.me/50766745522?text=${encodeURIComponent(msg)}`;
       window.open(url, "_blank");
 

@@ -21,7 +21,12 @@ export interface CsvValidationResult {
 const EXPECTED_HEADERS = ["SKU", "Nombre", "Precio", "Cantidad", "Genero", "Estado"];
 
 const VALID_GENDERS = ["male", "female", "kids", "unisex", "adults", "adults_m", "women", "junior"];
-const VALID_BADGES = ["nuevo", "oferta", ""];
+const VALID_BADGES = ["nuevo", "oferta", "proximamente", ""];
+
+// Strip diacritics (e.g., "próximamente" → "proximamente") for badge normalization.
+function stripAccents(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
 
 // ── CSV Parser with BOM + delimiter auto-detect ─────────────────────────────
 
@@ -170,10 +175,13 @@ export function validateCsvImport(
       }
     }
 
-    // Normalize gender & badge
+    // Normalize gender & badge — accept "próximamente" (with or without tilde)
     const gender = rawGender.toLowerCase();
-    const estadoLower = rawEstado.toLowerCase();
-    const badge = estadoLower === "nuevo" ? "nuevo" : estadoLower === "oferta" ? "oferta" : "";
+    const estadoLower = stripAccents(rawEstado.toLowerCase());
+    const badge =
+      estadoLower === "nuevo" ? "nuevo" :
+      estadoLower === "oferta" ? "oferta" :
+      estadoLower === "proximamente" ? "proximamente" : "";
 
     // 9. Genero no reconocido
     if (gender && !VALID_GENDERS.includes(gender)) {
@@ -182,7 +190,7 @@ export function validateCsvImport(
 
     // 10. Estado no reconocido
     if (rawEstado && !VALID_BADGES.includes(estadoLower)) {
-      warnings.push(`Fila ${lineNum} (SKU ${rawSku}): estado '${rawEstado}' no reconocido. Valores validos: Nuevo, Oferta, o vacio`);
+      warnings.push(`Fila ${lineNum} (SKU ${rawSku}): estado '${rawEstado}' no reconocido. Valores validos: Nuevo, Oferta, Proximamente o vacio`);
     }
 
     parsedRows.push({

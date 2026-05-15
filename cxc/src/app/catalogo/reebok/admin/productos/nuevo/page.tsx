@@ -18,6 +18,7 @@ function NuevoProducto() {
   const [form, setForm] = useState({
     sku: '', name: '', description: '', price: '', category: 'footwear',
     gender: 'male', sub_category: '', color: '', active: true, image_url: '',
+    badge: '' as '' | 'nuevo' | 'oferta' | 'proximamente',
   })
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -37,6 +38,7 @@ function NuevoProducto() {
             price: p.price?.toString() || '', category: p.category, gender: p.gender || 'male',
             sub_category: p.sub_category || '', color: p.color || '', active: p.active,
             image_url: p.image_url || '',
+            badge: (p.badge === 'nuevo' || p.badge === 'oferta' || p.badge === 'proximamente') ? p.badge : '',
           })
         })
     }
@@ -60,6 +62,7 @@ function NuevoProducto() {
     const body = {
       ...form,
       price: form.price ? parseFloat(form.price) : null,
+      badge: form.badge || null,
       ...(editId ? { id: editId } : {}),
     }
     const res = await fetch('/api/catalogo/reebok/products', {
@@ -163,6 +166,21 @@ function NuevoProducto() {
               </label>
             </div>
           )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">Estado</label>
+          <select
+            value={form.badge}
+            onChange={e => set('badge', e.target.value)}
+            className="w-full border rounded px-3 py-2 text-sm"
+          >
+            <option value="">Ninguno</option>
+            <option value="nuevo">Nuevo</option>
+            <option value="oferta">Oferta</option>
+            <option value="proximamente">Próximamente (pre-orden)</option>
+          </select>
+          <p className="text-xs text-gray-500 mt-1">Solo un estado a la vez. &quot;Próximamente&quot; permite recibir pre-órdenes sin stock.</p>
         </div>
 
         <label className="flex items-center gap-2">
