@@ -69,10 +69,10 @@ function escapeCsvField(val: string): string {
   return val;
 }
 
-function downloadCSV(products: { sku: string; name: string; price: number; quantity: number; gender: string; badge: string }[], filename: string) {
-  const header = "SKU,Nombre,Precio,Cantidad,Genero,Estado";
+function downloadCSV(products: { sku: string; name: string; price: number; quantity: number; gender: string; badge: string; category: string }[], filename: string) {
+  const header = "SKU,Nombre,Precio,Cantidad,Genero,Estado,Categoria";
   const rows = products.map(p =>
-    `${escapeCsvField(p.sku)},${escapeCsvField(p.name)},${p.price},${p.quantity},${escapeCsvField(p.gender)},${p.badge || ""}`
+    `${escapeCsvField(p.sku)},${escapeCsvField(p.name)},${p.price},${p.quantity},${escapeCsvField(p.gender)},${p.badge || ""},${escapeCsvField(p.category)}`
   );
   const csv = [header, ...rows].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -82,6 +82,13 @@ function downloadCSV(products: { sku: string; name: string; price: number; quant
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function categoryToSpanish(cat: string): string {
+  if (cat === "footwear") return "Calzado";
+  if (cat === "apparel") return "Ropa";
+  if (cat === "accessories") return "Accesorios";
+  return "";
 }
 
 function parseCSV(text: string): Record<string, string>[] {
@@ -424,6 +431,7 @@ function ImportarTab({
 }) {
   return (
     <div className="space-y-6">
+      <ImportInstructions />
       <ImportSection
         title="Active Shoes"
         subtitle="Calzado (footwear)"
@@ -447,6 +455,51 @@ function ImportarTab({
         accentColor="#1A2656"
       />
       <BatchPhotosSection showToast={showToast} />
+    </div>
+  );
+}
+
+// ── Import Instructions ──────────────────────────────────────────────────────
+
+function ImportInstructions() {
+  return (
+    <div className="bg-white border border-gray-200 rounded-lg p-5">
+      <h3 className="text-sm font-semibold text-gray-900 mb-3">Como importar productos</h3>
+
+      <div className="space-y-3 text-xs text-gray-600">
+        <div>
+          <p className="font-medium text-gray-800 mb-1">Columnas del archivo</p>
+          <p className="font-mono text-[11px] text-gray-700">SKU, Nombre, Precio, Cantidad, Genero, Estado, Categoria</p>
+        </div>
+        <div>
+          <p className="font-medium text-gray-800 mb-1">Valores validos</p>
+          <ul className="space-y-0.5">
+            <li>
+              <span className="font-mono text-gray-700">Genero</span>: male, female, kids, unisex
+            </li>
+            <li>
+              <span className="font-mono text-gray-700">Estado</span>: nuevo, oferta, proximamente (o vacio)
+            </li>
+            <li>
+              <span className="font-mono text-gray-700">Categoria</span> (solo Active Wear): Calzado, Ropa o Accesorios
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="mt-4 bg-amber-50 border border-amber-300 rounded-lg p-3">
+        <div className="flex gap-2">
+          <svg className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="text-xs text-amber-900 leading-relaxed">
+            <p className="font-semibold mb-1">Importante</p>
+            <p>
+              El archivo debe contener <strong>TODOS</strong> los productos de la empresa. Cualquier producto que no este en el archivo se desactiva y su stock pasa a 0. Para actualizar solo algunos, descarga primero la plantilla &mdash; ya trae todos los productos actuales con su precio y categoria &mdash; y edita sobre ella.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -477,7 +530,7 @@ function ImportSection({
   const [parsed, setParsed] = useState<CsvImportRow[] | null>(null);
   const [preview, setPreview] = useState<{ updated: number; created: number; deactivated: number } | null>(null);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ updated: number; created: number; deactivated: number; reactivated: number } | null>(null);
+  const [importResult, setImportResult] = useState<{ updated: number; created: number; deactivated: number; reactivated: number; unclassifiedNew: string[] } | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
   const [dragOver, setDragOver] = useState(false);
@@ -501,6 +554,7 @@ function ImportSection({
         quantity: getProductStock(p.id),
         gender: p.gender || "",
         badge: p.badge || "",
+        category: categoryToSpanish(p.category),
       }));
     downloadCSV(rows, `Reebok_${title.replace(/\s/g, "_")}_${new Date().toISOString().slice(0, 10)}.csv`);
     showToast("Plantilla descargada");
@@ -569,6 +623,7 @@ function ImportSection({
           created: result.created,
           deactivated: result.deactivated ?? 0,
           reactivated: result.reactivated ?? 0,
+          unclassifiedNew: Array.isArray(result.unclassifiedNew) ? result.unclassifiedNew : [],
         });
         setParsed(null);
         setPreview(null);
@@ -765,6 +820,19 @@ function ImportSection({
             {importResult.updated} actualizados &middot; {importResult.created} nuevos &middot; {importResult.deactivated} inactivados
             {importResult.reactivated > 0 ? ` · ${importResult.reactivated} reactivados` : ""}
           </p>
+          {importResult.unclassifiedNew.length > 0 && (
+            <div className="mt-3 bg-amber-50 border border-amber-300 rounded px-3 py-2">
+              <p className="text-xs font-semibold text-amber-900">
+                {importResult.unclassifiedNew.length} producto{importResult.unclassifiedNew.length !== 1 ? "s" : ""} nuevo{importResult.unclassifiedNew.length !== 1 ? "s" : ""} entr{importResult.unclassifiedNew.length !== 1 ? "aron" : "ó"} como Ropa por defecto
+              </p>
+              <p className="text-[11px] text-amber-800 mt-1">
+                Clasificalos en el tab Productos o corrige la columna Categoria del archivo y vuelve a subir.
+              </p>
+              <p className="text-[11px] font-mono text-amber-900 mt-2 break-all">
+                {importResult.unclassifiedNew.join(", ")}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

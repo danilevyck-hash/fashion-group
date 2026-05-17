@@ -8,6 +8,8 @@ export interface CsvImportRow {
   quantity: number;
   gender: string;
   badge: string;
+  // Optional — only used by active_wear imports to choose between apparel/accessories.
+  category?: "footwear" | "apparel" | "accessories";
 }
 
 export interface CsvValidationResult {
@@ -19,6 +21,7 @@ export interface CsvValidationResult {
 }
 
 const EXPECTED_HEADERS = ["SKU", "Nombre", "Precio", "Cantidad", "Genero", "Estado"];
+// Note: "Categoria" is optional — read inline below, only meaningful for active_wear imports.
 
 const VALID_GENDERS = ["male", "female", "kids", "unisex", "adults", "adults_m", "women", "junior"];
 const VALID_BADGES = ["nuevo", "oferta", "proximamente", ""];
@@ -193,6 +196,27 @@ export function validateCsvImport(
       warnings.push(`Fila ${lineNum} (SKU ${rawSku}): estado '${rawEstado}' no reconocido. Valores validos: Nuevo, Oferta, Proximamente o vacio`);
     }
 
+    // Optional Categoria column — case-insensitive + accent-insensitive mapping.
+    const rawCategoria = String(row["Categoria"] || row["categoria"] || "").trim();
+    let category: "footwear" | "apparel" | "accessories" | undefined = undefined;
+    if (rawCategoria) {
+      const catLower = stripAccents(rawCategoria.toLowerCase());
+      if (catLower === "calzado" || catLower === "footwear") {
+        category = "footwear";
+      } else if (catLower === "ropa" || catLower === "apparel") {
+        category = "apparel";
+      } else if (
+        catLower === "accesorio" ||
+        catLower === "accesorios" ||
+        catLower === "accessories" ||
+        catLower === "acces"
+      ) {
+        category = "accessories";
+      } else {
+        warnings.push(`Fila ${lineNum} (SKU ${rawSku}): categoria '${rawCategoria}' no reconocida. Valores validos: Calzado, Ropa, Accesorios`);
+      }
+    }
+
     parsedRows.push({
       sku: rawSku,
       name: rawName || rawSku,
@@ -200,6 +224,7 @@ export function validateCsvImport(
       quantity,
       gender: gender || "",
       badge,
+      ...(category ? { category } : {}),
     });
   }
 

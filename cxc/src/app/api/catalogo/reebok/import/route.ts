@@ -12,6 +12,8 @@ interface ImportProduct {
   quantity: number;
   gender: string;
   badge?: string;
+  // Optional — only honored for active_wear. Ignored for active_shoes.
+  category?: string;
 }
 
 // Category filters for each company
@@ -19,6 +21,8 @@ const COMPANY_CATEGORIES: Record<string, string[]> = {
   active_shoes: ["footwear"],
   active_wear: ["apparel", "accessories"],
 };
+
+const VALID_WEAR_CATEGORIES = new Set(["apparel", "accessories"]);
 
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
@@ -60,6 +64,9 @@ export async function POST(req: NextRequest) {
     let created = 0;
     let deactivated = 0;
     let reactivated = 0;
+    // SKUs of products NUEVOS that entered with the default category because the
+    // CSV did not provide a recognized Categoria. Only meaningful for active_wear.
+    const unclassifiedNew: string[] = [];
 
     // Determine default category for new products
     const defaultCategory = companyCategories ? companyCategories[0] : "footwear";
@@ -74,17 +81,29 @@ export async function POST(req: NextRequest) {
       // Pre-order items stay active even without stock so they appear in the catalog.
       const shouldBeActive = item.quantity > 0 || badgeValue === "proximamente";
 
+      // Category from CSV only applies to active_wear. For active_shoes it is ignored.
+      const itemCategoryForWear =
+        company === "active_wear" && item.category && VALID_WEAR_CATEGORIES.has(item.category)
+          ? item.category
+          : null;
+
       if (exist) {
-        // Update product fields — active follows stock
+        // Update product fields — active follows stock.
+        // Only touch category when the CSV brings a valid one (preserves manual edits otherwise).
+        const updatePayload: Record<string, unknown> = {
+          name: item.name,
+          price: item.price,
+          gender: item.gender || null,
+          badge: badgeValue,
+          active: shouldBeActive,
+        };
+        if (itemCategoryForWear) {
+          updatePayload.category = itemCategoryForWear;
+        }
+
         await reebokServer
           .from("products")
-          .update({
-            name: item.name,
-            price: item.price,
-            gender: item.gender || null,
-            badge: badgeValue,
-            active: shouldBeActive,
-          })
+          .update(updatePayload)
           .eq("id", exist.id);
 
         // Upsert inventory with size UNICA
@@ -100,6 +119,7 @@ export async function POST(req: NextRequest) {
         else updated++;
       } else {
         // Create new product — active only if it has stock
+        const finalCategory = itemCategoryForWear || defaultCategory;
         const { data: newProd } = await reebokServer
           .from("products")
           .insert({
@@ -107,7 +127,7 @@ export async function POST(req: NextRequest) {
             name: item.name,
             price: item.price,
             gender: item.gender || null,
-            category: defaultCategory,
+            category: finalCategory,
             active: shouldBeActive,
             on_sale: false,
             badge: badgeValue,
@@ -119,6 +139,11 @@ export async function POST(req: NextRequest) {
           await reebokServer
             .from("inventory")
             .insert({ product_id: newProd.id, size: "UNICA", quantity: item.quantity });
+        }
+
+        // Track new wear products that fell back to default category.
+        if (company === "active_wear" && !itemCategoryForWear) {
+          unclassifiedNew.push(item.sku);
         }
 
         created++;
@@ -143,7 +168,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ updated, created, deactivated, reactivated });
+    return NextResponse.json({ updated, created, deactivated, reactivated, unclassifiedNew });
   } catch (err) {
     console.error("Import error:", err);
     return NextResponse.json({ error: "Error al importar" }, { status: 500 });
