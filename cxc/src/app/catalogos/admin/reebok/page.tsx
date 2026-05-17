@@ -226,7 +226,7 @@ export default function ReebokAdminPage() {
         ) : (
           <>
             {tab === "productos" && (
-              <ProductosTab products={products} getStock={getStock} />
+              <ProductosTab products={products} getStock={getStock} onProductsChanged={loadProducts} />
             )}
             {tab === "pedidos" && (
               <PedidosTab pedidos={pedidos} />
@@ -248,16 +248,42 @@ export default function ReebokAdminPage() {
 
 // ── PRODUCTOS TAB (READ-ONLY) ────────────────────────────────────────────────
 
+type ProductSubTab = "footwear" | "apparel" | "accessories";
+
 function ProductosTab({
   products,
   getStock,
+  onProductsChanged,
 }: {
   products: ReebokProduct[];
   getStock: (id: string) => number;
+  onProductsChanged: () => Promise<void>;
 }) {
+  const [subTab, setSubTab] = useState<ProductSubTab>("footwear");
   const [search, setSearch] = useState("");
 
-  const filtered = products.filter((p) => {
+  // Optimistic price overrides keyed by product id — survive parent refetches.
+  const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>({});
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [justSavedId, setJustSavedId] = useState<string | null>(null);
+  const [errorById, setErrorById] = useState<Record<string, string>>({});
+
+  const subTabs: { key: ProductSubTab; label: string }[] = [
+    { key: "footwear", label: "Calzado" },
+    { key: "apparel", label: "Ropa" },
+    { key: "accessories", label: "Accesorios" },
+  ];
+
+  const counts = {
+    footwear: products.filter((p) => p.category === "footwear").length,
+    apparel: products.filter((p) => p.category === "apparel").length,
+    accessories: products.filter((p) => p.category === "accessories").length,
+  };
+
+  const inSubTab = products.filter((p) => p.category === subTab);
+
+  const filtered = inSubTab.filter((p) => {
     if (!search) return true;
     const q = search.toLowerCase();
     return (
@@ -267,10 +293,8 @@ function ProductosTab({
   });
 
   const sorted = [...filtered].sort((a, b) => {
-    // Active products first
     if (a.active !== false && b.active === false) return -1;
     if (a.active === false && b.active !== false) return 1;
-    // Then products with stock
     const stockA = getStock(a.id);
     const stockB = getStock(b.id);
     if (stockA > 0 && stockB === 0) return -1;
@@ -278,8 +302,101 @@ function ProductosTab({
     return a.name.localeCompare(b.name);
   });
 
+  function displayPrice(p: ReebokProduct): number {
+    return priceOverrides[p.id] !== undefined ? priceOverrides[p.id] : (p.price || 0);
+  }
+
+  function startEdit(p: ReebokProduct) {
+    setEditingId(p.id);
+    setErrorById((eb) => {
+      if (!(p.id in eb)) return eb;
+      const next = { ...eb };
+      delete next[p.id];
+      return next;
+    });
+  }
+
+  function cancelEdit(p: ReebokProduct, inputEl: HTMLInputElement) {
+    // Restore the input value to the original so onBlur sees "no change" and exits.
+    inputEl.value = String(displayPrice(p));
+    inputEl.blur();
+  }
+
+  async function commitEdit(p: ReebokProduct, raw: string) {
+    setEditingId(null);
+
+    const current = displayPrice(p);
+    const trimmed = raw.trim().replace(",", ".");
+    if (trimmed === "") {
+      // Empty = treat as cancel, no error.
+      return;
+    }
+    const next = parseFloat(trimmed);
+    if (isNaN(next) || next < 0) {
+      setErrorById((eb) => ({ ...eb, [p.id]: "Precio invalido" }));
+      return;
+    }
+    if (next === current) {
+      return;
+    }
+
+    const hadOverride = p.id in priceOverrides;
+    const prevOverride = priceOverrides[p.id];
+
+    setSavingId(p.id);
+    setPriceOverrides((o) => ({ ...o, [p.id]: next })); // optimistic
+
+    try {
+      const res = await fetch("/api/catalogo/reebok/products", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: p.id, price: next }),
+      });
+      if (!res.ok) throw new Error("save failed");
+
+      setJustSavedId(p.id);
+      setTimeout(() => {
+        setJustSavedId((s) => (s === p.id ? null : s));
+      }, 1500);
+
+      // Refresh in background so the rest of the app sees the new price.
+      onProductsChanged().catch(() => { /* ignore */ });
+    } catch {
+      // Revert optimistic override to whatever it was before.
+      setPriceOverrides((o) => {
+        const copy = { ...o };
+        if (hadOverride) copy[p.id] = prevOverride;
+        else delete copy[p.id];
+        return copy;
+      });
+      setErrorById((eb) => ({ ...eb, [p.id]: "No se pudo guardar. Intenta de nuevo." }));
+    } finally {
+      setSavingId((s) => (s === p.id ? null : s));
+    }
+  }
+
   return (
     <div>
+      {/* Subtabs */}
+      <div className="flex gap-1 mb-4 border-b border-gray-200">
+        {subTabs.map((st) => {
+          const active = subTab === st.key;
+          return (
+            <button
+              key={st.key}
+              onClick={() => setSubTab(st.key)}
+              className={`px-3 py-2 text-sm font-medium -mb-px border-b-2 transition ${
+                active
+                  ? "text-[#1A2656] border-[#1A2656]"
+                  : "text-gray-400 border-transparent hover:text-gray-600"
+              }`}
+            >
+              {st.label} ({counts[st.key]})
+            </button>
+          );
+        })}
+      </div>
+
       {/* Search */}
       <div className="relative mb-4">
         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -295,75 +412,127 @@ function ProductosTab({
 
       <p className="text-sm text-gray-500 mb-4">
         {filtered.length} producto{filtered.length !== 1 ? "s" : ""}
-        {search && ` (de ${products.length})`}
+        {search && ` (de ${inSubTab.length})`}
       </p>
 
-      <div className="space-y-2">
-        {sorted.map((product) => {
-          const stock = getStock(product.id);
-          const badgeLabel = product.badge === "nuevo" ? "Nuevo" : product.badge === "oferta" ? "Oferta" : null;
-
-          const isInactive = product.active === false;
-          return (
-            <div
-              key={product.id}
-              className={`bg-white border rounded-lg p-3 ${isInactive ? "opacity-50 border-gray-100 bg-gray-50/50" : stock === 0 ? "opacity-60 border-gray-100" : "border-gray-200"}`}
-            >
-              <div className="flex items-center gap-3">
-                {/* Image */}
-                <div className="w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
-                  {product.image_url ? (
-                    <Image
-                      src={product.image_url}
-                      alt={product.name}
-                      width={48}
-                      height={48}
-                      className="w-full h-full object-cover"
-                      unoptimized
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-300">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{product.name}</p>
-                    {isInactive && (
-                      <span className="text-[10px] font-medium bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">Inactivo</span>
-                    )}
-                    {!isInactive && badgeLabel && (
-                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                        product.badge === "oferta"
-                          ? "bg-orange-50 text-orange-600"
-                          : "bg-blue-50 text-blue-600"
-                      }`}>
-                        {badgeLabel}
-                      </span>
-                    )}
-                    {!isInactive && stock === 0 && (
-                      <span className="text-[10px] font-medium bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">Sin stock</span>
+      {sorted.length === 0 ? (
+        <div className="text-center py-12 text-sm text-gray-400">
+          {search ? "Ningun producto coincide con la busqueda" : "No hay productos en esta categoria"}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {sorted.map((product) => {
+            const stock = getStock(product.id);
+            const badgeLabel = product.badge === "nuevo" ? "Nuevo" : product.badge === "oferta" ? "Oferta" : null;
+            const isInactive = product.active === false;
+            const isEditing = editingId === product.id;
+            const isSaving = savingId === product.id;
+            const justSaved = justSavedId === product.id;
+            const error = errorById[product.id];
+            return (
+              <div
+                key={product.id}
+                className={`bg-white border rounded-lg p-3 ${isInactive ? "opacity-50 border-gray-100 bg-gray-50/50" : stock === 0 ? "opacity-60 border-gray-100" : "border-gray-200"}`}
+              >
+                <div className="flex items-center gap-3">
+                  {/* Image */}
+                  <div className="w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
+                    {product.image_url ? (
+                      <Image
+                        src={product.image_url}
+                        alt={product.name}
+                        width={48}
+                        height={48}
+                        className="w-full h-full object-cover"
+                        unoptimized
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-gray-300">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
                     )}
                   </div>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {product.sku || "—"} &middot; {product.category} &middot; {product.gender || "—"} &middot; Stock: {stock}
-                  </p>
-                </div>
 
-                {/* Price */}
-                <p className="text-sm font-semibold text-gray-900 tabular-nums flex-shrink-0">
-                  ${fmtMoney(product.price || 0)}
-                </p>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-gray-900 truncate">{product.name}</p>
+                      {isInactive && (
+                        <span className="text-[10px] font-medium bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">Inactivo</span>
+                      )}
+                      {!isInactive && badgeLabel && (
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                          product.badge === "oferta"
+                            ? "bg-orange-50 text-orange-600"
+                            : "bg-blue-50 text-blue-600"
+                        }`}>
+                          {badgeLabel}
+                        </span>
+                      )}
+                      {!isInactive && stock === 0 && (
+                        <span className="text-[10px] font-medium bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">Sin stock</span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {product.sku || "—"} &middot; {product.category} &middot; {product.gender || "—"} &middot; Stock: {stock}
+                    </p>
+                  </div>
+
+                  {/* Price — inline editable */}
+                  <div className="flex-shrink-0 flex items-center gap-1.5">
+                    {isEditing ? (
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm text-gray-400">$</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          autoFocus
+                          defaultValue={displayPrice(product).toFixed(2)}
+                          onBlur={(e) => commitEdit(product, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              (e.target as HTMLInputElement).blur();
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              cancelEdit(product, e.target as HTMLInputElement);
+                            }
+                          }}
+                          className="w-20 px-2 py-1 text-sm text-right tabular-nums border border-[#1A2656] rounded focus:outline-none focus:ring-1 focus:ring-[#1A2656]/30"
+                        />
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => startEdit(product)}
+                        disabled={isSaving}
+                        title="Editar precio"
+                        className="text-sm font-semibold text-gray-900 tabular-nums hover:bg-gray-100 px-2 py-1 rounded transition disabled:opacity-50"
+                      >
+                        ${fmtMoney(displayPrice(product))}
+                      </button>
+                    )}
+                    {isSaving && (
+                      <svg className="w-3.5 h-3.5 text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                    )}
+                    {justSaved && !isSaving && (
+                      <svg className="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+                {error && (
+                  <p className="text-[11px] text-red-600 mt-1.5 ml-15">{error}</p>
+                )}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
