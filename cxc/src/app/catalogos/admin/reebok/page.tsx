@@ -898,6 +898,9 @@ function BatchPhotosSection({ showToast }: { showToast: (msg: string) => void })
       try {
         const formData = new FormData();
         formData.append("file", file);
+        // Send the resolved SKU so the upload route can use a deterministic
+        // Storage path and overwrite previous photos for this product in place.
+        formData.append("sku", sku);
         const uploadRes = await fetch("/api/catalogo/reebok/upload", { method: "POST", body: formData });
         if (uploadRes.ok) {
           const { url } = await uploadRes.json();

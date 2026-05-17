@@ -4,6 +4,12 @@ import { requireRole } from '@/lib/requireRole'
 
 export const dynamic = "force-dynamic";
 
+// Lowercase + keep alphanumerics, period, hyphen, underscore — everything else → '_'.
+// Storage paths must be deterministic per SKU so a re-upload overwrites the same object.
+function normalizeSku(sku: string): string {
+  return sku.toLowerCase().replace(/[^a-z0-9._-]/g, '_')
+}
+
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, ['admin', 'secretaria'])
   if (auth instanceof NextResponse) return auth
@@ -12,7 +18,17 @@ export async function POST(req: NextRequest) {
   if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
   const buffer = Buffer.from(await file.arrayBuffer())
-  const filename = `products/${Date.now()}-${file.name}`
+
+  // When the caller supplies the resolved SKU we use a deterministic path so
+  // every re-upload overwrites the same Storage object (no orphans). The path
+  // intentionally has no extension — the browser uses Content-Type to render.
+  // Callers that do not send a SKU (legacy product-form upload) fall back to
+  // the timestamped path to avoid clobbering unrelated uploads.
+  const rawSku = (formData.get('sku') as string | null)?.trim() || ''
+  const skuKey = rawSku ? normalizeSku(rawSku) : ''
+  const filename = skuKey
+    ? `products/${skuKey}`
+    : `products/${Date.now()}-${file.name}`
 
   const { error: uploadError } = await reebokServer.storage
     .from('product-images')
@@ -24,5 +40,9 @@ export async function POST(req: NextRequest) {
     .from('product-images')
     .getPublicUrl(filename)
 
-  return NextResponse.json({ url: publicUrl })
+  // Cache-buster: the deterministic path means the URL is stable; without `?v=`
+  // the browser would keep serving the old cached bytes after a re-upload.
+  const url = `${publicUrl}?v=${Date.now()}`
+
+  return NextResponse.json({ url })
 }
