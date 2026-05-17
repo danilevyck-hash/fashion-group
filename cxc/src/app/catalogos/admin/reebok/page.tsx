@@ -69,11 +69,18 @@ function escapeCsvField(val: string): string {
   return val;
 }
 
-function downloadCSV(products: { sku: string; name: string; price: number; quantity: number; gender: string; badge: string; category: string }[], filename: string) {
-  const header = "SKU,Nombre,Precio,Cantidad,Genero,Estado,Categoria";
-  const rows = products.map(p =>
-    `${escapeCsvField(p.sku)},${escapeCsvField(p.name)},${p.price},${p.quantity},${escapeCsvField(p.gender)},${p.badge || ""},${escapeCsvField(p.category)}`
-  );
+function downloadCSV(
+  products: { sku: string; name: string; price: number; quantity: number; gender: string; badge: string; category: string }[],
+  filename: string,
+  includeCategory: boolean,
+) {
+  const header = includeCategory
+    ? "SKU,Nombre,Precio,Cantidad,Genero,Estado,Categoria"
+    : "SKU,Nombre,Precio,Cantidad,Genero,Estado";
+  const rows = products.map(p => {
+    const base = `${escapeCsvField(p.sku)},${escapeCsvField(p.name)},${p.price},${p.quantity},${escapeCsvField(p.gender)},${p.badge || ""}`;
+    return includeCategory ? `${base},${escapeCsvField(p.category)}` : base;
+  });
   const csv = [header, ...rows].join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -704,7 +711,7 @@ function ImportInstructions() {
               <span className="font-mono text-gray-700">Estado</span>: nuevo, oferta, proximamente (o vacio)
             </li>
             <li>
-              <span className="font-mono text-gray-700">Categoria</span> (solo Active Wear): Calzado, Ropa o Accesorios
+              <span className="font-mono text-gray-700">Categoria</span> (solo Active Wear): Ropa o Accesorios. Active Shoes no usa esta columna.
             </li>
           </ul>
         </div>
@@ -768,6 +775,10 @@ function ImportSection({
   }
 
   function handleDownloadTemplate() {
+    // Categoria only meaningful for active_wear (apparel vs accessories).
+    // Active Shoes is always footwear — omit the column entirely so the operator
+    // is not tempted to fill it.
+    const includeCategory = company === "active_wear";
     const rows = companyProducts
       .filter((p) => p.active !== false)
       .map((p) => ({
@@ -779,7 +790,7 @@ function ImportSection({
         badge: p.badge || "",
         category: categoryToSpanish(p.category),
       }));
-    downloadCSV(rows, `Reebok_${title.replace(/\s/g, "_")}_${new Date().toISOString().slice(0, 10)}.csv`);
+    downloadCSV(rows, `Reebok_${title.replace(/\s/g, "_")}_${new Date().toISOString().slice(0, 10)}.csv`, includeCategory);
     showToast("Plantilla descargada");
   }
 
