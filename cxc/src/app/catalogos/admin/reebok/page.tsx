@@ -261,6 +261,9 @@ function ProductosTab({
 }) {
   const [subTab, setSubTab] = useState<ProductSubTab>("footwear");
   const [search, setSearch] = useState("");
+  const [ofertaFilter, setOfertaFilter] = useState<"" | "solo">("");
+  const [genderFilter, setGenderFilter] = useState<"" | "male" | "female" | "kids" | "unisex" | "otro">("");
+  const [estadoFilter, setEstadoFilter] = useState<"" | "nuevo" | "proximamente">("");
 
   // Optimistic price overrides keyed by product id — survive parent refetches.
   const [priceOverrides, setPriceOverrides] = useState<Record<string, number>>({});
@@ -275,26 +278,44 @@ function ProductosTab({
     { key: "accessories", label: "Accesorios" },
   ];
 
+  // Inactive products are hidden everywhere — counts and lists reflect actives only.
+  const activeProducts = products.filter((p) => p.active !== false);
+
   const counts = {
-    footwear: products.filter((p) => p.category === "footwear").length,
-    apparel: products.filter((p) => p.category === "apparel").length,
-    accessories: products.filter((p) => p.category === "accessories").length,
+    footwear: activeProducts.filter((p) => p.category === "footwear").length,
+    apparel: activeProducts.filter((p) => p.category === "apparel").length,
+    accessories: activeProducts.filter((p) => p.category === "accessories").length,
   };
 
-  const inSubTab = products.filter((p) => p.category === subTab);
+  const inSubTab = activeProducts.filter((p) => p.category === subTab);
+
+  const STANDARD_GENDERS = new Set(["male", "female", "kids", "unisex"]);
 
   const filtered = inSubTab.filter((p) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      p.name.toLowerCase().includes(q) ||
-      (p.sku || "").toLowerCase().includes(q)
-    );
+    if (search) {
+      const q = search.toLowerCase();
+      if (
+        !p.name.toLowerCase().includes(q) &&
+        !(p.sku || "").toLowerCase().includes(q)
+      ) {
+        return false;
+      }
+    }
+    if (ofertaFilter === "solo" && p.badge !== "oferta") return false;
+    if (genderFilter) {
+      if (genderFilter === "otro") {
+        if (p.gender && STANDARD_GENDERS.has(p.gender)) return false;
+      } else if (p.gender !== genderFilter) {
+        return false;
+      }
+    }
+    if (estadoFilter && p.badge !== estadoFilter) return false;
+    return true;
   });
 
+  const hasActiveFilters = Boolean(search || ofertaFilter || genderFilter || estadoFilter);
+
   const sorted = [...filtered].sort((a, b) => {
-    if (a.active !== false && b.active === false) return -1;
-    if (a.active === false && b.active !== false) return 1;
     const stockA = getStock(a.id);
     const stockB = getStock(b.id);
     if (stockA > 0 && stockB === 0) return -1;
@@ -398,7 +419,7 @@ function ProductosTab({
       </div>
 
       {/* Search */}
-      <div className="relative mb-4">
+      <div className="relative mb-3">
         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
@@ -410,14 +431,47 @@ function ProductosTab({
         />
       </div>
 
+      {/* Filters */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        <select
+          value={ofertaFilter}
+          onChange={(e) => setOfertaFilter(e.target.value as "" | "solo")}
+          className="px-3 py-1.5 bg-white border border-gray-200 rounded-md text-xs text-gray-700 outline-none focus:border-[#1A2656]/30 transition cursor-pointer"
+        >
+          <option value="">Todas las ofertas</option>
+          <option value="solo">Solo en oferta</option>
+        </select>
+        <select
+          value={genderFilter}
+          onChange={(e) => setGenderFilter(e.target.value as "" | "male" | "female" | "kids" | "unisex" | "otro")}
+          className="px-3 py-1.5 bg-white border border-gray-200 rounded-md text-xs text-gray-700 outline-none focus:border-[#1A2656]/30 transition cursor-pointer"
+        >
+          <option value="">Todos los generos</option>
+          <option value="male">Hombre</option>
+          <option value="female">Mujer</option>
+          <option value="kids">Ninos</option>
+          <option value="unisex">Unisex</option>
+          <option value="otro">Otro</option>
+        </select>
+        <select
+          value={estadoFilter}
+          onChange={(e) => setEstadoFilter(e.target.value as "" | "nuevo" | "proximamente")}
+          className="px-3 py-1.5 bg-white border border-gray-200 rounded-md text-xs text-gray-700 outline-none focus:border-[#1A2656]/30 transition cursor-pointer"
+        >
+          <option value="">Todos los estados</option>
+          <option value="nuevo">Nuevo</option>
+          <option value="proximamente">Proximamente</option>
+        </select>
+      </div>
+
       <p className="text-sm text-gray-500 mb-4">
         {filtered.length} producto{filtered.length !== 1 ? "s" : ""}
-        {search && ` (de ${inSubTab.length})`}
+        {hasActiveFilters && filtered.length !== inSubTab.length && ` (de ${inSubTab.length})`}
       </p>
 
       {sorted.length === 0 ? (
         <div className="text-center py-12 text-sm text-gray-400">
-          {search ? "Ningun producto coincide con la busqueda" : "No hay productos en esta categoria"}
+          {hasActiveFilters ? "Ningun producto coincide con los filtros" : "No hay productos en esta categoria"}
         </div>
       ) : (
         <div className="space-y-2">
