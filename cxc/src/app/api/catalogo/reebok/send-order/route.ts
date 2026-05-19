@@ -4,8 +4,12 @@ import { requireRole } from "@/lib/requireRole";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import { REEBOK_LOGO_BASE64, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT } from "@/lib/reebok-logo";
+import { getBultoSize } from "@/lib/reebok-bulto";
+import { fetchReebokCategoryMap } from "@/lib/reebok-category-lookup";
 
-const P = 12;
+// Fallback category cuando un product_id no resuelve en `products`. Usamos
+// "apparel" (bulto=6) para nunca inflar el cobro asumiendo footwear=12.
+const FALLBACK_CATEGORY = "apparel";
 
 function fmt(n: number) { return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -16,7 +20,7 @@ export async function POST(req: NextRequest) {
   const RESEND_KEY = process.env.RESEND_API_KEY;
   if (!RESEND_KEY) return NextResponse.json({ error: "RESEND_API_KEY not configured" }, { status: 500 });
 
-  type EmailItem = { sku: string; name: string; quantity: number; unit_price: number; image_url: string; is_preorder?: boolean };
+  type EmailItem = { sku: string; name: string; quantity: number; unit_price: number; image_url: string; is_preorder?: boolean; category: string };
   let clientName: string;
   let orderNumber: string;
   let items: EmailItem[];
@@ -38,17 +42,23 @@ export async function POST(req: NextRequest) {
     orderNumber = order.order_number;
     comment = order.comment;
     createdAt = order.created_at;
-    items = (order.reebok_order_items || []).map((i: { sku: string; name: string; quantity: number; unit_price: number; image_url?: string; is_preorder?: boolean }) => ({
-      sku: i.sku || "", name: i.name || "", quantity: i.quantity, unit_price: i.unit_price, image_url: i.image_url || "", is_preorder: i.is_preorder === true,
+    const rawItems = (order.reebok_order_items || []) as { product_id: string; sku: string; name: string; quantity: number; unit_price: number; image_url?: string; is_preorder?: boolean }[];
+    const categoryMap = await fetchReebokCategoryMap(rawItems.map((i) => i.product_id));
+    items = rawItems.map((i) => ({
+      sku: i.sku || "", name: i.name || "", quantity: i.quantity, unit_price: i.unit_price,
+      image_url: i.image_url || "", is_preorder: i.is_preorder === true,
+      category: categoryMap.get(i.product_id) || FALLBACK_CATEGORY,
     }));
     totalBultos = items.reduce((s, i) => s + i.quantity, 0);
-    totalPiezas = totalBultos * P;
-    total = items.reduce((s, i) => s + i.quantity * P * Number(i.unit_price), 0);
+    totalPiezas = items.reduce((s, i) => s + i.quantity * getBultoSize(i.category), 0);
+    total = items.reduce((s, i) => s + i.quantity * getBultoSize(i.category) * Number(i.unit_price), 0);
   } else {
     clientName = body.clientName || "Sin nombre";
     orderNumber = "PEDIDO";
-    items = (body.items || []).map((i: { productId: string; productName: string; quantity: number; price: number; image_url?: string; is_preorder?: boolean }) => ({
-      sku: i.productId?.substring(0, 12) || "", name: i.productName || "", quantity: i.quantity, unit_price: i.price || 0, image_url: "", is_preorder: i.is_preorder === true,
+    items = (body.items || []).map((i: { productId: string; productName: string; quantity: number; price: number; image_url?: string; is_preorder?: boolean; category?: string }) => ({
+      sku: i.productId?.substring(0, 12) || "", name: i.productName || "", quantity: i.quantity, unit_price: i.price || 0,
+      image_url: "", is_preorder: i.is_preorder === true,
+      category: i.category || FALLBACK_CATEGORY,
     }));
     totalBultos = body.totalBultos || 0;
     totalPiezas = body.totalPiezas || 0;
@@ -96,7 +106,10 @@ export async function POST(req: NextRequest) {
     autoTable(doc, {
       startY: startY + 3,
       head: [["", "Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
-      body: sectionItems.map(i => ["", i.name, i.sku, String(i.quantity), String(i.quantity * P), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * P * Number(i.unit_price))}`]),
+      body: sectionItems.map(i => {
+        const bs = getBultoSize(i.category);
+        return ["", i.name, i.sku, String(i.quantity), String(i.quantity * bs), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * bs * Number(i.unit_price))}`];
+      }),
       styles: { fontSize: 8, cellPadding: 2, minCellHeight: 12 },
       headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: [249, 249, 249] },
@@ -138,15 +151,17 @@ export async function POST(req: NextRequest) {
   const pdfFilename = `Pedido-${orderNumber}-${dateStr}.pdf`;
 
   // ── Build HTML email ──
-  const renderRow = (item: EmailItem) =>
-    `<tr style="border-bottom:1px solid #eee">
+  const renderRow = (item: EmailItem) => {
+    const bs = getBultoSize(item.category);
+    return `<tr style="border-bottom:1px solid #eee">
       <td style="padding:8px;vertical-align:middle;width:48px">${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" width="40" height="40" style="display:block;width:40px;height:40px;object-fit:cover;border-radius:4px;border:1px solid #eee">` : `<div style="display:block;width:40px;height:40px;background:#e5e7eb;border-radius:4px"></div>`}</td>
       <td style="padding:8px;vertical-align:middle"><strong>${item.name}</strong><br><span style="font-size:11px;color:#888">${item.sku}</span></td>
       <td style="padding:8px;text-align:center;vertical-align:middle">${item.quantity}</td>
-      <td style="padding:8px;text-align:center;vertical-align:middle">${item.quantity * P}</td>
+      <td style="padding:8px;text-align:center;vertical-align:middle">${item.quantity * bs}</td>
       <td style="padding:8px;text-align:right;vertical-align:middle">$${fmt(item.unit_price)}</td>
-      <td style="padding:8px;text-align:right;vertical-align:middle">$${fmt(item.quantity * P * Number(item.unit_price))}</td>
+      <td style="padding:8px;text-align:right;vertical-align:middle">$${fmt(item.quantity * bs * Number(item.unit_price))}</td>
     </tr>`;
+  };
 
   const renderSection = (title: string, sectionItems: EmailItem[], accent: string) => sectionItems.length === 0 ? "" : `
     <div style="margin:16px 0 4px;display:flex;align-items:center;gap:8px">

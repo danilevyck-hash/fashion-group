@@ -5,12 +5,18 @@ import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { ConfirmDeleteModal, Toast } from "@/components/ui";
+import { getBultoSize } from "@/lib/reebok-bulto";
 
-interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; }
+interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string; }
 interface Order { id: string; order_number: string; client_name: string; client_email?: string | null; comment: string; status: string; total: number; reebok_order_items: OrderItem[]; created_at: string; }
 interface DirClient { nombre: string; empresa: string; }
 
-const P = 12;
+// Fallback cuando el item no resuelve category via products (producto borrado).
+// "apparel" devuelve bulto=6: NUNCA inflar a 12 a ciegas.
+const FALLBACK_CATEGORY = "apparel";
+function bs(item: { category?: string }): number {
+  return getBultoSize(item.category || FALLBACK_CATEGORY);
+}
 
 export default function OrderDetailPage() {
   const router = useRouter();
@@ -226,7 +232,10 @@ export default function OrderDetailPage() {
     autoTable(doc, {
       startY: 32,
       head: [["", "Producto", "SKU", "Bultos", "Piezas", "Precio/u", "Subtotal"]],
-      body: items.map(i => ["", i.name, i.sku || "", String(i.quantity), String(i.quantity * P), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * P * Number(i.unit_price))}`]),
+      body: items.map(i => {
+        const b = bs(i);
+        return ["", i.name, i.sku || "", String(i.quantity), String(i.quantity * b), `$${fmt(i.unit_price)}`, `$${fmt(i.quantity * b * Number(i.unit_price))}`];
+      }),
       styles: { fontSize: 8, cellPadding: 2, minCellHeight: 12 },
       headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: [249, 249, 249] },
@@ -305,8 +314,8 @@ export default function OrderDetailPage() {
   );
 
   const totalBultos = items.reduce((s, i) => s + (i.quantity || 0), 0);
-  const totalPiezas = totalBultos * P;
-  const totalMoney = items.reduce((s, i) => s + (i.quantity || 0) * P * Number(i.unit_price || 0), 0);
+  const totalPiezas = items.reduce((s, i) => s + (i.quantity || 0) * bs(i), 0);
+  const totalMoney = items.reduce((s, i) => s + (i.quantity || 0) * bs(i) * Number(i.unit_price || 0), 0);
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6">
@@ -389,7 +398,7 @@ export default function OrderDetailPage() {
                       <span className="tabular-nums">{item.quantity}</span>
                     )}
                   </td>
-                  <td className="py-2 text-center text-xs text-gray-400 tabular-nums">{item.quantity * P}</td>
+                  <td className="py-2 text-center text-xs text-gray-400 tabular-nums">{item.quantity * bs(item)}</td>
                   <td className="py-2 text-right">
                     {!isConfirmed ? (
                       <input type="number" step={1} min={0} value={item.unit_price}
@@ -399,7 +408,7 @@ export default function OrderDetailPage() {
                       <span className="tabular-nums">${fmt(item.unit_price)}</span>
                     )}
                   </td>
-                  <td className="py-2 text-right tabular-nums text-sm">${fmt(item.quantity * P * Number(item.unit_price))}</td>
+                  <td className="py-2 text-right tabular-nums text-sm">${fmt(item.quantity * bs(item) * Number(item.unit_price))}</td>
                   {!isConfirmed && (
                     <td className="py-2 text-center">
                       <button onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-500 transition text-xs">x</button>
