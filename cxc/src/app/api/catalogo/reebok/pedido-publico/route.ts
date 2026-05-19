@@ -24,9 +24,14 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const items: CartItem[] = body.items;
+    const cliente_nombre = typeof body.cliente_nombre === "string" ? body.cliente_nombre.trim() : "";
 
     if (!Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "El carrito está vacío" }, { status: 400 });
+    }
+
+    if (!cliente_nombre) {
+      return NextResponse.json({ error: "Falta el nombre del cliente" }, { status: 400 });
     }
 
     const total = calculateReebokOrderTotal(items);
@@ -36,6 +41,7 @@ export async function POST(req: NextRequest) {
       short_id,
       items,
       total,
+      cliente_nombre,
     });
 
     if (error) {

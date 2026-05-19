@@ -178,16 +178,33 @@ function PublicCatalog() {
   }
 
   const [sendingOrder, setSendingOrder] = useState(false);
+  const [clientName, setClientName] = useState("");
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("reebok_public_client_name");
+      if (saved) setClientName(saved);
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem("reebok_public_client_name", clientName); } catch { /* */ }
+  }, [clientName]);
 
   // WhatsApp send with shareable link
   async function handleSendWhatsApp() {
     if (cart.length === 0 || sendingOrder) return;
+    const trimmedName = clientName.trim();
+    if (!trimmedName) {
+      setToast("Escribe tu nombre antes de enviar el pedido");
+      return;
+    }
     setSendingOrder(true);
     try {
       const res = await fetch("/api/catalogo/reebok/pedido-publico", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ items: cart }),
+        body: JSON.stringify({ items: cart, cliente_nombre: trimmedName }),
       });
       if (!res.ok) throw new Error("save failed");
       const { short_id } = await res.json();
@@ -207,7 +224,7 @@ function PublicCatalog() {
         sections.push(`*PRE-ORDEN*\n${preorders.map(formatLine).join("\n")}`);
       }
       const link = `https://www.fashiongr.com/pedido-reebok/${short_id}`;
-      const msg = `Hola, quiero hacer un pedido de Reebok:\n\n${sections.join("\n\n")}\n\nTotal: $${total.toFixed(2)}\n\n${link}`;
+      const msg = `Hola, soy ${trimmedName}. Quiero hacer un pedido de Reebok:\n\n${sections.join("\n\n")}\n\nTotal: $${total.toFixed(2)}\n\n${link}`;
       const url = `https://wa.me/50766745522?text=${encodeURIComponent(msg)}`;
       window.open(url, "_blank");
 
@@ -345,6 +362,8 @@ function PublicCatalog() {
           onClearCart={handleClearCart}
           variant="public"
           onSendWhatsApp={handleSendWhatsApp}
+          clientName={clientName}
+          onClientNameChange={setClientName}
           saving={sendingOrder}
           actionLabel={sendingOrder ? "Enviando..." : undefined}
           formatTotal={fmt}

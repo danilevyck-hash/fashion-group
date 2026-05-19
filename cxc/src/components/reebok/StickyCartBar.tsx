@@ -25,6 +25,8 @@ interface StickyCartBarProps {
   variant: "public" | "vendor";
   // Public variant
   onSendWhatsApp?: () => void;
+  clientName?: string;
+  onClientNameChange?: (v: string) => void;
   // Vendor variant
   onCreateOrder?: () => void;
   saving?: boolean;
@@ -39,7 +41,7 @@ interface StickyCartBarProps {
 export default function StickyCartBar({
   cart, cartCount, cartTotal,
   onQtyChange, onClearCart,
-  variant, onSendWhatsApp, onCreateOrder,
+  variant, onSendWhatsApp, clientName, onClientNameChange, onCreateOrder,
   saving, actionLabel, actionColor,
   miniCartLink, formatTotal,
 }: StickyCartBarProps) {
@@ -161,6 +163,23 @@ export default function StickyCartBar({
         </div>
       </div>
 
+      {/* Client name input (public variant) */}
+      {variant === "public" && onClientNameChange && (
+        <div className="px-3 pt-2 pb-1 bg-white border-t border-gray-100">
+          <label className="block text-[10px] font-semibold uppercase tracking-wider text-[#1A2656]/50 mb-1">
+            Tu nombre
+          </label>
+          <input
+            type="text"
+            value={clientName || ""}
+            onChange={(e) => onClientNameChange(e.target.value)}
+            placeholder="Escribe tu nombre"
+            autoComplete="name"
+            className="w-full rounded-lg border border-gray-200 bg-[#F5F0E8] px-3 py-2 text-sm text-[#1A2656] placeholder:text-[#1A2656]/30 focus:border-[#1A2656] focus:bg-white focus:outline-none transition"
+          />
+        </div>
+      )}
+
       {/* Bottom bar */}
       <div className="p-3 bg-white border-t border-gray-100 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] flex items-center gap-2" style={{ paddingBottom: "max(12px, env(safe-area-inset-bottom))" }}>
         {/* Cart summary button */}
@@ -195,7 +214,7 @@ export default function StickyCartBar({
         {/* Main action button */}
         <button
           onClick={handleAction}
-          disabled={saving}
+          disabled={saving || (variant === "public" && onClientNameChange !== undefined && !(clientName || "").trim())}
           className={`flex-1 py-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition min-h-[56px] disabled:opacity-50 text-white ${btnColor} active:scale-[0.98]`}
         >
           {variant === "public" && (

@@ -23,6 +23,7 @@ interface Order {
   items: CartItem[];
   total: number;
   created_at: string;
+  cliente_nombre: string | null;
 }
 
 function fmtMoney(n: number) {
@@ -108,6 +109,9 @@ export default function PedidoReebokPage() {
           </div>
           <div className="text-right">
             <p className="text-white/80 text-sm font-medium">Pedido</p>
+            {order.cliente_nombre && (
+              <p className="text-white text-xs mt-0.5">{order.cliente_nombre}</p>
+            )}
             <p className="text-white/40 text-xs">{fmtDate(order.created_at)}</p>
           </div>
         </div>

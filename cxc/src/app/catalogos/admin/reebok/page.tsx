@@ -35,9 +35,10 @@ interface InventoryItem {
 interface ReebokPedido {
   id: string;
   short_id: string;
-  items: { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number }[];
+  items: { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string; is_preorder?: boolean }[];
   total: number;
   created_at: string;
+  cliente_nombre: string | null;
 }
 
 interface ImportRow {
@@ -615,6 +616,7 @@ function PedidosTab({ pedidos }: { pedidos: ReebokPedido[] }) {
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
             <th className="text-left px-4 py-3 font-medium text-gray-500">Fecha</th>
+            <th className="text-left px-4 py-3 font-medium text-gray-500">Cliente</th>
             <th className="text-left px-4 py-3 font-medium text-gray-500">Pedido</th>
             <th className="text-right px-4 py-3 font-medium text-gray-500">Items</th>
             <th className="text-right px-4 py-3 font-medium text-gray-500">Total</th>
@@ -624,6 +626,13 @@ function PedidosTab({ pedidos }: { pedidos: ReebokPedido[] }) {
           {pedidos.map((pedido) => (
             <tr key={pedido.id} className="hover:bg-gray-50 transition">
               <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(pedido.created_at)}</td>
+              <td className="px-4 py-3 text-gray-900">
+                {pedido.cliente_nombre ? (
+                  <span>{pedido.cliente_nombre}</span>
+                ) : (
+                  <span className="text-gray-300 italic">Sin nombre</span>
+                )}
+              </td>
               <td className="px-4 py-3">
                 <Link
                   href={`/pedido-reebok/${pedido.short_id}`}
