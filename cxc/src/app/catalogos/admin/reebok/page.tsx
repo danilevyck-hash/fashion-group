@@ -6,6 +6,9 @@ import AppHeader from "@/components/AppHeader";
 import Image from "next/image";
 import Link from "next/link";
 import { validateCsvImport, type CsvImportRow } from "@/lib/csv-import-validator";
+import { ConfirmModal, Modal } from "@/components/ui";
+import { calculateReebokOrderTotal } from "@/lib/reebok-order-total";
+import { getBultoSize } from "@/lib/reebok-bulto";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -237,7 +240,7 @@ export default function ReebokAdminPage() {
               <ProductosTab products={products} getStock={getStock} onProductsChanged={loadProducts} />
             )}
             {tab === "pedidos" && (
-              <PedidosTab pedidos={pedidos} />
+              <PedidosTab pedidos={pedidos} onRefresh={loadPedidos} showToast={showToast} />
             )}
             {tab === "importar" && (
               <ImportarTab
@@ -601,7 +604,44 @@ function ProductosTab({
 
 // ── PEDIDOS TAB ───────────────────────────────────────────────────────────────
 
-function PedidosTab({ pedidos }: { pedidos: ReebokPedido[] }) {
+function PedidosTab({
+  pedidos,
+  onRefresh,
+  showToast,
+}: {
+  pedidos: ReebokPedido[];
+  onRefresh: () => Promise<void>;
+  showToast: (msg: string) => void;
+}) {
+  const [deleting, setDeleting] = useState<ReebokPedido | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [editing, setEditing] = useState<ReebokPedido | null>(null);
+
+  async function handleDelete() {
+    if (!deleting) return;
+    setDeleteLoading(true);
+    try {
+      const res = await fetch(
+        `/api/catalogo/reebok/pedidos-publicos/${deleting.short_id}`,
+        { method: "DELETE" },
+      );
+      if (!res.ok) throw new Error("delete failed");
+      showToast("Pedido borrado");
+      setDeleting(null);
+      await onRefresh();
+    } catch {
+      showToast("No se pudo borrar el pedido");
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
+  async function handleSavedEdit() {
+    setEditing(null);
+    showToast("Pedido actualizado");
+    await onRefresh();
+  }
+
   if (pedidos.length === 0) {
     return (
       <div className="text-center py-16">
@@ -611,47 +651,239 @@ function PedidosTab({ pedidos }: { pedidos: ReebokPedido[] }) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-gray-50 border-b border-gray-200">
-            <th className="text-left px-4 py-3 font-medium text-gray-500">Fecha</th>
-            <th className="text-left px-4 py-3 font-medium text-gray-500">Cliente</th>
-            <th className="text-left px-4 py-3 font-medium text-gray-500">Pedido</th>
-            <th className="text-right px-4 py-3 font-medium text-gray-500">Items</th>
-            <th className="text-right px-4 py-3 font-medium text-gray-500">Total</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {pedidos.map((pedido) => (
-            <tr key={pedido.id} className="hover:bg-gray-50 transition">
-              <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(pedido.created_at)}</td>
-              <td className="px-4 py-3 text-gray-900">
-                {pedido.cliente_nombre ? (
-                  <span>{pedido.cliente_nombre}</span>
-                ) : (
-                  <span className="text-gray-300 italic">Sin nombre</span>
-                )}
-              </td>
-              <td className="px-4 py-3">
-                <Link
-                  href={`/pedido-reebok/${pedido.short_id}`}
-                  className="text-[#1A2656] font-medium hover:underline"
-                >
-                  {pedido.short_id}
-                </Link>
-              </td>
-              <td className="px-4 py-3 text-right text-gray-500 tabular-nums">
-                {Array.isArray(pedido.items) ? pedido.items.length : 0}
-              </td>
-              <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
-                ${fmtMoney(pedido.total)}
-              </td>
+    <>
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="text-left px-4 py-3 font-medium text-gray-500">Fecha</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-500">Cliente</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-500">Pedido</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-500">Items</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-500">Total</th>
+              <th className="text-right px-4 py-3 font-medium text-gray-500">Acciones</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {pedidos.map((pedido) => (
+              <tr key={pedido.id} className="hover:bg-gray-50 transition">
+                <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(pedido.created_at)}</td>
+                <td className="px-4 py-3 text-gray-900">
+                  {pedido.cliente_nombre ? (
+                    <span>{pedido.cliente_nombre}</span>
+                  ) : (
+                    <span className="text-gray-300 italic">Sin nombre</span>
+                  )}
+                </td>
+                <td className="px-4 py-3">
+                  <Link
+                    href={`/pedido-reebok/${pedido.short_id}`}
+                    className="text-[#1A2656] font-medium hover:underline"
+                  >
+                    {pedido.short_id}
+                  </Link>
+                </td>
+                <td className="px-4 py-3 text-right text-gray-500 tabular-nums">
+                  {Array.isArray(pedido.items) ? pedido.items.length : 0}
+                </td>
+                <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
+                  ${fmtMoney(pedido.total)}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="inline-flex items-center gap-2">
+                    <button
+                      onClick={() => setEditing(pedido)}
+                      className="px-2.5 py-1 rounded-md border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition"
+                    >
+                      Editar
+                    </button>
+                    <button
+                      onClick={() => setDeleting(pedido)}
+                      className="px-2.5 py-1 rounded-md border border-red-200 text-xs text-red-600 hover:bg-red-50 transition"
+                    >
+                      Borrar
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <ConfirmModal
+        open={!!deleting}
+        onClose={() => !deleteLoading && setDeleting(null)}
+        onConfirm={handleDelete}
+        title="¿Borrar pedido?"
+        message={
+          deleting
+            ? `¿Borrar el pedido de ${deleting.cliente_nombre || "cliente sin nombre"} por $${fmtMoney(deleting.total)}? Esta acción no se puede deshacer.`
+            : ""
+        }
+        confirmLabel="Borrar pedido"
+        destructive
+        loading={deleteLoading}
+      />
+
+      {editing && (
+        <EditPedidoModal
+          pedido={editing}
+          onClose={() => setEditing(null)}
+          onSaved={handleSavedEdit}
+        />
+      )}
+    </>
+  );
+}
+
+function EditPedidoModal({
+  pedido,
+  onClose,
+  onSaved,
+}: {
+  pedido: ReebokPedido;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [items, setItems] = useState(pedido.items);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const total = calculateReebokOrderTotal(items);
+
+  function updateQty(idx: number, qty: number) {
+    setItems((prev) => prev.map((it, i) => (i === idx ? { ...it, quantity: qty } : it)));
+  }
+
+  function removeItem(idx: number) {
+    setItems((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  async function handleSave() {
+    if (items.length === 0) {
+      setError("El pedido debe tener al menos un item");
+      return;
+    }
+    for (const it of items) {
+      if (!Number.isInteger(it.quantity) || it.quantity < 1) {
+        setError("La cantidad debe ser un número entero mayor o igual a 1");
+        return;
+      }
+    }
+    setError(null);
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/catalogo/reebok/pedidos-publicos/${pedido.short_id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ items }),
+        },
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "No se pudo guardar");
+      }
+      onSaved();
+    } catch (e) {
+      setError(e instanceof Error && e.message ? e.message : "No se pudo guardar");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal open onClose={() => !saving && onClose()} title={`Editar pedido ${pedido.short_id}`} maxWidth="max-w-xl">
+      <div className="space-y-3">
+        {items.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-6">No hay items en el pedido</p>
+        ) : (
+          <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
+            {items.map((item, idx) => {
+              const bs = getBultoSize(item.category || "footwear");
+              const lineTotal = item.quantity * bs * item.unit_price;
+              return (
+                <div key={`${item.product_id}-${idx}`} className="flex items-center gap-3 px-3 py-2.5">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                    <p className="text-[11px] text-gray-400">
+                      {item.sku} · {item.quantity * bs} pzas · ${fmtMoney(item.unit_price)}/pza
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => updateQty(idx, Math.max(1, item.quantity - 1))}
+                      disabled={saving}
+                      className="w-7 h-7 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                      aria-label="Disminuir"
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      value={item.quantity}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value, 10);
+                        updateQty(idx, Number.isFinite(v) && v >= 1 ? v : 1);
+                      }}
+                      disabled={saving}
+                      className="w-14 text-center text-sm border border-gray-200 rounded py-1 tabular-nums disabled:opacity-50"
+                    />
+                    <button
+                      onClick={() => updateQty(idx, item.quantity + 1)}
+                      disabled={saving}
+                      className="w-7 h-7 flex items-center justify-center rounded border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                      aria-label="Aumentar"
+                    >
+                      +
+                    </button>
+                  </div>
+                  <div className="text-right w-20 text-sm font-semibold text-gray-900 tabular-nums">
+                    ${fmtMoney(lineTotal)}
+                  </div>
+                  <button
+                    onClick={() => removeItem(idx)}
+                    disabled={saving}
+                    className="text-xs text-red-600 hover:underline disabled:opacity-50"
+                  >
+                    Quitar
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+          <span className="text-sm font-semibold text-gray-700">Total</span>
+          <span className="text-base font-bold text-gray-900 tabular-nums">${fmtMoney(total)}</span>
+        </div>
+
+        {error && (
+          <p className="text-xs text-red-600">{error}</p>
+        )}
+
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={handleSave}
+            disabled={saving || items.length === 0}
+            className="flex-1 px-4 py-2.5 rounded-md text-sm font-medium bg-black text-white hover:bg-gray-800 disabled:opacity-50 min-h-[44px]"
+          >
+            {saving ? "Guardando..." : "Guardar cambios"}
+          </button>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 disabled:opacity-50 min-h-[44px]"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }
 

@@ -1,0 +1,87 @@
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/supabase-server";
+import { requireRole } from "@/lib/requireRole";
+import { calculateReebokOrderTotal } from "@/lib/reebok-order-total";
+
+export const dynamic = "force-dynamic";
+
+interface PedidoItem {
+  product_id: string;
+  sku: string;
+  name: string;
+  image_url: string;
+  quantity: number;
+  unit_price: number;
+  category?: string;
+  is_preorder?: boolean;
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { short_id: string } },
+) {
+  const auth = requireRole(req, ["admin"]);
+  if (auth instanceof NextResponse) return auth;
+
+  const short_id = params.short_id;
+  if (!short_id) {
+    return NextResponse.json({ error: "short_id requerido" }, { status: 400 });
+  }
+
+  const { error } = await supabaseServer
+    .from("reebok_pedidos_publicos")
+    .delete()
+    .eq("short_id", short_id);
+
+  if (error) {
+    console.error("Error deleting reebok pedido:", error);
+    return NextResponse.json({ error: "No se pudo borrar el pedido" }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}
+
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: { short_id: string } },
+) {
+  const auth = requireRole(req, ["admin"]);
+  if (auth instanceof NextResponse) return auth;
+
+  const short_id = params.short_id;
+  if (!short_id) {
+    return NextResponse.json({ error: "short_id requerido" }, { status: 400 });
+  }
+
+  let body: { items?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  if (!Array.isArray(body.items) || body.items.length === 0) {
+    return NextResponse.json({ error: "El pedido debe tener al menos un item" }, { status: 400 });
+  }
+
+  const items = body.items as PedidoItem[];
+  for (const item of items) {
+    if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+      return NextResponse.json({ error: "Cantidad inválida" }, { status: 400 });
+    }
+  }
+
+  const total = calculateReebokOrderTotal(items);
+
+  const { error } = await supabaseServer
+    .from("reebok_pedidos_publicos")
+    .update({ items, total })
+    .eq("short_id", short_id);
+
+  if (error) {
+    console.error("Error updating reebok pedido:", error);
+    return NextResponse.json({ error: "No se pudo actualizar el pedido" }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, total });
+}
