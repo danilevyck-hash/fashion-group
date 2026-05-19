@@ -7,11 +7,15 @@ interface DirClient { nombre: string; empresa: string; }
 
 interface Props {
   onClose: () => void;
+  // When provided, the parent receives the selected client and the modal
+  // does NOT trigger router.push (same-URL redirects don't re-mount, leaving
+  // stale state). The parent should update its draftClient state directly.
+  onSelected?: (name: string, email: string) => void;
 }
 
 // This modal ONLY asks for client name, saves to sessionStorage, and navigates to catalog.
 // The order is created later when the user adds products and clicks "Crear pedido".
-export default function NewOrderModal({ onClose }: Props) {
+export default function NewOrderModal({ onClose, onSelected }: Props) {
   const router = useRouter();
   const [name, setName] = useState(() => {
     try {
@@ -62,6 +66,11 @@ export default function NewOrderModal({ onClose }: Props) {
       sessionStorage.setItem("reebok_draft_client_email", email.trim());
     } else {
       sessionStorage.removeItem("reebok_draft_client_email");
+    }
+    if (onSelected) {
+      onSelected(name.trim(), email.trim());
+      onClose();
+      return;
     }
     onClose();
     router.push("/catalogo/reebok/productos");

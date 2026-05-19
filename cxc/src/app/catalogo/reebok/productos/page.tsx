@@ -86,7 +86,14 @@ function Productos() {
           }
         }
       } catch { /* */ }
-      sessionStorage.removeItem("reebok_cart");
+      // Vendedor puede armar el carrito sin cliente; conservar items en sesion.
+      try {
+        const saved = sessionStorage.getItem("reebok_cart");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) setCart(parsed);
+        }
+      } catch { /* */ }
     }
   }, []);
 
@@ -578,7 +585,7 @@ function Productos() {
 
   // Grid
   const productGrid = (
-    <div className={`${cartCount > 0 && hasContext ? "pb-28" : ""}`}>
+    <div className={`${cartCount > 0 ? "pb-28" : ""}`}>
       {isGrouped ? (
         <div className="space-y-8">
           {groups.map(g => (
@@ -597,7 +604,6 @@ function Productos() {
                     product={p}
                     qty={cartMap.get(p.id) || 0}
                     onQtyChange={handleQtyChange}
-                    disabled={!hasContext}
                     showBultos
                   />
                 ))}
@@ -613,7 +619,6 @@ function Productos() {
               product={p}
               qty={cartMap.get(p.id) || 0}
               onQtyChange={handleQtyChange}
-              disabled={!hasContext}
               showBultos
             />
           ))}
@@ -670,7 +675,7 @@ function Productos() {
         </div>
       ) : (
         <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
-          <span className="text-sm text-amber-800">Para hacer un pedido, primero selecciona el cliente</span>
+          <span className="text-sm text-amber-800">Sin cliente seleccionado &middot; podras asignarlo al confirmar el pedido</span>
           <button onClick={() => setShowNameModal(true)} className="text-sm bg-[#1A2656] text-white px-4 py-1.5 rounded-lg hover:bg-[#0f1a3d] transition font-medium">Seleccionar cliente</button>
         </div>
       )}
@@ -731,11 +736,17 @@ function Productos() {
 
       {/* ── Name modal (when no context) ── */}
       {showNameModal && (
-        <NewOrderModal onClose={() => setShowNameModal(false)} />
+        <NewOrderModal
+          onClose={() => setShowNameModal(false)}
+          onSelected={(name) => {
+            setDraftClient(name);
+            setToast(`Cliente seleccionado: ${name}`);
+          }}
+        />
       )}
 
       {/* ── Sticky cart bar ── */}
-      {cartCount > 0 && hasContext && (
+      {cartCount > 0 && (
         <StickyCartBar
           cart={cart}
           cartCount={cartCount}
