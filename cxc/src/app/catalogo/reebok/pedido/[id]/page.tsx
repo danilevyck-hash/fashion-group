@@ -8,7 +8,7 @@ import { ConfirmDeleteModal, Toast } from "@/components/ui";
 import { getBultoSize } from "@/lib/reebok-bulto";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string; }
-interface Order { id: string; order_number: string; client_name: string; client_email?: string | null; comment: string; status: string; total: number; reebok_order_items: OrderItem[]; created_at: string; }
+interface Order { id: string; order_number: string; client_name: string; client_email?: string | null; comment: string; status: string; total: number; reebok_order_items: OrderItem[]; created_at: string; updated_at?: string | null; }
 interface DirClient { nombre: string; empresa: string; }
 
 // Fallback cuando el item no resuelve category via products (producto borrado).
@@ -16,6 +16,13 @@ interface DirClient { nombre: string; empresa: string; }
 const FALLBACK_CATEGORY = "apparel";
 function bs(item: { category?: string }): number {
   return getBultoSize(item.category || FALLBACK_CATEGORY);
+}
+
+function fmtDateTime(iso: string): string {
+  const d = new Date(iso);
+  const fecha = d.toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "");
+  const hora = d.toLocaleTimeString("es-PA", { hour: "numeric", minute: "2-digit" });
+  return `${fecha} ${hora}`;
 }
 
 export default function OrderDetailPage() {
@@ -36,6 +43,7 @@ export default function OrderDetailPage() {
   const [suggestions, setSuggestions] = useState<DirClient[]>([]);
   const [showSugg, setShowSugg] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<"saved" | "saving" | "dirty" | null>(null);
+  const [editedAt, setEditedAt] = useState<string | null>(null);
   const nameRef = useRef<HTMLDivElement>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInFlight = useRef(false);
@@ -87,7 +95,9 @@ export default function OrderDetailPage() {
   const changeCount = useRef(0);
   useEffect(() => {
     changeCount.current++;
-    if (changeCount.current <= 1 || !order || order.status === "confirmado") return;
+    // Editar funciona en cualquier estado (incluso confirmado). El PUT no
+    // manda status, asi que el pedido NO cambia de estado al auto-guardar.
+    if (changeCount.current <= 1 || !order) return;
     setAutoSaveStatus("dirty");
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(() => {
@@ -107,6 +117,9 @@ export default function OrderDetailPage() {
         body: JSON.stringify({ client_name: clientName, items }),
       });
       setAutoSaveStatus("saved");
+      // Marca de editado para pedidos confirmados (registro interno difiere
+      // de lo enviado). No reenvia correo: solo persiste y deja constancia.
+      if (order?.status === "confirmado") setEditedAt(new Date().toISOString());
     } catch {
       setAutoSaveStatus("dirty");
     }
@@ -328,7 +341,7 @@ export default function OrderDetailPage() {
         <div className="flex items-center gap-3" ref={nameRef}>
           <span className="text-sm font-mono text-gray-400">{order.order_number}</span>
           <div className="relative flex-1">
-            {!isConfirmed && canEdit ? (
+            {canEdit ? (
               <>
                 <input value={clientName} onChange={e => setClientName(e.target.value)}
                   onFocus={() => { if (suggestions.length) setShowSugg(true); }}
@@ -352,7 +365,7 @@ export default function OrderDetailPage() {
           {autoSaveStatus === "saving" && <span className="text-[11px] text-gray-400">Guardando...</span>}
           {autoSaveStatus === "saved" && <span className="text-[11px] text-green-600">Listo, guardado</span>}
           {/* Add more products */}
-          {!isConfirmed && canEdit && (
+          {canEdit && (
             <Link href="/catalogo/reebok/productos" className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full hover:bg-gray-200 transition">
               + Agregar productos
             </Link>
@@ -374,7 +387,7 @@ export default function OrderDetailPage() {
                 <th className="py-2 text-center text-[10px] uppercase text-gray-400 font-normal w-14">Pzas</th>
                 <th className="py-2 text-right text-[10px] uppercase text-gray-400 font-normal w-16">Precio</th>
                 <th className="py-2 text-right text-[10px] uppercase text-gray-400 font-normal w-20">Subtotal</th>
-                {!isConfirmed && <th className="w-8"></th>}
+                {canEdit && <th className="w-8"></th>}
               </tr>
             </thead>
             <tbody>
@@ -390,7 +403,7 @@ export default function OrderDetailPage() {
                     <div className="text-[10px] text-gray-400 font-mono">{item.sku}</div>
                   </td>
                   <td className="py-2 text-center">
-                    {!isConfirmed ? (
+                    {canEdit ? (
                       <input type="number" min={1} step={1} value={item.quantity}
                         onChange={e => updateItem(idx, "quantity", parseInt(e.target.value) || 1)}
                         className="w-12 text-center border-b border-gray-200 text-sm py-0.5 outline-none focus:border-black tabular-nums" />
@@ -400,7 +413,7 @@ export default function OrderDetailPage() {
                   </td>
                   <td className="py-2 text-center text-xs text-gray-400 tabular-nums">{item.quantity * bs(item)}</td>
                   <td className="py-2 text-right">
-                    {!isConfirmed ? (
+                    {canEdit ? (
                       <input type="number" step={1} min={0} value={item.unit_price}
                         onChange={e => updateItem(idx, "unit_price", parseFloat(e.target.value) || 0)}
                         className="w-14 text-right border-b border-gray-200 text-sm py-0.5 outline-none focus:border-black tabular-nums" />
@@ -409,7 +422,7 @@ export default function OrderDetailPage() {
                     )}
                   </td>
                   <td className="py-2 text-right tabular-nums text-sm">${fmt(item.quantity * bs(item) * Number(item.unit_price))}</td>
-                  {!isConfirmed && (
+                  {canEdit && (
                     <td className="py-2 text-center">
                       <button onClick={() => removeItem(idx)} className="text-gray-300 hover:text-red-500 transition text-xs">x</button>
                     </td>
@@ -444,6 +457,13 @@ export default function OrderDetailPage() {
               <span className="text-emerald-700 font-medium text-sm">Pedido confirmado</span>
             </div>
             <span className="text-emerald-600 text-xs block mt-0.5">Enviado por email a Fashion Group</span>
+            {(editedAt || order.updated_at) && (
+              <span className={`text-[11px] block mt-1 ${editedAt ? "text-amber-600 font-medium" : "text-emerald-600/70"}`}>
+                {editedAt
+                  ? `Editado despues de confirmar: ${fmtDateTime(editedAt)} — no se reenvio correo`
+                  : `Ultima edicion interna: ${fmtDateTime(order.updated_at!)}`}
+              </span>
+            )}
           </div>
 
           {/* Share section — subtle, optional */}
