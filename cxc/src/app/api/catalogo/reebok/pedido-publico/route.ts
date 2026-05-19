@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { calculateReebokOrderTotal } from "@/lib/reebok-order-total";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,8 @@ interface CartItem {
   image_url: string;
   quantity: number;
   unit_price: number;
+  category?: string;
+  is_preorder?: boolean;
 }
 
 export async function POST(req: NextRequest) {
@@ -26,7 +29,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "El carrito está vacío" }, { status: 400 });
     }
 
-    const total = items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
+    const total = calculateReebokOrderTotal(items);
     const short_id = Math.random().toString(36).substring(2, 10);
 
     const { error } = await supabase.from("reebok_pedidos_publicos").insert({

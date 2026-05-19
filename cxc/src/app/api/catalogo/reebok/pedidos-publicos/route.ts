@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
+import { calculateReebokOrderTotal } from "@/lib/reebok-order-total";
 
 export const dynamic = "force-dynamic";
 
@@ -18,5 +19,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 
-  return NextResponse.json(data || []);
+  // Pedidos viejos guardaron `total` sin multiplicar por bulto; recalcular
+  // siempre desde `items` para que admin coincida con el link del cliente.
+  const rows = (data || []).map((row) => ({
+    ...row,
+    total: calculateReebokOrderTotal(row.items || []),
+  }));
+
+  return NextResponse.json(rows);
 }

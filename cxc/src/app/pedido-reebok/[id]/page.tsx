@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { getBultoSize } from "@/lib/reebok-bulto";
+import { calculateReebokOrderTotal } from "@/lib/reebok-order-total";
 
 interface CartItem {
   product_id: string;
@@ -185,7 +186,7 @@ export default function PedidoReebokPage() {
         <div className="bg-[#1A2656] rounded-b-xl px-6 py-4 flex items-center justify-between">
           <span className="text-white/70 text-sm font-medium">Total</span>
           <span className="text-white font-bold text-xl tabular-nums">
-            ${fmtMoney(order.items.reduce((s, i) => s + i.quantity * getBultoSize(i.category || "footwear") * i.unit_price, 0))}
+            ${fmtMoney(calculateReebokOrderTotal(order.items))}
           </span>
         </div>
 
