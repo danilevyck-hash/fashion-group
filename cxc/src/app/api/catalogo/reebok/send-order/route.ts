@@ -6,6 +6,7 @@ import autoTable from "jspdf-autotable";
 import { REEBOK_LOGO_BASE64, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT } from "@/lib/reebok-logo";
 import { getBultoSize } from "@/lib/reebok-bulto";
 import { fetchReebokCategoryMap } from "@/lib/reebok-category-lookup";
+import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
 
 // Fallback category cuando un product_id no resuelve en `products`. Usamos
 // "apparel" (bulto=6) para nunca inflar el cobro asumiendo footwear=12.
@@ -64,6 +65,9 @@ export async function POST(req: NextRequest) {
     totalPiezas = body.totalPiezas || 0;
     total = body.total || 0;
   }
+
+  // Orden canonico por categoria + SKU (helper unico compartido con el detalle).
+  items = sortReebokOrderItems(items);
 
   const regularItems = items.filter((i) => !i.is_preorder);
   const preorderItems = items.filter((i) => i.is_preorder);

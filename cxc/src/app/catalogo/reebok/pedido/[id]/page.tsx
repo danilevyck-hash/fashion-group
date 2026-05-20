@@ -6,6 +6,7 @@ import Link from "next/link";
 import { fmt } from "@/lib/format";
 import { ConfirmDeleteModal, Toast } from "@/components/ui";
 import { getBultoSize } from "@/lib/reebok-bulto";
+import { sortReebokOrderItems } from "@/lib/reebok-order-sort";
 
 interface OrderItem { id?: string; product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number; category?: string; }
 interface Order { id: string; order_number: string; client_name: string; client_email?: string | null; comment: string; status: string; total: number; reebok_order_items: OrderItem[]; created_at: string; updated_at?: string | null; }
@@ -23,6 +24,10 @@ function fmtDateTime(iso: string): string {
   const fecha = d.toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "");
   const hora = d.toLocaleTimeString("es-PA", { hour: "numeric", minute: "2-digit" });
   return `${fecha} ${hora}`;
+}
+
+function fmtTimeHMS(iso: string): string {
+  return new Date(iso).toLocaleTimeString("es-PA", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
 }
 
 export default function OrderDetailPage() {
@@ -44,9 +49,15 @@ export default function OrderDetailPage() {
   const [showSugg, setShowSugg] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<"saved" | "saving" | "dirty" | null>(null);
   const [editedAt, setEditedAt] = useState<string | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const nameRef = useRef<HTMLDivElement>(null);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const saveInFlight = useRef(false);
+  const pendingSave = useRef(false);
+  // Refs con los ultimos valores para que el guardado (auto o manual) nunca
+  // mande datos viejos por culpa de closures de un render anterior.
+  const itemsRef = useRef<OrderItem[]>([]);
+  const clientNameRef = useRef("");
 
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(null), 3000); };
 
@@ -63,7 +74,7 @@ export default function OrderDetailPage() {
             router.push("/catalogo/reebok/productos"); return;
           }
         }
-        setOrder(d); setItems(d.reebok_order_items || []); setClientName(d.client_name || "");
+        setOrder(d); setItems(sortReebokOrderItems(d.reebok_order_items || [])); setClientName(d.client_name || "");
         if (d.client_email) setClientEmail(d.client_email);
         // Track active draft so catalog can add to it
         if (d.status === "borrador") sessionStorage.setItem("reebok_draft_id", id);
@@ -91,40 +102,58 @@ export default function OrderDetailPage() {
     document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h);
   }, []);
 
+  // Mantener refs sincronizados con el ultimo estado.
+  useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => { clientNameRef.current = clientName; }, [clientName]);
+
   // ── AUTO-SAVE (2s debounce) ──
   const changeCount = useRef(0);
   useEffect(() => {
     changeCount.current++;
     // Editar funciona en cualquier estado (incluso confirmado). El PUT no
-    // manda status, asi que el pedido NO cambia de estado al auto-guardar.
+    // manda status, asi que el pedido NO cambia de estado al guardar.
     if (changeCount.current <= 1 || !order) return;
     setAutoSaveStatus("dirty");
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    autoSaveTimer.current = setTimeout(() => {
-      if (!saveInFlight.current) doAutoSave();
-    }, 2000);
+    autoSaveTimer.current = setTimeout(() => { performSave(); }, 2000);
     return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, clientName]);
 
-  async function doAutoSave() {
-    if (saveInFlight.current) return;
+  // Guardado unico para auto-save y boton manual. Evita PUT simultaneos via
+  // saveInFlight; si llega otra peticion mientras guarda, encola un trailing
+  // save con los datos mas recientes (refs). No manda status ni envia correo.
+  async function performSave() {
+    if (saveInFlight.current) { pendingSave.current = true; return; }
+    if (autoSaveTimer.current) { clearTimeout(autoSaveTimer.current); autoSaveTimer.current = null; }
     saveInFlight.current = true;
     setAutoSaveStatus("saving");
     try {
       await fetch(`/api/catalogo/reebok/orders/${id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_name: clientName, items }),
+        body: JSON.stringify({ client_name: clientNameRef.current, items: itemsRef.current }),
       });
+      const now = new Date().toISOString();
       setAutoSaveStatus("saved");
+      setLastSavedAt(now);
       // Marca de editado para pedidos confirmados (registro interno difiere
       // de lo enviado). No reenvia correo: solo persiste y deja constancia.
-      if (order?.status === "confirmado") setEditedAt(new Date().toISOString());
+      if (order?.status === "confirmado") setEditedAt(now);
     } catch {
       setAutoSaveStatus("dirty");
     }
     saveInFlight.current = false;
+    if (pendingSave.current) { pendingSave.current = false; performSave(); }
   }
+
+  // Aviso nativo si hay cambios sin guardar al cerrar/navegar.
+  useEffect(() => {
+    function handler(e: BeforeUnloadEvent) {
+      if (autoSaveStatus === "dirty" || saveInFlight.current) { e.preventDefault(); e.returnValue = ""; }
+    }
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [autoSaveStatus]);
 
   // ── CONFIRM ORDER (mark confirmed first, then send email) ──
   async function confirmOrder() {
@@ -361,9 +390,6 @@ export default function OrderDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          {/* Auto-save indicator */}
-          {autoSaveStatus === "saving" && <span className="text-[11px] text-gray-400">Guardando...</span>}
-          {autoSaveStatus === "saved" && <span className="text-[11px] text-green-600">Listo, guardado</span>}
           {/* Add more products */}
           {canEdit && (
             <Link href="/catalogo/reebok/productos" className="text-xs bg-gray-100 text-gray-600 px-3 py-1.5 rounded-full hover:bg-gray-200 transition">
@@ -374,6 +400,42 @@ export default function OrderDetailPage() {
       </div>
 
       <p className="text-xs text-gray-400 mb-4">{new Date(order.created_at).toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "")}</p>
+
+      {/* Save bar — prominent status + manual save */}
+      {canEdit && (
+        <div className="flex items-center justify-between gap-3 mb-4 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5">
+          <div className="flex items-center gap-2 text-sm">
+            {autoSaveStatus === "saving" ? (
+              <>
+                <span className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-amber-600 font-medium">Guardando...</span>
+              </>
+            ) : autoSaveStatus === "dirty" ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-amber-500" />
+                <span className="text-amber-600 font-medium">Cambios sin guardar</span>
+              </>
+            ) : autoSaveStatus === "saved" && lastSavedAt ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="text-emerald-600 font-medium">Guardado a las {fmtTimeHMS(lastSavedAt)}</span>
+              </>
+            ) : (
+              <>
+                <span className="w-2 h-2 rounded-full bg-gray-300" />
+                <span className="text-gray-400">Sin cambios pendientes</span>
+              </>
+            )}
+          </div>
+          <button
+            onClick={() => performSave()}
+            disabled={autoSaveStatus === "saving"}
+            className="bg-black text-white text-sm font-medium px-5 py-2 rounded-md hover:bg-gray-800 active:scale-[0.97] transition disabled:opacity-50 min-h-[40px]"
+          >
+            {autoSaveStatus === "saving" ? "Guardando..." : "Guardar"}
+          </button>
+        </div>
+      )}
 
       {/* Items table */}
       {items.length > 0 ? (
