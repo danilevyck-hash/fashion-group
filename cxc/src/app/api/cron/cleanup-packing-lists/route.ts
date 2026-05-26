@@ -22,6 +22,23 @@ export async function GET(req: NextRequest) {
 
   if (error) {
     console.error("[cleanup-packing-lists] delete failed:", error.message);
+    // Persistir el fallo en cron_email_errors — los logs de Vercel rotan
+    // en 24h y el dashboard de salud necesita historial. Best-effort: si
+    // el propio INSERT falla, igual devolvemos el 500 con el error real.
+    try {
+      const { error: logErr } = await supabaseServer
+        .from("cron_email_errors")
+        .insert({
+          tipo: "cleanup_packing_lists",
+          cheque_context: null,
+          error_message: error.message,
+        });
+      if (logErr) {
+        console.error("[cleanup-packing-lists] cron_email_errors insert failed:", logErr.message);
+      }
+    } catch (logErr) {
+      console.error("[cleanup-packing-lists] cron_email_errors insert threw:", logErr);
+    }
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 
