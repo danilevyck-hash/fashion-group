@@ -32,14 +32,14 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(5),
 
-    // Guías: buscar por transportista TEXT histórico (filas pre-Sprint-2) y
-    // por observaciones. Las filas post-Sprint-2 con transportista=NULL no
-    // matchean el primer OR pero sí aparecen en la query de transportistas
-    // por nombre que se ejecuta abajo. Display label se computa con el JOIN.
+    // Guías: buscar por observaciones (texto libre del usuario). El match
+    // por nombre del transportista se hace en una 2da query más abajo
+    // (transportistas → guia_transporte vía FK), porque PostgREST no expone
+    // un OR mixto entre la tabla base y una relación joined.
     supabaseServer
       .from("guia_transporte")
-      .select("id, numero, fecha, transportista, modo_entrega, transportista_id, transportistas(nombre), estado")
-      .or(`transportista.ilike.${pattern},observaciones.ilike.${pattern}`)
+      .select("id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), estado")
+      .ilike("observaciones", pattern)
       .eq("deleted", false)
       .order("numero", { ascending: false })
       .limit(5),
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
   if (/^\d+$/.test(q)) {
     const numRes = await supabaseServer
       .from("guia_transporte")
-      .select("id, numero, fecha, transportista, modo_entrega, transportista_id, transportistas(nombre), estado")
+      .select("id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), estado")
       .eq("numero", parseInt(q))
       .eq("deleted", false)
       .limit(5);
@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
       guiasData = guiasData.slice(0, 5);
     }
   }
-  // Search by canonical transportista name (matches new rows whose TEXT is NULL).
+  // Search by canonical transportista name (vía FK transportistas → guia_transporte).
   {
     const { data: matchTransp } = await supabaseServer
       .from("transportistas")
@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
     if (ids.length > 0) {
       const { data: nameRes } = await supabaseServer
         .from("guia_transporte")
-        .select("id, numero, fecha, transportista, modo_entrega, transportista_id, transportistas(nombre), estado")
+        .select("id, numero, fecha, modo_entrega, transportista_id, transportistas(nombre), estado")
         .in("transportista_id", ids)
         .eq("deleted", false)
         .order("numero", { ascending: false })

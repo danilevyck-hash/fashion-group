@@ -1,6 +1,8 @@
 import type { GuiaItem } from "./types";
 
-export const DEFAULT_TRANSPORTISTAS = ["RedNblue", "Mojica", "Transporte Sol", "Sanjur"];
+// DEFAULT_TRANSPORTISTAS eliminado en Sprint 3 — los transportistas ahora
+// viven en la tabla `transportistas` y se cargan vía /api/transportistas.
+
 export const DEFAULT_CLIENTES = [
   "City Mall",
   "La Frontera Duty Free",
