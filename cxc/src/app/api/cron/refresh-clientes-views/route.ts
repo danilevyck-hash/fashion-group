@@ -50,6 +50,23 @@ export async function GET(req: NextRequest) {
   if (error) {
     const durationMs = Date.now() - startedAt;
     console.error(`[cron/refresh-clientes-views] failed after ${durationMs}ms:`, error.message);
+    // Persistir el fallo en cron_email_errors — los logs de Vercel rotan
+    // en 24h y el dashboard de salud necesita historial. Best-effort: si
+    // el propio INSERT falla, igual devolvemos el 500 con el error real.
+    try {
+      const { error: logErr } = await supabaseServer
+        .from("cron_email_errors")
+        .insert({
+          tipo: "refresh_clientes_vw",
+          cheque_context: null,
+          error_message: error.message,
+        });
+      if (logErr) {
+        console.error("[cron/refresh-clientes-views] cron_email_errors insert failed:", logErr.message);
+      }
+    } catch (logErr) {
+      console.error("[cron/refresh-clientes-views] cron_email_errors insert threw:", logErr);
+    }
     return NextResponse.json(
       { ok: false, error: error.message, durationMs, refreshedAt: startedAtIso },
       { status: 500 }
