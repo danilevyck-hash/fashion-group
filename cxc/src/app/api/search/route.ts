@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { transportistaLabel } from "@/lib/transportistaLabel";
 
 export const dynamic = "force-dynamic";
 
@@ -31,11 +32,15 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(5),
 
-    // Guías: buscar por numero (text) o transportista
+    // Guías: buscar por transportista TEXT histórico (filas pre-Sprint-2) y
+    // por observaciones. Las filas post-Sprint-2 con transportista=NULL no
+    // matchean el primer OR pero sí aparecen en la query de transportistas
+    // por nombre que se ejecuta abajo. Display label se computa con el JOIN.
     supabaseServer
       .from("guia_transporte")
-      .select("id, numero, fecha, transportista, estado")
+      .select("id, numero, fecha, transportista, modo_entrega, transportista_id, transportistas(nombre), estado")
       .or(`transportista.ilike.${pattern},observaciones.ilike.${pattern}`)
+      .eq("deleted", false)
       .order("numero", { ascending: false })
       .limit(5),
 
@@ -82,13 +87,16 @@ export async function GET(req: NextRequest) {
       .limit(5),
   ]);
 
-  // Also search guias by numero if q is numeric
+  // Also search guias by numero if q is numeric, plus by transportistas.nombre
+  // ilike (Sprint 2: las filas nuevas tienen transportista TEXT en NULL, así
+  // que el OR del Promise.all no las matchea por nombre canónico).
   let guiasData = guiasRes.data || [];
   if (/^\d+$/.test(q)) {
     const numRes = await supabaseServer
       .from("guia_transporte")
-      .select("id, numero, fecha, transportista, estado")
+      .select("id, numero, fecha, transportista, modo_entrega, transportista_id, transportistas(nombre), estado")
       .eq("numero", parseInt(q))
+      .eq("deleted", false)
       .limit(5);
     if (numRes.data?.length) {
       const existingIds = new Set(guiasData.map((g) => g.id));
@@ -98,6 +106,32 @@ export async function GET(req: NextRequest) {
       guiasData = guiasData.slice(0, 5);
     }
   }
+  // Search by canonical transportista name (matches new rows whose TEXT is NULL).
+  {
+    const { data: matchTransp } = await supabaseServer
+      .from("transportistas")
+      .select("id")
+      .ilike("nombre", pattern);
+    const ids = (matchTransp || []).map((t) => t.id);
+    if (ids.length > 0) {
+      const { data: nameRes } = await supabaseServer
+        .from("guia_transporte")
+        .select("id, numero, fecha, transportista, modo_entrega, transportista_id, transportistas(nombre), estado")
+        .in("transportista_id", ids)
+        .eq("deleted", false)
+        .order("numero", { ascending: false })
+        .limit(5);
+      if (nameRes?.length) {
+        const existingIds = new Set(guiasData.map((g) => g.id));
+        for (const g of nameRes) {
+          if (!existingIds.has(g.id)) guiasData.push(g);
+        }
+        guiasData = guiasData.slice(0, 5);
+      }
+    }
+  }
+  // Resolver display label
+  guiasData = guiasData.map((g) => ({ ...g, transportista: transportistaLabel(g) }));
 
   // Deduplicate CxC by nombre_normalized — aggregate total across companies
   const cxcRaw = cxcRes.data || [];

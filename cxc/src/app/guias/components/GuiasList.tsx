@@ -134,7 +134,7 @@ export default function GuiasList({
                             if (!search) return true;
                             const q = search.toLowerCase();
                             return (
-                              g.transportista.toLowerCase().includes(q) ||
+                              (g.transportista || "").toLowerCase().includes(q) ||
                               (g.guia_items || []).some(
                                 (item: GuiaItem) =>
                                   (item.facturas || "").toLowerCase().includes(q) ||
@@ -204,7 +204,7 @@ export default function GuiasList({
             <div className="mb-4 flex items-center gap-4 flex-wrap">
               {selectionMode && (
                 <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer shrink-0">
-                  <input type="checkbox" checked={(() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return g.transportista.toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).filter(g => !showPending || g.estado === "Pendiente Bodega").map(g => g.id); return ids.length > 0 && ids.every(id => selectedIds.has(id)); })()} onChange={() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return g.transportista.toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).filter(g => !showPending || g.estado === "Pendiente Bodega").map(g => g.id); const allSel = ids.length > 0 && ids.every(id => selectedIds.has(id)); if (allSel) { setSelectedIds(new Set()); } else { setSelectedIds(new Set(ids)); } }} className="accent-black" />
+                  <input type="checkbox" checked={(() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return (g.transportista || "").toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).filter(g => !showPending || g.estado === "Pendiente Bodega").map(g => g.id); return ids.length > 0 && ids.every(id => selectedIds.has(id)); })()} onChange={() => { const ids = guias.filter(g => { if (!search) return true; const q = search.toLowerCase(); return (g.transportista || "").toLowerCase().includes(q) || (g.guia_items || []).some((item: GuiaItem) => (item.facturas || "").toLowerCase().includes(q) || (item.cliente || "").toLowerCase().includes(q)); }).filter(g => !showPending || g.estado === "Pendiente Bodega").map(g => g.id); const allSel = ids.length > 0 && ids.every(id => selectedIds.has(id)); if (allSel) { setSelectedIds(new Set()); } else { setSelectedIds(new Set(ids)); } }} className="accent-black" />
                   Todas
                 </label>
               )}
@@ -227,7 +227,7 @@ export default function GuiasList({
                     if (!search) return true;
                     const q = search.toLowerCase();
                     return (
-                      g.transportista.toLowerCase().includes(q) ||
+                      (g.transportista || "").toLowerCase().includes(q) ||
                       (g.guia_items || []).some(
                         (item: GuiaItem) =>
                           (item.facturas || "").toLowerCase().includes(q) ||

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
+import { transportistaLabel } from "@/lib/transportistaLabel";
 
 const GUIAS_ROLES = ["admin", "secretaria", "bodega", "director", "vendedor"];
 
@@ -13,9 +14,10 @@ export async function GET(req: NextRequest) {
   // SELECT explícito: excluye firmas base64 (firma_transportista, firma_base64,
   // firma_entregador_base64) que pesan 30-100 KB cada una. El detalle completo
   // se sirve desde /api/guias/[id] cuando el usuario expande una fila.
+  // Sprint 2: JOIN a transportistas para resolver el label canónico.
   const { data, error } = await supabaseServer
     .from("guia_transporte")
-    .select("id, numero, fecha, transportista, placa, observaciones, monto_total, estado, tipo_despacho, receptor_nombre, nombre_entregador, entregado_por, nombre_chofer, numero_guia_transp, created_at, deleted, guia_items(bultos, facturas, cliente)")
+    .select("id, numero, fecha, transportista, modo_entrega, transportista_id, transportistas(nombre), placa, observaciones, monto_total, estado, tipo_despacho, receptor_nombre, nombre_entregador, entregado_por, nombre_chofer, numero_guia_transp, created_at, deleted, guia_items(bultos, facturas, cliente)")
     .eq("deleted", false)
     .order("numero", { ascending: false });
 
@@ -25,6 +27,9 @@ export async function GET(req: NextRequest) {
 
   const result = (data || []).map((g) => ({
     ...g,
+    // Override transportista con label computado para mantener compat con UI
+    // que ya consume g.transportista como string display-ready.
+    transportista: transportistaLabel(g),
     total_bultos: (g.guia_items || []).reduce((s: number, i: { bultos: number }) => s + (i.bultos || 0), 0),
     item_count: (g.guia_items || []).length,
   }));
@@ -36,7 +41,15 @@ export async function POST(req: NextRequest) {
   const s = getSession(req);
   if (!s || !GUIAS_ROLES.includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const body = await req.json();
-  const { fecha, transportista, placa, observaciones, items, monto_total, estado, firma_transportista, entregado_por } = body;
+  const { fecha, modo_entrega, transportista_id, placa, observaciones, items, monto_total, estado, firma_transportista, entregado_por } = body;
+
+  // Validate modo_entrega + transportista_id (Sprint 2 schema)
+  if (modo_entrega !== "transportista" && modo_entrega !== "entrega_directa") {
+    return NextResponse.json({ error: "Debes indicar el modo de entrega" }, { status: 400 });
+  }
+  if (modo_entrega === "transportista" && !transportista_id) {
+    return NextResponse.json({ error: "Selecciona un transportista" }, { status: 400 });
+  }
 
   // Validate items
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -60,7 +73,19 @@ export async function POST(req: NextRequest) {
 
     const numero = (last?.numero || 0) + 1;
 
-    const insertData: Record<string, unknown> = { numero, fecha, transportista, placa: placa || null, observaciones: observaciones || null, monto_total: monto_total || 0, estado: estado || "Pendiente Bodega", entregado_por: entregado_por || null };
+    // transportista TEXT queda en NULL — Sprint 2 dejó la columna como respaldo
+    // histórico, las escrituras nuevas usan modo_entrega + transportista_id.
+    const insertData: Record<string, unknown> = {
+      numero,
+      fecha,
+      modo_entrega,
+      transportista_id: modo_entrega === "transportista" ? transportista_id : null,
+      placa: placa || null,
+      observaciones: observaciones || null,
+      monto_total: monto_total || 0,
+      estado: estado || "Pendiente Bodega",
+      entregado_por: entregado_por || null,
+    };
     if (firma_transportista) insertData.firma_transportista = firma_transportista;
 
     const { data, error } = await supabaseServer

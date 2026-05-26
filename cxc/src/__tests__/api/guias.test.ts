@@ -33,13 +33,33 @@ function makeRequest(body: Record<string, unknown>): NextRequest {
   return req;
 }
 
+// Sprint 2 (2026-05-26): el POST espera modo_entrega + transportista_id en
+// lugar del transportista TEXT libre. Los tests se actualizan a ese contrato.
+const TRANSPORTISTA_UUID = "00000000-0000-0000-0000-000000000001";
+
 describe("POST /api/guias", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
+  it("returns 400 when modo_entrega is missing", async () => {
+    const req = makeRequest({ fecha: "2026-04-09", items: [{ cliente: "X", bultos: 1, facturas: "F-001" }] });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toMatch(/modo de entrega/i);
+  });
+
+  it("returns 400 when modo_entrega='transportista' without transportista_id", async () => {
+    const req = makeRequest({ fecha: "2026-04-09", modo_entrega: "transportista", items: [{ cliente: "X", bultos: 1 }] });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    const json = await res.json();
+    expect(json.error).toMatch(/transportista/i);
+  });
+
   it("returns 400 when items is empty", async () => {
-    const req = makeRequest({ fecha: "2026-04-09", transportista: "DHL", items: [] });
+    const req = makeRequest({ fecha: "2026-04-09", modo_entrega: "entrega_directa", items: [] });
     const res = await POST(req);
     expect(res.status).toBe(400);
     const json = await res.json();
@@ -47,7 +67,7 @@ describe("POST /api/guias", () => {
   });
 
   it("returns 400 when items is missing", async () => {
-    const req = makeRequest({ fecha: "2026-04-09", transportista: "DHL" });
+    const req = makeRequest({ fecha: "2026-04-09", modo_entrega: "entrega_directa" });
     const res = await POST(req);
     expect(res.status).toBe(400);
   });
@@ -55,7 +75,7 @@ describe("POST /api/guias", () => {
   it("returns 400 when all items have bultos=0", async () => {
     const req = makeRequest({
       fecha: "2026-04-09",
-      transportista: "DHL",
+      modo_entrega: "entrega_directa",
       items: [{ cliente: "Test", bultos: 0 }],
     });
     const res = await POST(req);
@@ -94,7 +114,8 @@ describe("POST /api/guias", () => {
 
     const req = makeRequest({
       fecha: "2026-04-09",
-      transportista: "DHL",
+      modo_entrega: "transportista",
+      transportista_id: TRANSPORTISTA_UUID,
       items: [{ cliente: "Cliente A", bultos: 5, facturas: "F-001" }],
     });
     const res = await POST(req);

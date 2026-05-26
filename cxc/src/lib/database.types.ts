@@ -166,12 +166,14 @@ export type Database = {
 
       // ─── GUÍAS DE TRANSPORTE ─────────────────────────────────────────────────
       // Columns from: schema.sql + guias-workflow.sql + guias-firma.sql + add-guias-detalle.sql
+      // Sprint 1/2 (2026-05-26): transportista TEXT pasa a NULLABLE (respaldo);
+      // modo_entrega + transportista_id son la nueva fuente de verdad.
       guia_transporte: {
         Row: {
           id: string
           numero: number
           fecha: string
-          transportista: string
+          transportista: string | null
           placa: string | null
           observaciones: string | null
           created_at: string | null
@@ -185,12 +187,15 @@ export type Database = {
           estado: string | null
           tipo_despacho: string | null
           nombre_chofer: string | null
+          // from 20260526000002_guia_transporte_add_modo_entrega.sql
+          modo_entrega: "transportista" | "entrega_directa"
+          transportista_id: string | null
         }
         Insert: {
           id?: string
           numero: number
           fecha: string
-          transportista: string
+          transportista?: string | null
           placa?: string | null
           observaciones?: string | null
           created_at?: string | null
@@ -201,12 +206,14 @@ export type Database = {
           estado?: string | null
           tipo_despacho?: string | null
           nombre_chofer?: string | null
+          modo_entrega?: "transportista" | "entrega_directa"
+          transportista_id?: string | null
         }
         Update: {
           id?: string
           numero?: number
           fecha?: string
-          transportista?: string
+          transportista?: string | null
           placa?: string | null
           observaciones?: string | null
           created_at?: string | null
@@ -217,6 +224,29 @@ export type Database = {
           estado?: string | null
           tipo_despacho?: string | null
           nombre_chofer?: string | null
+          modo_entrega?: "transportista" | "entrega_directa"
+          transportista_id?: string | null
+        }
+      }
+      // Catálogo canónico de transportistas (Sprint 1).
+      transportistas: {
+        Row: {
+          id: string
+          nombre: string
+          activo: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          nombre: string
+          activo?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          nombre?: string
+          activo?: boolean
+          created_at?: string
         }
       }
       guia_items: {

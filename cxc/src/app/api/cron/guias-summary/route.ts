@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { Resend } from "resend";
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
+import { transportistaLabel } from "@/lib/transportistaLabel";
 
 export const dynamic = "force-dynamic";
 
@@ -176,7 +177,7 @@ export async function GET(req: NextRequest) {
   // Query guías completed in the window
   const { data: guias, error: queryErr } = await supabaseServer
     .from("guia_transporte")
-    .select("*, guia_items(*)")
+    .select("*, transportistas(nombre), guia_items(*)")
     .eq("estado", "Completada")
     .eq("deleted", false)
     .gte("updated_at", startIso)
@@ -192,8 +193,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ message: "No guías dispatched today, email skipped", count: 0 });
   }
 
-  // Filter out deleted items and sort
+  // Filter out deleted items, sort, and resolve transportista label (Sprint 2).
   for (const g of guias) {
+    g.transportista = transportistaLabel(g);
     if (g.guia_items) {
       g.guia_items = g.guia_items.filter((i: { deleted?: boolean }) => !i.deleted);
       g.guia_items.sort((a: { orden: number }, b: { orden: number }) => a.orden - b.orden);

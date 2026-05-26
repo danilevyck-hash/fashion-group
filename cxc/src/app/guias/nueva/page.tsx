@@ -29,10 +29,10 @@ export default function GuiaNuevaPage() {
         formNumero={s.formNumero}
         fecha={s.fecha}
         setFecha={s.setFecha}
-        transportista={s.transportista}
-        setTransportista={s.setTransportista}
-        transportistaOtro={s.transportistaOtro}
-        setTransportistaOtro={s.setTransportistaOtro}
+        modoEntrega={s.modoEntrega}
+        setModoEntrega={s.setModoEntrega}
+        transportistaId={s.transportistaId}
+        setTransportistaId={s.setTransportistaId}
         entregadoPor={s.entregadoPor}
         setEntregadoPor={s.setEntregadoPor}
         observaciones={s.observaciones}
@@ -45,7 +45,6 @@ export default function GuiaNuevaPage() {
         validationErrors={s.validationErrors}
         error={s.error}
         saving={s.saving}
-        onAddTransportista={s.addTransportista}
         onAddCliente={s.addCliente}
         onAddDireccion={s.addDireccion}
         onAddEmpresa={s.addEmpresa}

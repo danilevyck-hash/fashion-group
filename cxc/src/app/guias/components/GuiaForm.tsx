@@ -6,8 +6,13 @@
 //   3. NO debe redirigir al listado /guias ni limpiar el form
 //   4. El auto-save silencioso dispara cada 1.5s sin perder el contexto
 //   5. Click "Guardar" final sí debe redirigir al listado
+//
+// Sprint 2 (2026-05-26): el input libre del transportista se reemplazó por
+// un segmented control de modo (Transportista | Entrega directa) + select
+// cerrado contra el catálogo canónico (tabla `transportistas`).
+
 import { useEffect, useRef, useState } from "react";
-import type { GuiaItem } from "./types";
+import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import AddNewInline from "./AddNewInline";
 import { ScrollableTable } from "@/components/ui";
 
@@ -16,23 +21,22 @@ interface GuiaFormProps {
   formNumero: number;
   fecha: string;
   setFecha: (v: string) => void;
-  transportista: string;
-  setTransportista: (v: string) => void;
-  transportistaOtro: string;
-  setTransportistaOtro: (v: string) => void;
+  modoEntrega: ModoEntrega;
+  setModoEntrega: (v: ModoEntrega) => void;
+  transportistaId: string | null;
+  setTransportistaId: (v: string | null) => void;
   entregadoPor: string;
   setEntregadoPor: (v: string) => void;
   observaciones: string;
   setObservaciones: (v: string) => void;
   items: GuiaItem[];
-  transportistas: string[];
+  transportistas: Transportista[];
   clientes: string[];
   direcciones: string[];
   empresas: string[];
   validationErrors: Set<string>;
   error: string | null;
   saving: boolean;
-  onAddTransportista: (v: string) => void;
   onAddCliente: (v: string) => void;
   onAddDireccion: (v: string) => void;
   onAddEmpresa: (v: string) => void;
@@ -49,11 +53,11 @@ interface GuiaFormProps {
 
 export default function GuiaForm({
   editingId, formNumero, fecha, setFecha,
-  transportista, setTransportista, transportistaOtro, setTransportistaOtro,
+  modoEntrega, setModoEntrega, transportistaId, setTransportistaId,
   entregadoPor, setEntregadoPor, observaciones, setObservaciones,
   items, transportistas, clientes, direcciones, empresas,
   validationErrors, error, saving,
-  onAddTransportista, onAddCliente, onAddDireccion, onAddEmpresa,
+  onAddCliente, onAddDireccion, onAddEmpresa,
   onUpdateItem, onAddRow, onRemoveRow, onSave, onCancel,
   hasDraft, draftTimeAgo, onRestoreDraft, onDiscardDraft,
 }: GuiaFormProps) {
@@ -99,12 +103,9 @@ export default function GuiaForm({
   function handleUndoRemove() {
     if (!undoRow) return;
     clearTimeout(undoRow.timer);
-    // Re-insert at original position by adding row and updating it
     onAddRow();
-    // After add, the new row is at the end — we need to update it with the removed data
-    // Since we can't insert at position, we update the last item
     setTimeout(() => {
-      const lastIdx = items.length; // after addRow, new item is at this index
+      const lastIdx = items.length;
       onUpdateItem(lastIdx, "cliente", undoRow.item.cliente);
       onUpdateItem(lastIdx, "direccion", undoRow.item.direccion);
       onUpdateItem(lastIdx, "empresa", undoRow.item.empresa);
@@ -123,7 +124,7 @@ export default function GuiaForm({
   useEffect(() => {
     changeCount.current++;
     if (changeCount.current > 1) setDirty(true);
-  }, [fecha, transportista, transportistaOtro, entregadoPor, observaciones, items]);
+  }, [fecha, modoEntrega, transportistaId, entregadoPor, observaciones, items]);
 
   // Auto-save with debounce (only when editing existing guía)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -133,7 +134,8 @@ export default function GuiaForm({
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
     autoSaveTimer.current = setTimeout(async () => {
       const hasItems = items.some(i => i.cliente && i.direccion && i.empresa && i.facturas && i.bultos > 0);
-      const hasHeader = fecha.trim() && (transportista.trim() && transportista !== "__other__" || transportistaOtro.trim()) && entregadoPor.trim();
+      const hasModo = modoEntrega === "entrega_directa" || (modoEntrega === "transportista" && !!transportistaId);
+      const hasHeader = fecha.trim() && hasModo && entregadoPor.trim();
       if (hasItems && hasHeader && !autoSaveInFlight.current) {
         console.log("[guia] autosave trigger", { items: items.length });
         autoSaveInFlight.current = true;
@@ -153,8 +155,6 @@ export default function GuiaForm({
     return () => window.removeEventListener("beforeunload", handler);
   }, [dirty, saving]);
 
-  // Wrap onSave to track status. `silent` propaga al handler del hook para
-  // que el auto-save NO haga resetForm() ni redirija al listado.
   function handleSave(opts?: { silent?: boolean }) {
     onSave(opts);
     setDirty(false);
@@ -164,13 +164,11 @@ export default function GuiaForm({
   function inputClass(key: string, base: string, touchedKey?: string, touchedValue?: string) {
     const hasSubmitError = validationErrors.has(key) || validationErrors.has(key + "-format") || validationErrors.has(key + "-separator");
     const hasTouchedError = touchedKey !== undefined && touchedValue !== undefined && touched[touchedKey] && !touchedValue.trim();
-    // text-base on mobile prevents iOS zoom, md:text-sm for desktop density
     const mobileSize = base.includes("text-sm") ? base.replace("text-sm", "text-base md:text-sm") : base;
     const mobilePadding = mobileSize.includes("py-2") ? mobileSize.replace("py-2", "py-3 md:py-2") : mobileSize.includes("py-1") ? mobileSize.replace("py-1", "py-2 md:py-1") : mobileSize;
     return `${mobilePadding} ${hasSubmitError || hasTouchedError ? "border-red-400" : ""}`;
   }
 
-  // Save status indicator
   const saveStatus = saving ? "saving" : dirty ? "dirty" : lastSaved ? "saved" : null;
 
   function SaveButton({ size = "normal" }: { size?: "normal" | "small" }) {
@@ -190,6 +188,10 @@ export default function GuiaForm({
     if (saveStatus === "saved") return <span className="text-sm text-green-600 animate-save-flash">Listo, guardado {lastSaved}</span>;
     return null;
   }
+
+  const transportistaError =
+    validationErrors.has("transportista") ||
+    (touched["transportista"] && modoEntrega === "transportista" && !transportistaId);
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
@@ -229,23 +231,50 @@ export default function GuiaForm({
               className={inputClass("fecha", "w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition", "fecha", fecha)} />
             {fieldError("fecha", fecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
           </div>
+
           <div>
             <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">
-              Transportista <span className="text-red-500">*</span>
-              <AddNewInline placeholder="Nombre" onAdd={onAddTransportista} />
+              Modo de entrega <span className="text-red-500">*</span>
             </label>
-            <select value={transportista} onChange={e => setTransportista(e.target.value)} onBlur={() => handleBlur("transportista")}
-              className={inputClass("transportista", "w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none", "transportista", transportista)}>
-              <option value="">Seleccionar...</option>
-              {transportistas.map(t => <option key={t} value={t}>{t}</option>)}
-              <option value="__other__">Otro...</option>
-            </select>
-            {fieldError("transportista", transportista) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
-            {transportista === "__other__" && (
-              <input type="text" placeholder="Nombre del transportista" value={transportistaOtro} onChange={e => setTransportistaOtro(e.target.value)}
-                className={inputClass("transportista", "w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition mt-3")} />
+            {/* Segmented control modo_entrega */}
+            <div className="flex rounded-lg bg-gray-100 p-0.5 mb-3">
+              <button
+                type="button"
+                onClick={() => { setModoEntrega("transportista"); handleBlur("transportista"); }}
+                className={`flex-1 text-sm py-2 px-3 rounded-md transition font-medium ${modoEntrega === "transportista" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
+                Transportista
+              </button>
+              <button
+                type="button"
+                onClick={() => { setModoEntrega("entrega_directa"); setTransportistaId(null); }}
+                className={`flex-1 text-sm py-2 px-3 rounded-md transition font-medium ${modoEntrega === "entrega_directa" ? "bg-white text-black border border-gray-200" : "text-gray-500 hover:text-gray-700"}`}>
+                Entrega directa
+              </button>
+            </div>
+            {modoEntrega === "transportista" ? (
+              <>
+                <select
+                  value={transportistaId || ""}
+                  onChange={e => setTransportistaId(e.target.value || null)}
+                  onBlur={() => handleBlur("transportista")}
+                  className={inputClass("transportista", "w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none")}
+                >
+                  <option value="">Seleccionar transportista...</option>
+                  {transportistas.map(t => (
+                    <option key={t.id} value={t.id}>{t.nombre}</option>
+                  ))}
+                </select>
+                {transportistaError && (
+                  <p className="text-red-500 text-xs mt-0.5">Selecciona un transportista</p>
+                )}
+              </>
+            ) : (
+              <p className="text-xs text-gray-500 italic">
+                Esta guía se entrega directamente, sin transportista externo.
+              </p>
             )}
           </div>
+
           <div>
             <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">
               Despachado por <span className="text-red-500">*</span>

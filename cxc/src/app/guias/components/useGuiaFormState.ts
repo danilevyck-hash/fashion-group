@@ -3,13 +3,16 @@
 // Hook del FORM de guía (crear o editar). Extraído de useGuiasState para
 // soportar rutas dedicadas /guias/nueva y /guias/[id]/editar.
 // El hook del listado (useGuiasState) ya no maneja estado de form.
+//
+// Sprint 2 (2026-05-26): el campo libre `transportista` se reemplazó por
+// (modoEntrega, transportistaId). El catálogo se lee de /api/transportistas
+// (tabla canónica con 6 registros activos seedeados en Sprint 1).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
-import type { GuiaItem } from "./types";
+import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import {
-  DEFAULT_TRANSPORTISTAS,
   DEFAULT_CLIENTES,
   DEFAULT_DIRECCIONES,
   DEFAULT_EMPRESAS,
@@ -29,8 +32,8 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
   const [validationErrors, setValidationErrors] = useState<Set<string>>(new Set());
   const [toast, setToast] = useState<string | null>(null);
 
-  // Listas dinámicas
-  const [transportistas, setTransportistas] = useState<string[]>(DEFAULT_TRANSPORTISTAS);
+  // Catálogo canónico de transportistas (vive en DB, no localStorage).
+  const [transportistas, setTransportistas] = useState<Transportista[]>([]);
   const [clientes, setClientes] = useState<string[]>(DEFAULT_CLIENTES);
   const [direcciones, setDirecciones] = useState<string[]>(DEFAULT_DIRECCIONES);
   const [empresas, setEmpresas] = useState<string[]>(DEFAULT_EMPRESAS);
@@ -38,10 +41,12 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
   // Form state
   const [editingEstado, setEditingEstado] = useState<string | null>(null);
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
-  const [transportista, setTransportista] = useState(() => {
-    try { return localStorage.getItem("fg_last_transportista") || ""; } catch { return ""; }
+  const [modoEntrega, setModoEntrega] = useState<ModoEntrega>(() => {
+    try { return (localStorage.getItem("fg_last_modo_entrega") as ModoEntrega) || "transportista"; } catch { return "transportista"; }
   });
-  const [transportistaOtro, setTransportistaOtro] = useState("");
+  const [transportistaId, setTransportistaId] = useState<string | null>(() => {
+    try { return localStorage.getItem("fg_last_transportista_id") || null; } catch { return null; }
+  });
   const [entregadoPor, setEntregadoPor] = useState(() => {
     try { return localStorage.getItem("fg_last_entregado_por") || ""; } catch { return ""; }
   });
@@ -56,12 +61,15 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
-  // Cargar listas dinámicas
+  // Cargar listas dinámicas + catálogo de transportistas
   useEffect(() => {
-    setTransportistas(loadList("fg_transportistas", DEFAULT_TRANSPORTISTAS));
     setClientes(loadList("fg_clientes", DEFAULT_CLIENTES));
     setDirecciones(loadList("fg_direcciones", DEFAULT_DIRECCIONES));
     setEmpresas(loadList("fg_empresas", DEFAULT_EMPRESAS));
+    fetch("/api/transportistas", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Transportista[]) => setTransportistas(data || []))
+      .catch(() => { /* el form muestra el modo "Entrega directa" como fallback */ });
   }, []);
 
   // Si es edición: cargar la guía una sola vez
@@ -77,14 +85,13 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
         setEditingEstado(g.estado || null);
         setFormNumero(g.numero);
         setFecha(g.fecha);
-        const listaTransp = loadList("fg_transportistas", DEFAULT_TRANSPORTISTAS);
-        if (listaTransp.includes(g.transportista)) {
-          setTransportista(g.transportista);
-          setTransportistaOtro("");
+        // Sprint 2: modo + FK directos del backend
+        if (g.modo_entrega === "transportista" || g.modo_entrega === "entrega_directa") {
+          setModoEntrega(g.modo_entrega);
         } else {
-          setTransportista("__other__");
-          setTransportistaOtro(g.transportista);
+          setModoEntrega(g.transportista_id ? "transportista" : "entrega_directa");
         }
+        setTransportistaId(g.transportista_id || null);
         setEntregadoPor(g.entregado_por || "");
         setObservaciones(g.observaciones || "");
         const guiaItems = (g.guia_items || []) as GuiaItem[];
@@ -117,31 +124,29 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
       .catch(() => {});
   }, [editingId]);
 
-  // Draft auto-save
+  // Draft auto-save (incluye modo + FK)
   const guiaDraftData = useMemo(() => ({
-    transportista, entregadoPor, items, observaciones,
-  }), [transportista, entregadoPor, items, observaciones]);
+    modoEntrega, transportistaId, entregadoPor, items, observaciones,
+  }), [modoEntrega, transportistaId, entregadoPor, items, observaciones]);
   const isGuiaDraftEmpty = useCallback((d: typeof guiaDraftData) => {
-    return !d.transportista && !d.entregadoPor && !d.observaciones && d.items.every(i => !i.cliente && !i.direccion && !i.facturas && (!i.bultos || i.bultos === 0));
+    return !d.transportistaId && !d.entregadoPor && !d.observaciones && d.items.every(i => !i.cliente && !i.direccion && !i.facturas && (!i.bultos || i.bultos === 0));
   }, []);
   const { draft: guiaDraft, hasDraft: hasGuiaDraft, clearDraft: clearGuiaDraft, draftTimeAgo: guiaDraftTimeAgo } = useDraftAutoSave("guia", guiaDraftData, isGuiaDraftEmpty);
 
   function restoreGuiaDraft() {
     if (!guiaDraft) return;
-    setTransportista(guiaDraft.transportista || "");
+    if (guiaDraft.modoEntrega === "transportista" || guiaDraft.modoEntrega === "entrega_directa") {
+      setModoEntrega(guiaDraft.modoEntrega);
+    }
+    setTransportistaId(guiaDraft.transportistaId || null);
     setEntregadoPor(guiaDraft.entregadoPor || "");
     setObservaciones(guiaDraft.observaciones || "");
     if (guiaDraft.items?.length) setItems(guiaDraft.items);
     clearGuiaDraft();
   }
 
-  // Adders de listas dinámicas
-  function addTransportista(name: string) {
-    const updated = [...transportistas, name];
-    setTransportistas(updated);
-    saveList("fg_transportistas", DEFAULT_TRANSPORTISTAS, updated);
-    setTransportista(name);
-  }
+  // Adders de listas dinámicas (transportistas ya no se agregan desde el form
+  // — son catálogo controlado por admin)
   function addCliente(name: string) {
     const updated = [...clientes, name];
     setClientes(updated);
@@ -174,9 +179,8 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
 
   function validate(): boolean {
     const errors = new Set<string>();
-    const transp = transportista === "__other__" ? transportistaOtro : transportista;
     if (!fecha) errors.add("fecha");
-    if (!transp) errors.add("transportista");
+    if (modoEntrega === "transportista" && !transportistaId) errors.add("transportista");
     if (!entregadoPor) errors.add("entregadoPor");
     const validItems = items.filter(
       (i) => i.cliente || i.direccion || i.facturas || i.bultos > 0,
@@ -214,9 +218,9 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     const silent = opts?.silent === true;
     console.log(`[guia] saveGuia start (silent=${silent}, editing=${editingId ?? "new"})`);
     if (!validate()) return;
-    const transp = transportista === "__other__" ? transportistaOtro : transportista;
     try {
-      localStorage.setItem("fg_last_transportista", transportista);
+      localStorage.setItem("fg_last_modo_entrega", modoEntrega);
+      if (transportistaId) localStorage.setItem("fg_last_transportista_id", transportistaId);
       localStorage.setItem("fg_last_entregado_por", entregadoPor);
     } catch { /* */ }
     const validItems = items.filter(
@@ -230,7 +234,8 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         fecha,
-        transportista: transp,
+        modo_entrega: modoEntrega,
+        transportista_id: modoEntrega === "transportista" ? transportistaId : null,
         entregado_por: entregadoPor,
         observaciones,
         estado: editingId && editingEstado ? editingEstado : "Pendiente Bodega",
@@ -243,12 +248,15 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
       const guia = await res.json();
       if (!editingId && !silent) {
         const totalB = validItems.reduce((s, i) => s + (i.bultos || 0), 0);
+        const transpLabel = modoEntrega === "entrega_directa"
+          ? "Entrega directa"
+          : transportistas.find((t) => t.id === transportistaId)?.nombre || "—";
         fetch("/api/guias/notify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             subject: `Nueva Guía GT-${String(guia.numero).padStart(3, "0")} — Pendiente Bodega`,
-            body: `<h2>Guía GT-${String(guia.numero).padStart(3, "0")}</h2><p><strong>Transportista:</strong> ${transp}</p><p><strong>Total bultos:</strong> ${totalB}</p><p>Pendiente de completar en bodega.</p>`,
+            body: `<h2>Guía GT-${String(guia.numero).padStart(3, "0")}</h2><p><strong>Transportista:</strong> ${transpLabel}</p><p><strong>Total bultos:</strong> ${totalB}</p><p>Pendiente de completar en bodega.</p>`,
           }),
         }).catch(() => {});
       }
@@ -257,7 +265,8 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
         router.push("/guias");
       }
     } else {
-      setError("Error al guardar. Verifica los datos.");
+      const errData = await res.json().catch(() => ({}));
+      setError(errData.error || "Error al guardar. Verifica los datos.");
     }
     setSaving(false);
   }
@@ -272,12 +281,12 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     showToast,
     // listas
     transportistas, clientes, direcciones, empresas,
-    addTransportista, addCliente, addDireccion, addEmpresa,
+    addCliente, addDireccion, addEmpresa,
     // form
     formNumero,
     fecha, setFecha,
-    transportista, setTransportista,
-    transportistaOtro, setTransportistaOtro,
+    modoEntrega, setModoEntrega,
+    transportistaId, setTransportistaId,
     entregadoPor, setEntregadoPor,
     observaciones, setObservaciones,
     items,
