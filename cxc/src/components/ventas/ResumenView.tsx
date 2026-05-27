@@ -372,6 +372,8 @@ export function ResumenView({
                   {showProyeccionCol && (
                     <EmpresaProjectionCell
                       proyeccion={findProyeccionForEmpresa(data.proyeccion!, r.empresa.id)}
+                      mesCorte={data.proyeccion!.mes_corte}
+                      prevYear={prevYear}
                     />
                   )}
                 </tr>
@@ -464,100 +466,43 @@ function ProyeccionHero({
   prevYear: number;
 }) {
   const g = proyeccion.totales_grupo;
-  const proy   = g.proyeccion_cierre;
-  const ytd    = g.ventas_ytd;
-  const cierre = g.cierre_anio_anterior_total;
-  const delta  = g.delta_vs_anio_anterior_total;
-  const dPct   = g.delta_vs_anio_anterior_pct;
-
-  // Color del delta: rojo negativo, verde positivo, neutro si ~0 o NULL.
-  const deltaTone = delta == null || Math.abs(delta) < 1
+  const proy  = g.proyeccion_cierre;
+  const delta = g.delta_vs_anio_anterior_total;
+  const deltaTone = delta == null
     ? "text-stone-500"
     : delta < 0 ? "text-red-700" : "text-emerald-700";
 
-  // Barra: escala = max(proy, cierre) para que el marker de cierre quede
-  // dentro y el excedente (si proy > cierre) se vea como tramo verde.
-  const scaleMax = Math.max(proy, cierre, ytd, 1);
-  const pctYtd      = (ytd / scaleMax) * 100;
-  const pctProy     = (proy / scaleMax) * 100;
-  const pctCierre   = cierre > 0 ? (cierre / scaleMax) * 100 : null;
-  const excedente   = cierre > 0 && proy > cierre;
-
-  // % del año transcurrido (basado en mes_corte).
-  const pctYearElapsed = proyeccion.mes_corte > 0 ? proyeccion.mes_corte / 12 : 0;
-
-  // Texto del delta: "22.3% bajo 2025" o "8.9% sobre 2025" etc.
-  const deltaText = dPct == null
-    ? null
-    : (dPct >= 0 ? `${(dPct * 100).toFixed(1)}% sobre ${prevYear}` : `${(Math.abs(dPct) * 100).toFixed(1)}% bajo ${prevYear}`);
-
   return (
-    <section className="space-y-3">
+    <section className="space-y-2">
       <p className="text-[11px] font-medium uppercase tracking-widest text-stone-500">
         Proyección de cierre {selectedYear}
       </p>
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <span className="font-mono text-4xl font-medium leading-none tracking-tight tabular-nums text-stone-950 md:text-[40px]">
-          {fmtMoneyCompact(proy)}
-        </span>
-        {deltaText && (
-          <span className={cn("text-sm", deltaTone)}>{deltaText}</span>
-        )}
-      </div>
-      <p className="text-xs text-stone-500">
-        {prevYear} cerró en <span className="font-mono font-medium tabular-nums text-stone-700">{fmtMoneyCompact(cierre)}</span>
-        <span className="mx-1.5 text-stone-300">·</span>
-        YTD {selectedYear} <span className="font-mono font-medium tabular-nums text-stone-700">{fmtMoneyCompact(ytd)}</span>
-        {pctYearElapsed > 0 && (
-          <span className="text-stone-400"> ({(pctYearElapsed * 100).toFixed(0)}% del año)</span>
-        )}
+      <p className="font-mono text-4xl font-medium leading-none tracking-tight tabular-nums text-stone-950 md:text-[40px]">
+        {fmtMoneyCompact(proy)}
       </p>
-
-      {/* Barra simple: real YTD + proyección restante. Marker en cierre 2025. */}
-      <div className="relative pt-5">
-        <div className="relative h-2 w-full overflow-hidden rounded-full bg-stone-100">
-          <div className="absolute inset-y-0 left-0 bg-teal-700" style={{ width: `${pctYtd}%` }} />
-          {pctProy > pctYtd && (
-            <div
-              className="absolute inset-y-0 bg-teal-200"
-              style={{
-                left: `${pctYtd}%`,
-                width: `${(pctCierre != null ? Math.min(pctCierre, pctProy) : pctProy) - pctYtd}%`,
-              }}
-            />
-          )}
-          {/* Excedente verde más allá del cierre 2025 (si proy > cierre) */}
-          {excedente && pctCierre != null && (
-            <div
-              className="absolute inset-y-0 bg-emerald-600"
-              style={{ left: `${pctCierre}%`, width: `${pctProy - pctCierre}%` }}
-            />
-          )}
-        </div>
-        {/* Marker vertical en cierre prev year con label */}
-        {pctCierre != null && (
-          <>
-            <div
-              className="absolute h-2 w-0.5 bg-stone-950"
-              style={{ left: `${pctCierre}%`, top: 20, transform: "translateX(-50%)" }}
-            />
-            <span
-              className="absolute font-mono text-[10px] tabular-nums text-stone-500"
-              style={{ left: `${pctCierre}%`, top: 0, transform: "translateX(-50%)" }}
-            >
-              {prevYear} {fmtMoneyCompact(cierre)}
-            </span>
-          </>
-        )}
-      </div>
+      {delta != null && (
+        <p className={cn("font-mono text-sm font-medium tabular-nums", deltaTone)}>
+          {(delta > 0 ? "+" : "") + fmtMoneyCompact(delta)} vs cierre {prevYear}
+        </p>
+      )}
     </section>
   );
 }
 
 /** Celda de proyección por empresa (al lado del Total YTD).
  *  v5: monto principal + Δ absoluto vs cierre del año anterior. Sin dots de
- *  status, sin comparativo con meta. */
-function EmpresaProjectionCell({ proyeccion }: { proyeccion: ProyeccionEmpresa | null }) {
+ *  status, sin comparativo con meta. Hover muestra desglose del cálculo
+ *  (algoritmo + fórmula) — transparencia para Daniel.
+ */
+function EmpresaProjectionCell({
+  proyeccion,
+  mesCorte,
+  prevYear,
+}: {
+  proyeccion: ProyeccionEmpresa | null;
+  mesCorte: number;
+  prevYear: number;
+}) {
   if (!proyeccion) {
     return (
       <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3.5 text-right font-mono text-xs tabular-nums text-stone-400">
@@ -567,17 +512,119 @@ function EmpresaProjectionCell({ proyeccion }: { proyeccion: ProyeccionEmpresa |
   }
   const delta = proyeccion.delta_vs_anio_anterior;
   return (
-    <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3.5 text-right font-mono text-xs tabular-nums">
-      <span className="block text-sm font-medium text-stone-950">{fmtMoneyCompact(proyeccion.proyeccion_cierre)}</span>
-      <p className={cn(
-        "mt-0.5 text-[10.5px]",
-        delta == null ? "text-stone-400" : delta < 0 ? "text-red-700" : delta > 0 ? "text-emerald-700" : "text-stone-500",
-      )}>
-        {delta == null
-          ? "sin comparativo"
-          : `${delta >= 0 ? "+" : "−"}${fmtMoneyCompact(Math.abs(delta))}`}
-      </p>
+    <td className="whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono text-xs tabular-nums">
+      <TooltipProvider delayDuration={120}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="block w-full cursor-help px-3.5 py-3.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
+            >
+              <span className="block text-sm font-medium text-stone-950">{fmtMoneyCompact(proyeccion.proyeccion_cierre)}</span>
+              <p className={cn(
+                "mt-0.5 text-[10.5px]",
+                delta == null ? "text-stone-400" : delta < 0 ? "text-red-700" : delta > 0 ? "text-emerald-700" : "text-stone-500",
+              )}>
+                {delta == null
+                  ? "sin comparativo"
+                  : `${delta >= 0 ? "+" : "−"}${fmtMoneyCompact(Math.abs(delta))}`}
+              </p>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent
+            side="left" align="start" sideOffset={8} collisionPadding={12}
+            className="min-w-[280px] max-w-[340px] border-0 bg-stone-950 p-3 text-white shadow-lg"
+          >
+            <ProjectionBreakdown proyeccion={proyeccion} mesCorte={mesCorte} prevYear={prevYear} />
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </td>
+  );
+}
+
+function ProjectionBreakdown({
+  proyeccion,
+  mesCorte,
+  prevYear,
+}: {
+  proyeccion: ProyeccionEmpresa;
+  mesCorte: number;
+  prevYear: number;
+}) {
+  const ytd  = proyeccion.ventas_ytd;
+  const ytdP = proyeccion.ventas_prev_ytd_sp;
+  const ratio = ytdP > 0 ? (ytd - ytdP) / ytdP : null;
+  const ratioStr = ratio == null ? "—" : `${ratio >= 0 ? "+" : ""}${(ratio * 100).toFixed(1)}%`;
+  const algoLabel = proyeccion.es_fallback_lineal
+    ? "Extrapolación lineal (datos insuficientes)"
+    : proyeccion.algoritmo === "estacional"
+      ? "Estacional"
+      : proyeccion.algoritmo === "mixto"
+        ? "Mixto"
+        : "Lineal";
+
+  return (
+    <div className="space-y-2 text-[11px]">
+      <div className="flex items-baseline justify-between gap-3 border-b border-white/10 pb-1.5">
+        <span className="text-[10px] font-medium uppercase tracking-widest text-stone-300">Algoritmo</span>
+        <span className={cn(
+          "font-medium",
+          proyeccion.es_fallback_lineal ? "text-stone-400" : "text-white",
+        )}>
+          {algoLabel}
+        </span>
+      </div>
+
+      <Row label={`YTD ${prevYear + 1}`} value={fmtMoneyCompact(ytd)} />
+      <Row label={`YTD ${prevYear} mismo período`} value={ytdP > 0 ? fmtMoneyCompact(ytdP) : "—"} />
+      <Row label="Δ vs mismo período" value={ratioStr} />
+      <Row label={`Cierre ${prevYear}`} value={fmtMoneyCompact(proyeccion.cierre_anio_anterior)} />
+
+      {proyeccion.algoritmo === "estacional" && proyeccion.frac_ytd_estacional != null && (
+        <>
+          <Row
+            label={`Fracción ${prevYear} al mismo día`}
+            value={`${(proyeccion.frac_ytd_estacional * 100).toFixed(1)}%`}
+          />
+          <Formula>
+            Proyección = YTD / fracción = {fmtMoneyCompact(proyeccion.proyeccion_cierre)}
+          </Formula>
+        </>
+      )}
+
+      {proyeccion.algoritmo === "mixto" && proyeccion.factor_final != null && (
+        <>
+          <Row label="Factor de crecimiento" value={`×${proyeccion.factor_final.toFixed(3)}`} />
+          <Formula>
+            Proyección = Cierre {prevYear} × factor = {fmtMoneyCompact(proyeccion.proyeccion_cierre)}
+          </Formula>
+        </>
+      )}
+
+      {(proyeccion.algoritmo === "fallback_lineal" || proyeccion.es_fallback_lineal) && mesCorte > 0 && (
+        <Formula>
+          Proyección = YTD × 12 / {mesCorte} = {fmtMoneyCompact(proyeccion.proyeccion_cierre)}
+        </Formula>
+      )}
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <span className="text-stone-300">{label}</span>
+      <span className="font-mono tabular-nums text-white">{value}</span>
+    </div>
+  );
+}
+
+function Formula({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="mt-1 rounded bg-white/5 px-2 py-1.5 font-mono text-[10.5px] leading-snug text-teal-200">
+      {children}
+    </p>
   );
 }
 
@@ -612,9 +659,47 @@ function HeatCell({ cell, mode, prevYear }: { cell: Cell; mode: ViewMode; prevYe
               : "text-stone-500";
 
   if (cur == null) {
+    // Mes futuro (o sin data aún): si hay dato del mismo mes año anterior,
+    // exponemos como tooltip — útil para anticipar "Jun 2026 esperable
+    // alrededor de Jun 2025 = $X" sin esperar al cierre.
+    const hasPrevForTooltip = cell.ventasPrev > 0 || cell.utilidadPrev > 0;
+    if (!hasPrevForTooltip) {
+      return (
+        <td className="whitespace-nowrap border-b border-stone-200 px-2.5 py-3.5 text-right font-mono text-xs tabular-nums">
+          <span className="text-stone-400">—</span>
+        </td>
+      );
+    }
+    const prevPeriodLabel = cell.periodLabel.replace(String(prevYear + 1), String(prevYear));
+    const prevVal = mode === "utilidad" ? cell.utilidadPrev : cell.ventasPrev;
     return (
-      <td className="whitespace-nowrap border-b border-stone-200 px-2.5 py-3.5 text-right font-mono text-xs tabular-nums">
-        <span className="text-stone-400">—</span>
+      <td className="whitespace-nowrap border-b border-stone-200 p-0 text-right font-mono text-xs tabular-nums">
+        <TooltipProvider delayDuration={120}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="block w-full cursor-help px-2.5 py-3.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
+              >
+                <span className="text-stone-400">—</span>
+              </button>
+            </TooltipTrigger>
+            <TooltipContent
+              side="bottom" align="end" sideOffset={4} collisionPadding={12}
+              className="min-w-[220px] border-0 bg-stone-950 p-3 text-white shadow-lg"
+            >
+              <div className="space-y-1.5 text-[11px]">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-stone-300">{prevPeriodLabel}</span>
+                  <span className="font-mono tabular-nums text-white">{renderCellValue(prevVal, mode)}</span>
+                </div>
+                <p className="text-[10.5px] text-stone-400">
+                  Aún no hay datos de {cell.periodLabel}
+                </p>
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </td>
     );
   }

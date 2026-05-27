@@ -97,73 +97,26 @@ function MobileProyHero({
 }) {
   const g = proyeccion.totales_grupo;
   const proy = g.proyeccion_cierre;
-  const meta = g.meta_total;
   const deltaCierre = g.delta_vs_anio_anterior_total;
-  const hasMeta = meta > 0;
-  const cumplimientoPct = hasMeta ? (proy / meta) * 100 : null;
-  const aMeta = hasMeta ? proy - meta : null;
-
-  // Barra: si hay meta usamos meta como denominador (cap visual al 100%).
-  // Sin meta, fallback a cierre anterior para tener referencia visual.
-  const barDenom = hasMeta ? meta : g.cierre_anio_anterior_total;
-  const barPct = barDenom > 0 ? Math.min(100, (proy / barDenom) * 100) : 0;
+  const deltaToneCls = deltaCierre == null
+    ? "text-teal-100"
+    : deltaCierre < 0 ? "text-rose-200" : "text-emerald-200";
 
   return (
     <section className="rounded-xl bg-teal-700 p-5 text-white shadow-sm">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-[10.5px] font-medium uppercase tracking-widest text-teal-100">
-          Proyección {selectedYear}
-        </p>
-        {cumplimientoPct != null && (
-          <p className="font-mono text-xs font-medium tabular-nums text-teal-100">
-            {cumplimientoPct.toFixed(0)}% del meta
-          </p>
-        )}
-      </div>
+      <p className="text-[10.5px] font-medium uppercase tracking-widest text-teal-100">
+        Proyección {selectedYear}
+      </p>
       <p className="mt-2 font-mono text-[40px] font-medium leading-none tracking-tight tabular-nums">
         {formatCompactCurrency(proy)}
       </p>
-      <p className="mt-2 text-xs text-teal-100">
-        {hasMeta
-          ? <>de <span className="font-mono tabular-nums text-white">{formatCompactCurrency(meta)}</span> meta anual</>
-          : "Meta anual no configurada"}
-      </p>
-      <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/20">
-        <div
-          className="h-full bg-white transition-[width] duration-300"
-          style={{ width: `${barPct}%` }}
-        />
-      </div>
-      <div className="mt-4 border-t border-white/20 pt-3">
-        <dl className="grid grid-cols-2 gap-3 text-xs">
-          <div>
-            <dt className="text-[10px] font-medium uppercase tracking-wider text-teal-100">A meta</dt>
-            <dd className={cn("mt-0.5 font-mono font-medium tabular-nums", deltaTone(aMeta))}>
-              {aMeta == null ? "—" : signedCompact(aMeta)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-[10px] font-medium uppercase tracking-wider text-teal-100">
-              vs cierre &apos;{String(prevYear).slice(-2)}
-            </dt>
-            <dd className={cn("mt-0.5 font-mono font-medium tabular-nums", deltaTone(deltaCierre))}>
-              {deltaCierre == null ? "—" : signedCompact(deltaCierre)}
-            </dd>
-          </div>
-        </dl>
-      </div>
+      {deltaCierre != null && (
+        <p className={cn("mt-2 font-mono text-xs font-medium tabular-nums", deltaToneCls)}>
+          {(deltaCierre > 0 ? "+" : "") + formatCompactCurrency(deltaCierre)} vs cierre {prevYear}
+        </p>
+      )}
     </section>
   );
-}
-
-function deltaTone(d: number | null | undefined): string {
-  if (d == null) return "text-teal-100";
-  return d < 0 ? "text-rose-200" : "text-emerald-200";
-}
-
-function signedCompact(n: number): string {
-  if (n === 0) return "$0";
-  return (n > 0 ? "+" : "") + formatCompactCurrency(n);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -512,12 +465,25 @@ function MobileCell({
     );
   }
 
+  // delta == null cuando ventasPrev (o utilidadPrev) <= 0 — i.e. la RPC
+  // ventas_dashboard_prev_same_period no devolvió ese empresa-mes en prev
+  // year. Visualmente marcamos "n/a" (mismo patrón que desktop) para no
+  // confundir con un cambio neutro vs un sin-comparativo.
+  const showNa = delta == null;
+
   return (
     <td className={cn("px-2 py-2.5 text-right font-mono text-[11px] tabular-nums", bgCls)}>
-      <span className="inline-flex items-baseline gap-0.5">
-        <DeltaArrow delta={delta} mode={mode} />
-        <span className="text-stone-900">{renderCell(cur, mode)}</span>
-      </span>
+      {showNa ? (
+        <span className="inline-flex items-baseline gap-0.5">
+          <span className="text-stone-900">{renderCell(cur, mode)}</span>
+          <span className="text-[9px] font-medium text-stone-400">n/a</span>
+        </span>
+      ) : (
+        <span className="inline-flex items-baseline gap-0.5">
+          <DeltaArrow delta={delta} mode={mode} />
+          <span className="text-stone-900">{renderCell(cur, mode)}</span>
+        </span>
+      )}
     </td>
   );
 }
