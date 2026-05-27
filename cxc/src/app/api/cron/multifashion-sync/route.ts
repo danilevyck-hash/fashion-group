@@ -5,6 +5,11 @@
  *
  * Ventana de 7 días para capturar ajustes y late entries (Switch puede modificar
  * saldo/total/descuento de facturas previas).
+ *
+ * Override manual: ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD
+ *   - Ambos parámetros son OPCIONALES, pero si uno está, el otro también debe estar.
+ *   - Rango máximo: 365 días (protección contra syncs accidentales gigantes).
+ *   - Cuando se usa override, triggered_by se loguea como 'manual'.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,6 +18,9 @@ import { syncMultifashionTickets } from "@/lib/switch-api/sync";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_RANGE_DAYS = 365;
+
 function panamaDate(offsetDays = 0): string {
   const now = new Date();
   const panama = new Date(
@@ -20,6 +28,96 @@ function panamaDate(offsetDays = 0): string {
   );
   panama.setDate(panama.getDate() + offsetDays);
   return panama.toISOString().slice(0, 10);
+}
+
+/** YYYY-MM-DD válido y representa una fecha real (descarta 2026-02-31). */
+function isValidYmd(s: string): boolean {
+  if (!YMD_RE.test(s)) return false;
+  const d = new Date(`${s}T00:00:00Z`);
+  if (Number.isNaN(d.getTime())) return false;
+  return d.toISOString().slice(0, 10) === s;
+}
+
+/** Días entre dos YMD asumidos válidos. Positivo si hasta > desde, 0 si iguales. */
+function daysBetween(desdeYmd: string, hastaYmd: string): number {
+  const a = Date.UTC(
+    Number(desdeYmd.slice(0, 4)),
+    Number(desdeYmd.slice(5, 7)) - 1,
+    Number(desdeYmd.slice(8, 10)),
+  );
+  const b = Date.UTC(
+    Number(hastaYmd.slice(0, 4)),
+    Number(hastaYmd.slice(5, 7)) - 1,
+    Number(hastaYmd.slice(8, 10)),
+  );
+  return Math.round((b - a) / (24 * 3600 * 1000));
+}
+
+type SyncRange = {
+  desde: string;
+  hasta: string;
+  triggeredBy: "cron" | "manual";
+};
+
+type RangeResult =
+  | { ok: true; range: SyncRange }
+  | { ok: false; status: 400; error: string };
+
+function resolveRange(req: NextRequest): RangeResult {
+  const desdeParam = req.nextUrl.searchParams.get("desde");
+  const hastaParam = req.nextUrl.searchParams.get("hasta");
+  const hasDesde = desdeParam !== null;
+  const hasHasta = hastaParam !== null;
+
+  if (hasDesde !== hasHasta) {
+    return {
+      ok: false,
+      status: 400,
+      error:
+        "desde y hasta deben venir juntos (o ambos ausentes para usar la ventana de 7 días)",
+    };
+  }
+
+  if (!hasDesde && !hasHasta) {
+    return {
+      ok: true,
+      range: {
+        desde: panamaDate(-7),
+        hasta: panamaDate(0),
+        triggeredBy: "cron",
+      },
+    };
+  }
+
+  // Override manual: ambos presentes.
+  const desde = desdeParam as string;
+  const hasta = hastaParam as string;
+
+  if (!isValidYmd(desde) || !isValidYmd(hasta)) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Fechas inválidas. Formato requerido: YYYY-MM-DD",
+    };
+  }
+
+  const days = daysBetween(desde, hasta);
+  if (days < 0) {
+    return {
+      ok: false,
+      status: 400,
+      error: "desde no puede ser mayor que hasta",
+    };
+  }
+  if (days > MAX_RANGE_DAYS) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Rango excede el máximo de ${MAX_RANGE_DAYS} días (recibido: ${days})`,
+    };
+  }
+
+  return { ok: true, range: { desde, hasta, triggeredBy: "manual" } };
 }
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
@@ -38,15 +136,17 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const desde = panamaDate(-7);
-  const hasta = panamaDate(0);
+  const resolved = resolveRange(req);
+  if (!resolved.ok) {
+    return NextResponse.json(
+      { ok: false, error: resolved.error },
+      { status: resolved.status },
+    );
+  }
+  const { desde, hasta, triggeredBy } = resolved.range;
 
   try {
-    const r = await syncMultifashionTickets({
-      desde,
-      hasta,
-      triggeredBy: "cron",
-    });
+    const r = await syncMultifashionTickets({ desde, hasta, triggeredBy });
     return NextResponse.json({
       ok: true,
       logId: r.logId,

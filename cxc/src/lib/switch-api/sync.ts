@@ -121,12 +121,45 @@ function mapFacturaToRow(f: SwitchFactura): TicketInsertRow | null {
 
 // ─── Persistencia ────────────────────────────────────────────────────────────
 
+/**
+ * Persistir un batch + reportar contadores correctos.
+ *
+ * Contrato del flujo de conteo (no romper sin actualizar el spec del sprint):
+ *
+ *   inserted = filas cuyo switch_factura_id NO existía en multifashion_tickets
+ *              ANTES de esta batch específica (medido por el SELECT inicial).
+ *   updated  = filas cuyo switch_factura_id SÍ existía en multifashion_tickets
+ *              ANTES de esta batch específica.
+ *
+ * Reglas clave para no regresionar:
+ *   1. El SELECT debe correr ANTES del INSERT. Si invertís el orden, los nuevos
+ *      se cuentan como updates (era el bug observado en el primer backfill:
+ *      todo terminaba en updated=N, inserted=0).
+ *   2. Dedupe IN-MEMORY por switch_factura_id antes del SELECT. Switch puede
+ *      devolver la misma factura en dos páginas adyacentes del mismo run;
+ *      sin dedupe, el INSERT explota por unique violation, o (peor) cuenta
+ *      la misma factura dos veces.
+ *   3. NO usar upsert sin SELECT previo: PostgREST no distingue insert vs
+ *      update en la respuesta y perdemos los counters.
+ *   4. La SELECT mira el estado pre-batch. Si en una run multi-batch la misma
+ *      factura aparece en batch 1 y batch 3 (cross-page Switch dupe), la
+ *      segunda aparición se cuenta como update porque ya está en DB — lo cual
+ *      es correcto: ese factura ya se contó como inserted en su primer
+ *      encuentro.
+ */
 async function persistBatch(
   rows: TicketInsertRow[],
 ): Promise<{ inserted: number; updated: number }> {
   if (rows.length === 0) return { inserted: 0, updated: 0 };
 
-  const ids = rows.map((r) => r.switch_factura_id);
+  // Dedupe within-batch: last-wins por switch_factura_id.
+  const byId = new Map<number, TicketInsertRow>();
+  for (const r of rows) byId.set(r.switch_factura_id, r);
+  const uniqueRows = Array.from(byId.values());
+
+  // Snapshot del estado PRE-batch. Cualquier id devuelto acá ya existía
+  // antes de tocar la tabla en esta llamada → se contará como update.
+  const ids = uniqueRows.map((r) => r.switch_factura_id);
   const { data: existing, error: selErr } = await supabaseServer
     .from("multifashion_tickets")
     .select("switch_factura_id")
@@ -142,8 +175,12 @@ async function persistBatch(
   );
 
   const nowIso = new Date().toISOString();
-  const newRows = rows.filter((r) => !existingSet.has(r.switch_factura_id));
-  const updRows = rows.filter((r) => existingSet.has(r.switch_factura_id));
+  const newRows = uniqueRows.filter(
+    (r) => !existingSet.has(r.switch_factura_id),
+  );
+  const updRows = uniqueRows.filter((r) =>
+    existingSet.has(r.switch_factura_id),
+  );
 
   if (newRows.length > 0) {
     const insertPayload = newRows.map((r) => ({
