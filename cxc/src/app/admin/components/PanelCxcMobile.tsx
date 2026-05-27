@@ -151,6 +151,7 @@ export default function PanelCxcMobile({
                 <li key={client.nombre_normalized}>
                   <MobileClientCard
                     client={client}
+                    cxcCompanies={cxcCompanies}
                     isFavorite={favorites.has(client.nombre_normalized)}
                     onToggleFavorite={() => onToggleFavorite(client.nombre_normalized)}
                     isExpanded={isExpanded}
@@ -444,6 +445,7 @@ function worstBucketBorder(client: ConsolidatedClient): string {
 
 function MobileClientCard({
   client,
+  cxcCompanies,
   isFavorite,
   onToggleFavorite,
   isExpanded,
@@ -451,6 +453,7 @@ function MobileClientCard({
   daysSinceContact,
 }: {
   client: ConsolidatedClient;
+  cxcCompanies: Company[];
   isFavorite: boolean;
   onToggleFavorite: () => void;
   isExpanded: boolean;
@@ -513,7 +516,7 @@ function MobileClientCard({
         </div>
       </button>
 
-      {isExpanded && <MobileClientExpanded client={client} />}
+      {isExpanded && <MobileClientExpanded client={client} cxcCompanies={cxcCompanies} />}
     </article>
   );
 }
@@ -544,23 +547,56 @@ function BucketChip({
   );
 }
 
-function MobileClientExpanded({ client }: { client: ConsolidatedClient }) {
-  const empresasConSaldo = Object.entries(client.companies)
-    .filter(([, d]) => d.total !== 0)
-    .sort((a, b) => b[1].total - a[1].total);
+function MobileClientExpanded({
+  client,
+  cxcCompanies,
+}: {
+  client: ConsolidatedClient;
+  cxcCompanies: Company[];
+}) {
+  // `companies[key].nombre` es el nombre del cliente registrado en esa
+  // empresa (variante por empresa), NO el nombre de la empresa. El nombre
+  // de la empresa se resuelve por key contra el array canónico cxcCompanies
+  // (misma fuente que usa el desktop en page.tsx para email/export).
+  const nameByKey = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const co of cxcCompanies) m[co.key] = co.name;
+    return m;
+  }, [cxcCompanies]);
+
+  const rows = useMemo(() => {
+    return Object.entries(client.companies)
+      .filter(([, d]) => d.total !== 0)
+      .map(([key, d]) => ({
+        key,
+        nombre: nameByKey[key] ?? key,
+        total: d.total,
+        current: d.d0_30 + d.d31_60 + d.d61_90,
+        watch: d.d91_120,
+        overdue: d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }, [client.companies, nameByKey]);
 
   return (
     <div className="border-t border-stone-100 bg-stone-50 px-3 py-3">
       <p className="mb-2 text-[10.5px] font-medium uppercase tracking-widest text-stone-500">
-        Desglose por empresa ({empresasConSaldo.length})
+        Desglose por empresa ({rows.length})
       </p>
-      <ul className="space-y-1.5">
-        {empresasConSaldo.map(([key, d]) => (
-          <li key={key} className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2">
-            <span className="truncate text-xs text-stone-700">{d.nombre || key}</span>
-            <span className={`shrink-0 font-mono text-xs font-medium tabular-nums ${d.total < 0 ? "text-stone-500" : "text-stone-900"}`}>
-              ${fmt(d.total)}
-            </span>
+      <ul className="divide-y divide-stone-200/70 overflow-hidden rounded-md bg-white">
+        {rows.map(row => (
+          <li key={row.key} className="px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3">
+              <span className="truncate text-xs text-stone-700">{row.nombre}</span>
+              <span className={`shrink-0 font-mono text-xs font-medium tabular-nums ${row.total < 0 ? "text-stone-500" : "text-stone-900"}`}>
+                ${fmt(row.total)}
+              </span>
+            </div>
+            <div className="mt-1.5 flex gap-1">
+              <EmpresaBucketMini variant="current" value={row.current} />
+              <EmpresaBucketMini variant="watch" value={row.watch} />
+              <EmpresaBucketMini variant="overdue" value={row.overdue} />
+            </div>
           </li>
         ))}
       </ul>
@@ -576,5 +612,24 @@ function MobileClientExpanded({ client }: { client: ConsolidatedClient }) {
         </svg>
       </button>
     </div>
+  );
+}
+
+function EmpresaBucketMini({
+  variant,
+  value,
+}: {
+  variant: "current" | "watch" | "overdue";
+  value: number;
+}) {
+  const theme = AGING_THEME[variant];
+  const isZero = value === 0;
+  return (
+    <span
+      className={`flex-1 rounded px-1.5 py-0.5 text-center font-mono text-[10px] tabular-nums ${theme.bgActive} ${theme.text}`}
+      style={isZero ? { opacity: 0.4 } : undefined}
+    >
+      {isZero ? "—" : formatCompactCurrency(value)}
+    </span>
   );
 }
