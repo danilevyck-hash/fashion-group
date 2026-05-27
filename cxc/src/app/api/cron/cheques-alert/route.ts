@@ -59,12 +59,34 @@ export async function GET(req: NextRequest) {
   const today = getPanamaDate();
   const tomorrow = getPanamaDate(1);
 
-  const { data: cheques } = await supabaseServer
+  const { data: cheques, error: queryErr } = await supabaseServer
     .from("cheques")
     .select("cliente, empresa, monto, fecha_deposito, vendedor")
     .eq("estado", "pendiente")
     .or(`fecha_deposito.eq.${today},fecha_deposito.eq.${tomorrow}`)
     .order("fecha_deposito");
+
+  if (queryErr) {
+    console.error("[cheques-alert] query failed:", queryErr.message);
+    // Persistir el fallo en cron_email_errors — los logs de Vercel rotan
+    // en 24h y el dashboard de salud necesita historial. Best-effort: si
+    // el propio INSERT falla, igual devolvemos el 500 con el error real.
+    try {
+      const { error: logErr } = await supabaseServer
+        .from("cron_email_errors")
+        .insert({
+          tipo: "cheques_query_failed",
+          cheque_context: null,
+          error_message: queryErr.message,
+        });
+      if (logErr) {
+        console.error("[cheques-alert] cron_email_errors insert failed:", logErr.message);
+      }
+    } catch (logErr) {
+      console.error("[cheques-alert] cron_email_errors insert threw:", logErr);
+    }
+    return NextResponse.json({ error: queryErr.message }, { status: 500 });
+  }
 
   if (!cheques || cheques.length === 0) {
     return NextResponse.json({ message: "No hay cheques por vencer", count: 0 });

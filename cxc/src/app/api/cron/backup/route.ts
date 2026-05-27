@@ -142,7 +142,25 @@ export async function GET(req: NextRequest) {
       upsert: true,
     });
 
-  if (storageErr) console.error("Storage upload error:", storageErr);
+  if (storageErr) {
+    console.error("Storage upload error:", storageErr);
+    // Persistir el fallo en cron_email_errors. Best-effort: si el propio
+    // INSERT falla, no rompemos el flujo — el cron sigue al envío de email.
+    try {
+      const { error: logErr } = await supabaseServer
+        .from("cron_email_errors")
+        .insert({
+          tipo: "backup_storage_failed",
+          cheque_context: null,
+          error_message: storageErr.message,
+        });
+      if (logErr) {
+        console.error("[backup] cron_email_errors insert failed:", logErr.message);
+      }
+    } catch (logErr) {
+      console.error("[backup] cron_email_errors insert threw:", logErr);
+    }
+  }
 
   // Clean old backups (keep last 30 days)
   try {
@@ -200,6 +218,22 @@ export async function GET(req: NextRequest) {
     }
   } catch (e) {
     console.error("Email error:", e);
+    // Persistir el fallo en cron_email_errors. Best-effort: si el propio
+    // INSERT falla, igual devolvemos el 200 con email:"failed".
+    try {
+      const { error: logErr } = await supabaseServer
+        .from("cron_email_errors")
+        .insert({
+          tipo: "backup_email_failed",
+          cheque_context: null,
+          error_message: e instanceof Error ? e.message : String(e),
+        });
+      if (logErr) {
+        console.error("[backup] cron_email_errors insert failed:", logErr.message);
+      }
+    } catch (logErr) {
+      console.error("[backup] cron_email_errors insert threw:", logErr);
+    }
     return NextResponse.json({ ok: true, date: today, counts, email: "failed", storage: !storageErr });
   }
 

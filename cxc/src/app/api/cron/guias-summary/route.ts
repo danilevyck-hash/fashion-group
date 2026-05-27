@@ -186,6 +186,22 @@ export async function GET(req: NextRequest) {
 
   if (queryErr) {
     console.error("[guias-summary] Query error:", queryErr.message);
+    // Persistir el fallo en cron_email_errors. Best-effort: si el propio
+    // INSERT falla, igual devolvemos el 500 con el error real.
+    try {
+      const { error: logErr } = await supabaseServer
+        .from("cron_email_errors")
+        .insert({
+          tipo: "guias_summary_query_failed",
+          cheque_context: null,
+          error_message: queryErr.message,
+        });
+      if (logErr) {
+        console.error("[guias-summary] cron_email_errors insert failed:", logErr.message);
+      }
+    } catch (logErr) {
+      console.error("[guias-summary] cron_email_errors insert threw:", logErr);
+    }
     return NextResponse.json({ error: queryErr.message }, { status: 500 });
   }
 
@@ -268,10 +284,42 @@ export async function GET(req: NextRequest) {
     });
     if (sendErr) {
       console.error("[guias-summary] Resend error:", sendErr.message);
+      // Persistir el fallo en cron_email_errors. Best-effort: si el propio
+      // INSERT falla, igual devolvemos el 500 con el error real.
+      try {
+        const { error: logErr } = await supabaseServer
+          .from("cron_email_errors")
+          .insert({
+            tipo: "guias_summary_email_failed",
+            cheque_context: null,
+            error_message: sendErr.message,
+          });
+        if (logErr) {
+          console.error("[guias-summary] cron_email_errors insert failed:", logErr.message);
+        }
+      } catch (logErr) {
+        console.error("[guias-summary] cron_email_errors insert threw:", logErr);
+      }
       return NextResponse.json({ error: sendErr.message }, { status: 500 });
     }
   } catch (err) {
     console.error("[guias-summary] Send failed:", err);
+    // Persistir el fallo en cron_email_errors. Best-effort: si el propio
+    // INSERT falla, igual devolvemos el 500 con el error real.
+    try {
+      const { error: logErr } = await supabaseServer
+        .from("cron_email_errors")
+        .insert({
+          tipo: "guias_summary_email_failed",
+          cheque_context: null,
+          error_message: err instanceof Error ? err.message : String(err),
+        });
+      if (logErr) {
+        console.error("[guias-summary] cron_email_errors insert failed:", logErr.message);
+      }
+    } catch (logErr) {
+      console.error("[guias-summary] cron_email_errors insert threw:", logErr);
+    }
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 

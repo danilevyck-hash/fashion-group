@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { supabaseServer } from "@/lib/supabase-server";
 import { runAllChecks, persistCheckResults, summarize, type CheckResult, type Severity } from "@/lib/integrity-checks";
 
 export const dynamic = "force-dynamic";
@@ -100,6 +101,23 @@ export async function GET(req: NextRequest) {
       emailSent = true;
     } catch (err) {
       console.error("[integrity] email send error:", err);
+      // Persistir el fallo en cron_email_errors. Best-effort: si el propio
+      // INSERT falla, no rompemos el flujo — el cron sigue al return final
+      // con email_sent=false.
+      try {
+        const { error: logErr } = await supabaseServer
+          .from("cron_email_errors")
+          .insert({
+            tipo: "integrity_check_email_failed",
+            cheque_context: null,
+            error_message: err instanceof Error ? err.message : String(err),
+          });
+        if (logErr) {
+          console.error("[integrity] cron_email_errors insert failed:", logErr.message);
+        }
+      } catch (logErr) {
+        console.error("[integrity] cron_email_errors insert threw:", logErr);
+      }
     }
   }
 
