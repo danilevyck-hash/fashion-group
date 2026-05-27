@@ -7,10 +7,11 @@
  * Uso:
  *   npx tsx scripts/switch-api-discovery.ts
  *
- * Requiere en .env.local:
- *   SWITCH_API_URL
- *   SWITCH_API_USER
- *   SWITCH_API_PASSWORD
+ * Convención multi-empresa de env vars: SWITCH_<EMPRESA_KEY>_API_*
+ * Este script apunta a Multifashion:
+ *   SWITCH_MULTIFASHION_API_URL
+ *   SWITCH_MULTIFASHION_API_USER
+ *   SWITCH_MULTIFASHION_API_PASSWORD
  *
  * Output:
  *   - Tabla en consola
@@ -23,14 +24,14 @@ import { writeFileSync } from "fs";
 
 config({ path: resolve(__dirname, "../.env.local") });
 
-const API_URL = process.env.SWITCH_API_URL;
-const API_USER = process.env.SWITCH_API_USER;
-const API_PASSWORD = process.env.SWITCH_API_PASSWORD;
+const API_URL = process.env.SWITCH_MULTIFASHION_API_URL;
+const API_USER = process.env.SWITCH_MULTIFASHION_API_USER;
+const API_PASSWORD = process.env.SWITCH_MULTIFASHION_API_PASSWORD;
 
 const missing: string[] = [];
-if (!API_URL) missing.push("SWITCH_API_URL");
-if (!API_USER) missing.push("SWITCH_API_USER");
-if (!API_PASSWORD) missing.push("SWITCH_API_PASSWORD");
+if (!API_URL) missing.push("SWITCH_MULTIFASHION_API_URL");
+if (!API_USER) missing.push("SWITCH_MULTIFASHION_API_USER");
+if (!API_PASSWORD) missing.push("SWITCH_MULTIFASHION_API_PASSWORD");
 if (missing.length > 0) {
   console.error(
     `\nFaltan variables en .env.local: ${missing.join(", ")}\n` +
@@ -66,6 +67,100 @@ interface Result {
 }
 
 const results: Result[] = [];
+
+type BuildAuthRequest = (
+  baseUrl: string,
+  init: RequestInit & { headers: Record<string, string> },
+) => { url: string; init: RequestInit };
+
+interface AuthVariant {
+  id: string;
+  label: string;
+  build: (token: string) => BuildAuthRequest;
+}
+
+const AUTH_VARIANTS: AuthVariant[] = [
+  {
+    id: "bearer",
+    label: "Authorization: Bearer <token>",
+    build: (token) => (url, init) => ({
+      url,
+      init: {
+        ...init,
+        headers: { ...init.headers, Authorization: `Bearer ${token}` },
+      },
+    }),
+  },
+  {
+    id: "raw",
+    label: "Authorization: <token>",
+    build: (token) => (url, init) => ({
+      url,
+      init: {
+        ...init,
+        headers: { ...init.headers, Authorization: token },
+      },
+    }),
+  },
+  {
+    id: "token-prefix",
+    label: "Authorization: token <token>",
+    build: (token) => (url, init) => ({
+      url,
+      init: {
+        ...init,
+        headers: { ...init.headers, Authorization: `token ${token}` },
+      },
+    }),
+  },
+  {
+    id: "header-token",
+    label: "token: <token>",
+    build: (token) => (url, init) => ({
+      url,
+      init: {
+        ...init,
+        headers: { ...init.headers, token },
+      },
+    }),
+  },
+  {
+    id: "x-token",
+    label: "X-Token: <token>",
+    build: (token) => (url, init) => ({
+      url,
+      init: {
+        ...init,
+        headers: { ...init.headers, "X-Token": token },
+      },
+    }),
+  },
+  {
+    id: "auth-token",
+    label: "auth-token: <token>",
+    build: (token) => (url, init) => ({
+      url,
+      init: {
+        ...init,
+        headers: { ...init.headers, "auth-token": token },
+      },
+    }),
+  },
+  {
+    id: "query",
+    label: "?token=<token>",
+    build: (token) => (url, init) => {
+      const sep = url.includes("?") ? "&" : "?";
+      return {
+        url: `${url}${sep}token=${encodeURIComponent(token)}`,
+        init,
+      };
+    },
+  },
+];
+
+let currentAuthBuilder: BuildAuthRequest | null = null;
+let currentAuthLabel: string = "(no detectado)";
 
 function truncate(s: string, n = 500): string {
   if (s.length <= n) return s;
@@ -119,24 +214,37 @@ async function call(opts: {
   body?: unknown;
 }): Promise<Result> {
   const { phase, label, method, endpoint, token, body } = opts;
-  const url = `${BASE}${endpoint}`;
+  let url = `${BASE}${endpoint}`;
   const headers: Record<string, string> = {
     Accept: "application/json",
   };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   const t0 = Date.now();
 
+  let init: RequestInit = {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal: controller.signal,
+  };
+
+  if (token) {
+    if (!currentAuthBuilder) {
+      clearTimeout(timer);
+      throw new Error(
+        "authBuilder no inicializado — llamar a probeAuthHeaderFormat antes de hacer llamadas autenticadas",
+      );
+    }
+    const built = currentAuthBuilder(url, { ...init, headers });
+    url = built.url;
+    init = built.init;
+  }
+
   try {
-    const res = await fetch(url, {
-      method,
-      headers,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-      signal: controller.signal,
-    });
+    const res = await fetch(url, init);
     clearTimeout(timer);
     const duration_ms = Date.now() - t0;
     const http_code = res.status;
@@ -326,6 +434,67 @@ function pickIdLike(item: Record<string, unknown> | null, keys: string[]): strin
   return null;
 }
 
+async function probeAuthHeaderFormat(
+  token: string,
+): Promise<
+  | {
+      variant: AuthVariant;
+      buildAuthRequest: BuildAuthRequest;
+    }
+  | null
+> {
+  console.log(`\n--- Detectando formato de header de auth (/empresainfo) ---`);
+  for (const variant of AUTH_VARIANTS) {
+    const builder = variant.build(token);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    const baseInit: RequestInit & { headers: Record<string, string> } = {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    };
+    const { url, init } = builder(`${BASE}/empresainfo`, baseInit);
+
+    try {
+      const res = await fetch(url, init);
+      clearTimeout(timer);
+      const text = await res.text();
+      let tokenInvalido = false;
+      try {
+        const parsed = text.length > 0 ? JSON.parse(text) : null;
+        if (parsed && typeof parsed === "object") {
+          const s = JSON.stringify(parsed);
+          if (s.includes("TOKEN INVALIDO") || s.includes(`"code":"0011"`)) {
+            tokenInvalido = true;
+          }
+        }
+      } catch {
+        // respuesta no es JSON, no afecta el chequeo
+      }
+
+      if (res.status === 200 && !tokenInvalido) {
+        console.log(`  OK    ${variant.label}  →  HTTP 200`);
+        return { variant, buildAuthRequest: builder };
+      }
+
+      const reason = tokenInvalido
+        ? "TOKEN INVALIDO"
+        : `HTTP ${res.status}`;
+      console.log(`  FAIL  ${variant.label}  →  ${reason}`);
+    } catch (err: unknown) {
+      clearTimeout(timer);
+      const isAbort = err instanceof Error && err.name === "AbortError";
+      const reason = isAbort
+        ? `timeout >${TIMEOUT_MS}ms`
+        : err instanceof Error
+          ? err.message
+          : String(err);
+      console.log(`  FAIL  ${variant.label}  →  ${reason}`);
+    }
+  }
+  return null;
+}
+
 async function run() {
   console.log(`\n=== Switch Soft API Discovery ===`);
   console.log(`Base URL: ${BASE}`);
@@ -398,7 +567,22 @@ async function run() {
     finalize();
     return;
   }
-  console.log(`Token obtenido (${token.length} chars). Continuo con endpoints autenticados.\n`);
+  console.log(`Token obtenido (${token.length} chars).`);
+
+  const probe = await probeAuthHeaderFormat(token);
+  if (!probe) {
+    const triedList = AUTH_VARIANTS.map((v) => v.label).join(", ");
+    console.error(
+      `\nNo se encontró formato de header válido. ` +
+        `Probadas: [${triedList}]. ` +
+        `Revisar doc de Switch o contactar soporte.\n`,
+    );
+    finalize();
+    return;
+  }
+  currentAuthBuilder = probe.buildAuthRequest;
+  currentAuthLabel = probe.variant.label;
+  console.log(`\nFormato de auth detectado: ${currentAuthLabel}\n`);
 
   results.push(
     await call({
@@ -764,7 +948,8 @@ function pad(s: string, n: number): string {
 }
 
 function finalize() {
-  console.log(`\n========================== RESULTADOS ==========================\n`);
+  console.log(`\n========================== RESULTADOS ==========================`);
+  console.log(`Formato de auth detectado: ${currentAuthLabel}\n`);
 
   const headers = [
     pad("Fase", 5),
@@ -820,6 +1005,7 @@ function finalize() {
       usuario: API_USER,
       timestamp: new Date().toISOString(),
       timeout_ms: TIMEOUT_MS,
+      auth_format: currentAuthLabel,
     },
     summary: counts,
     results,
