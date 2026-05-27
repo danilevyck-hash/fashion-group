@@ -13,6 +13,17 @@ export function fmtMoneyCompact(n: number | null | undefined): string {
   return "$" + Math.round(n).toLocaleString("en-US");
 }
 
+// "$87K" / "$1.09M" / "$766K". Para el layout mobile del Resumen donde el
+// ancho de celda no permite el formato largo. 2 decimales sólo para millones.
+export function formatCompactCurrency(n: number | null | undefined): string {
+  if (n == null) return "—";
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "−" : "";
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
+  if (abs >= 1_000)     return `${sign}$${Math.round(abs / 1_000)}K`;
+  return `${sign}$${Math.round(abs)}`;
+}
+
 export function fmtPct(d: number | null | undefined): string {
   if (d == null) return "—";
   const v = d * 100;

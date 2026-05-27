@@ -10,6 +10,7 @@ import type {
 import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, kpiDeltaSymbol } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
+import { ResumenViewMobile } from "./ResumenViewMobile";
 
 // Mapeo ventas_id (short) → empresa key snake_case usado por la RPC de
 // proyección. Inline para evitar importar server-only de empresa-mapping.
@@ -219,13 +220,24 @@ export function ResumenView({
   const kpiMargenSub   = `${margenSign}${Math.abs(margenDeltaPts).toFixed(1)} pts vs ${prevYear}`;
 
   return (
-    <div className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
+    <div className={cn(loading && "opacity-60 pointer-events-none transition-opacity")}>
       {error && (
-        <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
+        <div className="mb-4 rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
           No se pudo cargar el año {selectedYear}: {error}
         </div>
       )}
 
+      <ResumenViewMobile
+        data={data}
+        selectedYear={selectedYear}
+        isClosedYear={isClosedYear}
+        viewMode={viewMode}
+        setViewMode={onToggleMode}
+        granularity={granularity}
+        setGranularity={setGranularity}
+      />
+
+      <div className="hidden md:block space-y-5">
       {/* KPI cards YTD del grupo — 3 cols (Ventas Netas / Utilidad / Margen).
           Comparativo same-period vs prev year (ya viene aplicado desde la RPC
           ventas_dashboard_prev_same_period). El toggle de la matriz no afecta
@@ -418,6 +430,7 @@ export function ResumenView({
       {!isClosedYear && data.proyeccion && data.proyeccion.totales_grupo.ventas_ytd > 0 && (
         <ProyeccionHero proyeccion={data.proyeccion} selectedYear={selectedYear} prevYear={prevYear} />
       )}
+      </div>
     </div>
   );
 }
