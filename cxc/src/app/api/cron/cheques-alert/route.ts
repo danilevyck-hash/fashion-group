@@ -133,7 +133,6 @@ export async function GET(req: NextRequest) {
         }))
       );
     } catch {
-      // Table may not exist yet — errors already logged to console above
     }
   }
 

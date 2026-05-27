@@ -176,6 +176,22 @@ export async function GET(req: NextRequest) {
     }
   } catch (e) {
     console.error("Cleanup error:", e);
+    // Persistir el fallo en cron_email_errors. Best-effort: si el propio
+    // INSERT falla, no rompemos el flujo — el cron sigue al envío de email.
+    try {
+      const { error: logErr } = await supabaseServer
+        .from("cron_email_errors")
+        .insert({
+          tipo: "backup_cleanup_failed",
+          cheque_context: null,
+          error_message: e instanceof Error ? e.message : String(e),
+        });
+      if (logErr) {
+        console.error("[backup] cron_email_errors insert failed:", logErr.message);
+      }
+    } catch (logErr) {
+      console.error("[backup] cron_email_errors insert threw:", logErr);
+    }
   }
 
   // Send email(s) via Resend

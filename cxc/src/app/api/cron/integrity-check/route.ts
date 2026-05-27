@@ -83,8 +83,31 @@ export async function GET(req: NextRequest) {
   }
 
   const startedAt = new Date();
-  const results = await runAllChecks();
-  await persistCheckResults(results);
+  let results: CheckResult[];
+  try {
+    results = await runAllChecks();
+    await persistCheckResults(results);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[integrity] check run failed:", message);
+    // Persistir el fallo en cron_email_errors. Best-effort: si el propio
+    // INSERT falla, igual devolvemos el 500 con el error real.
+    try {
+      const { error: logErr } = await supabaseServer
+        .from("cron_email_errors")
+        .insert({
+          tipo: "integrity_check_failed",
+          cheque_context: null,
+          error_message: message,
+        });
+      if (logErr) {
+        console.error("[integrity] cron_email_errors insert failed:", logErr.message);
+      }
+    } catch (logErr) {
+      console.error("[integrity] cron_email_errors insert threw:", logErr);
+    }
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
   const summary = summarize(results);
 
   // Alerta por email solo si hay critical (warnings van al dashboard).
