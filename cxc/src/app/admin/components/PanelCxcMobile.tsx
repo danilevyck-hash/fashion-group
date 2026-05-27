@@ -1,0 +1,580 @@
+"use client";
+
+// Layout mobile-first del Panel CXC. Visible <md, gated por md:hidden.
+// El layout desktop existente queda intacto detrás de hidden md:block en
+// page.tsx. State filters (riskFilter, search, companyFilter) viven en el
+// padre (AdminDashboardInner) y se pasan acá para que persistan al rotar
+// entre breakpoints.
+//
+// NO incluye: contacto/email/whatsapp/phone, modal de email, export PDF
+// detallado, ContactPanel del desktop. Drill-down a ruta dedicada queda
+// para sprint siguiente — "Ver facturas pendientes" es CTA placeholder.
+
+import { useMemo, useState, useEffect, useRef } from "react";
+import type { ConsolidatedClient } from "@/lib/types";
+import type { Company } from "@/lib/companies";
+import type { ModuleFreshness } from "@/components/cxc/FreshnessIndicator";
+import { formatCompactCurrency } from "@/lib/ventas/format";
+import { fmt } from "@/lib/format";
+
+type RiskFilter = "all" | "current" | "watch" | "overdue";
+
+interface PanelCxcMobileProps {
+  filtered: ConsolidatedClient[];
+  roleClients: ConsolidatedClient[];
+  cxcCompanies: Company[];
+  search: string;
+  setSearch: (v: string) => void;
+  riskFilter: RiskFilter;
+  setRiskFilter: (v: RiskFilter) => void;
+  companyFilter: string;
+  setCompanyFilter: (v: string) => void;
+  favorites: Set<string>;
+  onToggleFavorite: (name: string) => void;
+  contactLog?: Record<string, { date: string; method: string }>;
+  freshness: ModuleFreshness | null;
+  canExport: boolean;
+  onCargar: () => void;
+  onConsolidado: () => void;
+  onExportarCsv: () => void;
+  empresaRestriction: string | null;
+}
+
+export default function PanelCxcMobile({
+  filtered,
+  roleClients,
+  cxcCompanies,
+  search,
+  setSearch,
+  riskFilter,
+  setRiskFilter,
+  companyFilter,
+  setCompanyFilter,
+  favorites,
+  onToggleFavorite,
+  contactLog,
+  freshness,
+  canExport,
+  onCargar,
+  onConsolidado,
+  onExportarCsv,
+  empresaRestriction,
+}: PanelCxcMobileProps) {
+  // Totales sobre el universo de empresas accesibles (roleClients), no sobre
+  // filtered — los chips muestran "qué hay en cada bucket" siempre.
+  const totals = useMemo(() => {
+    let total = 0, current = 0, watch = 0, overdue = 0;
+    let cCount = 0, wCount = 0, oCount = 0;
+    for (const c of roleClients) {
+      total += c.total;
+      current += c.current;
+      watch += c.watch;
+      overdue += c.overdue;
+      if (c.overdue > 0) oCount++;
+      else if (c.watch > 0) wCount++;
+      else if (c.total !== 0) cCount++;
+    }
+    return { total, current, watch, overdue, cCount, wCount, oCount };
+  }, [roleClients]);
+
+  // Ordenamiento mobile: favorites primero, luego negativos al final, luego
+  // por total desc. Independiente del sortKey/sortDir del desktop para que
+  // el helper "ordenados por total" sea siempre cierto en mobile.
+  const sortedMobile = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const aFav = favorites.has(a.nombre_normalized) ? 0 : 1;
+      const bFav = favorites.has(b.nombre_normalized) ? 0 : 1;
+      if (aFav !== bFav) return aFav - bFav;
+      const aNeg = a.total < 0 ? 1 : 0;
+      const bNeg = b.total < 0 ? 1 : 0;
+      if (aNeg !== bNeg) return aNeg - bNeg;
+      return b.total - a.total;
+    });
+  }, [filtered, favorites]);
+
+  const [expandedName, setExpandedName] = useState<string | null>(null);
+
+  return (
+    <div className="md:hidden bg-stone-50">
+      <div className="px-4 pt-4 pb-6 space-y-4">
+        <MobileHeader
+          freshness={freshness}
+          canExport={canExport}
+          onCargar={onCargar}
+          onConsolidado={onConsolidado}
+          onExportar={onExportarCsv}
+        />
+
+        <MobileHero total={totals.total} clientCount={roleClients.length} />
+
+        <MobileAgingChips
+          totals={{ current: totals.current, watch: totals.watch, overdue: totals.overdue }}
+          counts={{ current: totals.cCount, watch: totals.wCount, overdue: totals.oCount }}
+          active={riskFilter}
+          onChange={setRiskFilter}
+        />
+
+        <MobileSearch value={search} onChange={setSearch} />
+
+        <MobileEmpresaSelect
+          value={companyFilter}
+          onChange={setCompanyFilter}
+          options={cxcCompanies}
+          disabled={!!empresaRestriction}
+        />
+
+        <p className="text-[11px] text-stone-500">
+          {sortedMobile.length} {sortedMobile.length === 1 ? "cliente" : "clientes"} · ordenados por total
+        </p>
+
+        {sortedMobile.length === 0 ? (
+          <div className="rounded-xl border border-stone-200 bg-white px-4 py-8 text-center">
+            <p className="text-sm text-stone-500">No hay clientes con estos filtros</p>
+            {(search || riskFilter !== "all" || companyFilter !== "all") && (
+              <button
+                onClick={() => { setSearch(""); setRiskFilter("all"); if (!empresaRestriction) setCompanyFilter("all"); }}
+                className="mt-2 text-xs font-medium text-teal-700 active:text-teal-900"
+              >
+                Limpiar filtros
+              </button>
+            )}
+          </div>
+        ) : (
+          <ul className="space-y-2">
+            {sortedMobile.map(client => {
+              const lastContact = contactLog?.[client.nombre_normalized];
+              const daysSinceContact = lastContact
+                ? Math.floor((Date.now() - new Date(lastContact.date).getTime()) / 86400000)
+                : null;
+              const isExpanded = expandedName === client.nombre_normalized;
+              return (
+                <li key={client.nombre_normalized}>
+                  <MobileClientCard
+                    client={client}
+                    isFavorite={favorites.has(client.nombre_normalized)}
+                    onToggleFavorite={() => onToggleFavorite(client.nombre_normalized)}
+                    isExpanded={isExpanded}
+                    onToggle={() => setExpandedName(prev => prev === client.nombre_normalized ? null : client.nombre_normalized)}
+                    daysSinceContact={daysSinceContact}
+                  />
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <p className="pt-4 text-center text-[10.5px] leading-relaxed text-stone-400">
+          Política: 0-90d corriente · 91-120d vigilancia · 121d+ vencido
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Header — título + overflow menu (Cargar / Consolidado / Exportar)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MobileHeader({
+  freshness,
+  canExport,
+  onCargar,
+  onConsolidado,
+  onExportar,
+}: {
+  freshness: ModuleFreshness | null;
+  canExport: boolean;
+  onCargar: () => void;
+  onConsolidado: () => void;
+  onExportar: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) { if (e.key === "Escape") setOpen(false); }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const updatedLabel = freshness?.last_update
+    ? formatRelativeUpdated(freshness.last_update)
+    : freshness?.age_label || null;
+
+  return (
+    <header className="flex items-start justify-between gap-3">
+      <div>
+        <h1 className="font-display text-[22px] font-medium leading-tight tracking-tight text-stone-900">
+          Panel CXC
+        </h1>
+        {updatedLabel && (
+          <p className="mt-0.5 text-[11px] text-stone-500">
+            Actualizado {updatedLabel}
+          </p>
+        )}
+      </div>
+      {canExport && (
+        <div className="relative" ref={menuRef}>
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            aria-label="Acciones"
+            aria-haspopup="menu"
+            aria-expanded={open}
+            className="grid h-11 w-11 place-items-center rounded-full text-stone-600 active:bg-stone-200"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
+            </svg>
+          </button>
+          {open && (
+            <div role="menu" className="absolute right-0 top-12 z-30 w-56 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-lg">
+              <MenuItem label="Cargar archivo" onClick={() => { setOpen(false); onCargar(); }} />
+              <MenuItem label="Consolidado" onClick={() => { setOpen(false); onConsolidado(); }} />
+              <MenuItem label="Exportar CSV" onClick={() => { setOpen(false); onExportar(); }} />
+            </div>
+          )}
+        </div>
+      )}
+    </header>
+  );
+}
+
+function MenuItem({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      className="block w-full px-4 py-3 text-left text-sm text-stone-700 active:bg-stone-100"
+    >
+      {label}
+    </button>
+  );
+}
+
+function formatRelativeUpdated(iso: string): string {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffHrs = Math.floor(diffMs / 3_600_000);
+  if (diffHrs < 1) return "hace unos minutos";
+  if (diffHrs < 24) return `hace ${diffHrs} ${diffHrs === 1 ? "hora" : "horas"}`;
+  const diffDays = Math.floor(diffHrs / 24);
+  if (diffDays === 1) return "ayer";
+  if (diffDays < 7) return `hace ${diffDays} días`;
+  return d.toLocaleDateString("es-PA", { day: "numeric", month: "short" });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Hero — total pendiente Stone-900
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MobileHero({ total, clientCount }: { total: number; clientCount: number }) {
+  return (
+    <section className="rounded-xl bg-stone-900 px-5 py-4 text-white shadow-sm">
+      <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-400">
+        Total pendiente
+      </p>
+      <p className="mt-1 font-mono text-[36px] font-medium leading-none tracking-tight tabular-nums">
+        {formatCompactCurrency(total)}
+      </p>
+      <p className="mt-2 text-xs text-stone-400">
+        {clientCount} {clientCount === 1 ? "cliente" : "clientes"}
+      </p>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Aging chips filtros — Corriente / Vigilancia / Vencido (clickeables)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const AGING_THEME = {
+  current: {
+    label: "Corriente",
+    border: "border-[#0F6E56]",
+    text: "text-[#0F6E56]",
+    bgActive: "bg-[#0F6E56]/10",
+    borderActive: "border-[#0F6E56]",
+  },
+  watch: {
+    label: "Vigilancia",
+    border: "border-[#B45309]",
+    text: "text-[#B45309]",
+    bgActive: "bg-[#B45309]/10",
+    borderActive: "border-[#B45309]",
+  },
+  overdue: {
+    label: "Vencido",
+    border: "border-[#A32D2D]",
+    text: "text-[#A32D2D]",
+    bgActive: "bg-[#A32D2D]/10",
+    borderActive: "border-[#A32D2D]",
+  },
+} as const;
+
+function MobileAgingChips({
+  totals,
+  counts,
+  active,
+  onChange,
+}: {
+  totals: { current: number; watch: number; overdue: number };
+  counts: { current: number; watch: number; overdue: number };
+  active: RiskFilter;
+  onChange: (v: RiskFilter) => void;
+}) {
+  const items: { key: Exclude<RiskFilter, "all">; value: number; count: number }[] = [
+    { key: "current", value: totals.current, count: counts.current },
+    { key: "watch", value: totals.watch, count: counts.watch },
+    { key: "overdue", value: totals.overdue, count: counts.overdue },
+  ];
+
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {items.map(({ key, value, count }) => {
+        const theme = AGING_THEME[key];
+        const isActive = active === key;
+        const onClick = () => onChange(isActive ? "all" : key);
+        return (
+          <button
+            key={key}
+            type="button"
+            onClick={onClick}
+            aria-pressed={isActive}
+            className={[
+              "rounded-xl border-2 px-2.5 py-2.5 text-left transition min-h-[44px]",
+              isActive ? `${theme.borderActive} ${theme.bgActive}` : "border-stone-200 bg-white",
+            ].join(" ")}
+          >
+            <p className={`text-[10px] font-semibold uppercase tracking-wider ${theme.text}`}>
+              {theme.label}
+            </p>
+            <p className={`mt-0.5 font-mono text-sm font-medium tabular-nums ${isActive ? theme.text : "text-stone-900"}`}>
+              {formatCompactCurrency(value)}
+            </p>
+            <p className="mt-0.5 text-[10px] text-stone-500 tabular-nums">
+              {count} {count === 1 ? "cliente" : "clientes"}
+            </p>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Search + dropdown empresa
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MobileSearch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="relative">
+      <svg
+        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400"
+        width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      >
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input
+        type="search"
+        inputMode="search"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Buscar cliente, tel, email…"
+        className="w-full rounded-lg border border-stone-200 bg-white py-2.5 pl-9 pr-3 text-base text-stone-900 placeholder:text-stone-400 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400"
+      />
+    </div>
+  );
+}
+
+function MobileEmpresaSelect({
+  value,
+  onChange,
+  options,
+  disabled,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: Company[];
+  disabled: boolean;
+}) {
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        disabled={disabled}
+        className="w-full appearance-none rounded-lg border border-stone-200 bg-white py-2.5 pl-3 pr-8 text-sm text-stone-900 focus:border-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-400 disabled:opacity-60"
+      >
+        <option value="all">Todas mis empresas</option>
+        {options.map(o => (
+          <option key={o.key} value={o.key}>{o.name}</option>
+        ))}
+      </select>
+      <svg
+        className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-stone-400"
+        width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      >
+        <polyline points="6 9 12 15 18 9"/>
+      </svg>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Client card — closed + expanded
+// ─────────────────────────────────────────────────────────────────────────────
+
+function worstBucketBorder(client: ConsolidatedClient): string {
+  if (client.total < 0) return "border-l-stone-400";
+  if (client.overdue > 0) return "border-l-[#A32D2D]";
+  if (client.watch > 0) return "border-l-[#B45309]";
+  return "border-l-[#0F6E56]";
+}
+
+function MobileClientCard({
+  client,
+  isFavorite,
+  onToggleFavorite,
+  isExpanded,
+  onToggle,
+  daysSinceContact,
+}: {
+  client: ConsolidatedClient;
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+  isExpanded: boolean;
+  onToggle: () => void;
+  daysSinceContact: number | null;
+}) {
+  const borderLeft = worstBucketBorder(client);
+  const showStaleBadge = daysSinceContact !== null && daysSinceContact > 30;
+
+  return (
+    <article
+      className={`overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm border-l-4 ${borderLeft}`}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isExpanded}
+        className="block w-full text-left active:bg-stone-50"
+      >
+        <div className="flex items-start justify-between gap-3 px-3 py-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={e => { e.stopPropagation(); onToggleFavorite(); }}
+                onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onToggleFavorite(); } }}
+                aria-label={isFavorite ? "Quitar favorito" : "Marcar favorito"}
+                className="shrink-0 cursor-pointer text-base leading-none"
+              >
+                {isFavorite ? <span className="text-amber-500">★</span> : <span className="text-stone-300">☆</span>}
+              </span>
+              <span className="truncate text-sm font-medium text-stone-900">
+                {client.nombre_normalized}
+              </span>
+              {showStaleBadge && (
+                <span className="shrink-0 rounded-full bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-stone-600">
+                  30d+
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="font-mono text-base font-semibold tabular-nums text-stone-900">
+              {formatCompactCurrency(client.total)}
+            </span>
+            <svg
+              width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              className={`text-stone-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+            >
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+        </div>
+
+        <div className="flex gap-1.5 px-3 pb-3">
+          <BucketChip variant="current" value={client.current} />
+          <BucketChip variant="watch" value={client.watch} />
+          <BucketChip variant="overdue" value={client.overdue} />
+        </div>
+      </button>
+
+      {isExpanded && <MobileClientExpanded client={client} />}
+    </article>
+  );
+}
+
+function BucketChip({
+  variant,
+  value,
+}: {
+  variant: "current" | "watch" | "overdue";
+  value: number;
+}) {
+  const theme = AGING_THEME[variant];
+  const isZero = value === 0;
+  return (
+    <div
+      className={[
+        "flex-1 rounded-md border px-2 py-1 text-center",
+        isZero ? "border-stone-200 bg-stone-50" : `${theme.border} ${theme.bgActive}`,
+      ].join(" ")}
+    >
+      <p className={`font-mono text-[11px] font-medium tabular-nums ${isZero ? "text-stone-300" : theme.text}`}>
+        {isZero ? "—" : formatCompactCurrency(value)}
+      </p>
+      <p className={`text-[9px] uppercase tracking-wider ${isZero ? "text-stone-300" : theme.text}`}>
+        {theme.label}
+      </p>
+    </div>
+  );
+}
+
+function MobileClientExpanded({ client }: { client: ConsolidatedClient }) {
+  const empresasConSaldo = Object.entries(client.companies)
+    .filter(([, d]) => d.total !== 0)
+    .sort((a, b) => b[1].total - a[1].total);
+
+  return (
+    <div className="border-t border-stone-100 bg-stone-50 px-3 py-3">
+      <p className="mb-2 text-[10.5px] font-medium uppercase tracking-widest text-stone-500">
+        Desglose por empresa ({empresasConSaldo.length})
+      </p>
+      <ul className="space-y-1.5">
+        {empresasConSaldo.map(([key, d]) => (
+          <li key={key} className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2">
+            <span className="truncate text-xs text-stone-700">{d.nombre || key}</span>
+            <span className={`shrink-0 font-mono text-xs font-medium tabular-nums ${d.total < 0 ? "text-stone-500" : "text-stone-900"}`}>
+              ${fmt(d.total)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        disabled
+        title="Próximamente en el siguiente sprint"
+        className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-stone-400"
+      >
+        Ver facturas pendientes
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+        </svg>
+      </button>
+    </div>
+  );
+}

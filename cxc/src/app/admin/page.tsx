@@ -14,6 +14,7 @@ import UndoToast from "@/components/UndoToast";
 import KpiCards from "./components/KpiCards";
 import ClientTable from "./components/ClientTable";
 import { SkeletonRow } from "./components/Skeleton";
+import PanelCxcMobile from "./components/PanelCxcMobile";
 import useAdminData from "./hooks/useAdminData";
 import FreshnessIndicator, { type ModuleFreshness } from "@/components/cxc/FreshnessIndicator";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
@@ -440,11 +441,46 @@ function AdminDashboardInner() {
 
   const canExport = userRole === "admin" || userRole === "secretaria";
 
+  // Mobile actions — wired al mismo handler que usa el dropdown del desktop.
+  // Inline para evitar prop drilling de COMPANIES + import dinámicos.
+  const handleMobileConsolidado = async () => {
+    const { exportConsolidado } = await import("@/lib/excel-cxc-consolidado");
+    exportConsolidado(roleClients, cxcCompanies);
+  };
+  const handleMobileExportCsv = () => {
+    const riskL = riskFilter === "all" ? "" : riskFilter === "current" ? "corriente" : riskFilter === "watch" ? "vigilancia" : "vencido";
+    const coL = companyFilter !== "all" ? COMPANIES.find((c) => c.key === companyFilter)?.name || "" : "";
+    const riskLabel = riskFilter === "all" ? "" : riskFilter === "current" ? "Corriente" : riskFilter === "watch" ? "Vigilancia" : "Vencido";
+    exportCSV(filtered, [riskL, coL].filter(Boolean).join("_") || undefined, riskLabel || undefined, coL || undefined);
+  };
+
   return (
     <PullToRefresh onRefresh={loadData}>
     <div>
       <AppHeader module="Panel CXC" />
-      <div className="max-w-6xl mx-auto px-6 py-8">
+
+      <PanelCxcMobile
+        filtered={filtered}
+        roleClients={roleClients}
+        cxcCompanies={cxcCompanies}
+        search={search}
+        setSearch={setSearch}
+        riskFilter={riskFilter}
+        setRiskFilter={setRiskFilter}
+        companyFilter={companyFilter}
+        setCompanyFilter={setCompanyFilter}
+        favorites={favorites}
+        onToggleFavorite={toggleFavorite}
+        contactLog={contactLog}
+        freshness={freshness.cxc}
+        canExport={canExport}
+        onCargar={() => (window.location.href = "/upload?tab=cxc")}
+        onConsolidado={handleMobileConsolidado}
+        onExportarCsv={handleMobileExportCsv}
+        empresaRestriction={empresaRestriction}
+      />
+
+      <div className="hidden md:block max-w-6xl mx-auto px-6 py-8">
 
       {/* Freshness indicator: última fecha de upload CXC + Ventas */}
       <div className="mb-4">
@@ -597,12 +633,12 @@ function AdminDashboardInner() {
         onToggleFavorite={toggleFavorite}
         hideSearchAndRiskFilters
       />
+      </div>
 
       <Toast message={toast} />
       {pendingUndo && (
         <UndoToast message={pendingUndo.message} startedAt={pendingUndo.startedAt} onUndo={undoAction} />
       )}
-    </div>
     </div>
     </PullToRefresh>
   );
