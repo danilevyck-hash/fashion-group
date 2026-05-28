@@ -13,6 +13,8 @@ tsconfig.tsbuildinfo
 # Scripts de análisis: outputs puntuales, no versionados
 scripts/output/
 scripts/switch-api-discovery-output.json
+scripts/explore-*.ts
+scripts/explore-*.json
 
 # Sprint 1 — local artifacts no van al repo
 backups/

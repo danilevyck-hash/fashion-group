@@ -76,46 +76,94 @@ function parseSwitchFecha(s: string): string | null {
   return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}-05:00`;
 }
 
+/**
+ * Switch formatea montos en formato US: coma = separador de miles, punto =
+ * decimal. Ej: "2,112.0000" = 2112.0. Inconsistente entre campos: `total`
+ * llega sin coma ("2112.0000") pero `subTotal`/`subTotalDescuento` llegan con
+ * coma cuando son >= 1000. Number("2,112.0000") es NaN, así que hay que sacar
+ * la coma antes de parsear — sin esto se descartaban TODAS las facturas
+ * >= $1,000 (todo el wholesale). NO asumir formato europeo (punto=miles).
+ */
 function parseAmount(s: string | null | undefined): number | null {
-  if (s == null || s === "") return null;
-  const n = Number(s);
+  if (s == null) return null;
+  const cleaned = String(s).trim().replace(/,/g, "");
+  if (cleaned === "") return null;
+  const n = Number(cleaned);
   return Number.isFinite(n) ? n : null;
 }
 
-function mapFacturaToRow(f: SwitchFactura): TicketInsertRow | null {
-  if (!f || typeof f.id !== "number" || !f.secuencial || !f.tipoComprobante || !f.fecha) {
-    return null;
+/** Detalle de una factura descartada — para diagnóstico, nunca skip silencioso. */
+export interface SkipDetail {
+  facturaId: number | string | null;
+  secuencial: string | null;
+  campo: string;
+  valorCrudo: unknown;
+}
+
+type MapResult =
+  | { ok: true; row: TicketInsertRow }
+  | { ok: false; skip: SkipDetail };
+
+function mapFacturaToRow(f: SwitchFactura): MapResult {
+  // Identidad. Reportamos el primer campo de identidad que falle.
+  const facturaId = f && (typeof f.id === "number" || typeof f.id === "string") ? f.id : null;
+  const secuencial = f && typeof f.secuencial === "string" ? f.secuencial : null;
+  if (!f) {
+    return { ok: false, skip: { facturaId: null, secuencial: null, campo: "factura", valorCrudo: f } };
+  }
+  if (typeof f.id !== "number") {
+    return { ok: false, skip: { facturaId, secuencial, campo: "id", valorCrudo: f.id } };
+  }
+  if (!f.secuencial) {
+    return { ok: false, skip: { facturaId, secuencial, campo: "secuencial", valorCrudo: f.secuencial } };
+  }
+  if (!f.tipoComprobante) {
+    return { ok: false, skip: { facturaId, secuencial, campo: "tipoComprobante", valorCrudo: f.tipoComprobante } };
+  }
+  if (!f.fecha) {
+    return { ok: false, skip: { facturaId, secuencial, campo: "fecha", valorCrudo: f.fecha } };
   }
   const fechaIso = parseSwitchFecha(f.fecha);
-  if (!fechaIso) return null;
+  if (!fechaIso) {
+    return { ok: false, skip: { facturaId, secuencial, campo: "fecha", valorCrudo: f.fecha } };
+  }
 
   const subtotal = parseAmount(f.subTotal);
+  if (subtotal === null) {
+    return { ok: false, skip: { facturaId, secuencial, campo: "subTotal", valorCrudo: f.subTotal } };
+  }
   const total = parseAmount(f.total);
+  if (total === null) {
+    return { ok: false, skip: { facturaId, secuencial, campo: "total", valorCrudo: f.total } };
+  }
   const subtotalDescuento = parseAmount(f.subTotalDescuento);
-  if (subtotal === null || total === null || subtotalDescuento === null) {
-    return null;
+  if (subtotalDescuento === null) {
+    return { ok: false, skip: { facturaId, secuencial, campo: "subTotalDescuento", valorCrudo: f.subTotalDescuento } };
   }
 
   return {
-    switch_factura_id: f.id,
-    secuencial: f.secuencial,
-    tipo_comprobante: f.tipoComprobante,
-    fecha: fechaIso,
-    subtotal,
-    descuento: parseAmount(f.descuento) ?? 0,
-    subtotal_descuento: subtotalDescuento,
-    impuesto: parseAmount(f.impuesto) ?? 0,
-    total,
-    saldo: parseAmount(f.saldo) ?? 0,
-    condicion_venta: f.condicionVenta ?? null,
-    cliente_switch_id: typeof f.clienteId === "number" ? f.clienteId : null,
-    cliente_nombre: f.cliente ?? null,
-    cliente_email: f.clienteEmail ? f.clienteEmail : null,
-    vendedor_switch_id: typeof f.vendedorId === "number" ? f.vendedorId : null,
-    vendedor_nombre: f.vendedor ?? null,
-    sucursal_switch_id: typeof f.sucursalId === "number" ? f.sucursalId : null,
-    sucursal_nombre: f.sucursal ?? null,
-    raw_data: f,
+    ok: true,
+    row: {
+      switch_factura_id: f.id,
+      secuencial: f.secuencial,
+      tipo_comprobante: f.tipoComprobante,
+      fecha: fechaIso,
+      subtotal,
+      descuento: parseAmount(f.descuento) ?? 0,
+      subtotal_descuento: subtotalDescuento,
+      impuesto: parseAmount(f.impuesto) ?? 0,
+      total,
+      saldo: parseAmount(f.saldo) ?? 0,
+      condicion_venta: f.condicionVenta ?? null,
+      cliente_switch_id: typeof f.clienteId === "number" ? f.clienteId : null,
+      cliente_nombre: f.cliente ?? null,
+      cliente_email: f.clienteEmail ? f.clienteEmail : null,
+      vendedor_switch_id: typeof f.vendedorId === "number" ? f.vendedorId : null,
+      vendedor_nombre: f.vendedor ?? null,
+      sucursal_switch_id: typeof f.sucursalId === "number" ? f.sucursalId : null,
+      sucursal_nombre: f.sucursal ?? null,
+      raw_data: f,
+    },
   };
 }
 
@@ -225,6 +273,49 @@ async function persistBatch(
   return { inserted: newRows.length, updated: updRows.length };
 }
 
+// ─── Finalización del log (resiliente a columna skip_details ausente) ────────
+
+interface SyncLogFinalFields {
+  status: "success" | "error";
+  finished_at: string;
+  records_inserted: number;
+  records_updated: number;
+  records_skipped: number;
+  error_message?: string;
+  skip_details: SkipDetail[];
+}
+
+/**
+ * Marca el sync_log como terminado. Intenta escribir skip_details; si la
+ * columna aún no existe (migración no aplicada), reintenta sin ella para no
+ * dejar el log atascado en 'running'. Los skips ya quedaron en console.error.
+ */
+async function finalizeSyncLog(
+  logId: string,
+  fields: SyncLogFinalFields,
+): Promise<void> {
+  const { skip_details, ...core } = fields;
+  const withDetails = { ...core, skip_details };
+
+  const { error } = await supabaseServer
+    .from("multifashion_sync_log")
+    .update(withDetails)
+    .eq("id", logId);
+  if (!error) return;
+
+  // Fallback: probablemente la columna skip_details no existe todavía.
+  console.error(
+    `[sync] update con skip_details falló (${error.message}); reintento sin skip_details`,
+  );
+  const { error: error2 } = await supabaseServer
+    .from("multifashion_sync_log")
+    .update(core)
+    .eq("id", logId);
+  if (error2) {
+    console.error(`[sync] no pude finalizar sync_log: ${error2.message}`);
+  }
+}
+
 // ─── API pública ─────────────────────────────────────────────────────────────
 
 export async function syncMultifashionTickets(
@@ -255,6 +346,7 @@ export async function syncMultifashionTickets(
   let inserted = 0;
   let updated = 0;
   let skipped = 0;
+  const skipDetails: SkipDetail[] = [];
 
   try {
     const client = createSwitchClient(EMPRESA_KEY);
@@ -272,12 +364,17 @@ export async function syncMultifashionTickets(
       if (facturas.length === 0) break;
 
       for (const f of facturas) {
-        const row = mapFacturaToRow(f);
-        if (row === null) {
+        const res = mapFacturaToRow(f);
+        if (!res.ok) {
           skipped++;
+          skipDetails.push(res.skip);
+          // Nunca skip silencioso: log explícito con el campo y valor crudo.
+          console.error(
+            `[sync] SKIP factura id=${res.skip.facturaId} sec=${res.skip.secuencial} campo=${res.skip.campo} valorCrudo=${JSON.stringify(res.skip.valorCrudo)}`,
+          );
           continue;
         }
-        buffer.push(row);
+        buffer.push(res.row);
       }
 
       while (buffer.length >= UPSERT_BATCH) {
@@ -300,20 +397,14 @@ export async function syncMultifashionTickets(
 
     const durationMs = Date.now() - startedAt;
 
-    const { error: updLogErr } = await supabaseServer
-      .from("multifashion_sync_log")
-      .update({
-        status: "success",
-        finished_at: new Date().toISOString(),
-        records_inserted: inserted,
-        records_updated: updated,
-        records_skipped: skipped,
-      })
-      .eq("id", logId);
-    if (updLogErr) {
-      // No revertimos el run — la data ya está en multifashion_tickets.
-      console.error("[sync] No pude marcar sync_log success:", updLogErr.message);
-    }
+    await finalizeSyncLog(logId, {
+      status: "success",
+      finished_at: new Date().toISOString(),
+      records_inserted: inserted,
+      records_updated: updated,
+      records_skipped: skipped,
+      skip_details: skipDetails,
+    });
 
     return { logId, inserted, updated, skipped, durationMs };
   } catch (err: unknown) {
@@ -328,17 +419,15 @@ export async function syncMultifashionTickets(
     }
     if (stack) console.error(stack);
 
-    await supabaseServer
-      .from("multifashion_sync_log")
-      .update({
-        status: "error",
-        finished_at: new Date().toISOString(),
-        records_inserted: inserted,
-        records_updated: updated,
-        records_skipped: skipped,
-        error_message: message.slice(0, 2000),
-      })
-      .eq("id", logId);
+    await finalizeSyncLog(logId, {
+      status: "error",
+      finished_at: new Date().toISOString(),
+      records_inserted: inserted,
+      records_updated: updated,
+      records_skipped: skipped,
+      error_message: message.slice(0, 2000),
+      skip_details: skipDetails,
+    });
 
     throw err;
   }
