@@ -25,6 +25,8 @@ import {
   SwitchEstadoCuentaData,
   SwitchFacturaDetalle,
   SwitchFacturasData,
+  SwitchNotasCreditoData,
+  SwitchNotasDebitoData,
   SwitchSucursalesData,
   SwitchVendedoresData,
 } from "./types";
@@ -332,6 +334,10 @@ async function authedCall<T>(
 export interface SwitchClient {
   empresaKey: string;
   listFacturas(params: ListFacturasParams): Promise<SwitchFacturasData>;
+  /** Notas de crédito del rango. Total llega NEGATIVO (reducen ventas). */
+  listNotasCredito(params: ListFacturasParams): Promise<SwitchNotasCreditoData>;
+  /** Notas de débito del rango. Total positivo (suman a ventas). */
+  listNotasDebito(params: ListFacturasParams): Promise<SwitchNotasDebitoData>;
   getFactura(facturaId: number | string): Promise<SwitchFacturaDetalle>;
   listSucursales(): Promise<SwitchSucursalesData>;
   listVendedores(params: {
@@ -368,6 +374,38 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         empresaKey,
         cfg,
         `/apifactura/lista?${qs.toString()}`,
+        "GET",
+      );
+    },
+
+    async listNotasCredito(params) {
+      const qs = new URLSearchParams({
+        desde: params.desde,
+        hasta: params.hasta,
+        porPagina: String(params.porPagina),
+        paginaActual: String(params.paginaActual),
+      });
+      if (params.sucursalId !== undefined) qs.set("sucursalId", String(params.sucursalId));
+      return authedCall<SwitchNotasCreditoData>(
+        empresaKey,
+        cfg,
+        `/apinotacredito/lista?${qs.toString()}`,
+        "GET",
+      );
+    },
+
+    async listNotasDebito(params) {
+      const qs = new URLSearchParams({
+        desde: params.desde,
+        hasta: params.hasta,
+        porPagina: String(params.porPagina),
+        paginaActual: String(params.paginaActual),
+      });
+      if (params.sucursalId !== undefined) qs.set("sucursalId", String(params.sucursalId));
+      return authedCall<SwitchNotasDebitoData>(
+        empresaKey,
+        cfg,
+        `/apinotadebito/lista?${qs.toString()}`,
         "GET",
       );
     },

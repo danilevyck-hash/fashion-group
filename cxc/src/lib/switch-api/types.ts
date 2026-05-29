@@ -151,6 +151,46 @@ export interface SwitchFacturaDetalle extends SwitchFactura {
   [key: string]: unknown;
 }
 
+// ─── Notas de Crédito / Débito ───────────────────────────────────────────────
+
+/**
+ * Item de /apinotacredito/lista (data.notascredito[]) y /apinotadebito/lista
+ * (data.notasdebito[]). Mismo shape que SwitchFactura PERO sin tipoComprobante,
+ * condicionVenta ni clienteEmail. Montos como string con coma de miles.
+ *
+ * OJO signos: las NCs llegan con total NEGATIVO desde la API (ej. "-497.00").
+ * En storage se guardan POSITIVO (ABS); el signo lo aplica el cálculo de ventas
+ * netas en query time (switch_ventas_netas_vw).
+ */
+export interface SwitchNota {
+  id: number;
+  secuencial: string;
+  fecha: string;
+  subTotal: string;
+  descuento: string;
+  subTotalDescuento: string;
+  impuesto: string;
+  total: string;
+  saldo: string;
+  cliente: string;
+  clienteId: number;
+  vendedor: string;
+  vendedorId: number;
+  sucursal: string;
+  sucursalId: number;
+  [key: string]: unknown;
+}
+
+export interface SwitchNotasCreditoData {
+  notascredito: SwitchNota[];
+  paginacion: SwitchPaginacion;
+}
+
+export interface SwitchNotasDebitoData {
+  notasdebito: SwitchNota[];
+  paginacion: SwitchPaginacion;
+}
+
 // ─── Estado de cuenta (CXC) ──────────────────────────────────────────────────
 
 /**

@@ -44,10 +44,11 @@ function pad(n: number): string {
 function lastDayOfMonth(y: number, m1: number): number {
   return new Date(y, m1, 0).getDate();
 }
-function previousMonth(now: Date): { year: number; month: number } {
-  const m = now.getMonth(); // 0-indexed; previo (1-indexed) = getMonth()
-  if (m === 0) return { year: now.getFullYear() - 1, month: 12 };
-  return { year: now.getFullYear(), month: m };
+/** Mes en curso (1-indexed). El backfill llega "hasta hoy" → incluye este mes,
+ *  con hasta capado a la fecha actual (a diferencia del backfill de Multifashion
+ *  que paraba en el mes anterior). */
+function currentMonth(now: Date): { year: number; month: number } {
+  return { year: now.getFullYear(), month: now.getMonth() + 1 };
 }
 
 function parseArgs(): { tipo: "facturas" | "cxc" | "all"; empresa: EmpresaKey | null } {
@@ -67,7 +68,7 @@ function parseArgs(): { tipo: "facturas" | "cxc" | "all"; empresa: EmpresaKey | 
   return { tipo, empresa };
 }
 
-async function backfillFacturas(empresas: EmpresaKey[], end: { year: number; month: number }): Promise<void> {
+async function backfillFacturas(empresas: EmpresaKey[], end: { year: number; month: number }, hoy: string): Promise<void> {
   console.log(`\n========== FACTURAS → switch_facturas ==========`);
   for (const empresaKey of empresas) {
     console.log(`\n--- ${empresaKey} ---`);
@@ -77,7 +78,9 @@ async function backfillFacturas(empresas: EmpresaKey[], end: { year: number; mon
     while (y < end.year || (y === end.year && m <= end.month)) {
       const ym = `${y}-${pad(m)}`;
       const desde = `${y}-${pad(m)}-01`;
-      const hasta = `${y}-${pad(m)}-${pad(lastDayOfMonth(y, m))}`;
+      const finMes = `${y}-${pad(m)}-${pad(lastDayOfMonth(y, m))}`;
+      // Mes en curso: capar hasta a hoy (no traer fechas futuras).
+      const hasta = finMes > hoy ? hoy : finMes;
       try {
         const r = await syncEmpresaFacturas(empresaKey, { desde, hasta, triggeredBy: "backfill" });
         console.log(`[${empresaKey} ${ym}] ins=${r.inserted} upd=${r.updated} skip=${r.skipped} ${(r.durationMs / 1000).toFixed(1)}s`);
@@ -109,15 +112,16 @@ async function backfillCxc(empresas: EmpresaKey[]): Promise<void> {
 async function main(): Promise<void> {
   const { tipo, empresa } = parseArgs();
   const now = new Date();
-  const end = previousMonth(now);
+  const end = currentMonth(now);
+  const hoy = now.toISOString().slice(0, 10);
 
   console.log(`=== Switch Backfill ===`);
-  console.log(`tipo=${tipo} empresa=${empresa ?? "(todas)"} hoy=${now.toISOString().slice(0, 10)}`);
+  console.log(`tipo=${tipo} empresa=${empresa ?? "(todas)"} hoy=${hoy} (incluye mes en curso, hasta=${hoy})`);
 
   if (tipo === "facturas" || tipo === "all") {
     const list = empresa ? [empresa].filter((e) => empresasConFacturas().includes(e)) : empresasConFacturas();
     if (list.length === 0) console.log("(sin empresas con facturas para el filtro dado)");
-    else await backfillFacturas(list, end);
+    else await backfillFacturas(list, end, hoy);
   }
 
   if (tipo === "cxc" || tipo === "all") {

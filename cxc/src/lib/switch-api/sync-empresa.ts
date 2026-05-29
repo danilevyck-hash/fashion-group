@@ -15,6 +15,7 @@ import { createSwitchClient, SwitchApiError } from "./client";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
 import type {
   SwitchFactura,
+  SwitchNota,
   SwitchCliente,
   SwitchEstadoCuentaElement,
 } from "./types";
@@ -186,6 +187,61 @@ function mapFactura(empresaKey: string, f: SwitchFactura): FacturaMapResult {
   };
 }
 
+/**
+ * Mapea una Nota de Crédito/Débito a FacturaRow. Diferencias vs mapFactura:
+ *   - tipo_comprobante se setea explícito (el endpoint no lo trae).
+ *   - condicion_venta y cliente_email no vienen → null.
+ *   - Montos se guardan en POSITIVO (ABS): las NCs llegan negativas del API.
+ *     El signo contable lo aplica switch_ventas_netas_vw en query time.
+ */
+function mapNota(
+  empresaKey: string,
+  tipo: "Nota de Crédito" | "Nota de Débito",
+  n: SwitchNota,
+): FacturaMapResult {
+  const facturaId = n && (typeof n.id === "number" || typeof n.id === "string") ? n.id : null;
+  const secuencial = n && typeof n.secuencial === "string" ? n.secuencial : null;
+  if (!n) return { ok: false, skip: { facturaId: null, secuencial: null, campo: "nota", valorCrudo: n } };
+  if (typeof n.id !== "number") return { ok: false, skip: { facturaId, secuencial, campo: "id", valorCrudo: n.id } };
+  if (!n.secuencial) return { ok: false, skip: { facturaId, secuencial, campo: "secuencial", valorCrudo: n.secuencial } };
+  if (!n.fecha) return { ok: false, skip: { facturaId, secuencial, campo: "fecha", valorCrudo: n.fecha } };
+  const fechaIso = parseSwitchFecha(n.fecha);
+  if (!fechaIso) return { ok: false, skip: { facturaId, secuencial, campo: "fecha", valorCrudo: n.fecha } };
+
+  const subtotal = parseAmount(n.subTotal);
+  if (subtotal === null) return { ok: false, skip: { facturaId, secuencial, campo: "subTotal", valorCrudo: n.subTotal } };
+  const total = parseAmount(n.total);
+  if (total === null) return { ok: false, skip: { facturaId, secuencial, campo: "total", valorCrudo: n.total } };
+  const subtotalDescuento = parseAmount(n.subTotalDescuento);
+  if (subtotalDescuento === null) return { ok: false, skip: { facturaId, secuencial, campo: "subTotalDescuento", valorCrudo: n.subTotalDescuento } };
+
+  return {
+    ok: true,
+    row: {
+      empresa_key: empresaKey,
+      switch_factura_id: Number(n.id),
+      secuencial: n.secuencial,
+      tipo_comprobante: tipo,
+      fecha: fechaIso,
+      subtotal: Math.abs(subtotal),
+      descuento: Math.abs(parseAmount(n.descuento) ?? 0),
+      subtotal_descuento: Math.abs(subtotalDescuento),
+      impuesto: Math.abs(parseAmount(n.impuesto) ?? 0),
+      total: Math.abs(total),
+      saldo: Math.abs(parseAmount(n.saldo) ?? 0),
+      condicion_venta: null,
+      cliente_switch_id: typeof n.clienteId === "number" ? n.clienteId : null,
+      cliente_nombre: n.cliente ?? null,
+      cliente_email: null,
+      vendedor_switch_id: typeof n.vendedorId === "number" ? n.vendedorId : null,
+      vendedor_nombre: n.vendedor ?? null,
+      sucursal_switch_id: typeof n.sucursalId === "number" ? n.sucursalId : null,
+      sucursal_nombre: n.sucursal ?? null,
+      raw_data: n,
+    },
+  };
+}
+
 async function persistFacturasBatch(
   empresaKey: string,
   rows: FacturaRow[],
@@ -249,66 +305,103 @@ export async function syncEmpresaFacturas(
   const startedAt = Date.now();
   const logId = await createSyncLog(empresaKey, "facturas", opts);
 
-  let inserted = 0;
-  let updated = 0;
-  let skipped = 0;
+  const counters = { inserted: 0, updated: 0, skipped: 0 };
   const skipDetails: SkipDetail[] = [];
 
   try {
     const client = createSwitchClient(empresaKey);
-    let buffer: FacturaRow[] = [];
+    const buffer: FacturaRow[] = [];
 
-    for (let page = 1; page <= MAX_PAGES; page++) {
-      const resp = await client.listFacturas({
-        desde: opts.desde,
-        hasta: opts.hasta,
-        porPagina: PAGE_SIZE,
-        paginaActual: page,
-      });
-      const facturas = resp.facturas ?? [];
-      if (facturas.length === 0) break;
-
-      for (const f of facturas) {
-        const res = mapFactura(empresaKey, f);
-        if (!res.ok) {
-          skipped++;
-          skipDetails.push(res.skip);
-          console.error(
-            `[sync ${empresaKey} facturas] SKIP id=${res.skip.facturaId} sec=${res.skip.secuencial} campo=${res.skip.campo} valorCrudo=${JSON.stringify(res.skip.valorCrudo)}`,
-          );
-          continue;
-        }
-        buffer.push(res.row);
-      }
-
+    const flush = async (): Promise<void> => {
       while (buffer.length >= UPSERT_BATCH) {
         const batch = buffer.splice(0, UPSERT_BATCH);
         const r = await persistFacturasBatch(empresaKey, batch);
-        inserted += r.inserted;
-        updated += r.updated;
+        counters.inserted += r.inserted;
+        counters.updated += r.updated;
       }
+    };
 
-      const total = Number(resp.paginacion?.total ?? 0);
-      if (page * PAGE_SIZE >= total) break;
-    }
+    // Pagina un endpoint de comprobantes y empuja filas mapeadas al buffer común.
+    const stream = async (
+      label: string,
+      fetchPage: (page: number) => Promise<{ items: unknown[]; total: number }>,
+      mapOne: (it: unknown) => FacturaMapResult,
+    ): Promise<void> => {
+      for (let page = 1; page <= MAX_PAGES; page++) {
+        const { items, total } = await fetchPage(page);
+        if (items.length === 0) break;
+        for (const it of items) {
+          const res = mapOne(it);
+          if (!res.ok) {
+            counters.skipped++;
+            skipDetails.push(res.skip);
+            console.error(
+              `[sync ${empresaKey} ${label}] SKIP id=${res.skip.facturaId} sec=${res.skip.secuencial} campo=${res.skip.campo} valorCrudo=${JSON.stringify(res.skip.valorCrudo)}`,
+            );
+            continue;
+          }
+          buffer.push(res.row);
+        }
+        await flush();
+        if (page * PAGE_SIZE >= total) break;
+      }
+    };
 
+    // 1) Facturas (incluye Tiquete y Transacción que devuelve el mismo endpoint).
+    await stream(
+      "facturas",
+      async (page) => {
+        const resp = await client.listFacturas({ desde: opts.desde, hasta: opts.hasta, porPagina: PAGE_SIZE, paginaActual: page });
+        return { items: resp.facturas ?? [], total: Number(resp.paginacion?.total ?? 0) };
+      },
+      (it) => mapFactura(empresaKey, it as SwitchFactura),
+    );
+
+    // 2) Notas de crédito (total llega negativo del API; se guarda positivo).
+    await stream(
+      "notas-credito",
+      async (page) => {
+        const resp = await client.listNotasCredito({ desde: opts.desde, hasta: opts.hasta, porPagina: PAGE_SIZE, paginaActual: page });
+        return { items: resp.notascredito ?? [], total: Number(resp.paginacion?.total ?? 0) };
+      },
+      (it) => mapNota(empresaKey, "Nota de Crédito", it as SwitchNota),
+    );
+
+    // 3) Notas de débito.
+    await stream(
+      "notas-debito",
+      async (page) => {
+        const resp = await client.listNotasDebito({ desde: opts.desde, hasta: opts.hasta, porPagina: PAGE_SIZE, paginaActual: page });
+        return { items: resp.notasdebito ?? [], total: Number(resp.paginacion?.total ?? 0) };
+      },
+      (it) => mapNota(empresaKey, "Nota de Débito", it as SwitchNota),
+    );
+
+    // Flush final del remanente (< UPSERT_BATCH).
     if (buffer.length > 0) {
       const r = await persistFacturasBatch(empresaKey, buffer);
-      inserted += r.inserted;
-      updated += r.updated;
-      buffer = [];
+      counters.inserted += r.inserted;
+      counters.updated += r.updated;
     }
 
     const durationMs = Date.now() - startedAt;
     await finalizeSyncLog(logId, {
       status: "success",
       finished_at: new Date().toISOString(),
-      records_inserted: inserted,
-      records_updated: updated,
-      records_skipped: skipped,
+      records_inserted: counters.inserted,
+      records_updated: counters.updated,
+      records_skipped: counters.skipped,
       skip_details: skipDetails,
     });
-    return { empresaKey, syncType: "facturas", logId, inserted, updated, skipped, durationMs };
+    return {
+      empresaKey,
+      syncType: "facturas",
+      logId,
+      inserted: counters.inserted,
+      updated: counters.updated,
+      skipped: counters.skipped,
+      durationMs,
+    };
   } catch (err: unknown) {
     const durationMs = Date.now() - startedAt;
     const message = err instanceof Error ? err.message : String(err);
@@ -320,9 +413,9 @@ export async function syncEmpresaFacturas(
     await finalizeSyncLog(logId, {
       status: "error",
       finished_at: new Date().toISOString(),
-      records_inserted: inserted,
-      records_updated: updated,
-      records_skipped: skipped,
+      records_inserted: counters.inserted,
+      records_updated: counters.updated,
+      records_skipped: counters.skipped,
       error_message: message.slice(0, 2000),
       skip_details: skipDetails,
     });

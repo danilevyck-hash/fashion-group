@@ -35,9 +35,11 @@ export interface EmpresaSyncCapability {
 }
 
 export const EMPRESA_SYNC_CAPABILITIES: Record<EmpresaKey, EmpresaSyncCapability> = {
-  // Facturas en multifashion_tickets (sync legacy, intacto). Retail: sin CXC
-  // en el módulo central (su estado de cuenta no entra a switch_estadocuenta).
-  american_classic: { facturas: false, cxc: false },
+  // facturas:true → switch_facturas recibe facturas+NCs+NDs de Multifashion para
+  // que switch_ventas_netas_vw cubra las 8 empresas (fase 2). El sync legacy
+  // multifashion_tickets + su cron + el tab actual quedan INTACTOS (MF queda
+  // duplicada entre ambas tablas a propósito). cxc:false (retail, sin CXC central).
+  american_classic: { facturas: true, cxc: false },
   vistana: { facturas: true, cxc: true },
   fashion_wear: { facturas: true, cxc: true },
   fashion_shoes: { facturas: true, cxc: true },
