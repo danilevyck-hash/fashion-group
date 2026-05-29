@@ -163,7 +163,7 @@ function mapFactura(empresaKey: string, f: SwitchFactura): FacturaMapResult {
     ok: true,
     row: {
       empresa_key: empresaKey,
-      switch_factura_id: f.id,
+      switch_factura_id: Number(f.id),
       secuencial: f.secuencial,
       tipo_comprobante: f.tipoComprobante,
       fecha: fechaIso,
@@ -192,58 +192,54 @@ async function persistFacturasBatch(
 ): Promise<{ inserted: number; updated: number }> {
   if (rows.length === 0) return { inserted: 0, updated: 0 };
 
-  // Dedupe within-batch por switch_factura_id (last-wins).
+  // Dedupe within-batch por switch_factura_id (last-wins). Imprescindible: un
+  // upsert con la misma conflict-key repetida en el mismo payload revienta.
   const byId = new Map<number, FacturaRow>();
   for (const r of rows) byId.set(r.switch_factura_id, r);
   const unique = Array.from(byId.values());
 
+  // Conteo informativo (NO condiciona la escritura). Casteamos ambos lados a
+  // number: el path viejo SELECT→split clasificaba mal cuando PostgREST devolvía
+  // el id como string en algunos deployments (Set<number>.has(string)=false),
+  // marcando filas existentes como nuevas → INSERT → duplicate key. El upsert
+  // de abajo es inmune a eso.
   const ids = unique.map((r) => r.switch_factura_id);
+  const preexisting = new Set<number>();
   const { data: existing, error: selErr } = await supabaseServer
     .from("switch_facturas")
     .select("switch_factura_id")
     .eq("empresa_key", empresaKey)
     .in("switch_factura_id", ids);
-  if (selErr) throw new Error(`SELECT existentes falló: ${selErr.message}`);
-
-  const existingSet = new Set<number>(
-    ((existing ?? []) as Array<{ switch_factura_id: number }>).map((r) => r.switch_factura_id),
-  );
-
-  const nowIso = new Date().toISOString();
-  const newRows = unique.filter((r) => !existingSet.has(r.switch_factura_id));
-  const updRows = unique.filter((r) => existingSet.has(r.switch_factura_id));
-
-  if (newRows.length > 0) {
-    const { error } = await supabaseServer
-      .from("switch_facturas")
-      .insert(newRows.map((r) => ({ ...r, synced_at: nowIso, updated_at: nowIso })));
-    if (error) throw new Error(`INSERT falló: ${error.message}`);
-  }
-
-  if (updRows.length > 0) {
-    // Mutable: total, saldo, descuento, subtotal_descuento, impuesto, raw_data.
-    // Inmutable: switch_factura_id, secuencial, fecha, tipo_comprobante, subtotal.
-    const results = await Promise.all(
-      updRows.map((r) =>
-        supabaseServer
-          .from("switch_facturas")
-          .update({
-            total: r.total,
-            saldo: r.saldo,
-            descuento: r.descuento,
-            subtotal_descuento: r.subtotal_descuento,
-            impuesto: r.impuesto,
-            raw_data: r.raw_data,
-            updated_at: nowIso,
-          })
-          .eq("empresa_key", empresaKey)
-          .eq("switch_factura_id", r.switch_factura_id),
-      ),
+  if (selErr) {
+    console.error(
+      `[sync ${empresaKey} facturas] SELECT informativo falló (conteo aproximado): ${selErr.message}`,
     );
-    for (const res of results) if (res.error) throw new Error(`UPDATE falló: ${res.error.message}`);
+  } else {
+    for (const r of (existing ?? []) as Array<{ switch_factura_id: number | string }>) {
+      preexisting.add(Number(r.switch_factura_id));
+    }
   }
 
-  return { inserted: newRows.length, updated: updRows.length };
+  // Upsert atómico por (empresa_key, switch_factura_id). Omitimos synced_at del
+  // payload para preservar el primer sync en filas existentes (default now() en
+  // insert, sin cambio en conflicto); updated_at sí se refresca siempre.
+  const nowIso = new Date().toISOString();
+  const payload = unique.map((r) => ({ ...r, updated_at: nowIso }));
+  const { error: upErr } = await supabaseServer
+    .from("switch_facturas")
+    .upsert(payload, {
+      onConflict: "empresa_key,switch_factura_id",
+      ignoreDuplicates: false,
+    });
+  if (upErr) throw new Error(`UPSERT falló: ${upErr.message}`);
+
+  let inserted = 0;
+  let updated = 0;
+  for (const r of unique) {
+    if (preexisting.has(r.switch_factura_id)) updated++;
+    else inserted++;
+  }
+  return { inserted, updated };
 }
 
 export async function syncEmpresaFacturas(
@@ -372,7 +368,7 @@ function mapEstadoCuentaElement(
     ok: true,
     row: {
       empresa_key: empresaKey,
-      ccte_id: el.ccteId,
+      ccte_id: Number(el.ccteId),
       cliente_switch_id: typeof cliente.id === "number" ? cliente.id : null,
       cliente_nombre: cliente.nombre ?? null,
       cliente_codigo: cliente.codigo ?? null,
@@ -406,64 +402,43 @@ async function persistEstadoCuentaBatch(
   for (const r of rows) byId.set(r.ccte_id, r);
   const unique = Array.from(byId.values());
 
+  // Conteo informativo (NO condiciona la escritura), casteando a number.
   const ids = unique.map((r) => r.ccte_id);
+  const preexisting = new Set<number>();
   const { data: existing, error: selErr } = await supabaseServer
     .from("switch_estadocuenta")
     .select("ccte_id")
     .eq("empresa_key", empresaKey)
     .in("ccte_id", ids);
-  if (selErr) throw new Error(`SELECT estadocuenta falló: ${selErr.message}`);
-
-  const existingSet = new Set<number>(
-    ((existing ?? []) as Array<{ ccte_id: number }>).map((r) => r.ccte_id),
-  );
-
-  const newRows = unique.filter((r) => !existingSet.has(r.ccte_id));
-  const updRows = unique.filter((r) => existingSet.has(r.ccte_id));
-
-  if (newRows.length > 0) {
-    const { error } = await supabaseServer
-      .from("switch_estadocuenta")
-      .insert(newRows.map((r) => ({ ...r, synced_at: runStamp, updated_at: runStamp })));
-    if (error) throw new Error(`INSERT estadocuenta falló: ${error.message}`);
-  }
-
-  if (updRows.length > 0) {
-    // Snapshot: todos los campos son mutables. synced_at=runStamp marca "visto
-    // en este run" para la reconciliación posterior.
-    const results = await Promise.all(
-      updRows.map((r) =>
-        supabaseServer
-          .from("switch_estadocuenta")
-          .update({
-            cliente_switch_id: r.cliente_switch_id,
-            cliente_nombre: r.cliente_nombre,
-            cliente_codigo: r.cliente_codigo,
-            secuencial: r.secuencial,
-            numero_fiscal: r.numero_fiscal,
-            tipo_comprobante: r.tipo_comprobante,
-            abrev: r.abrev,
-            total: r.total,
-            saldo: r.saldo,
-            debito: r.debito,
-            credito: r.credito,
-            saldo_original: r.saldo_original,
-            total_original: r.total_original,
-            plazo_credito: r.plazo_credito,
-            dias: r.dias,
-            fecha_creacion: r.fecha_creacion,
-            raw_data: r.raw_data,
-            synced_at: runStamp,
-            updated_at: runStamp,
-          })
-          .eq("empresa_key", empresaKey)
-          .eq("ccte_id", r.ccte_id),
-      ),
+  if (selErr) {
+    console.error(
+      `[sync ${empresaKey} cxc] SELECT informativo falló (conteo aproximado): ${selErr.message}`,
     );
-    for (const res of results) if (res.error) throw new Error(`UPDATE estadocuenta falló: ${res.error.message}`);
+  } else {
+    for (const r of (existing ?? []) as Array<{ ccte_id: number | string }>) {
+      preexisting.add(Number(r.ccte_id));
+    }
   }
 
-  return { inserted: newRows.length, updated: updRows.length };
+  // Upsert atómico por (empresa_key, ccte_id). CXC es snapshot: synced_at=runStamp
+  // en cada escritura (insert y update) para que la reconciliación posterior
+  // (synced_at < runStamp) detecte documentos cerrados.
+  const payload = unique.map((r) => ({ ...r, synced_at: runStamp, updated_at: runStamp }));
+  const { error: upErr } = await supabaseServer
+    .from("switch_estadocuenta")
+    .upsert(payload, {
+      onConflict: "empresa_key,ccte_id",
+      ignoreDuplicates: false,
+    });
+  if (upErr) throw new Error(`UPSERT estadocuenta falló: ${upErr.message}`);
+
+  let inserted = 0;
+  let updated = 0;
+  for (const r of unique) {
+    if (preexisting.has(r.ccte_id)) updated++;
+    else inserted++;
+  }
+  return { inserted, updated };
 }
 
 export async function syncEmpresaEstadoCuenta(
