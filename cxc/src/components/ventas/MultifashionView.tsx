@@ -109,9 +109,13 @@ function buildClosedYearMetaSummary(pctMeta: number): { label: string; tone: str
 
 // "▲ +1.2 pts vs 2025" — margen retail vs margenPrev retail (mismo período).
 // FASE 2.1b: switch_facturas no tiene costo → margen puede venir null.
+// Chequeo estricto con typeof+isFinite por si JSON/Next.js coacciona null→0
+// en algún path intermedio (defensa contra "0.0% / Sin cambio vs 2025" en lugar de "—").
 function buildMargenSub(margen: number | null, margenPrev: number | null, prevYear: number): string {
-  if (margen == null || margenPrev == null) return "Sin costo en la fuente";
-  const deltaPts = (margen - margenPrev) * 100;
+  const mOk = typeof margen === "number" && Number.isFinite(margen);
+  const pOk = typeof margenPrev === "number" && Number.isFinite(margenPrev);
+  if (!mOk || !pOk) return "Sin costo en la fuente";
+  const deltaPts = ((margen as number) - (margenPrev as number)) * 100;
   if (Math.abs(deltaPts) < 0.05) {
     return `Sin cambio vs ${prevYear}`;
   }
@@ -119,9 +123,11 @@ function buildMargenSub(margen: number | null, margenPrev: number | null, prevYe
   return `${sign}${Math.abs(deltaPts).toFixed(1)} pts vs ${prevYear}`;
 }
 
-// FASE 2.1b: '—' cuando margen es null (sin costo en switch_facturas).
+// FASE 2.1b: '—' cuando margen no es un número finito (null/undefined/NaN).
 function fmtMargen(margen: number | null): string {
-  return margen == null ? "—" : `${(margen * 100).toFixed(1)}%`;
+  return typeof margen === "number" && Number.isFinite(margen)
+    ? `${(margen * 100).toFixed(1)}%`
+    : "—";
 }
 
 function OverviewSubtab({
@@ -220,7 +226,10 @@ function OverviewSubtab({
             className="h-full rounded-full bg-teal-700 transition-[width] duration-300"
             style={{ width: `${Math.min(100, pctMeta * 100)}%` }}
           />
-          {/* "Esperado hoy" marker — solo aplica al año en curso. */}
+          {/* "Esperado hoy" marker — solo aplica al año en curso. Label DEBAJO
+              de la barra para no solaparse con el título "Avance vs meta anual"
+              ni con el porcentaje 27.7% a la derecha. Posición clampeada al
+              rango [8%, 92%] para que el texto no se corte en los bordes. */}
           {!isClosedYear && (
             <>
               <div
@@ -228,8 +237,12 @@ function OverviewSubtab({
                 style={{ left: `${data.expectedTodayPct * 100}%` }}
               />
               <div
-                className="absolute whitespace-nowrap font-mono text-[10px] text-stone-950"
-                style={{ top: -22, left: `${data.expectedTodayPct * 100}%`, transform: "translateX(-50%)" }}
+                className="absolute whitespace-nowrap font-mono text-[10px] text-stone-500"
+                style={{
+                  top: 12,
+                  left: `${Math.max(8, Math.min(92, data.expectedTodayPct * 100))}%`,
+                  transform: "translateX(-50%)",
+                }}
               >
                 esperado hoy · {(data.expectedTodayPct * 100).toFixed(0)}%
               </div>
@@ -241,7 +254,9 @@ function OverviewSubtab({
             {closedSummary.arrow} {closedSummary.label}
           </p>
         ) : (
-          <p className="mt-3.5 text-xs text-stone-500">
+          /* mt-7 (28px) deja espacio para el label "esperado hoy" que ahora
+             vive debajo de la barra. mt-3.5 viejo causaba overlap. */
+          <p className="mt-7 text-xs text-stone-500">
             Proyección de cierre <span className="font-mono font-medium text-stone-950 tabular-nums">{fmtMoney(proyeccion)}</span>
             {" · "}
             {proyeccion >= data.metaAnual

@@ -275,8 +275,16 @@ export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
         ) : (
           <MiniKpi
             label="MARGEN BRUTO"
-            value={totales.margen == null ? "—" : `${(totales.margen * 100).toFixed(1)}%`}
-            sub={totales.margen == null ? "sin costo en la fuente" : "utilidad / ventas"}
+            value={
+              typeof totales.margen === "number" && Number.isFinite(totales.margen)
+                ? `${(totales.margen * 100).toFixed(1)}%`
+                : "—"
+            }
+            sub={
+              typeof totales.margen === "number" && Number.isFinite(totales.margen)
+                ? "utilidad / ventas"
+                : "sin costo en la fuente"
+            }
           />
         )}
       </div>
