@@ -151,6 +151,41 @@ export interface SwitchFacturaDetalle extends SwitchFactura {
   [key: string]: unknown;
 }
 
+// ─── Estado de cuenta (CXC) ──────────────────────────────────────────────────
+
+/**
+ * Item de /apicliente/estadocuenta?clienteId=X (bajo data.estadocuenta.elements[]).
+ * Montos llegan como string ("3,616.0000") o number según el campo; parsear con
+ * parseAmount. fechaCreacion es "DD-MM-YYYY".
+ */
+export interface SwitchEstadoCuentaElement {
+  ccteId: number;
+  numeroOrden: string;
+  secuencial: string;
+  numeroFiscal: string;
+  plazoCredito: string | number;
+  total: string | number;
+  saldo: string | number;
+  tipoComprobante: string;
+  abrev: string;
+  tiporecibo: string | null;
+  /** "DD-MM-YYYY" */
+  fechaCreacion: string;
+  dias: number;
+  saldoConsecutivo: number;
+  totalOriginal: string | number;
+  saldoOriginal: string | number;
+  debito: string | number;
+  credito: string | number;
+  [key: string]: unknown;
+}
+
+export interface SwitchEstadoCuentaData {
+  estadocuenta: {
+    elements: SwitchEstadoCuentaElement[];
+  };
+}
+
 // ─── Errores ─────────────────────────────────────────────────────────────────
 
 /**

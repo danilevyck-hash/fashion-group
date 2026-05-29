@@ -6,6 +6,7 @@
     { "path": "/api/cron/cleanup-packing-lists", "schedule": "0 3 * * *" },
     { "path": "/api/cron/refresh-clientes-views", "schedule": "0 5 * * *" },
     { "path": "/api/cron/integrity-check", "schedule": "0 12 * * *" },
-    { "path": "/api/cron/multifashion-sync", "schedule": "0 5 * * *" }
+    { "path": "/api/cron/multifashion-sync", "schedule": "0 5 * * *" },
+    { "path": "/api/cron/switch-sync", "schedule": "30 5 * * *" }
   ]
 }

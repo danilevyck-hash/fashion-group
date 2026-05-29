@@ -22,11 +22,13 @@ import {
   SwitchApiResponse,
   SwitchAuthResponseData,
   SwitchClientesData,
+  SwitchEstadoCuentaData,
   SwitchFacturaDetalle,
   SwitchFacturasData,
   SwitchSucursalesData,
   SwitchVendedoresData,
 } from "./types";
+import { resolveSwitchEnvKey } from "./empresas";
 
 // ─── Errores ─────────────────────────────────────────────────────────────────
 
@@ -73,7 +75,10 @@ interface EmpresaConfig {
 }
 
 function readConfig(empresaKey: string): EmpresaConfig {
-  const upper = empresaKey.toUpperCase();
+  // Resuelve la empresa_key canónica (american_classic, vistana, ...) al
+  // namespace de env vars que armó Daniel (MULTIFASHION, VISTANA_INTERNATIONAL,
+  // ...). Acepta también un env key directo ("multifashion") por compat.
+  const upper = resolveSwitchEnvKey(empresaKey);
   const url = process.env[`SWITCH_${upper}_API_URL`];
   const user = process.env[`SWITCH_${upper}_API_USER`];
   const password = process.env[`SWITCH_${upper}_API_PASSWORD`];
@@ -337,6 +342,8 @@ export interface SwitchClient {
     porPagina: number;
     paginaActual: number;
   }): Promise<SwitchClientesData>;
+  /** Estado de cuenta (CXC) de un cliente: facturas/NC abiertas con saldo y aging. */
+  getEstadoCuenta(clienteId: number | string): Promise<SwitchEstadoCuentaData>;
   /** Limpia el token cacheado de esta empresa (fuerza re-auth en la próxima llamada). */
   clearTokenCache(): void;
 }
@@ -406,6 +413,16 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         empresaKey,
         cfg,
         `/apicliente/lista?${qs.toString()}`,
+        "GET",
+      );
+    },
+
+    async getEstadoCuenta(clienteId) {
+      const qs = new URLSearchParams({ clienteId: String(clienteId) });
+      return authedCall<SwitchEstadoCuentaData>(
+        empresaKey,
+        cfg,
+        `/apicliente/estadocuenta?${qs.toString()}`,
         "GET",
       );
     },
