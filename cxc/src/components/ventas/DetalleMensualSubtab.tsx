@@ -23,7 +23,8 @@ import { cn } from "@/lib/utils";
 interface DiaRow {
   dia: number;
   ventas: number;
-  utilidad: number;
+  /** null cuando la fuente es switch_facturas (sin costo). */
+  utilidad: number | null;
   n_tickets: number;
   ventas_mes_anterior: number;
 }
@@ -37,16 +38,19 @@ interface HeatmapDow {
 
 interface Totales {
   ventas: number;
-  utilidad: number;
+  /** null cuando la fuente es switch_facturas (sin costo). */
+  utilidad: number | null;
   n_tickets: number;
   ticket_promedio: number;
-  margen: number;
+  /** null cuando la fuente es switch_facturas (sin costo). UI → '—'. */
+  margen: number | null;
   proyeccion_cierre: number | null;
 }
 
 interface ComparativoBlock {
   ventas: number;
-  utilidad: number;
+  /** null cuando la fuente es switch_facturas (sin costo). */
+  utilidad: number | null;
   n_tickets: number;
   tiene_data: boolean;
 }
@@ -271,8 +275,8 @@ export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
         ) : (
           <MiniKpi
             label="MARGEN BRUTO"
-            value={(totales.margen * 100).toFixed(1) + "%"}
-            sub="utilidad / ventas"
+            value={totales.margen == null ? "—" : `${(totales.margen * 100).toFixed(1)}%`}
+            sub={totales.margen == null ? "sin costo en la fuente" : "utilidad / ventas"}
           />
         )}
       </div>

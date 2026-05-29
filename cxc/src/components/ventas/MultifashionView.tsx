@@ -108,13 +108,20 @@ function buildClosedYearMetaSummary(pctMeta: number): { label: string; tone: str
 }
 
 // "▲ +1.2 pts vs 2025" — margen retail vs margenPrev retail (mismo período).
-function buildMargenSub(margen: number, margenPrev: number, prevYear: number): string {
+// FASE 2.1b: switch_facturas no tiene costo → margen puede venir null.
+function buildMargenSub(margen: number | null, margenPrev: number | null, prevYear: number): string {
+  if (margen == null || margenPrev == null) return "Sin costo en la fuente";
   const deltaPts = (margen - margenPrev) * 100;
   if (Math.abs(deltaPts) < 0.05) {
     return `Sin cambio vs ${prevYear}`;
   }
   const sign = deltaPts >= 0 ? "▲ +" : "▼ ";
   return `${sign}${Math.abs(deltaPts).toFixed(1)} pts vs ${prevYear}`;
+}
+
+// FASE 2.1b: '—' cuando margen es null (sin costo en switch_facturas).
+function fmtMargen(margen: number | null): string {
+  return margen == null ? "—" : `${(margen * 100).toFixed(1)}%`;
 }
 
 function OverviewSubtab({
@@ -178,7 +185,7 @@ function OverviewSubtab({
         <RetailKpi label={`VENTAS RETAIL ${ytdSuffix}`} value={fmtMoney(retail.ytdVentas)} sub={retailYtdSub} />
         <RetailKpi label={`TICKETS RETAIL ${ytdSuffix}`} value={retail.ytdTickets.toLocaleString()} sub="boletas emitidas" />
         <RetailKpi label="TICKET PROMEDIO RETAIL" value={"$" + retail.ticketProm.toFixed(2)} sub="por boleta" />
-        <RetailKpi label="MARGEN BRUTO RETAIL" value={(retail.margen * 100).toFixed(1) + "%"} sub={margenSub} />
+        <RetailKpi label="MARGEN BRUTO RETAIL" value={fmtMargen(retail.margen)} sub={margenSub} />
       </div>
 
       {/* 3. Wholesale card (debajo de los 4 retail KPIs) */}

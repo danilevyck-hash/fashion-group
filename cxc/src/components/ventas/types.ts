@@ -272,10 +272,11 @@ export type MultifashionRetail = {
   ytdVentas: number;
   ytdTickets: number;
   ticketProm: number;
-  margen: number;
-  /** Margen retail YTD del año anterior — mismo período (mes <= p_mes).
-   *  Usado por la UI para "Δ X pts vs 2025" en el card Margen Bruto. */
-  margenPrev: number;
+  /** null cuando la fuente es switch_facturas (sin columna costo).
+   *  Frontend renderiza '—'. */
+  margen: number | null;
+  /** null cuando la fuente es switch_facturas (sin columna costo). */
+  margenPrev: number | null;
   meses: RetailMonthly[];
 };
 
