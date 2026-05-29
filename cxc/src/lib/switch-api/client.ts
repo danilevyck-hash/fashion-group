@@ -28,6 +28,7 @@ import {
   SwitchNotasCreditoData,
   SwitchNotasDebitoData,
   SwitchSucursalesData,
+  SwitchTotalVentasData,
   SwitchVendedoresData,
 } from "./types";
 import { resolveSwitchEnvKey } from "./empresas";
@@ -350,6 +351,9 @@ export interface SwitchClient {
   }): Promise<SwitchClientesData>;
   /** Estado de cuenta (CXC) de un cliente: facturas/NC abiertas con saldo y aging. */
   getEstadoCuenta(clienteId: number | string): Promise<SwitchEstadoCuentaData>;
+  /** Reporte "Total de ventas" del mes EN CURSO (tipo=03): totales diarios con
+   *  costo completo (incluye B2B). Único endpoint con costo recuperable. */
+  getReporteMesActual(): Promise<SwitchTotalVentasData>;
   /** Limpia el token cacheado de esta empresa (fuerza re-auth en la próxima llamada). */
   clearTokenCache(): void;
 }
@@ -461,6 +465,15 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         empresaKey,
         cfg,
         `/apicliente/estadocuenta?${qs.toString()}`,
+        "GET",
+      );
+    },
+
+    async getReporteMesActual() {
+      return authedCall<SwitchTotalVentasData>(
+        empresaKey,
+        cfg,
+        `/apireporte/totalventas?tipo=03`,
         "GET",
       );
     },

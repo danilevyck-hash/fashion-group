@@ -8,6 +8,7 @@
     { "path": "/api/cron/integrity-check", "schedule": "0 12 * * *" },
     { "path": "/api/cron/multifashion-sync", "schedule": "0 5 * * *" },
     { "path": "/api/cron/switch-sync?tipo=facturas", "schedule": "30 5 * * *" },
-    { "path": "/api/cron/switch-sync?tipo=estadocuenta", "schedule": "45 5 * * *" }
+    { "path": "/api/cron/switch-sync?tipo=estadocuenta", "schedule": "45 5 * * *" },
+    { "path": "/api/cron/switch-costo-diario", "schedule": "0 6 * * *" }
   ]
 }

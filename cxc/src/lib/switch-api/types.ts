@@ -191,6 +191,29 @@ export interface SwitchNotasDebitoData {
   paginacion: SwitchPaginacion;
 }
 
+// ─── Reporte Total de Ventas (costo diario) ──────────────────────────────────
+
+/**
+ * /apireporte/totalventas?tipo=03 → data.totales es un objeto keyed por día
+ * ("1".."31") con totales del mes EN CURSO. Único endpoint con costo completo
+ * (incluye B2B). fecha es "DD-MM-YYYY". Montos string con coma de miles.
+ */
+export interface SwitchTotalVentasDia {
+  total: string | number;
+  costo: string | number;
+  utilidad: string | number;
+  etiqueta: number | string;
+  fecha: string;
+}
+
+export interface SwitchTotalVentasData {
+  totales: Record<string, SwitchTotalVentasDia>;
+  totalventa: string | number;
+  totalcosto: string | number;
+  totalutilidad: string | number;
+  [key: string]: unknown;
+}
+
 // ─── Estado de cuenta (CXC) ──────────────────────────────────────────────────
 
 /**

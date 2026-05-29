@@ -22,6 +22,8 @@ import type {
 import { parseAmount, parseSwitchFecha, parseFechaDMY } from "./parse";
 import { supabaseServer } from "../supabase-server";
 
+import type { SwitchTotalVentasDia } from "./types";
+
 // ─── Tipos ───────────────────────────────────────────────────────────────────
 
 export interface EmpresaSyncResult {
@@ -641,4 +643,64 @@ export async function syncEmpresaEstadoCuenta(
     });
     throw err;
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//   COSTO DIARIO (forward) → switch_costo_diario
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface CostoDiarioResult {
+  empresaKey: EmpresaKey;
+  dias: number;
+  durationMs: number;
+}
+
+/**
+ * Sincroniza el costo/venta/utilidad diario del MES EN CURSO desde el reporte
+ * "Total de ventas" (tipo=03) → switch_costo_diario. Único endpoint con costo
+ * completo (incluye B2B). Forward-only: solo el período en curso. El cron diario
+ * re-corre y refresca todo el mes (los días que aún no ocurrieron se actualizan
+ * al pasar). UPSERT por (empresa_key, fecha).
+ */
+export async function syncCostoDiario(
+  empresaKey: EmpresaKey,
+): Promise<CostoDiarioResult> {
+  const startedAt = Date.now();
+  const client = createSwitchClient(empresaKey);
+  const data = await client.getReporteMesActual();
+  const totales = data.totales ?? {};
+
+  const nowIso = new Date().toISOString();
+  const rows: Array<{
+    empresa_key: string;
+    fecha: string;
+    venta_total: number;
+    costo_total: number;
+    utilidad_total: number;
+    synced_at: string;
+    updated_at: string;
+  }> = [];
+
+  for (const v of Object.values(totales) as SwitchTotalVentasDia[]) {
+    const fecha = parseFechaDMY(v.fecha);
+    if (!fecha) continue;
+    rows.push({
+      empresa_key: empresaKey,
+      fecha,
+      venta_total: parseAmount(v.total) ?? 0,
+      costo_total: parseAmount(v.costo) ?? 0,
+      utilidad_total: parseAmount(v.utilidad) ?? 0,
+      synced_at: nowIso,
+      updated_at: nowIso,
+    });
+  }
+
+  if (rows.length > 0) {
+    const { error } = await supabaseServer
+      .from("switch_costo_diario")
+      .upsert(rows, { onConflict: "empresa_key,fecha", ignoreDuplicates: false });
+    if (error) throw new Error(`UPSERT costo_diario falló: ${error.message}`);
+  }
+
+  return { empresaKey, dias: rows.length, durationMs: Date.now() - startedAt };
 }
