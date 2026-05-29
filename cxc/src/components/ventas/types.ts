@@ -134,6 +134,11 @@ export type VentasResumen = {
    *  (mismo offset desde el inicio del mes que fecha_corte). null
    *  cuando se mira un año cerrado. */
   dia_corte_anio_anterior: string | null;
+  /** ISO timestamp. MAX(synced_at) de switch_facturas — momento del último
+   *  sync que insertó data nueva. Lo usa el subtitle "Data actualizada al
+   *  ..." para mostrar frescura real (no la fecha de hoy). null si
+   *  switch_facturas está vacío. */
+  data_actualizada_at: string | null;
   /** Proyección de cierre del año actual (por empresa + grupo). null si
    *  la RPC falló o el año seleccionado no tiene data. */
   proyeccion: ProyeccionResp | null;

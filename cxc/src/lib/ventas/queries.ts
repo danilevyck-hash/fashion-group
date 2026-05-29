@@ -56,7 +56,7 @@ function buildEmpresa(key: string): Empresa {
  * construye el shape VentasResumen mapeando empresa key → ventas_id.
  */
 export async function fetchVentasResumen({ year }: { year: number }): Promise<VentasResumen> {
-  const [curRes, prevRes, metaRes, proyRes] = await Promise.all([
+  const [curRes, prevRes, metaRes, proyRes, syncedRes] = await Promise.all([
     supabaseServer.rpc("ventas_dashboard_summary", { p_anio: year }),
     // Prev year usa same-period day-by-day: el mes que está en curso en
     // el calendario actual se recorta al mismo offset de días en el año
@@ -71,6 +71,11 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // vs 2025 cierre), la meta queda como referencia en /ventas/metas.
     // FASE 2.1: migrado a v6 (lee switch_ventas_unificado_vw, base subtotal pre-impuesto).
     supabaseServer.rpc("ventas_proyeccion_cierre_v6", { p_anio: year }),
+    // FASE 2.1b: MAX(synced_at) de switch_facturas — momento del último sync
+    // que insertó data nueva. Alimenta el subtitle "Data actualizada al ..."
+    // para mostrar frescura real (no la fecha de hoy). Graceful: si falla,
+    // el subtitle cae a fecha_corte (lógica vieja) vía null.
+    supabaseServer.from("switch_facturas").select("synced_at").order("synced_at", { ascending: false }).limit(1),
   ]);
 
   if (curRes.error)  throw new Error(`ventas_dashboard_summary(${year}): ${curRes.error.message}`);
@@ -203,6 +208,10 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     proyeccion = proyRes.data as ProyeccionResp;
   }
 
+  // FASE 2.1b: último sync real (MAX synced_at) — para subtitle "Data actualizada al ..."
+  const syncedRow = (syncedRes.data as Array<{ synced_at: string }> | null) ?? [];
+  const dataActualizadaAt = syncedRow[0]?.synced_at ?? null;
+
   return {
     year,
     mesActual,
@@ -220,6 +229,7 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     es_periodo_parcial:      prevPayload.es_periodo_parcial,
     fecha_corte:             prevPayload.fecha_corte,
     dia_corte_anio_anterior: prevPayload.dia_corte_anio_anterior,
+    data_actualizada_at:     dataActualizadaAt,
     proyeccion,
   };
 }

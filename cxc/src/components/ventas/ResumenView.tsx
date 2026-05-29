@@ -1105,14 +1105,25 @@ function deltaTextTone(delta: number | null, mode: "pct" | "pts" = "pct"): strin
   return "text-stone-500";
 }
 
-// Pill arriba: "Data actualizada al sábado 9 de mayo 2026"
-// Fuente: data.fecha_corte (mismo origen que el footer al pie de la tabla).
+// Pill arriba: "Data actualizada al 29 may 2026, 12:00 a. m."
+// FASE 2.1b: fuente = data.data_actualizada_at (MAX synced_at de switch_facturas
+// = momento del último sync que insertó data nueva), formateado en TZ Panamá
+// con fecha + hora. Antes usaba data.fecha_corte (solo día) lo que confundía:
+// durante el día parecía haber un gap vs el panel que en realidad era lag de sync.
 function buildDatePillLabel(data: VentasResumen): string | null {
-  if (!data.fecha_corte) return null;
-  const d = parseIsoDateResumen(data.fecha_corte);
-  const weekday = new Intl.DateTimeFormat("es-PA", { weekday: "long" }).format(d);
-  const month = new Intl.DateTimeFormat("es-PA", { month: "long" }).format(d);
-  return `Data actualizada al ${weekday} ${d.getDate()} de ${month} ${d.getFullYear()}`;
+  if (!data.data_actualizada_at) return null;
+  const d = new Date(data.data_actualizada_at);
+  if (Number.isNaN(d.getTime())) return null;
+  const fmt = new Intl.DateTimeFormat("es-PA", {
+    timeZone: "America/Panama",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  return `Data actualizada al ${fmt.format(d)}`;
 }
 
 // Rango formateado del prev YTD para el tooltip de Total: "1 ene – 9 may 2025"
