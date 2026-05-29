@@ -17,11 +17,26 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- ── 1. Ventas unificadas (empresa_key, mes, ventas_netas) ────────────────────
--- switch_ventas_netas_vw cubre >= 2025-05 (validado al centavo vs panel);
--- ventas_raw cubre < 2025-05.
+-- BASE CONTABLE: post-descuento PRE-IMPUESTO (subtotal), igual que la versión
+-- vieja de ventas_dashboard_summary (SUM(subtotal) de ventas_raw). NO usamos
+-- switch_ventas_netas_vw (que es total CON ITBMS, base del panel) para no
+-- inflar ~7% los números y no romper los YoY al migrar.
+--   - switch_facturas.subtotal_descuento = ventas_raw.subtotal (match exacto:
+--     FW nov 2025 ambos = 769,292.75). Fórmula contable: positivos − NC.
+--   - switch cubre >= 2025-05; ventas_raw cubre < 2025-05.
 CREATE OR REPLACE VIEW switch_ventas_unificado_vw AS
-  SELECT empresa_key, mes, ventas_netas
-  FROM switch_ventas_netas_vw
+  SELECT
+    empresa_key,
+    date_trunc('month', fecha)::date AS mes,
+    COALESCE(SUM(subtotal_descuento) FILTER (
+      WHERE tipo_comprobante IN ('Factura', 'Tiquete', 'Transacción', 'Nota de Débito')
+    ), 0)
+    - COALESCE(SUM(subtotal_descuento) FILTER (
+      WHERE tipo_comprobante = 'Nota de Crédito'
+    ), 0) AS ventas_netas
+  FROM switch_facturas
+  WHERE fecha >= DATE '2025-05-01'
+  GROUP BY 1, 2
 UNION ALL
   SELECT
     CASE
@@ -30,7 +45,7 @@ UNION ALL
       ELSE empresa
     END AS empresa_key,
     make_date(anio, mes, 1) AS mes,
-    SUM(total)::numeric AS ventas_netas
+    SUM(subtotal)::numeric AS ventas_netas
   FROM ventas_raw
   WHERE make_date(anio, mes, 1) < DATE '2025-05-01'
   GROUP BY 1, 2;

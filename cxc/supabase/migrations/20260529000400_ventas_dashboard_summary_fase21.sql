@@ -6,24 +6,22 @@
 -- total_subtotal, total_costo, total_utilidad, total_facturado, filas) → el
 -- frontend (src/lib/ventas/queries.ts) no cambia.
 --
--- Cambios de semántica (intencionales, validados contra el panel oficial):
---   - total_subtotal ahora = ventas NETAS (neto con impuesto: F+T+Tr+ND − NC),
---     no el subtotal pre-impuesto de antes. Es la cifra que cuadra con el panel.
+-- Base contable PRESERVADA: post-descuento pre-impuesto (igual que la versión
+-- vieja SUM(subtotal) de ventas_raw). switch_ventas_unificado_vw usa
+-- subtotal_descuento de switch_facturas (= ventas_raw.subtotal, match exacto),
+-- así los YoY NO se inflan al migrar.
+--   - total_subtotal = ventas netas pre-impuesto (F+T+Tr+ND − NC).
 --   - total_costo = switch_costo_diario (>= 2026-05) / ventas_raw (< 2026-05).
---   - total_utilidad = ventas_netas − costo (en query time, no almacenado).
+--   - total_utilidad = ventas − costo (query time). margen = util/ventas.
 --   - empresa = empresa_key canónica (vistana, confecciones_boston, ...).
 --   - filas ya no es COUNT real (el frontend no lo usa); se deja en 0.
 --
--- Validación: Fashion Wear mayo 2026 → ventas 700,628.45 / costo 447,442.61 /
--- utilidad 253,185.84 / margen 36.1% (cuadra con panel).
+-- Validación (base pre-impuesto, cuadra con el reporte "Total de ventas" del panel):
+--   Fashion Wear mayo 2026 → ventas 663,277.11 / costo 447,442.61 /
+--   utilidad 215,834.50 / margen 32.5%.
 --
--- ⚠ Aplicar JUNTO con la migración de ventas_dashboard_prev_same_period (fase
---   2.1, pendiente): este RPC pasa el año en curso a base neto-con-impuesto;
---   si el comparativo de año anterior sigue en ventas_raw (subtotal pre-impuesto)
---   los deltas YoY del heatmap quedan inflados ~7% (el impuesto). Ambos deben
---   migrar a la vez.
---
--- Aplicar manual en Supabase Dashboard → SQL Editor (después de las vistas unificadas).
+-- Aplicar JUNTO con prev_same_period v2 (migration 500) y proyeccion_cierre_v6
+-- (600) — todas usan la misma base unificada. Aplicar después de las vistas (300).
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION ventas_dashboard_summary(p_anio int)

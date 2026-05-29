@@ -69,7 +69,8 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // cierre_anio_anterior + delta_vs_anio_anterior por empresa y grupo.
     // El hero del Resumen muestra realidad vs realidad (2026 proyectado
     // vs 2025 cierre), la meta queda como referencia en /ventas/metas.
-    supabaseServer.rpc("ventas_proyeccion_cierre_v5", { p_anio: year }),
+    // FASE 2.1: migrado a v6 (lee switch_ventas_unificado_vw, base subtotal pre-impuesto).
+    supabaseServer.rpc("ventas_proyeccion_cierre_v6", { p_anio: year }),
   ]);
 
   if (curRes.error)  throw new Error(`ventas_dashboard_summary(${year}): ${curRes.error.message}`);
