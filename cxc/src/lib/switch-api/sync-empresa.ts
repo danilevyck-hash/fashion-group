@@ -170,8 +170,31 @@ interface FacturaRow {
 }
 
 type FacturaMapResult =
-  | { ok: true; row: FacturaRow }
+  | { ok: true; row: FacturaRow; warnings?: SkipDetail[] }
   | { ok: false; skip: SkipDetail };
+
+/**
+ * parseAmount para campos OPCIONALES (descuento/impuesto/saldo). Distingue:
+ *   - ausente (null/undefined/""): 0 legítimo, sin warning.
+ *   - presente pero NO parseable: 0 + warning en `warnings` (no skipea la fila,
+ *     pero deja rastro en switch_sync_log.skip_details). 🟡-10: antes
+ *     `parseAmount(x) ?? 0` convertía un valor corrupto en 0 sin registro.
+ */
+function parseOptionalAmount(
+  raw: string | number | null | undefined,
+  campo: string,
+  facturaId: number | string | null,
+  secuencial: string | null,
+  warnings: SkipDetail[],
+): number {
+  if (raw == null || String(raw).trim() === "") return 0;
+  const n = parseAmount(raw);
+  if (n === null) {
+    warnings.push({ facturaId, secuencial, campo: `${campo}_malformado_default_0`, valorCrudo: raw });
+    return 0;
+  }
+  return n;
+}
 
 function mapFactura(empresaKey: string, f: SwitchFactura): FacturaMapResult {
   const facturaId = f && (typeof f.id === "number" || typeof f.id === "string") ? f.id : null;
@@ -191,8 +214,10 @@ function mapFactura(empresaKey: string, f: SwitchFactura): FacturaMapResult {
   const subtotalDescuento = parseAmount(f.subTotalDescuento);
   if (subtotalDescuento === null) return { ok: false, skip: { facturaId, secuencial, campo: "subTotalDescuento", valorCrudo: f.subTotalDescuento } };
 
+  const warnings: SkipDetail[] = [];
   return {
     ok: true,
+    warnings,
     row: {
       empresa_key: empresaKey,
       switch_factura_id: Number(f.id),
@@ -200,11 +225,11 @@ function mapFactura(empresaKey: string, f: SwitchFactura): FacturaMapResult {
       tipo_comprobante: f.tipoComprobante,
       fecha: fechaIso,
       subtotal,
-      descuento: parseAmount(f.descuento) ?? 0,
+      descuento: parseOptionalAmount(f.descuento, "descuento", facturaId, secuencial, warnings),
       subtotal_descuento: subtotalDescuento,
-      impuesto: parseAmount(f.impuesto) ?? 0,
+      impuesto: parseOptionalAmount(f.impuesto, "impuesto", facturaId, secuencial, warnings),
       total,
-      saldo: parseAmount(f.saldo) ?? 0,
+      saldo: parseOptionalAmount(f.saldo, "saldo", facturaId, secuencial, warnings),
       condicion_venta: f.condicionVenta ?? null,
       cliente_switch_id: typeof f.clienteId === "number" ? f.clienteId : null,
       cliente_nombre: f.cliente ?? null,
@@ -246,8 +271,10 @@ function mapNota(
   const subtotalDescuento = parseAmount(n.subTotalDescuento);
   if (subtotalDescuento === null) return { ok: false, skip: { facturaId, secuencial, campo: "subTotalDescuento", valorCrudo: n.subTotalDescuento } };
 
+  const warnings: SkipDetail[] = [];
   return {
     ok: true,
+    warnings,
     row: {
       empresa_key: empresaKey,
       switch_factura_id: Number(n.id),
@@ -255,11 +282,11 @@ function mapNota(
       tipo_comprobante: tipo,
       fecha: fechaIso,
       subtotal: Math.abs(subtotal),
-      descuento: Math.abs(parseAmount(n.descuento) ?? 0),
+      descuento: Math.abs(parseOptionalAmount(n.descuento, "descuento", facturaId, secuencial, warnings)),
       subtotal_descuento: Math.abs(subtotalDescuento),
-      impuesto: Math.abs(parseAmount(n.impuesto) ?? 0),
+      impuesto: Math.abs(parseOptionalAmount(n.impuesto, "impuesto", facturaId, secuencial, warnings)),
       total: Math.abs(total),
-      saldo: Math.abs(parseAmount(n.saldo) ?? 0),
+      saldo: Math.abs(parseOptionalAmount(n.saldo, "saldo", facturaId, secuencial, warnings)),
       condicion_venta: null,
       cliente_switch_id: typeof n.clienteId === "number" ? n.clienteId : null,
       cliente_nombre: n.cliente ?? null,
@@ -381,6 +408,16 @@ export async function syncEmpresaFacturas(
               `[sync ${empresaKey} ${label}] SKIP id=${res.skip.facturaId} sec=${res.skip.secuencial} campo=${res.skip.campo} valorCrudo=${JSON.stringify(res.skip.valorCrudo)}`,
             );
             continue;
+          }
+          // 🟡-10: campos opcionales malformados → la fila se guarda (con 0) pero
+          // el anómalo queda visible en skip_details. No incrementa `skipped`.
+          if (res.warnings && res.warnings.length > 0) {
+            for (const w of res.warnings) {
+              skipDetails.push(w);
+              console.warn(
+                `[sync ${empresaKey} ${label}] CAMPO MALFORMADO id=${w.facturaId} campo=${w.campo} valorCrudo=${JSON.stringify(w.valorCrudo)}`,
+              );
+            }
           }
           buffer.push(res.row);
         }
