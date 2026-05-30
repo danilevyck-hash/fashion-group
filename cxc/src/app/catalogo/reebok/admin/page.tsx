@@ -604,6 +604,13 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
     Object.entries(fm).forEach(([idx, field]) => {
       const v = cols[parseInt(idx)] || ''; if (!v) return
       if (field === 'price') { const n = parseFloat(v.replace(/[^0-9.,]/g, '').replace(',', '.')); p[field] = isNaN(n) ? undefined : n }
+      // ⚠️ BUG CONOCIDO (no arreglado aún, scope aparte — ver src/lib/reebok-gender.ts):
+      // `x.includes('male')` se evalúa ANTES que la rama de mujer, y "female"
+      // CONTIENE "male" (f-e-male). Resultado: un CSV con género "female" se guarda
+      // como 'male' → productos de mujer terminan bajo Hombre. El orden correcto
+      // sería chequear 'female'/'mujer' ANTES que 'male', o usar normalizeGender().
+      // El fix del importador + re-corrida del CSV va en commit separado (requiere
+      // re-importar la data ya mal guardada).
       else if (field === 'gender') { const x = v.toLowerCase(); p[field] = x.includes('hombre') || x.includes('male') || x === 'm' ? 'male' : x.includes('mujer') || x.includes('female') || x === 'f' ? 'female' : x.includes('nino') || x.includes('kid') ? 'kids' : x.includes('unisex') ? 'unisex' : v }
       else if (field === 'category') { const x = v.toLowerCase(); p[field] = x.includes('foot') || x.includes('calzado') ? 'footwear' : x.includes('apparel') || x.includes('ropa') ? 'apparel' : x.includes('acces') ? 'accessories' : v || 'footwear' }
       else if (field === 'quantity') p[field] = parseInt(v) || 0

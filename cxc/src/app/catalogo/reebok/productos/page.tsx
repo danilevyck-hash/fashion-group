@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Product } from "@/components/reebok/supabase";
 import { getBultoSize } from "@/lib/reebok-bulto";
+import { matchesGenderFilter, genderGroupKey, genderGroupLabel, genderGroupOrder, genderFilterLabel } from "@/lib/reebok-gender";
 import NewOrderModal from "@/components/reebok/NewOrderModal";
 import { Toast } from "@/components/ui";
 import CatalogHeader from "@/components/reebok/CatalogHeader";
@@ -239,13 +240,11 @@ function Productos() {
 
   // ── Derived state ──
   const catOrder: Record<string, number> = { footwear: 0, apparel: 1, accessories: 2 };
-  const genOrder: Record<string, number> = { male: 0, female: 1, kids: 2, unisex: 3 };
   const catLabel: Record<string, string> = { footwear: "Calzado", apparel: "Ropa", accessories: "Accesorios" };
-  const genLabel: Record<string, string> = { male: "Hombre", female: "Mujer", kids: "Ninos", unisex: "Unisex" };
 
   const filtered = products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
-    .filter(p => !gender || p.gender === gender)
+    .filter(p => matchesGenderFilter(p.gender, gender))
     .filter(p => !category || p.category === category)
     .filter(p => !saleFilter || p.badge === saleFilter)
     .sort((a, b) => {
@@ -254,7 +253,7 @@ function Productos() {
       if (sortBy === "nombre-az") return a.name.localeCompare(b.name);
       const ca = catOrder[a.category] ?? 9, cb = catOrder[b.category] ?? 9;
       if (ca !== cb) return ca - cb;
-      const ga = genOrder[a.gender || "unisex"] ?? 9, gb = genOrder[b.gender || "unisex"] ?? 9;
+      const ga = genderGroupOrder(a.gender), gb = genderGroupOrder(b.gender);
       if (ga !== gb) return ga - gb;
       return a.name.localeCompare(b.name);
     });
@@ -266,9 +265,9 @@ function Productos() {
   const groups: Group[] = [];
   let lastKey = "";
   for (const p of filtered) {
-    const key = `${p.category}|${p.gender || "unisex"}`;
+    const key = `${p.category}|${genderGroupKey(p.gender)}`;
     if (key !== lastKey) {
-      groups.push({ label: `${catLabel[p.category] || p.category} — ${genLabel[p.gender || "unisex"] || p.gender}`, items: [] });
+      groups.push({ label: `${catLabel[p.category] || p.category} — ${genderGroupLabel(p.gender)}`, items: [] });
       lastKey = key;
     }
     groups[groups.length - 1].items.push(p);
@@ -427,7 +426,7 @@ function Productos() {
       y += 5;
 
       const filterDesc: string[] = [];
-      if (gender) filterDesc.push(genLabel[gender] || gender);
+      if (gender) filterDesc.push(genderFilterLabel(gender));
       if (category) filterDesc.push(catLabel[category] || category);
       if (saleFilter === "oferta") filterDesc.push("Oferta");
       if (saleFilter === "nuevo") filterDesc.push("Nuevo");
@@ -439,15 +438,19 @@ function Productos() {
       doc.text(subtitle.toUpperCase(), M, y);
       y += 8;
 
+      // Agrupaci\u00f3n can\u00f3nica (women+female \u2192 Mujer; unisex propio). "otros" cierra
+      // el catch-all para que ning\u00fan producto con g\u00e9nero no contemplado se caiga
+      // del PDF en silencio.
       const genders = [
-        { key: "male", label: "HOMBRE" },
-        { key: "female", label: "MUJER" },
-        { key: "kids", label: "NI\u00d1OS" },
+        { key: "hombre", label: "HOMBRE" },
+        { key: "mujer", label: "MUJER" },
+        { key: "ninos", label: "NI\u00d1OS" },
         { key: "unisex", label: "UNISEX" },
+        { key: "otros", label: "OTROS" },
       ];
 
       for (const g of genders) {
-        const gItems = items.filter(p => (p.gender || "unisex") === g.key);
+        const gItems = items.filter(p => genderGroupKey(p.gender) === g.key);
         if (!gItems.length) continue;
         needPage(GENDER_H + CH);
         doc.setFillColor(...NAVY);

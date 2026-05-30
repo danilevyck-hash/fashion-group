@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { Product } from "@/components/reebok/supabase";
 import { getBultoSize } from "@/lib/reebok-bulto";
+import { matchesGenderFilter, genderGroupKey, genderGroupLabel, genderGroupOrder } from "@/lib/reebok-gender";
 import { Toast } from "@/components/ui";
 import CatalogHeader from "@/components/reebok/CatalogHeader";
 import CatalogFilters, { SaleFilter } from "@/components/reebok/CatalogFilters";
@@ -135,13 +136,11 @@ function PublicCatalog() {
 
   // Derived state
   const catOrder: Record<string, number> = { footwear: 0, apparel: 1, accessories: 2 };
-  const genOrder: Record<string, number> = { male: 0, female: 1, kids: 2, unisex: 3 };
   const catLabel: Record<string, string> = { footwear: "Calzado", apparel: "Ropa", accessories: "Accesorios" };
-  const genLabel: Record<string, string> = { male: "Hombre", female: "Mujer", kids: "Ninos", unisex: "Unisex" };
 
   const filtered = products
     .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || "").toLowerCase().includes(search.toLowerCase()) || (p.color || "").toLowerCase().includes(search.toLowerCase()))
-    .filter(p => !gender || p.gender === gender)
+    .filter(p => matchesGenderFilter(p.gender, gender))
     .filter(p => !category || p.category === category)
     .filter(p => !saleFilter || p.badge === saleFilter)
     .sort((a, b) => {
@@ -150,7 +149,7 @@ function PublicCatalog() {
       if (sortBy === "nombre-az") return a.name.localeCompare(b.name);
       const ca = catOrder[a.category] ?? 9, cb = catOrder[b.category] ?? 9;
       if (ca !== cb) return ca - cb;
-      const ga = genOrder[a.gender || "unisex"] ?? 9, gb = genOrder[b.gender || "unisex"] ?? 9;
+      const ga = genderGroupOrder(a.gender), gb = genderGroupOrder(b.gender);
       if (ga !== gb) return ga - gb;
       return a.name.localeCompare(b.name);
     });
@@ -162,9 +161,9 @@ function PublicCatalog() {
   const groups: Group[] = [];
   let lastKey = "";
   for (const p of filtered) {
-    const key = `${p.category}|${p.gender || "unisex"}`;
+    const key = `${p.category}|${genderGroupKey(p.gender)}`;
     if (key !== lastKey) {
-      groups.push({ label: `${catLabel[p.category] || p.category} — ${genLabel[p.gender || "unisex"] || p.gender}`, items: [] });
+      groups.push({ label: `${catLabel[p.category] || p.category} — ${genderGroupLabel(p.gender)}`, items: [] });
       lastKey = key;
     }
     groups[groups.length - 1].items.push(p);
