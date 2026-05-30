@@ -175,6 +175,14 @@ function extractCode(parsed: unknown): string | null {
   if (!parsed || typeof parsed !== "object") return null;
   const p = parsed as Record<string, unknown>;
   if (typeof p.code === "string") return p.code;
+  // Switch entrega los errores como { error: { code, message, http_code } }
+  // (verificado en vivo: token inválido → {"error":{"code":"0011",...}}). Sin
+  // leer error.code, el código de error quedaba invisible en respuestas que no
+  // fueran 401/403 — incluido el caso "200 con error en el body".
+  if (p.error && typeof p.error === "object") {
+    const e = p.error as Record<string, unknown>;
+    if (typeof e.code === "string") return e.code;
+  }
   if (p.data && typeof p.data === "object") {
     const d = p.data as Record<string, unknown>;
     if (typeof d.code === "string") return d.code;
@@ -186,6 +194,10 @@ function extractMessage(parsed: unknown, fallback: string): string {
   if (!parsed || typeof parsed !== "object") return fallback;
   const p = parsed as Record<string, unknown>;
   if (typeof p.message === "string") return p.message;
+  if (p.error && typeof p.error === "object") {
+    const e = p.error as Record<string, unknown>;
+    if (typeof e.message === "string") return e.message;
+  }
   if (p.data && typeof p.data === "object") {
     const d = p.data as Record<string, unknown>;
     if (typeof d.message === "string") return d.message;

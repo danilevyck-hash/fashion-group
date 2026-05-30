@@ -252,8 +252,15 @@ export interface SwitchEstadoCuentaData {
 // ─── Errores ─────────────────────────────────────────────────────────────────
 
 /**
- * Códigos conocidos de Switch que requieren re-auth:
- *  - "0005" TOKEN EXPIRADO
- *  - "0011" TOKEN INVALIDO
+ * Códigos conocidos de Switch que requieren re-auth. Verificados en vivo
+ * (2026-05-30) probando la API real — el envelope de error es
+ * { error: { code, message, http_code } }:
+ *  - "0005" TOKEN EXPIRADO        (documentado)
+ *  - "0008" NO SE HA ENCONTRADO UN TOKEN VALIDO  (token ausente → re-auth)
+ *  - "0011" TOKEN INVALIDO        (verificado: token basura → HTTP 401 code 0011)
+ *
+ * NOTA: el code "0006" NO existe para token (auditoría 🟡-9). Los token-errors
+ * llegan en HTTP 401, que el cliente ya re-autentica por fallback aunque el code
+ * no esté en este set; el set importa para el caso "HTTP 200 con error en body".
  */
-export const SWITCH_TOKEN_ERROR_CODES = new Set(["0005", "0011"]);
+export const SWITCH_TOKEN_ERROR_CODES = new Set(["0005", "0008", "0011"]);
