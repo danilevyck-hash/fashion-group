@@ -54,7 +54,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   }
 
   let query = supabaseServer
-    .from("cxc_aging")
+    .from("switch_estadocuenta_aging")
     .select("d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365")
     .eq("codigo", codigo);
 
