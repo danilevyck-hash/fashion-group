@@ -73,6 +73,13 @@ interface TicketInsertRow {
 function parseSwitchFecha(s: string): string | null {
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
   if (!m) return null;
+  // Rechazar zero-dates ("0000-00-00 00:00:00") y componentes imposibles: el
+  // regex los acepta y generaría una fecha basura ("0000-00-00T..."). El caller
+  // las trata como null → skip + skipDetails (no se guardan).
+  const anio = Number(m[1]);
+  const mes = Number(m[2]);
+  const dia = Number(m[3]);
+  if (anio < 2000 || mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
   return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}-05:00`;
 }
 
