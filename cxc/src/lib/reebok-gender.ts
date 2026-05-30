@@ -3,54 +3,69 @@
  *
  * La data cruda (tabla `products`) guarda valores heterogéneos del CSV/forma:
  *   unisex, male, women, female, kids  (verificado 2026-05-30, 218 filas).
- * OJO: hay DOS valores para mujer — `women` (48) y `female` (8) — y `unisex`.
  *
- * El filtro de la UI (CatalogFilters) usa botones con valores male/female/kids.
- * Mapeo deseado (cara al cliente):
- *   Hombre (male)  → male  + unisex
- *   Mujer  (female)→ women + female + unisex
- *   Niños  (kids)  → kids
- *   Todos  ("")    → todo
+ * MAPEO FINAL:
+ *   Hombre → male, men, hombre, unisex
+ *   Mujer  → women, female, mujer, dama   (SIN unisex)
+ *   Niños  → kids, niño/nino, junior
+ *   Todos  → todo
  *
- * REGLA: case-insensitive + trim. Un valor crudo NO contemplado NO se asigna a
- * ningún grupo por defecto — se loguea (console.warn, una vez por valor) para
- * detectarlo, igual que la lección del bug de clasificación previo.
+ * Matching robusto: case-insensitive, SIN acentos (se normalizan tildes), y por
+ * RAÍZ/INCLUSIÓN — así "Niño", "NINOS", "niños", "Women", "DAMA" caen en su grupo
+ * sin enumerar cada forma. El ORDEN importa: Mujer se evalúa ANTES que Hombre para
+ * que "female" (que contiene "male") y "women" (que contiene "men") no caigan en
+ * Hombre. unisex es su propio grupo; sale de Mujer y queda solo en Hombre (lo
+ * decide matchesGenderFilter).
+ *
+ * REGLA: un valor crudo que NO cae en ningún grupo NO se asigna por defecto —
+ * se loguea (console.warn, una vez por valor) para detectarlo.
  */
 
 export type GenderGroup = "hombre" | "mujer" | "ninos" | "unisex";
 
-// Alias crudo (lowercase) → grupo canónico. Robusto a variantes esperables.
-const ALIASES: Record<string, GenderGroup> = {
-  male: "hombre", men: "hombre", man: "hombre", mens: "hombre", hombre: "hombre", h: "hombre", m: "hombre",
-  female: "mujer", women: "mujer", woman: "mujer", womens: "mujer", "women's": "mujer", mujer: "mujer", dama: "mujer", w: "mujer", f: "mujer",
-  kids: "ninos", kid: "ninos", ninos: "ninos", "niños": "ninos", nino: "ninos", "niño": "ninos", ninas: "ninos", child: "ninos", children: "ninos", boys: "ninos", girls: "ninos", junior: "ninos", infant: "ninos",
-  unisex: "unisex", uni: "unisex",
-};
+// Raíces por grupo, en ORDEN de evaluación (Mujer y Niños antes que Hombre para
+// resolver las colisiones de inclusión female⊃male y women⊃men).
+const GROUP_ROOTS: Array<{ group: GenderGroup; roots: string[] }> = [
+  { group: "mujer", roots: ["wom", "female", "mujer", "dama"] },
+  { group: "ninos", roots: ["nino", "kid", "junior"] },
+  { group: "hombre", roots: ["male", "men", "hombre"] },
+  { group: "unisex", roots: ["unisex"] },
+];
 
 const _warned = new Set<string>();
+
+/** lowercase + trim + colapsa espacios + quita tildes (NFD). */
+function canonical(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "") // quita marcas diacriticas (tildes; n-tilde -> n)
+    .replace(/\s+/g, " ");
+}
 
 /** Normaliza un valor crudo de género a su grupo canónico, o null si no se contempla. */
 export function normalizeGender(raw: string | null | undefined): GenderGroup | null {
   if (raw == null) return null;
-  const key = String(raw).trim().toLowerCase().replace(/\s+/g, " ");
+  const key = canonical(String(raw));
   if (key === "") return null;
-  const g = ALIASES[key];
-  if (!g) {
-    if (!_warned.has(key)) {
-      _warned.add(key);
-      console.warn(
-        `[reebok-gender] valor de género NO contemplado: ${JSON.stringify(raw)} — no se asigna a ningún grupo. Agregar el alias en src/lib/reebok-gender.ts`,
-      );
-    }
-    return null;
+  for (const { group, roots } of GROUP_ROOTS) {
+    if (roots.some(r => key.includes(r))) return group;
   }
-  return g;
+  if (!_warned.has(key)) {
+    _warned.add(key);
+    console.warn(
+      `[reebok-gender] valor de género NO contemplado: ${JSON.stringify(raw)} — no se asigna a ningún grupo. Agregar la raíz en src/lib/reebok-gender.ts`,
+    );
+  }
+  return null;
 }
 
 // Valor del botón de filtro (CatalogFilters) → grupos canónicos que debe mostrar.
+// unisex solo en Hombre; Mujer NO incluye unisex.
 const FILTER_TO_GROUPS: Record<string, GenderGroup[]> = {
   male: ["hombre", "unisex"],
-  female: ["mujer", "unisex"],
+  female: ["mujer"],
   kids: ["ninos"],
 };
 
