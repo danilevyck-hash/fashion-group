@@ -121,8 +121,10 @@ export async function generateReebokOrderPdf(cart: OrderItem[]): Promise<void> {
         item.sku || "-",
         item.name,
         qtyLabel,
-        `$${fmtMoney(item.unit_price)}`,
-        `$${fmtMoney(lineTotal)}`,
+        // Precio unitario = protagonista (negrita, navy, mayor)
+        { content: `$${fmtMoney(item.unit_price)}`, styles: { fontStyle: "bold" as const, fontSize: 9, textColor: NAVY_RGB } },
+        // Total del bulto = secundario (menor, gris)
+        { content: `$${fmtMoney(lineTotal)}`, styles: { fontSize: 7, textColor: GRAY_TEXT } },
       ];
     });
   }
