@@ -418,6 +418,40 @@ async function checkCxcUploadsZombie(): Promise<CheckResult> {
   };
 }
 
+// CHECK 10: tipos de comprobante fuera de las whitelists de signo del aging
+// (🔴-4). switch_estadocuenta_aging trata desconocido/NULL como neutral (0) para
+// no inflar CXC; esta vista de vigilancia expone cualquier tipo nuevo. Si tiene
+// saldo<>0 está distorsionando CXC (subcuenta un débito o ignora un crédito) →
+// critical para clasificarlo ya. Sin saldo = warning (apareció pero aún no pesa).
+async function checkAgingTiposSinClasificar(): Promise<CheckResult> {
+  const { data, error } = await supabaseServer
+    .from("switch_estadocuenta_tipos_sin_clasificar")
+    .select("empresa_key, tipo_comprobante, filas, filas_con_saldo, suma_saldo");
+
+  if (error) {
+    return checkError("aging_tipos_sin_clasificar", "switch_estadocuenta", error.message);
+  }
+
+  const rows = data ?? [];
+  const conSaldo = rows.filter(r => Number(r.filas_con_saldo) > 0);
+  const count = rows.length;
+  const severity: Severity = conSaldo.length > 0 ? "critical" : count > 0 ? "warning" : "ok";
+
+  return {
+    check_name: "aging_tipos_sin_clasificar",
+    table_name: "switch_estadocuenta",
+    severity,
+    rows_affected: count,
+    threshold_exceeded: count > 0,
+    details: {
+      sample: rows.slice(0, 20),
+      con_saldo: conSaldo.slice(0, 20),
+      hint: "tipo_comprobante fuera de las whitelists de signo de switch_estadocuenta_aging. Clasificarlo (crédito vs débito) en una migration nueva. saldo<>0 = ya distorsiona CXC.",
+      threshold: { warning: "tipo nuevo sin saldo", critical: "tipo nuevo con saldo<>0" },
+    },
+  };
+}
+
 // ── Error wrapper ────────────────────────────────────────────────────────────
 
 // Un check que no puede correr (query falló, schema cambió) NO debe alertar
@@ -448,6 +482,7 @@ export async function runAllChecks(): Promise<CheckResult[]> {
     checkLastUploadAge(),
     checkCxcSinVentaCorrespondiente(),
     checkCxcUploadsZombie(),
+    checkAgingTiposSinClasificar(),
   ]);
 
   // checkLastUploadAge devuelve un array de 2 — el resto devuelve uno solo.
