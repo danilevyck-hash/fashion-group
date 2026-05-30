@@ -66,6 +66,14 @@ interface TokenEntry {
   expiresAt: number;
 }
 
+// 🟢-17 (auditoría del sync): decisión deliberada de NO persistir el token fuera
+// del proceso (ej. tabla con expiry). El cache en memoria ya evita re-auths
+// DENTRO de un run (1 auth por empresa, reusada en todas sus páginas) — el 99%
+// del costo. Persistir solo ahorraría 1 POST liviano por empresa por cold start,
+// y como los crons corren ~1×/día (>55min entre corridas) un token persistido
+// casi siempre estaría expirado al arrancar → re-auth igual (hit-rate ≈ 0). No
+// compensa la complejidad ni el riesgo de guardar un JWT de sesión en reposo.
+// Reconsiderar solo si el sync pasa a correr muchas veces por hora.
 const tokenCache = new Map<string, TokenEntry>();
 const TOKEN_TTL_MS = 55 * 60 * 1000;
 
