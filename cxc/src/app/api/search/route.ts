@@ -15,9 +15,9 @@ export async function GET(req: NextRequest) {
   const pattern = `%${q}%`;
 
   const [cxcRes, reclamosRes, guiasRes, dirRes, chequesRes, ventasRes, prestamosRes, cajaRes] = await Promise.all([
-    // CxC: buscar por nombre (agregado por cliente vía cxc_aging)
+    // CxC: buscar por nombre (agregado por cliente vía switch_estadocuenta_aging)
     supabaseServer
-      .from("cxc_aging")
+      .from("switch_estadocuenta_aging")
       .select("id, nombre_normalized, total, company_key")
       .ilike("nombre_normalized", pattern)
       .order("total", { ascending: false })

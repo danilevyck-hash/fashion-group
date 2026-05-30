@@ -44,7 +44,7 @@ export default function useAdminData() {
       }
       setUploads(latestUploads);
 
-      const { data: rows } = await supabase.from("cxc_aging").select("*");
+      const { data: rows } = await supabase.from("switch_estadocuenta_aging").select("*");
       const { data: overrides } = await supabase.from("cxc_client_overrides").select("*");
       const overrideMap: Record<string, { correo: string; telefono: string; celular: string; contacto: string; resultado_contacto?: string; proximo_seguimiento?: string }> = {};
       if (overrides) {
