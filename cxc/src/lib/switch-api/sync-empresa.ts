@@ -620,16 +620,23 @@ export async function syncEmpresaEstadoCuenta(
     }
 
     // 2) Estado de cuenta por cliente → buffer → flush batches.
+    //
+    // failedClienteIds: clientes cuyo getEstadoCuenta falló (red/timeout/429) en
+    // este run. NO deben entrar al reconcile que pone saldo=0 — no los pudimos
+    // re-consultar, así que su saldo viejo es la mejor verdad disponible, NO 0.
     let buffer: EstadoCuentaRow[] = [];
     let procesados = 0;
+    const failedClienteIds: number[] = [];
     for (const cliente of clientes) {
       if (typeof cliente.id !== "number") continue;
       let ec;
       try {
         ec = await client.getEstadoCuenta(cliente.id);
       } catch (err) {
-        // Un cliente que falla no aborta todo el run; se loguea como skip.
+        // Un cliente que falla no aborta todo el run; se loguea como skip y se
+        // excluye del reconcile (abajo) para no corromper su saldo a 0.
         skipped++;
+        failedClienteIds.push(cliente.id);
         skipDetails.push({ facturaId: cliente.id, secuencial: null, campo: "getEstadoCuenta", valorCrudo: err instanceof Error ? err.message : String(err) });
         console.error(`[sync ${empresaKey} cxc] cliente ${cliente.id} falló: ${err instanceof Error ? err.message : String(err)}`);
         continue;
@@ -664,12 +671,30 @@ export async function syncEmpresaEstadoCuenta(
 
     // 3) Reconciliar: documentos no vistos en este run (pagados/cerrados) que
     //    aún tengan saldo > 0 → poner saldo 0. synced_at < runStamp = no tocado.
-    const { error: recErr } = await supabaseServer
+    //
+    //    PERO excluir los clientes que fallaron este run (failedClienteIds): no
+    //    los pudimos re-consultar, así que sus documentos tienen synced_at viejo
+    //    sin que eso signifique "cerrado". Zerearlos corrompería su CXC a $0 por
+    //    una falla transitoria de red. Un cliente procesado OK con 0 elements SÍ
+    //    se reconcilia (sus docs realmente se cerraron).
+    let reconcileQuery = supabaseServer
       .from("switch_estadocuenta")
       .update({ saldo: 0, updated_at: new Date().toISOString() })
       .eq("empresa_key", empresaKey)
       .lt("synced_at", runStamp)
       .gt("saldo", 0);
+    if (failedClienteIds.length > 0) {
+      const uniqFailed = [...new Set(failedClienteIds)];
+      reconcileQuery = reconcileQuery.not(
+        "cliente_switch_id",
+        "in",
+        `(${uniqFailed.join(",")})`,
+      );
+      console.error(
+        `[sync ${empresaKey} cxc] reconcile excluye ${uniqFailed.length} clientes que fallaron este run`,
+      );
+    }
+    const { error: recErr } = await reconcileQuery;
     if (recErr) console.error(`[sync ${empresaKey} cxc] reconcile falló: ${recErr.message}`);
 
     const durationMs = Date.now() - startedAt;
