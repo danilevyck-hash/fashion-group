@@ -96,7 +96,7 @@ async function finalizeSyncLog(
  */
 async function markStaleRunningLogs(
   empresaKey: EmpresaKey,
-  syncType: "facturas" | "estadocuenta",
+  syncType: "facturas" | "estadocuenta" | "costo",
 ): Promise<void> {
   const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
   const { error } = await supabaseServer
@@ -813,6 +813,7 @@ export interface CostoDiarioResult {
   empresaKey: EmpresaKey;
   dias: number;
   durationMs: number;
+  logId: string | null;
 }
 
 /**
@@ -821,46 +822,113 @@ export interface CostoDiarioResult {
  * completo (incluye B2B). Forward-only: solo el período en curso. El cron diario
  * re-corre y refresca todo el mes (los días que aún no ocurrieron se actualizan
  * al pasar). UPSERT por (empresa_key, fecha).
+ *
+ * 🟡-8: loguea a switch_sync_log (sync_type='costo') igual que facturas/cxc —
+ * antes no dejaba rastro persistente y los errores solo vivían en el JSON del cron.
  */
 export async function syncCostoDiario(
   empresaKey: EmpresaKey,
+  triggeredBy: "cron" | "manual" | "backfill" = "cron",
 ): Promise<CostoDiarioResult> {
   const startedAt = Date.now();
-  const client = createSwitchClient(empresaKey);
-  const data = await client.getReporteMesActual();
-  const totales = data.totales ?? {};
 
-  const nowIso = new Date().toISOString();
-  const rows: Array<{
-    empresa_key: string;
-    fecha: string;
-    venta_total: number;
-    costo_total: number;
-    utilidad_total: number;
-    synced_at: string;
-    updated_at: string;
-  }> = [];
-
-  for (const v of Object.values(totales) as SwitchTotalVentasDia[]) {
-    const fecha = parseFechaDMY(v.fecha);
-    if (!fecha) continue;
-    rows.push({
-      empresa_key: empresaKey,
-      fecha,
-      venta_total: parseAmount(v.total) ?? 0,
-      costo_total: parseAmount(v.costo) ?? 0,
-      utilidad_total: parseAmount(v.utilidad) ?? 0,
-      synced_at: nowIso,
-      updated_at: nowIso,
-    });
+  await markStaleRunningLogs(empresaKey, "costo");
+  // Logging degradable: si el INSERT falla (ej. migración del CHECK 'costo' aún
+  // no aplicada), NO abortamos el sync — el costo se sincroniza igual y solo se
+  // pierde la observabilidad de esa corrida.
+  let logId: string | null = null;
+  {
+    const { data: logRow, error: logErr } = await supabaseServer
+      .from("switch_sync_log")
+      .insert({
+        empresa_key: empresaKey,
+        sync_type: "costo",
+        status: "running",
+        triggered_by: triggeredBy,
+        records_inserted: 0,
+        records_updated: 0,
+        records_skipped: 0,
+      })
+      .select("id")
+      .single();
+    if (logErr || !logRow) {
+      console.error(`[sync ${empresaKey} costo] no pude crear switch_sync_log (¿migración 'costo' pendiente?): ${logErr?.message ?? "vacío"}`);
+    } else {
+      logId = (logRow as { id: string }).id;
+    }
   }
 
-  if (rows.length > 0) {
-    const { error } = await supabaseServer
-      .from("switch_costo_diario")
-      .upsert(rows, { onConflict: "empresa_key,fecha", ignoreDuplicates: false });
-    if (error) throw new Error(`UPSERT costo_diario falló: ${error.message}`);
-  }
+  const skipDetails: SkipDetail[] = [];
+  let skipped = 0;
 
-  return { empresaKey, dias: rows.length, durationMs: Date.now() - startedAt };
+  try {
+    const client = createSwitchClient(empresaKey);
+    const data = await client.getReporteMesActual();
+    const totales = data.totales ?? {};
+
+    const nowIso = new Date().toISOString();
+    const rows: Array<{
+      empresa_key: string;
+      fecha: string;
+      venta_total: number;
+      costo_total: number;
+      utilidad_total: number;
+      synced_at: string;
+      updated_at: string;
+    }> = [];
+
+    for (const v of Object.values(totales) as SwitchTotalVentasDia[]) {
+      const fecha = parseFechaDMY(v.fecha);
+      if (!fecha) {
+        // 🟡-8: día con fecha inválida/vacía no se descarta en silencio.
+        skipped++;
+        skipDetails.push({ facturaId: null, secuencial: null, campo: "costo_fecha_invalida", valorCrudo: v.fecha });
+        continue;
+      }
+      rows.push({
+        empresa_key: empresaKey,
+        fecha,
+        venta_total: parseAmount(v.total) ?? 0,
+        costo_total: parseAmount(v.costo) ?? 0,
+        utilidad_total: parseAmount(v.utilidad) ?? 0,
+        synced_at: nowIso,
+        updated_at: nowIso,
+      });
+    }
+
+    if (rows.length > 0) {
+      const { error } = await supabaseServer
+        .from("switch_costo_diario")
+        .upsert(rows, { onConflict: "empresa_key,fecha", ignoreDuplicates: false });
+      if (error) throw new Error(`UPSERT costo_diario falló: ${error.message}`);
+    }
+
+    if (logId) {
+      await finalizeSyncLog(logId, {
+        status: "success",
+        finished_at: new Date().toISOString(),
+        records_inserted: 0,
+        records_updated: rows.length, // upsert refresca el mes; no separa ins/upd
+        records_skipped: skipped,
+        skip_details: skipDetails,
+      });
+    }
+
+    return { empresaKey, dias: rows.length, durationMs: Date.now() - startedAt, logId };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[sync ${empresaKey} costo] ERROR: ${message}`);
+    if (logId) {
+      await finalizeSyncLog(logId, {
+        status: "error",
+        finished_at: new Date().toISOString(),
+        records_inserted: 0,
+        records_updated: 0,
+        records_skipped: skipped,
+        error_message: message.slice(0, 2000),
+        skip_details: skipDetails,
+      });
+    }
+    throw err;
+  }
 }
