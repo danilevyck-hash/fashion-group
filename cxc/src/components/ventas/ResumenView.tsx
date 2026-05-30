@@ -149,7 +149,6 @@ export function ResumenView({
   // day-by-day ya aplicado en la RPC ventas_dashboard_prev_same_period.
   // El texto se adapta a la granularidad activa (mensual vs trimestral).
   const partialFooter = buildPartialFooter(data, selectedYear, granularity);
-  const partialKpiNote = buildPartialKpiNote(data);
   // Rango formateado del prev YTD ("1 ene – 9 may 2025") para los tooltips
   // de las celdas Total. Se calcula UNA vez por render.
   const prevYtdRange = buildPrevYtdRange(data, prevYear);
@@ -263,17 +262,13 @@ export function ResumenView({
           sub={kpiMargenSub}
         />
       </div>
-      {partialKpiNote && (
-        <p className="-mt-3 text-[11px] text-stone-400">{partialKpiNote}</p>
-      )}
-
-      {/* Toolbar — subtitle + date pill (left) · controls (right) */}
+      {/* Toolbar — sync pill (left) · controls (right). El meta "Mostrando
+          mes a mes vs 2025" y la nota "Ajustado al día de corte (X may)" se
+          quitaron por ruido: la tabla muestra las columnas del prev year
+          explícitas y el footer "Comparativo vs <mes> 1-X 2025" ya marca
+          el cutoff. El pill + warning ámbar son suficientes acá. */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-xs text-stone-500">
-            Mostrando {isMargen ? "margen " : isUtil ? "utilidad " : ""}
-            {granularity === "mensual" ? "mes a mes" : "por trimestre"} · comparando vs {prevYear}
-          </p>
           <SyncStatus
             tabla="facturas"
             empresasEsperadas={SWITCH_FACTURAS_EMPRESA_KEYS}
@@ -1141,14 +1136,6 @@ function buildPartialFooter(
   const curMonth = MES_FULL_RESUMEN[cur.getMonth()];
   const prevMonth = MES_FULL_RESUMEN[prev.getMonth()];
   return `${curMonth} ${year} en curso · Comparativo vs ${prevMonth} 1–${prev.getDate()} ${prev.getFullYear()}`;
-}
-
-// Chip pequeño debajo del KPI "vs prev year" cuando hay corte day-by-day.
-function buildPartialKpiNote(data: VentasResumen): string | null {
-  if (!data.es_periodo_parcial || !data.fecha_corte) return null;
-  const d = parseIsoDateResumen(data.fecha_corte);
-  const mesShort = MONTHS[d.getMonth()].toLowerCase();
-  return `Ajustado al día de corte (${d.getDate()} ${mesShort})`;
 }
 
 function buildRow(
