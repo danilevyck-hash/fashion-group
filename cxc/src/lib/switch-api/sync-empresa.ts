@@ -769,7 +769,13 @@ export async function syncEmpresaEstadoCuenta(
       );
     }
     const { error: recErr } = await reconcileQuery;
-    if (recErr) console.error(`[sync ${empresaKey} cxc] reconcile falló: ${recErr.message}`);
+    if (recErr) {
+      // 🟡-13: un reconcile fallido deja documentos cerrados con saldo stale →
+      // CXC inflado. No marcar 'success' en silencio: tiramos para que el run
+      // quede como 'error' en switch_sync_log (vía el catch). Los upserts ya
+      // están commiteados; el próximo run reconcilia (idempotente).
+      throw new Error(`reconcile falló: ${recErr.message}`);
+    }
 
     const durationMs = Date.now() - startedAt;
     await finalizeSyncLog(logId, {
