@@ -79,6 +79,24 @@ export const ALL_EMPRESA_KEYS = [
 
 export type EmpresaKey = typeof ALL_EMPRESA_KEYS[number];
 
+/**
+ * Empresas que el cron switch-sync?tipo=facturas pobla en switch_facturas.
+ * Lista usada por el indicador SyncStatus para detectar empresas que
+ * deberían estar al día pero no lo están. Si en el futuro se agrega una
+ * empresa al sync de facturas, actualizar acá y la UI la cubre automático.
+ */
+export const SWITCH_FACTURAS_EMPRESA_KEYS = [
+  "active_shoes",
+  "active_wear",
+  "american_classic",
+] as const;
+
+/**
+ * Empresas que el cron switch-sync?tipo=estadocuenta pobla en
+ * switch_estadocuenta. Hoy = las 6 B2B (Boston/Multifashion no aplican).
+ */
+export const SWITCH_ESTADOCUENTA_EMPRESA_KEYS = B2B_EMPRESA_KEYS;
+
 export function mapEmpresaName(key: string): string {
   return EMPRESA_KEY_TO_NAME[key] ?? key;
 }

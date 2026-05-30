@@ -16,7 +16,11 @@ import ClientTable from "./components/ClientTable";
 import { SkeletonRow } from "./components/Skeleton";
 import PanelCxcMobile from "./components/PanelCxcMobile";
 import useAdminData from "./hooks/useAdminData";
-import FreshnessIndicator, { type ModuleFreshness } from "@/components/cxc/FreshnessIndicator";
+import SyncStatus from "@/components/shared/SyncStatus";
+import {
+  SWITCH_ESTADOCUENTA_EMPRESA_KEYS,
+  EMPRESA_KEY_TO_NAME,
+} from "@/lib/empresa-mapping";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
@@ -120,26 +124,6 @@ function AdminDashboardInner() {
   const [favorites, setFavorites] = useState<Set<string>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("cxc_favorites") || "[]")); } catch { return new Set(); }
   });
-
-  // Freshness indicator: última actualización CXC + Ventas
-  const [freshness, setFreshness] = useState<{ cxc: ModuleFreshness | null; ventas: ModuleFreshness | null }>({ cxc: null, ventas: null });
-  const [freshnessLoading, setFreshnessLoading] = useState(true);
-  useEffect(() => {
-    if (!authChecked) return;
-    let cancelled = false;
-    setFreshnessLoading(true);
-    fetch("/api/cxc/freshness", { cache: "no-store" })
-      .then((r) => r.ok ? r.json() : Promise.reject(r))
-      .then((data: { cxc: ModuleFreshness; ventas: ModuleFreshness }) => {
-        if (cancelled) return;
-        setFreshness({ cxc: data.cxc, ventas: data.ventas });
-      })
-      .catch(() => {
-        // Silencioso: el header sigue funcional sin el indicador
-      })
-      .finally(() => { if (!cancelled) setFreshnessLoading(false); });
-    return () => { cancelled = true; };
-  }, [authChecked]);
 
   // Load favorites from DB (overrides localStorage on success)
   useEffect(() => {
@@ -472,7 +456,6 @@ function AdminDashboardInner() {
         favorites={favorites}
         onToggleFavorite={toggleFavorite}
         contactLog={contactLog}
-        freshness={freshness.cxc}
         canExport={canExport}
         onCargar={() => (window.location.href = "/upload?tab=cxc")}
         onConsolidado={handleMobileConsolidado}
@@ -482,9 +465,14 @@ function AdminDashboardInner() {
 
       <div className="hidden md:block max-w-6xl mx-auto px-6 py-8">
 
-      {/* Freshness indicator: última fecha de upload CXC + Ventas */}
+      {/* Sync status — MAX(synced_at) por empresa del cron switch-sync, con
+          warning si alguna empresa lleva >26h sin actualizar. */}
       <div className="mb-4">
-        <FreshnessIndicator cxc={freshness.cxc} ventas={freshness.ventas} loading={freshnessLoading} />
+        <SyncStatus
+          tabla="estadocuenta"
+          empresasEsperadas={SWITCH_ESTADOCUENTA_EMPRESA_KEYS}
+          empresaLabels={EMPRESA_KEY_TO_NAME}
+        />
       </div>
 
       {/* Export buttons — admin/secretaria only */}

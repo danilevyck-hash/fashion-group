@@ -3,7 +3,12 @@
 import { useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Calendar, Info } from "lucide-react";
+import { Info } from "lucide-react";
+import SyncStatus from "@/components/shared/SyncStatus";
+import {
+  SWITCH_FACTURAS_EMPRESA_KEYS,
+  EMPRESA_KEY_TO_NAME,
+} from "@/lib/empresa-mapping";
 import type {
   VentasResumen, Multifashion, ProyeccionResp, ProyeccionEmpresa, ProyeccionGrupo,
 } from "./types";
@@ -145,7 +150,6 @@ export function ResumenView({
   // El texto se adapta a la granularidad activa (mensual vs trimestral).
   const partialFooter = buildPartialFooter(data, selectedYear, granularity);
   const partialKpiNote = buildPartialKpiNote(data);
-  const datePillLabel = buildDatePillLabel(data);
   // Rango formateado del prev YTD ("1 ene – 9 may 2025") para los tooltips
   // de las celdas Total. Se calcula UNA vez por render.
   const prevYtdRange = buildPrevYtdRange(data, prevYear);
@@ -270,12 +274,13 @@ export function ResumenView({
             Mostrando {isMargen ? "margen " : isUtil ? "utilidad " : ""}
             {granularity === "mensual" ? "mes a mes" : "por trimestre"} · comparando vs {prevYear}
           </p>
-          {datePillLabel && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2.5 py-0.5 text-[11px] font-medium text-stone-600">
-              <Calendar className="h-3 w-3 text-stone-400" />
-              {datePillLabel}
-            </span>
-          )}
+          <SyncStatus
+            tabla="facturas"
+            empresasEsperadas={SWITCH_FACTURAS_EMPRESA_KEYS}
+            empresaLabels={EMPRESA_KEY_TO_NAME}
+            variant="pill"
+            prefix="Data actualizada al"
+          />
         </div>
         <div className="flex items-center gap-2">
           <div className="inline-flex rounded-full bg-stone-100 p-0.5 text-xs">
@@ -1103,27 +1108,6 @@ function deltaTextTone(delta: number | null, mode: "pct" | "pts" = "pct"): strin
   if (delta > threshold)  return "text-emerald-700";
   if (delta < -threshold) return "text-red-600";
   return "text-stone-500";
-}
-
-// Pill arriba: "Data actualizada al 29 may 2026, 12:00 a. m."
-// FASE 2.1b: fuente = data.data_actualizada_at (MAX synced_at de switch_facturas
-// = momento del último sync que insertó data nueva), formateado en TZ Panamá
-// con fecha + hora. Antes usaba data.fecha_corte (solo día) lo que confundía:
-// durante el día parecía haber un gap vs el panel que en realidad era lag de sync.
-function buildDatePillLabel(data: VentasResumen): string | null {
-  if (!data.data_actualizada_at) return null;
-  const d = new Date(data.data_actualizada_at);
-  if (Number.isNaN(d.getTime())) return null;
-  const fmt = new Intl.DateTimeFormat("es-PA", {
-    timeZone: "America/Panama",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
-  return `Data actualizada al ${fmt.format(d)}`;
 }
 
 // Rango formateado del prev YTD para el tooltip de Total: "1 ene – 9 may 2025"

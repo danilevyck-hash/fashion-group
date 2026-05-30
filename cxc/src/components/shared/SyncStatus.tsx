@@ -1,0 +1,149 @@
+"use client";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// <SyncStatus />
+//
+// Indicador compartido de frescura del sync de Switch (switch_facturas o
+// switch_estadocuenta). Se renderiza hoy en:
+//   - Panel CXC (variant="block", tabla="estadocuenta", 6 B2B)
+//   - Resumen de Ventas (variant="pill", tabla="facturas", 3 empresas)
+//
+// Lee /api/sync-status. Muestra el timestamp más reciente del sync (en TZ
+// Panamá, formato "30 may 2026, 1:45 a. m.") y, si alguna empresa esperada
+// tiene su último sync hace >26h o no tiene filas, agrega una línea de
+// warning con el detalle por empresa.
+//
+// Cuando todas las empresas están al día, el warning se omite.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { useEffect, useState } from "react";
+import { Calendar } from "lucide-react";
+
+export type SyncTable = "facturas" | "estadocuenta";
+
+interface StaleEntry {
+  empresa: string;
+  last_synced_at: string | null;
+}
+
+interface SyncStatusData {
+  last_global: string | null;
+  stale: StaleEntry[];
+}
+
+interface SyncStatusProps {
+  tabla: SyncTable;
+  empresasEsperadas: readonly string[];
+  empresaLabels: Record<string, string>;
+  variant?: "block" | "pill";
+  prefix?: string;
+  className?: string;
+}
+
+const TS_FMT = new Intl.DateTimeFormat("es-PA", {
+  timeZone: "America/Panama",
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+});
+
+const DATE_FMT = new Intl.DateTimeFormat("es-PA", {
+  timeZone: "America/Panama",
+  day: "numeric",
+  month: "short",
+});
+
+function fmtTimestamp(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return TS_FMT.format(d).replace(/\./g, "");
+}
+
+function fmtShortDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return DATE_FMT.format(d).replace(/\./g, "");
+}
+
+function buildWarning(stale: StaleEntry[], empresaLabels: Record<string, string>): string | null {
+  if (stale.length === 0) return null;
+  const parts = stale.map((s) => {
+    const label = empresaLabels[s.empresa] ?? s.empresa;
+    if (!s.last_synced_at) return `${label} sin datos`;
+    return `${label} sin actualizar desde ${fmtShortDate(s.last_synced_at)}`;
+  });
+  return `⚠️ ${parts.join(" · ")}`;
+}
+
+export default function SyncStatus({
+  tabla,
+  empresasEsperadas,
+  empresaLabels,
+  variant = "block",
+  prefix,
+  className,
+}: SyncStatusProps) {
+  const [data, setData] = useState<SyncStatusData | null>(null);
+  const [error, setError] = useState(false);
+
+  const empresasKey = empresasEsperadas.join(",");
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(false);
+    const url = `/api/sync-status?tabla=${tabla}&empresas=${empresasKey}`;
+    fetch(url, { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((json: SyncStatusData) => {
+        if (cancelled) return;
+        setData(json);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setError(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tabla, empresasKey]);
+
+  if (error || !data) return null;
+
+  const tsLabel = data.last_global ? fmtTimestamp(data.last_global) : "sin datos";
+  const labelPrefix = prefix ?? "Actualizado:";
+  const mainLabel = data.last_global ? `${labelPrefix} ${tsLabel}` : `${labelPrefix} sin datos`;
+  const warning = buildWarning(data.stale, empresaLabels);
+
+  if (variant === "pill") {
+    return (
+      <span className={className}>
+        <span
+          className="inline-flex items-center gap-1 rounded-full border border-stone-200 bg-white px-2.5 py-0.5 text-[11px] font-medium text-stone-600"
+          title={warning ?? undefined}
+        >
+          <Calendar className="h-3 w-3 text-stone-400" />
+          {mainLabel}
+        </span>
+        {warning && (
+          <span className="basis-full mt-1 block text-[11px] text-amber-600" role="status">
+            {warning}
+          </span>
+        )}
+      </span>
+    );
+  }
+
+  return (
+    <div className={className} aria-live="polite">
+      <p className="text-[11px] text-stone-500">{mainLabel}</p>
+      {warning && (
+        <p className="mt-0.5 text-[11px] text-amber-600" role="status">
+          {warning}
+        </p>
+      )}
+    </div>
+  );
+}

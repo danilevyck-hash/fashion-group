@@ -13,7 +13,11 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import type { ConsolidatedClient } from "@/lib/types";
 import type { Company } from "@/lib/companies";
-import type { ModuleFreshness } from "@/components/cxc/FreshnessIndicator";
+import SyncStatus from "@/components/shared/SyncStatus";
+import {
+  SWITCH_ESTADOCUENTA_EMPRESA_KEYS,
+  EMPRESA_KEY_TO_NAME,
+} from "@/lib/empresa-mapping";
 import { formatCompactCurrency } from "@/lib/ventas/format";
 import { fmt } from "@/lib/format";
 
@@ -32,7 +36,6 @@ interface PanelCxcMobileProps {
   favorites: Set<string>;
   onToggleFavorite: (name: string) => void;
   contactLog?: Record<string, { date: string; method: string }>;
-  freshness: ModuleFreshness | null;
   canExport: boolean;
   onCargar: () => void;
   onConsolidado: () => void;
@@ -53,7 +56,6 @@ export default function PanelCxcMobile({
   favorites,
   onToggleFavorite,
   contactLog,
-  freshness,
   canExport,
   onCargar,
   onConsolidado,
@@ -98,7 +100,6 @@ export default function PanelCxcMobile({
     <div className="md:hidden bg-stone-50">
       <div className="px-4 pt-4 pb-6 space-y-4">
         <MobileHeader
-          freshness={freshness}
           canExport={canExport}
           onCargar={onCargar}
           onConsolidado={onConsolidado}
@@ -177,13 +178,11 @@ export default function PanelCxcMobile({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function MobileHeader({
-  freshness,
   canExport,
   onCargar,
   onConsolidado,
   onExportar,
 }: {
-  freshness: ModuleFreshness | null;
   canExport: boolean;
   onCargar: () => void;
   onConsolidado: () => void;
@@ -206,21 +205,18 @@ function MobileHeader({
     };
   }, [open]);
 
-  const updatedLabel = freshness?.last_update
-    ? formatRelativeUpdated(freshness.last_update)
-    : freshness?.age_label || null;
-
   return (
     <header className="flex items-start justify-between gap-3">
       <div>
         <h1 className="font-display text-[22px] font-medium leading-tight tracking-tight text-stone-900">
           Panel CXC
         </h1>
-        {updatedLabel && (
-          <p className="mt-0.5 text-[11px] text-stone-500">
-            Actualizado {updatedLabel}
-          </p>
-        )}
+        <SyncStatus
+          tabla="estadocuenta"
+          empresasEsperadas={SWITCH_ESTADOCUENTA_EMPRESA_KEYS}
+          empresaLabels={EMPRESA_KEY_TO_NAME}
+          className="mt-0.5"
+        />
       </div>
       {canExport && (
         <div className="relative" ref={menuRef}>
@@ -260,19 +256,6 @@ function MenuItem({ label, onClick }: { label: string; onClick: () => void }) {
       {label}
     </button>
   );
-}
-
-function formatRelativeUpdated(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffHrs = Math.floor(diffMs / 3_600_000);
-  if (diffHrs < 1) return "hace unos minutos";
-  if (diffHrs < 24) return `hace ${diffHrs} ${diffHrs === 1 ? "hora" : "horas"}`;
-  const diffDays = Math.floor(diffHrs / 24);
-  if (diffDays === 1) return "ayer";
-  if (diffDays < 7) return `hace ${diffDays} días`;
-  return d.toLocaleDateString("es-PA", { day: "numeric", month: "short" });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
