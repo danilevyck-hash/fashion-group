@@ -658,7 +658,14 @@ export async function syncEmpresaEstadoCuenta(
     let procesados = 0;
     const failedClienteIds: number[] = [];
     for (const cliente of clientes) {
-      if (typeof cliente.id !== "number") continue;
+      if (typeof cliente.id !== "number") {
+        // 🟡-11: no skip silencioso — un cliente sin id numérico se omite pero
+        // queda registrado en switch_sync_log.skip_details.
+        skipped++;
+        skipDetails.push({ facturaId: null, secuencial: cliente.codigo ?? null, campo: "cliente_id_no_numerico", valorCrudo: cliente.id });
+        console.error(`[sync ${empresaKey} cxc] cliente sin id numérico omitido: codigo=${cliente.codigo ?? "?"} id=${JSON.stringify(cliente.id)}`);
+        continue;
+      }
       let ec;
       try {
         ec = await client.getEstadoCuenta(cliente.id);
