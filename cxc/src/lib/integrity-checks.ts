@@ -10,6 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { supabaseServer } from "@/lib/supabase-server";
+import { empresasConFacturas } from "@/lib/switch-api/empresas";
 
 export type Severity = "ok" | "info" | "warning" | "critical";
 
@@ -452,6 +453,80 @@ async function checkAgingTiposSinClasificar(): Promise<CheckResult> {
   };
 }
 
+// CHECK 11: continuidad mensual de switch_facturas (🟡-6). Las vistas de ventas
+// asumen cobertura completa; un empresa-mes faltante se muestra como $0 legítimo,
+// indistinguible de "mes futuro". Marca los huecos INTERIORES por empresa: meses
+// sin filas entre el PRIMER mes con data de esa empresa y el último mes cerrado.
+// Usar el primer mes real como piso (en vez de 2025-05 fijo) evita falsos
+// positivos por empresas que arrancaron después (ej. joystep desde 2025-07).
+function lastClosedMonth(now: Date): string {
+  const firstOfCurrent = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const lc = new Date(firstOfCurrent);
+  lc.setUTCMonth(lc.getUTCMonth() - 1); // mes en curso está a medias → se exige hasta el anterior
+  return `${lc.getUTCFullYear()}-${String(lc.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+/** Enumera "YYYY-MM" de desde a hasta inclusive (ambos "YYYY-MM"). */
+function monthRange(desde: string, hasta: string): string[] {
+  const out: string[] = [];
+  let y = Number(desde.slice(0, 4));
+  let m = Number(desde.slice(5, 7));
+  while (`${y}-${String(m).padStart(2, "0")}` <= hasta) {
+    out.push(`${y}-${String(m).padStart(2, "0")}`);
+    m++;
+    if (m > 12) { m = 1; y++; }
+  }
+  return out;
+}
+
+async function checkSwitchFacturasContinuidad(): Promise<CheckResult> {
+  const { data, error } = await supabaseServer
+    .from("switch_facturas_cobertura_mensual")
+    .select("empresa_key, mes, filas");
+  if (error) {
+    return checkError("switch_facturas_continuidad", "switch_facturas", error.message);
+  }
+
+  const mesesPorEmpresa = new Map<string, Set<string>>();
+  for (const r of data ?? []) {
+    const set = mesesPorEmpresa.get(r.empresa_key) ?? new Set<string>();
+    set.add(r.mes as string);
+    mesesPorEmpresa.set(r.empresa_key, set);
+  }
+
+  const hasta = lastClosedMonth(new Date());
+  const gaps: { empresa_key: string; mes: string }[] = [];
+  const sinDatos: string[] = [];
+  for (const empresa of empresasConFacturas()) {
+    const meses = mesesPorEmpresa.get(empresa);
+    if (!meses || meses.size === 0) {
+      sinDatos.push(empresa);
+      continue;
+    }
+    const primerMes = [...meses].sort()[0];
+    if (primerMes > hasta) continue; // recién arrancó este mes en curso
+    for (const mes of monthRange(primerMes, hasta)) {
+      if (!meses.has(mes)) gaps.push({ empresa_key: empresa, mes });
+    }
+  }
+
+  const count = gaps.length + sinDatos.length;
+  return {
+    check_name: "switch_facturas_continuidad",
+    table_name: "switch_facturas",
+    severity: count === 0 ? "ok" : "warning",
+    rows_affected: count,
+    threshold_exceeded: count > 0,
+    details: {
+      huecos: gaps.slice(0, 40),
+      empresas_sin_datos: sinDatos,
+      hasta,
+      hint: "empresa-mes interior sin filas en switch_facturas → el dashboard lo cuenta como $0. Backfill: scripts/switch-backfill.ts --tipo=facturas --empresa=X --... Un mes con cero ventas reales sería falso positivo (raro en B2B). Piso por empresa = su primer mes con data.",
+      threshold: { warning: ">0 huecos interiores" },
+    },
+  };
+}
+
 // ── Error wrapper ────────────────────────────────────────────────────────────
 
 // Un check que no puede correr (query falló, schema cambió) NO debe alertar
@@ -483,6 +558,7 @@ export async function runAllChecks(): Promise<CheckResult[]> {
     checkCxcSinVentaCorrespondiente(),
     checkCxcUploadsZombie(),
     checkAgingTiposSinClasificar(),
+    checkSwitchFacturasContinuidad(),
   ]);
 
   // checkLastUploadAge devuelve un array de 2 — el resto devuelve uno solo.
