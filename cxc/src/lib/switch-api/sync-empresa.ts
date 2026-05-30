@@ -87,6 +87,35 @@ async function finalizeSyncLog(
   if (error2) console.error(`[sync] no pude finalizar switch_sync_log: ${error2.message}`);
 }
 
+/**
+ * Marca como 'error' los logs de esta empresa+tipo que quedaron atascados en
+ * 'running' (un run previo que murió por timeout antes de llamar finalizeSyncLog).
+ * >30min sin terminar = no es un run vivo. 🔴-3: con el fan-out por empresa los
+ * timeouts ya no deberían pasar, pero esto auto-sana los logs huérfanos que dejó
+ * el cron monolítico viejo y cualquier muerte futura.
+ */
+async function markStaleRunningLogs(
+  empresaKey: EmpresaKey,
+  syncType: "facturas" | "estadocuenta",
+): Promise<void> {
+  const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  const { error } = await supabaseServer
+    .from("switch_sync_log")
+    .update({
+      status: "error",
+      finished_at: new Date().toISOString(),
+      error_message:
+        "Run previo atascado en 'running' (probable timeout); cerrado por el siguiente run.",
+    })
+    .eq("empresa_key", empresaKey)
+    .eq("sync_type", syncType)
+    .eq("status", "running")
+    .lt("started_at", cutoff);
+  if (error) {
+    console.error(`[sync ${empresaKey} ${syncType}] no pude limpiar logs stale: ${error.message}`);
+  }
+}
+
 async function createSyncLog(
   empresaKey: EmpresaKey,
   syncType: "facturas" | "estadocuenta",
@@ -569,6 +598,7 @@ export async function syncEmpresaEstadoCuenta(
 ): Promise<EmpresaSyncResult> {
   const startedAt = Date.now();
   const runStamp = new Date(startedAt).toISOString();
+  await markStaleRunningLogs(empresaKey, "estadocuenta");
   const logId = await createSyncLog(empresaKey, "estadocuenta", opts);
 
   let inserted = 0;

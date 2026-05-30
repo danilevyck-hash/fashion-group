@@ -8,7 +8,12 @@
     { "path": "/api/cron/integrity-check", "schedule": "0 12 * * *" },
     { "path": "/api/cron/multifashion-sync", "schedule": "0 5 * * *" },
     { "path": "/api/cron/switch-sync?tipo=facturas", "schedule": "30 5 * * *" },
-    { "path": "/api/cron/switch-sync?tipo=estadocuenta", "schedule": "45 5 * * *" },
+    { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresa=vistana", "schedule": "45 5 * * *" },
+    { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresa=fashion_wear", "schedule": "48 5 * * *" },
+    { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresa=fashion_shoes", "schedule": "51 5 * * *" },
+    { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresa=active_shoes", "schedule": "54 5 * * *" },
+    { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresa=active_wear", "schedule": "57 5 * * *" },
+    { "path": "/api/cron/switch-sync?tipo=estadocuenta&empresa=joystep", "schedule": "59 5 * * *" },
     { "path": "/api/cron/switch-costo-diario", "schedule": "0 6 * * *" }
   ]
 }

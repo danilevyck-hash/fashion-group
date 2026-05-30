@@ -10,10 +10,13 @@
  *   empresa=<empresa_key>        sincroniza solo esa empresa
  *   desde=YYYY-MM-DD&hasta=...   override de rango (manual), ambos o ninguno
  *
- * NOTA timing: estadocuenta hace una llamada por cliente (cientos/empresa) y NO
- * entra en el timeout de Vercel. Para CXC usar el backfill (scripts/switch-backfill.ts)
- * o invocar este endpoint con ?tipo=estadocuenta&empresa=X manualmente en un
- * entorno sin límite de tiempo. El cron programado solo corre facturas.
+ * NOTA timing: estadocuenta hace una llamada por cliente (cientos/empresa). Las 6
+ * empresas en una sola invocación tardan ~472s y NO caben en maxDuration=300
+ * (timeout confirmado en prod: el run monolítico moría a mitad, dejando logs en
+ * 'running' y empresas sin sincronizar). Por eso el cron de estadocuenta corre
+ * UNA empresa por entrada en vercel.json (?tipo=estadocuenta&empresa=X,
+ * escalonadas), cada una 9–124s, holgada bajo 300s. El backfill
+ * (scripts/switch-backfill.ts) sigue disponible para corridas manuales masivas.
  */
 
 import { NextRequest, NextResponse } from "next/server";
