@@ -527,6 +527,34 @@ async function checkSwitchFacturasContinuidad(): Promise<CheckResult> {
   };
 }
 
+// CHECK 12: filas de estado de cuenta con dias NULL/negativo y saldo<>0 (🟡-7).
+// El aging bucketea por `dias`; un null/negativo suma a `total` pero a ningún
+// bucket → cxcVencida subestima. Hoy 0 casos; vigilancia preventiva.
+async function checkAgingDiasAnomalo(): Promise<CheckResult> {
+  const { data, error } = await supabaseServer
+    .from("switch_estadocuenta_dias_anomalo")
+    .select("empresa_key, dias_null, dias_negativo, suma_saldo");
+
+  if (error) {
+    return checkError("aging_dias_anomalo", "switch_estadocuenta", error.message);
+  }
+
+  const rows = data ?? [];
+  const count = rows.reduce((s, r) => s + Number(r.dias_null ?? 0) + Number(r.dias_negativo ?? 0), 0);
+  return {
+    check_name: "aging_dias_anomalo",
+    table_name: "switch_estadocuenta",
+    severity: count === 0 ? "ok" : "warning",
+    rows_affected: count,
+    threshold_exceeded: count > 0,
+    details: {
+      por_empresa: rows,
+      hint: "dias NULL/negativo con saldo → no entra en ningún bucket del aging, cxcVencida lo subestima. Revisar fechaCreacion/dias en switch_estadocuenta para esas filas.",
+      threshold: { warning: ">0 filas" },
+    },
+  };
+}
+
 // ── Error wrapper ────────────────────────────────────────────────────────────
 
 // Un check que no puede correr (query falló, schema cambió) NO debe alertar
@@ -559,6 +587,7 @@ export async function runAllChecks(): Promise<CheckResult[]> {
     checkCxcUploadsZombie(),
     checkAgingTiposSinClasificar(),
     checkSwitchFacturasContinuidad(),
+    checkAgingDiasAnomalo(),
   ]);
 
   // checkLastUploadAge devuelve un array de 2 — el resto devuelve uno solo.
