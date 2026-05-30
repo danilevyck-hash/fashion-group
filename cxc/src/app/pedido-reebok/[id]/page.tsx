@@ -152,11 +152,11 @@ export default function PedidoReebokPage() {
                     const lineTotal = item.quantity * bs * item.unit_price;
                     return (
                       <>
-                        <p className="text-sm font-semibold text-[#1A2656] tabular-nums">
-                          ${fmtMoney(lineTotal)}
+                        <p className="text-base font-semibold text-[#1A2656] tabular-nums">
+                          ${fmtMoney(item.unit_price)}<span className="text-xs font-normal text-[#1A2656]/40"> c/u</span>
                         </p>
                         <p className="text-xs text-[#1A2656]/40 tabular-nums">
-                          {item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * bs} pzas) x ${fmtMoney(item.unit_price)}
+                          {item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * bs} pzas) · ${fmtMoney(lineTotal)}
                         </p>
                       </>
                     );
