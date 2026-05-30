@@ -459,6 +459,18 @@ async function checkAgingTiposSinClasificar(): Promise<CheckResult> {
 // sin filas entre el PRIMER mes con data de esa empresa y el último mes cerrado.
 // Usar el primer mes real como piso (en vez de 2025-05 fijo) evita falsos
 // positivos por empresas que arrancaron después (ej. joystep desde 2025-07).
+//
+// Allowlist de meses CERO-legítimo: empresa-mes sin ventas reales en Switch
+// (verificado contra API + panel), NO huecos de sync. Excluidos del conteo para
+// no alertar a diario. Un hueco NUEVO (fuera de esta lista) sí alerta.
+const CONTINUIDAD_CEROS_CONOCIDOS = new Set<string>([
+  // active_wear y joystep: meses sin ventas wholesale (0 docs en API,
+  // verificado 2026-05-30; las ventas que parecían faltar eran de dic-2025).
+  "active_wear|2025-11",
+  "active_wear|2026-01",
+  "joystep|2025-11",
+  "joystep|2026-01",
+]);
 function lastClosedMonth(now: Date): string {
   const firstOfCurrent = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const lc = new Date(firstOfCurrent);
@@ -496,6 +508,7 @@ async function checkSwitchFacturasContinuidad(): Promise<CheckResult> {
 
   const hasta = lastClosedMonth(new Date());
   const gaps: { empresa_key: string; mes: string }[] = [];
+  const cerosConocidos: { empresa_key: string; mes: string }[] = [];
   const sinDatos: string[] = [];
   for (const empresa of empresasConFacturas()) {
     const meses = mesesPorEmpresa.get(empresa);
@@ -506,7 +519,12 @@ async function checkSwitchFacturasContinuidad(): Promise<CheckResult> {
     const primerMes = [...meses].sort()[0];
     if (primerMes > hasta) continue; // recién arrancó este mes en curso
     for (const mes of monthRange(primerMes, hasta)) {
-      if (!meses.has(mes)) gaps.push({ empresa_key: empresa, mes });
+      if (meses.has(mes)) continue;
+      if (CONTINUIDAD_CEROS_CONOCIDOS.has(`${empresa}|${mes}`)) {
+        cerosConocidos.push({ empresa_key: empresa, mes }); // cero legítimo, no alerta
+      } else {
+        gaps.push({ empresa_key: empresa, mes });
+      }
     }
   }
 
@@ -520,9 +538,10 @@ async function checkSwitchFacturasContinuidad(): Promise<CheckResult> {
     details: {
       huecos: gaps.slice(0, 40),
       empresas_sin_datos: sinDatos,
+      ceros_conocidos: cerosConocidos, // excluidos del conteo (allowlist)
       hasta,
-      hint: "empresa-mes interior sin filas en switch_facturas → el dashboard lo cuenta como $0. Backfill: scripts/switch-backfill.ts --tipo=facturas --empresa=X --... Un mes con cero ventas reales sería falso positivo (raro en B2B). Piso por empresa = su primer mes con data.",
-      threshold: { warning: ">0 huecos interiores" },
+      hint: "empresa-mes interior sin filas en switch_facturas → el dashboard lo cuenta como $0. Backfill: scripts/switch-backfill.ts --tipo=facturas --empresa=X --... Un mes con cero ventas reales va a CONTINUIDAD_CEROS_CONOCIDOS (no alerta). Piso por empresa = su primer mes con data.",
+      threshold: { warning: ">0 huecos interiores (excluye ceros conocidos)" },
     },
   };
 }
