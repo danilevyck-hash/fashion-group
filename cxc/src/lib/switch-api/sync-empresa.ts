@@ -324,13 +324,24 @@ export async function syncEmpresaFacturas(
     };
 
     // Pagina un endpoint de comprobantes y empuja filas mapeadas al buffer común.
+    //
+    // Corte por ACUMULADO REAL (traidos >= total), NO por page*PAGE_SIZE. Switch
+    // capa porPagina silenciosamente en endpoints hermanos (/apicliente/lista
+    // devuelve ~50 aunque pidamos más), así que asumir "cada página trajo
+    // PAGE_SIZE" trunca páginas y pierde comprobantes en silencio. Además, si el
+    // API reporta total=0/ausente, el corte viejo (page*PAGE_SIZE>=0) cortaba tras
+    // la página 1; ahora solo cortamos por total cuando total es confiable (>0) y
+    // si no, seguimos hasta que una página venga vacía.
     const stream = async (
       label: string,
       fetchPage: (page: number) => Promise<{ items: unknown[]; total: number }>,
       mapOne: (it: unknown) => FacturaMapResult,
     ): Promise<void> => {
+      let traidos = 0;
+      let totalReportado = 0;
       for (let page = 1; page <= MAX_PAGES; page++) {
         const { items, total } = await fetchPage(page);
+        if (page === 1) totalReportado = total;
         if (items.length === 0) break;
         for (const it of items) {
           const res = mapOne(it);
@@ -344,8 +355,24 @@ export async function syncEmpresaFacturas(
           }
           buffer.push(res.row);
         }
+        traidos += items.length;
         await flush();
-        if (page * PAGE_SIZE >= total) break;
+        if (totalReportado > 0 && traidos >= totalReportado) break;
+      }
+
+      // Cobertura: si el API dijo que había más de lo que trajimos, warning
+      // visible (console + skip_details en switch_sync_log). Nunca truncar callado.
+      if (totalReportado > 0 && traidos < totalReportado) {
+        const faltantes = totalReportado - traidos;
+        console.warn(
+          `[sync ${empresaKey} ${label}] WARNING: traídos ${traidos}/${totalReportado}, faltan ${faltantes} (paginación incompleta)`,
+        );
+        skipDetails.push({
+          facturaId: null,
+          secuencial: null,
+          campo: `${label}_paginacion_incompleta`,
+          valorCrudo: { total_reportado: totalReportado, traidos, faltantes },
+        });
       }
     };
 

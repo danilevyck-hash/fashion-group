@@ -352,6 +352,13 @@ export async function syncMultifashionTickets(
     const client = createSwitchClient(EMPRESA_KEY);
     let buffer: TicketInsertRow[] = [];
 
+    // Corte por ACUMULADO REAL (traidos >= total), NO por page*PAGE_SIZE. Switch
+    // capa porPagina silenciosamente en endpoints hermanos, así que asumir "cada
+    // página trajo PAGE_SIZE" trunca páginas y pierde facturas en silencio. Si el
+    // API reporta total=0/ausente seguimos hasta página vacía en vez de cortar tras
+    // la página 1.
+    let traidos = 0;
+    let totalReportado = 0;
     for (let page = 1; page <= MAX_PAGES; page++) {
       const resp = await client.listFacturas({
         desde: opts.desde,
@@ -361,6 +368,7 @@ export async function syncMultifashionTickets(
       });
 
       const facturas = resp.facturas ?? [];
+      if (page === 1) totalReportado = Number(resp.paginacion?.total ?? 0);
       if (facturas.length === 0) break;
 
       for (const f of facturas) {
@@ -377,6 +385,8 @@ export async function syncMultifashionTickets(
         buffer.push(res.row);
       }
 
+      traidos += facturas.length;
+
       while (buffer.length >= UPSERT_BATCH) {
         const batch = buffer.splice(0, UPSERT_BATCH);
         const r = await persistBatch(batch);
@@ -384,8 +394,22 @@ export async function syncMultifashionTickets(
         updated += r.updated;
       }
 
-      const total = Number(resp.paginacion?.total ?? 0);
-      if (page * PAGE_SIZE >= total) break;
+      if (totalReportado > 0 && traidos >= totalReportado) break;
+    }
+
+    // Cobertura: si el API reportó más facturas de las que trajimos, warning
+    // visible (console + skip_details). Nunca truncar callado.
+    if (totalReportado > 0 && traidos < totalReportado) {
+      const faltantes = totalReportado - traidos;
+      console.warn(
+        `[sync] WARNING: traídas ${traidos}/${totalReportado} facturas, faltan ${faltantes} (paginación incompleta)`,
+      );
+      skipDetails.push({
+        facturaId: null,
+        secuencial: null,
+        campo: "facturas_paginacion_incompleta",
+        valorCrudo: { total_reportado: totalReportado, traidos, faltantes },
+      });
     }
 
     if (buffer.length > 0) {
