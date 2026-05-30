@@ -39,6 +39,9 @@ export const EMPRESA_SYNC_CAPABILITIES: Record<EmpresaKey, EmpresaSyncCapability
   // que switch_ventas_netas_vw cubra las 8 empresas (fase 2). El sync legacy
   // multifashion_tickets + su cron + el tab actual quedan INTACTOS (MF queda
   // duplicada entre ambas tablas a propósito). cxc:false (retail, sin CXC central).
+  // ⚠️ INVARIANTE (🟡-14): MF vive en switch_facturas Y multifashion_tickets a la
+  // vez. NUNCA sumar ambas fuentes en un total → doble conteo. Ver el comentario
+  // en src/lib/ventas/queries.ts (RETAIL_KEYS).
   american_classic: { facturas: true, cxc: false },
   vistana: { facturas: true, cxc: true },
   fashion_wear: { facturas: true, cxc: true },
