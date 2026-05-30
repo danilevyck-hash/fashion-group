@@ -553,16 +553,44 @@ export async function syncEmpresaEstadoCuenta(
     const client = createSwitchClient(empresaKey);
 
     // 1) Traer todos los clientes de la empresa.
+    //
+    // OJO con la paginación: /apicliente/lista NO respeta porPagina (Switch cap
+    // silencioso ~50 por página aunque pidamos 200). El sync anterior usaba
+    //   if (page * CLIENTES_PAGE >= total) break;
+    // y cortaba en la página 1 cuando page*200 >= total — dejaba afuera 60%+
+    // de los clientes en vistana (50 de 135). Ahora cortamos por:
+    //   a) accumulated >= total (clientes ya traídos cubren el total reportado), o
+    //   b) batch vacío (defensa contra loop infinito si total es 0/mentiroso).
+    // No confiamos en porPagina; trackeamos accumulated real.
     const clientes: SwitchCliente[] = [];
+    let clientesTotalReportado = 0;
     for (let page = 1; page <= MAX_CLIENTES_PAGES; page++) {
       const resp = await client.listClientes({ porPagina: CLIENTES_PAGE, paginaActual: page });
       const batch = resp.clientes ?? [];
       if (batch.length === 0) break;
       clientes.push(...batch);
-      const total = Number(resp.paginacion?.total ?? 0);
-      if (page * CLIENTES_PAGE >= total) break;
+      const totalPagina = Number(resp.paginacion?.total ?? 0);
+      if (page === 1) clientesTotalReportado = totalPagina;
+      if (totalPagina > 0 && clientes.length >= totalPagina) break;
     }
-    console.error(`[sync ${empresaKey} cxc] ${clientes.length} clientes a consultar`);
+    const cobertura = clientesTotalReportado > 0
+      ? `${clientes.length}/${clientesTotalReportado} (${Math.round((clientes.length / clientesTotalReportado) * 100)}%)`
+      : `${clientes.length} (total no reportado)`;
+    console.error(`[sync ${empresaKey} cxc] ${cobertura} clientes a consultar`);
+
+    // Warning explícito si el sync no cubrió todos los clientes que el API dice
+    // que existen — se persiste también en switch_sync_log vía skipDetails para
+    // que sea visible (no silencioso).
+    if (clientesTotalReportado > 0 && clientes.length < clientesTotalReportado) {
+      const faltantes = clientesTotalReportado - clientes.length;
+      console.warn(`[sync ${empresaKey} cxc] WARNING: faltaron ${faltantes} clientes del API (paginación incompleta)`);
+      skipDetails.push({
+        facturaId: null,
+        secuencial: null,
+        campo: "listClientes_paginacion_incompleta",
+        valorCrudo: { total_reportado: clientesTotalReportado, traidos: clientes.length, faltantes },
+      });
+    }
 
     // 2) Estado de cuenta por cliente → buffer → flush batches.
     let buffer: EstadoCuentaRow[] = [];
