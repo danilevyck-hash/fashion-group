@@ -69,7 +69,7 @@ export default function CompanySummary({
               <div className="text-sm font-semibold tabular-nums">${fmt(val)}</div>
               {overdue > 0 && (
                 <div className="text-[10px] text-red-500 tabular-nums mt-0.5">
-                  Vencido: ${fmt(overdue)}
+                  Vencido crítico: ${fmt(overdue)}
                 </div>
               )}
             </div>

@@ -96,15 +96,15 @@ export default function ClientTable({
   const activeFilterCount = (riskFilter !== "all" ? 1 : 0) + (companyFilter !== "all" ? 1 : 0);
 
   const riskTooltips: Record<string, string> = {
-    current: "Al día — deuda con 0 a 90 días",
-    watch: "Vigilancia — deuda con 91 a 120 días sin pagar",
-    overdue: "Vencido — deuda con más de 121 días sin pagar",
+    current: "Por vencer — deuda dentro del plazo de crédito (0 a 90 días)",
+    watch: "Vencido reciente — deuda con 91 a 120 días sin pagar",
+    overdue: "Vencido crítico — deuda con más de 120 días sin pagar",
   };
 
   const riskSubtitles: Record<string, string> = {
-    current: "Al dia (0-90 dias)",
-    watch: "Atencion (91-120 dias)",
-    overdue: "Vencido (121+ dias)",
+    current: "Por vencer (0-90 días)",
+    watch: "Vencido reciente (91-120 días)",
+    overdue: "Vencido crítico (+120 días)",
   };
 
   const filterBtn = (key: RiskFilter, label: string, count: number, activeClasses: string, inactiveClasses: string) => (
@@ -158,9 +158,9 @@ export default function ClientTable({
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Estado</div>
                 <div className="grid grid-cols-2 gap-2">
                   {filterBtn("all", "Todos", roleClients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600")}
-                  {filterBtn("current", "Corriente", countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700")}
-                  {filterBtn("watch", "Vigilancia", countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700")}
-                  {filterBtn("overdue", "Vencido", countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700")}
+                  {filterBtn("current", "Por vencer", countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700")}
+                  {filterBtn("watch", "Vencido reciente", countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700")}
+                  {filterBtn("overdue", "Vencido crítico", countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700")}
                 </div>
               </div>
               {roleCompanies.length > 1 && (
@@ -192,9 +192,9 @@ export default function ClientTable({
           <div className="hidden sm:flex flex-row gap-3 mb-4">
             <div className="flex gap-1.5 flex-wrap">
               {filterBtn("all", "Todos", roleClients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
-              {filterBtn("current", "Corriente", countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700 hover:bg-emerald-100")}
-              {filterBtn("watch", "Vigilancia", countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700 hover:bg-amber-100")}
-              {filterBtn("overdue", "Vencido", countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700 hover:bg-red-100")}
+              {filterBtn("current", "Por vencer", countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700 hover:bg-emerald-100")}
+              {filterBtn("watch", "Vencido reciente", countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700 hover:bg-amber-100")}
+              {filterBtn("overdue", "Vencido crítico", countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700 hover:bg-red-100")}
             </div>
             {roleCompanies.length > 1 && (
               <select

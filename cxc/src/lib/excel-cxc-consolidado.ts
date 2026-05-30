@@ -120,7 +120,7 @@ function buildResumenSheet(clients: ConsolidatedClient[], companies: Company[], 
   ws[addr(r, 0)] = { v: "% Vencido (>90d) por Empresa", t: "s", s: { font: { bold: true, sz: 11, color: { rgb: "FFFFFF" }, name: "Calibri" }, fill: { fgColor: { rgb: MID } }, alignment: { horizontal: "center", vertical: "center" } } };
   fillRow(lastCol, r, ws, MID); merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } }); h[r] = 22; r++;
 
-  const pctHeaders = ["Empresa", "Corriente (0-90d)", "Vigilancia (91-120d)", "Vencido (121d+)", "% Vencido", "", ""];
+  const pctHeaders = ["Empresa", "Por vencer (0-90d)", "Vencido reciente (91-120d)", "Vencido crítico (+120d)", "% Vencido", "", ""];
   pctHeaders.forEach((hv, i) => { ws[addr(r, i)] = { v: hv, t: "s", s: hdrStyle(i === 0 ? "left" : "center") }; });
   h[r] = 22; r++;
 
@@ -249,7 +249,7 @@ function buildTop20Sheet(clients: ConsolidatedClient[], companies: Company[], da
   fillRow(lastCol, r, ws, SEP); merges.push({ s: { r, c: 0 }, e: { r, c: lastCol } }); h[r] = 4; r++;
 
   // Headers
-  const headers = ["#", "Cliente", "Empresas", "Corriente", "Vencido (121d+)", "Total"];
+  const headers = ["#", "Cliente", "Empresas", "Por vencer", "Vencido crítico (+120d)", "Total"];
   headers.forEach((hv, i) => { ws[addr(r, i)] = { v: hv, t: "s", s: hdrStyle(i <= 2 ? "left" : "right") }; });
   h[r] = 22; r++;
 

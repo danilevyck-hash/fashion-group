@@ -165,7 +165,7 @@ export default function PanelCxcMobile({
         )}
 
         <p className="pt-4 text-center text-[10.5px] leading-relaxed text-stone-400">
-          Política: 0-90d corriente · 91-120d vigilancia · 121d+ vencido
+          Política: 0-90d por vencer · 91-120d vencido reciente · +120d vencido crítico
         </p>
       </div>
     </div>
@@ -296,26 +296,28 @@ function MobileHero({ total, clientCount }: { total: number; clientCount: number
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Aging chips filtros — Corriente / Vigilancia / Vencido (clickeables)
+// Aging chips filtros — Por vencer / Vencido reciente / Vencido crítico
+// (3 buckets de presentación; los 8 buckets de cxc_aging se siguen agregando
+// abajo en el detalle del cliente y la barra muestra el wedge granular).
 // ─────────────────────────────────────────────────────────────────────────────
 
 const AGING_THEME = {
   current: {
-    label: "Corriente",
+    label: "Por vencer",
     border: "border-[#0F6E56]",
     text: "text-[#0F6E56]",
     bgActive: "bg-[#0F6E56]/10",
     borderActive: "border-[#0F6E56]",
   },
   watch: {
-    label: "Vigilancia",
+    label: "Vencido reciente",
     border: "border-[#B45309]",
     text: "text-[#B45309]",
     bgActive: "bg-[#B45309]/10",
     borderActive: "border-[#B45309]",
   },
   overdue: {
-    label: "Vencido",
+    label: "Vencido crítico",
     border: "border-[#A32D2D]",
     text: "text-[#A32D2D]",
     bgActive: "bg-[#A32D2D]/10",

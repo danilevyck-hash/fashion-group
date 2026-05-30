@@ -34,7 +34,7 @@ export default function KpiCards({ roleClients, riskFilter, onRiskFilterChange }
     },
     {
       key: "current",
-      label: "Corriente",
+      label: "Por vencer",
       sublabel: "0-90d",
       value: totalCurrent,
       count: currentClients,
@@ -44,7 +44,7 @@ export default function KpiCards({ roleClients, riskFilter, onRiskFilterChange }
     },
     {
       key: "watch",
-      label: "Vigilancia",
+      label: "Vencido reciente",
       sublabel: "91-120d",
       value: totalWatch,
       count: watchClients,
@@ -54,8 +54,8 @@ export default function KpiCards({ roleClients, riskFilter, onRiskFilterChange }
     },
     {
       key: "overdue",
-      label: "Vencido",
-      sublabel: "+121d",
+      label: "Vencido crítico",
+      sublabel: "+120d",
       value: totalOverdue,
       count: criticalClients,
       countLabel: "clientes",

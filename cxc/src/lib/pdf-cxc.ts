@@ -139,7 +139,7 @@ export function generatePDFResumen(data: ConsolidatedClient[], subtitle?: string
   autoTable(doc, {
     startY: y,
     margin: { left: 19, right: 19 },
-    head: [["Cliente", "Corriente 0-90d", "Vigilancia 91-120d", "Vencido 121d+", "Total"]],
+    head: [["Cliente", "Por vencer 0-90d", "Vencido reciente 91-120d", "Vencido crítico +120d", "Total"]],
     body: tableData,
     foot: [["TOTAL", `$${fmt(totalCurrent)}`, `$${fmt(totalWatch)}`, `$${fmt(totalOverdue)}`, `$${fmt(totalCxc)}`]],
     styles: { font: "helvetica", fontSize: 8, cellPadding: 2, textColor: [17, 24, 39] },

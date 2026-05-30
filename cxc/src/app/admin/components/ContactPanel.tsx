@@ -130,9 +130,9 @@ export default function ContactPanel({
               <thead>
                 <tr className="text-[10px] text-gray-400 uppercase tracking-wider">
                   {roleCompanies.length > 1 && <th className="text-left py-1.5 font-medium">Empresa</th>}
-                  <th className="text-right py-1.5 font-medium text-emerald-600">0-90d</th>
-                  <th className="text-right py-1.5 font-medium text-amber-600">91-120d</th>
-                  <th className="text-right py-1.5 font-medium text-red-500">121d+</th>
+                  <th className="text-right py-1.5 font-medium text-emerald-600" title="0-30 + 31-60 + 61-90 días">Por vencer</th>
+                  <th className="text-right py-1.5 font-medium text-amber-600" title="91-120 días">Vencido reciente</th>
+                  <th className="text-right py-1.5 font-medium text-red-500" title="121-180 + 181-270 + 271-365 + +365 días">Vencido crítico</th>
                   <th className="text-right py-1.5 font-medium">Total</th>
                 </tr>
               </thead>
@@ -142,12 +142,16 @@ export default function ContactPanel({
                   const current = d.d0_30 + d.d31_60 + d.d61_90;
                   const watch = d.d91_120;
                   const overdue = d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365;
+                  // Tooltips con el desglose de los 8 buckets originales
+                  // (presentación agrupada en 3, detalle disponible al hover).
+                  const tipCurrent = `0-30: $${fmt(d.d0_30)} · 31-60: $${fmt(d.d31_60)} · 61-90: $${fmt(d.d61_90)}`;
+                  const tipOverdue = `121-180: $${fmt(d.d121_180)} · 181-270: $${fmt(d.d181_270)} · 271-365: $${fmt(d.d271_365)} · +365: $${fmt(d.mas_365)}`;
                   return (
                     <tr key={co.key} className="border-t border-gray-200 hover:bg-white transition">
                       {roleCompanies.length > 1 && <td className="py-1.5 font-medium">{co.name}</td>}
-                      <td className="text-right py-1.5 tabular-nums text-emerald-700">{fmt(current)}</td>
-                      <td className="text-right py-1.5 tabular-nums text-amber-600">{fmt(watch)}</td>
-                      <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(overdue)}</td>
+                      <td className="text-right py-1.5 tabular-nums text-emerald-700 cursor-help" title={tipCurrent}>{fmt(current)}</td>
+                      <td className="text-right py-1.5 tabular-nums text-amber-600 cursor-help" title="91-120 días">{fmt(watch)}</td>
+                      <td className="text-right py-1.5 tabular-nums text-red-600 cursor-help" title={tipOverdue}>{fmt(overdue)}</td>
                       <td className="text-right py-1.5 tabular-nums font-semibold">{fmt(d.total)}</td>
                     </tr>
                   );
@@ -251,9 +255,9 @@ export default function ContactPanel({
                     <thead>
                       <tr className="text-[10px] text-gray-400 uppercase tracking-wider">
                         <th className="text-left py-1.5 font-medium">Empresa</th>
-                        <th className="text-right py-1.5 font-medium">0-90d</th>
-                        <th className="text-right py-1.5 font-medium text-amber-600">91-120d</th>
-                        <th className="text-right py-1.5 font-medium text-red-500">121d+</th>
+                        <th className="text-right py-1.5 font-medium text-emerald-600" title="0-30 + 31-60 + 61-90 días">Por vencer</th>
+                        <th className="text-right py-1.5 font-medium text-amber-600" title="91-120 días">Vencido reciente</th>
+                        <th className="text-right py-1.5 font-medium text-red-500" title="121-180 + 181-270 + 271-365 + +365 días">Vencido crítico</th>
                         <th className="text-right py-1.5 font-medium">Total</th>
                       </tr>
                     </thead>
@@ -263,12 +267,14 @@ export default function ContactPanel({
                         const watch = inv.d91_120 || 0;
                         const overdue = (inv.d121_180 || 0) + (inv.d181_270 || 0) + (inv.d271_365 || 0) + (inv.mas_365 || 0);
                         const totalColor = overdue > 0 ? "text-red-600" : watch > 0 ? "text-amber-600" : "text-emerald-600";
+                        const tipCurrent = `0-30: $${fmt(inv.d0_30 || 0)} · 31-60: $${fmt(inv.d31_60 || 0)} · 61-90: $${fmt(inv.d61_90 || 0)}`;
+                        const tipOverdue = `121-180: $${fmt(inv.d121_180 || 0)} · 181-270: $${fmt(inv.d181_270 || 0)} · 271-365: $${fmt(inv.d271_365 || 0)} · +365: $${fmt(inv.mas_365 || 0)}`;
                         return (
                           <tr key={i} className="border-t border-gray-200 hover:bg-white transition">
                             <td className="py-1.5 font-medium">{COMPANIES.find(c => c.key === inv.company_key)?.name ?? inv.company_key}</td>
-                            <td className="text-right py-1.5 tabular-nums">{fmt(current)}</td>
-                            <td className="text-right py-1.5 tabular-nums text-amber-600">{fmt(watch)}</td>
-                            <td className="text-right py-1.5 tabular-nums text-red-600">{fmt(overdue)}</td>
+                            <td className="text-right py-1.5 tabular-nums text-emerald-700 cursor-help" title={tipCurrent}>{fmt(current)}</td>
+                            <td className="text-right py-1.5 tabular-nums text-amber-600 cursor-help" title="91-120 días">{fmt(watch)}</td>
+                            <td className="text-right py-1.5 tabular-nums text-red-600 cursor-help" title={tipOverdue}>{fmt(overdue)}</td>
                             <td className={`text-right py-1.5 tabular-nums font-semibold ${totalColor}`}>{fmt(inv.total)}</td>
                           </tr>
                         );

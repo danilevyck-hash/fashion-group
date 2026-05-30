@@ -46,9 +46,9 @@ function buildEmailBody(client: ConsolidatedClient) {
     lines.push(`${co.name} (${co.brand}): $${fmt(d.total)}`);
   }
   lines.push(``);
-  if (client.current > 0) lines.push(`Corriente (0-90d): $${fmt(client.current)}`);
-  if (client.watch > 0) lines.push(`Vigilancia (91-120d): $${fmt(client.watch)}`);
-  if (client.overdue > 0) lines.push(`VENCIDO (121d+): $${fmt(client.overdue)}`);
+  if (client.current > 0) lines.push(`Por vencer (0-90d): $${fmt(client.current)}`);
+  if (client.watch > 0) lines.push(`Vencido reciente (91-120d): $${fmt(client.watch)}`);
+  if (client.overdue > 0) lines.push(`VENCIDO CRITICO (+120d): $${fmt(client.overdue)}`);
   lines.push(`TOTAL: $${fmt(client.total)}`);
   lines.push(``);
   lines.push(`Agradecemos su pronta atencion a este saldo. Quedamos a su disposicion para cualquier consulta.`);
@@ -65,7 +65,7 @@ function exportCSV(data: ConsolidatedClient[], label?: string, riskLabel?: strin
   const meta = `"Reporte CXC Fashion Group — ${date}${companyLabel ? ` — ${companyLabel}` : ""}${riskLabel ? ` — ${riskLabel}` : ""} — ${data.length} registros"\n`;
   const header = "Cliente,0-30d,31-60d,61-90d,91-120d,121d+,Total,Estado,Correo,Telefono,Celular,Contacto\n";
   const rows = data.map((c) => {
-    const estado = c.overdue > 0 ? "Vencido" : c.watch > 0 ? "Vigilancia" : "Corriente";
+    const estado = c.overdue > 0 ? "Vencido crítico" : c.watch > 0 ? "Vencido reciente" : "Por vencer";
     return `"${c.nombre_normalized}",${(c.d0_30 ?? c.current).toFixed(2)},${(c.d31_60 ?? 0).toFixed(2)},${(c.d61_90 ?? 0).toFixed(2)},${(c.d91_120 ?? c.watch).toFixed(2)},${(c.d121_plus ?? c.overdue).toFixed(2)},${c.total.toFixed(2)},"${estado}","${c.correo}","${c.telefono}","${c.celular}","${c.contacto}"`;
   }).join("\n");
   const BOM = "\uFEFF";
@@ -410,7 +410,7 @@ function AdminDashboardInner() {
   function buildExportSubtitle() {
     const parts: string[] = [];
     if (riskFilter !== "all") {
-      const labels: Record<string, string> = { current: "Corriente", watch: "Vigilancia", overdue: "Vencido" };
+      const labels: Record<string, string> = { current: "Por vencer", watch: "Vencido reciente", overdue: "Vencido crítico" };
       parts.push(labels[riskFilter] || "");
     }
     if (companyFilter !== "all") {
@@ -448,9 +448,9 @@ function AdminDashboardInner() {
     exportConsolidado(roleClients, cxcCompanies);
   };
   const handleMobileExportCsv = () => {
-    const riskL = riskFilter === "all" ? "" : riskFilter === "current" ? "corriente" : riskFilter === "watch" ? "vigilancia" : "vencido";
+    const riskL = riskFilter === "all" ? "" : riskFilter === "current" ? "por-vencer" : riskFilter === "watch" ? "vencido-reciente" : "vencido-critico";
     const coL = companyFilter !== "all" ? COMPANIES.find((c) => c.key === companyFilter)?.name || "" : "";
-    const riskLabel = riskFilter === "all" ? "" : riskFilter === "current" ? "Corriente" : riskFilter === "watch" ? "Vigilancia" : "Vencido";
+    const riskLabel = riskFilter === "all" ? "" : riskFilter === "current" ? "Por vencer" : riskFilter === "watch" ? "Vencido reciente" : "Vencido crítico";
     exportCSV(filtered, [riskL, coL].filter(Boolean).join("_") || undefined, riskLabel || undefined, coL || undefined);
   };
 
@@ -524,9 +524,9 @@ function AdminDashboardInner() {
                 </div>
                 <button
                   onClick={() => {
-                    const riskL = riskFilter === "all" ? "" : riskFilter === "current" ? "corriente" : riskFilter === "watch" ? "vigilancia" : "vencido";
+                    const riskL = riskFilter === "all" ? "" : riskFilter === "current" ? "por-vencer" : riskFilter === "watch" ? "vencido-reciente" : "vencido-critico";
                     const coL = companyFilter !== "all" ? COMPANIES.find((c) => c.key === companyFilter)?.name || "" : "";
-                    const riskLabel = riskFilter === "all" ? "" : riskFilter === "current" ? "Corriente" : riskFilter === "watch" ? "Vigilancia" : "Vencido";
+                    const riskLabel = riskFilter === "all" ? "" : riskFilter === "current" ? "Por vencer" : riskFilter === "watch" ? "Vencido reciente" : "Vencido crítico";
                     exportCSV(filtered, [riskL, coL].filter(Boolean).join("_") || undefined, riskLabel || undefined, coL || undefined);
                     setShowExport(false);
                   }}
