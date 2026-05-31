@@ -99,7 +99,7 @@ export default function NewOrderModal({ onClose, onSelected }: Props) {
               <input value={name} onChange={e => setName(e.target.value)}
                 onFocus={() => { if (suggestions.length) setShowSugg(true); }}
                 onKeyDown={e => { if (e.key === "Enter" && canProceed) proceed(); }}
-                placeholder="Ej: City Mall Paso Canó" autoFocus
+                placeholder="" autoFocus
                 className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
               {showSugg && suggestions.length > 0 && (
                 <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
