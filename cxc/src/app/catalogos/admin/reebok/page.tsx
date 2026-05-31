@@ -641,6 +641,28 @@ function PedidosTab({
   const [deleting, setDeleting] = useState<UnifiedPedido | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [converting, setConverting] = useState<string | null>(null);
+
+  // "Editar del link": convierte la pública en reebok_orders (idempotente) y
+  // redirige a la maquinaria de edición existente. El origen se conserva
+  // (origen_original='link') — el pedido sigue mostrándose como "Del link".
+  async function handleEditLink(p: UnifiedPedido) {
+    if (converting) return;
+    setConverting(p.id_natural);
+    try {
+      const res = await fetch(
+        `/api/catalogo/reebok/pedidos-publicos/${p.id_natural}/convertir`,
+        { method: "POST" },
+      );
+      if (!res.ok) throw new Error("convert failed");
+      const data = await res.json();
+      if (!data?.order_id) throw new Error("sin order_id");
+      router.push(`/catalogo/reebok/pedido/${data.order_id}`);
+    } catch {
+      showToast("No se pudo abrir el pedido para editar. Intenta de nuevo.");
+      setConverting(null);
+    }
+  }
 
   async function handleExport() {
     if (exporting) return;
@@ -805,19 +827,31 @@ function PedidosTab({
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(pedido.created_at)}</td>
                   <td className="px-4 py-3 text-right">
-                    {/* Borrar inline sólo para públicas NO convertidas (viven en
-                        pedidos_publicos con short_id). Una convertida ya es un
-                        reebok_orders y no se borra desde acá. */}
+                    {/* Editar/Borrar inline sólo para públicas NO convertidas
+                        (viven en pedidos_publicos con short_id). Una convertida
+                        ya es un reebok_orders: se edita abriéndola con clic. */}
                     {(pedido.fuente ? pedido.fuente === "publicos" : pedido.origen === "link") && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setDeleting(pedido);
-                        }}
-                        className="px-2.5 py-1 rounded-md border border-red-200 text-xs text-red-600 hover:bg-red-50 transition"
-                      >
-                        Borrar
-                      </button>
+                      <div className="inline-flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditLink(pedido);
+                          }}
+                          disabled={converting === pedido.id_natural}
+                          className="px-2.5 py-1 rounded-md border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
+                        >
+                          {converting === pedido.id_natural ? "Abriendo..." : "Editar"}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleting(pedido);
+                          }}
+                          className="px-2.5 py-1 rounded-md border border-red-200 text-xs text-red-600 hover:bg-red-50 transition"
+                        >
+                          Borrar
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
