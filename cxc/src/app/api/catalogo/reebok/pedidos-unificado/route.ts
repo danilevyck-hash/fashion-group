@@ -28,6 +28,10 @@ interface UnifiedRow {
   created_at: string;
   vendor: string | null;
   items: UnifiedItem[] | null;
+  // FASE 2: tabla física de origen. 'orders' → reebok_orders (detalle interno),
+  // 'publicos' → reebok_pedidos_publicos (detalle del link). Ausente si la vista
+  // aún no fue migrada a FASE 2.
+  fuente?: "orders" | "publicos";
 }
 
 /**
@@ -72,6 +76,7 @@ export async function GET(req: NextRequest) {
       created_at: r.created_at,
       vendor: r.vendor,
       item_count: items.length,
+      fuente: r.fuente ?? (r.origen === "link" ? "publicos" : "orders"),
     };
   });
 

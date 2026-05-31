@@ -43,6 +43,10 @@ interface UnifiedPedido {
   created_at: string;
   vendor: string | null;
   item_count: number;
+  // Tabla física de origen. El badge usa `origen`; el routing del detalle y el
+  // borrado usan `fuente` (una pública convertida vive en reebok_orders pero se
+  // muestra como "Del link").
+  fuente?: "orders" | "publicos";
 }
 
 interface ImportRow {
@@ -674,8 +678,14 @@ function PedidosTab({
     return true;
   });
 
+  // El detalle se enruta por la tabla física (fuente), no por el badge: una
+  // pública convertida vive en reebok_orders y se abre en el detalle interno.
+  // Fallback por `origen` si la vista aún no expone `fuente`.
+  function isOrdersRow(p: UnifiedPedido): boolean {
+    return p.fuente ? p.fuente === "orders" : p.origen === "mio";
+  }
   function detailHref(p: UnifiedPedido): string {
-    return p.origen === "mio"
+    return isOrdersRow(p)
       ? `/catalogo/reebok/pedido/${p.id_natural}`
       : `/pedido-reebok/${p.id_natural}`;
   }
@@ -776,7 +786,7 @@ function PedidosTab({
             <tbody className="divide-y divide-gray-100">
               {filtered.map((pedido) => (
                 <tr
-                  key={`${pedido.origen}-${pedido.id_natural}`}
+                  key={`${pedido.fuente ?? pedido.origen}-${pedido.id_natural}`}
                   onClick={() => router.push(detailHref(pedido))}
                   className="hover:bg-gray-50 transition cursor-pointer"
                 >
@@ -795,7 +805,10 @@ function PedidosTab({
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(pedido.created_at)}</td>
                   <td className="px-4 py-3 text-right">
-                    {pedido.origen === "link" && (
+                    {/* Borrar inline sólo para públicas NO convertidas (viven en
+                        pedidos_publicos con short_id). Una convertida ya es un
+                        reebok_orders y no se borra desde acá. */}
+                    {(pedido.fuente ? pedido.fuente === "publicos" : pedido.origen === "link") && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
