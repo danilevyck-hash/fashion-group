@@ -636,6 +636,28 @@ function PedidosTab({
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState<UnifiedPedido | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const res = await fetch("/api/catalogo/reebok/pedidos-export", { method: "POST" });
+      if (!res.ok) throw new Error("export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Pedidos-Reebok-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Excel listo — revisa tu carpeta de descargas");
+    } catch {
+      showToast("No se pudo generar el Excel. Intenta de nuevo.");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const counts = {
     todos: pedidos.length,
@@ -686,6 +708,20 @@ function PedidosTab({
 
   return (
     <div>
+      {/* Acciones */}
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={handleExport}
+          disabled={exporting || pedidos.length === 0}
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md border border-gray-200 text-gray-700 hover:bg-gray-50 active:scale-[0.97] transition disabled:opacity-50"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          {exporting ? "Generando..." : "Exportar Excel"}
+        </button>
+      </div>
+
       {/* Filtros por origen */}
       <div className="flex gap-1 mb-4 border-b border-gray-200">
         {filterTabs.map((ft) => {
