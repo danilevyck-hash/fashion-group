@@ -10,28 +10,36 @@
  * 🟡-14: nunca sumar las dos fuentes → doble conteo).
  *
  * Query params (todos opcionales):
- *   tipo=facturas|estadocuenta   (default facturas)
- *   empresa=<empresa_key>        sincroniza solo esa empresa
- *   desde=YYYY-MM-DD&hasta=...   override de rango (manual), ambos o ninguno
+ *   tipo=facturas|estadocuenta|all   (default facturas)
+ *   empresa=<empresa_key>            sincroniza solo esa empresa
+ *   empresas=a,b,c                   CSV; precede a `empresa`
+ *   desde=YYYY-MM-DD&hasta=...        override de rango (manual), ambos o ninguno
  *
- * NOTA timing: estadocuenta hace una llamada por cliente (cientos/empresa). Las 6
- * empresas en una sola invocación tardan ~472s y NO caben en maxDuration=300.
- * Tampoco se pueden disparar 6 crons solapados: Switch es SESIÓN ÚNICA por
- * empresa — un 2do login a la misma empresa mata el token del 1ro (code 0006) y
- * dispara los 401 en CXC. Fix: SERIALIZAR + CONSOLIDAR. El cron de estadocuenta
- * corre en 3 entradas (?tipo=estadocuenta&empresas=a,b, CSV), cada una procesa
- * sus 2 empresas en serie dentro de una sola invocación (el for de abajo es
- * secuencial). Duraciones medidas (~85-120s/empresa, dominadas por el loop por
- * cliente; auth es por-empresa, no se comparte) → 2 empresas/run ≈ 200s, holgado
- * bajo 300s. Empresas distintas en crons distintos NO colisionan (0006 es por
- * empresa). El backfill (scripts/switch-backfill.ts) sigue para corridas masivas.
+ * tipo=all (PRODUCCIÓN): por cada empresa del grupo corre los 3 syncs EN SERIE
+ * dentro de UNA sola invocación —facturas → estadocuenta (solo B2B) → costo—
+ * reusando el MISMO token (tokenCache es por-empresa, TTL 55min: 1 auth por
+ * empresa cubre los 3 tipos). Es el modo que dispara el cron de producción.
+ *
+ * NOTA timing + sesión única (raíz del 401 / code 0006): Switch es SESIÓN ÚNICA
+ * por empresa — un 2do login a la misma empresa mata el token del 1ro (0006) →
+ * 401. Antes los crons facturas (monolito), estadocuenta (x3) y costo corrían en
+ * invocaciones separadas que Vercel agrupaba en un cluster, autenticando la MISMA
+ * empresa concurrentemente → colisión. Fix: UN cron por GRUPO de empresas con
+ * tipo=all. Cada empresa vive en exactamente un cron (cero colisión intra-empresa,
+ * todo serial) y empresas distintas no comparten sesión (cero colisión cross-cron,
+ * aunque Vercel los agrupe → ya NO depende de horarios). Duraciones medidas
+ * (~85-120s/empresa en estadocuenta; facturas/costo ~2-12s) → 2 B2B/run ≈ 210-225s,
+ * holgado bajo maxDuration=300. El backfill (scripts/switch-backfill.ts) sigue
+ * disponible para corridas masivas.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import {
   syncEmpresaFacturas,
   syncEmpresaEstadoCuenta,
+  syncCostoDiario,
   type EmpresaSyncResult,
+  type CostoDiarioResult,
 } from "@/lib/switch-api/sync-empresa";
 import {
   empresasConFacturas,
@@ -39,6 +47,8 @@ import {
   isEmpresaKey,
 } from "@/lib/switch-api/empresas";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
+
+type SyncTipo = "facturas" | "estadocuenta" | "all";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -77,18 +87,22 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const sp = req.nextUrl.searchParams;
 
   // tipo
-  const tipo = sp.get("tipo") ?? "facturas";
-  if (tipo !== "facturas" && tipo !== "estadocuenta") {
-    return NextResponse.json({ ok: false, error: "tipo inválido (facturas|estadocuenta)" }, { status: 400 });
+  const tipo = (sp.get("tipo") ?? "facturas") as SyncTipo;
+  if (tipo !== "facturas" && tipo !== "estadocuenta" && tipo !== "all") {
+    return NextResponse.json({ ok: false, error: "tipo inválido (facturas|estadocuenta|all)" }, { status: 400 });
   }
 
   // empresa(s) (opcional). `empresas=a,b,c` (CSV) tiene precedencia sobre
   // `empresa=x` singular; ambos siguen soportados (aditivo). Las empresas se
   // procesan SERIALMENTE en el for de abajo — requisito de la sesión única por
   // empresa de Switch (logins concurrentes a la misma empresa → code 0006).
+  //
+  // Universo: estadocuenta solo aplica a B2B (empresasConCxc); facturas y `all`
+  // aplican a todas las que tienen facturas (en `all`, estadocuenta se salta
+  // adentro del loop para las retail que no tienen CXC).
   const empresaParam = sp.get("empresa");
   const empresasParam = sp.get("empresas");
-  const universe: EmpresaKey[] = tipo === "facturas" ? empresasConFacturas() : empresasConCxc();
+  const universe: EmpresaKey[] = tipo === "estadocuenta" ? empresasConCxc() : empresasConFacturas();
   let empresas: EmpresaKey[];
   if (empresasParam !== null) {
     const raw = empresasParam.split(",").map(s => s.trim()).filter(Boolean);
@@ -143,18 +157,40 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     triggeredBy = "cron";
   }
 
-  const results: EmpresaSyncResult[] = [];
-  const errors: Array<{ empresaKey: string; error: string }> = [];
+  const results: Array<EmpresaSyncResult | CostoDiarioResult> = [];
+  const errors: Array<{ empresaKey: string; tipo: string; error: string }> = [];
+  const msg = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
+  // estadocuenta solo corre para B2B (empresasConCxc); en tipo=all las retail
+  // (american_classic, confecciones_boston) hacen solo facturas+costo.
+  const cxcSet = new Set<EmpresaKey>(empresasConCxc());
+
+  const runFacturas = async (empresaKey: EmpresaKey) => {
+    try { results.push(await syncEmpresaFacturas(empresaKey, { desde, hasta, triggeredBy })); }
+    catch (err) { errors.push({ empresaKey, tipo: "facturas", error: msg(err) }); }
+  };
+  const runEstadoCuenta = async (empresaKey: EmpresaKey) => {
+    try { results.push(await syncEmpresaEstadoCuenta(empresaKey, { desde, hasta, triggeredBy })); }
+    catch (err) { errors.push({ empresaKey, tipo: "estadocuenta", error: msg(err) }); }
+  };
+  const runCosto = async (empresaKey: EmpresaKey) => {
+    try { results.push(await syncCostoDiario(empresaKey, triggeredBy)); }
+    catch (err) { errors.push({ empresaKey, tipo: "costo", error: msg(err) }); }
+  };
+
+  // SERIAL por empresa. En tipo=all, los 3 syncs de UNA empresa corren seguidos
+  // (1 auth reusada) antes de pasar a la siguiente. Un fallo de un tipo NO aborta
+  // los demás ni el resto de empresas.
   for (const empresaKey of empresas) {
-    try {
-      const r =
-        tipo === "facturas"
-          ? await syncEmpresaFacturas(empresaKey, { desde, hasta, triggeredBy })
-          : await syncEmpresaEstadoCuenta(empresaKey, { desde, hasta, triggeredBy });
-      results.push(r);
-    } catch (err: unknown) {
-      errors.push({ empresaKey, error: err instanceof Error ? err.message : String(err) });
+    if (tipo === "facturas") {
+      await runFacturas(empresaKey);
+    } else if (tipo === "estadocuenta") {
+      await runEstadoCuenta(empresaKey);
+    } else {
+      // tipo === "all": facturas → estadocuenta (solo B2B) → costo
+      await runFacturas(empresaKey);
+      if (cxcSet.has(empresaKey)) await runEstadoCuenta(empresaKey);
+      await runCosto(empresaKey);
     }
   }
 
