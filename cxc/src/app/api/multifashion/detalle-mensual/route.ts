@@ -37,14 +37,28 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
 
-  const { data, error } = await supabaseServer.rpc("multifashion_detalle_mensual_v1", {
-    p_year: year,
-    p_mes: mes,
-  });
-  if (error) {
-    console.error("[multifashion/detalle-mensual] rpc error", error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // Detalle mensual + ventas por hora (hora pico) en paralelo. La hora pico es
+  // aditiva: si su RPC falla, el detalle igual responde (la sección de horas
+  // simplemente no se renderiza) — no bloquea el resto del subtab.
+  const [detalleRes, horasRes] = await Promise.all([
+    supabaseServer.rpc("multifashion_detalle_mensual_v1", { p_year: year, p_mes: mes }),
+    supabaseServer.rpc("multifashion_horas_pico_v1", { p_year: year, p_mes: mes }),
+  ]);
+
+  if (detalleRes.error) {
+    console.error("[multifashion/detalle-mensual] rpc error", detalleRes.error);
+    return NextResponse.json({ error: detalleRes.error.message }, { status: 500 });
   }
 
-  return NextResponse.json(data);
+  if (horasRes.error) {
+    console.error("[multifashion/detalle-mensual] horas rpc error", horasRes.error);
+  }
+  const horas = horasRes.error
+    ? { horas: [], hora_pico: null, hora_pico_ventas: null }
+    : (horasRes.data ?? { horas: [], hora_pico: null, hora_pico_ventas: null });
+
+  return NextResponse.json({
+    ...(detalleRes.data as Record<string, unknown>),
+    ...(horas as Record<string, unknown>),
+  });
 }

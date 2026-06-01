@@ -15,7 +15,7 @@ import {
 import { Award, AlertTriangle, Info } from "lucide-react";
 import {
   Bar, XAxis, YAxis, Tooltip as RTooltip,
-  ResponsiveContainer, Line, ComposedChart,
+  ResponsiveContainer, Line, ComposedChart, Cell,
 } from "recharts";
 import { fmtMoney, fmtMoneyCompact, fmtPct } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
@@ -34,6 +34,13 @@ interface HeatmapDow {
   dow_label: string;
   ventas_promedio: number;
   count_dias: number;
+}
+
+interface HoraRow {
+  /** Hora del día 0-23, en zona horaria de Panamá (UTC-5). */
+  hora: number;
+  ventas: number;
+  n_tickets: number;
 }
 
 interface Totales {
@@ -69,6 +76,11 @@ interface DetalleMensualResp {
   mejor_dia: { fecha: string; ventas: number } | null;
   peor_dia: { fecha: string; ventas: number } | null;
   heatmap_dia_semana: HeatmapDow[];
+  /** Ventas por hora del día (0-23, hora Panamá). Aditivo: puede faltar. */
+  horas?: HoraRow[];
+  /** Hora con mayor venta neta del mes (0-23, Panamá). null si sin ventas. */
+  hora_pico?: number | null;
+  hora_pico_ventas?: number | null;
 }
 
 interface DetalleMensualSubtabProps {
@@ -130,6 +142,42 @@ function renderDeltaInline(delta: number): string {
   if (isDeltaNegligible(delta)) return "≈0%";
   const arrow = delta >= 0 ? "▲" : "▼";
   return `${arrow} ${fmtPct(delta)}`;
+}
+
+// Hora 0-23 → etiqueta corta para el eje X ("9a", "12p", "4p").
+function horaLabelShort(h: number): string {
+  const period = h < 12 ? "a" : "p";
+  const hr = h % 12 === 0 ? 12 : h % 12;
+  return `${hr}${period}`;
+}
+
+// Hora pico 0-23 → rango legible ("4–5 pm", cruce de meridiano "11 pm–12 am").
+function horaPicoLabel(h: number): string {
+  const end = (h + 1) % 24;
+  const hr = (x: number) => (x % 12 === 0 ? 12 : x % 12);
+  const per = (x: number) => (x < 12 ? "am" : "pm");
+  return per(h) === per(end)
+    ? `${hr(h)}–${hr(end)} ${per(h)}`
+    : `${hr(h)} ${per(h)}–${hr(end)} ${per(end)}`;
+}
+
+// Tooltip del chart de ventas por hora.
+function HoraTooltip({ active, payload }: {
+  active?: boolean;
+  payload?: ReadonlyArray<unknown> | undefined;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const row = (payload[0] as { payload?: { hora: number; ventas: number; n_tickets: number } }).payload;
+  if (!row) return null;
+  return (
+    <div className="rounded-md border border-stone-200 bg-white px-3 py-2 text-xs shadow-sm">
+      <p className="font-medium text-stone-950">{horaPicoLabel(row.hora)}</p>
+      <p className="mt-0.5 font-mono tabular-nums text-stone-700">{fmtMoney(row.ventas)}</p>
+      <p className="text-[10px] text-stone-500">
+        {row.n_tickets} {row.n_tickets === 1 ? "ticket" : "tickets"}
+      </p>
+    </div>
+  );
 }
 
 export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
@@ -227,6 +275,22 @@ export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
     ventas:              Math.max(0, d.ventas),
     ventas_mes_anterior: showPrevLine ? Math.max(0, d.ventas_mes_anterior) : 0,
   }));
+
+  // Ventas por hora (hora Panamá). Recorta el chart al rango con actividad
+  // (primera→última hora con tickets) para no mostrar horas muertas.
+  const horas = data.horas ?? [];
+  const horaPico = data.hora_pico ?? null;
+  const horasConData = horas.filter(h => h.n_tickets > 0);
+  const minHora = horasConData.length ? Math.min(...horasConData.map(h => h.hora)) : 0;
+  const maxHora = horasConData.length ? Math.max(...horasConData.map(h => h.hora)) : 0;
+  const horasChart = horas
+    .filter(h => h.hora >= minHora && h.hora <= maxHora)
+    .map(h => ({
+      hora:      h.hora,
+      label:     horaLabelShort(h.hora),
+      ventas:    Math.max(0, h.ventas),
+      n_tickets: h.n_tickets,
+    }));
 
   const headerTitle = is_mes_actual
     ? `${mes_label} ${year} · al día ${data.dia_actual} (data más reciente)`
@@ -407,13 +471,52 @@ export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
         </section>
       )}
 
-      {/* Nota hora pico — solo si tiene data, no llenar visualmente cuando no hay nada */}
-      {hasData && (
+      {/* Ventas por hora del día + hora pico (hora Panamá). Reemplaza el aviso
+          viejo "hora no disponible" — la fecha SÍ trae hora (timestamptz). */}
+      {hasData && horasChart.length > 0 && (
         <section>
-          <Card className="flex items-center gap-3 border-stone-200 bg-stone-50 p-4">
-            <Info className="h-4 w-4 text-stone-400" />
-            <p className="text-xs text-stone-500">
-              Hora pico no disponible (la venta solo registra fecha, no hora).
+          <div className="mb-2 flex items-baseline justify-between gap-3">
+            <h4 className="font-display text-sm font-semibold text-stone-950">Ventas por hora</h4>
+            {horaPico != null && (
+              <span className="text-xs text-stone-500">
+                Hora pico <span className="font-medium text-teal-700">{horaPicoLabel(horaPico)}</span>
+              </span>
+            )}
+          </div>
+          <Card className="overflow-hidden p-3">
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer>
+                <ComposedChart data={horasChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                  <XAxis
+                    dataKey="label"
+                    interval={0}
+                    tick={{ fontSize: 10, fill: "#78716c" }}
+                    axisLine={{ stroke: "#e7e5e4" }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    domain={[0, "dataMax"]}
+                    allowDataOverflow={false}
+                    tick={{ fontSize: 10, fill: "#78716c" }}
+                    axisLine={{ stroke: "#e7e5e4" }}
+                    tickLine={false}
+                    tickFormatter={(v: number) => fmtMoneyCompact(v)}
+                  />
+                  <RTooltip
+                    cursor={{ fill: "rgba(0,0,0,0.03)" }}
+                    content={(p) => <HoraTooltip active={p.active} payload={p.payload as ReadonlyArray<unknown> | undefined} />}
+                  />
+                  <Bar dataKey="ventas" radius={[2, 2, 0, 0]}>
+                    {horasChart.map(h => (
+                      // Barra de la hora pico en teal más oscuro para destacarla.
+                      <Cell key={h.hora} fill={h.hora === horaPico ? "#0f766e" : "#5eead4"} />
+                    ))}
+                  </Bar>
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="mt-2 px-1 text-[10.5px] text-stone-500">
+              Ventas netas por hora del día (hora de Panamá) · {mes_label} {year}
             </p>
           </Card>
         </section>
