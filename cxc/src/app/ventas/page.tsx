@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { fetchVentasResumen, fetchClientes, fetchMultifashion, fetchAvailableYears } from "@/lib/ventas/queries";
 import { VentasShell } from "./VentasShell";
 
@@ -33,12 +34,16 @@ export default async function VentasPage() {
   ]);
 
   return (
-    <VentasShell
-      year={year}
-      availableYears={availableYears}
-      resumen={resumen}
-      clientes={clientes}
-      multi={multi}
-    />
+    // Suspense boundary requerido por useSearchParams (vía useUrlState en
+    // VentasShell) en Next 14 App Router. Mismo patrón que reclamos/upload.
+    <Suspense>
+      <VentasShell
+        year={year}
+        availableYears={availableYears}
+        resumen={resumen}
+        clientes={clientes}
+        multi={multi}
+      />
+    </Suspense>
   );
 }

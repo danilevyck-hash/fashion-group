@@ -1,6 +1,7 @@
 "use client";
 
 import { Card } from "@/components/ui/card";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, CalendarRange, Users, UserCircle, Package } from "lucide-react";
 import type { Multifashion, RetailMonthly, WholesaleMonthly } from "./types";
@@ -20,8 +21,11 @@ interface MultifashionViewProps {
 }
 
 export function MultifashionView({ data, selectedYear, isClosedYear }: MultifashionViewProps) {
+  // Sub-tab activo en la URL (?subtab=overview|mes|vendedoras|clientes). Key
+  // distinta a "tab" del shell para no chocar. Persiste en refresh/back-forward.
+  const [subtab, setSubtab] = useUrlState("subtab", "overview");
   return (
-    <Tabs defaultValue="overview" className="w-full">
+    <Tabs value={subtab} onValueChange={setSubtab} className="w-full">
       <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-stone-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
         <TabsTrigger value="overview" className={SUBTAB_TRIGGER_CLASS}>
           <TrendingUp className="h-3 w-3" /> Overview

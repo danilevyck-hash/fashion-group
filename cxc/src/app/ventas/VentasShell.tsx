@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useCallback } from "react";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Download, ShoppingBag, TrendingUp, Contact } from "lucide-react";
@@ -34,6 +35,9 @@ export function VentasShell({
   const [, startTransition] = useTransition();
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  // Tab activo en la URL (?tab=resumen|clientes|multifashion) para que refresh,
+  // back/forward y compartir-link mantengan dónde estaba el usuario.
+  const [tab, setTab] = useUrlState("tab", "resumen");
 
   const onYearChange = useCallback(async (year: number) => {
     if (year === selectedYear) return;
@@ -134,7 +138,7 @@ export function VentasShell({
         </div>
       </header>
 
-      <Tabs defaultValue="resumen" className="w-full">
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-stone-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
           <TabsTrigger
             value="resumen"
