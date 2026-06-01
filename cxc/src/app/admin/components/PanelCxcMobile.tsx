@@ -37,8 +37,6 @@ interface PanelCxcMobileProps {
   onToggleFavorite: (name: string) => void;
   contactLog?: Record<string, { date: string; method: string }>;
   canExport: boolean;
-  onCargar: () => void;
-  onConsolidado: () => void;
   onExportarCsv: () => void;
   empresaRestriction: string | null;
 }
@@ -57,8 +55,6 @@ export default function PanelCxcMobile({
   onToggleFavorite,
   contactLog,
   canExport,
-  onCargar,
-  onConsolidado,
   onExportarCsv,
   empresaRestriction,
 }: PanelCxcMobileProps) {
@@ -101,8 +97,6 @@ export default function PanelCxcMobile({
       <div className="px-4 pt-4 pb-6 space-y-4">
         <MobileHeader
           canExport={canExport}
-          onCargar={onCargar}
-          onConsolidado={onConsolidado}
           onExportar={onExportarCsv}
         />
 
@@ -179,13 +173,9 @@ export default function PanelCxcMobile({
 
 function MobileHeader({
   canExport,
-  onCargar,
-  onConsolidado,
   onExportar,
 }: {
   canExport: boolean;
-  onCargar: () => void;
-  onConsolidado: () => void;
   onExportar: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -234,8 +224,6 @@ function MobileHeader({
           </button>
           {open && (
             <div role="menu" className="absolute right-0 top-12 z-30 w-56 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-lg">
-              <MenuItem label="Cargar archivo" onClick={() => { setOpen(false); onCargar(); }} />
-              <MenuItem label="Consolidado" onClick={() => { setOpen(false); onConsolidado(); }} />
               <MenuItem label="Exportar CSV" onClick={() => { setOpen(false); onExportar(); }} />
             </div>
           )}

@@ -427,10 +427,6 @@ function AdminDashboardInner() {
 
   // Mobile actions — wired al mismo handler que usa el dropdown del desktop.
   // Inline para evitar prop drilling de COMPANIES + import dinámicos.
-  const handleMobileConsolidado = async () => {
-    const { exportConsolidado } = await import("@/lib/excel-cxc-consolidado");
-    exportConsolidado(roleClients, cxcCompanies);
-  };
   const handleMobileExportCsv = () => {
     const riskL = riskFilter === "all" ? "" : riskFilter === "current" ? "por-vencer" : riskFilter === "watch" ? "vencido-reciente" : "vencido-critico";
     const coL = companyFilter !== "all" ? COMPANIES.find((c) => c.key === companyFilter)?.name || "" : "";
@@ -457,8 +453,6 @@ function AdminDashboardInner() {
         onToggleFavorite={toggleFavorite}
         contactLog={contactLog}
         canExport={canExport}
-        onCargar={() => (window.location.href = "/upload?tab=cxc")}
-        onConsolidado={handleMobileConsolidado}
         onExportarCsv={handleMobileExportCsv}
         empresaRestriction={empresaRestriction}
       />
@@ -478,24 +472,6 @@ function AdminDashboardInner() {
       {/* Export buttons — admin/secretaria only */}
       {canExport && (
         <div className="flex justify-end items-center gap-2 sm:gap-3 mb-6 flex-wrap">
-          <button
-            onClick={() => (window.location.href = "/upload?tab=cxc")}
-            className="text-sm border border-gray-200 text-gray-700 px-4 sm:px-5 rounded-lg font-medium hover:bg-gray-50 active:bg-gray-100 transition-all flex items-center gap-2 min-h-[44px]"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <span className="hidden sm:inline">Cargar archivo</span>
-            <span className="sm:hidden">Cargar</span>
-          </button>
-          <button
-            onClick={async () => {
-              const { exportConsolidado } = await import("@/lib/excel-cxc-consolidado");
-              exportConsolidado(roleClients, cxcCompanies);
-            }}
-            className="text-sm border border-gray-200 text-gray-700 px-4 sm:px-5 rounded-lg font-medium hover:bg-gray-50 active:bg-gray-100 transition-all flex items-center gap-2 min-h-[44px]"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-            Consolidado
-          </button>
           <div className="relative">
             <button
               onClick={() => setShowExport(!showExport)}
