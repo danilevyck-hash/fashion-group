@@ -51,10 +51,8 @@ export default function ClientTable({
   toggleSort,
   sortArrow,
   userRole,
-  contactLog,
   onOpenEmail,
   onSaveEdit,
-  onQuickMarkContacted,
   favorites,
   onToggleFavorite,
   hideSearchAndRiskFilters,
@@ -290,8 +288,6 @@ export default function ClientTable({
                   isExpanded={isExpanded}
                   onToggle={() => setExpanded(isExpanded ? null : client.nombre_normalized)}
                   userRole={userRole}
-                  contactLog={contactLog}
-                  onQuickMarkContacted={onQuickMarkContacted}
                   isFavorite={favorites?.has(client.nombre_normalized)}
                   onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(client.nombre_normalized) : undefined}
                   onRowContextMenu={(e) => showContextMenu(e, buildClientContextMenu(client))}
@@ -299,7 +295,6 @@ export default function ClientTable({
                 <AccordionContent open={isExpanded}>
                   <ContactPanel
                     client={client}
-                    onOpenEmail={onOpenEmail}
                     onSaveEdit={onSaveEdit}
                     companyFilter={companyFilter}
                     roleCompanies={roleCompanies}

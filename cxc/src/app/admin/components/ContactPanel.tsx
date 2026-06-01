@@ -2,15 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Company } from "@/lib/companies";
-import { COMPANIES } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
 
-type InvoiceRow = { company_key: string; codigo: string; nombre: string; d0_30: number; d31_60: number; d61_90: number; d91_120: number; d121_180: number; d181_270: number; d271_365: number; mas_365: number; total: number };
-
 interface Props {
   client: ConsolidatedClient;
-  onOpenEmail: (client: ConsolidatedClient) => void;
   onSaveEdit: (nombre: string, data: { correo: string; telefono: string; celular: string; contacto: string }) => void;
   companyFilter: string;
   roleCompanies: Company[];
@@ -18,7 +14,6 @@ interface Props {
 
 export default function ContactPanel({
   client,
-  onOpenEmail,
   onSaveEdit,
   companyFilter,
   roleCompanies,
@@ -32,28 +27,6 @@ export default function ContactPanel({
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const editDataRef = useRef(editData);
   editDataRef.current = editData;
-
-  // FIX 9: Invoices fetched on demand
-  const [invoices, setInvoices] = useState<InvoiceRow[]>([]);
-  const [invoicesOpen, setInvoicesOpen] = useState(false);
-  const [invoicesLoading, setInvoicesLoading] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchInvoices() {
-      setInvoicesLoading(true);
-      try {
-        const res = await fetch(`/api/cxc-rows?name=${encodeURIComponent(client.nombre_normalized)}`);
-        if (!cancelled) {
-          const data = await res.json();
-          setInvoices(data || []);
-        }
-      } catch { /* */ }
-      if (!cancelled) setInvoicesLoading(false);
-    }
-    fetchInvoices();
-    return () => { cancelled = true; };
-  }, [client.nombre_normalized]);
 
   function startEdit() {
     setEditing(true);
@@ -101,17 +74,6 @@ export default function ContactPanel({
     <div className="bg-gray-50/80 px-6 py-4 border-b border-gray-200 space-y-3">
 
       {/* ═══ LEVEL 1: Always visible when expanded ═══ */}
-
-      {/* ── Quick actions ── */}
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          onClick={(e) => { e.stopPropagation(); onOpenEmail(client); }}
-          className="flex items-center gap-2 text-xs border border-gray-200 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition font-medium min-h-[36px]"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          Email
-        </button>
-      </div>
 
       {/* ── Company breakdown table (expanded by default) ──── */}
       {visibleCompanies.length > 0 && (
@@ -233,102 +195,8 @@ export default function ContactPanel({
               </div>
             )}
           </div>
-
-          {/* ── Facturas pendientes ────────────────────────── */}
-          <div>
-            <button
-              onClick={() => setInvoicesOpen(!invoicesOpen)}
-              className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5 hover:text-gray-700 transition"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-              <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${invoicesOpen ? "rotate-90" : ""}`} fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg>
-              Facturas pendientes {invoicesLoading ? "(cargando...)" : `(${invoices.length})`}
-            </button>
-            {invoicesOpen && (
-              invoicesLoading ? (
-                <div className="text-xs text-gray-400 py-2">Cargando facturas...</div>
-              ) : invoices.length === 0 ? (
-                <div className="text-xs text-gray-400 py-2">Sin facturas encontradas.</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="text-[10px] text-gray-400 uppercase tracking-wider">
-                        <th className="text-left py-1.5 font-medium">Empresa</th>
-                        <th className="text-right py-1.5 font-medium text-emerald-600" title="0-30 + 31-60 + 61-90 días">Por vencer</th>
-                        <th className="text-right py-1.5 font-medium text-amber-600" title="91-120 días">Vencido reciente</th>
-                        <th className="text-right py-1.5 font-medium text-red-500" title="121-180 + 181-270 + 271-365 + +365 días">Vencido crítico</th>
-                        <th className="text-right py-1.5 font-medium">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {invoices.map((inv, i) => {
-                        const current = (inv.d0_30 || 0) + (inv.d31_60 || 0) + (inv.d61_90 || 0);
-                        const watch = inv.d91_120 || 0;
-                        const overdue = (inv.d121_180 || 0) + (inv.d181_270 || 0) + (inv.d271_365 || 0) + (inv.mas_365 || 0);
-                        const totalColor = overdue > 0 ? "text-red-600" : watch > 0 ? "text-amber-600" : "text-emerald-600";
-                        const tipCurrent = `0-30: $${fmt(inv.d0_30 || 0)} · 31-60: $${fmt(inv.d31_60 || 0)} · 61-90: $${fmt(inv.d61_90 || 0)}`;
-                        const tipOverdue = `121-180: $${fmt(inv.d121_180 || 0)} · 181-270: $${fmt(inv.d181_270 || 0)} · 271-365: $${fmt(inv.d271_365 || 0)} · +365: $${fmt(inv.mas_365 || 0)}`;
-                        return (
-                          <tr key={i} className="border-t border-gray-200 hover:bg-white transition">
-                            <td className="py-1.5 font-medium">{COMPANIES.find(c => c.key === inv.company_key)?.name ?? inv.company_key}</td>
-                            <td className="text-right py-1.5 tabular-nums text-emerald-700 cursor-help" title={tipCurrent}>{fmt(current)}</td>
-                            <td className="text-right py-1.5 tabular-nums text-amber-600 cursor-help" title="91-120 días">{fmt(watch)}</td>
-                            <td className="text-right py-1.5 tabular-nums text-red-600 cursor-help" title={tipOverdue}>{fmt(overdue)}</td>
-                            <td className={`text-right py-1.5 tabular-nums font-semibold ${totalColor}`}>{fmt(inv.total)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )
-            )}
-          </div>
-
-          {/* ── Nota interna ───────────────────────────────── */}
-          <ClientNote clientName={client.nombre_normalized} />
         </>
       )}
-    </div>
-  );
-}
-
-function ClientNote({ clientName }: { clientName: string }) {
-  const [note, setNote] = useState("");
-  const [focused, setFocused] = useState(false);
-  const [savedAt, setSavedAt] = useState<number | null>(null);
-  const [showSaved, setShowSaved] = useState(false);
-  useEffect(() => {
-    try {
-      const all = JSON.parse(localStorage.getItem("fg_client_notes") || "{}");
-      setNote(all[clientName]?.text || all[clientName] || "");
-      setSavedAt(all[clientName]?.ts || null);
-    } catch { /* */ }
-  }, [clientName]);
-  function save() {
-    const now = Date.now();
-    try { const all = JSON.parse(localStorage.getItem("fg_client_notes") || "{}"); all[clientName] = { text: note, ts: now }; localStorage.setItem("fg_client_notes", JSON.stringify(all)); } catch { /* */ }
-    setSavedAt(now);
-    setShowSaved(true);
-    setTimeout(() => setShowSaved(false), 2000);
-  }
-  const agoMin = savedAt ? Math.floor((Date.now() - savedAt) / 60000) : null;
-  return (
-    <div>
-      <div className="text-[11px] uppercase tracking-wider text-gray-400 mb-1.5 font-medium flex items-center gap-1.5">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-        Nota interna
-        {showSaved && <span className="text-green-600 normal-case tracking-normal font-normal ml-1">Nota guardada</span>}
-      </div>
-      <textarea value={note} onChange={(e) => setNote(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => { setFocused(false); save(); }}
-        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); save(); } }}
-        placeholder="Ej: Acuerdo de pago, cliente VIP..." rows={1}
-        className="w-full border border-gray-200 rounded-lg p-2.5 text-xs outline-none focus:ring-1 focus:ring-gray-300 resize-none text-gray-600 placeholder:text-gray-300" />
-      <div className="flex items-center gap-2 mt-0.5">
-        {focused && <span className="text-[10px] text-gray-300">Presiona Enter para guardar</span>}
-        {savedAt && agoMin !== null && <span className="text-[10px] text-gray-300 ml-auto">Guardado {agoMin < 1 ? "ahora" : `hace ${agoMin} min`}</span>}
-      </div>
     </div>
   );
 }

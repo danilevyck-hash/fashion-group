@@ -53,7 +53,6 @@ export default function PanelCxcMobile({
   setCompanyFilter,
   favorites,
   onToggleFavorite,
-  contactLog,
   canExport,
   onExportarCsv,
   empresaRestriction,
@@ -137,10 +136,6 @@ export default function PanelCxcMobile({
         ) : (
           <ul className="space-y-2">
             {sortedMobile.map(client => {
-              const lastContact = contactLog?.[client.nombre_normalized];
-              const daysSinceContact = lastContact
-                ? Math.floor((Date.now() - new Date(lastContact.date).getTime()) / 86400000)
-                : null;
               const isExpanded = expandedName === client.nombre_normalized;
               return (
                 <li key={client.nombre_normalized}>
@@ -151,7 +146,6 @@ export default function PanelCxcMobile({
                     onToggleFavorite={() => onToggleFavorite(client.nombre_normalized)}
                     isExpanded={isExpanded}
                     onToggle={() => setExpandedName(prev => prev === client.nombre_normalized ? null : client.nombre_normalized)}
-                    daysSinceContact={daysSinceContact}
                   />
                 </li>
               );
@@ -423,7 +417,6 @@ function MobileClientCard({
   onToggleFavorite,
   isExpanded,
   onToggle,
-  daysSinceContact,
 }: {
   client: ConsolidatedClient;
   cxcCompanies: Company[];
@@ -431,10 +424,8 @@ function MobileClientCard({
   onToggleFavorite: () => void;
   isExpanded: boolean;
   onToggle: () => void;
-  daysSinceContact: number | null;
 }) {
   const borderLeft = worstBucketBorder(client);
-  const showStaleBadge = daysSinceContact !== null && daysSinceContact > 30;
 
   return (
     <article
@@ -462,11 +453,6 @@ function MobileClientCard({
               <span className="truncate text-sm font-medium text-stone-900">
                 {client.nombre_normalized}
               </span>
-              {showStaleBadge && (
-                <span className="shrink-0 rounded-full bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-stone-600">
-                  30d+
-                </span>
-              )}
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
