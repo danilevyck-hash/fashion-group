@@ -6,11 +6,9 @@
 //
 // Estructura: 2 KPI cards → Toggles segmented → Heatmap con sticky col +
 // mes actual highlighted + total grupo dark row.
-// Heatmap de una línea: el monto se colorea según la tendencia vs año pasado
-// (verde/rojo/stone). El % exacto se ve al tocar la celda (CellDetailPopover) —
-// no hay hover en touch, así que el drill-down es por tap.
+// Sin tooltips (no hover en touch); drill-down al detalle queda para el
+// siguiente sprint.
 
-import { useState } from "react";
 import type {
   VentasResumen,
   EmpresaMonthlySales,
@@ -18,7 +16,7 @@ import type {
   ProyeccionEmpresa,
 } from "./types";
 import { MONTHS, QUARTERS, formatCompactCurrency } from "@/lib/ventas/format";
-import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
+import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 
 type Granularity = "mensual" | "trimestral";
@@ -69,7 +67,6 @@ export function ResumenViewMobile({
       />
       <MobileHeatmap
         data={data}
-        selectedYear={selectedYear}
         viewMode={viewMode}
         granularity={granularity}
         isClosedYear={isClosedYear}
@@ -236,30 +233,18 @@ type CellData = {
   utilidadPrev: number;
 };
 
-// Detalle que se abre al tocar una celda (el % exacto vive acá, no en la grilla).
-type CellDetail = {
-  title: string;
-  pctLine: string;
-  rangeLine: string;
-  tone: DeltaTone;
-};
-
 function MobileHeatmap({
   data,
-  selectedYear,
   viewMode,
   granularity,
   isClosedYear,
 }: {
   data: VentasResumen;
-  selectedYear: number;
   viewMode: ViewMode;
   granularity: Granularity;
   isClosedYear: boolean;
 }) {
   const cols = granularity === "mensual" ? MONTHS : QUARTERS;
-  const prevYear = selectedYear - 1;
-  const [detail, setDetail] = useState<CellDetail | null>(null);
 
   // Índice de columna del mes en curso para highlight.
   // mesActual es 1-indexed (5 = May). En trimestral: ceil(5/3)=2 → Q2 → idx 1.
@@ -312,7 +297,6 @@ function MobileHeatmap({
   const showProy = !isClosedYear && !!data.proyeccion;
 
   return (
-    <>
     <div className="relative overflow-x-auto rounded-xl border border-stone-200 bg-white">
       <table className="w-full border-collapse text-xs">
         <thead>
@@ -360,7 +344,7 @@ function MobileHeatmap({
               <tr key={r.id} className="border-b border-stone-100 last:border-b-0">
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 min-w-[120px] max-w-[140px] truncate border-r border-stone-200 bg-white px-3 py-2.5 text-left text-xs font-medium text-stone-900"
+                  className="sticky left-0 z-10 min-w-[120px] max-w-[140px] truncate border-r border-stone-200 bg-white px-3 py-3 text-left text-xs font-medium text-stone-900"
                 >
                   {r.nombre}
                 </th>
@@ -370,9 +354,6 @@ function MobileHeatmap({
                     cell={c}
                     mode={viewMode}
                     highlighted={ci === currentColIdx}
-                    title={`${r.nombre} · ${cols[ci]}`}
-                    vsLabel={`${cols[ci]} ${prevYear}`}
-                    onSelect={setDetail}
                   />
                 ))}
                 <MobileTotalCell
@@ -381,9 +362,6 @@ function MobileHeatmap({
                   mode={viewMode}
                   margenPct={r.margenPct}
                   margenPctPrev={r.margenPctPrev}
-                  title={`${r.nombre} · Total`}
-                  vsLabel={`YTD ${prevYear}`}
-                  onSelect={setDetail}
                 />
                 {showProy && <MobileProyCell proyeccion={proy} />}
               </tr>
@@ -392,7 +370,7 @@ function MobileHeatmap({
           <tr className="bg-stone-900 text-white">
             <th
               scope="row"
-              className="sticky left-0 z-10 min-w-[120px] border-r border-stone-700 bg-stone-900 px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider"
+              className="sticky left-0 z-10 min-w-[120px] border-r border-stone-700 bg-stone-900 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider"
             >
               Total grupo
             </th>
@@ -402,9 +380,6 @@ function MobileHeatmap({
                 cell={agg}
                 mode={viewMode}
                 highlighted={ci === currentColIdx}
-                title={`Total grupo · ${cols[ci]}`}
-                vsLabel={`${cols[ci]} ${prevYear}`}
-                onSelect={setDetail}
               />
             ))}
             <MobileTotalGrupoYtdCell
@@ -414,9 +389,6 @@ function MobileHeatmap({
               prevUtil={groupYtd.up}
               mode={viewMode}
               data={data}
-              title="Total grupo · Total"
-              vsLabel={`YTD ${prevYear}`}
-              onSelect={setDetail}
             />
             {showProy && (
               <MobileProyGrupoCell proyeccion={data.proyeccion!} />
@@ -425,96 +397,17 @@ function MobileHeatmap({
         </tbody>
       </table>
     </div>
-    {detail && <CellDetailPopover detail={detail} onClose={() => setDetail(null)} />}
-    </>
   );
-}
-
-// Popover inferior (mini-sheet) que muestra el % exacto al tocar una celda.
-// El color del monto ya da la tendencia en la grilla; el número vive acá.
-function CellDetailPopover({ detail, onClose }: { detail: CellDetail; onClose: () => void }) {
-  const toneCls =
-    detail.tone === "emerald" ? "text-emerald-600"
-      : detail.tone === "orange" ? "text-rose-600"
-        : "text-stone-500";
-  return (
-    <>
-      <div className="fixed inset-0 z-40" onClick={onClose} aria-hidden />
-      <div
-        role="dialog"
-        className="fixed inset-x-4 bottom-4 z-50 rounded-xl border border-stone-200 bg-white p-4 shadow-lg"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <p className="text-sm font-semibold text-stone-900">{detail.title}</p>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="-mr-1 -mt-1 rounded-md p-1 text-stone-400 active:bg-stone-100"
-          >
-            ✕
-          </button>
-        </div>
-        <p className={cn("mt-1.5 text-sm font-medium", toneCls)}>{detail.pctLine}</p>
-        <p className="mt-0.5 font-mono text-xs tabular-nums text-stone-500">{detail.rangeLine}</p>
-      </div>
-    </>
-  );
-}
-
-// Color del monto según el signo del delta: verde subió, rojo bajó, stone
-// neutro (sin comparativo o sin cambio). El color comunica la tendencia sin
-// flecha ni número — el % exacto se ve al tocar (CellDetailPopover).
-function montoToneClass(delta: number | null, dark?: boolean): string {
-  if (delta == null) return dark ? "text-stone-400" : "text-stone-500";
-  if (delta > 0) return dark ? "text-emerald-300" : "text-emerald-600";
-  if (delta < 0) return dark ? "text-rose-300" : "text-rose-600";
-  return dark ? "text-stone-300" : "text-stone-500";
-}
-
-// Valor previo (año pasado) para mostrar "de X a Y" en el popover.
-function prevValue(c: CellData, mode: ViewMode): number {
-  if (mode === "utilidad") return c.utilidadPrev;
-  if (mode === "margen") return c.ventasPrev >= MARGEN_VENTAS_MIN ? c.utilidadPrev / c.ventasPrev : 0;
-  return c.ventasPrev;
-}
-
-// Arma el detalle del popover. Reusa formatDeltaRatio (mismo delta/umbral que
-// desktop). ventas/utilidad = ratio %, margen = puntos.
-function buildDetail(
-  title: string,
-  vsLabel: string,
-  mode: ViewMode,
-  cur: number,
-  prev: number,
-  delta: number | null,
-): CellDetail {
-  const fmt = formatDeltaRatio(delta, mode === "margen" ? "pts" : "pct");
-  const fmtVal = (n: number) => (mode === "margen" ? (n * 100).toFixed(1) + "%" : formatCompactCurrency(n));
-  return {
-    title,
-    pctLine: delta == null
-      ? `Sin comparativo vs ${vsLabel}`
-      : `vs ${vsLabel}: ${fmt.arrow ?? ""}${fmt.displayValue}`,
-    rangeLine: delta == null ? fmtVal(cur) : `${fmtVal(prev)} → ${fmtVal(cur)}`,
-    tone: fmt.tone,
-  };
 }
 
 function MobileCell({
   cell,
   mode,
   highlighted,
-  title,
-  vsLabel,
-  onSelect,
 }: {
   cell: CellData;
   mode: ViewMode;
   highlighted: boolean;
-  title: string;
-  vsLabel: string;
-  onSelect: (d: CellDetail) => void;
 }) {
   const cur = cellNumber(cell, mode);
   const delta = cellDelta(cell, mode);
@@ -522,24 +415,22 @@ function MobileCell({
 
   if (cur == null) {
     return (
-      <td className={cn("px-2 py-2.5 text-right font-mono text-[12px] tabular-nums text-stone-300", bgCls)}>
+      <td className={cn("px-2 py-3 text-right font-mono text-[11px] tabular-nums text-stone-300", bgCls)}>
         —
       </td>
     );
   }
 
-  // Una sola línea: el monto, coloreado según el signo del delta (verde subió,
-  // rojo bajó, stone neutro). El color comunica la tendencia sin saturar; el %
-  // exacto se ve al tocar (abre CellDetailPopover).
+  // Bloque alineado a la derecha: monto suave arriba (stone-600, sin negrita —
+  // deja de ser el grito principal), delta chiquito y discreto debajo con un
+  // poco de aire (gap-0.5). flex-col items-end alinea a la derecha sin centrar.
+  // Sin comparativo → DeltaPct no renderiza nada, queda solo el monto.
   return (
-    <td className={cn("p-0 text-right font-mono tabular-nums", bgCls)}>
-      <button
-        type="button"
-        onClick={() => onSelect(buildDetail(title, vsLabel, mode, cur, prevValue(cell, mode), delta))}
-        className={cn("block w-full px-2 py-2.5 text-right text-[12px] font-medium tabular-nums active:bg-stone-100", montoToneClass(delta))}
-      >
-        {renderCell(cur, mode)}
-      </button>
+    <td className={cn("px-2 py-3 text-right font-mono tabular-nums", bgCls)}>
+      <span className="flex flex-col items-end gap-0.5 leading-tight">
+        <span className="text-[11px] text-stone-600">{renderCell(cur, mode)}</span>
+        <DeltaPct delta={delta} mode={mode} />
+      </span>
     </td>
   );
 }
@@ -550,44 +441,31 @@ function MobileTotalCell({
   mode,
   margenPct,
   margenPctPrev,
-  title,
-  vsLabel,
-  onSelect,
 }: {
   ventas: number;
   prev: number;
   mode: ViewMode;
   margenPct: number;
   margenPctPrev: number;
-  title: string;
-  vsLabel: string;
-  onSelect: (d: CellDetail) => void;
 }) {
   let cur: number;
-  let prevVal: number;
   let delta: number | null;
   let display: string;
   if (mode === "margen") {
     cur = margenPct;
-    prevVal = margenPctPrev;
     delta = margenPctPrev > 0 ? margenPct - margenPctPrev : null;
     display = (cur * 100).toFixed(1) + "%";
   } else {
     cur = ventas;
-    prevVal = prev;
     delta = prev > 0 ? (ventas - prev) / prev : null;
     display = formatCompactCurrency(cur);
   }
-  // Ancla: monto fuerte y neutro (stone-950 semibold), una línea. Tap → % YTD.
   return (
-    <td className="border-l border-stone-200 p-0 text-right font-mono tabular-nums text-stone-950">
-      <button
-        type="button"
-        onClick={() => onSelect(buildDetail(title, vsLabel, mode, cur, prevVal, delta))}
-        className="block w-full px-2.5 py-2.5 text-right text-[12px] font-semibold tabular-nums active:bg-stone-100"
-      >
-        {display}
-      </button>
+    <td className="border-l border-stone-200 px-2.5 py-3 text-right font-mono tabular-nums text-stone-950">
+      <span className="flex flex-col items-end gap-0.5 leading-tight">
+        <span className="text-[11px] font-semibold">{display}</span>
+        <DeltaPct delta={delta} mode={mode} />
+      </span>
     </td>
   );
 }
@@ -595,13 +473,13 @@ function MobileTotalCell({
 function MobileProyCell({ proyeccion }: { proyeccion: ProyeccionEmpresa | null }) {
   if (!proyeccion) {
     return (
-      <td className="border-l border-stone-200 px-2.5 py-2.5 text-right font-mono text-[11px] tabular-nums text-stone-300">
+      <td className="border-l border-stone-200 px-2.5 py-3 text-right font-mono text-[11px] tabular-nums text-stone-300">
         —
       </td>
     );
   }
   return (
-    <td className="border-l border-stone-200 px-2.5 py-2.5 text-right font-mono text-[11px] font-semibold tabular-nums text-teal-700">
+    <td className="border-l border-stone-200 px-2.5 py-3 text-right font-mono text-[11px] font-semibold tabular-nums text-teal-700">
       {formatCompactCurrency(proyeccion.proyeccion_cierre)}
     </td>
   );
@@ -611,35 +489,25 @@ function MobileTotalGrupoCell({
   cell,
   mode,
   highlighted,
-  title,
-  vsLabel,
-  onSelect,
 }: {
   cell: CellData;
   mode: ViewMode;
   highlighted: boolean;
-  title: string;
-  vsLabel: string;
-  onSelect: (d: CellDetail) => void;
 }) {
   const cur = cellNumber(cell, mode);
   const delta = cellDelta(cell, mode);
   const bgCls = highlighted ? "bg-[rgba(15,118,110,0.12)]" : "";
 
   if (cur == null) {
-    return <td className={cn("px-2 py-2.5 text-right font-mono text-[12px] tabular-nums text-stone-500", bgCls)}>—</td>;
+    return <td className={cn("px-2 py-3 text-right font-mono text-[11px] tabular-nums text-stone-500", bgCls)}>—</td>;
   }
 
-  // Fila ancla (dark): monto blanco fuerte, una línea. Tap → % del mes.
   return (
-    <td className={cn("p-0 text-right font-mono tabular-nums", bgCls)}>
-      <button
-        type="button"
-        onClick={() => onSelect(buildDetail(title, vsLabel, mode, cur, prevValue(cell, mode), delta))}
-        className="block w-full px-2 py-2.5 text-right text-[12px] font-semibold tabular-nums text-white active:bg-white/10"
-      >
-        {renderCell(cur, mode)}
-      </button>
+    <td className={cn("px-2 py-3 text-right font-mono tabular-nums", bgCls)}>
+      <span className="flex flex-col items-end gap-0.5 leading-tight">
+        <span className="text-[11px] font-medium text-white">{renderCell(cur, mode)}</span>
+        <DeltaPct delta={delta} mode={mode} dark />
+      </span>
     </td>
   );
 }
@@ -651,9 +519,6 @@ function MobileTotalGrupoYtdCell({
   prevUtil,
   mode,
   data,
-  title,
-  vsLabel,
-  onSelect,
 }: {
   cur: number;
   prev: number;
@@ -661,52 +526,75 @@ function MobileTotalGrupoYtdCell({
   prevUtil: number;
   mode: ViewMode;
   data: VentasResumen;
-  title: string;
-  vsLabel: string;
-  onSelect: (d: CellDetail) => void;
 }) {
   let v: number;
-  let prevVal: number;
   let d: number | null;
   let display: string;
   if (mode === "margen") {
     v = data.kpis.margenYTD;
-    prevVal = data.kpis.margen2025YTD;
     d = data.kpis.margen2025YTD > 0 ? v - data.kpis.margen2025YTD : null;
     display = (v * 100).toFixed(1) + "%";
   } else if (mode === "utilidad") {
     v = curUtil;
-    prevVal = prevUtil;
     d = prevUtil > 0 ? (curUtil - prevUtil) / prevUtil : null;
     display = formatCompactCurrency(v);
   } else {
     v = cur;
-    prevVal = prev;
     d = prev > 0 ? (cur - prev) / prev : null;
     display = formatCompactCurrency(v);
   }
-  // Ancla principal (dark): monto blanco fuerte, una línea. Tap → % YTD grupo.
   return (
-    <td className="border-l border-stone-700 p-0 text-right font-mono tabular-nums text-white">
-      <button
-        type="button"
-        onClick={() => onSelect(buildDetail(title, vsLabel, mode, v, prevVal, d))}
-        className="block w-full px-2.5 py-2.5 text-right text-[12px] font-semibold tabular-nums active:bg-white/10"
-      >
-        {display}
-      </button>
+    <td className="border-l border-stone-700 px-2.5 py-3 text-right font-mono tabular-nums text-white">
+      <span className="flex flex-col items-end gap-0.5 leading-tight">
+        <span className="text-[11px] font-semibold">{display}</span>
+        <DeltaPct delta={d} mode={mode} dark />
+      </span>
     </td>
   );
 }
 
 function MobileProyGrupoCell({ proyeccion }: { proyeccion: ProyeccionResp }) {
   return (
-    <td className="border-l border-stone-700 px-2.5 py-2.5 text-right font-mono text-[11px] font-semibold tabular-nums text-teal-200">
+    <td className="border-l border-stone-700 px-2.5 py-3 text-right font-mono text-[11px] font-semibold tabular-nums text-teal-200">
       {formatCompactCurrency(proyeccion.totales_grupo.proyeccion_cierre)}
     </td>
   );
 }
 
+// Flecha + % numérico vs 2025, compacto debajo del monto. En todas las celdas
+// del heatmap (mensual/trimestral por empresa, total grupo y columna TOTAL),
+// para igualar al desktop, que muestra monto + flecha + Δ%. Usa el mismo delta
+// ya calculado por la celda (ventas/utilidad = ratio %, margen = puntos),
+// formateado con el helper compartido formatDeltaRatio.
+function DeltaPct({
+  delta,
+  mode,
+  dark,
+}: {
+  delta: number | null;
+  mode: ViewMode;
+  dark?: boolean;
+}) {
+  // Sin comparativo (RPC no devolvió prev) → no renderiza nada: queda solo el
+  // monto, sin segunda línea suelta. La zona neutral (delta dentro del umbral)
+  // sí muestra el % en stone, sin flecha.
+  if (delta == null) return null;
+  const fmt = formatDeltaRatio(delta, mode === "margen" ? "pts" : "pct");
+  const tone =
+    fmt.tone === "emerald"
+      ? dark ? "text-emerald-300" : "text-emerald-700"
+      : fmt.tone === "orange"
+        ? dark ? "text-rose-300" : "text-rose-600"
+        : dark ? "text-stone-400" : "text-stone-500";
+  // Flecha + % pegados en una sola pieza ("▲+110%"), sin espacio. Discreto
+  // (9px, sin negrita): el color aparece solo donde importa, sin que toda la
+  // grilla vibre.
+  return (
+    <span className={cn("text-[9px] font-normal leading-tight", tone)}>
+      {fmt.arrow ?? ""}{fmt.displayValue}
+    </span>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers de derivación de cells
