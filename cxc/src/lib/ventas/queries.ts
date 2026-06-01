@@ -42,7 +42,7 @@ const RETAIL_KEYS = new Set(["american_classic"]);
 // mismo total — sería doble conteo (~$300-800K YTD). El Resumen (fetchVentasResumen
 // → ventas_dashboard_summary → switch_ventas_unificado_vw) ya incluye
 // american_classic UNA vez; el tab Multifashion (fetchMultifashion →
-// multifashion_mensual_v5) es su propia vista y NO debe agregarse al total grupo.
+// multifashion_mensual_v6) es su propia vista y NO debe agregarse al total grupo.
 
 function toNum(v: number | string | null | undefined): number {
   return typeof v === "number" ? v : Number(v ?? 0) || 0;
@@ -398,14 +398,15 @@ export async function fetchMultifashion({
   year: number;
   mes: number;
 }): Promise<Multifashion> {
-  const { data, error } = await supabaseServer.rpc("multifashion_mensual_v5", {
+  const { data, error } = await supabaseServer.rpc("multifashion_mensual_v6", {
     p_year: year,
     p_mes: mes,
   });
-  if (error) throw new Error(`multifashion_mensual_v5: ${error.message}`);
+  if (error) throw new Error(`multifashion_mensual_v6: ${error.message}`);
 
-  // v5 devuelve el shape exacto Multifashion con bloques retail/wholesale/total.
-  // Ventas/tickets vienen de switch_facturas (v3 fase 2.1b); v5 agrega SOLO
-  // total.margen / total.margenPrev (margen real tienda completa, switch_costo_diario).
+  // v6 devuelve el shape exacto Multifashion con bloques retail/wholesale/total.
+  // Ventas/tickets de switch_facturas (v3 fase 2.1b) + total.margen tienda completa
+  // (v5) + vs2025 de retail.meses con prev-year BLEND switch∪ventas_raw (v6: Ene-Abr
+  // 2025 vienen de ventas_raw, que switch_facturas no cubre).
   return data as Multifashion;
 }
