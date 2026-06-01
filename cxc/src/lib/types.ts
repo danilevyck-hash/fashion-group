@@ -68,7 +68,6 @@ export interface ConsolidatedClient {
   celular: string;
   contacto: string;
   resultado_contacto?: string;
-  proximo_seguimiento?: string;
   total: number;
   current: number;    // 0-90
   watch: number;      // 91-120

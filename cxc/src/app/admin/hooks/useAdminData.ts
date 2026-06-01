@@ -68,7 +68,6 @@ export default function useAdminData() {
               celular: ovr?.celular || r.celular || "",
               contacto: ovr?.contacto || r.contacto || "",
               resultado_contacto: ovr?.resultado_contacto || "",
-              proximo_seguimiento: ovr?.proximo_seguimiento || "",
               total: 0, current: 0, watch: 0, overdue: 0,
               d0_30: 0, d31_60: 0, d61_90: 0, d91_120: 0, d121_plus: 0,
               hasOverride: !!ovr,

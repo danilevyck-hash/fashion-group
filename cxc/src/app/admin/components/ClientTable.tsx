@@ -10,7 +10,7 @@ import type { ContextMenuItem } from "@/components/ui";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
 
 type RiskFilter = "all" | "current" | "watch" | "overdue";
-type SortKey = "name" | "current" | "watch" | "overdue" | "total" | "follow_up";
+type SortKey = "name" | "current" | "watch" | "overdue" | "total";
 type SortDir = "asc" | "desc";
 
 interface Props {
