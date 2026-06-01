@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useTransition, useCallback } from "react";
-import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, Plus, ShoppingBag, TrendingUp, Contact, Target } from "lucide-react";
+import { Download, ShoppingBag, TrendingUp, Contact } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ResumenView } from "@/components/ventas/ResumenView";
 import { ClientesView } from "@/components/ventas/ClientesView";
@@ -103,8 +102,8 @@ export function VentasShell({
       {/* Page head — `relative z-20` para garantizar stacking context propio
           encima del TabsList (que tiene overflow-x-auto y crea su propio
           stacking en algunos browsers, tapando los buttons del header en
-          viewports angostos). Sin esto, Excel/Configurar metas/Cargar archivo
-          no respondían a click en producción. */}
+          viewports angostos). Sin esto, el botón Excel no respondía a click
+          en producción. */}
       <header className="relative z-20 mb-5 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-stone-950 md:text-4xl">
@@ -131,16 +130,6 @@ export function VentasShell({
           </Select>
           <Button variant="outline" size="sm" onClick={onExportExcel} disabled={!resumen}>
             <Download className="mr-1.5 h-3.5 w-3.5" /> Excel
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/ventas/metas">
-              <Target className="mr-1.5 h-3.5 w-3.5" /> Configurar metas
-            </Link>
-          </Button>
-          <Button size="sm" asChild>
-            <Link href="/upload?tab=ventas">
-              <Plus className="mr-1.5 h-3.5 w-3.5" /> Cargar archivo
-            </Link>
           </Button>
         </div>
       </header>

@@ -426,12 +426,6 @@ export function ResumenView({
         )}
       </div>
 
-      {/* Hero proyección de cierre — al final como conclusión, no premisa.
-          La matriz mes-a-mes es lo central; este hero resume el cierre
-          proyectado del año en curso comparado vs el cierre real prev. */}
-      {!isClosedYear && data.proyeccion && data.proyeccion.totales_grupo.ventas_ytd > 0 && (
-        <ProyeccionHero proyeccion={data.proyeccion} selectedYear={selectedYear} prevYear={prevYear} />
-      )}
       </div>
     </div>
   );
@@ -445,47 +439,6 @@ function KpiCard({ label, value, sub }: { label: string; value: string; sub?: st
       <p className="mt-1.5 font-mono text-[26px] font-medium leading-tight tracking-tight tabular-nums text-stone-950">{value}</p>
       {sub && <p className="mt-1.5 text-xs text-stone-500">{sub}</p>}
     </Card>
-  );
-}
-
-/**
- * Hero del Resumen — proyección de cierre del año en curso como medidor
- * principal, comparado con el cierre real del año anterior (no vs meta).
- *
- * Layout:
- *   [label uppercase tracking-wide]
- *   [monto grande Geist Mono]   [delta text-secondary]
- *   [subtítulo con cierre prev + YTD actual + %]
- *   [barra simple: real YTD sólido + proyección restante claro + marker prev]
- */
-function ProyeccionHero({
-  proyeccion, selectedYear, prevYear,
-}: {
-  proyeccion: ProyeccionResp;
-  selectedYear: number;
-  prevYear: number;
-}) {
-  const g = proyeccion.totales_grupo;
-  const proy  = g.proyeccion_cierre;
-  const delta = g.delta_vs_anio_anterior_total;
-  const deltaTone = delta == null
-    ? "text-stone-500"
-    : delta < 0 ? "text-red-700" : "text-emerald-700";
-
-  return (
-    <section className="space-y-2">
-      <p className="text-[11px] font-medium uppercase tracking-widest text-stone-500">
-        Proyección de cierre {selectedYear}
-      </p>
-      <p className="font-mono text-4xl font-medium leading-none tracking-tight tabular-nums text-stone-950 md:text-[40px]">
-        {fmtMoneyCompact(proy)}
-      </p>
-      {delta != null && (
-        <p className={cn("font-mono text-sm font-medium tabular-nums", deltaTone)}>
-          {(delta > 0 ? "+" : "") + fmtMoneyCompact(delta)} vs cierre {prevYear}
-        </p>
-      )}
-    </section>
   );
 }
 
@@ -722,10 +675,19 @@ function HeatCell({ cell, mode, prevYear }: { cell: Cell; mode: ViewMode; prevYe
                   <span className="text-stone-400">{renderCellValue(cur, mode)}</span>
                   <span className="text-[9px] font-medium text-stone-400">n/a</span>
                 </span>
-              ) : (
+              ) : mode === "margen" ? (
                 <span className="inline-flex items-baseline gap-1.5">
                   {fmt.arrow && <span className={cn("text-[10px]", tone)}>{fmt.arrow}</span>}
                   <span className="text-stone-950">{renderCellValue(cur, mode)}</span>
+                </span>
+              ) : (
+                // Modo Ventas/Utilidad: monto arriba, flecha + % same-period
+                // (fmt.displayValue ya viene del delta del RPC) abajo, menor.
+                <span className="flex flex-col items-end leading-tight">
+                  <span className="text-stone-950">{renderCellValue(cur, mode)}</span>
+                  <span className={cn("mt-0.5 text-[10px]", tone)}>
+                    {fmt.arrow ? `${fmt.arrow} ` : ""}{fmt.displayValue}
+                  </span>
                 </span>
               )}
             </button>
@@ -949,10 +911,19 @@ function TotalGroupCell({
               type="button"
               className="block w-full cursor-help px-2.5 py-3.5 text-right outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40"
             >
-              <span className="inline-flex items-baseline gap-1.5">
-                {fmt.arrow && <span className={cn("text-[10px]", arrowTone)}>{fmt.arrow}</span>}
-                <span className="text-white">{renderCellValue(cur, mode)}</span>
-              </span>
+              {mode === "margen" ? (
+                <span className="inline-flex items-baseline gap-1.5">
+                  {fmt.arrow && <span className={cn("text-[10px]", arrowTone)}>{fmt.arrow}</span>}
+                  <span className="text-white">{renderCellValue(cur, mode)}</span>
+                </span>
+              ) : (
+                <span className="flex flex-col items-end leading-tight">
+                  <span className="text-white">{renderCellValue(cur, mode)}</span>
+                  <span className={cn("mt-0.5 text-[10px]", arrowTone)}>
+                    {fmt.arrow ? `${fmt.arrow} ` : ""}{fmt.displayValue}
+                  </span>
+                </span>
+              )}
             </button>
           </TooltipTrigger>
           <TooltipContent

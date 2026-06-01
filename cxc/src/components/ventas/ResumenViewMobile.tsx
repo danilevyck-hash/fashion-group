@@ -4,8 +4,8 @@
 // el contenedor. El layout desktop existente queda intacto detrás de
 // hidden md:block en ResumenView.tsx.
 //
-// Estructura: Hero Proyección (teal-700) → 2 KPI cards → Toggles segmented →
-// Heatmap con sticky col + mes actual highlighted + total grupo dark row.
+// Estructura: 2 KPI cards → Toggles segmented → Heatmap con sticky col +
+// mes actual highlighted + total grupo dark row.
 // Sin tooltips (no hover en touch); drill-down al detalle queda para el
 // siguiente sprint.
 
@@ -54,17 +54,9 @@ export function ResumenViewMobile({
   setGranularity,
 }: ResumenViewMobileProps) {
   const prevYear = selectedYear - 1;
-  const showProyeccion = !isClosedYear && !!data.proyeccion && data.proyeccion.totales_grupo.ventas_ytd > 0;
 
   return (
     <div className="md:hidden space-y-4">
-      {showProyeccion && (
-        <MobileProyHero
-          proyeccion={data.proyeccion!}
-          selectedYear={selectedYear}
-          prevYear={prevYear}
-        />
-      )}
       <MobileKpis data={data} prevYear={prevYear} />
       <MobileToggles
         viewMode={viewMode}
@@ -79,43 +71,6 @@ export function ResumenViewMobile({
         isClosedYear={isClosedYear}
       />
     </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Hero Proyección — card teal-700 con % cumplimiento + progress + sub-cifras
-// ─────────────────────────────────────────────────────────────────────────────
-
-function MobileProyHero({
-  proyeccion,
-  selectedYear,
-  prevYear,
-}: {
-  proyeccion: ProyeccionResp;
-  selectedYear: number;
-  prevYear: number;
-}) {
-  const g = proyeccion.totales_grupo;
-  const proy = g.proyeccion_cierre;
-  const deltaCierre = g.delta_vs_anio_anterior_total;
-  const deltaToneCls = deltaCierre == null
-    ? "text-teal-100"
-    : deltaCierre < 0 ? "text-rose-200" : "text-emerald-200";
-
-  return (
-    <section className="rounded-xl bg-teal-700 p-5 text-white shadow-sm">
-      <p className="text-[10.5px] font-medium uppercase tracking-widest text-teal-100">
-        Proyección {selectedYear}
-      </p>
-      <p className="mt-2 font-mono text-[40px] font-medium leading-none tracking-tight tabular-nums">
-        {formatCompactCurrency(proy)}
-      </p>
-      {deltaCierre != null && (
-        <p className={cn("mt-2 font-mono text-xs font-medium tabular-nums", deltaToneCls)}>
-          {(deltaCierre > 0 ? "+" : "") + formatCompactCurrency(deltaCierre)} vs cierre {prevYear}
-        </p>
-      )}
-    </section>
   );
 }
 
