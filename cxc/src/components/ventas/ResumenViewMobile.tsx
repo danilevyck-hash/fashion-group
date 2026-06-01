@@ -427,18 +427,17 @@ function MobileCell({
   // confundir con un cambio neutro vs un sin-comparativo.
   const showNa = delta == null;
 
+  // Apilado en 2 líneas: monto arriba, flecha + Δ% debajo en chico. El ancho
+  // de mobile no alcanza para ponerlo en línea; apilar también reduce el ancho
+  // por columna (mejor en pantallas de teléfono). Mismo patrón que la columna
+  // TOTAL. showNa → "n/a" debajo (sin comparativo, igual que desktop).
   return (
-    <td className={cn("px-2 py-2.5 text-right font-mono text-[11px] tabular-nums", bgCls)}>
+    <td className={cn("px-2 py-1.5 text-right font-mono text-[11px] tabular-nums", bgCls)}>
+      <span className="block leading-tight text-stone-900">{renderCell(cur, mode)}</span>
       {showNa ? (
-        <span className="inline-flex items-baseline gap-0.5">
-          <span className="text-stone-900">{renderCell(cur, mode)}</span>
-          <span className="text-[9px] font-medium text-stone-400">n/a</span>
-        </span>
+        <span className="mt-0.5 block text-[9px] font-medium leading-none text-stone-400">n/a</span>
       ) : (
-        <span className="inline-flex items-baseline gap-0.5">
-          <DeltaArrow delta={delta} mode={mode} />
-          <span className="text-stone-900">{renderCell(cur, mode)}</span>
-        </span>
+        <DeltaPct delta={delta} mode={mode} />
       )}
     </td>
   );
@@ -506,15 +505,17 @@ function MobileTotalGrupoCell({
   const bgCls = highlighted ? "bg-[rgba(15,118,110,0.12)]" : "";
 
   if (cur == null) {
-    return <td className={cn("px-2 py-2.5 text-right font-mono text-[11px] tabular-nums text-stone-500", bgCls)}>—</td>;
+    return <td className={cn("px-2 py-1.5 text-right font-mono text-[11px] tabular-nums text-stone-500", bgCls)}>—</td>;
   }
 
   return (
-    <td className={cn("px-2 py-2.5 text-right font-mono text-[11px] font-medium tabular-nums", bgCls)}>
-      <span className="inline-flex items-baseline gap-0.5">
-        <DeltaArrow delta={delta} mode={mode} dark />
-        <span className="text-white">{renderCell(cur, mode)}</span>
-      </span>
+    <td className={cn("px-2 py-1.5 text-right font-mono text-[11px] font-medium tabular-nums", bgCls)}>
+      <span className="block leading-tight text-white">{renderCell(cur, mode)}</span>
+      {delta == null ? (
+        <span className="mt-0.5 block text-[9px] font-medium leading-none text-stone-400">n/a</span>
+      ) : (
+        <DeltaPct delta={delta} mode={mode} dark />
+      )}
     </td>
   );
 }
@@ -566,30 +567,11 @@ function MobileProyGrupoCell({ proyeccion }: { proyeccion: ProyeccionResp }) {
   );
 }
 
-function DeltaArrow({
-  delta,
-  mode,
-  dark,
-}: {
-  delta: number | null;
-  mode: ViewMode;
-  dark?: boolean;
-}) {
-  if (delta == null) return null;
-  const threshold = mode === "margen" ? 0.005 : 0.05;
-  if (delta > threshold) {
-    return <span className={cn("text-[9px]", dark ? "text-emerald-300" : "text-emerald-700")}>▲</span>;
-  }
-  if (delta < -threshold) {
-    return <span className={cn("text-[9px]", dark ? "text-rose-300" : "text-rose-600")}>▼</span>;
-  }
-  return null;
-}
-
-// Flecha + % numérico vs 2025, compacto debajo del monto. Solo en columna TOTAL
-// (por empresa + total grupo) para igualar al desktop, que muestra monto + flecha
-// + Δ%. Usa el mismo delta ya calculado por la celda (ventas/utilidad = ratio %,
-// margen = puntos), formateado con el helper compartido formatDeltaRatio.
+// Flecha + % numérico vs 2025, compacto debajo del monto. En todas las celdas
+// del heatmap (mensual/trimestral por empresa, total grupo y columna TOTAL),
+// para igualar al desktop, que muestra monto + flecha + Δ%. Usa el mismo delta
+// ya calculado por la celda (ventas/utilidad = ratio %, margen = puntos),
+// formateado con el helper compartido formatDeltaRatio.
 function DeltaPct({
   delta,
   mode,
