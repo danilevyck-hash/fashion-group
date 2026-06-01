@@ -427,7 +427,7 @@ function MobileCell({
   // Sin comparativo → DeltaPct no renderiza nada, queda solo el monto.
   return (
     <td className={cn("px-2 py-3 text-right font-mono tabular-nums", bgCls)}>
-      <span className="flex flex-col items-end gap-0.5 leading-tight">
+      <span className="flex flex-col items-end gap-1 leading-tight">
         <span className="text-[11px] text-stone-600">{renderCell(cur, mode)}</span>
         <DeltaPct delta={delta} mode={mode} />
       </span>
@@ -462,7 +462,7 @@ function MobileTotalCell({
   }
   return (
     <td className="border-l border-stone-200 px-2.5 py-3 text-right font-mono tabular-nums text-stone-950">
-      <span className="flex flex-col items-end gap-0.5 leading-tight">
+      <span className="flex flex-col items-end gap-1 leading-tight">
         <span className="text-[11px] font-semibold">{display}</span>
         <DeltaPct delta={delta} mode={mode} />
       </span>
@@ -504,7 +504,7 @@ function MobileTotalGrupoCell({
 
   return (
     <td className={cn("px-2 py-3 text-right font-mono tabular-nums", bgCls)}>
-      <span className="flex flex-col items-end gap-0.5 leading-tight">
+      <span className="flex flex-col items-end gap-1 leading-tight">
         <span className="text-[11px] font-medium text-white">{renderCell(cur, mode)}</span>
         <DeltaPct delta={delta} mode={mode} dark />
       </span>
@@ -545,7 +545,7 @@ function MobileTotalGrupoYtdCell({
   }
   return (
     <td className="border-l border-stone-700 px-2.5 py-3 text-right font-mono tabular-nums text-white">
-      <span className="flex flex-col items-end gap-0.5 leading-tight">
+      <span className="flex flex-col items-end gap-1 leading-tight">
         <span className="text-[11px] font-semibold">{display}</span>
         <DeltaPct delta={d} mode={mode} dark />
       </span>
@@ -590,7 +590,7 @@ function DeltaPct({
   // (9px, sin negrita): el color aparece solo donde importa, sin que toda la
   // grilla vibre.
   return (
-    <span className={cn("text-[9px] font-normal leading-tight", tone)}>
+    <span className={cn("text-[8px] font-normal leading-tight", tone)}>
       {fmt.arrow ?? ""}{fmt.displayValue}
     </span>
   );
