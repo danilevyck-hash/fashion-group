@@ -415,19 +415,20 @@ function MobileCell({
 
   if (cur == null) {
     return (
-      <td className={cn("px-2 py-2.5 text-right font-mono text-[11px] tabular-nums text-stone-300", bgCls)}>
+      <td className={cn("px-2 py-2 text-right font-mono text-[11px] tabular-nums text-stone-300", bgCls)}>
         —
       </td>
     );
   }
 
-  // Bloque alineado a la derecha: monto arriba, delta (flecha+%) chiquito y
-  // pegado debajo. flex-col items-end garantiza alineación derecha sin centrar.
+  // Bloque alineado a la derecha: monto suave arriba (stone-600, sin negrita —
+  // deja de ser el grito principal), delta chiquito y discreto debajo con un
+  // poco de aire (gap-0.5). flex-col items-end alinea a la derecha sin centrar.
   // Sin comparativo → DeltaPct no renderiza nada, queda solo el monto.
   return (
-    <td className={cn("px-2 py-1.5 text-right font-mono tabular-nums", bgCls)}>
-      <span className="flex flex-col items-end leading-tight">
-        <span className="text-[11px] text-stone-900">{renderCell(cur, mode)}</span>
+    <td className={cn("px-2 py-2 text-right font-mono tabular-nums", bgCls)}>
+      <span className="flex flex-col items-end gap-0.5 leading-tight">
+        <span className="text-[11px] text-stone-600">{renderCell(cur, mode)}</span>
         <DeltaPct delta={delta} mode={mode} />
       </span>
     </td>
@@ -460,8 +461,8 @@ function MobileTotalCell({
     display = formatCompactCurrency(cur);
   }
   return (
-    <td className="border-l border-stone-200 px-2.5 py-1.5 text-right font-mono tabular-nums text-stone-950">
-      <span className="flex flex-col items-end leading-tight">
+    <td className="border-l border-stone-200 px-2.5 py-2 text-right font-mono tabular-nums text-stone-950">
+      <span className="flex flex-col items-end gap-0.5 leading-tight">
         <span className="text-[11px] font-semibold">{display}</span>
         <DeltaPct delta={delta} mode={mode} />
       </span>
@@ -498,12 +499,12 @@ function MobileTotalGrupoCell({
   const bgCls = highlighted ? "bg-[rgba(15,118,110,0.12)]" : "";
 
   if (cur == null) {
-    return <td className={cn("px-2 py-1.5 text-right font-mono text-[11px] tabular-nums text-stone-500", bgCls)}>—</td>;
+    return <td className={cn("px-2 py-2 text-right font-mono text-[11px] tabular-nums text-stone-500", bgCls)}>—</td>;
   }
 
   return (
-    <td className={cn("px-2 py-1.5 text-right font-mono tabular-nums", bgCls)}>
-      <span className="flex flex-col items-end leading-tight">
+    <td className={cn("px-2 py-2 text-right font-mono tabular-nums", bgCls)}>
+      <span className="flex flex-col items-end gap-0.5 leading-tight">
         <span className="text-[11px] font-medium text-white">{renderCell(cur, mode)}</span>
         <DeltaPct delta={delta} mode={mode} dark />
       </span>
@@ -543,8 +544,8 @@ function MobileTotalGrupoYtdCell({
     display = formatCompactCurrency(v);
   }
   return (
-    <td className="border-l border-stone-700 px-2.5 py-1.5 text-right font-mono tabular-nums text-white">
-      <span className="flex flex-col items-end leading-tight">
+    <td className="border-l border-stone-700 px-2.5 py-2 text-right font-mono tabular-nums text-white">
+      <span className="flex flex-col items-end gap-0.5 leading-tight">
         <span className="text-[11px] font-semibold">{display}</span>
         <DeltaPct delta={d} mode={mode} dark />
       </span>
@@ -585,9 +586,11 @@ function DeltaPct({
       : fmt.tone === "orange"
         ? dark ? "text-rose-300" : "text-rose-600"
         : dark ? "text-stone-400" : "text-stone-500";
-  // Flecha + % pegados en una sola pieza ("▲+110%"), sin espacio.
+  // Flecha + % pegados en una sola pieza ("▲+110%"), sin espacio. Discreto
+  // (9px, sin negrita): el color aparece solo donde importa, sin que toda la
+  // grilla vibre.
   return (
-    <span className={cn("text-[10px] font-medium leading-tight", tone)}>
+    <span className={cn("text-[9px] font-normal leading-tight", tone)}>
       {fmt.arrow ?? ""}{fmt.displayValue}
     </span>
   );
