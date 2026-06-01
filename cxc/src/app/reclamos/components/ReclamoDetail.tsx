@@ -8,6 +8,7 @@ import { Reclamo, RItem } from "./types";
 import { ESTADOS, EMPRESAS, EC, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, buildSingleReclamoPdfHtml, openPdfWindow, loadCustomMotivos, saveCustomMotivo, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, estadoLabel } from "./constants";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
+import FotoBadge from "./FotoBadge";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   "Borrador": ["Enviado"],
@@ -151,7 +152,10 @@ export default function ReclamoDetail({
 
       <div className="flex items-start justify-between mb-4">
         <div>
-          <h1 className="text-xl font-light tracking-tight">{current.nro_reclamo}</h1>
+          <h1 className="text-xl font-light tracking-tight flex items-center gap-2">
+            {current.nro_reclamo}
+            <FotoBadge count={fotos.length} />
+          </h1>
           <p className="text-sm text-gray-400 mt-1">{current.empresa} — {current.marca} — {current.proveedor}</p>
           <p className="text-sm text-gray-400">Factura: {current.nro_factura}{current.nro_orden_compra ? ` | PO: ${current.nro_orden_compra}` : ""}</p>
           <p className="text-sm text-gray-400">{fmtDate(current.fecha_reclamo)} — {days} días</p>

@@ -6,6 +6,7 @@ import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
 import { ESTADOS, daysSince, calcSub, FACTOR_TOTAL, estadoLabel } from "./constants";
 import { EmptyState, StatusBadge, Toast } from "@/components/ui";
+import FotoBadge from "./FotoBadge";
 
 interface Props {
   role: string;
@@ -240,7 +241,10 @@ export default function EmpresaList({
                       <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!isOpen} className="accent-black disabled:opacity-50" />
                     )}
                     <div>
-                      <p className="text-sm font-medium">{r.nro_reclamo}</p>
+                      <p className="text-sm font-medium flex items-center gap-1.5">
+                        {r.nro_reclamo}
+                        <FotoBadge count={r.reclamo_fotos?.length ?? 0} />
+                      </p>
                       <p className="text-xs text-gray-400 mt-0.5">{r.nro_factura}</p>
                     </div>
                   </div>
@@ -314,7 +318,12 @@ export default function EmpresaList({
                       <input type="checkbox" checked={selectedIds.includes(r.id)} onChange={() => toggleSelect(r.id)} disabled={!isOpen} className="accent-black disabled:opacity-50" />
                     </td>
                   )}
-                  <td className="py-3 font-medium text-xs">{r.nro_reclamo}</td>
+                  <td className="py-3 font-medium text-xs">
+                    <span className="inline-flex items-center gap-1.5">
+                      {r.nro_reclamo}
+                      <FotoBadge count={r.reclamo_fotos?.length ?? 0} />
+                    </span>
+                  </td>
                   <td className="py-3 text-gray-500">{r.nro_factura}</td>
                   <td className="py-3 text-gray-500">{fmtDate(r.fecha_reclamo)}</td>
                   <td className={`py-3 text-right tabular-nums ${days > 60 && isOpen ? "text-red-600 font-medium" : days > 30 && isOpen ? "text-amber-600" : "text-gray-400"}`}>{days}d</td>
