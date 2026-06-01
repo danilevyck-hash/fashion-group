@@ -256,11 +256,17 @@ export interface SwitchEstadoCuentaData {
  * (2026-05-30) probando la API real — el envelope de error es
  * { error: { code, message, http_code } }:
  *  - "0005" TOKEN EXPIRADO        (documentado)
+ *  - "0006" SESIÓN ÚNICA: un 2do login a la misma empresa invalida el token del
+ *           1ro. Switch es sesión única por empresa → cuando dos corridas pisan
+ *           la misma empresa, la perdedora recibe 0006 y debe re-autenticar.
+ *           (Confirmado 2026-06; corrige la auditoría 🟡-9 que lo creía inexistente
+ *           para token.) El fix de raíz es serializar/consolidar los crons CXC
+ *           para no solapar la misma empresa; tratarlo como token-error acá da
+ *           recuperación adicional ante solapes transitorios.
  *  - "0008" NO SE HA ENCONTRADO UN TOKEN VALIDO  (token ausente → re-auth)
  *  - "0011" TOKEN INVALIDO        (verificado: token basura → HTTP 401 code 0011)
  *
- * NOTA: el code "0006" NO existe para token (auditoría 🟡-9). Los token-errors
- * llegan en HTTP 401, que el cliente ya re-autentica por fallback aunque el code
- * no esté en este set; el set importa para el caso "HTTP 200 con error en body".
+ * El set importa sobre todo para el caso "HTTP 200 con error en body" (los
+ * token-errors en HTTP 401 ya re-autentican por fallback del cliente).
  */
-export const SWITCH_TOKEN_ERROR_CODES = new Set(["0005", "0008", "0011"]);
+export const SWITCH_TOKEN_ERROR_CODES = new Set(["0005", "0006", "0008", "0011"]);

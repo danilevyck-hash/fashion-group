@@ -15,12 +15,16 @@
  *   desde=YYYY-MM-DD&hasta=...   override de rango (manual), ambos o ninguno
  *
  * NOTA timing: estadocuenta hace una llamada por cliente (cientos/empresa). Las 6
- * empresas en una sola invocación tardan ~472s y NO caben en maxDuration=300
- * (timeout confirmado en prod: el run monolítico moría a mitad, dejando logs en
- * 'running' y empresas sin sincronizar). Por eso el cron de estadocuenta corre
- * UNA empresa por entrada en vercel.json (?tipo=estadocuenta&empresa=X,
- * escalonadas), cada una 9–124s, holgada bajo 300s. El backfill
- * (scripts/switch-backfill.ts) sigue disponible para corridas manuales masivas.
+ * empresas en una sola invocación tardan ~472s y NO caben en maxDuration=300.
+ * Tampoco se pueden disparar 6 crons solapados: Switch es SESIÓN ÚNICA por
+ * empresa — un 2do login a la misma empresa mata el token del 1ro (code 0006) y
+ * dispara los 401 en CXC. Fix: SERIALIZAR + CONSOLIDAR. El cron de estadocuenta
+ * corre en 3 entradas (?tipo=estadocuenta&empresas=a,b, CSV), cada una procesa
+ * sus 2 empresas en serie dentro de una sola invocación (el for de abajo es
+ * secuencial). Duraciones medidas (~85-120s/empresa, dominadas por el loop por
+ * cliente; auth es por-empresa, no se comparte) → 2 empresas/run ≈ 200s, holgado
+ * bajo 300s. Empresas distintas en crons distintos NO colisionan (0006 es por
+ * empresa). El backfill (scripts/switch-backfill.ts) sigue para corridas masivas.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -78,11 +82,28 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: "tipo inválido (facturas|estadocuenta)" }, { status: 400 });
   }
 
-  // empresa (opcional)
+  // empresa(s) (opcional). `empresas=a,b,c` (CSV) tiene precedencia sobre
+  // `empresa=x` singular; ambos siguen soportados (aditivo). Las empresas se
+  // procesan SERIALMENTE en el for de abajo — requisito de la sesión única por
+  // empresa de Switch (logins concurrentes a la misma empresa → code 0006).
   const empresaParam = sp.get("empresa");
+  const empresasParam = sp.get("empresas");
   const universe: EmpresaKey[] = tipo === "facturas" ? empresasConFacturas() : empresasConCxc();
   let empresas: EmpresaKey[];
-  if (empresaParam !== null) {
+  if (empresasParam !== null) {
+    const raw = empresasParam.split(",").map(s => s.trim()).filter(Boolean);
+    if (raw.length === 0) {
+      return NextResponse.json({ ok: false, error: "empresas vacío" }, { status: 400 });
+    }
+    const invalid = raw.filter(e => !isEmpresaKey(e) || !universe.includes(e as EmpresaKey));
+    if (invalid.length > 0) {
+      return NextResponse.json(
+        { ok: false, error: `empresa(s) inválida(s) para tipo ${tipo}: ${invalid.join(", ")}` },
+        { status: 400 },
+      );
+    }
+    empresas = [...new Set(raw)] as EmpresaKey[]; // dedupe, preserva orden
+  } else if (empresaParam !== null) {
     if (!isEmpresaKey(empresaParam)) {
       return NextResponse.json({ ok: false, error: `empresa inválida: ${empresaParam}` }, { status: 400 });
     }
