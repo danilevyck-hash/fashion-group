@@ -102,31 +102,43 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     return qs ? `/reclamos?${qs}` : "/reclamos";
   }
 
+  // Transiciones de NIVEL (list↔form↔detail) → push: cada nivel deja entrada
+  // en el historial para que el Back del navegador deshaga un nivel a la vez.
+  // Los cambios al MISMO nivel (search, filtro de estado, sort) son useState
+  // puro y no tocan la URL, así que no contaminan el historial.
   function setView(v: RView, id?: string) {
     _setView(v);
-    router.replace(buildUrl(v, id, activeEmpresa));
+    router.push(buildUrl(v, id, activeEmpresa));
   }
 
+  // Cambio de empresa = drill-down de nivel (selector ↔ empresa ↔ detalle) → push.
   function changeEmpresa(empresa: string | null, opts?: { view?: RView; id?: string | null }) {
     setActiveEmpresa(empresa);
     const v = opts?.view ?? view;
     const id = opts?.id ?? (v === "detail" ? current?.id : null);
-    router.replace(buildUrl(v, id, empresa));
+    _setView(v);
+    router.push(buildUrl(v, id, empresa));
   }
 
+  // loadDetail SOLO trae datos y muestra el detalle localmente (sin navegar).
+  // La entrada de historial la crea el caller (setView/changeEmpresa) una sola
+  // vez. Así popstate (Back/Forward) y los refresh inline no pushean de más.
   const loadDetail = useCallback(async (id: string) => {
     try {
       const res = await fetch(`/api/reclamos/${id}`);
-      if (res.ok) { const d = await res.json(); if (d?.id) { setCurrent(d); setView("detail", d.id); } }
+      if (res.ok) { const d = await res.json(); if (d?.id) { setCurrent(d); _setView("detail"); } }
     } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
+    // Back/Forward: reconstruye los 3 niveles (empresa + view + id) desde la URL.
     function onPopState() {
       const params = new URLSearchParams(window.location.search);
       const v = (params.get("view") as RView) || "list";
       const id = params.get("id") || "";
+      const emp = params.get("empresa");
+      setActiveEmpresa(emp ? decodeURIComponent(emp) : null);
       _setView(v);
       if (v === "detail" && id) loadDetail(id);
       else if (v === "list") setCurrent(null);
@@ -337,7 +349,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
           setSortDir={setSortDir}
           onBack={() => changeEmpresa(null)}
           onNewReclamo={() => { resetForm(); setFEmpresa(activeEmpresa); setView("form"); }}
-          onLoadDetail={(id) => loadDetail(id)}
+          onLoadDetail={(id) => { setView("detail", id); loadDetail(id); }}
           onDeleteReclamo={(id) => requestDeleteReclamo(id)}
         />
         {deleteModal}
@@ -366,7 +378,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         newMotivoText={newMotivoText} setNewMotivoText={setNewMotivoText}
         onSave={saveReclamo}
         onCancel={() => { resetForm(); setView("list"); }}
-        onViewSaved={() => { const id = savedReclamoId; resetForm(); loadReclamos(); if (id) loadDetail(id); }}
+        onViewSaved={() => { const id = savedReclamoId; resetForm(); loadReclamos(); if (id) { setView("detail", id); loadDetail(id); } }}
         onResetAndCreateAnother={resetForm}
         hasDraft={hasReclamoDraft}
         draftTimeAgo={reclamoDraftTimeAgo}

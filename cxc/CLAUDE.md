@@ -97,6 +97,14 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 - 1 acción principal por vista + OverflowMenu "···" para secundarias
 - Toasts: errores 8s, éxitos 3s, con botón X para cerrar
 
+## Navegación e Historial (Back/Forward consistente)
+- **Regla:** el stack del historial debe ser ESPEJO del breadcrumb (Inicio › Grupo › Módulo › Detalle). El Back del navegador solo deshace la última URL — no conoce la jerarquía, así que la jerarquía debe vivir en el historial.
+- **Drill-down a un nivel más profundo → `push`** (selector→empresa, lista→detalle, módulo→sub-route). Cada nivel deja entrada → Back deshace un nivel a la vez.
+- **Filtro / tab / sort en el MISMO nivel → `replace`** (no debe crear entrada; Back no debe ciclar por tabs/filtros).
+- `useUrlState(key, default, { history: "push" })` para params que representan un nivel; default `"replace"` para filtros/tabs.
+- **SPAs de un solo route** (varios niveles bajo un mismo `/route`): el patrón de referencia es **Camisetas** (`src/app/camisetas/page.tsx`) — `pushState` para drill-down, `replaceState` para tabs, listener `popstate` que reconstruye el estado desde la URL. Reclamos (`src/app/reclamos/ReclamosClient.tsx`) sigue el mismo modelo vía router de Next.
+- Módulos con **routes reales** (Caja, Préstamos, Guías, Clientes detalle) ya son correctos: cada nivel es una URL distinta empujada con `router.push`/`<Link>`. No requieren tratamiento especial.
+
 ## Keyboard Shortcuts (Desktop)
 - `/` o `⌘K` — buscar
 - `?` — mostrar ayuda de atajos
