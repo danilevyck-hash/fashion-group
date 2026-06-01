@@ -578,6 +578,51 @@ function mapEstadoCuentaElement(
   };
 }
 
+/**
+ * Persiste el directorio completo de clientes (de /apicliente/lista) en
+ * switch_clientes. Es el PUENTE id→codigo que usan las vistas de clientes para
+ * mapear switch_facturas.(empresa_key, cliente_switch_id) → codigo D-XXX →
+ * clientes_master. Incluye clientes de contado que NO aparecen en
+ * switch_estadocuenta (ver migration 20260601000000_switch_clientes.sql).
+ *
+ * Upsert atómico por (empresa_key, cliente_switch_id). No reconcilia/borra: el
+ * directorio es acumulativo (un cliente que deja de listarse mantiene su mapeo
+ * histórico para no romper facturas viejas que lo referencien).
+ */
+async function persistClientesDirectorio(
+  empresaKey: string,
+  clientes: SwitchCliente[],
+  runStamp: string,
+): Promise<number> {
+  // Dedupe within-batch por id (último gana) y descartar sin id numérico.
+  const byId = new Map<number, SwitchCliente>();
+  for (const c of clientes) {
+    if (typeof c.id === "number") byId.set(c.id, c);
+  }
+  if (byId.size === 0) return 0;
+
+  const payload = Array.from(byId.values()).map((c) => ({
+    empresa_key: empresaKey,
+    cliente_switch_id: c.id,
+    codigo: c.codigo ?? null,
+    nombre: c.nombre ?? null,
+    razonsocial: c.razonsocial ?? null,
+    email: c.email ?? null,
+    telefono: c.telefono ?? null,
+    celular: c.celular ?? null,
+    identificacion: c.identificacion ?? null,
+    raw_data: c,
+    synced_at: runStamp,
+    updated_at: runStamp,
+  }));
+
+  const { error } = await supabaseServer
+    .from("switch_clientes")
+    .upsert(payload, { onConflict: "empresa_key,cliente_switch_id", ignoreDuplicates: false });
+  if (error) throw new Error(`UPSERT switch_clientes falló: ${error.message}`);
+  return payload.length;
+}
+
 async function persistEstadoCuentaBatch(
   empresaKey: string,
   rows: EstadoCuentaRow[],
@@ -684,6 +729,18 @@ export async function syncEmpresaEstadoCuenta(
         campo: "listClientes_paginacion_incompleta",
         valorCrudo: { total_reportado: clientesTotalReportado, traidos: clientes.length, faltantes },
       });
+    }
+
+    // 1b) Persistir el directorio completo en switch_clientes (PUENTE id→codigo
+    //     para las vistas de clientes). Se hace acá porque ya tenemos la lista
+    //     completa en memoria; incluye clientes de contado ausentes de
+    //     switch_estadocuenta. Falla del directorio NO aborta el sync de CXC.
+    try {
+      const dirCount = await persistClientesDirectorio(empresaKey, clientes, runStamp);
+      console.error(`[sync ${empresaKey} cxc] switch_clientes: ${dirCount} clientes upserted (puente id→codigo)`);
+    } catch (err) {
+      console.error(`[sync ${empresaKey} cxc] WARNING persistClientesDirectorio: ${err instanceof Error ? err.message : String(err)}`);
+      skipDetails.push({ facturaId: null, secuencial: null, campo: "persistClientesDirectorio", valorCrudo: err instanceof Error ? err.message : String(err) });
     }
 
     // 2) Estado de cuenta por cliente → buffer → flush batches.
