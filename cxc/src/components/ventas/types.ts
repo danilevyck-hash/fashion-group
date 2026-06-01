@@ -294,6 +294,13 @@ export type MultifashionWholesale = {
 export type MultifashionTotal = {
   ytdVentas: number;
   ytdTickets: number;
+  /** Margen bruto a nivel TIENDA COMPLETA (retail + mayoreo). Costo real de
+   *  switch_costo_diario (tipo=03, total-tienda) vs ventas totales. La API no
+   *  separa costo retail puro, por eso el margen solo es honesto a nivel tienda.
+   *  null si no hay costo en el período (renderiza '—'). */
+  margen: number | null;
+  /** Margen tienda completa del año anterior, mismo período (YTD through mes). */
+  margenPrev: number | null;
 };
 
 export type Multifashion = {

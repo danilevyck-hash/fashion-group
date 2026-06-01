@@ -42,7 +42,7 @@ const RETAIL_KEYS = new Set(["american_classic"]);
 // mismo total — sería doble conteo (~$300-800K YTD). El Resumen (fetchVentasResumen
 // → ventas_dashboard_summary → switch_ventas_unificado_vw) ya incluye
 // american_classic UNA vez; el tab Multifashion (fetchMultifashion →
-// multifashion_mensual_v3) es su propia vista y NO debe agregarse al total grupo.
+// multifashion_mensual_v4) es su propia vista y NO debe agregarse al total grupo.
 
 function toNum(v: number | string | null | undefined): number {
   return typeof v === "number" ? v : Number(v ?? 0) || 0;
@@ -398,12 +398,13 @@ export async function fetchMultifashion({
   year: number;
   mes: number;
 }): Promise<Multifashion> {
-  const { data, error } = await supabaseServer.rpc("multifashion_mensual_v3", {
+  const { data, error } = await supabaseServer.rpc("multifashion_mensual_v4", {
     p_year: year,
     p_mes: mes,
   });
-  if (error) throw new Error(`multifashion_mensual_v3: ${error.message}`);
+  if (error) throw new Error(`multifashion_mensual_v4: ${error.message}`);
 
-  // v3 devuelve el shape exacto Multifashion con bloques retail/wholesale/total.
+  // v4 devuelve el shape exacto Multifashion con bloques retail/wholesale/total.
+  // v4 agrega total.margen / total.margenPrev (margen real tienda completa).
   return data as Multifashion;
 }

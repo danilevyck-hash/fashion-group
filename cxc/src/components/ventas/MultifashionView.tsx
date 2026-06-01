@@ -107,14 +107,16 @@ function buildClosedYearMetaSummary(pctMeta: number): { label: string; tone: str
   return { label: `Año cerrado · alcanzó ${pct}% de meta`, tone: "text-red-700", arrow: "▼" };
 }
 
-// "▲ +1.2 pts vs 2025" — margen retail vs margenPrev retail (mismo período).
-// FASE 2.1b: switch_facturas no tiene costo → margen puede venir null.
-// Chequeo estricto con typeof+isFinite por si JSON/Next.js coacciona null→0
-// en algún path intermedio (defensa contra "0.0% / Sin cambio vs 2025" en lugar de "—").
+// Sub-label del card de margen TIENDA COMPLETA (v4: costo real de
+// switch_costo_diario). "▲ +3.0 pts vs 2025" cuando hay margen del año anterior.
+// Chequeo estricto con typeof+isFinite por si JSON/Next.js coacciona null→0.
 function buildMargenSub(margen: number | null, margenPrev: number | null, prevYear: number): string {
   const mOk = typeof margen === "number" && Number.isFinite(margen);
+  if (!mOk) return "Sin costo disponible";
   const pOk = typeof margenPrev === "number" && Number.isFinite(margenPrev);
-  if (!mOk || !pOk) return "Sin costo en la fuente";
+  // Hay margen actual pero no del año anterior: aclara el alcance en vez de
+  // mostrar un delta falso.
+  if (!pOk) return "Retail + mayoreo";
   const deltaPts = ((margen as number) - (margenPrev as number)) * 100;
   if (Math.abs(deltaPts) < 0.05) {
     return `Sin cambio vs ${prevYear}`;
@@ -155,7 +157,10 @@ function OverviewSubtab({
   const partialDisclaimer = partialMonth ? buildPartialMonthDisclaimer(partialMonth) : null;
 
   const retailYtdSub = buildRetailYtdSub(retail.meses, year, isClosedYear);
-  const margenSub = buildMargenSub(retail.margen, retail.margenPrev, prevYear);
+  // Margen a nivel TIENDA COMPLETA (retail + mayoreo): la API (tipo=03) da costo
+  // agregado, no separa retail puro, así que el margen solo es honesto a nivel
+  // tienda. Usa total.margen, NO retail.margen.
+  const margenSub = buildMargenSub(total.margen, total.margenPrev, prevYear);
 
   // Labels KPI: "YTD" para año en curso, "{year}" para año cerrado.
   const ytdSuffix = isClosedYear ? String(year) : "YTD";
@@ -186,12 +191,13 @@ function OverviewSubtab({
         </div>
       </Card>
 
-      {/* 2. 4 KPI cards — RETAIL ONLY */}
+      {/* 2. 4 KPI cards — los 3 primeros RETAIL ONLY; el margen es TIENDA COMPLETA
+          (la API tipo=03 da costo agregado retail+mayoreo, no separa retail puro). */}
       <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
         <RetailKpi label={`VENTAS RETAIL ${ytdSuffix}`} value={fmtMoney(retail.ytdVentas)} sub={retailYtdSub} />
         <RetailKpi label={`TICKETS RETAIL ${ytdSuffix}`} value={retail.ytdTickets.toLocaleString()} sub="boletas emitidas" />
         <RetailKpi label="TICKET PROMEDIO RETAIL" value={"$" + retail.ticketProm.toFixed(2)} sub="por boleta" />
-        <RetailKpi label="MARGEN BRUTO RETAIL" value={fmtMargen(retail.margen)} sub={margenSub} />
+        <RetailKpi label="MARGEN BRUTO · TIENDA COMPLETA" value={fmtMargen(total.margen)} sub={margenSub} />
       </div>
 
       {/* 3. Wholesale card (debajo de los 4 retail KPIs) */}

@@ -6,9 +6,9 @@ export const dynamic = "force-dynamic";
 export default async function VentasPage() {
   const now = new Date();
   const year = now.getFullYear();
-  // mes 1-indexed = mes en curso del calendario. multifashion_mensual_v3
+  // mes 1-indexed = mes en curso del calendario. multifashion_mensual_v4
   // suma WHERE mes <= p_mes para los KPIs YTD (retail.ytdVentas, ticketProm,
-  // margen, etc.) — pasarlo como mes en curso garantiza que la data parcial
+  // margen tienda completa, etc.) — pasarlo como mes en curso garantiza que la data parcial
   // del mes (ej. mayo 1–9) entra al YTD. retail.meses[mes_en_curso] marca
   // es_periodo_parcial=true así que el footer / label sub muestran el corte.
   const mes = now.getMonth() + 1;
