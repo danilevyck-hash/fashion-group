@@ -2,8 +2,12 @@
  * Cron multi-empresa Switch.
  *
  * Por defecto (sin params): sincroniza FACTURAS incrementales (ventana 7 días)
- * de todas las empresas con facturas=true (las 6 B2B + Boston). Multifashion
- * NO entra acá — tiene su cron propio (/api/cron/multifashion-sync → legacy).
+ * de todas las empresas con facturas=true (empresasConFacturas() = las 6 B2B +
+ * Boston + Multifashion/american_classic). Multifashion SÍ entra acá: su data
+ * alimenta switch_facturas (base del tab Multifashion desde fase 2.1b) además de
+ * su tabla legacy multifashion_tickets, que su cron propio (/api/cron/
+ * multifashion-sync) sigue manteniendo. Vive en ambas a propósito (invariante
+ * 🟡-14: nunca sumar las dos fuentes → doble conteo).
  *
  * Query params (todos opcionales):
  *   tipo=facturas|estadocuenta   (default facturas)

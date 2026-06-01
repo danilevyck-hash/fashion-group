@@ -8,8 +8,10 @@
  *      MULTIFASHION aunque su empresa_key sea american_classic). El cliente
  *      resuelve vía esta tabla en vez de derivar el env key del empresa_key.
  *   2. EMPRESA_SYNC_CAPABILITIES — qué sincroniza cada empresa:
- *      - facturas → switch_facturas. Multifashion=false (usa multifashion_tickets
- *        legacy, no se toca).
+ *      - facturas → switch_facturas. Multifashion=true: alimenta switch_facturas
+ *        (base del tab Multifashion desde fase 2.1b) además de su tabla legacy
+ *        multifashion_tickets (que su cron propio sigue manteniendo). Vive en ambas
+ *        a propósito (invariante 🟡-14: nunca sumar las dos fuentes → doble conteo).
  *      - cxc → switch_estadocuenta. Boston=false (su CXC se maneja por otro lado,
  *        probablemente Brand It).
  */
@@ -55,7 +57,7 @@ export const EMPRESA_SYNC_CAPABILITIES: Record<EmpresaKey, EmpresaSyncCapability
 
 const ALL_KEYS = Object.keys(EMPRESA_SYNC_CAPABILITIES) as EmpresaKey[];
 
-/** Empresas cuyas facturas van a switch_facturas (excluye Multifashion → legacy). */
+/** Empresas cuyas facturas van a switch_facturas (incluye Multifashion/american_classic). */
 export function empresasConFacturas(): EmpresaKey[] {
   return ALL_KEYS.filter((k) => EMPRESA_SYNC_CAPABILITIES[k].facturas);
 }
