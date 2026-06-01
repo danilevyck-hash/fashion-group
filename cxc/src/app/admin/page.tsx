@@ -532,16 +532,10 @@ function AdminDashboardInner() {
             <path d="M12 8v4m0 4h.01" />
           </svg>
           <p className="text-sm font-medium text-gray-500 mb-1">No hay datos de cartera cargados</p>
-          <p className="text-xs text-gray-400 mb-4 max-w-xs">Importa el archivo CSV de cartera desde Switch para ver el panel de cuentas por cobrar.</p>
-          {canExport && (
-            <button
-              onClick={() => (window.location.href = "/upload?tab=cxc")}
-              className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all min-h-[44px] flex items-center gap-2"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-              Importar archivo de cartera
-            </button>
-          )}
+          <p className="text-xs text-gray-400 mb-4 max-w-xs">Los datos de cartera se sincronizan automáticamente desde Switch.</p>
+          {/* Botón "Importar archivo de cartera" → /upload OCULTO: upload manual
+              de CSV deprecado (el sync de Switch cubre la carga). La página
+              /upload sigue viva y accesible por URL directa. */}
         </div>
       )}
 

@@ -9,7 +9,6 @@
 
 import {
   CircleDollarSign,
-  RefreshCw,
   Truck,
   Wallet,
   Contact,
@@ -75,7 +74,12 @@ export const ALL_MODULES: AppModule[] = [
   { key: "camisetas",     label: "Camisetas Selección", subtitle: "Pedidos y stock",                                    href: "/camisetas",      icon: Shirt,            roles: ["admin", "director", "vendedor"],                               group: "catalogos" },
 
   // Sistema
-  { key: "upload",        label: "Actualizar Datos",    subtitle: "Subir archivos de Switch Soft",                      href: "/upload",         icon: RefreshCw,        roles: ["admin", "director", "secretaria"],                             group: "sistema" },
+  // "Actualizar Datos" (upload manual de CSV) OCULTO — deprecado. El sync de
+  // Switch API ya cubre la carga. La página /upload y los endpoints
+  // (/api/cxc/upload, /api/ventas/upload) siguen VIVOS y accesibles por URL
+  // directa (admin/secretaria pasan vía allowedRoles en useAuth, no por esta
+  // lista). Solo se esconde la entrada visual para que nadie suba CSV por error.
+  // { key: "upload",        label: "Actualizar Datos",    subtitle: "Subir archivos de Switch Soft",                      href: "/upload",         icon: RefreshCw,        roles: ["admin", "director", "secretaria"],                             group: "sistema" },
   { key: "usuarios",      label: "Usuarios",            subtitle: "Gestión de usuarios y permisos",                     href: "/admin/usuarios", icon: Users,            roles: ["admin"],                                                       group: "sistema" },
   { key: "data-health",   label: "Data Health",         subtitle: "Monitoreo automático de integridad de datos",        href: "/admin/data-health", icon: ShieldCheck,   roles: ["admin"],                                                       group: "sistema" },
 ];
