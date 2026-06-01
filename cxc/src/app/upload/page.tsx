@@ -381,6 +381,18 @@ function UploadPageInner() {
   }
 
   async function handleCxcUpload(fileArg?: File, companyKeyArg?: string) {
+    // KILL-SWITCH Fase 3 Paso 0 — upload manual de CXC deprecado (CXC se sincroniza
+    // desde Switch). Neutraliza el submit sin llamar al endpoint. REVERSIBLE: poner
+    // CXC_UPLOAD_DISABLED en false. El endpoint /api/cxc/upload también bloquea con
+    // 410. Ventas intacto. (flag tipado boolean para no dejar código inalcanzable)
+    const CXC_UPLOAD_DISABLED: boolean = true;
+    if (CXC_UPLOAD_DISABLED) {
+      setCxcPreview(null);
+      setPendingFile(null);
+      setMessage({ text: "Upload manual de CXC deprecado — CXC se sincroniza automáticamente desde Switch.", type: "err" });
+      return;
+    }
+
     const theFile = fileArg ?? pendingFile;
     const companyKey = companyKeyArg ?? cxcPreview?.companyKey;
     if (!theFile || !companyKey) return;

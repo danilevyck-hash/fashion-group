@@ -37,6 +37,16 @@ const ALLOWED_CXC_EMPRESAS: ReadonlySet<string> = new Set(B2B_EMPRESA_KEYS);
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+// ── KILL-SWITCH (Fase 3 Paso 0) ───────────────────────────────────────────────
+// CXC ya se sincroniza automáticamente desde Switch (switch_estadocuenta →
+// switch_estadocuenta_aging, vía el cron switch-sync tipo=all). El upload manual
+// de CXC quedó deprecado. Este flag bloquea la ejecución del POST sin borrar la
+// lógica (parsing/insert intactos abajo). REVERSIBLE: poner en `false` para
+// re-habilitar el upload manual de CXC. No afecta /api/ventas/upload.
+const CXC_UPLOAD_DISABLED = true;
+const CXC_UPLOAD_DISABLED_MSG =
+  "Upload manual de CXC deprecado — CXC se sincroniza automáticamente desde Switch.";
+
 // Umbrales de validación post-parse para uploads (AJUSTE 6).
 // Una vez reparada la baseline histórica, esperamos máximo ~2.5% de NULL
 // legítimas (Saldo Anterior + NCs sin fecha). Estos umbrales aplican
@@ -180,6 +190,12 @@ function parseCsv(text: string): ParseResult {
 }
 
 export async function POST(req: NextRequest) {
+  // KILL-SWITCH Fase 3 Paso 0 — ver CXC_UPLOAD_DISABLED arriba. Bloqueo temprano,
+  // antes de auth/parsing. 410 Gone = recurso deprecado permanentemente.
+  if (CXC_UPLOAD_DISABLED) {
+    return NextResponse.json({ ok: false, error: CXC_UPLOAD_DISABLED_MSG }, { status: 410 });
+  }
+
   const authError = requireAuth(req, ["admin", "secretaria"]);
   if (authError) return authError;
   const session = getSession(req);
