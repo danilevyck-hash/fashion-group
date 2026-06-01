@@ -93,20 +93,46 @@ export default function SyncStatus({
 
   useEffect(() => {
     let cancelled = false;
-    setError(false);
     const url = `/api/sync-status?tabla=${tabla}&empresas=${empresasKey}`;
-    fetch(url, { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
-      .then((json: SyncStatusData) => {
-        if (cancelled) return;
-        setData(json);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setError(true);
-      });
+
+    // Mismo fetch de siempre, extraído para poder re-disparar. No cambia el
+    // endpoint ni la lógica de stale — solo permite re-consultar.
+    const fetchStatus = () => {
+      fetch(url, { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+        .then((json: SyncStatusData) => {
+          if (cancelled) return;
+          setData(json);
+          setError(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setError(true);
+        });
+    };
+
+    fetchStatus(); // inicial al montar
+
+    // (a) Re-fetch cuando la pestaña vuelve a tener foco — cubre el caso
+    //     "disparé un sync y volví a la pestaña": el banner se actualiza solo.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") fetchStatus();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", fetchStatus);
+
+    // (b) Polling cada 5 min, solo mientras la pestaña está visible (no gasta
+    //     requests en background).
+    const POLL_MS = 5 * 60 * 1000;
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") fetchStatus();
+    }, POLL_MS);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", fetchStatus);
+      clearInterval(interval);
     };
   }, [tabla, empresasKey]);
 
