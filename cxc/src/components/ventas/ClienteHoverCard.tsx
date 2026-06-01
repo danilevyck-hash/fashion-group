@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fmtMoneyCompact } from "@/lib/ventas/format";
+import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
+import { fmtDate } from "@/lib/format";
 import { formatDelta, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 
@@ -111,6 +112,77 @@ function useCxcAging(codigo: string, empresaScope: string): CxcState {
   return cxcCache.get(key) ?? { status: "loading" };
 }
 
+// ── Últimas facturas ──────────────────────────────────────────────────────────
+// Mismo patrón de cache module-level que el CXC aging: el HoverCard se
+// monta/desmonta con cada hover, así que el cache (keyed por codigo|empresaScope)
+// hace instantáneos los hovers repetidos. Fuente: switch_facturas vía el puente
+// switch_clientes (join por ID). Respeta el scope de empresa activo.
+
+export interface FacturaItem {
+  fecha: string | null;
+  monto: number;
+  empresa_key: string;
+}
+
+type FacturasState =
+  | { status: "loading" }
+  | { status: "ready"; data: FacturaItem[] }
+  | { status: "error" };
+
+const facturasCache = new Map<string, FacturasState>();
+const facturasInFlight = new Set<string>();
+const facturasSubscribers = new Map<string, Set<() => void>>();
+
+function subscribeFacturas(key: string, cb: () => void): () => void {
+  let set = facturasSubscribers.get(key);
+  if (!set) { set = new Set(); facturasSubscribers.set(key, set); }
+  set.add(cb);
+  return () => {
+    set?.delete(cb);
+    if (set && set.size === 0) facturasSubscribers.delete(key);
+  };
+}
+
+function notifyFacturas(key: string) {
+  facturasSubscribers.get(key)?.forEach(cb => cb());
+}
+
+function fetchUltimasFacturas(codigo: string, empresaScope: string): void {
+  const key = `${codigo}|${empresaScope}`;
+  if (facturasCache.has(key) || facturasInFlight.has(key)) return;
+  facturasInFlight.add(key);
+  facturasCache.set(key, { status: "loading" });
+  notifyFacturas(key);
+
+  const url = `/api/clientes/${encodeURIComponent(codigo)}/ultimas-facturas?empresa=${encodeURIComponent(empresaScope)}`;
+  fetch(url)
+    .then(async r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json() as Promise<{ facturas: FacturaItem[] }>;
+    })
+    .then(data => {
+      facturasCache.set(key, { status: "ready", data: data.facturas ?? [] });
+    })
+    .catch(() => {
+      facturasCache.set(key, { status: "error" });
+    })
+    .finally(() => {
+      facturasInFlight.delete(key);
+      notifyFacturas(key);
+    });
+}
+
+function useUltimasFacturas(codigo: string, empresaScope: string): FacturasState {
+  const key = `${codigo}|${empresaScope}`;
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const unsubscribe = subscribeFacturas(key, () => setTick(t => t + 1));
+    fetchUltimasFacturas(codigo, empresaScope);
+    return unsubscribe;
+  }, [codigo, empresaScope, key]);
+  return facturasCache.get(key) ?? { status: "loading" };
+}
+
 interface ClienteHoverCardProps {
   nombre: string;
   /** Switch Soft código, ej. "D-04" — visible en el subtítulo */
@@ -148,6 +220,7 @@ export function ClienteHoverCard({
   }, []);
 
   const cxc = useCxcAging(codigo, empresaScope);
+  const facturas = useUltimasFacturas(codigo, empresaScope);
 
   const ready = historial.status === "ready" ? historial.data : null;
   const histLoading = historial.status === "loading" || historial.status === "idle";
@@ -214,6 +287,40 @@ export function ClienteHoverCard({
           loading={histLoading}
         />
       </div>
+
+      {/* Últimas facturas: hasta 5, más reciente primero. Solo tipo 'Factura',
+          monto pre-impuesto (subtotal_descuento). Una línea por factura. */}
+      <UltimasFacturas state={facturas} />
+    </div>
+  );
+}
+
+/** Sección compacta de últimas facturas. Una línea por factura: fecha · monto.
+ *  Estado vacío limpio cuando el cliente no tiene facturas registradas. */
+function UltimasFacturas({ state }: { state: FacturasState }) {
+  return (
+    <div className="space-y-1.5 border-t border-stone-100 pt-3">
+      <div className="text-[11px] uppercase tracking-wider text-stone-500">Últimas facturas</div>
+      {state.status === "loading" ? (
+        <div className="space-y-1.5">
+          <div className="h-3.5 w-full animate-pulse rounded bg-stone-100" />
+          <div className="h-3.5 w-5/6 animate-pulse rounded bg-stone-100" />
+          <div className="h-3.5 w-4/6 animate-pulse rounded bg-stone-100" />
+        </div>
+      ) : state.status === "error" ? (
+        <p className="text-[11px] text-stone-400">No se pudieron cargar.</p>
+      ) : state.data.length === 0 ? (
+        <p className="text-[11px] text-stone-400">Sin facturas registradas.</p>
+      ) : (
+        <ul className="space-y-1">
+          {state.data.map((f, i) => (
+            <li key={i} className="flex items-baseline justify-between gap-3 text-xs">
+              <span className="text-stone-600">{f.fecha ? fmtDate(f.fecha) : "—"}</span>
+              <span className="font-mono tabular-nums text-stone-800">{fmtMoney(f.monto)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
