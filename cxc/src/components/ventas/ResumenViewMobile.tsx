@@ -421,24 +421,15 @@ function MobileCell({
     );
   }
 
-  // delta == null cuando ventasPrev (o utilidadPrev) <= 0 — i.e. la RPC
-  // ventas_dashboard_prev_same_period no devolvió ese empresa-mes en prev
-  // year. Visualmente marcamos "n/a" (mismo patrón que desktop) para no
-  // confundir con un cambio neutro vs un sin-comparativo.
-  const showNa = delta == null;
-
-  // Apilado en 2 líneas: monto arriba, flecha + Δ% debajo en chico. El ancho
-  // de mobile no alcanza para ponerlo en línea; apilar también reduce el ancho
-  // por columna (mejor en pantallas de teléfono). Mismo patrón que la columna
-  // TOTAL. showNa → "n/a" debajo (sin comparativo, igual que desktop).
+  // Bloque alineado a la derecha: monto arriba, delta (flecha+%) chiquito y
+  // pegado debajo. flex-col items-end garantiza alineación derecha sin centrar.
+  // Sin comparativo → DeltaPct no renderiza nada, queda solo el monto.
   return (
-    <td className={cn("px-2 py-1.5 text-right font-mono text-[11px] tabular-nums", bgCls)}>
-      <span className="block leading-tight text-stone-900">{renderCell(cur, mode)}</span>
-      {showNa ? (
-        <span className="mt-0.5 block text-[9px] font-medium leading-none text-stone-400">n/a</span>
-      ) : (
+    <td className={cn("px-2 py-1.5 text-right font-mono tabular-nums", bgCls)}>
+      <span className="flex flex-col items-end leading-tight">
+        <span className="text-[11px] text-stone-900">{renderCell(cur, mode)}</span>
         <DeltaPct delta={delta} mode={mode} />
-      )}
+      </span>
     </td>
   );
 }
@@ -469,9 +460,11 @@ function MobileTotalCell({
     display = formatCompactCurrency(cur);
   }
   return (
-    <td className="border-l border-stone-200 px-2.5 py-2.5 text-right font-mono text-[11px] font-semibold tabular-nums text-stone-950">
-      <span className="block leading-tight">{display}</span>
-      <DeltaPct delta={delta} mode={mode} />
+    <td className="border-l border-stone-200 px-2.5 py-1.5 text-right font-mono tabular-nums text-stone-950">
+      <span className="flex flex-col items-end leading-tight">
+        <span className="text-[11px] font-semibold">{display}</span>
+        <DeltaPct delta={delta} mode={mode} />
+      </span>
     </td>
   );
 }
@@ -509,13 +502,11 @@ function MobileTotalGrupoCell({
   }
 
   return (
-    <td className={cn("px-2 py-1.5 text-right font-mono text-[11px] font-medium tabular-nums", bgCls)}>
-      <span className="block leading-tight text-white">{renderCell(cur, mode)}</span>
-      {delta == null ? (
-        <span className="mt-0.5 block text-[9px] font-medium leading-none text-stone-400">n/a</span>
-      ) : (
+    <td className={cn("px-2 py-1.5 text-right font-mono tabular-nums", bgCls)}>
+      <span className="flex flex-col items-end leading-tight">
+        <span className="text-[11px] font-medium text-white">{renderCell(cur, mode)}</span>
         <DeltaPct delta={delta} mode={mode} dark />
-      )}
+      </span>
     </td>
   );
 }
@@ -552,9 +543,11 @@ function MobileTotalGrupoYtdCell({
     display = formatCompactCurrency(v);
   }
   return (
-    <td className="border-l border-stone-700 px-2.5 py-2.5 text-right font-mono text-[11px] font-semibold tabular-nums text-white">
-      <span className="block leading-tight">{display}</span>
-      <DeltaPct delta={d} mode={mode} dark />
+    <td className="border-l border-stone-700 px-2.5 py-1.5 text-right font-mono tabular-nums text-white">
+      <span className="flex flex-col items-end leading-tight">
+        <span className="text-[11px] font-semibold">{display}</span>
+        <DeltaPct delta={d} mode={mode} dark />
+      </span>
     </td>
   );
 }
@@ -581,16 +574,21 @@ function DeltaPct({
   mode: ViewMode;
   dark?: boolean;
 }) {
+  // Sin comparativo (RPC no devolvió prev) → no renderiza nada: queda solo el
+  // monto, sin segunda línea suelta. La zona neutral (delta dentro del umbral)
+  // sí muestra el % en stone, sin flecha.
+  if (delta == null) return null;
   const fmt = formatDeltaRatio(delta, mode === "margen" ? "pts" : "pct");
   const tone =
     fmt.tone === "emerald"
       ? dark ? "text-emerald-300" : "text-emerald-700"
       : fmt.tone === "orange"
         ? dark ? "text-rose-300" : "text-rose-600"
-        : dark ? "text-stone-400" : "text-stone-400";
+        : dark ? "text-stone-400" : "text-stone-500";
+  // Flecha + % pegados en una sola pieza ("▲+110%"), sin espacio.
   return (
-    <span className={cn("mt-0.5 block text-[9px] font-medium leading-none", tone)}>
-      {fmt.arrow ? `${fmt.arrow} ` : ""}{fmt.displayValue}
+    <span className={cn("text-[10px] font-medium leading-tight", tone)}>
+      {fmt.arrow ?? ""}{fmt.displayValue}
     </span>
   );
 }
