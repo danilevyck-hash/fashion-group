@@ -16,6 +16,7 @@ import type {
   ProyeccionEmpresa,
 } from "./types";
 import { MONTHS, QUARTERS, formatCompactCurrency } from "@/lib/ventas/format";
+import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 
 type Granularity = "mensual" | "trimestral";
@@ -470,10 +471,8 @@ function MobileTotalCell({
   }
   return (
     <td className="border-l border-stone-200 px-2.5 py-2.5 text-right font-mono text-[11px] font-semibold tabular-nums text-stone-950">
-      <span className="inline-flex items-baseline gap-0.5">
-        <DeltaArrow delta={delta} mode={mode} />
-        <span>{display}</span>
-      </span>
+      <span className="block leading-tight">{display}</span>
+      <DeltaPct delta={delta} mode={mode} />
     </td>
   );
 }
@@ -553,10 +552,8 @@ function MobileTotalGrupoYtdCell({
   }
   return (
     <td className="border-l border-stone-700 px-2.5 py-2.5 text-right font-mono text-[11px] font-semibold tabular-nums text-white">
-      <span className="inline-flex items-baseline gap-0.5">
-        <DeltaArrow delta={d} mode={mode} dark />
-        <span>{display}</span>
-      </span>
+      <span className="block leading-tight">{display}</span>
+      <DeltaPct delta={d} mode={mode} dark />
     </td>
   );
 }
@@ -587,6 +584,33 @@ function DeltaArrow({
     return <span className={cn("text-[9px]", dark ? "text-rose-300" : "text-rose-600")}>▼</span>;
   }
   return null;
+}
+
+// Flecha + % numérico vs 2025, compacto debajo del monto. Solo en columna TOTAL
+// (por empresa + total grupo) para igualar al desktop, que muestra monto + flecha
+// + Δ%. Usa el mismo delta ya calculado por la celda (ventas/utilidad = ratio %,
+// margen = puntos), formateado con el helper compartido formatDeltaRatio.
+function DeltaPct({
+  delta,
+  mode,
+  dark,
+}: {
+  delta: number | null;
+  mode: ViewMode;
+  dark?: boolean;
+}) {
+  const fmt = formatDeltaRatio(delta, mode === "margen" ? "pts" : "pct");
+  const tone =
+    fmt.tone === "emerald"
+      ? dark ? "text-emerald-300" : "text-emerald-700"
+      : fmt.tone === "orange"
+        ? dark ? "text-rose-300" : "text-rose-600"
+        : dark ? "text-stone-400" : "text-stone-400";
+  return (
+    <span className={cn("mt-0.5 block text-[9px] font-medium leading-none", tone)}>
+      {fmt.arrow ? `${fmt.arrow} ` : ""}{fmt.displayValue}
+    </span>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
