@@ -37,6 +37,9 @@ const SORT_LABELS: Record<SortKey, string> = {
   ultima:  "última compra",
 };
 
+// Pills visibles del filtro de empresa. Joystep, Confecciones Boston y
+// Multifashion se ocultan del filtro (decisión visual). Joystep sigue B2B y
+// permanece sumada en el agregado "Todas" — solo se quita su pill.
 const EMPRESA_PILLS: { id: string; label: string }[] = [
   { id: "todas",                label: "Todas" },
   { id: "vistana",              label: "Vistana International" },
@@ -44,9 +47,6 @@ const EMPRESA_PILLS: { id: string; label: string }[] = [
   { id: "fashion_shoes",        label: "Fashion Shoes" },
   { id: "active_shoes",         label: "Active Shoes" },
   { id: "active_wear",          label: "Active Wear" },
-  { id: "joystep",              label: "Joystep" },
-  { id: "confecciones_boston",  label: "Confecciones Boston" },
-  { id: "american_classic",     label: "Multifashion" },
 ];
 
 // Pills donde la fila agregada "Otros clientes" NO se renderiza.
@@ -365,7 +365,6 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                 <SortHeader col="ytd"     align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Compras YTD</SortHeader>
                 <SortHeader col="delta"   align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Δ vs 2025</SortHeader>
                 <SortHeader col="ultima"  align="right" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Última compra</SortHeader>
-                <th className="w-12 border-b border-stone-200 px-3.5 py-2.5" />
               </tr>
             </thead>
             <tbody>
@@ -397,7 +396,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                 );
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan={7} className="px-3.5 py-12 text-center text-sm text-stone-500">
+                <tr><td colSpan={6} className="px-3.5 py-12 text-center text-sm text-stone-500">
                   No se encontraron clientes con esos filtros.
                 </td></tr>
               )}
@@ -586,19 +585,6 @@ function ClienteRow({
         {fmt.displayValue}
       </td>
       <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">{c.ultima || "—"}</td>
-      <td className="border-b border-stone-200 px-3.5 py-3 text-center">
-        {c.wa ? (
-          <a
-            href={`https://wa.me/${c.wa.replace("+","")}`}
-            target="_blank" rel="noopener noreferrer"
-            aria-label={`Enviar WhatsApp a ${c.nombre}`}
-            onClick={e => e.stopPropagation()}
-            className="inline-flex text-[#25D366] hover:opacity-80"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.4-1.5-.9-.8-1.5-1.8-1.6-2.1-.2-.3 0-.4.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.6-1.5-.9-2.1-.2-.5-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4 0 1.4 1 2.8 1.2 3 .1.2 2.1 3.2 5.1 4.5 1.8.7 2.5.8 3.4.7.5-.1 1.7-.7 2-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3z M12 2C6.5 2 2 6.5 2 12c0 1.7.4 3.3 1.2 4.7L2 22l5.3-1.2c1.4.7 3 1.1 4.7 1.1 5.5 0 10-4.5 10-10S17.5 2 12 2zm0 18c-1.5 0-3-.4-4.3-1.1l-.3-.2-3.2.7.7-3-.2-.4C4 14.6 4 13.3 4 12c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8z"/></svg>
-          </a>
-        ) : null}
-      </td>
     </tr>
   );
 }
@@ -635,7 +621,6 @@ function OtrosRow({ c, onClick }: { c: Cliente; onClick: () => void }) {
       <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">
         {c.ultima || "—"}
       </td>
-      <td className="border-b border-stone-200 px-3.5 py-3 text-center" />
     </tr>
   );
 }
@@ -661,9 +646,9 @@ function ClienteCard({
       tabIndex={0}
       onClick={onTap}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onTap(); } }}
-      className="flex items-stretch gap-1 rounded-lg border border-stone-200 bg-white active:bg-stone-50"
+      className="rounded-lg border border-stone-200 bg-white active:bg-stone-50"
     >
-      <div className="flex-1 px-4 py-3.5">
+      <div className="px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-2">
           <div className="min-w-0 flex-1 truncate text-[15px] font-medium leading-tight text-stone-950">
             {c.nombre}
@@ -692,19 +677,6 @@ function ClienteCard({
           </div>
         </div>
       </div>
-
-      {c.wa ? (
-        <a
-          href={`https://wa.me/${c.wa.replace("+","")}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Enviar WhatsApp a ${c.nombre}`}
-          onClick={e => e.stopPropagation()}
-          className="flex w-12 flex-shrink-0 items-center justify-center text-[#25D366] active:bg-stone-100"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M17.5 14.4c-.3-.1-1.7-.8-2-.9-.3-.1-.5-.1-.7.1-.2.3-.7.9-.9 1.1-.2.2-.3.2-.6.1-.3-.1-1.2-.5-2.4-1.5-.9-.8-1.5-1.8-1.6-2.1-.2-.3 0-.4.1-.6l.4-.5c.1-.2.2-.3.3-.5.1-.2 0-.4 0-.5 0-.1-.6-1.5-.9-2.1-.2-.5-.5-.5-.7-.5h-.6c-.2 0-.5.1-.8.4-.3.3-1 1-1 2.4 0 1.4 1 2.8 1.2 3 .1.2 2.1 3.2 5.1 4.5 1.8.7 2.5.8 3.4.7.5-.1 1.7-.7 2-1.4.2-.7.2-1.2.2-1.4-.1-.1-.3-.2-.6-.3z M12 2C6.5 2 2 6.5 2 12c0 1.7.4 3.3 1.2 4.7L2 22l5.3-1.2c1.4.7 3 1.1 4.7 1.1 5.5 0 10-4.5 10-10S17.5 2 12 2zm0 18c-1.5 0-3-.4-4.3-1.1l-.3-.2-3.2.7.7-3-.2-.4C4 14.6 4 13.3 4 12c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8z"/></svg>
-        </a>
-      ) : null}
     </div>
   );
 }
