@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
@@ -132,12 +133,22 @@ function parseCSV(text: string): Record<string, string>[] {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ReebokAdminPage() {
+  // Suspense boundary requerido por useSearchParams (vía useUrlState) en
+  // Next 14 App Router — esta página es prerenderizada estática.
+  return (
+    <Suspense>
+      <ReebokAdminInner />
+    </Suspense>
+  );
+}
+
+function ReebokAdminInner() {
   const { authChecked } = useAuth({
     moduleKey: "catalogos",
     allowedRoles: ["admin"],
   });
 
-  const [tab, setTab] = useState<Tab>("productos");
+  const [tab, setTab] = useUrlState<Tab>("tab", "productos");
   const [products, setProducts] = useState<ReebokProduct[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [pedidos, setPedidos] = useState<UnifiedPedido[]>([]);
@@ -275,7 +286,9 @@ function ProductosTab({
   getStock: (id: string) => number;
   onProductsChanged: () => Promise<void>;
 }) {
-  const [subTab, setSubTab] = useState<ProductSubTab>("footwear");
+  // Sub-tab de productos (footwear/apparel/accessories) en la URL (?subtab=).
+  // Key distinta a "tab" para no chocar con el tab principal.
+  const [subTab, setSubTab] = useUrlState<ProductSubTab>("subtab", "footwear");
   const [search, setSearch] = useState("");
   const [ofertaFilter, setOfertaFilter] = useState<"" | "solo">("");
   const [genderFilter, setGenderFilter] = useState<"" | "male" | "female" | "kids" | "unisex" | "otro">("");

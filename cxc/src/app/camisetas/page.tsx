@@ -28,7 +28,7 @@ function Dot({ color, size = "sm" }: { color: string; size?: "sm" | "md" }) {
 
 export default function CamisetasPage() {
   const { authChecked, role } = useAuth({ moduleKey: "camisetas", allowedRoles: ["admin","vendedor"] });
-  const [tab, setTab] = useState<"resumen" | "cliente" | "stock">("cliente");
+  const [tab, _setTab] = useState<"resumen" | "cliente" | "stock">("cliente");
   const [productos, setProductos] = useState<Producto[]>([]);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
@@ -37,27 +37,51 @@ export default function CamisetasPage() {
   const [selectedClient, _setSelectedClient] = useState<string | null>(null);
 
   // Wrapper: sincroniza selectedClient con la URL para que el Back del browser
-  // regrese a la lista en lugar de saltar a /home.
+  // regrese a la lista en lugar de saltar a /home. Lee window.location en cada
+  // llamada para preservar el param ?tab existente.
   const setSelectedClient = useCallback((id: string | null) => {
     _setSelectedClient(id);
     if (typeof window === "undefined") return;
-    const url = id ? `/camisetas?cliente=${id}` : "/camisetas";
+    const params = new URLSearchParams(window.location.search);
+    if (id) params.set("cliente", id); else params.delete("cliente");
+    const qs = params.toString();
+    const url = qs ? `/camisetas?${qs}` : "/camisetas";
     if (window.location.pathname + window.location.search !== url) {
       window.history.pushState(null, "", url);
     }
   }, []);
 
+  // Tab activo (resumen/cliente/stock) en la URL (?tab=stock). Usa el MISMO
+  // mecanismo manual de history que selectedClient — esta página no usa el
+  // router de Next, así que useUrlState desincronizaría el param ?cliente.
+  // replaceState para no llenar el historial con cada cambio de tab.
+  const setTab = useCallback((t: "resumen" | "cliente" | "stock") => {
+    _setTab(t);
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (t === "cliente") params.delete("tab"); else params.set("tab", t);
+    const qs = params.toString();
+    const url = qs ? `/camisetas?${qs}` : "/camisetas";
+    window.history.replaceState(null, "", url);
+  }, []);
+
   // Popstate listener: al Back/Forward, sincroniza el state con la URL.
   useEffect(() => {
+    function readTab(params: URLSearchParams): "resumen" | "cliente" | "stock" {
+      const t = params.get("tab");
+      return t === "resumen" || t === "stock" ? t : "cliente";
+    }
     function onPopState() {
       const params = new URLSearchParams(window.location.search);
       _setSelectedClient(params.get("cliente"));
+      _setTab(readTab(params));
     }
     window.addEventListener("popstate", onPopState);
-    // Init inicial desde URL (ej. usuario llega con /camisetas?cliente=X)
+    // Init inicial desde URL (ej. usuario llega con /camisetas?cliente=X&tab=stock)
     const params = new URLSearchParams(window.location.search);
     const initial = params.get("cliente");
     if (initial) _setSelectedClient(initial);
+    _setTab(readTab(params));
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
   const [editCell, setEditCell] = useState<{ cId: string; pId: string } | null>(null);

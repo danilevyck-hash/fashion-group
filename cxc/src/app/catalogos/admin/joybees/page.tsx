@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import Image from "next/image";
@@ -101,12 +102,22 @@ function parseCSV(text: string): Record<string, string>[] {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function JoybeesAdminPage() {
+  // Suspense boundary requerido por useSearchParams (vía useUrlState) en
+  // Next 14 App Router — esta página es prerenderizada estática.
+  return (
+    <Suspense>
+      <JoybeesAdminInner />
+    </Suspense>
+  );
+}
+
+function JoybeesAdminInner() {
   const { authChecked } = useAuth({
     moduleKey: "catalogos",
     allowedRoles: ["admin"],
   });
 
-  const [tab, setTab] = useState<Tab>("productos");
+  const [tab, setTab] = useUrlState<Tab>("tab", "productos");
   const [products, setProducts] = useState<JoybeesProduct[]>([]);
   const [pedidos, setPedidos] = useState<JoybeesPedido[]>([]);
   const [loading, setLoading] = useState(true);

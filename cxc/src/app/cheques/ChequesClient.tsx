@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense, Fragment } from "react";
 import { useSearchParams } from "next/navigation";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import AppHeader from "@/components/AppHeader";
 import { SkeletonTable, EmptyState, Toast, StatusBadge, ConfirmModal, AnimatedNumber, useContextMenu, PullToRefresh, SwipeableRow } from "@/components/ui";
 import type { ContextMenuItem, SwipeAction } from "@/components/ui";
@@ -115,7 +116,9 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingEstado, setEditingEstado] = useState<string | null>(null);
   const [search, setSearch] = useState("");
-  const [viewMode, setViewMode] = useState<"lista" | "calendario">("lista");
+  // Vista (lista/calendario) en la URL (?view=calendario) para sobrevivir
+  // refresh/back. Preserva el param ?filter existente.
+  const [viewMode, setViewMode] = useUrlState<"lista" | "calendario">("view", "lista");
   const [calMonth, setCalMonth] = useState(() => { const d = new Date(); return { year: d.getFullYear(), month: d.getMonth() }; });
   const [calPopover, setCalPopover] = useState<string | null>(null);
   const [dayChequesModal, setDayChequesModal] = useState<string | null>(null);

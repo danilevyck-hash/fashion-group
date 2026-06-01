@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import ReportePorMarcaView from "./ReportePorMarcaView";
 import ReportePorTiendaView from "./ReportePorTiendaView";
 import ReportePorProyectoView from "./ReportePorProyectoView";
@@ -14,7 +14,9 @@ const TABS: Array<{ value: Tab; label: string; sub: string }> = [
 ];
 
 export function ReportesTabs() {
-  const [tab, setTab] = useState<Tab>("marca");
+  // Tab del reporte en la URL (?rep=tienda). Key "rep" para no chocar con
+  // vista/proyecto del page ni con el tab del overlay de proyecto.
+  const [tab, setTab] = useUrlState<Tab>("rep", "marca");
   const active = TABS.find((t) => t.value === tab) ?? TABS[0];
 
   return (

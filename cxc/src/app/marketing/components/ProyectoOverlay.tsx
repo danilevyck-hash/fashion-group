@@ -13,6 +13,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmTypeNameModal } from "@/components/ui";
 import { useDescargarZip } from "@/lib/marketing/useDescargarZip";
@@ -61,7 +62,9 @@ export default function ProyectoOverlay({
   const [facturas, setFacturas] = useState<FacturaConAdjuntosYMarcas[]>([]);
   const [entregas, setEntregas] = useState<EntregaConItems[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<Tab>("facturas");
+  // Tab del overlay (Facturas/Fotos) en la URL (?pt=fotos). Key "pt" para no
+  // chocar con proyecto/vista del page. Sobrevive refresh con ?proyecto=<id>.
+  const [tab, setTab] = useUrlState<Tab>("pt", "facturas");
   const [marcasCatalogo, setMarcasCatalogo] = useState<MkMarca[]>([]);
   const [editando, setEditando] = useState(false);
   const [eliminando, setEliminando] = useState(false);
