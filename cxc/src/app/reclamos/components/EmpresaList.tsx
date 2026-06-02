@@ -7,6 +7,7 @@ import { Reclamo, Contacto } from "./types";
 import { ESTADOS, daysSince, calcSub, FACTOR_TOTAL, estadoLabel } from "./constants";
 import { EmptyState, StatusBadge, Toast } from "@/components/ui";
 import FotoBadge from "./FotoBadge";
+import EnviarProveedorModal from "./EnviarProveedorModal";
 
 interface Props {
   role: string;
@@ -31,7 +32,7 @@ interface Props {
   onDeleteReclamo: (id: string) => void;
 }
 
-type BulkAction = "excel" | "zip" | "email";
+type BulkAction = "excel" | "zip";
 
 export default function EmpresaList({
   activeEmpresa, reclamos, contactos, search, setSearch,
@@ -41,6 +42,7 @@ export default function EmpresaList({
 }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState<BulkAction | null>(null);
+  const [showEnviar, setShowEnviar] = useState(false);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   const allEmpresaRecs = reclamos.filter((r) => r.empresa === activeEmpresa);
@@ -146,29 +148,13 @@ export default function EmpresaList({
     }
   }
 
-  async function sendBulkEmail() {
+  function openEnviar() {
     if (busy || selectedIds.length === 0) return;
     if (!c?.correo) {
-      showToast(`No hay correo configurado para ${activeEmpresa}.`);
+      showToast(`No hay correo configurado para ${activeEmpresa}. Agrégalo en el directorio de contactos.`);
       return;
     }
-    setBusy("email");
-    try {
-      const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/send-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reclamo_ids: selectedIds }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error || "Error al enviar correo.");
-      }
-      showToast(`Email enviado a ${activeEmpresa} con ${selectedIds.length} reclamo${selectedIds.length === 1 ? "" : "s"}`);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Error al enviar correo");
-    } finally {
-      setBusy(null);
-    }
+    setShowEnviar(true);
   }
 
   function cancelSelection() {
@@ -217,12 +203,12 @@ export default function EmpresaList({
                 {busy === "excel" ? "Generando..." : "Solo Excel"}
               </button>
               <button
-                onClick={sendBulkEmail}
+                onClick={openEnviar}
                 disabled={busy !== null || !c?.correo}
-                title={!c?.correo ? "No hay correo configurado para esta empresa" : ""}
+                title={!c?.correo ? "No hay correo configurado para esta empresa" : "Enviar el ZIP al proveedor por correo (editable)"}
                 className="text-sm border border-gray-300 px-4 py-2 rounded-md text-gray-700 hover:text-black hover:border-gray-400 transition disabled:opacity-40"
               >
-                {busy === "email" ? "Enviando..." : "Enviar por Email"}
+                Enviar al proveedor
               </button>
               <button
                 onClick={cancelSelection}
@@ -384,6 +370,16 @@ export default function EmpresaList({
       )}
 
       <Toast message={toast} />
+      <EnviarProveedorModal
+        open={showEnviar}
+        empresa={activeEmpresa}
+        reclamoIds={selectedIds}
+        defaultTo={c?.correo || ""}
+        contactoNombre={c?.nombre_contacto || c?.nombre || ""}
+        count={selCount}
+        onClose={() => setShowEnviar(false)}
+        onSent={(msg) => { showToast(msg); cancelSelection(); }}
+      />
       </div>
     </div>
   );

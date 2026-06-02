@@ -4,11 +4,12 @@ import { useRef, useState, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox, ScrollableTable } from "@/components/ui";
-import { Reclamo, RItem } from "./types";
+import { Reclamo, RItem, Contacto } from "./types";
 import { ESTADOS, EMPRESAS, EC, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, buildSingleReclamoPdfHtml, openPdfWindow, loadCustomMotivos, saveCustomMotivo, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, estadoLabel } from "./constants";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
 import FotoBadge from "./FotoBadge";
+import EnviarProveedorModal from "./EnviarProveedorModal";
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   "Borrador": ["Enviado"],
@@ -21,6 +22,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 interface Props {
   current: Reclamo;
   role: string;
+  contacto?: Contacto | null;
   nota: string;
   setNota: (v: string) => void;
   editMode: boolean;
@@ -73,7 +75,7 @@ interface Props {
 const SUPA_URL = typeof window !== "undefined" ? (process.env.NEXT_PUBLIC_SUPABASE_URL || "") : "";
 
 export default function ReclamoDetail({
-  current, role, nota, setNota, editMode, setEditMode,
+  current, role, contacto, nota, setNota, editMode, setEditMode,
   editEmpresa, setEditEmpresa, editFactura, setEditFactura, editPedido, setEditPedido,
   editFecha, setEditFecha, editNotas, setEditNotas, editEstado, setEditEstado,
   editItems, setEditItems, editSaving, confirmingEstado, setConfirmingEstado,
@@ -90,6 +92,7 @@ export default function ReclamoDetail({
   const [deleteFotoTarget, setDeleteFotoTarget] = useState<{ id: string; path: string } | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [showEstadoHelp, setShowEstadoHelp] = useState(false);
+  const [showEnviar, setShowEnviar] = useState(false);
 
   const items = current.reclamo_items ?? [];
   const seg = current.reclamo_seguimiento ?? [];
@@ -179,6 +182,19 @@ export default function ReclamoDetail({
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
           Excel
         </button>
+        {(role === "admin" || role === "secretaria") && (
+          <button
+            onClick={() => {
+              if (!contacto?.correo) { showToast(`No hay correo configurado para ${current.empresa}. Agrégalo en el directorio de contactos.`); return; }
+              setShowEnviar(true);
+            }}
+            title="Enviar este reclamo (ZIP con Excel + fotos) al proveedor por correo (editable)"
+            className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16v16H4z" /><polyline points="22,6 12,13 2,6" /></svg>
+            Enviar al proveedor
+          </button>
+        )}
         {(role === "admin" || role === "secretaria") && (
           <button onClick={() => setShowDeleteConfirm(true)} className="text-xs text-red-300 hover:text-red-600 transition ml-auto">Eliminar Reclamo</button>
         )}
@@ -419,6 +435,18 @@ export default function ReclamoDetail({
       />
 
       <FotoLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+
+      <EnviarProveedorModal
+        open={showEnviar}
+        empresa={current.empresa}
+        reclamoIds={[current.id]}
+        defaultTo={contacto?.correo || ""}
+        contactoNombre={contacto?.nombre_contacto || contacto?.nombre || ""}
+        count={1}
+        defaultSubject={`Reclamo ${current.nro_reclamo} — ${current.empresa} — Factura ${current.nro_factura}`}
+        onClose={() => setShowEnviar(false)}
+        onSent={(msg) => showToast(msg)}
+      />
 
       {/* Edit mode panel */}
       {editMode && (

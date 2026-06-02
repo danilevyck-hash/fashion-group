@@ -396,6 +396,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
       <ReclamoDetail
         current={current}
         role={role}
+        contacto={contactos.find((ct) => ct.empresa === current.empresa) || null}
         nota={nota} setNota={setNota}
         editMode={editMode} setEditMode={setEditMode}
         editEmpresa={editEmpresa} setEditEmpresa={setEditEmpresa}
