@@ -632,7 +632,6 @@ export function FacturaForm({
               const cobrable = total * pct;
               const deshabilitada =
                 tipoActivo !== null && tipoActivo !== tipoMarca;
-              const labelPct = tipoMarca === "interna" ? "100%" : "50%";
               return (
                 <label
                   key={m.id}
@@ -660,7 +659,6 @@ export function FacturaForm({
                       className="accent-black w-4 h-4 disabled:cursor-not-allowed"
                     />
                     <span className="text-sm text-gray-800">{m.nombre}</span>
-                    <span className="text-[11px] text-gray-400">{labelPct}</span>
                     {tipoMarca === "interna" && (
                       <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
                         Interna

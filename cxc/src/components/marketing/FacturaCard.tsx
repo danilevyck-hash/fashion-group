@@ -122,7 +122,6 @@ export function FacturaCard({
               >
                 <span className="font-semibold">[{inicial}]</span>
                 <span className="font-medium">{m.marca.nombre}</span>
-                <span className="tabular-nums opacity-70">{m.porcentaje}%</span>
                 <span className="text-gray-400">→</span>
                 <span className="font-mono tabular-nums font-semibold">
                   {formatearMonto(cobrable)}

@@ -60,9 +60,6 @@ export function ProyectoCard({
                   {m.marca.nombre}
                 </span>
               )}
-              <span className="text-xs text-gray-500 tabular-nums">
-                {m.porcentaje}%
-              </span>
             </div>
           );
         })}
