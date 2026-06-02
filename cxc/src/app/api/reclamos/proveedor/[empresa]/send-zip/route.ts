@@ -8,12 +8,25 @@ import { buildReclamosZip } from "@/lib/reclamos/zip-bulk";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const BUCKET = "reclamo-fotos";
+// Bucket PRIVADO dedicado a los ZIPs (facturas + fotos del negocio).
+// NO usar el bucket público reclamo-fotos: ahí el objeto quedaría alcanzable
+// por URL aunque el link firmado venza. En privado, solo la signed URL sirve.
+const ZIP_BUCKET = "reclamo-zips-privado";
 const ATTACH_LIMIT = 10 * 1024 * 1024; // ≤10MB → adjunta; sobre eso → link firmado
 const SIGNED_URL_DAYS = 7;
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
+}
+
+/** Crea el bucket privado si no existe (idempotente, self-healing). */
+async function ensureZipBucket(): Promise<void> {
+  const { data } = await supabaseServer.storage.getBucket(ZIP_BUCKET);
+  if (data) return;
+  const { error } = await supabaseServer.storage.createBucket(ZIP_BUCKET, { public: false });
+  if (error && !/exist/i.test(error.message)) {
+    throw new Error(`No se pudo preparar el almacenamiento privado: ${error.message}`);
+  }
 }
 
 function fmt(n: number): string {
@@ -118,15 +131,16 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       downloadBlock = `<p style="font-size:13px;color:#444">Adjunto encontrará <strong>${esc(filename)}</strong> (${sizeMB.toFixed(1)} MB) con el Excel resumen y las fotos de evidencia organizadas por número de factura.</p>`;
     } else {
       mode = "link";
-      const path = `zips/${safeName}/${new Date().toISOString().slice(0, 10)}_${Date.now()}_${filename}`;
+      await ensureZipBucket();
+      const path = `${safeName}/${new Date().toISOString().slice(0, 10)}_${Date.now()}_${filename}`;
       const { error: upErr } = await supabaseServer.storage
-        .from(BUCKET)
+        .from(ZIP_BUCKET)
         .upload(path, buffer, { contentType: "application/zip", upsert: true });
       if (upErr) {
         return NextResponse.json({ error: "No se pudo preparar el archivo para el envío." }, { status: 500 });
       }
       const { data: signed, error: signErr } = await supabaseServer.storage
-        .from(BUCKET)
+        .from(ZIP_BUCKET)
         .createSignedUrl(path, SIGNED_URL_DAYS * 24 * 60 * 60);
       if (signErr || !signed?.signedUrl) {
         return NextResponse.json({ error: "No se pudo generar el enlace de descarga." }, { status: 500 });
