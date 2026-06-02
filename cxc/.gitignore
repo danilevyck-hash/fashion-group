@@ -20,3 +20,4 @@ scripts/explore-*.json
 backups/
 data/
 .claude/scheduled_tasks.lock
+.vercel

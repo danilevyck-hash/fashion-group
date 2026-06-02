@@ -7,7 +7,7 @@ import XLSX from "xlsx-js-style";
 import { supabaseServer } from "@/lib/supabase-server";
 import { formatearFecha } from "./normalizar";
 import { getMarcas } from "./queries";
-import { getEntregaTotalPorMarcaBatch, getEntregaTotalByProyectoBatch } from "./inventario";
+import { getEntregaTotalByProyectoBatch } from "./inventario";
 import type { MkMarca, EstadoProyecto } from "./types";
 
 // ----------------------------------------------------------------------------
@@ -15,9 +15,9 @@ import type { MkMarca, EstadoProyecto } from "./types";
 // ----------------------------------------------------------------------------
 export interface ReporteMarcaItem {
   marca: MkMarca;
-  gastadoYtd: number;
-  cobradoYtd: number;
-  pendiente: number;
+  // Gasto COMPLETO atribuido a la marca (sin co-op). Ya no se calcula
+  // cuánto reembolsa la marca; se muestra el monto total del gasto.
+  gasto: number;
 }
 
 export interface ReporteTiendaItem {
@@ -53,6 +53,10 @@ export interface FiltrosReporteProyecto {
 function anioRange(anio?: number): { ini: string; fin: string } | null {
   if (!anio) return null;
   return { ini: `${anio}-01-01`, fin: `${anio}-12-31` };
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }
 
 interface ProyectoMin {
@@ -213,6 +217,84 @@ async function cargarCobranzas(
 // ----------------------------------------------------------------------------
 // Reporte por marca
 // ----------------------------------------------------------------------------
+// Gasto COMPLETO por (proyecto → marca), SIN co-op. Fuente de verdad:
+//   - Facturas: factura.total distribuido por PORCIÓN real de cada marca
+//     (porcentaje normalizado entre las marcas de esa factura). 1 marca = total
+//     completo; 2 marcas 50/50 = mitad real a cada una. Σ por marca = total.
+//   - Entregas de muebles: porción real de cada marca = total_por_marca +
+//     total_por_empresa_interna[empresa_codigo de la marca] (el "otro 50%" que
+//     antes absorbía FG ahora se atribuye al gasto de esa marca).
+// Garantiza la DoD: Σ gasto por marca == Σ facturas.total + Σ entregas.total.
+async function cargarGastoCompletoPorMarca(
+  proyectoIds: ReadonlyArray<string>,
+): Promise<Map<string, Map<string, number>>> {
+  const out = new Map<string, Map<string, number>>();
+  if (proyectoIds.length === 0) return out;
+
+  const addParte = (pid: string, marcaId: string, monto: number) => {
+    const inner = out.get(pid) ?? new Map<string, number>();
+    inner.set(marcaId, round2((inner.get(marcaId) ?? 0) + monto));
+    out.set(pid, inner);
+  };
+
+  const [factRes, fmRes, entRes, marcas] = await Promise.all([
+    supabaseServer
+      .from("mk_facturas")
+      .select("id, proyecto_id, total")
+      .in("proyecto_id", proyectoIds)
+      .is("anulado_en", null),
+    supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id, porcentaje"),
+    supabaseServer
+      .from("mk_entregas_muebles")
+      .select("proyecto_id, total_por_marca, total_por_empresa_interna")
+      .in("proyecto_id", proyectoIds)
+      .not("proyecto_id", "is", null),
+    getMarcas(),
+  ]);
+  if (factRes.error) throw new Error(`cargarGastoCompletoPorMarca[fact]: ${factRes.error.message}`);
+  if (fmRes.error) throw new Error(`cargarGastoCompletoPorMarca[fm]: ${fmRes.error.message}`);
+  if (entRes.error) throw new Error(`cargarGastoCompletoPorMarca[ent]: ${entRes.error.message}`);
+
+  const factById = new Map<string, { proyectoId: string; total: number }>();
+  for (const f of (factRes.data ?? []) as Array<{ id: string; proyecto_id: string; total: number }>) {
+    factById.set(String(f.id), { proyectoId: String(f.proyecto_id), total: Number(f.total ?? 0) });
+  }
+  const empresaByMarca = new Map(marcas.map((m) => [m.id, m.empresa_codigo]));
+
+  // Facturas: distribuir el total por porción (porcentaje normalizado).
+  const rowsByFactura = new Map<string, Array<{ marcaId: string; pct: number }>>();
+  for (const r of (fmRes.data ?? []) as Array<{ factura_id: string; marca_id: string; porcentaje: number }>) {
+    const fid = String(r.factura_id);
+    if (!factById.has(fid)) continue;
+    const arr = rowsByFactura.get(fid) ?? [];
+    arr.push({ marcaId: String(r.marca_id), pct: Number(r.porcentaje ?? 0) });
+    rowsByFactura.set(fid, arr);
+  }
+  for (const [fid, rows] of rowsByFactura) {
+    const info = factById.get(fid)!;
+    const sumPct = rows.reduce((s, r) => s + r.pct, 0) || 1;
+    for (const r of rows) addParte(info.proyectoId, r.marcaId, info.total * (r.pct / sumPct));
+  }
+
+  // Entregas: porción real = total_por_marca + el interno pareja de esa marca.
+  for (const e of (entRes.data ?? []) as Array<{
+    proyecto_id: string;
+    total_por_marca: Record<string, number> | null;
+    total_por_empresa_interna: Record<string, number> | null;
+  }>) {
+    const pid = String(e.proyecto_id);
+    const tpm = e.total_por_marca ?? {};
+    const tpe = e.total_por_empresa_interna ?? {};
+    for (const [mid, v] of Object.entries(tpm)) {
+      const emp = empresaByMarca.get(mid);
+      const interna = emp && tpe[emp] ? Number(tpe[emp]) : 0;
+      addParte(pid, mid, Number(v) + interna);
+    }
+  }
+
+  return out;
+}
+
 export async function reportePorMarca(
   anio?: number
 ): Promise<ReporteMarcaItem[]> {
@@ -223,51 +305,20 @@ export async function reportePorMarca(
   if (marcas.length === 0) return [];
 
   const proyectoIds = proyectos.map((p) => p.id);
-  const [proyMarcas, facturas, cobranzas, entregasByProyMarca] = await Promise.all([
-    cargarProyMarcas(proyectoIds),
-    cargarFacturas(proyectoIds),
-cargarCobranzas(proyectoIds, proyectos),
-    getEntregaTotalPorMarcaBatch(proyectoIds),
-  ]);
+  const gastoPorProyMarca = await cargarGastoCompletoPorMarca(proyectoIds);
 
-  // Total facturado por proyecto
-  const totalByProy = new Map<string, number>();
-  for (const f of facturas) {
-    totalByProy.set(f.proyecto_id, (totalByProy.get(f.proyecto_id) ?? 0) + f.total);
-  }
-
-  // Gastado por marca = suma por proyecto de (total * porcentaje / 100)
-  const gastadoByMarca = new Map<string, number>();
-  for (const pm of proyMarcas) {
-    const proyTotal = totalByProy.get(pm.proyecto_id) ?? 0;
-    const parte = (proyTotal * pm.porcentaje) / 100;
-    gastadoByMarca.set(pm.marca_id, (gastadoByMarca.get(pm.marca_id) ?? 0) + parte);
-  }
-
-  // Sumar entregas: total_por_marca ya viene desglosado por marca, no usa %.
-  for (const [, byMarca] of entregasByProyMarca) {
-    for (const [marcaId, monto] of byMarca) {
-      gastadoByMarca.set(marcaId, (gastadoByMarca.get(marcaId) ?? 0) + monto);
+  // Gasto completo por marca = suma sobre todos los proyectos.
+  const gastoByMarca = new Map<string, number>();
+  for (const [, inner] of gastoPorProyMarca) {
+    for (const [marcaId, monto] of inner) {
+      gastoByMarca.set(marcaId, (gastoByMarca.get(marcaId) ?? 0) + monto);
     }
   }
 
-  // Cobrado por marca = suma de montos de cobranzas en estado 'cobrada'
-  const cobradoByMarca = new Map<string, number>();
-  for (const cb of cobranzas) {
-    if (cb.estado !== "cobrada") continue;
-    cobradoByMarca.set(cb.marca_id, (cobradoByMarca.get(cb.marca_id) ?? 0) + cb.monto);
-  }
-
-  return marcas.map((m) => {
-    const gast = Number((gastadoByMarca.get(m.id) ?? 0).toFixed(2));
-    const cob = Number((cobradoByMarca.get(m.id) ?? 0).toFixed(2));
-    return {
-      marca: m,
-      gastadoYtd: gast,
-      cobradoYtd: cob,
-      pendiente: Number((gast - cob).toFixed(2)),
-    };
-  });
+  return marcas.map((m) => ({
+    marca: m,
+    gasto: Number((gastoByMarca.get(m.id) ?? 0).toFixed(2)),
+  }));
 }
 
 // ----------------------------------------------------------------------------
@@ -283,34 +334,26 @@ export async function reportePorTienda(
   if (proyectos.length === 0) return [];
 
   const proyectoIds = proyectos.map((p) => p.id);
-  const [proyMarcas, facturas] = await Promise.all([
-    cargarProyMarcas(proyectoIds),
-    cargarFacturas(proyectoIds),
-  ]);
+  const gastoPorProyMarca = await cargarGastoCompletoPorMarca(proyectoIds);
 
   const proyectoById = new Map(proyectos.map((p) => [p.id, p]));
   const marcaById = new Map(marcas.map((m) => [m.id, m]));
 
-  const totalByProy = new Map<string, number>();
-  for (const f of facturas) {
-    totalByProy.set(f.proyecto_id, (totalByProy.get(f.proyecto_id) ?? 0) + f.total);
-  }
-
-  // tienda → { marcaNombre → monto, total }
+  // tienda → { marcaNombre → gasto completo, total }
   const bucket = new Map<string, { porMarca: Record<string, number>; total: number }>();
-  for (const pm of proyMarcas) {
-    const proyecto = proyectoById.get(pm.proyecto_id);
-    const marca = marcaById.get(pm.marca_id);
-    if (!proyecto || !marca) continue;
+  for (const [proyectoId, inner] of gastoPorProyMarca) {
+    const proyecto = proyectoById.get(proyectoId);
+    if (!proyecto) continue;
     const tienda = proyecto.tienda;
-    const proyTotal = totalByProy.get(pm.proyecto_id) ?? 0;
-    const parte = (proyTotal * pm.porcentaje) / 100;
-
     const entry = bucket.get(tienda) ?? { porMarca: {}, total: 0 };
-    entry.porMarca[marca.nombre] = Number(
-      ((entry.porMarca[marca.nombre] ?? 0) + parte).toFixed(2)
-    );
-    entry.total = Number((entry.total + parte).toFixed(2));
+    for (const [marcaId, monto] of inner) {
+      const marca = marcaById.get(marcaId);
+      if (!marca) continue;
+      entry.porMarca[marca.nombre] = Number(
+        ((entry.porMarca[marca.nombre] ?? 0) + monto).toFixed(2)
+      );
+      entry.total = Number((entry.total + monto).toFixed(2));
+    }
     bucket.set(tienda, entry);
   }
 
@@ -414,7 +457,7 @@ function esReporteMarcaItem(x: unknown): x is ReporteMarcaItem {
     typeof x === "object" &&
     x !== null &&
     "marca" in x &&
-    "gastadoYtd" in x
+    "gasto" in x
   );
 }
 
@@ -453,31 +496,21 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
       throw new Error("data inválida para reporte por marca");
     }
     hoja = "Por marca";
-    const aoa: unknown[][] = [
-      ["Marca", "Código", "A cobrar YTD", "Cobrado YTD", "Pendiente"],
-    ];
+    const aoa: unknown[][] = [["Marca", "Código", "Gasto"]];
     for (const item of data) {
-      aoa.push([
-        item.marca.nombre,
-        item.marca.codigo,
-        item.gastadoYtd,
-        item.cobradoYtd,
-        item.pendiente,
-      ]);
+      aoa.push([item.marca.nombre, item.marca.codigo, item.gasto]);
     }
     ws = XLSX.utils.aoa_to_sheet(aoa);
-    ws["!cols"] = [{ wch: 20 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
-    for (let c = 0; c < 5; c++) {
+    ws["!cols"] = [{ wch: 20 }, { wch: 10 }, { wch: 14 }];
+    for (let c = 0; c < 3; c++) {
       const addr = XLSX.utils.encode_cell({ r: 0, c });
       if (ws[addr]) ws[addr].s = headerStyle;
     }
     for (let r = 1; r <= data.length; r++) {
-      for (const c of [2, 3, 4]) {
-        const addr = XLSX.utils.encode_cell({ r, c });
-        if (ws[addr]) {
-          ws[addr].t = "n";
-          ws[addr].z = moneyFmt;
-        }
+      const addr = XLSX.utils.encode_cell({ r, c: 2 });
+      if (ws[addr]) {
+        ws[addr].t = "n";
+        ws[addr].z = moneyFmt;
       }
     }
   } else if (tipo === "tienda") {
@@ -488,7 +521,7 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
     const marcasUnicas = Array.from(
       new Set(data.flatMap((d) => Object.keys(d.porMarca)))
     ).sort((a, b) => a.localeCompare(b, "es"));
-    const aoa: unknown[][] = [["Tienda", ...marcasUnicas, "A cobrar"]];
+    const aoa: unknown[][] = [["Tienda", ...marcasUnicas, "Gasto"]];
     for (const item of data) {
       aoa.push([
         item.tienda,

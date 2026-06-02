@@ -55,16 +55,10 @@ export function ReportePorMarcaView() {
     void cargar();
   }, [cargar]);
 
-  const totales = useMemo(() => {
-    return items.reduce(
-      (acc, it) => ({
-        gastado: acc.gastado + it.gastadoYtd,
-        cobrado: acc.cobrado + it.cobradoYtd,
-        pendiente: acc.pendiente + it.pendiente,
-      }),
-      { gastado: 0, cobrado: 0, pendiente: 0 }
-    );
-  }, [items]);
+  const totalGasto = useMemo(
+    () => items.reduce((acc, it) => acc + it.gasto, 0),
+    [items]
+  );
 
   async function exportar() {
     try {
@@ -123,9 +117,7 @@ export function ReportePorMarcaView() {
             <thead className="bg-gray-50 text-gray-600">
               <tr>
                 <th className="text-left font-medium px-4 py-2">Marca</th>
-                <th className="text-right font-medium px-4 py-2">A cobrar</th>
-                <th className="text-right font-medium px-4 py-2">Cobrado</th>
-                <th className="text-right font-medium px-4 py-2">Pendiente</th>
+                <th className="text-right font-medium px-4 py-2">Gasto</th>
               </tr>
             </thead>
             <tbody>
@@ -148,17 +140,7 @@ export function ReportePorMarcaView() {
                     </div>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-gray-900">
-                    {fmtMoney(it.gastadoYtd)}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-emerald-700">
-                    {fmtMoney(it.cobradoYtd)}
-                  </td>
-                  <td
-                    className={`px-4 py-3 text-right tabular-nums ${
-                      it.pendiente > 0 ? "text-amber-700" : "text-gray-500"
-                    }`}
-                  >
-                    {fmtMoney(it.pendiente)}
+                    {fmtMoney(it.gasto)}
                   </td>
                 </tr>
               ))}
@@ -169,13 +151,7 @@ export function ReportePorMarcaView() {
                   Total
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums font-medium">
-                  {fmtMoney(totales.gastado)}
-                </td>
-                <td className="px-4 py-2 text-right tabular-nums font-medium text-emerald-700">
-                  {fmtMoney(totales.cobrado)}
-                </td>
-                <td className="px-4 py-2 text-right tabular-nums font-medium text-amber-700">
-                  {fmtMoney(totales.pendiente)}
+                  {fmtMoney(totalGasto)}
                 </td>
               </tr>
             </tfoot>

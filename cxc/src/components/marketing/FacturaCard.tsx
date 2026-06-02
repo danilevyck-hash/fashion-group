@@ -43,6 +43,10 @@ export function FacturaCard({
     return "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200";
   }
 
+  // Gasto completo por marca (sin co-op): reparte factura.total por la porción
+  // real de cada marca (porcentaje normalizado). 1 marca = total completo.
+  const sumPctMarcas = porcentajesMarcas.reduce((s, m) => s + m.porcentaje, 0) || 1;
+
   const body = (
     <div className="flex flex-col gap-2">
       <div className="grid grid-cols-[1fr_auto] gap-2 items-start">
@@ -111,7 +115,7 @@ export function FacturaCard({
       {porcentajesMarcas.length > 0 && !anulada && (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-2">
           {porcentajesMarcas.map((m) => {
-            const cobrable = (factura.total * m.porcentaje) / 100;
+            const cobrable = factura.total * (m.porcentaje / sumPctMarcas);
             const inicial = (m.marca.nombre || m.marca.codigo || "?")
               .charAt(0)
               .toUpperCase();

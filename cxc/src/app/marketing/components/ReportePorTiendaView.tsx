@@ -159,7 +159,7 @@ export function ReportePorTiendaView() {
                     {m}
                   </th>
                 ))}
-                <th className="text-right font-medium px-4 py-2">A cobrar</th>
+                <th className="text-right font-medium px-4 py-2">Gasto</th>
               </tr>
             </thead>
             <tbody>
@@ -191,7 +191,7 @@ export function ReportePorTiendaView() {
                   className="px-4 py-2 text-sm font-medium text-gray-700"
                   colSpan={marcasColumnas.length + 1}
                 >
-                  A cobrar (total)
+                  Gasto (total)
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums font-medium">
                   {fmtMoney(totalGlobal)}

@@ -133,6 +133,7 @@ export async function GET(req: NextRequest) {
           nombre: String(m.nombre ?? ""),
           codigo: String(m.codigo ?? ""),
           tipo,
+          empresa_codigo: String(m.empresa_codigo ?? ""),
         };
       });
     const marcaById = new Map(marcas.map((m) => [String(m.id), m]));
@@ -171,7 +172,7 @@ export async function GET(req: NextRequest) {
         .select("factura_id, marca_id, porcentaje"),
       supabaseServer
         .from("mk_entregas_muebles")
-        .select("proyecto_id, total, total_por_marca")
+        .select("proyecto_id, total, total_por_marca, total_por_empresa_interna")
         .in("proyecto_id", proyectoIds)
         .not("proyecto_id", "is", null),
     ]);
@@ -218,46 +219,62 @@ export async function GET(req: NextRequest) {
       fotosCountByProy.set(pid, (fotosCountByProy.get(pid) ?? 0) + 1);
     }
 
-    // Marcas involucradas por proyecto + cobrable desde facturas por marca
+    // Marcas involucradas por proyecto + GASTO COMPLETO por marca (sin co-op).
+    // Se distribuye factura.total por la PORCIÓN real de cada marca (porcentaje
+    // normalizado entre las marcas de esa factura): 1 marca = total completo;
+    // 2 marcas 50/50 = mitad real a cada una. Alimenta el tooltip de desglose.
     const marcasByProy = new Map<string, Set<string>>();
     const cobrableFactByProyMarca = new Map<string, Map<string, number>>();
+    const fmByFactura = new Map<string, Array<{ mid: string; pct: number }>>();
     for (const r of fm) {
-      const finfo = facturaIndex.get(String(r.factura_id));
-      if (!finfo) continue;
+      const fid = String(r.factura_id);
+      if (!facturaIndex.has(fid)) continue;
+      const arr = fmByFactura.get(fid) ?? [];
+      arr.push({ mid: String(r.marca_id), pct: Number(r.porcentaje ?? 0) });
+      fmByFactura.set(fid, arr);
+    }
+    for (const [fid, rows] of fmByFactura) {
+      const finfo = facturaIndex.get(fid)!;
       const pid = finfo.proyectoId;
-      const mid = String(r.marca_id);
+      const sumPct = rows.reduce((s, x) => s + x.pct, 0) || 1;
       const set = marcasByProy.get(pid) ?? new Set<string>();
-      set.add(mid);
+      const inner = cobrableFactByProyMarca.get(pid) ?? new Map<string, number>();
+      for (const r of rows) {
+        set.add(r.mid);
+        const monto = finfo.total * (r.pct / sumPct);
+        inner.set(r.mid, (inner.get(r.mid) ?? 0) + monto);
+      }
       marcasByProy.set(pid, set);
-
-      const inner =
-        cobrableFactByProyMarca.get(pid) ?? new Map<string, number>();
-      const monto = (finfo.total * Number(r.porcentaje ?? 0)) / 100;
-      inner.set(mid, (inner.get(mid) ?? 0) + monto);
       cobrableFactByProyMarca.set(pid, inner);
     }
 
-    // Sumar entregas de muebles al cobrable por marca de cada proyecto.
-    // total_por_marca es {"<marca_id>": <monto>} y va sin desglose.
+    // Sumar entregas de muebles al GASTO COMPLETO por marca de cada proyecto.
+    // Porción real de cada marca = total_por_marca + total_por_empresa_interna
+    // del empresa_codigo pareja (el "otro 50%" que antes absorbía FG ahora se
+    // atribuye al gasto de esa marca). Sin co-op.
     const entregasCountByProy = new Map<string, number>();
     for (const e of (entregasRes.data ?? []) as Array<{
       proyecto_id: string;
       total: number | null;
       total_por_marca: Record<string, number> | null;
+      total_por_empresa_interna: Record<string, number> | null;
     }>) {
       const pid = String(e.proyecto_id);
       entregasCountByProy.set(pid, (entregasCountByProy.get(pid) ?? 0) + 1);
-      // Bruto: el total completo de la entrega (no su desglose co-op por marca).
+      // Bruto: el total completo de la entrega.
       grossByProy.set(pid, (grossByProy.get(pid) ?? 0) + Number(e.total ?? 0));
       const tpm = e.total_por_marca ?? {};
+      const tpe = e.total_por_empresa_interna ?? {};
       const set = marcasByProy.get(pid) ?? new Set<string>();
       const inner =
         cobrableFactByProyMarca.get(pid) ?? new Map<string, number>();
       for (const [mid, monto] of Object.entries(tpm)) {
         const n = Number(monto);
         if (!Number.isFinite(n) || n <= 0) continue;
+        const emp = marcaById.get(mid)?.empresa_codigo;
+        const interna = emp && tpe[emp] ? Number(tpe[emp]) : 0;
         set.add(mid);
-        inner.set(mid, (inner.get(mid) ?? 0) + n);
+        inner.set(mid, (inner.get(mid) ?? 0) + n + interna);
       }
       marcasByProy.set(pid, set);
       cobrableFactByProyMarca.set(pid, inner);
@@ -322,7 +339,7 @@ export async function GET(req: NextRequest) {
         const marcasArr = Array.from(marcasSet)
           .map((mid) => marcaById.get(mid))
           .filter(
-            (x): x is { id: string; nombre: string; codigo: string; tipo: "externa" | "interna" } =>
+            (x): x is { id: string; nombre: string; codigo: string; tipo: "externa" | "interna"; empresa_codigo: string } =>
               !!x,
           )
           .map((m) => ({

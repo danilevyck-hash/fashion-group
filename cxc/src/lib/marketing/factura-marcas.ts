@@ -313,9 +313,13 @@ export async function getCobrableByMarca(
     throw new Error(`getCobrableByMarca[fm]: ${fmError.message}`);
   }
 
+  // Gasto COMPLETO por marca (sin co-op): el total se reparte por la porción
+  // real de cada marca (porcentaje normalizado). 1 marca = total completo.
+  const rows = (fmData ?? []) as Array<{ marca_id: string; porcentaje: number }>;
+  const sumPct = rows.reduce((s, r) => s + Number(r.porcentaje ?? 0), 0) || 1;
   const result = new Map<string, number>();
-  for (const r of (fmData ?? []) as Array<{ marca_id: string; porcentaje: number }>) {
-    const monto = round2((total * Number(r.porcentaje ?? 0)) / 100);
+  for (const r of rows) {
+    const monto = round2(total * (Number(r.porcentaje ?? 0) / sumPct));
     result.set(String(r.marca_id), monto);
   }
   return result;
@@ -355,16 +359,27 @@ export async function getCobrableDeProyectoPorMarca(
     throw new Error(`getCobrableDeProyectoPorMarca[fm]: ${fmError.message}`);
   }
 
-  const result = new Map<string, number>();
+  // Gasto COMPLETO por marca (sin co-op): el total de cada factura se reparte
+  // por la porción real de sus marcas (porcentaje normalizado por factura).
+  const rowsByFactura = new Map<string, Array<{ marca_id: string; pct: number }>>();
   for (const r of (fmData ?? []) as Array<{
     factura_id: string;
     marca_id: string;
     porcentaje: number;
   }>) {
-    const total = totalByFactura.get(String(r.factura_id)) ?? 0;
-    const monto = (total * Number(r.porcentaje ?? 0)) / 100;
-    const prev = result.get(String(r.marca_id)) ?? 0;
-    result.set(String(r.marca_id), prev + monto);
+    const fid = String(r.factura_id);
+    const arr = rowsByFactura.get(fid) ?? [];
+    arr.push({ marca_id: String(r.marca_id), pct: Number(r.porcentaje ?? 0) });
+    rowsByFactura.set(fid, arr);
+  }
+  const result = new Map<string, number>();
+  for (const [fid, rows] of rowsByFactura) {
+    const total = totalByFactura.get(fid) ?? 0;
+    const sumPct = rows.reduce((s, r) => s + r.pct, 0) || 1;
+    for (const r of rows) {
+      const monto = total * (r.pct / sumPct);
+      result.set(r.marca_id, (result.get(r.marca_id) ?? 0) + monto);
+    }
   }
 
   // Redondear a 2 decimales al final
