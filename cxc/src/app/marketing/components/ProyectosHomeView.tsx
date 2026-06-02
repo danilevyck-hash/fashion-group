@@ -32,14 +32,16 @@ interface ProyectoListItem {
     codigo: string;
     tipo?: "externa" | "interna";
   }>;
+  // Gasto bruto real (Σ factura.total con ITBMS + entregas), sin ponderar
+  // por co-op. Es el número de la columna "Gastado".
+  gasto_real?: number;
   por_cobrar_total: number;
   por_cobrar_por_marca: Array<{
     marca_id: string;
     marca_nombre: string;
     monto: number;
   }>;
-  // Proyectos cobrados llevan su monto en `cobrado_*`. Para el archivo plano
-  // sumamos ambos para mostrar el total gastado real sin importar estado.
+  // Cobrable co-op por marca (alimenta SOLO el tooltip de desglose).
   cobrado_total?: number;
   cobrado_por_marca?: Array<{
     marca_id: string;
@@ -301,11 +303,12 @@ export default function ProyectosHomeView({
                 // Archivo plano: solo fecha de creación, sin label de transición.
                 const fechaIso = p.created_at;
 
-                // Archivo plano: ya no diferenciamos "por cobrar" vs "cobrado".
-                // El total gastado es el desglose completo, sin condicionar
-                // por estado del proyecto.
+                // "Gastado" = lo que se pagó de verdad (Σ factura.total con
+                // ITBMS + entregas), SIN ponderar por co-op. El tooltip de
+                // abajo sí muestra el cobrable por marca (co-op). Fallback al
+                // cálculo viejo por si llega una respuesta cacheada sin gasto_real.
                 const totalGastado =
-                  (p.por_cobrar_total || 0) + (p.cobrado_total || 0);
+                  p.gasto_real ?? ((p.por_cobrar_total || 0) + (p.cobrado_total || 0));
                 const desgloseFuente =
                   p.por_cobrar_por_marca.length > 0
                     ? p.por_cobrar_por_marca

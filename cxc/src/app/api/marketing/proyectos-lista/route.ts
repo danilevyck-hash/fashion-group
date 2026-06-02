@@ -171,7 +171,7 @@ export async function GET(req: NextRequest) {
         .select("factura_id, marca_id, porcentaje"),
       supabaseServer
         .from("mk_entregas_muebles")
-        .select("proyecto_id, total_por_marca")
+        .select("proyecto_id, total, total_por_marca")
         .in("proyecto_id", proyectoIds)
         .not("proyecto_id", "is", null),
     ]);
@@ -194,11 +194,14 @@ export async function GET(req: NextRequest) {
 
     // Índice: factura_id → { proyecto_id, total }
     const facturaIndex = new Map<string, { proyectoId: string; total: number }>();
+    // Gasto BRUTO por proyecto = Σ factura.total (con ITBMS) + Σ entrega.total.
+    // Es "lo que se pagó de verdad", SIN ponderar por co-op (distinto del
+    // cobrable a marcas que vive en cobrableFactByProyMarca).
+    const grossByProy = new Map<string, number>();
     for (const f of facturas) {
-      facturaIndex.set(String(f.id), {
-        proyectoId: String(f.proyecto_id),
-        total: Number(f.total ?? 0),
-      });
+      const pid = String(f.proyecto_id);
+      facturaIndex.set(String(f.id), { proyectoId: pid, total: Number(f.total ?? 0) });
+      grossByProy.set(pid, (grossByProy.get(pid) ?? 0) + Number(f.total ?? 0));
     }
 
     // Conteo de facturas por proyecto
@@ -239,10 +242,13 @@ export async function GET(req: NextRequest) {
     const entregasCountByProy = new Map<string, number>();
     for (const e of (entregasRes.data ?? []) as Array<{
       proyecto_id: string;
+      total: number | null;
       total_por_marca: Record<string, number> | null;
     }>) {
       const pid = String(e.proyecto_id);
       entregasCountByProy.set(pid, (entregasCountByProy.get(pid) ?? 0) + 1);
+      // Bruto: el total completo de la entrega (no su desglose co-op por marca).
+      grossByProy.set(pid, (grossByProy.get(pid) ?? 0) + Number(e.total ?? 0));
       const tpm = e.total_por_marca ?? {};
       const set = marcasByProy.get(pid) ?? new Set<string>();
       const inner =
@@ -350,7 +356,11 @@ export async function GET(req: NextRequest) {
           fotos_count: fotosCountByProy.get(pid) ?? 0,
           entregas_count: entregasCountByProy.get(pid) ?? 0,
           marcas: marcasArr,
+          // Gasto BRUTO real (Σ factura.total con ITBMS + entregas), sin co-op.
+          // Es el número grande que se muestra en la columna "Gastado".
+          gasto_real: Number((grossByProy.get(pid) ?? 0).toFixed(2)),
           // Activos: desglose de pendiente; cobrados: 0 (ya cobrado).
+          // Esto alimenta SOLO el tooltip de desglose por marca (cobrable co-op).
           por_cobrar_total: esCobrado ? 0 : desg.total,
           por_cobrar_por_marca: esCobrado ? [] : desgloseConNombres,
           // Historial: monto ya cobrado por marca (mismo cálculo, semántica distinta).
