@@ -219,7 +219,7 @@ export default function ProyectosHomeView({
           type="search"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Buscar por nombre o tienda…"
+          placeholder="Buscar por proyecto, tienda o N° de factura…"
           className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none"
         />
         <select

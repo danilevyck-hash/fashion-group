@@ -81,6 +81,7 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
   const ws: XLSX.WorkSheet = {};
   const h: number[] = [];
   const merges: XLSX.Range[] = [];
+  const CMAX = 8; // 9 columnas (0..8)
   let r = 0;
 
   // Title
@@ -93,8 +94,8 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
       alignment: { horizontal: "center", vertical: "center" },
     },
   };
-  fillRow(6, r, ws, PRI);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 6 } });
+  fillRow(CMAX, r, ws, PRI);
+  merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } });
   h[r] = 32; r++;
 
   // Subtitle
@@ -107,17 +108,17 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
       alignment: { horizontal: "center", vertical: "center" },
     },
   };
-  fillRow(6, r, ws, MID);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 6 } });
+  fillRow(CMAX, r, ws, MID);
+  merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } });
   h[r] = 22; r++;
 
   // Separator
-  fillRow(6, r, ws, SEP);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 6 } });
+  fillRow(CMAX, r, ws, SEP);
+  merges.push({ s: { r, c: 0 }, e: { r, c: CMAX } });
   h[r] = 6; r++;
 
   // Headers
-  const headers = ["N° Reclamo", "Factura", "Fecha", "Subtotal", "Importación", "ITBMS", "Total"];
+  const headers = ["N° Reclamo", "Factura", "Fecha", "Estado", "Subtotal", "Importación", "ITBMS", "Total", "# Fotos"];
   headers.forEach((hv, i) => {
     ws[addr(r, i)] = {
       v: hv,
@@ -137,6 +138,7 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
   let grandImp = 0;
   let grandItbms = 0;
   let grandTotal = 0;
+  let grandFotos = 0;
   for (const rec of reclamos) {
     const items = rec.reclamo_items || [];
     const sub = items.reduce(
@@ -146,10 +148,12 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
     const imp = sub * TASA_IMPORTACION;
     const itbms = sub * TASA_ITBMS;
     const total = sub * FACTOR_TOTAL;
+    const nFotos = (rec.reclamo_fotos || []).length;
     grandSub += sub;
     grandImp += imp;
     grandItbms += itbms;
     grandTotal += total;
+    grandFotos += nFotos;
 
     const txt = (v: string, ha: string, bold = false) => ({
       v,
@@ -172,14 +176,26 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
         border: B,
       },
     });
+    const int = (v: number) => ({
+      v,
+      t: "n" as const,
+      s: {
+        font: { sz: 10, color: { rgb: "111111" }, name: "Calibri" },
+        fill: { fgColor: { rgb: DATA_BG } },
+        alignment: { horizontal: "center" },
+        border: B,
+      },
+    });
 
     ws[addr(r, 0)] = txt(rec.nro_reclamo || "", "left", true);
     ws[addr(r, 1)] = txt(rec.nro_factura || "", "left");
     ws[addr(r, 2)] = txt(fmtDate(rec.fecha_reclamo), "center");
-    ws[addr(r, 3)] = num(sub);
-    ws[addr(r, 4)] = num(imp);
-    ws[addr(r, 5)] = num(itbms);
-    ws[addr(r, 6)] = num(total, true);
+    ws[addr(r, 3)] = txt(rec.estado || "", "center");
+    ws[addr(r, 4)] = num(sub);
+    ws[addr(r, 5)] = num(imp);
+    ws[addr(r, 6)] = num(itbms);
+    ws[addr(r, 7)] = num(total, true);
+    ws[addr(r, 8)] = int(nFotos);
     h[r] = 18; r++;
   }
 
@@ -203,25 +219,37 @@ function buildResumenSheet(reclamos: ReclamoFull[], empresa: string): XLSX.WorkS
       alignment: { horizontal: "right", vertical: "center" },
     },
   });
+  const tInt = (v: number) => ({
+    v,
+    t: "n" as const,
+    s: {
+      font: { bold: true, sz: 11, color: { rgb: "FFFFFF" }, name: "Calibri" },
+      fill: { fgColor: { rgb: PRI } },
+      alignment: { horizontal: "center", vertical: "center" },
+    },
+  });
   ws[addr(r, 0)] = tBand("TOTAL GENERAL", "left");
-  for (let c = 1; c <= 2; c++) ws[addr(r, c)] = tBand("", "left");
-  ws[addr(r, 3)] = tNum(grandSub);
-  ws[addr(r, 4)] = tNum(grandImp);
-  ws[addr(r, 5)] = tNum(grandItbms);
-  ws[addr(r, 6)] = tNum(grandTotal);
-  merges.push({ s: { r, c: 0 }, e: { r, c: 2 } });
+  for (let c = 1; c <= 3; c++) ws[addr(r, c)] = tBand("", "left");
+  ws[addr(r, 4)] = tNum(grandSub);
+  ws[addr(r, 5)] = tNum(grandImp);
+  ws[addr(r, 6)] = tNum(grandItbms);
+  ws[addr(r, 7)] = tNum(grandTotal);
+  ws[addr(r, 8)] = tInt(grandFotos);
+  merges.push({ s: { r, c: 0 }, e: { r, c: 3 } });
   h[r] = 24; r++;
 
-  ws["!ref"] = `A1:G${r}`;
+  ws["!ref"] = `A1:I${r}`;
   ws["!merges"] = merges;
   ws["!cols"] = [
     { wch: 16 },
     { wch: 18 },
     { wch: 12 },
+    { wch: 12 },
     { wch: 14 },
     { wch: 14 },
     { wch: 14 },
     { wch: 16 },
+    { wch: 9 },
   ];
   ws["!rows"] = h.map((v) => ({ hpt: v || 16 }));
   return ws;

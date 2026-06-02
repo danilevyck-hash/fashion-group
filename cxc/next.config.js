@@ -13,6 +13,11 @@ const nextConfig = {
   },
   compress: true,
   poweredByHeader: false,
+  experimental: {
+    // sharp es un binario nativo: externalizarlo evita que webpack lo empaquete
+    // (requerido para que funcione en las funciones serverless de Vercel).
+    serverComponentsExternalPackages: ["sharp"],
+  },
 };
 
 module.exports = withSentryConfig(nextConfig, {

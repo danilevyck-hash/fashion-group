@@ -9,7 +9,11 @@ export const fetchCache = "force-no-store";
 // GET /api/marketing/proyectos-lista
 //   ?filtro_estado=activos|todos|abierto|por_cobrar|enviado|cobrado
 //   ?marca_id=<uuid>  → solo proyectos con ≥1 factura de esa marca
-//   ?busqueda=<str>   → match en nombre o tienda (ILIKE)
+//   ?busqueda=<str>   → match en nombre o tienda del proyecto (ILIKE),
+//                       y también en sus facturas: número de factura,
+//                       concepto/nota, o monto exacto. El número tolera
+//                       ceros a la izquierda porque usa "contains"
+//                       (ej. "64327" encuentra "0000064327").
 //
 // Respuesta: Array<ProyectoListItem>
 // Calcula por_cobrar usando mk_factura_marcas + cobranzas.
@@ -30,7 +34,43 @@ export async function GET(req: NextRequest) {
   const marcaIdFiltro = url.searchParams.get("marca_id");
   const busqueda = (url.searchParams.get("busqueda") ?? "").trim();
 
+  // Escape ILIKE wildcards una sola vez (reutilizado en facturas y proyectos).
+  const esc = busqueda.replace(/[%_]/g, (m) => `\\${m}`);
+
   try {
+    // 0. Pre-búsqueda en facturas: si hay texto, encontrar los proyectos cuyas
+    //    facturas (no anuladas) matchean por número, concepto/nota o monto
+    //    exacto. Devuelve la lista de proyecto_id para sumarla al filtro OR
+    //    de proyectos más abajo. Solo lectura, no toca data ni cálculos.
+    let proyectoIdsPorFactura: string[] = [];
+    if (busqueda.length > 0) {
+      const orFacturas = [
+        `numero_factura.ilike.%${esc}%`,
+        `concepto.ilike.%${esc}%`,
+      ];
+      // Monto exacto: solo si el término es un número válido (admite comas de
+      // miles). "150.50" → total.eq.150.5. No rompe si no es número.
+      const montoNum = Number(busqueda.replace(/,/g, ""));
+      if (busqueda.replace(/,/g, "").trim() !== "" && Number.isFinite(montoNum)) {
+        orFacturas.push(`total.eq.${montoNum}`);
+      }
+      const factSearchRes = await supabaseServer
+        .from("mk_facturas")
+        .select("proyecto_id")
+        .is("anulado_en", null)
+        .or(orFacturas.join(","));
+      if (factSearchRes.error) {
+        throw new Error(`facturas-busqueda: ${factSearchRes.error.message}`);
+      }
+      proyectoIdsPorFactura = Array.from(
+        new Set(
+          ((factSearchRes.data ?? []) as Array<{ proyecto_id: string }>).map(
+            (r) => String(r.proyecto_id),
+          ),
+        ),
+      );
+    }
+
     // 1. Cargar marcas (catálogo completo para nombres, colores y tipo)
     const [marcasRes, proyectosRes] = await Promise.all([
       supabaseServer
@@ -57,8 +97,15 @@ export async function GET(req: NextRequest) {
           q = q.eq("estado", filtroEstado);
         }
         if (busqueda.length > 0) {
-          const esc = busqueda.replace(/[%_]/g, (m) => `\\${m}`);
-          q = q.or(`nombre.ilike.%${esc}%,tienda.ilike.%${esc}%`);
+          const orProyecto = [
+            `nombre.ilike.%${esc}%`,
+            `tienda.ilike.%${esc}%`,
+          ];
+          // Proyectos cuyas facturas matchearon (número, concepto o monto).
+          if (proyectoIdsPorFactura.length > 0) {
+            orProyecto.push(`id.in.(${proyectoIdsPorFactura.join(",")})`);
+          }
+          q = q.or(orProyecto.join(","));
         }
         // Historial ordena por fecha_cobrado DESC (lo más reciente arriba).
         // Resto del módulo ordena por created_at DESC.

@@ -1,10 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
 import { EMPRESAS, EC, daysSince, calcSub, buildReclamosPdfHtml, openPdfWindow, FACTOR_TOTAL } from "./constants";
-import { SkeletonTable, EmptyState } from "@/components/ui";
+import { SkeletonTable, EmptyState, Toast } from "@/components/ui";
 
 interface Props {
   role: string;
@@ -28,8 +29,51 @@ export default function EmpresaSelector({
   expandedHistorial, setExpandedHistorial, totalPendiente, pendientes, alertas,
   onNewReclamo, onSelectEmpresa, onLoadDetail,
 }: Props) {
+  const [zipBusy, setZipBusy] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
+
   function getC(empresa: string) {
     return contactos.find((c) => c.empresa === empresa) || null;
+  }
+
+  async function downloadEmpresaZip(empresa: string, ev: React.MouseEvent) {
+    ev.stopPropagation();
+    if (zipBusy) return;
+    const ids = reclamos.filter((r) => r.empresa === empresa).map((r) => r.id);
+    if (!ids.length) return;
+    setZipBusy(empresa);
+    try {
+      const res = await fetch(`/api/reclamos/proveedor/${encodeURIComponent(empresa)}/export-zip`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reclamo_ids: ids }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || "Error al generar el ZIP.");
+      }
+      const omitidas = Number(res.headers.get("X-Fotos-Omitidas") || "0");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Reclamos-${empresa}-${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      const sizeMB = blob.size / (1024 * 1024);
+      if (sizeMB > 25) {
+        showToast(`ZIP de ${sizeMB.toFixed(0)}MB descargado. Pesado para adjuntar en Outlook — considera enviar por selección de reclamos.`);
+      } else if (omitidas > 0) {
+        showToast(`ZIP descargado. ${omitidas} foto${omitidas === 1 ? "" : "s"} no se pudo incluir.`);
+      } else {
+        showToast(`ZIP de ${empresa} descargado`);
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Error al generar el ZIP");
+    } finally {
+      setZipBusy(null);
+    }
   }
 
   async function downloadEmpresaExcel(empresa: string, ev: React.MouseEvent) {
@@ -132,6 +176,8 @@ export default function EmpresaSelector({
                   <div className="flex items-start justify-between mb-1">
                     <p className="text-sm font-semibold">{empresa}</p>
                     <div className="flex gap-1.5">
+                      <button onClick={(ev) => downloadEmpresaZip(empresa, ev)} disabled={zipBusy !== null} title="Descargar Excel resumen + fotos comprimidas de toda la empresa en un solo ZIP"
+                        className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 py-2 rounded-full flex-shrink-0 font-medium disabled:opacity-40">{zipBusy === empresa ? "ZIP…" : "↓ ZIP"}</button>
                       <button onClick={(ev) => downloadEmpresaPdf(empresa, ev)} title="Descargar todos los reclamos de esta empresa en PDF"
                         className="text-gray-400 hover:text-black transition text-xs border border-gray-200 px-4 py-2 rounded-full flex-shrink-0">↓ PDF</button>
                       <button onClick={(ev) => downloadEmpresaExcel(empresa, ev)} title="Descargar todos los reclamos de esta empresa en Excel"
@@ -184,6 +230,7 @@ export default function EmpresaSelector({
           </div>
         )}
       </div>
+      <Toast message={toast} />
     </div>
   );
 }

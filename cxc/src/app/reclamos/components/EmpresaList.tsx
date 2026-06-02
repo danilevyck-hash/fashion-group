@@ -31,7 +31,7 @@ interface Props {
   onDeleteReclamo: (id: string) => void;
 }
 
-type BulkAction = "excel" | "email";
+type BulkAction = "excel" | "zip" | "email";
 
 export default function EmpresaList({
   activeEmpresa, reclamos, contactos, search, setSearch,
@@ -109,6 +109,43 @@ export default function EmpresaList({
     }
   }
 
+  async function downloadBulkZip() {
+    if (busy || selectedIds.length === 0) return;
+    setBusy("zip");
+    try {
+      const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/export-zip`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reclamo_ids: selectedIds }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || "Error al generar el ZIP.");
+      }
+      const omitidas = Number(res.headers.get("X-Fotos-Omitidas") || "0");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const safe = activeEmpresa.replace(/[^A-Za-z0-9_-]+/g, "_");
+      a.href = url;
+      a.download = `Reclamos_${safe}_${new Date().toISOString().slice(0, 10)}.zip`;
+      a.click();
+      URL.revokeObjectURL(url);
+      const sizeMB = blob.size / (1024 * 1024);
+      if (sizeMB > 25) {
+        showToast(`ZIP de ${sizeMB.toFixed(0)}MB descargado. Es pesado para adjuntar en Outlook — considera seleccionar menos reclamos.`);
+      } else if (omitidas > 0) {
+        showToast(`ZIP descargado. ${omitidas} foto${omitidas === 1 ? "" : "s"} no se pudo incluir.`);
+      } else {
+        showToast(`ZIP descargado con ${selectedIds.length} reclamo${selectedIds.length === 1 ? "" : "s"}`);
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Error al generar el ZIP");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function sendBulkEmail() {
     if (busy || selectedIds.length === 0) return;
     if (!c?.correo) {
@@ -165,11 +202,19 @@ export default function EmpresaList({
                 {selCount} seleccionado{selCount === 1 ? "" : "s"}
               </span>
               <button
-                onClick={downloadBulkExcel}
+                onClick={downloadBulkZip}
                 disabled={busy !== null}
+                title="Descargar Excel resumen + fotos comprimidas en un solo ZIP"
                 className="text-sm bg-black text-white px-5 py-2 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
               >
-                {busy === "excel" ? "Generando..." : "Descargar Excel"}
+                {busy === "zip" ? "Generando ZIP..." : "Descargar ZIP"}
+              </button>
+              <button
+                onClick={downloadBulkExcel}
+                disabled={busy !== null}
+                className="text-sm border border-gray-300 px-4 py-2 rounded-md text-gray-700 hover:text-black hover:border-gray-400 transition disabled:opacity-40"
+              >
+                {busy === "excel" ? "Generando..." : "Solo Excel"}
               </button>
               <button
                 onClick={sendBulkEmail}
