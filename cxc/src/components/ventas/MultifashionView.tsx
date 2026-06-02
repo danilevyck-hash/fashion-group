@@ -34,20 +34,27 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
   // sub-tabs que lo usan (Detalle mensual + Vendedoras). Overview (YTD anual) y
   // Clientes (rangos relativos) lo ignoran. El mes persiste en URL (?mfMes=),
   // sin chocar con ?subtab= ni con el ?tab= del shell de Ventas.
-  const mesesConData = useMemo(() => {
-    const out: number[] = [];
+  //
+  // Default = ÚLTIMO mes con data REAL del año, EXCLUYENDO el mes en curso
+  // parcial. La RPC marca como es_periodo_parcial el mes que contiene la fecha
+  // de hoy (ej. 2 jun → junio con 1 día de data) y overview pide p_mes = mes
+  // calendario, así que junio entra en retail.meses con ventas>0. Sin esta
+  // exclusión el default caía en junio; queremos mayo (último mes cerrado).
+  // Preferencia: 1) último mes con data y NO parcial (mayo)
+  //              2) último mes con data aunque sea parcial (si no hay otro)
+  //              3) Dic (año cerrado) / mes calendario (año en curso) sin data.
+  const mesDefault = useMemo(() => {
+    let lastReal = 0;
+    let lastAny = 0;
     data.retail.meses.forEach((m, i) => {
-      if (m.tickets > 0 || m.ventas > 0) out.push(i + 1);
+      if (m.tickets <= 0 && m.ventas <= 0) return;
+      lastAny = i + 1;
+      if (!m.es_periodo_parcial) lastReal = i + 1;
     });
-    return out;
-  }, [data.retail.meses]);
-
-  // Default = último mes con data retail; si no hay, Dic para años cerrados o
-  // el mes calendario actual para el año en curso (misma regla que tenían
-  // Detalle mensual y Vendedoras antes de elevar el estado).
-  const mesDefault = mesesConData.length > 0
-    ? mesesConData[mesesConData.length - 1]
-    : (isClosedYear ? 12 : new Date().getMonth() + 1);
+    if (lastReal > 0) return lastReal;
+    if (lastAny > 0) return lastAny;
+    return isClosedYear ? 12 : new Date().getMonth() + 1;
+  }, [data.retail.meses, isClosedYear]);
 
   const [mes, setMes] = useUrlState("mfMes", mesDefault);
 
