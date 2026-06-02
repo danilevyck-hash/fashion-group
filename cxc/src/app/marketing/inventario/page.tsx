@@ -481,8 +481,8 @@ export default function InventarioPage() {
                                   key={marcaId}
                                   title={
                                     empresaStyle
-                                      ? `${marca.nombre} 50% + ${empresaStyle.nombre} 50%`
-                                      : `${marca.nombre} 100%`
+                                      ? `${marca.nombre} y ${empresaStyle.nombre} cubren parte cada uno`
+                                      : `${marca.nombre} · Fashion Group absorbe todo`
                                   }
                                   className="inline-flex items-center gap-1.5 border border-gray-200 bg-white rounded-md px-1.5 py-0.5 text-[11px]"
                                 >

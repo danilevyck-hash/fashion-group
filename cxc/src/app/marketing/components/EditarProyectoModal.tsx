@@ -167,7 +167,7 @@ export default function EditarProyectoModal({
             Marcas asignadas <span className="text-red-500">*</span>
           </div>
           <p className="text-[11px] text-gray-400 mb-2">
-            Externas (Tommy, Calvin, Reebok) cubren 50%. Internas (Joybees) 100%.
+            Externas (Tommy, Calvin, Reebok): la marca cubre parte del costo. Internas (Joybees): Fashion Group absorbe todo.
             Cambiar el reparto sobreescribe TODAS las facturas del proyecto.
           </p>
           <div className="space-y-1.5">

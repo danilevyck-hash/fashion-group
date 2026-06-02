@@ -308,7 +308,7 @@ export function BorradorFacturaCard({
           Marcas que aplican
           <span className="text-red-500 ml-0.5">*</span>
           <span className="text-gray-400 ml-2">
-            Externas 50% · Internas 100%
+            Externas: la marca cubre parte · Internas: FG absorbe todo
           </span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
@@ -336,7 +336,7 @@ export function BorradorFacturaCard({
                     deshabilitada
                       ? "Joybees no se puede mezclar con otras marcas en el mismo proyecto"
                       : tipoMarca === "interna"
-                        ? "Marca interna · Fashion Group absorbe 100%"
+                        ? "Marca interna · Fashion Group absorbe todo"
                         : undefined
                   }
                   className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md border transition text-sm ${

@@ -609,7 +609,7 @@ export function FacturaForm({
       <PasoInstruccion
         numero={3}
         titulo="¿A qué marca(s) aplica esta factura?"
-        descripcion="Externas (Tommy, Calvin, Reebok): 50% del total. Internas (Joybees): 100%. No se pueden mezclar."
+        descripcion="Externas (Tommy, Calvin, Reebok): la marca cubre parte del costo. Internas (Joybees): Fashion Group absorbe todo. No se pueden mezclar."
         completado={marcasValidas}
       >
         <div className="space-y-2">
@@ -639,7 +639,7 @@ export function FacturaForm({
                     deshabilitada
                       ? "Joybees no se puede mezclar con otras marcas en el mismo proyecto"
                       : tipoMarca === "interna"
-                        ? "Marca interna · Fashion Group absorbe 100%"
+                        ? "Marca interna · Fashion Group absorbe todo"
                         : undefined
                   }
                   className={`flex items-center justify-between gap-3 px-3 py-2 rounded-md border transition ${
