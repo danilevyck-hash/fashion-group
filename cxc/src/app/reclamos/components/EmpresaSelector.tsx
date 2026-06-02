@@ -4,9 +4,8 @@ import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Reclamo, Contacto } from "./types";
-import { EMPRESAS, EC, daysSince, calcSub, buildReclamosPdfHtml, openPdfWindow, FACTOR_TOTAL } from "./constants";
+import { EMPRESAS, EC, daysSince, calcSub, FACTOR_TOTAL } from "./constants";
 import { SkeletonTable, EmptyState, Toast } from "@/components/ui";
-import EnviarProveedorModal from "./EnviarProveedorModal";
 
 interface Props {
   role: string;
@@ -32,18 +31,7 @@ export default function EmpresaSelector({
 }: Props) {
   const [zipBusy, setZipBusy] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [enviarEmpresa, setEnviarEmpresa] = useState<string | null>(null);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 4000); };
-
-  function openEnviar(empresa: string, ev: React.MouseEvent) {
-    ev.stopPropagation();
-    const c = getC(empresa);
-    if (!c?.correo) {
-      showToast(`No hay correo configurado para ${empresa}. Agrégalo en el directorio de contactos.`);
-      return;
-    }
-    setEnviarEmpresa(empresa);
-  }
 
   function getC(empresa: string) {
     return contactos.find((c) => c.empresa === empresa) || null;
@@ -86,27 +74,6 @@ export default function EmpresaSelector({
     } finally {
       setZipBusy(null);
     }
-  }
-
-  async function downloadEmpresaExcel(empresa: string, ev: React.MouseEvent) {
-    ev.stopPropagation();
-    const ids = reclamos.filter((r) => r.empresa === empresa).map((r) => r.id);
-    if (!ids.length) return;
-    const res = await fetch("/api/reclamos/export-excel", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids }) });
-    if (res.ok) {
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url; a.download = `Reclamos-${empresa}-${new Date().toISOString().slice(0, 10)}.xlsx`;
-      a.click(); URL.revokeObjectURL(url);
-    }
-  }
-
-  function downloadEmpresaPdf(empresa: string, ev: React.MouseEvent) {
-    ev.stopPropagation();
-    const empReclamos = reclamos.filter((r) => r.empresa === empresa);
-    if (!empReclamos.length) return;
-    openPdfWindow(buildReclamosPdfHtml(empReclamos, empresa));
   }
 
   return (
@@ -188,14 +155,8 @@ export default function EmpresaSelector({
                   <div className="flex items-start justify-between mb-1">
                     <p className="text-sm font-semibold">{empresa}</p>
                     <div className="flex gap-1.5 flex-wrap justify-end">
-                      <button onClick={(ev) => openEnviar(empresa, ev)} title="Enviar el ZIP (Excel + fotos) al proveedor por correo (editable antes de enviar)"
-                        className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 py-2 rounded-full flex-shrink-0 font-medium">✉ Enviar</button>
                       <button onClick={(ev) => downloadEmpresaZip(empresa, ev)} disabled={zipBusy !== null} title="Descargar Excel resumen + fotos comprimidas de toda la empresa en un solo ZIP"
                         className="text-gray-600 hover:text-black hover:border-gray-400 transition text-xs border border-gray-300 px-4 py-2 rounded-full flex-shrink-0 font-medium disabled:opacity-40">{zipBusy === empresa ? "ZIP…" : "↓ ZIP"}</button>
-                      <button onClick={(ev) => downloadEmpresaPdf(empresa, ev)} title="Descargar todos los reclamos de esta empresa en PDF"
-                        className="text-gray-400 hover:text-black transition text-xs border border-gray-200 px-4 py-2 rounded-full flex-shrink-0">↓ PDF</button>
-                      <button onClick={(ev) => downloadEmpresaExcel(empresa, ev)} title="Descargar todos los reclamos de esta empresa en Excel"
-                        className="text-gray-400 hover:text-black transition text-xs border border-gray-200 px-4 py-2 rounded-full flex-shrink-0">↓ Excel</button>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mb-4">
@@ -245,22 +206,6 @@ export default function EmpresaSelector({
         )}
       </div>
       <Toast message={toast} />
-      {enviarEmpresa && (() => {
-        const ids = reclamos.filter((r) => r.empresa === enviarEmpresa).map((r) => r.id);
-        const c = getC(enviarEmpresa);
-        return (
-          <EnviarProveedorModal
-            open={true}
-            empresa={enviarEmpresa}
-            reclamoIds={ids}
-            defaultTo={c?.correo || ""}
-            contactoNombre={c?.nombre_contacto || c?.nombre || ""}
-            count={ids.length}
-            onClose={() => setEnviarEmpresa(null)}
-            onSent={(msg) => { showToast(msg); setEnviarEmpresa(null); }}
-          />
-        );
-      })()}
     </div>
   );
 }

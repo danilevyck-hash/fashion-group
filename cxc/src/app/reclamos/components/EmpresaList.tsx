@@ -7,7 +7,6 @@ import { Reclamo, Contacto } from "./types";
 import { ESTADOS, daysSince, calcSub, FACTOR_TOTAL, estadoLabel } from "./constants";
 import { EmptyState, StatusBadge, Toast } from "@/components/ui";
 import FotoBadge from "./FotoBadge";
-import EnviarProveedorModal from "./EnviarProveedorModal";
 
 interface Props {
   role: string;
@@ -32,7 +31,7 @@ interface Props {
   onDeleteReclamo: (id: string) => void;
 }
 
-type BulkAction = "excel" | "zip";
+type BulkAction = "zip";
 
 export default function EmpresaList({
   activeEmpresa, reclamos, contactos, search, setSearch,
@@ -42,7 +41,6 @@ export default function EmpresaList({
 }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState<BulkAction | null>(null);
-  const [showEnviar, setShowEnviar] = useState(false);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   const allEmpresaRecs = reclamos.filter((r) => r.empresa === activeEmpresa);
@@ -82,35 +80,6 @@ export default function EmpresaList({
 
   const empresaPath = encodeURIComponent(activeEmpresa);
 
-  async function downloadBulkExcel() {
-    if (busy || selectedIds.length === 0) return;
-    setBusy("excel");
-    try {
-      const res = await fetch(`/api/reclamos/proveedor/${empresaPath}/export-excel`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reclamo_ids: selectedIds }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error || "Error al generar Excel.");
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      const safe = activeEmpresa.replace(/[^A-Za-z0-9_-]+/g, "_");
-      a.href = url;
-      a.download = `Reclamos_${safe}_${new Date().toISOString().slice(0, 10)}.xlsx`;
-      a.click();
-      URL.revokeObjectURL(url);
-      showToast(`Excel descargado con ${selectedIds.length} reclamo${selectedIds.length === 1 ? "" : "s"}`);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Error al descargar Excel");
-    } finally {
-      setBusy(null);
-    }
-  }
-
   async function downloadBulkZip() {
     if (busy || selectedIds.length === 0) return;
     setBusy("zip");
@@ -146,15 +115,6 @@ export default function EmpresaList({
     } finally {
       setBusy(null);
     }
-  }
-
-  function openEnviar() {
-    if (busy || selectedIds.length === 0) return;
-    if (!c?.correo) {
-      showToast(`No hay correo configurado para ${activeEmpresa}. Agrégalo en el directorio de contactos.`);
-      return;
-    }
-    setShowEnviar(true);
   }
 
   function cancelSelection() {
@@ -194,21 +154,6 @@ export default function EmpresaList({
                 className="text-sm bg-black text-white px-5 py-2 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
               >
                 {busy === "zip" ? "Generando ZIP..." : "Descargar ZIP"}
-              </button>
-              <button
-                onClick={downloadBulkExcel}
-                disabled={busy !== null}
-                className="text-sm border border-gray-300 px-4 py-2 rounded-md text-gray-700 hover:text-black hover:border-gray-400 transition disabled:opacity-40"
-              >
-                {busy === "excel" ? "Generando..." : "Solo Excel"}
-              </button>
-              <button
-                onClick={openEnviar}
-                disabled={busy !== null || !c?.correo}
-                title={!c?.correo ? "No hay correo configurado para esta empresa" : "Enviar el ZIP al proveedor por correo (editable)"}
-                className="text-sm border border-gray-300 px-4 py-2 rounded-md text-gray-700 hover:text-black hover:border-gray-400 transition disabled:opacity-40"
-              >
-                Enviar al proveedor
               </button>
               <button
                 onClick={cancelSelection}
@@ -370,16 +315,6 @@ export default function EmpresaList({
       )}
 
       <Toast message={toast} />
-      <EnviarProveedorModal
-        open={showEnviar}
-        empresa={activeEmpresa}
-        reclamoIds={selectedIds}
-        defaultTo={c?.correo || ""}
-        contactoNombre={c?.nombre_contacto || c?.nombre || ""}
-        count={selCount}
-        onClose={() => setShowEnviar(false)}
-        onSent={(msg) => { showToast(msg); cancelSelection(); }}
-      />
       </div>
     </div>
   );
