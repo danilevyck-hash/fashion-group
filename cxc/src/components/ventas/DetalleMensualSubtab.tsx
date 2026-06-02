@@ -4,14 +4,11 @@
 // Server data: RPC multifashion_detalle_mensual_v1(p_year, p_mes).
 //
 // Reemplaza al anterior MesEnCursoSubtab. Soporta cualquier mes histórico
-// (no solo el mes en curso). Year viene desde el selector global del módulo
-// Ventas; el selector de mes es local a este sub-tab.
+// (no solo el mes en curso). Year y mes vienen como props desde el shell de
+// Multifashion (selector único de período); este sub-tab solo los consume.
 
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
-import {
-  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
-} from "@/components/ui/select";
 import { Award, AlertTriangle, Info } from "lucide-react";
 import {
   Bar, XAxis, YAxis, Tooltip as RTooltip,
@@ -85,6 +82,8 @@ interface DetalleMensualResp {
 
 interface DetalleMensualSubtabProps {
   year: number;
+  /** Mes (1-12) del selector único de período en el shell de Multifashion. */
+  mes: number;
 }
 
 const MESES_FULL = [
@@ -102,17 +101,6 @@ function parseIsoDateLocal(iso: string): Date {
 function formatFechaShort(iso: string): string {
   const d = parseIsoDateLocal(iso);
   return `${d.getDate()} ${MESES_SHORT[d.getMonth()]}`;
-}
-
-// Default selectedMes según year:
-//   - year == currentYear → mes actual del calendario
-//   - year <  currentYear → 12 (diciembre)
-//   - year >  currentYear → 1  (raro, pero defensivo)
-function defaultMesForYear(year: number): number {
-  const now = new Date();
-  if (year === now.getFullYear()) return now.getMonth() + 1;
-  if (year < now.getFullYear()) return 12;
-  return 1;
 }
 
 // Delta % entre ventas corrientes y comparativo. Devuelve null si !tiene_data
@@ -180,22 +168,16 @@ function HoraTooltip({ active, payload }: {
   );
 }
 
-export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
-  const [selectedMes, setSelectedMes] = useState<number>(() => defaultMesForYear(year));
+export function DetalleMensualSubtab({ year, mes }: DetalleMensualSubtabProps) {
   const [data, setData] = useState<DetalleMensualResp | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // Cuando year cambia (selector global), resetear mes con la misma regla.
-  useEffect(() => {
-    setSelectedMes(defaultMesForYear(year));
-  }, [year]);
 
   useEffect(() => {
     const ctrl = new AbortController();
     setLoading(true);
     setError(null);
-    fetch(`/api/multifashion/detalle-mensual?year=${year}&mes=${selectedMes}`, {
+    fetch(`/api/multifashion/detalle-mensual?year=${year}&mes=${mes}`, {
       cache: "no-store",
       signal: ctrl.signal,
     })
@@ -214,7 +196,7 @@ export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
       })
       .finally(() => setLoading(false));
     return () => ctrl.abort();
-  }, [year, selectedMes]);
+  }, [year, mes]);
 
   const heatmapMax = useMemo(() => {
     if (!data) return 0;
@@ -224,11 +206,8 @@ export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
   if (loading && !data) {
     return (
       <div className="space-y-5">
-        <MonthSelectorHeader
-          year={year}
-          selectedMes={selectedMes}
-          onMesChange={setSelectedMes}
-          title={`${MESES_FULL[selectedMes - 1]} ${year}`}
+        <DetalleHeader
+          title={`${MESES_FULL[mes - 1]} ${year}`}
           subtitle="Cargando…"
         />
         <Card className="flex min-h-[200px] items-center justify-center p-12 text-sm text-stone-500">
@@ -240,11 +219,8 @@ export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
   if (error) {
     return (
       <div className="space-y-5">
-        <MonthSelectorHeader
-          year={year}
-          selectedMes={selectedMes}
-          onMesChange={setSelectedMes}
-          title={`${MESES_FULL[selectedMes - 1]} ${year}`}
+        <DetalleHeader
+          title={`${MESES_FULL[mes - 1]} ${year}`}
           subtitle="—"
         />
         <Card className="rounded-md border border-orange-200 bg-orange-50 p-4 text-xs text-orange-900">
@@ -298,10 +274,7 @@ export function DetalleMensualSubtab({ year }: DetalleMensualSubtabProps) {
 
   return (
     <div className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
-      <MonthSelectorHeader
-        year={year}
-        selectedMes={selectedMes}
-        onMesChange={setSelectedMes}
+      <DetalleHeader
         title={headerTitle}
         subtitle="Retail mostrador. Mayoreo se reporta en Clientes."
       />
@@ -615,36 +588,18 @@ function ChartTooltip({
   );
 }
 
-function MonthSelectorHeader({
-  year, selectedMes, onMesChange, title, subtitle,
+// Header del sub-tab (título + subtítulo). El selector de mes vive ahora en el
+// header del tab Multifashion (selector único de período), no aquí.
+function DetalleHeader({
+  title, subtitle,
 }: {
-  year: number;
-  selectedMes: number;
-  onMesChange: (mes: number) => void;
   title: string;
   subtitle: string;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div>
-        <h3 className="font-display text-base font-semibold text-stone-950">{title}</h3>
-        <p className="mt-0.5 text-[11px] text-stone-500">{subtitle}</p>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Mes</span>
-        <Select value={String(selectedMes)} onValueChange={v => onMesChange(parseInt(v, 10))}>
-          <SelectTrigger className="h-8 w-[140px] border-stone-300 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {MESES_FULL.map((label, i) => (
-              <SelectItem key={i + 1} value={String(i + 1)} className="text-xs">
-                {label} {year}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+    <div>
+      <h3 className="font-display text-base font-semibold text-stone-950">{title}</h3>
+      <p className="mt-0.5 text-[11px] text-stone-500">{subtitle}</p>
     </div>
   );
 }
