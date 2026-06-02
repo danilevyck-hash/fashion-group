@@ -9,10 +9,8 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   "Borrador": ["Enviado"],
-  "Enviado": ["Confirmado"],
-  "Confirmado": ["Aplicado", "Rechazado"],
-  "Aplicado": [],
-  "Rechazado": [],
+  "Enviado": ["Pagado", "Borrador"],
+  "Pagado": ["Enviado"],
 };
 
 export const dynamic = "force-dynamic";

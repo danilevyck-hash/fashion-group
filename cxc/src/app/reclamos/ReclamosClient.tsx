@@ -46,14 +46,11 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState(""); const [filterEstado, setFilterEstado] = useState("all");
-  const [confirmingEstado, setConfirmingEstado] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState("");
   const [sortCol, setSortCol] = useState<"fecha" | "dias" | "total" | "estado">("fecha");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
-  const [showAplicadaModal, setShowAplicadaModal] = useState(false);
-  const [aplicadaNc, setAplicadaNc] = useState(""); const [aplicadaMonto, setAplicadaMonto] = useState("");
   const [expandedHistorial, setExpandedHistorial] = useState<Record<string, boolean>>({});
   // Form state
   const [fEmpresa, setFEmpresa] = useState(""); const [fFecha, setFFecha] = useState(new Date().toISOString().slice(0, 10));
@@ -219,7 +216,6 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   }
   async function changeEstado(e: string) {
     if (!current || current.estado === e) return;
-    setConfirmingEstado(null);
     // Optimistic: update estado badge immediately
     const prevEstado = current.estado;
     setCurrent({ ...current, estado: e });
@@ -275,18 +271,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     setEditSaving(false);
   }
 
-  async function handleAplicadaConfirm() {
-    if (!current || !aplicadaNc.trim() || !aplicadaMonto) return;
-    try {
-      const r1 = await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "Aplicado" }) });
-      if (!r1.ok) { setToast("Error al aplicar NC."); setTimeout(() => setToast(null), 3000); return; }
-      await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ seguimiento_nota: `Aplicado — N/C ${aplicadaNc} por $${parseFloat(aplicadaMonto).toFixed(2)}`, autor: role }) });
-      setShowAplicadaModal(false); setAplicadaNc(""); setAplicadaMonto("");
-      await loadDetail(current.id); loadReclamos();
-    } catch { setToast("Error de conexion."); setTimeout(() => setToast(null), 3000); }
-  }
-
-  const pendientes = reclamos.filter((r) => r.estado !== "Aplicado" && r.estado !== "Rechazado");
+  const pendientes = reclamos.filter((r) => r.estado !== "Pagado");
   const totalPendiente = pendientes.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
   const alertas = pendientes.filter((r) => daysSince(r.fecha_reclamo) > 45).length;
   // ── Confirm modal — always rendered (used by list + detail views) ──
@@ -407,11 +392,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         editEstado={editEstado} setEditEstado={setEditEstado}
         editItems={editItems} setEditItems={setEditItems}
         editSaving={editSaving}
-        confirmingEstado={confirmingEstado} setConfirmingEstado={setConfirmingEstado}
         showDeleteConfirm={showDeleteConfirm} setShowDeleteConfirm={setShowDeleteConfirm}
-        showAplicadaModal={showAplicadaModal} setShowAplicadaModal={setShowAplicadaModal}
-        aplicadaNc={aplicadaNc} setAplicadaNc={setAplicadaNc}
-        aplicadaMonto={aplicadaMonto} setAplicadaMonto={setAplicadaMonto}
         toast={toast}
         customMotivos={customMotivos} setCustomMotivos={setCustomMotivos}
         addingEditMotivo={addingEditMotivo} setAddingEditMotivo={setAddingEditMotivo}
@@ -425,7 +406,6 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         onSaveEdit={saveEdit}
         onUploadFoto={uploadFoto}
         onDeleteFoto={deleteFoto}
-        onAplicadaConfirm={handleAplicadaConfirm}
         showToast={(msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); }}
       />
       {pendingUndoReclamo && <UndoToast message={pendingUndoReclamo.message} startedAt={pendingUndoReclamo.startedAt} onUndo={undoActionReclamo} />}
