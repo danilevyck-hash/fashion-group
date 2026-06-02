@@ -7,7 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { TrendingUp, CalendarRange, Users, UserCircle, Package } from "lucide-react";
+import {
+  TrendingUp, CalendarRange, Users, UserCircle, Package, ChevronLeft, ChevronRight,
+} from "lucide-react";
 import type { Multifashion, RetailMonthly, WholesaleMonthly } from "./types";
 import { fmtMoney, fmtPct, deltaSymbol, MONTHS } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
@@ -35,40 +37,68 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
   // Clientes (rangos relativos) lo ignoran. El mes persiste en URL (?mfMes=),
   // sin chocar con ?subtab= ni con el ?tab= del shell de Ventas.
   //
-  // Default = ÚLTIMO mes con data REAL del año, EXCLUYENDO el mes en curso
-  // parcial. La RPC marca como es_periodo_parcial el mes que contiene la fecha
-  // de hoy (ej. 2 jun → junio con 1 día de data) y overview pide p_mes = mes
-  // calendario, así que junio entra en retail.meses con ventas>0. Sin esta
-  // exclusión el default caía en junio; queremos mayo (último mes cerrado).
-  // Preferencia: 1) último mes con data y NO parcial (mayo)
-  //              2) último mes con data aunque sea parcial (si no hay otro)
-  //              3) Dic (año cerrado) / mes calendario (año en curso) sin data.
-  const mesDefault = useMemo(() => {
-    let lastReal = 0;
-    let lastAny = 0;
+  // FUENTE ÚNICA DE VERDAD del rango de meses navegables. La consumen el
+  // dropdown, ‹ y › — no se duplica la lista de meses ni el cálculo del tope.
+  //   - minMonth: primer mes con data del año (piso, ‹ se deshabilita ahí).
+  //   - maxMonth: tope navegable. Año en curso = mes calendario actual (junio:
+  //     navegable, es el mes en curso parcial). Año cerrado = último mes con
+  //     data. › se deshabilita ahí. No se navega al futuro.
+  //   - mesDefault: ÚLTIMO mes con data que NO sea el mes calendario en curso
+  //     (hoy 2 jun → mayo, no junio). Solo el valor inicial del estado de UI.
+  //     Fallbacks: si solo el mes en curso tiene data, ese mismo; sin data,
+  //     Dic (año cerrado) / mes calendario (año en curso).
+  const { minMonth, maxMonth, mesDefault } = useMemo(() => {
+    const now = new Date();
+    const isCurrentYear = selectedYear === now.getFullYear();
+    const currentCalMonth = now.getMonth() + 1;
+    const withData: number[] = [];
     data.retail.meses.forEach((m, i) => {
-      if (m.tickets <= 0 && m.ventas <= 0) return;
-      lastAny = i + 1;
-      if (!m.es_periodo_parcial) lastReal = i + 1;
+      if (m.tickets > 0 || m.ventas > 0) withData.push(i + 1);
     });
-    if (lastReal > 0) return lastReal;
-    if (lastAny > 0) return lastAny;
-    return isClosedYear ? 12 : new Date().getMonth() + 1;
-  }, [data.retail.meses, isClosedYear]);
+    const min = withData.length > 0 ? withData[0] : 1;
+    const max = isCurrentYear
+      ? currentCalMonth
+      : (withData.length > 0 ? withData[withData.length - 1] : 12);
+    // default = último con data excluyendo el mes calendario en curso.
+    const closed = withData.filter(m => !(isCurrentYear && m === currentCalMonth));
+    const def = closed.length > 0
+      ? closed[closed.length - 1]
+      : withData.length > 0
+        ? withData[withData.length - 1]
+        : (isClosedYear ? 12 : currentCalMonth);
+    return { minMonth: min, maxMonth: max, mesDefault: def };
+  }, [data.retail.meses, selectedYear, isClosedYear]);
 
   const [mes, setMes] = useUrlState("mfMes", mesDefault);
 
-  // Al cambiar el año global, snap del mes al default del nuevo año. Se omite
-  // el primer render para respetar un ?mfMes= compartido por link. Dep en
-  // mesDefault además de selectedYear porque la data del año nuevo llega un
-  // tick después (refetch en VentasShell); mesDefault es estable dentro de un
-  // mismo año, así que no pisa la selección manual del usuario. setMes se omite
-  // a propósito: su identidad cambia con cada update de la URL y lo
-  // re-dispararía en cada cambio manual de mes.
+  // Meses para el dropdown: el mismo rango [minMonth, maxMonth] que limita a
+  // las flechas. Una sola fuente de verdad para los tres controles.
+  const navMonths = useMemo(() => {
+    const out: number[] = [];
+    for (let m = minMonth; m <= maxMonth; m++) out.push(m);
+    return out;
+  }, [minMonth, maxMonth]);
+
+  // Límites de navegación. › tope = mes en curso (año actual) / último con data
+  // (año cerrado). ‹ piso = primer mes con data. Sin cruce de año (el año se
+  // cambia con el selector global de Ventas).
+  const canPrev = mes > minMonth;
+  const canNext = mes < maxMonth;
+  const goPrev = () => { if (canPrev) setMes(mes - 1); };
+  const goNext = () => { if (canNext) setMes(mes + 1); };
+
+  // Al cambiar el año global, snap del mes al default del nuevo año. En el
+  // primer render se respeta un ?mfMes= compartido por link SOLO si cae en el
+  // rango navegable; si viene fuera de rango (URL manual/obsoleta) se hace snap
+  // al default. Dep en mesDefault además de selectedYear porque la data del año
+  // nuevo llega un tick después (refetch en VentasShell); mesDefault es estable
+  // dentro de un mismo año, así que no pisa la selección manual. setMes se omite
+  // a propósito: su identidad cambia con cada update de la URL.
   const isFirstRender = useRef(true);
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
+      if (mes < minMonth || mes > maxMonth) setMes(mesDefault);
       return;
     }
     setMes(mesDefault);
@@ -77,24 +107,45 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
 
   return (
     <div className="w-full">
-      {/* Selector único de período (mes). Alineado a la derecha, mismo alto que
-          el selector de año global de Ventas. El año lo fija ese selector
-          global; aquí solo el mes. Siempre visible para placement estable;
-          solo tiene efecto en Detalle mensual y Vendedoras. */}
+      {/* Selector único de período (mes) con flechas ‹ › a los lados. Alineado
+          a la derecha, mismo alto (h-9) que el selector de año global de Ventas.
+          El año lo fija ese selector global; aquí solo el mes. Siempre visible
+          para placement estable; solo tiene efecto en Detalle mensual y
+          Vendedoras. Flechas y dropdown comparten el rango [minMonth, maxMonth]. */}
       <div className="mb-4 flex items-center justify-end gap-2">
         <span className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Mes</span>
-        <Select value={String(mes)} onValueChange={v => setMes(parseInt(v, 10))}>
-          <SelectTrigger className="h-9 w-auto min-w-[140px] gap-1.5 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {MES_FULL_OVERVIEW.map((label, i) => (
-              <SelectItem key={i + 1} value={String(i + 1)} className="text-xs">
-                {label} {selectedYear}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={goPrev}
+            disabled={!canPrev}
+            aria-label="Mes anterior"
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-stone-200 disabled:hover:text-stone-600"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <Select value={String(mes)} onValueChange={v => setMes(parseInt(v, 10))}>
+            <SelectTrigger className="h-9 w-auto min-w-[140px] gap-1.5 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {navMonths.map(m => (
+                <SelectItem key={m} value={String(m)} className="text-xs">
+                  {MES_FULL_OVERVIEW[m - 1]} {selectedYear}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <button
+            type="button"
+            onClick={goNext}
+            disabled={!canNext}
+            aria-label="Mes siguiente"
+            className="flex h-9 w-9 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-stone-200 disabled:hover:text-stone-600"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
       <Tabs value={subtab} onValueChange={setSubtab} className="w-full">
