@@ -101,16 +101,8 @@ export function ReportePorProyectoView() {
     void cargar();
   }, [cargar]);
 
-  const totales = useMemo(
-    () =>
-      items.reduce(
-        (acc, it) => ({
-          gasto: acc.gasto + it.gastoTotal,
-          cobrado: acc.cobrado + it.cobrado,
-          pendiente: acc.pendiente + it.pendiente,
-        }),
-        { gasto: 0, cobrado: 0, pendiente: 0 }
-      ),
+  const totalGasto = useMemo(
+    () => items.reduce((acc, it) => acc + it.gastoTotal, 0),
     [items]
   );
 
@@ -243,8 +235,6 @@ export function ReportePorProyectoView() {
                 <th className="text-left font-medium px-4 py-2">Estado</th>
                 <th className="text-left font-medium px-4 py-2">Marcas</th>
                 <th className="text-right font-medium px-4 py-2">Gasto real</th>
-                <th className="text-right font-medium px-4 py-2">Cobrado</th>
-                <th className="text-right font-medium px-4 py-2">Pendiente</th>
               </tr>
             </thead>
             <tbody>
@@ -270,23 +260,11 @@ export function ReportePorProyectoView() {
                     {it.marcas.length === 0 ? (
                       <span className="text-gray-300">—</span>
                     ) : (
-                      it.marcas
-                        .map((m) => `${m.nombre} (${m.porcentaje.toFixed(0)}%)`)
-                        .join(", ")
+                      it.marcas.map((m) => m.nombre).join(", ")
                     )}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-gray-900">
                     {fmtMoney(it.gastoTotal)}
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-emerald-700">
-                    {fmtMoney(it.cobrado)}
-                  </td>
-                  <td
-                    className={`px-4 py-3 text-right tabular-nums ${
-                      it.pendiente > 0 ? "text-amber-700" : "text-gray-500"
-                    }`}
-                  >
-                    {fmtMoney(it.pendiente)}
                   </td>
                 </tr>
               ))}
@@ -300,13 +278,7 @@ export function ReportePorProyectoView() {
                   Total
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums font-medium">
-                  {fmtMoney(totales.gasto)}
-                </td>
-                <td className="px-4 py-2 text-right tabular-nums font-medium text-emerald-700">
-                  {fmtMoney(totales.cobrado)}
-                </td>
-                <td className="px-4 py-2 text-right tabular-nums font-medium text-amber-700">
-                  {fmtMoney(totales.pendiente)}
+                  {fmtMoney(totalGasto)}
                 </td>
               </tr>
             </tfoot>

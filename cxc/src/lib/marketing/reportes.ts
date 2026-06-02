@@ -34,10 +34,8 @@ export interface ReporteProyectoItem {
     fecha_inicio: string;
     estado: EstadoProyecto;
   };
-  marcas: Array<{ nombre: string; porcentaje: number }>;
+  marcas: Array<{ nombre: string }>;
   gastoTotal: number;
-  cobrado: number;
-  pendiente: number;
 }
 
 export interface FiltrosReporteProyecto {
@@ -78,13 +76,6 @@ interface FacturaMin {
   total: number;
 }
 
-interface CobranzaMin {
-  id: string;
-  proyecto_id: string;
-  marca_id: string;
-  monto: number;
-  estado: string;
-}
 
 async function cargarProyectosVigentes(
   anio?: number
@@ -146,73 +137,6 @@ async function cargarFacturas(
     };
   });
 }
-
-// Simula CobranzaMin[] derivándolo del estado del proyecto + mk_factura_marcas.
-// Marca estado="cobrada" si el proyecto está en 'cobrado'; "enviada" si está en
-// 'enviado' o 'abierto'. El caller solo diferencia "cobrada" vs otros.
-async function cargarCobranzas(
-  proyectoIds: ReadonlyArray<string>,
-  proyectos: ReadonlyArray<ProyectoMin>,
-): Promise<CobranzaMin[]> {
-  if (proyectoIds.length === 0) return [];
-  const estadoPorProy = new Map(
-    proyectos.map((p) => [p.id, p.estado as string]),
-  );
-
-  const [facturasRes, fmRes] = await Promise.all([
-    supabaseServer
-      .from("mk_facturas")
-      .select("id, proyecto_id, total")
-      .in("proyecto_id", proyectoIds)
-      .is("anulado_en", null),
-    // mk_factura_marcas no filtra por proyecto directo; lo joineamos via facturaIndex.
-    supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id, porcentaje"),
-  ]);
-  if (facturasRes.error) throw new Error(`cargarCobranzas[fact]: ${facturasRes.error.message}`);
-  if (fmRes.error) throw new Error(`cargarCobranzas[fm]: ${fmRes.error.message}`);
-
-  const facturas = (facturasRes.data ?? []) as Array<{
-    id: string;
-    proyecto_id: string;
-    total: number;
-  }>;
-  const factIndex = new Map<string, { proyectoId: string; total: number }>();
-  for (const f of facturas) {
-    factIndex.set(String(f.id), {
-      proyectoId: String(f.proyecto_id),
-      total: Number(f.total ?? 0),
-    });
-  }
-
-  // Agregado: por proyecto × marca, suma de (factura.total × %).
-  const byProyMarca = new Map<string, number>();
-  for (const r of (fmRes.data ?? []) as Array<{
-    factura_id: string;
-    marca_id: string;
-    porcentaje: number;
-  }>) {
-    const info = factIndex.get(String(r.factura_id));
-    if (!info) continue;
-    const key = `${info.proyectoId}::${r.marca_id}`;
-    const monto = (info.total * Number(r.porcentaje ?? 0)) / 100;
-    byProyMarca.set(key, (byProyMarca.get(key) ?? 0) + monto);
-  }
-
-  const items: CobranzaMin[] = [];
-  for (const [key, monto] of byProyMarca) {
-    const [proyectoId, marcaId] = key.split("::");
-    const est = estadoPorProy.get(proyectoId) ?? "abierto";
-    items.push({
-      id: key,
-      proyecto_id: proyectoId,
-      marca_id: marcaId,
-      monto: Number(monto.toFixed(2)),
-      estado: est === "cobrado" ? "cobrada" : "enviada",
-    });
-  }
-  return items;
-}
-
 
 // ----------------------------------------------------------------------------
 // Reporte por marca
@@ -384,10 +308,9 @@ export async function reportePorProyecto(
   if (proyectos.length === 0) return [];
 
   const proyectoIds = proyectos.map((p) => p.id);
-  const [proyMarcas, facturas, cobranzas, entregaTotalByProy] = await Promise.all([
+  const [proyMarcas, facturas, entregaTotalByProy] = await Promise.all([
     cargarProyMarcas(proyectoIds),
     cargarFacturas(proyectoIds),
-cargarCobranzas(proyectoIds, proyectos),
     getEntregaTotalByProyectoBatch(proyectoIds),
   ]);
 
@@ -407,23 +330,13 @@ cargarCobranzas(proyectoIds, proyectos),
     totalByProy.set(f.proyecto_id, (totalByProy.get(f.proyecto_id) ?? 0) + f.total);
   }
 
-  const marcasByProy = new Map<string, Array<{ nombre: string; porcentaje: number }>>();
+  const marcasByProy = new Map<string, Array<{ nombre: string }>>();
   for (const pm of proyMarcas) {
     const marca = marcaById.get(pm.marca_id);
     if (!marca) continue;
     const arr = marcasByProy.get(pm.proyecto_id) ?? [];
-    arr.push({ nombre: marca.nombre, porcentaje: pm.porcentaje });
+    arr.push({ nombre: marca.nombre });
     marcasByProy.set(pm.proyecto_id, arr);
-  }
-
-  // Cobrado = suma de montos de cobranzas en estado 'cobrada' de este proyecto
-  const cobradoByProy = new Map<string, number>();
-  for (const cb of cobranzas) {
-    if (cb.estado !== "cobrada") continue;
-    cobradoByProy.set(
-      cb.proyecto_id,
-      (cobradoByProy.get(cb.proyecto_id) ?? 0) + cb.monto,
-    );
   }
 
   return proyectosFiltrados
@@ -431,13 +344,10 @@ cargarCobranzas(proyectoIds, proyectos),
       const gastoFact = totalByProy.get(p.id) ?? 0;
       const gastoEntregas = entregaTotalByProy.get(p.id) ?? 0;
       const gasto = Number((gastoFact + gastoEntregas).toFixed(2));
-      const cobrado = Number((cobradoByProy.get(p.id) ?? 0).toFixed(2));
       return {
         proyecto: p,
         marcas: marcasByProy.get(p.id) ?? [],
         gastoTotal: gasto,
-        cobrado,
-        pendiente: Number((gasto - cobrado).toFixed(2)),
       };
     })
     .sort((a, b) => b.proyecto.fecha_inicio.localeCompare(a.proyecto.fecha_inicio));
@@ -557,14 +467,10 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
         "Estado",
         "Marcas",
         "Gasto real",
-        "Cobrado",
-        "Pendiente",
       ],
     ];
     for (const item of data) {
-      const marcasTxt = item.marcas
-        .map((m) => `${m.nombre} (${m.porcentaje.toFixed(2)}%)`)
-        .join(", ");
+      const marcasTxt = item.marcas.map((m) => m.nombre).join(", ");
       aoa.push([
         item.proyecto.nombre ?? item.proyecto.tienda,
         item.proyecto.tienda,
@@ -572,8 +478,6 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
         item.proyecto.estado,
         marcasTxt,
         item.gastoTotal,
-        item.cobrado,
-        item.pendiente,
       ]);
     }
     ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -584,20 +488,16 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
       { wch: 14 },
       { wch: 30 },
       { wch: 14 },
-      { wch: 14 },
-      { wch: 14 },
     ];
-    for (let c = 0; c < 8; c++) {
+    for (let c = 0; c < 6; c++) {
       const addr = XLSX.utils.encode_cell({ r: 0, c });
       if (ws[addr]) ws[addr].s = headerStyle;
     }
     for (let r = 1; r <= data.length; r++) {
-      for (const c of [5, 6, 7]) {
-        const addr = XLSX.utils.encode_cell({ r, c });
-        if (ws[addr]) {
-          ws[addr].t = "n";
-          ws[addr].z = moneyFmt;
-        }
+      const addr = XLSX.utils.encode_cell({ r, c: 5 });
+      if (ws[addr]) {
+        ws[addr].t = "n";
+        ws[addr].z = moneyFmt;
       }
     }
   }
