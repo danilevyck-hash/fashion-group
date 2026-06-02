@@ -1,8 +1,12 @@
 "use client";
 
+import { useEffect, useMemo, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { TrendingUp, CalendarRange, Users, UserCircle, Package } from "lucide-react";
 import type { Multifashion, RetailMonthly, WholesaleMonthly } from "./types";
 import { fmtMoney, fmtPct, deltaSymbol, MONTHS } from "@/lib/ventas/format";
@@ -24,36 +28,98 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
   // Sub-tab activo en la URL (?subtab=overview|mes|vendedoras|clientes). Key
   // distinta a "tab" del shell para no chocar. Persiste en refresh/back-forward.
   const [subtab, setSubtab] = useUrlState("subtab", "overview");
-  return (
-    <Tabs value={subtab} onValueChange={setSubtab} className="w-full">
-      <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-stone-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
-        <TabsTrigger value="overview" className={SUBTAB_TRIGGER_CLASS}>
-          <TrendingUp className="h-3 w-3" /> Overview
-        </TabsTrigger>
-        <TabsTrigger value="mes" className={SUBTAB_TRIGGER_CLASS}>
-          <CalendarRange className="h-3 w-3" /> Detalle mensual
-        </TabsTrigger>
-        <TabsTrigger value="vendedoras" className={SUBTAB_TRIGGER_CLASS}>
-          <Users className="h-3 w-3" /> Vendedoras
-        </TabsTrigger>
-        <TabsTrigger value="clientes" className={SUBTAB_TRIGGER_CLASS}>
-          <UserCircle className="h-3 w-3" /> Clientes
-        </TabsTrigger>
-      </TabsList>
 
-      <TabsContent value="overview" className="mt-5">
-        <OverviewSubtab data={data} selectedYear={selectedYear} isClosedYear={isClosedYear} />
-      </TabsContent>
-      <TabsContent value="mes" className="mt-5">
-        <DetalleMensualSubtab year={selectedYear} />
-      </TabsContent>
-      <TabsContent value="vendedoras" className="mt-5">
-        <VendedorasSubtab data={data} selectedYear={selectedYear} isClosedYear={isClosedYear} />
-      </TabsContent>
-      <TabsContent value="clientes" className="mt-5">
-        <ClientesMultifashionSubtab selectedYear={selectedYear} />
-      </TabsContent>
-    </Tabs>
+  // PERÍODO global de Multifashion: el AÑO viene del selector global de Ventas
+  // (selectedYear) y el MES se eleva a este shell para compartirlo entre los
+  // sub-tabs que lo usan (Detalle mensual + Vendedoras). Overview (YTD anual) y
+  // Clientes (rangos relativos) lo ignoran. El mes persiste en URL (?mfMes=),
+  // sin chocar con ?subtab= ni con el ?tab= del shell de Ventas.
+  const mesesConData = useMemo(() => {
+    const out: number[] = [];
+    data.retail.meses.forEach((m, i) => {
+      if (m.tickets > 0 || m.ventas > 0) out.push(i + 1);
+    });
+    return out;
+  }, [data.retail.meses]);
+
+  // Default = último mes con data retail; si no hay, Dic para años cerrados o
+  // el mes calendario actual para el año en curso (misma regla que tenían
+  // Detalle mensual y Vendedoras antes de elevar el estado).
+  const mesDefault = mesesConData.length > 0
+    ? mesesConData[mesesConData.length - 1]
+    : (isClosedYear ? 12 : new Date().getMonth() + 1);
+
+  const [mes, setMes] = useUrlState("mfMes", mesDefault);
+
+  // Al cambiar el año global, snap del mes al default del nuevo año. Se omite
+  // el primer render para respetar un ?mfMes= compartido por link. Dep en
+  // mesDefault además de selectedYear porque la data del año nuevo llega un
+  // tick después (refetch en VentasShell); mesDefault es estable dentro de un
+  // mismo año, así que no pisa la selección manual del usuario. setMes se omite
+  // a propósito: su identidad cambia con cada update de la URL y lo
+  // re-dispararía en cada cambio manual de mes.
+  const isFirstRender = useRef(true);
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setMes(mesDefault);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedYear, mesDefault]);
+
+  return (
+    <div className="w-full">
+      {/* Selector único de período (mes). Alineado a la derecha, mismo alto que
+          el selector de año global de Ventas. El año lo fija ese selector
+          global; aquí solo el mes. Siempre visible para placement estable;
+          solo tiene efecto en Detalle mensual y Vendedoras. */}
+      <div className="mb-4 flex items-center justify-end gap-2">
+        <span className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Mes</span>
+        <Select value={String(mes)} onValueChange={v => setMes(parseInt(v, 10))}>
+          <SelectTrigger className="h-9 w-auto min-w-[140px] gap-1.5 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {MES_FULL_OVERVIEW.map((label, i) => (
+              <SelectItem key={i + 1} value={String(i + 1)} className="text-xs">
+                {label} {selectedYear}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Tabs value={subtab} onValueChange={setSubtab} className="w-full">
+        <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-stone-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
+          <TabsTrigger value="overview" className={SUBTAB_TRIGGER_CLASS}>
+            <TrendingUp className="h-3 w-3" /> Overview
+          </TabsTrigger>
+          <TabsTrigger value="mes" className={SUBTAB_TRIGGER_CLASS}>
+            <CalendarRange className="h-3 w-3" /> Detalle mensual
+          </TabsTrigger>
+          <TabsTrigger value="vendedoras" className={SUBTAB_TRIGGER_CLASS}>
+            <Users className="h-3 w-3" /> Vendedoras
+          </TabsTrigger>
+          <TabsTrigger value="clientes" className={SUBTAB_TRIGGER_CLASS}>
+            <UserCircle className="h-3 w-3" /> Clientes
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="mt-5">
+          <OverviewSubtab data={data} selectedYear={selectedYear} isClosedYear={isClosedYear} />
+        </TabsContent>
+        <TabsContent value="mes" className="mt-5">
+          <DetalleMensualSubtab year={selectedYear} mes={mes} />
+        </TabsContent>
+        <TabsContent value="vendedoras" className="mt-5">
+          <VendedorasSubtab data={data} selectedYear={selectedYear} mes={mes} />
+        </TabsContent>
+        <TabsContent value="clientes" className="mt-5">
+          <ClientesMultifashionSubtab selectedYear={selectedYear} />
+        </TabsContent>
+      </Tabs>
+    </div>
   );
 }
 

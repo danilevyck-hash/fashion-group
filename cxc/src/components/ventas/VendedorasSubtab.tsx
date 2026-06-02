@@ -9,9 +9,9 @@
 // Server-side: RPC multifashion_vendedoras (ver migration
 // 20260511130000_multifashion_vendedoras_periodo.sql).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { ChevronDown, Users } from "lucide-react";
+import { Users } from "lucide-react";
 import type {
   Multifashion,
   VendedoraDetalle,
@@ -106,17 +106,17 @@ interface VendedorasSubtabProps {
   /** Año del selector global de Ventas. Se propaga a las queries de
    *  multifashion_vendedoras_v3 vía URLSearchParams. */
   selectedYear: number;
-  /** true cuando selectedYear < año calendario actual. Cambia defaults
-   *  del selector (Mes/Trimestre) a opciones del año cerrado y oculta
-   *  YTD parcial. */
-  isClosedYear: boolean;
+  /** Mes (1-12) del selector único de período en el shell de Multifashion.
+   *  Es la base de los modos del toggle: "Mes" usa este mes directo y
+   *  "Trimestre" usa el trimestre que lo contiene. "YTD" lo ignora. */
+  mes: number;
 }
 
-export function VendedorasSubtab({ data, selectedYear, isClosedYear }: VendedorasSubtabProps) {
+export function VendedorasSubtab({ data, selectedYear, mes }: VendedorasSubtabProps) {
   const year = selectedYear;
 
-  // Meses con data RETAIL en el año actual (para el dropdown). 1..12.
-  // Wholesale se reporta en Overview, no entra al ranking de vendedoras.
+  // Meses con data RETAIL en el año actual. 1..12. Wholesale se reporta en
+  // Overview, no entra al ranking de vendedoras. Se usa para el subtitle YTD.
   const mesesConData = useMemo(() => {
     const out: number[] = [];
     data.retail.meses.forEach((m, i) => {
@@ -125,16 +125,10 @@ export function VendedorasSubtab({ data, selectedYear, isClosedYear }: Vendedora
     return out;
   }, [data.retail.meses]);
 
-  // Último mes con data — default para "Mes". Para años cerrados es Dic
-  // (todos los meses tienen data); para año en curso es el mes parcial.
-  const mesDefault = mesesConData.length > 0
-    ? mesesConData[mesesConData.length - 1]
-    : (isClosedYear ? 12 : new Date().getMonth() + 1);
-  const trimDefault = Math.max(1, Math.ceil(mesDefault / 3));
+  // Trimestre derivado del mes global (toggle "Trimestre" respeta el mes base).
+  const trimestre = Math.max(1, Math.ceil(mes / 3));
 
   const [periodo, setPeriodo] = useState<VendedorasPeriodoTipo>("mes");
-  const [mes, setMes] = useState<number>(mesDefault);
-  const [trimestre, setTrimestre] = useState<number>(trimDefault);
 
   const [resp, setResp] = useState<VendedorasPeriodo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -225,21 +219,14 @@ export function VendedorasSubtab({ data, selectedYear, isClosedYear }: Vendedora
         </div>
       )}
 
-      {/* 1. Selector de período */}
+      {/* 1. Toggle de período (Mes / Trimestre / YTD). El mes base lo fija el
+          selector único del header de Multifashion; aquí solo se elige el modo. */}
       <PeriodoSelector
         periodo={periodo}
         mes={mes}
         trimestre={trimestre}
         year={year}
-        mesesConData={mesesConData}
-        onPeriodoChange={(next) => {
-          setPeriodo(next);
-          // Asegura defaults razonables al cambiar
-          if (next === "mes" && !mesesConData.includes(mes)) setMes(mesDefault);
-          if (next === "trimestre" && (trimestre < 1 || trimestre > 4)) setTrimestre(trimDefault);
-        }}
-        onMesChange={setMes}
-        onTrimestreChange={setTrimestre}
+        onPeriodoChange={setPeriodo}
       />
 
       {/* 2. Subtitle dinámico */}
@@ -310,7 +297,9 @@ export function VendedorasSubtab({ data, selectedYear, isClosedYear }: Vendedora
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Periodo Selector — three pills + inline dropdown when mes/trimestre activo
+// Periodo Selector — toggle de modo (Mes / Trimestre / YTD). El mes y el
+// trimestre los fija el selector único del header de Multifashion (mes global);
+// aquí solo se elige el modo, sin dropdowns propios de mes/trimestre.
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface PeriodoSelectorProps {
@@ -318,103 +307,24 @@ interface PeriodoSelectorProps {
   mes: number;
   trimestre: number;
   year: number;
-  mesesConData: number[];
   onPeriodoChange: (p: VendedorasPeriodoTipo) => void;
-  onMesChange: (m: number) => void;
-  onTrimestreChange: (t: number) => void;
 }
 
 function PeriodoSelector({
-  periodo, mes, trimestre, year, mesesConData,
-  onPeriodoChange, onMesChange, onTrimestreChange,
+  periodo, mes, trimestre, year, onPeriodoChange,
 }: PeriodoSelectorProps) {
-  const [openMenu, setOpenMenu] = useState<"mes" | "trim" | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Close on outside click
-  useEffect(() => {
-    if (!openMenu) return;
-    const onDocClick = (e: MouseEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) setOpenMenu(null);
-    };
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, [openMenu]);
-
   const mesLabel = `${MES_FULL[mes - 1]} ${year}`;
   const trimLabel = `Q${trimestre} ${year}`;
 
   return (
-    <div ref={containerRef} className="flex flex-wrap items-start gap-2">
-      {/* Mes pill */}
-      <PeriodoPill
-        active={periodo === "mes"}
-        hasDropdown
-        open={openMenu === "mes"}
-        onClick={() => {
-          if (periodo !== "mes") {
-            onPeriodoChange("mes");
-            setOpenMenu(null);
-          } else {
-            setOpenMenu(openMenu === "mes" ? null : "mes");
-          }
-        }}
-      >
+    <div className="flex flex-wrap items-center gap-2">
+      <PeriodoPill active={periodo === "mes"} onClick={() => onPeriodoChange("mes")}>
         {periodo === "mes" ? mesLabel : "Mes"}
       </PeriodoPill>
-      {openMenu === "mes" && (
-        <DropdownPanel onClose={() => setOpenMenu(null)}>
-          {mesesConData.length === 0
-            ? <div className="px-3 py-2 text-xs text-stone-500">Sin meses con data</div>
-            : mesesConData.map(m => (
-                <DropdownItem
-                  key={m}
-                  active={m === mes}
-                  onClick={() => { onMesChange(m); setOpenMenu(null); }}
-                >
-                  {MES_FULL[m - 1]} {year}
-                </DropdownItem>
-              ))}
-        </DropdownPanel>
-      )}
-
-      {/* Trimestre pill */}
-      <PeriodoPill
-        active={periodo === "trimestre"}
-        hasDropdown
-        open={openMenu === "trim"}
-        onClick={() => {
-          if (periodo !== "trimestre") {
-            onPeriodoChange("trimestre");
-            setOpenMenu(null);
-          } else {
-            setOpenMenu(openMenu === "trim" ? null : "trim");
-          }
-        }}
-      >
+      <PeriodoPill active={periodo === "trimestre"} onClick={() => onPeriodoChange("trimestre")}>
         {periodo === "trimestre" ? trimLabel : "Trimestre"}
       </PeriodoPill>
-      {openMenu === "trim" && (
-        <DropdownPanel onClose={() => setOpenMenu(null)}>
-          {[1, 2, 3, 4].map(q => (
-            <DropdownItem
-              key={q}
-              active={q === trimestre}
-              onClick={() => { onTrimestreChange(q); setOpenMenu(null); }}
-            >
-              Q{q} {year}
-            </DropdownItem>
-          ))}
-        </DropdownPanel>
-      )}
-
-      {/* YTD pill (sin dropdown) */}
-      <PeriodoPill
-        active={periodo === "ytd"}
-        hasDropdown={false}
-        open={false}
-        onClick={() => { onPeriodoChange("ytd"); setOpenMenu(null); }}
-      >
+      <PeriodoPill active={periodo === "ytd"} onClick={() => onPeriodoChange("ytd")}>
         YTD {year}
       </PeriodoPill>
     </div>
@@ -422,11 +332,9 @@ function PeriodoSelector({
 }
 
 function PeriodoPill({
-  active, hasDropdown, open, onClick, children,
+  active, onClick, children,
 }: {
   active: boolean;
-  hasDropdown: boolean;
-  open: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -440,53 +348,9 @@ function PeriodoPill({
           ? "border-teal-700 bg-teal-700 text-white"
           : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"
       )}
-      aria-expanded={hasDropdown ? open : undefined}
+      aria-pressed={active}
     >
       <span>{children}</span>
-      {active && hasDropdown && (
-        <ChevronDown
-          className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")}
-        />
-      )}
-    </button>
-  );
-}
-
-function DropdownPanel({
-  children, onClose,
-}: { children: React.ReactNode; onClose: () => void }) {
-  // ESC closes
-  const onKey = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Escape") onClose();
-  }, [onClose]);
-  return (
-    <div
-      onKeyDown={onKey}
-      className="w-full max-w-[220px] overflow-hidden rounded-md border border-stone-200 bg-white py-1 shadow-md md:w-auto md:min-w-[180px]"
-      role="listbox"
-    >
-      {children}
-    </div>
-  );
-}
-
-function DropdownItem({
-  active, onClick, children,
-}: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      role="option"
-      aria-selected={active}
-      onClick={onClick}
-      className={cn(
-        "block w-full px-3 py-2 text-left text-xs transition",
-        active
-          ? "bg-teal-50 font-medium text-teal-800"
-          : "text-stone-700 hover:bg-stone-50"
-      )}
-    >
-      {children}
     </button>
   );
 }
