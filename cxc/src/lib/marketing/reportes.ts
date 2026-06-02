@@ -454,7 +454,7 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
     }
     hoja = "Por marca";
     const aoa: unknown[][] = [
-      ["Marca", "Código", "Gastado YTD", "Cobrado YTD", "Pendiente"],
+      ["Marca", "Código", "A cobrar YTD", "Cobrado YTD", "Pendiente"],
     ];
     for (const item of data) {
       aoa.push([
@@ -488,7 +488,7 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
     const marcasUnicas = Array.from(
       new Set(data.flatMap((d) => Object.keys(d.porMarca)))
     ).sort((a, b) => a.localeCompare(b, "es"));
-    const aoa: unknown[][] = [["Tienda", ...marcasUnicas, "Total"]];
+    const aoa: unknown[][] = [["Tienda", ...marcasUnicas, "A cobrar"]];
     for (const item of data) {
       aoa.push([
         item.tienda,
@@ -523,7 +523,7 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
         "Fecha inicio",
         "Estado",
         "Marcas",
-        "Gasto total",
+        "Gasto real",
         "Cobrado",
         "Pendiente",
       ],

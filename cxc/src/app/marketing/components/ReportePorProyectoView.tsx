@@ -242,7 +242,7 @@ export function ReportePorProyectoView() {
                 <th className="text-left font-medium px-4 py-2">Inicio</th>
                 <th className="text-left font-medium px-4 py-2">Estado</th>
                 <th className="text-left font-medium px-4 py-2">Marcas</th>
-                <th className="text-right font-medium px-4 py-2">Gasto</th>
+                <th className="text-right font-medium px-4 py-2">Gasto real</th>
                 <th className="text-right font-medium px-4 py-2">Cobrado</th>
                 <th className="text-right font-medium px-4 py-2">Pendiente</th>
               </tr>

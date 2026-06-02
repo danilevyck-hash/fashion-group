@@ -123,7 +123,7 @@ export function ReportePorMarcaView() {
             <thead className="bg-gray-50 text-gray-600">
               <tr>
                 <th className="text-left font-medium px-4 py-2">Marca</th>
-                <th className="text-right font-medium px-4 py-2">Gastado</th>
+                <th className="text-right font-medium px-4 py-2">A cobrar</th>
                 <th className="text-right font-medium px-4 py-2">Cobrado</th>
                 <th className="text-right font-medium px-4 py-2">Pendiente</th>
               </tr>
