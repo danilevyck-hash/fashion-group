@@ -6,6 +6,7 @@ import {
   PORCENTAJE_IMPORTACION_ZONA_LIBRE,
   calcularImportacion,
 } from "@/lib/marketing-calc";
+import AdjuntosFactura from "./AdjuntosFactura";
 
 interface PorcentajeMarca {
   marca: MkMarca;
@@ -134,12 +135,29 @@ export function FacturaCard({
     </div>
   );
 
-  if (!onClick) return <div className={base}>{body}</div>;
+  // Adjuntos (PDFs/fotos de la factura) inline — visibles al abrir el proyecto,
+  // sin tener que descargar el ZIP. Se renderizan como hermano del área
+  // clickable para no anidar interactivos dentro de un <button>.
+  const adjuntosBlock = !anulada && factura.adjuntos.length > 0 ? (
+    <AdjuntosFactura adjuntos={factura.adjuntos} />
+  ) : null;
+
+  if (!onClick) {
+    return (
+      <div className={base}>
+        {body}
+        {adjuntosBlock}
+      </div>
+    );
+  }
 
   return (
-    <button type="button" onClick={onClick} className={`w-full text-left ${base}`}>
-      {body}
-    </button>
+    <div className={base}>
+      <button type="button" onClick={onClick} className="w-full text-left">
+        {body}
+      </button>
+      {adjuntosBlock}
+    </div>
   );
 }
 
