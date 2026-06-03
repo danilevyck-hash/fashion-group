@@ -1,6 +1,6 @@
 "use client";
 
-// Sub-tab Vendedoras del módulo /ventas → Multifashion.
+// Sub-tab Vendedoras del módulo Multifashion (/multifashion).
 //
 // Permite explorar el ranking de vendedoras (empresa='american_classic')
 // con tres ventanas: Mes / Trimestre / YTD. Delta de cada fila compara
@@ -17,7 +17,7 @@ import type {
   VendedoraDetalle,
   VendedorasPeriodo,
   VendedorasPeriodoTipo,
-} from "./types";
+} from "@/components/ventas/types";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { formatDelta, formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";

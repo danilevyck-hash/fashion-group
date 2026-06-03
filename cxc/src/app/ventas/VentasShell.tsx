@@ -4,11 +4,10 @@ import { useState, useTransition, useCallback } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, ShoppingBag, TrendingUp, Contact } from "lucide-react";
+import { Download, TrendingUp, Contact } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ResumenView } from "@/components/ventas/ResumenView";
 import { ClientesView } from "@/components/ventas/ClientesView";
-import { MultifashionView } from "@/components/ventas/MultifashionView";
 import { exportResumenToExcel } from "@/lib/ventas/excel";
 import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/types";
 
@@ -35,8 +34,9 @@ export function VentasShell({
   const [, startTransition] = useTransition();
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  // Tab activo en la URL (?tab=resumen|clientes|multifashion) para que refresh,
-  // back/forward y compartir-link mantengan dónde estaba el usuario.
+  // Tab activo en la URL (?tab=resumen|clientes) para que refresh, back/forward
+  // y compartir-link mantengan dónde estaba el usuario. Multifashion se separó
+  // a su propio módulo (/multifashion); Ventas queda con Resumen + Clientes.
   const [tab, setTab] = useUrlState("tab", "resumen");
 
   const onYearChange = useCallback(async (year: number) => {
@@ -45,8 +45,10 @@ export function VentasShell({
     setLoading(true);
     setFetchError(null);
     try {
-      // Refetch los 3 datasets en paralelo. El selector global de año
-      // debe propagarse a TODOS los tabs (Resumen, Clientes, Multifashion).
+      // Refetch en paralelo. resumen + clientes son los tabs visibles; multi
+      // (overview Multifashion) ya no tiene tab propio aquí, pero ResumenView
+      // lo usa para el tooltip de desglose retail/mayoreo de la fila
+      // Multifashion del heatmap, así que se sigue refetcheando con el año.
       const [resumenRes, clientesRes, multiRes] = await Promise.all([
         fetch(`/api/ventas/resumen?year=${year}`, { cache: "no-store" }),
         fetch(`/api/ventas/clientes-12m?year=${year}`, { cache: "no-store" }),
@@ -152,12 +154,6 @@ export function VentasShell({
           >
             <Contact className="h-3.5 w-3.5" /> Clientes
           </TabsTrigger>
-          <TabsTrigger
-            value="multifashion"
-            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none"
-          >
-            <ShoppingBag className="h-3.5 w-3.5" /> Multifashion
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="mt-5">
@@ -185,20 +181,6 @@ export function VentasShell({
               isClosedYear={isClosedYear}
             />
           ) : <ErrorState scope="clientes" />}
-        </TabsContent>
-        <TabsContent value="multifashion" className="mt-5">
-          {multi ? (
-            // Sin `key={selectedYear}`: el sub-tab activo (Overview / Detalle
-            // mensual / Vendedoras / Clientes) debe persistir al cambiar año.
-            // La data se actualiza vía props (multi) y los sub-tabs hacen su
-            // propio refetch cuando year cambia. ClientesView arriba sí usa
-            // key= porque su búsqueda/filtro asume el universo del año.
-            <MultifashionView
-              data={multi}
-              selectedYear={selectedYear}
-              isClosedYear={isClosedYear}
-            />
-          ) : <ErrorState scope="multifashion" />}
         </TabsContent>
       </Tabs>
     </main>

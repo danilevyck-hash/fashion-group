@@ -10,7 +10,7 @@ import {
 import {
   TrendingUp, CalendarRange, Users, UserCircle, Package, ChevronLeft, ChevronRight,
 } from "lucide-react";
-import type { Multifashion, RetailMonthly, WholesaleMonthly } from "./types";
+import type { Multifashion, RetailMonthly, WholesaleMonthly } from "@/components/ventas/types";
 import { fmtMoney, fmtPct, deltaSymbol, MONTHS } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 import { VendedorasSubtab } from "./VendedorasSubtab";
