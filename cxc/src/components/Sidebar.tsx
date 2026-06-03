@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
-import { Home, ChevronDown } from "lucide-react";
+import { Home, ChevronRight } from "lucide-react";
 import { ALL_MODULES, getVisibleGroups, getModulesInGroup } from "@/lib/modules";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -44,20 +44,19 @@ function useCollapsedSync(): boolean {
   return collapsed;
 }
 
-// Acordeón: grupos expandidos en el sidebar. Persistencia simple (no crítica).
-const EXPANDED_KEY = "fg_sidebar_expanded";
+// Acordeón EXCLUSIVO: un solo grupo abierto a la vez. Persistencia simple
+// (no crítica) del grupo abierto.
+const OPEN_GROUP_KEY = "fg_sidebar_open_group";
 
-function readExpanded(): string[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const v = JSON.parse(window.localStorage.getItem(EXPANDED_KEY) || "[]");
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
-  } catch { return []; }
+function readOpenGroup(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(OPEN_GROUP_KEY) || null;
 }
 
-function writeExpanded(keys: string[]): void {
+function writeOpenGroup(key: string | null): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(EXPANDED_KEY, JSON.stringify(keys));
+  if (key) window.localStorage.setItem(OPEN_GROUP_KEY, key);
+  else window.localStorage.removeItem(OPEN_GROUP_KEY);
 }
 
 /** Devuelve la key del grupo activo para una pathname dada, o null si estamos en /home u otra ruta neutra. */
@@ -105,21 +104,21 @@ export default function Sidebar() {
 
   const activeGroup = activeGroupForPath(pathname);
 
-  // Estado del acordeón: set de grupos abiertos. Init desde localStorage; el
-  // grupo activo siempre arranca abierto. Hooks ANTES de los early returns.
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Estado del acordeón EXCLUSIVO: un solo grupo abierto. Init = grupo activo,
+  // o el último persistido si estamos en una ruta neutra (/home). El grupo
+  // activo se abre al navegar (cierra los demás). Hooks ANTES de early returns.
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
   useEffect(() => {
-    setExpanded(new Set(readExpanded()));
+    setOpenGroup(activeGroup ?? readOpenGroup());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (!activeGroup) return;
-    setExpanded(prev => (prev.has(activeGroup) ? prev : new Set(prev).add(activeGroup)));
+    if (activeGroup) setOpenGroup(activeGroup);
   }, [activeGroup]);
   const toggleGroup = useCallback((key: string) => {
-    setExpanded(prev => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      writeExpanded([...next]);
+    setOpenGroup(prev => {
+      const next = prev === key ? null : key;
+      writeOpenGroup(next);
       return next;
     });
   }, []);
@@ -224,7 +223,7 @@ export default function Sidebar() {
           }
 
           // Expandido: el grupo es un toggle de acordeón; los hijos navegan.
-          const isOpen = expanded.has(g.key);
+          const isOpen = openGroup === g.key;
           const children = getModulesInGroup(g.key, userRole, fgModules);
           // Hijo activo: match por href MÁS específico (evita doble-resaltado
           // entre /admin y /admin/usuarios, etc.).
@@ -248,31 +247,50 @@ export default function Sidebar() {
               >
                 <Icon size={16} strokeWidth={1.5} />
                 <span className="flex-1 truncate text-left">{g.label}</span>
-                <ChevronDown
+                {/* chevron-right → rota 90° (apunta abajo) al abrir */}
+                <ChevronRight
                   size={14}
                   strokeWidth={1.5}
-                  className={`flex-shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                  className={`flex-shrink-0 text-gray-400 transition-transform duration-[180ms] ease-out motion-reduce:transition-none ${
+                    isOpen ? "rotate-90" : ""
+                  }`}
                 />
               </button>
-              {isOpen && children.map((m) => {
-                const MIcon = m.icon;
-                const mActive = m.key === activeChildKey;
-                return (
-                  <button
-                    key={m.key}
-                    onClick={() => router.push(m.href)}
-                    title={m.label}
-                    className={`w-full flex items-center gap-2.5 pl-12 pr-5 py-2 text-[13px] transition-all border-l-2 ${
-                      mActive
-                        ? "bg-gray-50 text-black font-medium border-l-blue-500"
-                        : "text-gray-500 hover:bg-gray-50 hover:text-gray-700 border-l-transparent"
-                    }`}
-                  >
-                    <MIcon size={15} strokeWidth={1.5} className="flex-shrink-0" />
-                    <span className="truncate text-left">{m.label}</span>
-                  </button>
-                );
-              })}
+              {/* Acordeón animado: grid-template-rows 0fr↔1fr anima la altura sin
+                  display:none, + fade. Respeta prefers-reduced-motion. */}
+              <div
+                aria-hidden={!isOpen}
+                className={`grid transition-[grid-template-rows] duration-[180ms] ease-out motion-reduce:transition-none ${
+                  isOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                }`}
+              >
+                <div
+                  className={`min-h-0 overflow-hidden transition-opacity duration-[180ms] ease-out motion-reduce:transition-none ${
+                    isOpen ? "opacity-100" : "opacity-0"
+                  }`}
+                >
+                  {children.map((m) => {
+                    const MIcon = m.icon;
+                    const mActive = m.key === activeChildKey;
+                    return (
+                      <button
+                        key={m.key}
+                        onClick={() => router.push(m.href)}
+                        title={m.label}
+                        tabIndex={isOpen ? 0 : -1}
+                        className={`w-full flex items-center gap-2.5 pl-12 pr-5 py-1.5 text-[13px] transition-colors border-l-2 ${
+                          mActive
+                            ? "bg-blue-50 text-blue-700 font-medium border-l-blue-500"
+                            : "text-gray-500 hover:bg-gray-50 hover:text-gray-700 border-l-transparent"
+                        }`}
+                      >
+                        <MIcon size={14} strokeWidth={1.5} className="flex-shrink-0" />
+                        <span className="truncate text-left">{m.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           );
         })}
