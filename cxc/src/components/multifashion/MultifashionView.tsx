@@ -90,6 +90,15 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
   const goPrev = () => { if (canPrev) setMes(mes - 1); };
   const goNext = () => { if (canNext) setMes(mes + 1); };
 
+  // Aclaración sutil bajo el selector: cuando muestra el ÚLTIMO MES CERRADO por
+  // default (ej. mayo estando en junio) explica por qué no es el mes en curso.
+  // Solo en ese caso (default + año actual + el mes no es el calendario actual);
+  // navegar manualmente a otro mes lo oculta. No cambia data ni el default.
+  const nowRef = new Date();
+  const currentCalMonth = nowRef.getMonth() + 1;
+  const showMesCerradoHint =
+    selectedYear === nowRef.getFullYear() && mes === mesDefault && mes !== currentCalMonth;
+
   // Al cambiar el año global, snap del mes al default del nuevo año. En el
   // primer render se respeta un ?mfMes= compartido por link SOLO si cae en el
   // rango navegable; si viene fuera de rango (URL manual/obsoleta) se hace snap
@@ -115,7 +124,8 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
           El año lo fija ese selector global; aquí solo el mes. Siempre visible
           para placement estable; solo tiene efecto en Detalle mensual y
           Vendedoras. Flechas y dropdown comparten el rango [minMonth, maxMonth]. */}
-      <div className="mb-4 flex items-center justify-end gap-2">
+      <div className="mb-4">
+        <div className="flex items-center justify-end gap-2">
         <span className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Mes</span>
         <div className="flex items-center gap-1">
           <button
@@ -149,6 +159,12 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
             <ChevronRight className="h-4 w-4" />
           </button>
         </div>
+        </div>
+        {showMesCerradoHint && (
+          <p className="mt-1 text-right text-[10.5px] text-stone-400">
+            último mes cerrado · {MES_FULL_OVERVIEW[currentCalMonth - 1].toLowerCase()} en curso
+          </p>
+        )}
       </div>
 
       <Tabs value={subtab} onValueChange={setSubtab} className="w-full">
