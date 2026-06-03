@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 import { Home, ChevronRight } from "lucide-react";
-import { ALL_MODULES, getVisibleGroups, getModulesInGroup } from "@/lib/modules";
+import {
+  ALL_MODULES, getVisibleGroups, getModulesInGroup,
+  type AppGroup, type AppModule,
+} from "@/lib/modules";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin", secretaria: "Secretaria", bodega: "Bodega",
@@ -81,6 +84,69 @@ function activeGroupForPath(pathname: string): string | null {
   return group;
 }
 
+/** Key del módulo hijo activo dentro de un grupo: match por href MÁS específico
+ *  (evita doble-resaltado entre /admin y /admin/usuarios, etc.). */
+function activeChildKeyFor(children: AppModule[], pathname: string): string | null {
+  let key: string | null = null;
+  let bestLen = -1;
+  for (const m of children) {
+    if ((pathname === m.href || pathname.startsWith(m.href + "/")) && m.href.length > bestLen) {
+      key = m.key;
+      bestLen = m.href.length;
+    }
+  }
+  return key;
+}
+
+/** Flyout del sidebar COLAPSADO: panel flotante a la derecha del ícono de grupo
+ *  con los módulos hijos (ícono + label). Position fixed para no ser recortado
+ *  por el overflow del nav; anclado al top del ícono de grupo (left = ancho del
+ *  rail colapsado, w-16 = 64px). */
+function CollapsedFlyout({
+  group, top, role, fgModules, pathname, onNavigate,
+}: {
+  group: AppGroup;
+  top: number;
+  role: string;
+  fgModules: string[] | null;
+  pathname: string;
+  onNavigate: (href: string) => void;
+}) {
+  const children = getModulesInGroup(group.key, role, fgModules);
+  const activeChildKey = activeChildKeyFor(children, pathname);
+  return (
+    <div
+      className="fixed z-50 ml-1 motion-reduce:animate-none animate-in fade-in-0 slide-in-from-left-1 duration-150"
+      style={{ top, left: 64 }}
+    >
+      <div className="min-w-[12rem] max-h-[70vh] overflow-y-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg">
+        <p className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">
+          {group.label}
+        </p>
+        {children.map((m) => {
+          const MIcon = m.icon;
+          const active = m.key === activeChildKey;
+          return (
+            <button
+              key={m.key}
+              onClick={() => onNavigate(m.href)}
+              title={m.label}
+              className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-[13px] transition-colors ${
+                active
+                  ? "bg-blue-50 text-blue-700 font-medium"
+                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              }`}
+            >
+              <MIcon size={14} strokeWidth={1.5} className="flex-shrink-0" />
+              <span className="truncate text-left">{m.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function Sidebar() {
   const pathname = usePathname() || "";
   const router = useRouter();
@@ -123,6 +189,24 @@ export default function Sidebar() {
     });
   }, []);
 
+  // Flyout del rail colapsado (acordeón exclusivo también acá: un solo grupo).
+  // No se auto-abre (a diferencia del acordeón expandido) para no popear un
+  // panel flotante al cargar. `top` = posición del ícono de grupo clickeado.
+  const asideRef = useRef<HTMLElement>(null);
+  const [flyout, setFlyout] = useState<{ key: string; top: number } | null>(null);
+  // Cerrar el flyout al navegar o al alternar colapsado/expandido.
+  useEffect(() => { setFlyout(null); }, [pathname, collapsed]);
+  // Cerrar al hacer click fuera del sidebar. Los clicks dentro del aside
+  // (íconos de grupo / items del flyout) los maneja su propio onClick.
+  useEffect(() => {
+    if (!flyout) return;
+    const onDown = (e: MouseEvent) => {
+      if (asideRef.current && !asideRef.current.contains(e.target as Node)) setFlyout(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [flyout]);
+
   if (pathname === "/" || PUBLIC_PATH_PREFIXES.some(p => pathname.startsWith(p))) return null;
   if (!userRole) return null;
 
@@ -139,11 +223,15 @@ export default function Sidebar() {
 
   return (
     <aside
+      ref={asideRef}
       className={`hidden md:flex fixed left-0 top-0 h-screen ${width} bg-white border-r border-gray-200 flex-col z-20 transition-[width] duration-200 ease-out`}
     >
+      {/* Header: logo a la izquierda, toggle SIEMPRE en la esquina superior
+          derecha (centrado vertical) en ambos estados — antes el toggle saltaba
+          a una fila separada centrada al colapsar. */}
       <div
-        className={`h-[57px] border-b border-gray-200 flex items-center ${
-          collapsed ? "justify-center px-0" : "justify-between px-5"
+        className={`h-[57px] border-b border-gray-200 flex items-center justify-between ${
+          collapsed ? "px-1.5" : "px-5"
         }`}
       >
         <button
@@ -158,32 +246,17 @@ export default function Sidebar() {
             </span>
           )}
         </button>
-        {!collapsed && (
-          <button
-            onClick={toggleCollapsed}
-            aria-label="Colapsar barra lateral"
-            title="Colapsar"
-            className="text-gray-400 hover:text-gray-700 p-1 rounded transition"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
-          </button>
-        )}
-      </div>
-
-      {collapsed && (
         <button
           onClick={toggleCollapsed}
-          aria-label="Expandir barra lateral"
-          title="Expandir"
-          className="mx-auto mt-2 mb-1 text-gray-400 hover:text-gray-700 p-1 rounded transition"
+          aria-label={collapsed ? "Expandir barra lateral" : "Colapsar barra lateral"}
+          title={collapsed ? "Expandir" : "Colapsar"}
+          className="flex-shrink-0 text-gray-400 hover:text-gray-700 p-1 rounded transition"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="9 18 15 12 9 6" />
+            <polyline points={collapsed ? "9 18 15 12 9 6" : "15 18 9 12 15 6"} />
           </svg>
         </button>
-      )}
+      </div>
 
       <nav className="flex-1 overflow-y-auto py-2">
         <button
@@ -203,38 +276,46 @@ export default function Sidebar() {
           const Icon = g.icon;
           const groupActive = activeGroup === g.key;
 
-          // Colapsado (solo íconos): sin espacio para acordeón → el ícono navega
-          // a la página intermedia /grupo (comportamiento de siempre).
+          // Colapsado (solo íconos): clic en el ícono de grupo abre un FLYOUT a
+          // la derecha con los módulos hijos (ícono + label). Exclusivo: un solo
+          // flyout abierto a la vez. Ya no navega a /grupo.
           if (collapsed) {
+            const isFlyoutOpen = flyout?.key === g.key;
             return (
-              <button
-                key={g.key}
-                onClick={() => router.push(g.href)}
-                title={g.label}
-                className={`w-full flex items-center justify-center px-0 py-2.5 text-sm transition-all border-l-2 ${
-                  groupActive
-                    ? "bg-gray-50 text-black font-medium border-l-blue-500"
-                    : "text-gray-600 hover:bg-gray-50 border-l-transparent"
-                }`}
-              >
-                <Icon size={16} strokeWidth={1.5} />
-              </button>
+              <div key={g.key}>
+                <button
+                  onClick={(e) => {
+                    const t = e.currentTarget.getBoundingClientRect().top;
+                    setFlyout(prev => (prev?.key === g.key ? null : { key: g.key, top: t }));
+                  }}
+                  title={g.label}
+                  aria-expanded={isFlyoutOpen}
+                  className={`w-full flex items-center justify-center px-0 py-2.5 text-sm transition-all border-l-2 ${
+                    groupActive || isFlyoutOpen
+                      ? "bg-gray-50 text-black font-medium border-l-blue-500"
+                      : "text-gray-600 hover:bg-gray-50 border-l-transparent"
+                  }`}
+                >
+                  <Icon size={16} strokeWidth={1.5} />
+                </button>
+                {isFlyoutOpen && (
+                  <CollapsedFlyout
+                    group={g}
+                    top={flyout!.top}
+                    role={userRole}
+                    fgModules={fgModules}
+                    pathname={pathname}
+                    onNavigate={(href) => { setFlyout(null); router.push(href); }}
+                  />
+                )}
+              </div>
             );
           }
 
           // Expandido: el grupo es un toggle de acordeón; los hijos navegan.
           const isOpen = openGroup === g.key;
           const children = getModulesInGroup(g.key, userRole, fgModules);
-          // Hijo activo: match por href MÁS específico (evita doble-resaltado
-          // entre /admin y /admin/usuarios, etc.).
-          let activeChildKey: string | null = null;
-          let bestLen = -1;
-          for (const m of children) {
-            if ((pathname === m.href || pathname.startsWith(m.href + "/")) && m.href.length > bestLen) {
-              activeChildKey = m.key;
-              bestLen = m.href.length;
-            }
-          }
+          const activeChildKey = activeChildKeyFor(children, pathname);
 
           return (
             <div key={g.key}>
