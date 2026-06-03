@@ -120,7 +120,7 @@ export default function ContactPanel({
                         {d.ultimoPagoFecha ? (
                           <span className="text-gray-600">{fmtDate(d.ultimoPagoFecha)} · ${fmt(d.ultimoPagoMonto ?? 0)}</span>
                         ) : (
-                          <span className="text-gray-300">sin pago registrado</span>
+                          <span className="text-gray-300">sin recibo activo</span>
                         )}
                       </td>
                     </tr>
