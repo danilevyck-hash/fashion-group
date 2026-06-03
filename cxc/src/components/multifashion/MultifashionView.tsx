@@ -10,6 +10,9 @@ import {
 import {
   TrendingUp, CalendarRange, Users, UserCircle, Package, ChevronLeft, ChevronRight,
 } from "lucide-react";
+import {
+  LineChart, Line, XAxis, Tooltip as RTooltip, ResponsiveContainer,
+} from "recharts";
 import type { Multifashion, RetailMonthly, WholesaleMonthly } from "@/components/ventas/types";
 import { fmtMoney, fmtPct, deltaSymbol, MONTHS } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
@@ -222,17 +225,39 @@ function buildRetailYtdSub(meses: RetailMonthly[], year: number, isClosedYear: b
   return rangeLabel;
 }
 
-// "Año cerrado · alcanzó 92% de meta" con color semantic.
-// >=100% verde "supera meta", >=85% ámbar "cerca", <85% rojo "lejos".
-function buildClosedYearMetaSummary(pctMeta: number): { label: string; tone: string; arrow: string } {
-  const pct = (pctMeta * 100).toFixed(1);
-  if (pctMeta >= 1.0) {
-    return { label: `Año cerrado · alcanzó ${pct}% de meta`, tone: "text-emerald-700", arrow: "▲" };
-  }
-  if (pctMeta >= 0.85) {
-    return { label: `Año cerrado · alcanzó ${pct}% de meta`, tone: "text-amber-700", arrow: "—" };
-  }
-  return { label: `Año cerrado · alcanzó ${pct}% de meta`, tone: "text-red-700", arrow: "▼" };
+type ProyChartPoint = { mes: string; prev: number | null; cur: number | null };
+type Proyeccion = {
+  chart: ProyChartPoint[];
+  proyeccion: number;
+  delta: number | null;
+  has: boolean;
+};
+
+// Proyección de cierre PONDERADA POR TEMPORADA (no lineal). Escala el cierre
+// real del año anterior por el ritmo YTD real del año en curso, usando solo
+// meses COMPLETOS en ambos lados (excluye el mes en curso parcial):
+//   proyeccion = ytd_actual × (cierre_prev / ytd_prev_mismos_meses)
+// Respeta la forma estacional de 2025 sin inventar meses futuros. Para año
+// cerrado, lastComplete=12 ⇒ proyeccion = cierre real del año (ytd_actual).
+// chart: 12 puntos { prev (año anterior, mes completo), cur (año en curso,
+// solo hasta el último mes completo; null después para cortar la línea) }.
+function buildProyeccion(meses: RetailMonthly[]): Proyeccion {
+  let lastComplete = 0;
+  meses.forEach((m, i) => {
+    if (!m.es_periodo_parcial && (m.ventas > 0 || m.tickets > 0)) lastComplete = i + 1;
+  });
+  const cierrePrev = meses.reduce((s, m) => s + (m.ventasPrev ?? 0), 0);
+  const ytdActual = meses.slice(0, lastComplete).reduce((s, m) => s + m.ventas, 0);
+  const ytdPrev = meses.slice(0, lastComplete).reduce((s, m) => s + (m.ventasPrev ?? 0), 0);
+  const has = lastComplete > 0 && ytdPrev > 0 && cierrePrev > 0;
+  const proyeccion = has ? ytdActual * (cierrePrev / ytdPrev) : 0;
+  const delta = has ? (proyeccion - cierrePrev) / cierrePrev : null;
+  const chart: ProyChartPoint[] = meses.map((m, i) => ({
+    mes: m.mes,
+    prev: m.ventasPrev ?? null,
+    cur: i + 1 <= lastComplete ? m.ventas : null,
+  }));
+  return { chart, proyeccion, delta, has };
 }
 
 // Sub-label del card de margen TIENDA COMPLETA (v4: costo real de
@@ -271,13 +296,10 @@ function OverviewSubtab({
   const year = selectedYear;
   const prevYear = year - 1;
 
-  // Progress bar usa TOTAL (retail + wholesale) porque la meta anual del
-  // negocio históricamente incluye todo.
-  const pctMeta = data.metaAnual > 0 ? total.ytdVentas / data.metaAnual : 0;
-  const proyeccion = data.expectedTodayPct > 0
-    ? total.ytdVentas / data.expectedTodayPct
-    : 0;
-  const closedSummary = isClosedYear ? buildClosedYearMetaSummary(pctMeta) : null;
+  // Hero de proyección: serie mensual retail del año anterior (mes completo) vs
+  // año en curso, + proyección de cierre PONDERADA POR TEMPORADA (no lineal).
+  // Reemplaza la barra "avance vs meta". Retail-only.
+  const proy = buildProyeccion(retail.meses);
 
   // Disclaimer del mes parcial para el footer de la tabla retail.
   // Para años cerrados no aplica (no hay mes parcial).
@@ -347,59 +369,8 @@ function OverviewSubtab({
         </Card>
       )}
 
-      {/* 4. Progress vs meta — usa TOTAL */}
-      <Card className="p-4">
-        <div className="mb-2.5 flex items-center justify-between">
-          <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Avance vs meta anual</p>
-          <p className="font-mono text-xs text-stone-950 tabular-nums">
-            {(pctMeta * 100).toFixed(1)}% · {fmtMoney(total.ytdVentas)} de {fmtMoney(data.metaAnual)}
-          </p>
-        </div>
-        <div className="relative h-3 rounded-full bg-stone-100">
-          <div
-            className="h-full rounded-full bg-teal-700 transition-[width] duration-300"
-            style={{ width: `${Math.min(100, pctMeta * 100)}%` }}
-          />
-          {/* "Esperado hoy" marker — solo aplica al año en curso. Label DEBAJO
-              de la barra para no solaparse con el título "Avance vs meta anual"
-              ni con el porcentaje 27.7% a la derecha. Posición clampeada al
-              rango [8%, 92%] para que el texto no se corte en los bordes. */}
-          {!isClosedYear && (
-            <>
-              <div
-                className="absolute -top-1 -bottom-1 w-0.5 bg-stone-950"
-                style={{ left: `${data.expectedTodayPct * 100}%` }}
-              />
-              <div
-                className="absolute whitespace-nowrap font-mono text-[10px] text-stone-500"
-                style={{
-                  top: 12,
-                  left: `${Math.max(8, Math.min(92, data.expectedTodayPct * 100))}%`,
-                  transform: "translateX(-50%)",
-                }}
-              >
-                esperado hoy · {(data.expectedTodayPct * 100).toFixed(0)}%
-              </div>
-            </>
-          )}
-        </div>
-        {isClosedYear && closedSummary ? (
-          <p className={cn("mt-3.5 text-xs font-medium", closedSummary.tone)}>
-            {closedSummary.arrow} {closedSummary.label}
-          </p>
-        ) : (
-          /* mt-7 (28px) deja espacio para el label "esperado hoy" que ahora
-             vive debajo de la barra. mt-3.5 viejo causaba overlap. */
-          <p className="mt-7 text-xs text-stone-500">
-            Proyección de cierre <span className="font-mono font-medium text-stone-950 tabular-nums">{fmtMoney(proyeccion)}</span>
-            {" · "}
-            {proyeccion >= data.metaAnual
-              ? <span className="text-emerald-600">▲ supera meta</span>
-              : <span className="text-amber-700">▼ por debajo de meta</span>}
-            {" · incluye retail + mayoreo"}
-          </p>
-        )}
-      </Card>
+      {/* 4. Hero de proyección — líneas año anterior vs año en curso + cierre */}
+      <ProyeccionHero proy={proy} year={year} prevYear={prevYear} isClosedYear={isClosedYear} />
 
       {/* 5. Tabla detalle mensual retail + fila resumen wholesale */}
       <section>
@@ -438,6 +409,139 @@ function OverviewSubtab({
         </Card>
       </section>
 
+    </div>
+  );
+}
+
+// Hero de proyección: a la izquierda dos líneas finas (año anterior ámbar full
+// year 1.5px + año en curso azul 3px, corta donde no hay data); a la derecha el
+// número de proyección de cierre + delta vs cierre del año anterior.
+// Colores fijos por accesibilidad (Daniel daltónico): ámbar #BA7517, azul #185FA5.
+function ProyeccionHero({
+  proy, year, prevYear, isClosedYear,
+}: {
+  proy: Proyeccion;
+  year: number;
+  prevYear: number;
+  isClosedYear: boolean;
+}) {
+  const label = isClosedYear ? `Cierre ${year}` : "Proyección de cierre";
+  const sub = isClosedYear ? "cierre real del año" : "ponderado por temporada";
+  const delta = proy.delta;
+  const deltaTone = delta == null ? "text-stone-400"
+    : delta > 0.001 ? "text-emerald-600"
+    : delta < -0.001 ? "text-red-600"
+    : "text-stone-500";
+  const deltaStr = delta == null ? "—"
+    : `${delta >= 0 ? "▲ +" : "▼ "}${Math.abs(delta * 100).toFixed(0)}%`;
+
+  return (
+    <Card className="flex flex-col gap-4 p-4 md:flex-row md:items-center">
+      {/* Izquierda: líneas finas año anterior vs año en curso */}
+      <div className="min-w-0 flex-1">
+        <div className="h-[170px] w-full">
+          <ResponsiveContainer>
+            <LineChart data={proy.chart} margin={{ top: 8, right: 8, left: 4, bottom: 0 }}>
+              <XAxis
+                dataKey="mes"
+                tick={{ fontSize: 10, fill: "#78716c" }}
+                axisLine={{ stroke: "#e7e5e4" }}
+                tickLine={false}
+                interval={0}
+              />
+              <RTooltip
+                cursor={{ stroke: "#d6d3d1", strokeWidth: 1 }}
+                content={(p) => (
+                  <ProyeccionTooltip
+                    active={p.active}
+                    payload={p.payload as ReadonlyArray<unknown> | undefined}
+                    label={typeof p.label === "string" ? p.label : undefined}
+                    year={year}
+                    prevYear={prevYear}
+                  />
+                )}
+              />
+              {/* Año anterior — ámbar, fino, completa los 12 meses. */}
+              <Line
+                type="monotone"
+                dataKey="prev"
+                stroke="#BA7517"
+                strokeWidth={1.5}
+                dot={false}
+                connectNulls
+                isAnimationActive={false}
+              />
+              {/* Año en curso — azul, grueso, corta donde no hay data real. */}
+              <Line
+                type="monotone"
+                dataKey="cur"
+                stroke="#185FA5"
+                strokeWidth={3}
+                dot={false}
+                connectNulls={false}
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Derecha: proyección de cierre + delta */}
+      <div className="shrink-0 border-stone-200 md:w-56 md:border-l md:pl-5">
+        <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">{label}</p>
+        <p className="mt-1 font-mono text-3xl font-medium leading-tight text-stone-950 tabular-nums">
+          {proy.has ? fmtMoney(proy.proyeccion) : "—"}
+        </p>
+        {proy.has && (
+          <p className={cn("mt-1.5 font-mono text-sm font-medium tabular-nums", deltaTone)}>
+            {deltaStr}{" "}
+            <span className="font-sans text-[11px] font-normal text-stone-500">vs cierre {prevYear}</span>
+          </p>
+        )}
+        <p className="mt-1 text-[11px] text-stone-400">{sub}</p>
+      </div>
+    </Card>
+  );
+}
+
+function ProyeccionTooltip({
+  active, payload, label, year, prevYear,
+}: {
+  active?: boolean;
+  payload?: ReadonlyArray<unknown>;
+  label?: string;
+  year: number;
+  prevYear: number;
+}) {
+  if (!active || !payload || payload.length === 0 || !label) return null;
+  const read = (key: string): number | null => {
+    for (const it of payload) {
+      if (typeof it === "object" && it !== null && (it as Record<string, unknown>).dataKey === key) {
+        const v = (it as Record<string, unknown>).value;
+        return typeof v === "number" ? v : null;
+      }
+    }
+    return null;
+  };
+  const cur = read("cur");
+  const prev = read("prev");
+  return (
+    <div className="rounded-md border border-stone-200 bg-white px-3 py-2 text-[11px] shadow-sm">
+      <p className="mb-1 font-medium text-stone-700">{label}</p>
+      <div className="flex items-center justify-between gap-4">
+        <span className="inline-flex items-center gap-1.5 text-stone-500">
+          <span className="inline-block h-0.5 w-3 rounded-full" style={{ backgroundColor: "#185FA5" }} />
+          {year}
+        </span>
+        <span className="font-mono tabular-nums text-stone-950">{cur != null ? fmtMoney(cur) : "—"}</span>
+      </div>
+      <div className="mt-0.5 flex items-center justify-between gap-4">
+        <span className="inline-flex items-center gap-1.5 text-stone-500">
+          <span className="inline-block h-0.5 w-3 rounded-full" style={{ backgroundColor: "#BA7517" }} />
+          {prevYear}
+        </span>
+        <span className="font-mono tabular-nums text-stone-700">{prev != null ? fmtMoney(prev) : "—"}</span>
+      </div>
     </div>
   );
 }
