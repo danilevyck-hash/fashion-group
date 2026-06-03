@@ -198,6 +198,11 @@ export type RetailMonthly = {
   tickets: number;
   ticketProm: number;
   vs2025: number | null;
+  /** Ventas del MISMO mes del año anterior, MES COMPLETO (no recortado al día).
+   *  Lo expone multifashion_mensual_v6 para el hero de proyección del Overview
+   *  (línea año anterior full-year + cierre real del año previo). Opcional:
+   *  ausente si el backend desplegado aún no trae el campo. */
+  ventasPrev?: number;
   /** true sólo en el mes que contiene CURRENT_DATE (calendario, no data). */
   es_periodo_parcial?: boolean;
   /** YYYY-MM-DD. MAX(fecha) con data del mes actual cuando es_periodo_parcial=true. */
