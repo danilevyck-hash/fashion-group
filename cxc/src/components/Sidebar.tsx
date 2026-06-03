@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
-import { Home } from "lucide-react";
-import { ALL_MODULES, getVisibleGroups } from "@/lib/modules";
+import { Home, ChevronDown } from "lucide-react";
+import { ALL_MODULES, getVisibleGroups, getModulesInGroup } from "@/lib/modules";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin", secretaria: "Secretaria", bodega: "Bodega",
@@ -44,6 +44,22 @@ function useCollapsedSync(): boolean {
   return collapsed;
 }
 
+// Acordeón: grupos expandidos en el sidebar. Persistencia simple (no crítica).
+const EXPANDED_KEY = "fg_sidebar_expanded";
+
+function readExpanded(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const v = JSON.parse(window.localStorage.getItem(EXPANDED_KEY) || "[]");
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+  } catch { return []; }
+}
+
+function writeExpanded(keys: string[]): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(EXPANDED_KEY, JSON.stringify(keys));
+}
+
 /** Devuelve la key del grupo activo para una pathname dada, o null si estamos en /home u otra ruta neutra. */
 function activeGroupForPath(pathname: string): string | null {
   if (!pathname || pathname === "/home" || pathname === "/") return null;
@@ -52,9 +68,18 @@ function activeGroupForPath(pathname: string): string | null {
     g => pathname === g || pathname.startsWith(g + "/")
   );
   if (direct) return direct.slice(1);
-  // Match via el href del módulo: si pathname empieza con el href de un módulo, retornar su grupo
-  const mod = ALL_MODULES.find(m => pathname.startsWith(m.href));
-  return mod ? mod.group : null;
+  // Match vía el href del módulo, MÁS ESPECÍFICO (href más largo gana). Evita
+  // que /admin/usuarios o /admin/data-health (grupo "sistema") resalten CXC
+  // ("/admin", grupo "reportes") solo por compartir prefijo.
+  let group: string | null = null;
+  let bestLen = -1;
+  for (const m of ALL_MODULES) {
+    if ((pathname === m.href || pathname.startsWith(m.href + "/")) && m.href.length > bestLen) {
+      group = m.group;
+      bestLen = m.href.length;
+    }
+  }
+  return group;
 }
 
 export default function Sidebar() {
@@ -78,6 +103,27 @@ export default function Sidebar() {
     writeCollapsed(!collapsed);
   }, [collapsed]);
 
+  const activeGroup = activeGroupForPath(pathname);
+
+  // Estado del acordeón: set de grupos abiertos. Init desde localStorage; el
+  // grupo activo siempre arranca abierto. Hooks ANTES de los early returns.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setExpanded(new Set(readExpanded()));
+  }, []);
+  useEffect(() => {
+    if (!activeGroup) return;
+    setExpanded(prev => (prev.has(activeGroup) ? prev : new Set(prev).add(activeGroup)));
+  }, [activeGroup]);
+  const toggleGroup = useCallback((key: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      writeExpanded([...next]);
+      return next;
+    });
+  }, []);
+
   if (pathname === "/" || PUBLIC_PATH_PREFIXES.some(p => pathname.startsWith(p))) return null;
   if (!userRole) return null;
 
@@ -91,7 +137,6 @@ export default function Sidebar() {
 
   const width = collapsed ? "w-16" : "w-56";
   const homeActive = pathname === "/home";
-  const activeGroup = activeGroupForPath(pathname);
 
   return (
     <aside
@@ -156,22 +201,79 @@ export default function Sidebar() {
         </button>
         <div className="h-px bg-gray-100 my-1 mx-5" />
         {visibleGroups.map((g) => {
-          const active = activeGroup === g.key;
           const Icon = g.icon;
+          const groupActive = activeGroup === g.key;
+
+          // Colapsado (solo íconos): sin espacio para acordeón → el ícono navega
+          // a la página intermedia /grupo (comportamiento de siempre).
+          if (collapsed) {
+            return (
+              <button
+                key={g.key}
+                onClick={() => router.push(g.href)}
+                title={g.label}
+                className={`w-full flex items-center justify-center px-0 py-2.5 text-sm transition-all border-l-2 ${
+                  groupActive
+                    ? "bg-gray-50 text-black font-medium border-l-blue-500"
+                    : "text-gray-600 hover:bg-gray-50 border-l-transparent"
+                }`}
+              >
+                <Icon size={16} strokeWidth={1.5} />
+              </button>
+            );
+          }
+
+          // Expandido: el grupo es un toggle de acordeón; los hijos navegan.
+          const isOpen = expanded.has(g.key);
+          const children = getModulesInGroup(g.key, userRole, fgModules);
+          // Hijo activo: match por href MÁS específico (evita doble-resaltado
+          // entre /admin y /admin/usuarios, etc.).
+          let activeChildKey: string | null = null;
+          let bestLen = -1;
+          for (const m of children) {
+            if ((pathname === m.href || pathname.startsWith(m.href + "/")) && m.href.length > bestLen) {
+              activeChildKey = m.key;
+              bestLen = m.href.length;
+            }
+          }
+
           return (
-            <button
-              key={g.key}
-              onClick={() => router.push(g.href)}
-              title={collapsed ? g.label : undefined}
-              className={`w-full flex items-center ${collapsed ? "justify-center px-0" : "gap-3 px-5"} py-2.5 text-sm transition-all border-l-2 ${
-                active
-                  ? "bg-gray-50 text-black font-medium border-l-blue-500"
-                  : "text-gray-600 hover:bg-gray-50 border-l-transparent"
-              }`}
-            >
-              <Icon size={16} strokeWidth={1.5} />
-              {!collapsed && <span className="truncate">{g.label}</span>}
-            </button>
+            <div key={g.key}>
+              <button
+                onClick={() => toggleGroup(g.key)}
+                aria-expanded={isOpen}
+                className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm transition-all border-l-2 border-l-transparent ${
+                  groupActive ? "text-black font-medium" : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                <Icon size={16} strokeWidth={1.5} />
+                <span className="flex-1 truncate text-left">{g.label}</span>
+                <ChevronDown
+                  size={14}
+                  strokeWidth={1.5}
+                  className={`flex-shrink-0 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                />
+              </button>
+              {isOpen && children.map((m) => {
+                const MIcon = m.icon;
+                const mActive = m.key === activeChildKey;
+                return (
+                  <button
+                    key={m.key}
+                    onClick={() => router.push(m.href)}
+                    title={m.label}
+                    className={`w-full flex items-center gap-2.5 pl-12 pr-5 py-2 text-[13px] transition-all border-l-2 ${
+                      mActive
+                        ? "bg-gray-50 text-black font-medium border-l-blue-500"
+                        : "text-gray-500 hover:bg-gray-50 hover:text-gray-700 border-l-transparent"
+                    }`}
+                  >
+                    <MIcon size={15} strokeWidth={1.5} className="flex-shrink-0" />
+                    <span className="truncate text-left">{m.label}</span>
+                  </button>
+                );
+              })}
+            </div>
           );
         })}
       </nav>
