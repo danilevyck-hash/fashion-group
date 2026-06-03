@@ -61,11 +61,6 @@ export interface ConsolidatedClient {
       d271_365: number;
       mas_365: number;
       total: number;
-      /** Último pago (Recibo más reciente) del cliente en ESA empresa.
-       *  null/undefined si no hay recibo en switch_estadocuenta (cobertura
-       *  parcial del API). La UI muestra "sin pago registrado". */
-      ultimoPagoFecha?: string | null;
-      ultimoPagoMonto?: number | null;
     };
   };
   correo: string;
