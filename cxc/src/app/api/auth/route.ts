@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   try {
     const { data: users } = await supabaseServer
       .from("fg_users")
-      .select("id, name, role, password, active, is_owner")
+      .select("id, name, role, password, active, is_owner, associated_company")
       .eq("active", true);
 
     if (users) {
@@ -85,11 +85,18 @@ export async function POST(req: NextRequest) {
             modules = getDefaultModulesForRole(user.role);
           }
 
-          // Per-user config (empresa restrictions, readonly flags)
-          const USER_CONFIG: Record<string, { empresaFilter?: string; guiasReadonly?: boolean }> = {
-            edwin: { empresaFilter: "vistana", guiasReadonly: true },
+          // Per-user config (readonly flags). El filtro de empresa para CXC ya
+          // NO se hardcodea acá: viene de fg_users.associated_company (DB).
+          const USER_CONFIG: Record<string, { guiasReadonly?: boolean }> = {
+            edwin: { guiasReadonly: true },
           };
           const userConfig = USER_CONFIG[user.name.toLowerCase()] || {};
+
+          // Restricción de empresa para CXC (fuente: fg_users.associated_company).
+          // Vendedor con empresa asociada ve solo esa; sin asociada (null) ve todas.
+          // El server (API /api/cxc/aging) la re-aplica de forma autoritativa;
+          // esto solo alimenta el lock visual del selector de empresa.
+          const empresaFilter = user.associated_company || undefined;
 
           const payload = {
             authenticated: true,
@@ -98,7 +105,7 @@ export async function POST(req: NextRequest) {
             userName: user.name,
             modules,
             isOwner: !!user.is_owner,
-            ...(userConfig.empresaFilter && { empresaFilter: userConfig.empresaFilter }),
+            ...(empresaFilter && { empresaFilter }),
             ...(userConfig.guiasReadonly && { guiasReadonly: true }),
           };
 
@@ -128,7 +135,7 @@ export async function POST(req: NextRequest) {
           setSessionCookie(res, {
             role: user.role, userId: user.id, userName: user.name, modules, sessionToken,
             isOwner: !!user.is_owner,
-            ...(userConfig.empresaFilter && { empresaFilter: userConfig.empresaFilter }),
+            ...(empresaFilter && { empresaFilter }),
             ...(userConfig.guiasReadonly && { guiasReadonly: true }),
           });
           await logActivity(user.role, "login", "auth", { userName: user.name }, user.name);

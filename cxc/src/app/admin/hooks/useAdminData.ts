@@ -44,7 +44,14 @@ export default function useAdminData() {
       }
       setUploads(latestUploads);
 
-      const { data: rows } = await supabase.from("switch_estadocuenta_aging").select("*");
+      // Aging vía API server-side: aplica la restricción por empresa asociada
+      // del vendedor de forma autoritativa (no se puede saltar desde el cliente).
+      let rows: CxcRow[] | null = null;
+      const agingRes = await fetch("/api/cxc/aging", { cache: "no-store" });
+      if (agingRes.ok) {
+        const agingJson = await agingRes.json();
+        rows = (agingJson.rows ?? null) as CxcRow[] | null;
+      }
       const { data: overrides } = await supabase.from("cxc_client_overrides").select("*");
       const overrideMap: Record<string, { correo: string; telefono: string; celular: string; contacto: string; resultado_contacto?: string; proximo_seguimiento?: string }> = {};
       if (overrides) {
