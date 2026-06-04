@@ -101,3 +101,5 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION comision_b2b_v3(text, int, int) TO service_role;
+
+NOTIFY pgrst, 'reload schema';
