@@ -27,6 +27,7 @@ import {
   SwitchFacturasData,
   SwitchNotasCreditoData,
   SwitchNotasDebitoData,
+  SwitchPaginacion,
   SwitchSucursalesData,
   SwitchTotalVentasData,
   SwitchVendedoresData,
@@ -374,8 +375,26 @@ export interface SwitchClient {
   /** Reporte "Total de ventas" del mes EN CURSO (tipo=03): totales diarios con
    *  costo completo (incluye B2B). Único endpoint con costo recuperable. */
   getReporteMesActual(): Promise<SwitchTotalVentasData>;
+  /** Reporte de recibos (cobros) del rango. Un row por recibo. Paginación de 50. */
+  listRecibos(params: ListFacturasParams): Promise<SwitchRecibosData>;
   /** Limpia el token cacheado de esta empresa (fuerza re-auth en la próxima llamada). */
   clearTokenCache(): void;
+}
+
+/** Item de /apireporte/recibos (data.recibos[]). Sin id/secuencial de recibo. */
+export interface SwitchReciboReporte {
+  fechaCreacion: string;
+  vendedorId: number | null;
+  vendedor: string | null;
+  clienteId: number | null;
+  clienteCodigo: string | null;
+  clienteNombre: string | null;
+  total: string | number;
+  [key: string]: unknown;
+}
+export interface SwitchRecibosData {
+  recibos: SwitchReciboReporte[];
+  paginacion: SwitchPaginacion;
 }
 
 export function createSwitchClient(empresaKey: string): SwitchClient {
@@ -494,6 +513,22 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         empresaKey,
         cfg,
         `/apireporte/totalventas?tipo=03`,
+        "GET",
+      );
+    },
+
+    async listRecibos(params) {
+      const qs = new URLSearchParams({
+        desde: params.desde,
+        hasta: params.hasta,
+        porPagina: String(params.porPagina),
+        paginaActual: String(params.paginaActual),
+      });
+      if (params.sucursalId !== undefined) qs.set("sucursalId", String(params.sucursalId));
+      return authedCall<SwitchRecibosData>(
+        empresaKey,
+        cfg,
+        `/apireporte/recibos?${qs.toString()}`,
         "GET",
       );
     },
