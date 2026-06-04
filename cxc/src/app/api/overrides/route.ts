@@ -5,14 +5,14 @@ import { supabaseServer } from "@/lib/supabase-server";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]); if (auth instanceof NextResponse) return auth;
+  const auth = requireRole(req, ["admin", "secretaria"]); if (auth instanceof NextResponse) return auth;
   const { data, error } = await supabaseServer.from("cxc_client_overrides").select("*");
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json(data);
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   const body = await req.json();
   const { nombre_normalized, correo, telefono, celular, contacto, resultado_contacto, proximo_seguimiento } = body;

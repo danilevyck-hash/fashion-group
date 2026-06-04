@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase-server";
 import PackingListsClient, { type PLRecord } from "./PackingListsClient";
 
-const PACKING_LISTS_ROLES = ["admin", "secretaria", "bodega", "director", "vendedor"];
+const PACKING_LISTS_ROLES = ["admin", "secretaria", "bodega", "vendedor"];
 
 export const dynamic = "force-dynamic";
 

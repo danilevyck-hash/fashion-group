@@ -4,7 +4,7 @@ import { getSession } from "@/lib/require-auth";
 import { calculateReebokOrderTotal } from "@/lib/reebok-order-total";
 import { fetchReebokCategoryMap } from "@/lib/reebok-category-lookup";
 
-const VIEW_ROLES = ["admin", "secretaria", "vendedor", "director"];
+const VIEW_ROLES = ["admin", "secretaria", "vendedor"];
 const CREATE_ROLES = ["admin", "secretaria", "vendedor", "cliente"];
 
 // Fallback category cuando un product_id no resuelve en `products`

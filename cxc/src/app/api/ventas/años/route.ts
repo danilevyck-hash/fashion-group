@@ -5,7 +5,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "director", "contabilidad"]); if (auth instanceof NextResponse) return auth;
+  const auth = requireRole(req, ["admin", "contabilidad"]); if (auth instanceof NextResponse) return auth;
   // Fetch distinct years efficiently using a simple query with ordering
   const years = new Set<number>();
 

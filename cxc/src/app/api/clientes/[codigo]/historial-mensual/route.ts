@@ -23,7 +23,7 @@ import { ALL_EMPRESA_KEYS, type EmpresaKey } from "@/lib/empresa-mapping";
 
 export const dynamic = "force-dynamic";
 
-const READ_ROLES = ["admin", "director", "contabilidad", "secretaria", "vendedor"];
+const READ_ROLES = ["admin", "contabilidad", "secretaria", "vendedor"];
 
 interface MesAgg {
   anio: number;

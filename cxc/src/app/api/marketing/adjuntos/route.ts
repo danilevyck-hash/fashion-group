@@ -7,7 +7,7 @@ import type { CreateAdjuntoInput } from "@/lib/marketing/types";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   try {
     const body = (await req.json()) as Partial<CreateAdjuntoInput>;

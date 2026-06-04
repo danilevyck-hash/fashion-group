@@ -41,7 +41,7 @@ interface UnifiedRow {
  * en pedidos viejos quedo subvaluado ~6x.
  */
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   const { data, error } = await supabaseServer

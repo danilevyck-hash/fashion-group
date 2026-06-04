@@ -33,7 +33,7 @@ export default function InventarioPage() {
   const router = useRouter();
   const { authChecked, role } = useAuth({
     moduleKey: "marketing",
-    allowedRoles: ["admin", "secretaria", "director"],
+    allowedRoles: ["admin", "secretaria"],
   });
   const { toast } = useToast();
 

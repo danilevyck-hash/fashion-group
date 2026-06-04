@@ -44,7 +44,7 @@ export default function HomePage() {
   // Auto-redirect si user tiene 1 solo modulo (ej: Bodega → Guías)
   useEffect(() => {
     if (!authChecked || !role) return;
-    if (role === "admin" || role === "director") return;
+    if (role === "admin") return;
 
     const visible = getVisibleModules(role, fgModules);
     if (visible.length === 1) {
@@ -90,7 +90,7 @@ export default function HomePage() {
         </div>
 
         {/* Global Search — admin, secretaria, director */}
-        {["admin", "secretaria", "director"].includes(role) && (
+        {["admin", "secretaria"].includes(role) && (
           <SearchBar darkMode={darkMode} />
         )}
 

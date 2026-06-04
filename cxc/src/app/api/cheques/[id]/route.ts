@@ -6,7 +6,7 @@ import { requireRole } from "@/lib/requireRole";
 import { getCompany } from "@/lib/companies";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const CHEQUES_ROLES = ["admin", "secretaria", "director"];
+const CHEQUES_ROLES = ["admin", "secretaria"];
 const VALID_ESTADOS = new Set(["pendiente", "depositado", "rebotado"]);
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {

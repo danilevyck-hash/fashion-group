@@ -174,7 +174,7 @@ async function buildPdf(reclamos: Record<string, unknown>[]) {
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   try {
     const { ids } = await req.json();
@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const auth2 = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth2 = requireRole(req, ["admin", "secretaria"]);
   if (auth2 instanceof NextResponse) return auth2;
   try {
     const empresa = req.nextUrl.searchParams.get("empresa");

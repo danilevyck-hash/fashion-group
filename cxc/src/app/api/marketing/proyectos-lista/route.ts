@@ -26,7 +26,7 @@ export const fetchCache = "force-no-store";
 const ACTIVOS = ["abierto", "enviado"] as const;
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   const url = new URL(req.url);

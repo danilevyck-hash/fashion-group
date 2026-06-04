@@ -25,7 +25,7 @@ import { requireAuth } from "@/lib/require-auth";
 
 export const dynamic = "force-dynamic";
 
-const READ_ROLES = ["admin", "director", "contabilidad", "secretaria", "vendedor"];
+const READ_ROLES = ["admin", "contabilidad", "secretaria", "vendedor"];
 const MAX_FACTURAS = 5;
 
 interface ParBridge {

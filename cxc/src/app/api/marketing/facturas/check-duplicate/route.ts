@@ -13,7 +13,7 @@ export const fetchCache = "force-no-store";
 // Solo facturas vigentes (anulado_en IS NULL). Matching case-insensitive con
 // trim en proveedor. numero_factura exacto.
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   const url = new URL(req.url);

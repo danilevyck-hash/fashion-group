@@ -38,12 +38,12 @@ export interface ClienteDetailData {
   ultima_factura: string | null;
 }
 
-const EDITABLE_ROLES = ["admin", "director", "secretaria"];
+const EDITABLE_ROLES = ["admin", "secretaria"];
 
 export default function ClienteDetail({ initialData }: { initialData: ClienteDetailData }) {
   const { authChecked, role } = useAuth({
     moduleKey: "directorio",
-    allowedRoles: ["admin", "secretaria", "director", "vendedor", "bodega"],
+    allowedRoles: ["admin", "secretaria", "vendedor", "bodega"],
   });
   const canEdit = EDITABLE_ROLES.includes(role);
 

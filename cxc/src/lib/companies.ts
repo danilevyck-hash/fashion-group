@@ -51,8 +51,7 @@ export function getCompanyDisplay(key: string | null | undefined): string {
 export const EMPRESAS = ALL_COMPANIES.map((c) => c.name);
 
 export function getCompaniesForRole(role: string): Company[] {
-  if (role === "director") return ALL_COMPANIES;
-  if (role === "admin") return ADMIN_COMPANIES;
+  if (role === "admin") return ALL_COMPANIES; // admin (incluye al ex-owner/director) ve las 7
   if (role === "vendedor") return ADMIN_COMPANIES;
   return ALL_COMPANIES; // upload sees all for uploading
 }

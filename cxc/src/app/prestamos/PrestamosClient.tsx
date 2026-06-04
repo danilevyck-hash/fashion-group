@@ -391,7 +391,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         </div>
 
         {/* Pending approval banner */}
-        {totalPendientes > 0 && (role === "admin" || role === "director") && (
+        {totalPendientes > 0 && (role === "admin") && (
           <button
             onClick={() => setFilterPendientes(!filterPendientes)}
             className="w-full mb-6 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-left flex items-center justify-between hover:border-amber-400 transition"
@@ -465,7 +465,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         })()}
 
         {/* Movement status filter tabs */}
-        {(role === "admin" || role === "director") && (
+        {(role === "admin") && (
           <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 mb-4 max-w-lg overflow-x-auto">
             {[
               { key: "todos", label: "Todos", count: 0, color: "" },

@@ -21,7 +21,7 @@ import { requireAuth } from "@/lib/require-auth";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_ROLES = ["admin", "director", "secretaria", "vendedor", "bodega"];
+const ALLOWED_ROLES = ["admin", "secretaria", "vendedor", "bodega"];
 
 export async function GET(req: NextRequest) {
   const authError = requireAuth(req, ALLOWED_ROLES);

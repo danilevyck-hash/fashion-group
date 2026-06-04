@@ -2,7 +2,7 @@
  * Configuración de tasas de comisión GLOBALES por vendedor.
  * - GET: lista comision_vendedor_tasa + origen (empresas del maestro vendedores).
  * - PUT: actualiza tasa_venta / activo por vendedor.
- * Solo admin/director (admin pasa siempre por requireRole).
+ * Solo admin (admin pasa siempre por requireRole).
  */
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
@@ -19,7 +19,7 @@ interface ConfigRow {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["director"]);
+  const auth = requireRole(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
   const [tasasRes, vendRes] = await Promise.all([
@@ -63,7 +63,7 @@ interface UpdateInput {
 }
 
 export async function PUT(req: NextRequest) {
-  const auth = requireRole(req, ["director"]);
+  const auth = requireRole(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
   let body: unknown;

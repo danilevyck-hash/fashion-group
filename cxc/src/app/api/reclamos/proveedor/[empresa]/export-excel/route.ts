@@ -6,7 +6,7 @@ import { buildBulkReclamosExcel, fetchReclamosForEmpresa, BulkSelector } from "@
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest, { params }: { params: { empresa: string } }) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   try {

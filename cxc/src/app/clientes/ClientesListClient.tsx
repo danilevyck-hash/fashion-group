@@ -26,7 +26,7 @@ interface Props {
 export default function ClientesListClient({ initialClientes, initialTotal, provincias, pageSize }: Props) {
   const { authChecked } = useAuth({
     moduleKey: "directorio",
-    allowedRoles: ["admin", "secretaria", "director", "vendedor", "bodega"],
+    allowedRoles: ["admin", "secretaria", "vendedor", "bodega"],
   });
 
   const [clientes, setClientes] = useState<Cliente[]>(initialClientes);

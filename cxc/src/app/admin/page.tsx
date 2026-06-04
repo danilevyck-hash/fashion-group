@@ -94,7 +94,7 @@ export default function AdminDashboard() {
 }
 
 function AdminDashboardInner() {
-  const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "director", "vendedor"] });
+  const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "vendedor"] });
   const { clients, uploads, contactLog, loading, loadError, loadData, setContactLog } = useAdminData();
   usePersistedScroll("cxc", !loading && clients.length > 0);
   const searchParams = useSearchParams();

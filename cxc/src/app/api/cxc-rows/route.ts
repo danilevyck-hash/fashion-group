@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/requireRole";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   const name = req.nextUrl.searchParams.get("name");
   if (!name) return NextResponse.json({ error: "Falta el parametro name" }, { status: 400 });

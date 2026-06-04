@@ -38,7 +38,7 @@ function MarketingPage() {
   const searchParams = useSearchParams();
   const { authChecked, role } = useAuth({
     moduleKey: "marketing",
-    allowedRoles: ["admin", "secretaria", "director"],
+    allowedRoles: ["admin", "secretaria"],
   });
 
   const proyectoParam = searchParams.get("proyecto");

@@ -6,7 +6,7 @@ import type { PLIndexRow } from "@/lib/parse-packing-list";
 
 export const dynamic = "force-dynamic";
 
-const READ_ROLES = ["admin", "secretaria", "bodega", "vendedor", "director"];
+const READ_ROLES = ["admin", "secretaria", "bodega", "vendedor"];
 const WRITE_ROLES = ["admin", "secretaria"];
 
 export async function GET(req: NextRequest) {

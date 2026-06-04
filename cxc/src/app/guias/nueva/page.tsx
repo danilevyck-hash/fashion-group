@@ -11,7 +11,7 @@ export default function GuiaNuevaPage() {
   const router = useRouter();
   const { authChecked } = useAuth({
     moduleKey: "guias",
-    allowedRoles: ["admin", "secretaria", "bodega", "director", "vendedor"],
+    allowedRoles: ["admin", "secretaria", "bodega", "vendedor"],
   });
 
   const s = useGuiaFormState({ editingId: null });

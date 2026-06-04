@@ -75,7 +75,7 @@ async function computeDistribucion(priorYear: number): Promise<Record<string, nu
 // ─── GET: Return metas + distribution ────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  const authError = requireAuth(req, ["admin", "director", "contabilidad"]);
+  const authError = requireAuth(req, ["admin", "contabilidad"]);
   if (authError) return authError;
 
   const anio = req.nextUrl.searchParams.get("anio");

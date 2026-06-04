@@ -6,7 +6,7 @@ import { requireRole } from "@/lib/requireRole";
 export const dynamic = "force-dynamic";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const READ_ROLES = ["admin", "secretaria", "bodega", "vendedor", "director"];
+const READ_ROLES = ["admin", "secretaria", "bodega", "vendedor"];
 const DELETE_ROLES = ["admin", "secretaria"];
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {

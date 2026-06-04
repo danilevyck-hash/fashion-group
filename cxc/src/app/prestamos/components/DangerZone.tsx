@@ -115,21 +115,6 @@ export default function DangerZone({
           )}
         </>
       )}
-
-      {/* Force Archive for director (outside danger zone) */}
-      {role === "director" && !isAdmin && activo && saldo > 0 && (
-        <div className="border border-red-200 bg-red-50/50 rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-sm font-medium text-red-700">Forzar Archivado</div>
-              <div className="text-xs text-red-400">Archiva aunque tenga saldo pendiente (salida de empresa)</div>
-            </div>
-            <button onClick={onForceArchive} className="px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition">
-              Forzar Archivado
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

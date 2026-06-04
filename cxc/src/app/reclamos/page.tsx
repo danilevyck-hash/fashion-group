@@ -4,7 +4,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import ReclamosClient from "./ReclamosClient";
 import type { Reclamo, Contacto } from "./components/types";
 
-const RECLAMOS_ROLES = ["admin", "secretaria", "director"];
+const RECLAMOS_ROLES = ["admin", "secretaria"];
 
 export const dynamic = "force-dynamic";
 

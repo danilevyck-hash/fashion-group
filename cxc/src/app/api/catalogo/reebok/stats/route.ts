@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/requireRole";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "vendedor", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria", "vendedor"]);
   if (auth instanceof NextResponse) return auth;
   // Products summary
   const { data: products } = await reebokServer

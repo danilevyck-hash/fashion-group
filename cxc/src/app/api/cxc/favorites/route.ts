@@ -9,7 +9,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   const session = auth as SessionPayload;
   const userId = session.userId || session.userName || "default";
@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
  * If already favorited, removes it. If not, adds it.
  */
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   const session = auth as SessionPayload;
   const userId = session.userId || session.userName || "default";

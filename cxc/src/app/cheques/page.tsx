@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase-server";
 import ChequesClient, { type Cheque } from "./ChequesClient";
 
-const CHEQUES_ROLES = ["admin", "secretaria", "director"];
+const CHEQUES_ROLES = ["admin", "secretaria"];
 
 export const dynamic = "force-dynamic";
 

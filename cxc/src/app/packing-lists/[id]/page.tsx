@@ -33,7 +33,7 @@ interface PLDetail {
 export default function PackingListDetailPage() {
   const { authChecked } = useAuth({
     moduleKey: "packing-lists",
-    allowedRoles: ["admin", "secretaria", "bodega", "director", "vendedor"],
+    allowedRoles: ["admin", "secretaria", "bodega", "vendedor"],
   });
 
   const params = useParams();

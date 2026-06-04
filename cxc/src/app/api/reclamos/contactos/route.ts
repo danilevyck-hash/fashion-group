@@ -14,7 +14,7 @@ function pick(body: Record<string, unknown>, fields: string[]) {
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   const { data, error } = await supabaseServer
     .from("reclamo_contactos")

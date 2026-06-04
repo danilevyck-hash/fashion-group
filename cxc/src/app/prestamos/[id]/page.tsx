@@ -73,7 +73,7 @@ export default function PrestamoDetallePage() {
   if (!authChecked || loading || !empleado) return null;
 
   const isAdmin = role === "admin";
-  const isAdminOrDirector = role === "admin" || role === "director";
+  const isAdminOrDirector = role === "admin";
   const canEdit = role === "admin" || role === "contabilidad";
   const canDelete = role === "admin" || role === "contabilidad";
   const sortedMovs = [...movs].sort((a, b) => b.fecha.localeCompare(a.fecha) || b.created_at.localeCompare(a.created_at));

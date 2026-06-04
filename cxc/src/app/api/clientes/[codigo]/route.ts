@@ -15,8 +15,8 @@ import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 
 export const dynamic = "force-dynamic";
 
-const READ_ROLES = ["admin", "director", "secretaria", "vendedor", "bodega"];
-const WRITE_ROLES = ["admin", "director", "secretaria"];
+const READ_ROLES = ["admin", "secretaria", "vendedor", "bodega"];
+const WRITE_ROLES = ["admin", "secretaria"];
 
 interface EmpresaTotals {
   empresa: string;

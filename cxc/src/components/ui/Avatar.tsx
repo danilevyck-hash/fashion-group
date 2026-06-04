@@ -2,7 +2,6 @@
 
 const ROLE_COLORS: Record<string, string> = {
   admin:        "bg-stone-900 text-white",
-  director:     "bg-slate-700 text-white",
   secretaria:   "bg-amber-600 text-white",
   vendedor:     "bg-teal-700 text-white",
   bodega:       "bg-stone-400 text-white",

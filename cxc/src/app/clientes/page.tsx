@@ -10,7 +10,7 @@ import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase-server";
 import ClientesListClient, { type Cliente } from "./ClientesListClient";
 
-const ALLOWED_ROLES = ["admin", "secretaria", "director", "vendedor", "bodega"];
+const ALLOWED_ROLES = ["admin", "secretaria", "vendedor", "bodega"];
 const PAGE_SIZE = 50;
 
 export const dynamic = "force-dynamic";

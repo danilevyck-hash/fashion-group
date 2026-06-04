@@ -62,7 +62,7 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
 
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role") || "";
-    setCanConfig(r === "admin" || r === "director");
+    setCanConfig(r === "admin");
   }, []);
 
   const load = useCallback(async () => {

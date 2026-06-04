@@ -6,7 +6,7 @@ import { transportistaLabel } from "@/lib/transportistaLabel";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director", "vendedor", "bodega", "contabilidad"]); if (auth instanceof NextResponse) return auth;
+  const auth = requireRole(req, ["admin", "secretaria", "vendedor", "bodega", "contabilidad"]); if (auth instanceof NextResponse) return auth;
   const q = req.nextUrl.searchParams.get("q")?.trim();
   if (!q || q.length < 2) {
     return NextResponse.json({ cxc: [], reclamos: [], guias: [], directorio: [], cheques: [], ventas: [], prestamos: [], caja: [] });
@@ -246,15 +246,6 @@ export async function GET(req: NextRequest) {
       ...allResults,
       ventas: [],
       prestamos: [],
-    });
-  }
-
-  // Director: everything except prestamos and caja
-  if (role === "director") {
-    return NextResponse.json({
-      ...allResults,
-      prestamos: [],
-      caja: [],
     });
   }
 

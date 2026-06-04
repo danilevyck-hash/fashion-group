@@ -10,7 +10,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import ClienteDetail, { type ClienteDetailData } from "./ClienteDetail";
 
-const ALLOWED_ROLES = ["admin", "secretaria", "director", "vendedor", "bodega"];
+const ALLOWED_ROLES = ["admin", "secretaria", "vendedor", "bodega"];
 
 export const dynamic = "force-dynamic";
 

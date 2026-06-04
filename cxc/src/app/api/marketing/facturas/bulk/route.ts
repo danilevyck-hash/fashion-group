@@ -110,7 +110,7 @@ function normalizar(raw: BulkItem): ItemNormalizado | { error: string } {
 // para uno, lo marca en errores y sigue con el resto. Si permitirDuplicado=true,
 // loguea factura_duplicada_permitida en activity_logs.
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   let body: BulkBody;

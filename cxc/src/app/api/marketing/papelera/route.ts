@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const t0 = Date.now();
   console.log(`[papelera] GET ${new Date().toISOString()}`);
 
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) {
     console.log("[papelera] requireRole bloqueó la solicitud");
     return auth;

@@ -57,23 +57,23 @@ export const GROUPS: AppGroup[] = [
 
 export const ALL_MODULES: AppModule[] = [
   // Operaciones
-  { key: "guias",         label: "Guías de Despacho",   subtitle: "Crear y rastrear envíos",                            href: "/guias",          icon: Truck,            roles: ["admin", "secretaria", "bodega", "director", "vendedor"],       group: "operaciones" },
-  { key: "cheques",       label: "Cheques",             subtitle: "Control de cheques por cobrar",                      href: "/cheques",        icon: FileText,         roles: ["admin", "secretaria", "director"],                             group: "operaciones" },
-  { key: "reclamos",      label: "Reclamos",            subtitle: "Reportar y dar seguimiento",                         href: "/reclamos",       icon: AlertTriangle,    roles: ["admin", "secretaria", "director"],                             group: "operaciones" },
-  { key: "packing-lists", label: "Packing Lists",       subtitle: "Índices de bultos por estilo",                       href: "/packing-lists",  icon: ClipboardList,    roles: ["admin", "director", "secretaria", "bodega"],                   group: "operaciones" },
-  { key: "caja",          label: "Caja Menuda",         subtitle: "Registrar gastos del día a día",                     href: "/caja",           icon: Wallet,           roles: ["admin", "director", "secretaria"],                             group: "operaciones" },
+  { key: "guias",         label: "Guías de Despacho",   subtitle: "Crear y rastrear envíos",                            href: "/guias",          icon: Truck,            roles: ["admin", "secretaria", "bodega", "vendedor"],       group: "operaciones" },
+  { key: "cheques",       label: "Cheques",             subtitle: "Control de cheques por cobrar",                      href: "/cheques",        icon: FileText,         roles: ["admin", "secretaria"],                             group: "operaciones" },
+  { key: "reclamos",      label: "Reclamos",            subtitle: "Reportar y dar seguimiento",                         href: "/reclamos",       icon: AlertTriangle,    roles: ["admin", "secretaria"],                             group: "operaciones" },
+  { key: "packing-lists", label: "Packing Lists",       subtitle: "Índices de bultos por estilo",                       href: "/packing-lists",  icon: ClipboardList,    roles: ["admin", "secretaria", "bodega"],                   group: "operaciones" },
+  { key: "caja",          label: "Caja Menuda",         subtitle: "Registrar gastos del día a día",                     href: "/caja",           icon: Wallet,           roles: ["admin", "secretaria"],                             group: "operaciones" },
 
   // Reportes
-  { key: "cxc",           label: "Cuentas por Cobrar",  subtitle: "Quién debe, cuánto y desde cuándo",                  href: "/admin",          icon: CircleDollarSign, roles: ["admin", "director", "vendedor"],                               group: "reportes" },
-  { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",                    href: "/ventas",         icon: TrendingUp,       roles: ["admin", "director"],                                           group: "reportes" },
+  { key: "cxc",           label: "Cuentas por Cobrar",  subtitle: "Quién debe, cuánto y desde cuándo",                  href: "/admin",          icon: CircleDollarSign, roles: ["admin", "vendedor"],                               group: "reportes" },
+  { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",                    href: "/ventas",         icon: TrendingUp,       roles: ["admin"],                                           group: "reportes" },
   { key: "multifashion",  label: "Multifashion",        subtitle: "Retail tienda física · vendedoras y clientes",       href: "/multifashion",   icon: ShoppingBag,      roles: ["admin"],                                                       group: "reportes" },
-  { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)",href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria", "director"],                             group: "reportes" },
-  { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones de empleados",               href: "/prestamos",      icon: HandCoins,        roles: ["admin", "director", "contabilidad"],                           group: "reportes" },
-  { key: "directorio",    label: "Clientes",            subtitle: "Datos fiscales, contacto y CXC actual",              href: "/clientes",       icon: Contact,          roles: ["admin", "director", "secretaria", "vendedor", "bodega"],       group: "reportes" },
+  { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)",href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria"],                             group: "reportes" },
+  { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones de empleados",               href: "/prestamos",      icon: HandCoins,        roles: ["admin", "contabilidad"],                           group: "reportes" },
+  { key: "directorio",    label: "Clientes",            subtitle: "Datos fiscales, contacto y CXC actual",              href: "/clientes",       icon: Contact,          roles: ["admin", "secretaria", "vendedor", "bodega"],       group: "reportes" },
 
   // Catálogos
-  { key: "catalogos",     label: "Catálogos",           subtitle: "Reebok, Joybees",                                    href: "/catalogos/marcas",icon: BookOpen,        roles: ["admin", "director", "secretaria", "vendedor", "bodega"],       group: "catalogos" },
-  { key: "camisetas",     label: "Camisetas Selección", subtitle: "Pedidos y stock",                                    href: "/camisetas",      icon: Shirt,            roles: ["admin", "director", "vendedor"],                               group: "catalogos" },
+  { key: "catalogos",     label: "Catálogos",           subtitle: "Reebok, Joybees",                                    href: "/catalogos/marcas",icon: BookOpen,        roles: ["admin", "secretaria", "vendedor", "bodega"],       group: "catalogos" },
+  { key: "camisetas",     label: "Camisetas Selección", subtitle: "Pedidos y stock",                                    href: "/camisetas",      icon: Shirt,            roles: ["admin", "vendedor"],                               group: "catalogos" },
 
   // Sistema
   // "Actualizar Datos" (upload manual de CSV) OCULTO — deprecado. El sync de
@@ -81,7 +81,7 @@ export const ALL_MODULES: AppModule[] = [
   // (/api/cxc/upload, /api/ventas/upload) siguen VIVOS y accesibles por URL
   // directa (admin/secretaria pasan vía allowedRoles en useAuth, no por esta
   // lista). Solo se esconde la entrada visual para que nadie suba CSV por error.
-  // { key: "upload",        label: "Actualizar Datos",    subtitle: "Subir archivos de Switch Soft",                      href: "/upload",         icon: RefreshCw,        roles: ["admin", "director", "secretaria"],                             group: "sistema" },
+  // { key: "upload",        label: "Actualizar Datos",    subtitle: "Subir archivos de Switch Soft",                      href: "/upload",         icon: RefreshCw,        roles: ["admin", "secretaria"],                             group: "sistema" },
   { key: "usuarios",      label: "Usuarios",            subtitle: "Gestión de usuarios y permisos",                     href: "/admin/usuarios", icon: Users,            roles: ["admin"],                                                       group: "sistema" },
   { key: "data-health",   label: "Data Health",         subtitle: "Monitoreo automático de integridad de datos",        href: "/admin/data-health", icon: ShieldCheck,   roles: ["admin"],                                                       group: "sistema" },
 ];

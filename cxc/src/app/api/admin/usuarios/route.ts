@@ -6,7 +6,6 @@ import { getDefaultModulesForRole, ALL_MODULE_KEYS } from "@/lib/modules";
 // All system roles
 const SYSTEM_ROLES = [
   { key: "admin", label: "Administrador" },
-  { key: "director", label: "Director" },
   { key: "contabilidad", label: "Contabilidad" },
   { key: "secretaria", label: "Secretaria" },
   { key: "bodega", label: "Bodega" },

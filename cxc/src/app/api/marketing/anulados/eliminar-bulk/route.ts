@@ -22,7 +22,7 @@ function esTipo(t: unknown): t is Tipo {
 // Solo admin/director. Valida que cada item esté anulado antes de borrar.
 // Retorna { ok: true, eliminados: N, fallos: [{ tipo, id, error }] }.
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "director"]);
+  const auth = requireRole(req, ["admin"]);
   if (auth instanceof NextResponse) return auth;
 
   let body: BulkBody;

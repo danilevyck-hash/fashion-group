@@ -71,7 +71,7 @@ export default function GuiasPage() {
   const router = useRouter();
   const { authChecked, role } = useAuth({
     moduleKey: "guias",
-    allowedRoles: ["admin", "secretaria", "bodega", "director", "vendedor"],
+    allowedRoles: ["admin", "secretaria", "bodega", "vendedor"],
   });
 
   const s = useGuiasState();

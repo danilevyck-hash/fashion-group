@@ -19,7 +19,7 @@ function esTipoValido(t: unknown): t is TipoRestaurar {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   let body: RestaurarBody;

@@ -6,7 +6,7 @@ import { getEndOfWeek } from "@/lib/cheques-dates";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director", "contabilidad", "bodega", "vendedor"]);
+  const auth = requireRole(req, ["admin", "secretaria", "contabilidad", "bodega", "vendedor"]);
   if (auth instanceof NextResponse) return auth;
 
   const now = new Date();

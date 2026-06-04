@@ -10,7 +10,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "director", "contabilidad"]);
+  const auth = requireRole(req, ["admin", "contabilidad"]);
   if (auth instanceof NextResponse) return auth;
 
   const anioParam = req.nextUrl.searchParams.get("anio");

@@ -9,7 +9,7 @@ import { ALL_MODULES, getVisibleGroups } from "@/lib/modules";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin", secretaria: "Secretaria", bodega: "Bodega",
-  director: "Director", contabilidad: "Contabilidad", vendedor: "Vendedor", cliente: "Cliente",
+ contabilidad: "Contabilidad", vendedor: "Vendedor", cliente: "Cliente",
 };
 
 interface AppHeaderProps {

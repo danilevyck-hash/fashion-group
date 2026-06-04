@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60; // armar+comprimir el ZIP puede tardar
 
 export async function POST(req: NextRequest, { params }: { params: { empresa: string } }) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   try {

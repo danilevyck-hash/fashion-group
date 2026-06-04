@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 
-const ALL_ROLES = ["admin", "secretaria", "director", "contabilidad", "bodega", "vendedor"];
+const ALL_ROLES = ["admin", "secretaria", "contabilidad", "bodega", "vendedor"];
 
 export const dynamic = "force-dynamic";
 

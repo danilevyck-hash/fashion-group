@@ -20,7 +20,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   if (!uuidRegex.test(params.id)) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
@@ -46,7 +46,7 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   if (!uuidRegex.test(params.id)) {
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });

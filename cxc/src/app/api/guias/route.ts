@@ -4,7 +4,7 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { transportistaLabel } from "@/lib/transportistaLabel";
 
-const GUIAS_ROLES = ["admin", "secretaria", "bodega", "director", "vendedor"];
+const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"];
 
 export const dynamic = "force-dynamic";
 

@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/requireRole";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director", "contabilidad", "vendedor"]);
+  const auth = requireRole(req, ["admin", "secretaria", "contabilidad", "vendedor"]);
   if (auth instanceof NextResponse) return auth;
   const nombres = req.nextUrl.searchParams.get("nombres");
   if (!nombres) return NextResponse.json([]);

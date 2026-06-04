@@ -11,7 +11,7 @@ import {
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin", secretaria: "Secretaria", bodega: "Bodega",
-  director: "Director", contabilidad: "Contabilidad", vendedor: "Vendedor", cliente: "Cliente",
+ contabilidad: "Contabilidad", vendedor: "Vendedor", cliente: "Cliente",
 };
 
 const PUBLIC_PATH_PREFIXES = ["/catalogo-publico", "/pedido-reebok", "/pedido-joybees"];

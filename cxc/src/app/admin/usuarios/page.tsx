@@ -23,7 +23,7 @@ interface RolePermission {
 const MODULES = ALL_MODULES.map(m => ({ key: m.key, label: m.label }));
 
 // Roles disponibles para crear/filtrar usuarios. Mismo orden que el select del modal.
-const USER_ROLES = ["admin", "director", "secretaria", "vendedor", "contabilidad", "bodega"] as const;
+const USER_ROLES = ["admin", "secretaria", "vendedor", "contabilidad", "bodega"] as const;
 
 function relativeTime(iso: string): string {
   const t = new Date(iso).getTime();
@@ -474,7 +474,6 @@ export default function UsuariosPage() {
                     className="w-full bg-white border border-stone-200 rounded-md px-3 py-3 text-sm focus:outline-none focus:border-teal-700 transition"
                   >
                     <option value="admin">Admin — acceso total</option>
-                    <option value="director">Director — lectura y reportes</option>
                     <option value="secretaria">Secretaria — operaciones diarias</option>
                     <option value="vendedor">Vendedor — catálogo y CXC</option>
                     <option value="contabilidad">Contabilidad — préstamos y ventas</option>

@@ -100,7 +100,7 @@ export default function ChequesClient({ initialData }: { initialData: ChequesIni
 }
 
 function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
-  const { authChecked, role } = useAuth({ moduleKey: "cheques", allowedRoles: ["admin","secretaria","director"] });
+  const { authChecked, role } = useAuth({ moduleKey: "cheques", allowedRoles: ["admin","secretaria"] });
   const searchParams = useSearchParams();
   const isOnline = useOnline();
   const [cheques, setCheques] = useState<Cheque[]>(initialData.cheques);

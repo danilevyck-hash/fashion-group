@@ -5,7 +5,7 @@ import { requireRole } from "@/lib/requireRole";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   const { data, error } = await supabaseServer.from("switch_estadocuenta_aging").select("id, company_key, nombre_normalized, total, d0_30, d31_60, d61_90, d91_120, d121_180, d181_270, d271_365, mas_365");
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }

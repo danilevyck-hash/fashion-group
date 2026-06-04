@@ -71,7 +71,7 @@ function parsearRespuesta(texto: string): FacturaExtraida | null {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   const apiKey = process.env.ANTHROPIC_API_KEY;

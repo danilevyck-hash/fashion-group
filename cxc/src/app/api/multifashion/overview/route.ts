@@ -15,7 +15,7 @@ import { fetchMultifashion } from "@/lib/ventas/queries";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "director", "contabilidad"]);
+  const auth = requireRole(req, ["admin", "contabilidad"]);
   if (auth instanceof NextResponse) return auth;
 
   const sp = req.nextUrl.searchParams;

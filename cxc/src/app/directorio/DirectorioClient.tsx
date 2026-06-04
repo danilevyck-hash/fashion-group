@@ -32,7 +32,7 @@ export interface DirectorioInitialData {
 
 export default function DirectorioClient({ initialData }: { initialData: DirectorioInitialData }) {
   const router = useRouter();
-  const { authChecked, role } = useAuth({ moduleKey: "directorio", allowedRoles: ["admin","secretaria","director","vendedor"] });
+  const { authChecked, role } = useAuth({ moduleKey: "directorio", allowedRoles: ["admin","secretaria","vendedor"] });
   const [clientes, setClientes] = useState<Cliente[]>(initialData.clientes);
   const [total, setTotal] = useState(initialData.total);
   const [loading, setLoading] = useState(false);

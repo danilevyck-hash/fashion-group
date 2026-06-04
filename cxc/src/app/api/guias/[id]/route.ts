@@ -6,7 +6,7 @@ import { requireRole } from "@/lib/requireRole";
 import { transportistaLabel } from "@/lib/transportistaLabel";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const GUIAS_ROLES = ["admin", "secretaria", "bodega", "director", "vendedor"];
+const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"];
 
 // ── GET ──
 

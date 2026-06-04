@@ -52,7 +52,7 @@ interface GuiasListProps {
   readOnly?: boolean;
 }
 
-const DESPACHO_ROLES = ["admin", "secretaria", "bodega", "director"];
+const DESPACHO_ROLES = ["admin", "secretaria", "bodega"];
 const CREATE_ROLES = ["admin", "secretaria", "bodega"];
 const DELETE_ROLES = ["admin", "secretaria"];
 const REJECT_ROLES = ["admin", "secretaria"];

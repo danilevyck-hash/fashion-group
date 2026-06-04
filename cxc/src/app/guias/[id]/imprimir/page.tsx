@@ -13,7 +13,7 @@ export default function GuiaImprimirPage() {
   const id = params?.id ?? null;
   const { authChecked } = useAuth({
     moduleKey: "guias",
-    allowedRoles: ["admin", "secretaria", "bodega", "director", "vendedor"],
+    allowedRoles: ["admin", "secretaria", "bodega", "vendedor"],
   });
 
   const [guia, setGuia] = useState<Guia | null>(null);

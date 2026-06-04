@@ -18,7 +18,7 @@ import { requireRole } from "@/lib/requireRole";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const auth = await requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = await requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   const { data, error } = await supabaseServer
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 
 // POST — add a new custom motivo
 export async function POST(req: NextRequest) {
-  const auth = await requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = await requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   const body = await req.json();

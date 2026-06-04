@@ -21,7 +21,7 @@ import { ALL_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 
 export const dynamic = "force-dynamic";
 
-const READ_ROLES = ["admin", "director", "contabilidad", "secretaria", "vendedor"];
+const READ_ROLES = ["admin", "contabilidad", "secretaria", "vendedor"];
 
 interface AgingRow {
   d0_30: number | string | null;

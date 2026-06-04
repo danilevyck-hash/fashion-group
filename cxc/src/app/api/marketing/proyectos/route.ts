@@ -21,7 +21,7 @@ interface ProyectoListItem extends MkProyecto {
 
 // GET /api/marketing/proyectos?estado=abierto&marca_id=xxx
 export async function GET(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   try {
@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/marketing/proyectos
 export async function POST(req: NextRequest) {
-  const auth = requireRole(req, ["admin", "secretaria", "director"]);
+  const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
 
   try {

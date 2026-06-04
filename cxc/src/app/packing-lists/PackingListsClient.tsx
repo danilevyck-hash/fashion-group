@@ -106,7 +106,7 @@ function EditableDistBadge({
 export default function PackingListsClient({ initialData }: { initialData: PackingListsInitialData }) {
   const { authChecked, role } = useAuth({
     moduleKey: "packing-lists",
-    allowedRoles: ["admin", "secretaria", "bodega", "director", "vendedor"],
+    allowedRoles: ["admin", "secretaria", "bodega", "vendedor"],
   });
 
   const router = useRouter();

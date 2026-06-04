@@ -3,7 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
 import { getCompany } from "@/lib/companies";
 
-const CHEQUES_ROLES = ["admin", "secretaria", "director"];
+const CHEQUES_ROLES = ["admin", "secretaria"];
 
 export const dynamic = "force-dynamic";
 
