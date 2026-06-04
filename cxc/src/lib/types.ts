@@ -61,6 +61,11 @@ export interface ConsolidatedClient {
       d271_365: number;
       mas_365: number;
       total: number;
+      /** Último pago (recibo más reciente) del cliente en ESA empresa, desde
+       *  switch_ultimo_pago_cliente_v2 (historial completo de recibos, incluye
+       *  retenciones como actividad de pago). null si no hay recibo. */
+      ultimoPagoFecha?: string | null;
+      ultimoPagoMonto?: number | null;
     };
   };
   correo: string;

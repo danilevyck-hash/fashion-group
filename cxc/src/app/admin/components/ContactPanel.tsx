@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
-import { fmt } from "@/lib/format";
+import { fmt, fmtDate } from "@/lib/format";
 
 interface Props {
   client: ConsolidatedClient;
@@ -96,6 +96,7 @@ export default function ContactPanel({
                   <th className="text-right py-1.5 font-medium text-amber-600" title="91-120 días">Vencido reciente</th>
                   <th className="text-right py-1.5 font-medium text-red-500" title="121-180 + 181-270 + 271-365 + +365 días">Vencido crítico</th>
                   <th className="text-right py-1.5 font-medium">Total</th>
+                  <th className="text-right py-1.5 font-medium" title="Recibo más reciente del cliente en esta empresa (incluye retenciones)">Último pago</th>
                 </tr>
               </thead>
               <tbody>
@@ -115,6 +116,9 @@ export default function ContactPanel({
                       <td className="text-right py-1.5 tabular-nums text-amber-600 cursor-help" title="91-120 días">{fmt(watch)}</td>
                       <td className="text-right py-1.5 tabular-nums text-red-600 cursor-help" title={tipOverdue}>{fmt(overdue)}</td>
                       <td className="text-right py-1.5 tabular-nums font-semibold">{fmt(d.total)}</td>
+                      <td className="text-right py-1.5 tabular-nums text-gray-500" title={d.ultimoPagoMonto != null ? `$${fmt(d.ultimoPagoMonto)}` : ""}>
+                        {d.ultimoPagoFecha ? fmtDate(d.ultimoPagoFecha) : <span className="text-gray-300">—</span>}
+                      </td>
                     </tr>
                   );
                 })}

@@ -51,6 +51,22 @@ export default function useAdminData() {
         for (const o of overrides) overrideMap[o.nombre_normalized] = o;
       }
 
+      // Último pago por empresa+cliente, de la vista read-only
+      // switch_ultimo_pago_cliente_v2 (lee de switch_recibos = historial completo,
+      // ya NO de estadocuenta que solo traía recibos abiertos). Join por
+      // (empresa_key, cliente_codigo). Incluye retenciones como actividad de pago.
+      const { data: pagos } = await supabase.from("switch_ultimo_pago_cliente_v2").select("*");
+      const pagoMap = new Map<string, { fecha: string; monto: number }>();
+      if (pagos) {
+        for (const p of pagos) {
+          if (!p.cliente_codigo) continue;
+          pagoMap.set(`${p.empresa_key}|${p.cliente_codigo}`, {
+            fecha: p.ultimo_pago_fecha,
+            monto: Number(p.ultimo_pago_monto) || 0,
+          });
+        }
+      }
+
       const map = new Map<string, ConsolidatedClient>();
       if (rows) {
         for (const r of rows as CxcRow[]) {
@@ -82,12 +98,15 @@ export default function useAdminData() {
             existing.d181_270 += r.d181_270; existing.d271_365 += r.d271_365;
             existing.mas_365 += r.mas_365; existing.total += r.total;
           } else {
+            const pago = pagoMap.get(`${r.company_key}|${r.codigo}`);
             client.companies[r.company_key] = {
               nombre: r.nombre, codigo: r.codigo,
               d0_30: r.d0_30, d31_60: r.d31_60, d61_90: r.d61_90,
               d91_120: r.d91_120, d121_180: r.d121_180,
               d181_270: r.d181_270, d271_365: r.d271_365,
               mas_365: r.mas_365, total: r.total,
+              ultimoPagoFecha: pago?.fecha ?? null,
+              ultimoPagoMonto: pago?.monto ?? null,
             };
           }
 
