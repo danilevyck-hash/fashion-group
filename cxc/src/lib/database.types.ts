@@ -1060,6 +1060,8 @@ export type Database = {
           role: string
           active: boolean | null
           associated_company: string | null
+          // override de módulos por usuario; null = aplica role_permissions
+          modulos_override: string[] | null
           created_at: string | null
           updated_at: string | null
           // from fg-users-is-owner.sql
@@ -1072,6 +1074,7 @@ export type Database = {
           role?: string
           active?: boolean | null
           associated_company?: string | null
+          modulos_override?: string[] | null
           created_at?: string | null
           updated_at?: string | null
           is_owner?: boolean
@@ -1083,6 +1086,7 @@ export type Database = {
           role?: string
           active?: boolean | null
           associated_company?: string | null
+          modulos_override?: string[] | null
           created_at?: string | null
           updated_at?: string | null
           is_owner?: boolean

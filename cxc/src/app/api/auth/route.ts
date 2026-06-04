@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   try {
     const { data: users } = await supabaseServer
       .from("fg_users")
-      .select("id, name, role, password, active, is_owner, associated_company")
+      .select("id, name, role, password, active, is_owner, associated_company, modulos_override")
       .eq("active", true);
 
     if (users) {
@@ -71,18 +71,26 @@ export async function POST(req: NextRequest) {
           // role_permissions y bloqueaban módulos legítimos. /api/admin/users
           // ya documenta esto. Si role_permissions no responde, fallback a
           // defaults hardcoded.)
+          // Prioridad de módulos del usuario:
+          //   1) modulos_override (per-usuario) si está definido y no vacío
+          //   2) role_permissions del rol
+          //   3) defaults hardcoded por rol (fallback si la tabla no responde)
           let modules: string[] = [];
-          try {
-            const { data: rolePerm } = await supabaseServer
-              .from("role_permissions")
-              .select("modulos")
-              .eq("role", user.role)
-              .single();
-            if (rolePerm?.modulos) modules = rolePerm.modulos;
-          } catch { /* use defaults below if table missing */ }
+          if (Array.isArray(user.modulos_override) && user.modulos_override.length > 0) {
+            modules = user.modulos_override;
+          } else {
+            try {
+              const { data: rolePerm } = await supabaseServer
+                .from("role_permissions")
+                .select("modulos")
+                .eq("role", user.role)
+                .single();
+              if (rolePerm?.modulos) modules = rolePerm.modulos;
+            } catch { /* use defaults below if table missing */ }
 
-          if (modules.length === 0) {
-            modules = getDefaultModulesForRole(user.role);
+            if (modules.length === 0) {
+              modules = getDefaultModulesForRole(user.role);
+            }
           }
 
           // Per-user config (readonly flags). El filtro de empresa para CXC ya
