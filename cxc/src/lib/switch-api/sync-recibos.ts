@@ -80,6 +80,24 @@ async function finishLog(logId: string | null, status: "success" | "error", n: n
     .eq("id", logId);
 }
 
+/** cliente_switch_id → vendedor dueño de cartera (maestro /apicliente/lista). */
+async function buildCarteraMap(empresaKey: EmpresaKey): Promise<Map<number, string>> {
+  const client = createSwitchClient(empresaKey);
+  const map = new Map<number, string>();
+  let pagina = 1;
+  for (;;) {
+    const data = await client.listClientes({ porPagina: 500, paginaActual: pagina });
+    const clientes = data.clientes ?? [];
+    for (const c of clientes) {
+      if (c.vendedor && String(c.vendedor).trim()) map.set(c.id, String(c.vendedor).trim());
+    }
+    const total = data.paginacion?.total ?? clientes.length;
+    if (map.size >= total || clientes.length === 0) break;
+    pagina += 1;
+  }
+  return map;
+}
+
 /** cliente_switch_id → facturas [{fecha, impuesto}] para la heurística de retención. */
 type ImpuestoMap = Map<number, { fecha: string; imp: number }[]>;
 
@@ -121,7 +139,7 @@ function esRetencion(cliId: number | null, fecha: string | null, total: number, 
 }
 
 /** Trae todos los recibos de un mes (paginación de 50 server-side). */
-async function fetchRecibosMes(empresaKey: EmpresaKey, year: number, month: number, impuestoMap: ImpuestoMap) {
+async function fetchRecibosMes(empresaKey: EmpresaKey, year: number, month: number, impuestoMap: ImpuestoMap, carteraMap: Map<number, string>) {
   const client = createSwitchClient(empresaKey);
   const { inicio } = monthBounds(year, month);
   const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
@@ -131,7 +149,7 @@ async function fetchRecibosMes(empresaKey: EmpresaKey, year: number, month: numb
   for (;;) {
     const data = await client.listRecibos({ desde: inicio, hasta, porPagina: 50, paginaActual: pagina });
     const recibos = data.recibos ?? [];
-    for (const r of recibos) rows.push(mapRow(empresaKey, r, impuestoMap));
+    for (const r of recibos) rows.push(mapRow(empresaKey, r, impuestoMap, carteraMap));
     const total = data.paginacion?.total ?? recibos.length;
     if (rows.length >= total || recibos.length === 0) break;
     pagina += 1;
@@ -139,11 +157,12 @@ async function fetchRecibosMes(empresaKey: EmpresaKey, year: number, month: numb
   return rows;
 }
 
-function mapRow(empresaKey: EmpresaKey, r: Record<string, unknown>, impuestoMap: ImpuestoMap) {
+function mapRow(empresaKey: EmpresaKey, r: Record<string, unknown>, impuestoMap: ImpuestoMap, carteraMap: Map<number, string>) {
   const fc = String(r.fechaCreacion ?? "");
   const fecha = fc.match(/^\d{4}-\d{2}-\d{2}/)?.[0] ?? null; // "YYYY-MM-DD HH:mm:ss" → fecha
   const cliId = typeof r.clienteId === "number" ? r.clienteId : null;
   const total = num(r.total);
+  const vendedorRegistro = (r.vendedor as string) ?? null;
   return {
     empresa_key: empresaKey,
     fecha,
@@ -151,7 +170,9 @@ function mapRow(empresaKey: EmpresaKey, r: Record<string, unknown>, impuestoMap:
     cliente_switch_id: cliId,
     cliente_codigo: (r.clienteCodigo as string) ?? null,
     cliente_nombre: (r.clienteNombre as string) ?? null,
-    vendedor_registro: (r.vendedor as string) ?? null,
+    vendedor_registro: vendedorRegistro,
+    // atribución por cartera (dueño del cliente); fallback al vendedor del recibo
+    vendedor_cartera: (cliId != null ? carteraMap.get(cliId) : undefined) ?? vendedorRegistro,
     total,
     es_retencion: esRetencion(cliId, fecha, total, impuestoMap),
     synced_at: new Date().toISOString(),
@@ -173,10 +194,11 @@ export async function syncEmpresaRecibos(
     const winFrom = new Date(Date.UTC(f0.year, f0.month - 1, 1) - RET_WINDOW_MS).toISOString().slice(0, 10);
     const winTo = monthBounds(lN.year, lN.month).finExcl;
     const impuestoMap = await loadImpuestoMap(empresaKey, winFrom, winTo);
+    const carteraMap = await buildCarteraMap(empresaKey);
 
     let totalRecibos = 0;
     for (const { year, month } of meses) {
-      const rows = await fetchRecibosMes(empresaKey, year, month, impuestoMap);
+      const rows = await fetchRecibosMes(empresaKey, year, month, impuestoMap, carteraMap);
       const { inicio, finExcl } = monthBounds(year, month);
       // delete+insert por mes (el endpoint no da id de recibo → reemplazo limpio)
       const { error: delErr } = await supabaseServer
