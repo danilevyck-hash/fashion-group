@@ -30,8 +30,10 @@ interface ComisionVendedor {
   base: number;
   tasa: number;
   comision: number;
-  facturas_comisionables: number;
-  notas_credito: number;
+  base_cobro: number;
+  tasa_cobro: number;
+  comision_cobro: number;
+  comision_total: number;
 }
 interface ComisionResp {
   empresa_key: string;
@@ -87,8 +89,11 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
   }, [load]);
 
   const vendedores = data?.vendedores ?? [];
-  const totalComision = vendedores.reduce((a, v) => a + (v.comision ?? 0), 0);
   const totalBase = vendedores.reduce((a, v) => a + (v.base ?? 0), 0);
+  const totalComision = vendedores.reduce((a, v) => a + (v.comision ?? 0), 0);
+  const totalCobroBase = vendedores.reduce((a, v) => a + (v.base_cobro ?? 0), 0);
+  const totalComisionCobro = vendedores.reduce((a, v) => a + (v.comision_cobro ?? 0), 0);
+  const totalGeneral = vendedores.reduce((a, v) => a + (v.comision_total ?? 0), 0);
 
   return (
     <div className="space-y-4">
@@ -137,9 +142,10 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
       <div className="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
         <Info className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
         <p>
-          Comisiona: facturas con utilidad &gt;20% menos notas de crédito. Excluye
-          intercompañía y clientes internos. Se asigna al vendedor dueño del cliente.
-          Fuente: reporte de utilidad de Switch.
+          <b>Venta:</b> facturas con utilidad &gt;20% menos notas de crédito.{" "}
+          <b>Cobro:</b> recibos del mes, excluyendo retenciones de ITBMS. Ambas
+          excluyen intercompañía y clientes internos, y se asignan al vendedor
+          dueño del cliente. Fuente: reportes de Switch.
         </p>
       </div>
 
@@ -158,9 +164,11 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wide text-gray-500">
                 <th className="px-4 py-2 font-medium">Vendedor</th>
-                <th className="px-4 py-2 text-right font-medium">Ventas (base)</th>
-                <th className="px-4 py-2 text-right font-medium">% aplicado</th>
-                <th className="px-4 py-2 text-right font-medium">Comisión</th>
+                <th className="px-4 py-2 text-right font-medium">Ventas</th>
+                <th className="px-4 py-2 text-right font-medium">Com. venta</th>
+                <th className="px-4 py-2 text-right font-medium">Cobros</th>
+                <th className="px-4 py-2 text-right font-medium">Com. cobro</th>
+                <th className="px-4 py-2 text-right font-medium">Com. total</th>
               </tr>
             </thead>
             <tbody>
@@ -168,12 +176,10 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
                 <tr key={v.vendedor} className="border-b border-gray-100 last:border-0">
                   <td className="px-4 py-2.5 text-gray-900">{v.vendedor}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">{fmtMoney(v.base)}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">
-                    {`${(v.tasa * 100).toFixed(2)}%`}
-                  </td>
-                  <td className="px-4 py-2.5 text-right font-medium tabular-nums text-gray-900">
-                    {fmtMoney(v.comision)}
-                  </td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{fmtMoney(v.comision)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">{fmtMoney(v.base_cobro)}</td>
+                  <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{fmtMoney(v.comision_cobro)}</td>
+                  <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-gray-900">{fmtMoney(v.comision_total)}</td>
                 </tr>
               ))}
             </tbody>
@@ -181,8 +187,10 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
               <tr className="border-t border-gray-200 bg-gray-50 font-medium text-gray-900">
                 <td className="px-4 py-2.5">Total</td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{fmtMoney(totalBase)}</td>
-                <td className="px-4 py-2.5"></td>
                 <td className="px-4 py-2.5 text-right tabular-nums">{fmtMoney(totalComision)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{fmtMoney(totalCobroBase)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{fmtMoney(totalComisionCobro)}</td>
+                <td className="px-4 py-2.5 text-right tabular-nums">{fmtMoney(totalGeneral)}</td>
               </tr>
             </tfoot>
           </table>
