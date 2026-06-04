@@ -87,26 +87,59 @@ function toCacheRow(empresaKey: EmpresaKey, r: UtilidadRow, cartera: Map<number,
   };
 }
 
-// ─── Auto-seed de tasas: vendedores nuevos → 1% (excepto DEFAULT) ────────────
+// ─── Maestro de vendedores: Switch /apivendedor/lista → tabla vendedores ──────
+// Universo del tab Comisiones v2 (mostrar a todos aunque base=$0). Usa el API
+// JSON (mismo token que listClientes), independiente del login web single-session.
+// Devuelve los nombres sincronizados para sembrar sus tasas globales.
+async function syncVendedores(empresaKey: EmpresaKey): Promise<string[]> {
+  const client = createSwitchClient(empresaKey);
+  const rows: { empresa_key: string; switch_id: number; nombre: string; codigo: string | null; activo: boolean; updated_at: string }[] = [];
+  const now = new Date().toISOString();
+  let pagina = 1;
+  for (;;) {
+    const data = await client.listVendedores({ porPagina: 500, paginaActual: pagina });
+    const vendedores = data.vendedores ?? [];
+    for (const v of vendedores) {
+      const nombre = String(v.nombre ?? "").trim();
+      if (!nombre) continue;
+      rows.push({
+        empresa_key: empresaKey,
+        switch_id: v.id,
+        nombre,
+        codigo: v.codigo ?? null,
+        activo: true,
+        updated_at: now,
+      });
+    }
+    const total = data.paginacion?.total ?? vendedores.length;
+    if (rows.length >= total || vendedores.length === 0) break;
+    pagina += 1;
+  }
+  if (rows.length > 0) {
+    const { error } = await supabaseServer
+      .from("vendedores")
+      .upsert(rows, { onConflict: "empresa_key,nombre" });
+    if (error) console.error(`[sync-utilidad ${empresaKey}] upsert vendedores falló: ${error.message}`);
+  }
+  return rows.map((r) => r.nombre);
+}
 
-async function autoSeedTasas(
-  empresaKey: EmpresaKey,
-  vendedores: Set<string>,
-): Promise<number> {
+// ─── Auto-seed de tasas GLOBALES: vendedores nuevos → 0.50% (excepto DEFAULT) ──
+// Tabla global comision_vendedor_tasa (no por empresa). ignoreDuplicates: no pisa
+// tasas ya configuradas (ej. Reinaldo 1%, o lo que edite Daniel en el modal).
+async function seedTasasGlobal(vendedores: Set<string>): Promise<number> {
   const rows = [...vendedores]
     .filter((v) => v && v.toUpperCase() !== "DEFAULT")
     .map((v) => ({
-      empresa_key: empresaKey,
       vendedor_nombre: v,
-      tasa_venta: 0.01,
-      tasa_cobro: 0.01,
+      tasa_venta: 0.005,
+      tasa_cobro: 0,
     }));
   if (rows.length === 0) return 0;
-  // ignoreDuplicates: no pisa tasas ya configuradas (ej. Edwin 0.5%).
   const { error } = await supabaseServer
-    .from("comision_tasas")
-    .upsert(rows, { onConflict: "empresa_key,vendedor_nombre", ignoreDuplicates: true });
-  if (error) console.error(`[sync-utilidad ${empresaKey}] auto-seed tasas falló: ${error.message}`);
+    .from("comision_vendedor_tasa")
+    .upsert(rows, { onConflict: "vendedor_nombre", ignoreDuplicates: true });
+  if (error) console.error(`[sync-utilidad] seed tasas global falló: ${error.message}`);
   return rows.length;
 }
 
@@ -179,10 +212,13 @@ export async function syncEmpresaUtilidad(
   const logId = await createLog(empresaKey, meses, triggeredBy);
   try {
     const cartera = await buildCarteraMap(empresaKey);
+    // Maestro de vendedores (API JSON, no usa el login web). Alimenta el universo
+    // del tab Comisiones v2 + siembra tasas globales de los nombres del maestro.
+    const vendedoresMaestro = await syncVendedores(empresaKey);
     const session = await loginSwitchWeb(empresaKey);
 
     const cacheRows: ReturnType<typeof toCacheRow>[] = [];
-    const vendedores = new Set<string>();
+    const vendedores = new Set<string>(vendedoresMaestro);
     for (const { year, month } of meses) {
       const rows = await fetchUtilidadMes(session, year, month);
       for (const r of rows) {
@@ -193,7 +229,8 @@ export async function syncEmpresaUtilidad(
     }
 
     await upsertCacheRows(cacheRows);
-    const vendedoresNuevos = await autoSeedTasas(empresaKey, vendedores);
+    // Siembra tasas globales (0.5%) para nombres del maestro + atribuidos por cartera.
+    const vendedoresNuevos = await seedTasasGlobal(vendedores);
 
     await finishLog(logId, "success", cacheRows.length);
     return {
