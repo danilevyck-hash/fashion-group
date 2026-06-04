@@ -4,7 +4,6 @@ import { useState } from "react";
 
 interface Props {
   isAdmin: boolean;
-  isAdminOrDirector: boolean;
   activo: boolean;
   saldo: number;
   hasMovs: boolean;
@@ -16,7 +15,6 @@ interface Props {
 
 export default function DangerZone({
   isAdmin,
-  isAdminOrDirector,
   activo,
   saldo,
   hasMovs,
@@ -95,7 +93,7 @@ export default function DangerZone({
                 </div>
 
                 {/* Force Archive (admin) */}
-                {isAdminOrDirector && activo && saldo > 0 && (
+                {isAdmin && activo && saldo > 0 && (
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="text-sm font-medium text-red-700">Forzar Archivado</div>

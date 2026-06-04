@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import FGLogo from "@/components/FGLogo";
 import { Home, ChevronRight } from "lucide-react";
 import {
-  ALL_MODULES, getVisibleGroups, getModulesInGroup,
+  ALL_MODULES, GROUPS, getVisibleGroups, getModulesInGroup,
   type AppGroup, type AppModule,
 } from "@/lib/modules";
 
@@ -65,14 +65,14 @@ function writeOpenGroup(key: string | null): void {
 /** Devuelve la key del grupo activo para una pathname dada, o null si estamos en /home u otra ruta neutra. */
 function activeGroupForPath(pathname: string): string | null {
   if (!pathname || pathname === "/home" || pathname === "/") return null;
-  // Match directo a la página de grupo
-  const direct = ["/operaciones", "/reportes", "/catalogos", "/sistema"].find(
-    g => pathname === g || pathname.startsWith(g + "/")
+  // Match directo a la página de grupo (ruta dinámica /g/[grupo]).
+  const direct = GROUPS.find(
+    g => pathname === g.href || pathname.startsWith(g.href + "/")
   );
-  if (direct) return direct.slice(1);
+  if (direct) return direct.key;
   // Match vía el href del módulo, MÁS ESPECÍFICO (href más largo gana). Evita
   // que /admin/usuarios o /admin/data-health (grupo "sistema") resalten CXC
-  // ("/admin", grupo "reportes") solo por compartir prefijo.
+  // ("/admin", grupo "ventas") solo por compartir prefijo.
   let group: string | null = null;
   let bestLen = -1;
   for (const m of ALL_MODULES) {

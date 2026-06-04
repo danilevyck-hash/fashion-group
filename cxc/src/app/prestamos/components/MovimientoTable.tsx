@@ -8,7 +8,6 @@ interface Props {
   sortedMovs: Movimiento[];
   saldoByMov: Map<string, number>;
   isAdmin: boolean;
-  isAdminOrDirector: boolean;
   canEdit: boolean;
   canDelete: boolean;
   onApprove: (movId: string) => void;
@@ -22,7 +21,7 @@ function isCargo(concepto: string) {
   return PRESTAMO_CONCEPTOS.includes(concepto);
 }
 
-export default function MovimientoTable({ sortedMovs, saldoByMov, isAdmin, isAdminOrDirector, canEdit, canDelete, onApprove, onEdit, onDelete }: Props) {
+export default function MovimientoTable({ sortedMovs, saldoByMov, isAdmin, canEdit, canDelete, onApprove, onEdit, onDelete }: Props) {
   const total = sortedMovs.length;
   const hasMixedEstados = sortedMovs.some(m => m.estado !== "aprobado");
 

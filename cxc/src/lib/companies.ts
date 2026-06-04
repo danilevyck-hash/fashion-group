@@ -17,14 +17,14 @@ export const ADMIN_COMPANIES: Company[] = [
   { key: "active_wear", name: "Active Wear", brand: "Reebok Apparel" },
 ];
 
-// Director's extra 2 companies
-export const DIRECTOR_EXTRA_COMPANIES: Company[] = [
+// 2 empresas adicionales (solo admin las ve)
+export const EXTRA_COMPANIES: Company[] = [
   { key: "confecciones_boston", name: "Confecciones Boston", brand: "Confecciones Boston" },
   { key: "joystep", name: "Joystep", brand: "Joybees" },
 ];
 
-// All 7 companies (for upload and director view)
-export const ALL_COMPANIES: Company[] = [...ADMIN_COMPANIES, ...DIRECTOR_EXTRA_COMPANIES];
+// Las 7 empresas del grupo
+export const ALL_COMPANIES: Company[] = [...ADMIN_COMPANIES, ...EXTRA_COMPANIES];
 
 // Legacy export for backward compat
 export const COMPANIES = ALL_COMPANIES;
@@ -51,7 +51,7 @@ export function getCompanyDisplay(key: string | null | undefined): string {
 export const EMPRESAS = ALL_COMPANIES.map((c) => c.name);
 
 export function getCompaniesForRole(role: string): Company[] {
-  if (role === "admin") return ALL_COMPANIES; // admin (incluye al ex-owner/director) ve las 7
+  if (role === "admin") return ALL_COMPANIES; // admin ve las 7
   if (role === "vendedor") return ADMIN_COMPANIES;
-  return ALL_COMPANIES; // upload sees all for uploading
+  return ALL_COMPANIES;
 }
