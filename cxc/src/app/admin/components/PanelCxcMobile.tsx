@@ -57,8 +57,11 @@ export default function PanelCxcMobile({
   onExportarCsv,
   empresaRestriction,
 }: PanelCxcMobileProps) {
-  // Totales sobre el universo de empresas accesibles (roleClients), no sobre
-  // filtered — los chips muestran "qué hay en cada bucket" siempre.
+  // Totales del resumen de buckets. roleClients aquí ya viene filtrado por
+  // empresa (kpiClients en page.tsx): con "Todas" es el universo accesible,
+  // con una empresa seleccionada son sólo los buckets de esa empresa. No usa
+  // filtered porque los chips muestran "qué hay en cada bucket" sin el filtro
+  // de riesgo/búsqueda aplicado.
   const totals = useMemo(() => {
     let total = 0, current = 0, watch = 0, overdue = 0;
     let cCount = 0, wCount = 0, oCount = 0;

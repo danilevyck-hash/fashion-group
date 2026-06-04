@@ -283,6 +283,26 @@ function AdminDashboardInner() {
       .filter((c): c is ConsolidatedClient => c !== null && c.total !== 0);
   }, [clients, cxcCompanies]);
 
+  // ── Clients para el resumen de buckets (KPIs) ──
+  // Reacciona al filtro de empresa: con "Todas" usa el total global (roleClients);
+  // con una empresa seleccionada recalcula los buckets sólo para esa empresa.
+  const kpiClients = useMemo(() => {
+    if (companyFilter === "all") return roleClients;
+    return roleClients
+      .filter((c) => c.companies[companyFilter])
+      .map((c) => {
+        const d = c.companies[companyFilter];
+        return {
+          ...c,
+          current: d.d0_30 + d.d31_60 + d.d61_90,
+          watch: d.d91_120,
+          overdue: d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365,
+          total: d.total,
+        };
+      })
+      .filter((c) => c.total !== 0);
+  }, [roleClients, companyFilter]);
+
   useEffect(() => {
     if (!authChecked) return;
     loadData();
@@ -427,7 +447,7 @@ function AdminDashboardInner() {
 
       <PanelCxcMobile
         filtered={filtered}
-        roleClients={roleClients}
+        roleClients={kpiClients}
         cxcCompanies={cxcCompanies}
         search={search}
         setSearch={setSearch}
@@ -552,12 +572,12 @@ function AdminDashboardInner() {
       </div>
 
       {/* Clickable KPI cards = risk filter */}
-      <KpiCards roleClients={roleClients} riskFilter={riskFilter} onRiskFilterChange={setRiskFilter} />
+      <KpiCards roleClients={kpiClients} riskFilter={riskFilter} onRiskFilterChange={setRiskFilter} />
 
       <ClientTable
         filtered={filtered}
         roleCompanies={cxcCompanies}
-        roleClients={roleClients}
+        roleClients={kpiClients}
         companyFilter={companyFilter}
         setCompanyFilter={setCompanyFilter}
         riskFilter={riskFilter}
