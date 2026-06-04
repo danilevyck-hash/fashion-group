@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
 
-  const { data, error } = await supabaseServer.rpc("comision_b2b", {
+  const { data, error } = await supabaseServer.rpc("comision_b2b_v2", {
     p_empresa_key: empresa,
     p_year: year,
     p_mes: mes,
