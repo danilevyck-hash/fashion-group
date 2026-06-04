@@ -3,16 +3,21 @@
 // Sección "Bonos del mes" del subtab Vendedoras (/multifashion).
 //
 // Dos bonos sobre el MES CERRADO (año contra año):
-//   1. Bono gerente — ventas totales de la tienda vs el mismo mes del año
+//   1. Bono gerente — ventas totales retail de la tienda vs el mismo mes del año
 //      anterior. ≥5% y <10% → $50 · ≥10% → $100.
 //   2. Bono vendedoras — $50 a la de mayor venta del mes (empate → todas).
 //
-// Server-side: RPC multifashion_bonos_v1 (migration 20260604130000). Es YoY e
-// independiente de multifashion_vendedoras_v3 (que es MoM).
+// El mes lo fija el selector ÚNICO del header de Multifashion (prop `mes`); esta
+// sección no tiene selector propio. Si el mes no es evaluable (en curso o data
+// incompleta) NO se muestran cifras: solo el aviso "pendiente" + link al último
+// mes evaluable.
+//
+// Server-side: RPC multifashion_bonos_v2 (migration 20260604160000). Lee de la
+// MISMA fuente y blend que Overview (_multifashion_sf_vw / switch_facturas).
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Trophy, ChevronLeft, ChevronRight, Award } from "lucide-react";
+import { Trophy, Award, Clock } from "lucide-react";
 import type { BonosMultifashion, BonoVendedora } from "@/components/ventas/types";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
@@ -32,27 +37,22 @@ const TONE_LIGHT: Record<DeltaTone, string> = {
 interface BonosSectionProps {
   /** Año del selector global del shell de Multifashion. */
   selectedYear: number;
+  /** Mes (1-12) del selector único del header. */
+  mes: number;
+  /** Cambia el mes del selector único (para el link "ver último mes evaluable"). */
+  onMesChange: (mes: number) => void;
 }
 
-export function BonosSection({ selectedYear }: BonosSectionProps) {
-  // Mes evaluado. null → el RPC elige el último mes elegible del año.
-  const [mes, setMes] = useState<number | null>(null);
+export function BonosSection({ selectedYear, mes, onMesChange }: BonosSectionProps) {
   const [resp, setResp] = useState<BonosMultifashion | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const lastKey = useRef<string>("");
-
-  // Al cambiar de año, re-defaultear el mes (lo resuelve el RPC).
-  useEffect(() => {
-    setMes(null);
-  }, [selectedYear]);
 
   useEffect(() => {
     const ctrl = new AbortController();
     setLoading(true);
     setError(null);
-    const params = new URLSearchParams({ year: String(selectedYear) });
-    if (mes != null) params.set("mes", String(mes));
+    const params = new URLSearchParams({ year: String(selectedYear), mes: String(mes) });
     fetch(`/api/multifashion/bonos?${params.toString()}`, {
       cache: "no-store",
       signal: ctrl.signal,
@@ -64,11 +64,7 @@ export function BonosSection({ selectedYear }: BonosSectionProps) {
         }
         return r.json() as Promise<BonosMultifashion>;
       })
-      .then(json => {
-        setResp(json);
-        // Sincroniza el selector al mes que el server eligió por default.
-        if (mes == null && !json.sin_data) setMes(json.mes_evaluado.mes);
-      })
+      .then(json => setResp(json))
       .catch(err => {
         if (err?.name === "AbortError") return;
         console.error("[multifashion/bonos] fetch failed", err);
@@ -78,49 +74,12 @@ export function BonosSection({ selectedYear }: BonosSectionProps) {
     return () => ctrl.abort();
   }, [selectedYear, mes]);
 
-  const selMes = mes ?? resp?.mes_evaluado.mes ?? null;
-
-  const goPrev = () => { if (selMes && selMes > 1) setMes(selMes - 1); };
-  const goNext = () => { if (selMes && selMes < 12) setMes(selMes + 1); };
-
   return (
     <section className="space-y-3">
-      {/* Encabezado + selector de mes */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="flex items-center gap-2 font-display text-base font-semibold text-stone-950">
-          <Trophy className="h-4 w-4 text-amber-500" strokeWidth={2} />
-          Bonos del mes
-        </h3>
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={goPrev}
-            disabled={!selMes || selMes <= 1}
-            aria-label="Mes anterior"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 disabled:opacity-40"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <select
-            value={selMes ?? ""}
-            onChange={e => setMes(Number(e.target.value))}
-            className="h-9 rounded-md border border-stone-200 bg-white px-3 text-sm font-medium text-stone-800"
-          >
-            {MES_FULL.map((m, i) => (
-              <option key={m} value={i + 1}>{m} {selectedYear}</option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={goNext}
-            disabled={!selMes || selMes >= 12}
-            aria-label="Mes siguiente"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 disabled:opacity-40"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
+      <h3 className="flex items-center gap-2 font-display text-base font-semibold text-stone-950">
+        <Trophy className="h-4 w-4 text-amber-500" strokeWidth={2} />
+        Bonos del mes
+      </h3>
 
       {error && (
         <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
@@ -136,8 +95,14 @@ export function BonosSection({ selectedYear }: BonosSectionProps) {
 
       {resp && !resp.sin_data && (
         <div className={cn("space-y-4", loading && "opacity-60 pointer-events-none transition-opacity")}>
-          <GerenteCard resp={resp} onJumpToElegible={() => setMes(resp.ultimo_mes_elegible.mes)} />
-          <VendedorasRanking resp={resp} />
+          {resp.es_elegible ? (
+            <>
+              <GerenteCard resp={resp} />
+              <VendedorasRanking resp={resp} />
+            </>
+          ) : (
+            <PendienteCard resp={resp} onMesChange={onMesChange} selectedYear={selectedYear} />
+          )}
         </div>
       )}
     </section>
@@ -145,19 +110,54 @@ export function BonosSection({ selectedYear }: BonosSectionProps) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Card del bono de la gerente
+// Mes no evaluable — SIN cifras. Solo aviso + link al último mes evaluable.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function GerenteCard({
-  resp, onJumpToElegible,
+function PendienteCard({
+  resp, onMesChange, selectedYear,
 }: {
   resp: BonosMultifashion;
-  onJumpToElegible: () => void;
+  onMesChange: (mes: number) => void;
+  selectedYear: number;
 }) {
+  const mesLabel = `${MES_FULL[resp.mes_evaluado.mes - 1]} ${resp.mes_evaluado.year}`;
+  const ult = resp.ultimo_mes_elegible;
+  const ultLabel = `${MES_FULL[ult.mes - 1]} ${ult.year}`;
+  const distinto = ult.mes !== resp.mes_evaluado.mes || ult.year !== resp.mes_evaluado.year;
+  // El link solo navega el mes (el año lo fija el selector global).
+  const puedeNavegar = distinto && ult.year === selectedYear;
+
+  return (
+    <Card className="flex flex-col items-center gap-2 border-dashed border-stone-300 bg-stone-50/60 p-6 text-center">
+      <Clock className="h-7 w-7 text-stone-400" strokeWidth={1.5} />
+      <p className="text-sm font-medium text-stone-700">
+        Bono de {mesLabel} pendiente — se calcula al cierre del mes
+      </p>
+      <p className="max-w-md text-xs text-stone-500">
+        El mes está en curso o su data aún no está completa. Las cifras y el bono
+        aparecen cuando el mes cierra.
+      </p>
+      {puedeNavegar && (
+        <button
+          type="button"
+          onClick={() => onMesChange(ult.mes)}
+          className="mt-1 inline-flex items-center rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:border-stone-400"
+        >
+          Ver {ultLabel}
+        </button>
+      )}
+    </Card>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Card del bono de la gerente (solo en meses evaluables)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function GerenteCard({ resp }: { resp: BonosMultifashion }) {
   const g = resp.gerente;
   const mesLabel = `${MES_FULL[resp.mes_evaluado.mes - 1]} ${resp.mes_evaluado.year}`;
   const prevLabel = `${MES_FULL[resp.mes_evaluado.mes - 1]} ${resp.mes_evaluado.year - 1}`;
-  const ultElegibleLabel = `${MES_FULL[resp.ultimo_mes_elegible.mes - 1]} ${resp.ultimo_mes_elegible.year}`;
   const delta = formatDeltaRatio(g.delta_pct);
   const deltaExact = g.delta_pct != null
     ? `${g.delta_pct >= 0 ? "+" : ""}${(g.delta_pct * 100).toFixed(1)}%`
@@ -180,47 +180,36 @@ function GerenteCard({
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
-        <Metric label={`Ventas ${resp.mes_evaluado.year}`} value={fmtMoney(g.ventas_mes)} />
-        <Metric label={`Ventas ${prevLabel}`} value={g.tiene_comparacion ? fmtMoney(g.ventas_mes_prev) : "—"} />
-        <Metric
-          label="Crecimiento"
-          value={deltaExact}
-          valueClass={cn("tabular-nums", TONE_LIGHT[delta.tone])}
-          arrow={delta.arrow}
-        />
-        <div className="flex flex-col">
-          <span className="text-[11px] uppercase tracking-wider text-stone-500">Bono</span>
-          <span className={cn("font-display text-2xl font-bold tabular-nums", bonoColor)}>
-            ${g.bono}
-          </span>
+      {g.tiene_comparacion ? (
+        <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
+          <Metric label={`Ventas ${resp.mes_evaluado.year}`} value={fmtMoney(g.ventas_mes)} />
+          <Metric label={`Ventas ${prevLabel}`} value={fmtMoney(g.ventas_mes_prev)} />
+          <Metric
+            label="Crecimiento"
+            value={deltaExact}
+            valueClass={cn("tabular-nums", TONE_LIGHT[delta.tone])}
+            arrow={delta.arrow}
+          />
+          <div className="flex flex-col">
+            <span className="text-[11px] uppercase tracking-wider text-stone-500">Bono</span>
+            <span className={cn("font-display text-2xl font-bold tabular-nums", bonoColor)}>
+              ${g.bono}
+            </span>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3 p-4">
+          <Metric label={`Ventas ${resp.mes_evaluado.year}`} value={fmtMoney(g.ventas_mes)} />
+          <p className="text-xs text-stone-500">
+            Sin datos de {prevLabel} para comparar — no se puede calcular el bono.
+          </p>
+        </div>
+      )}
 
       <div className="border-t border-stone-100 px-4 py-2.5 text-[11px] text-stone-500">
         Regla: crecimiento ≥ 5% y &lt; 10% → <span className="font-medium text-teal-600">$50</span> ·
         {" "}≥ 10% → <span className="font-medium text-emerald-600">$100</span> · vs mismo mes año anterior.
       </div>
-
-      {!resp.es_elegible && (
-        <div className="border-t border-amber-100 bg-amber-50/70 px-4 py-2.5 text-xs text-amber-900">
-          {mesLabel} aún no es evaluable (mes en curso o data incompleta) — el bono se calcula al cerrar el mes.
-          {resp.ultimo_mes_elegible.mes !== resp.mes_evaluado.mes || resp.ultimo_mes_elegible.year !== resp.mes_evaluado.year ? (
-            <>
-              {" "}
-              <button type="button" onClick={onJumpToElegible} className="font-medium underline">
-                Ver {ultElegibleLabel}
-              </button>
-            </>
-          ) : null}
-        </div>
-      )}
-
-      {resp.es_elegible && !g.tiene_comparacion && (
-        <div className="border-t border-stone-100 bg-stone-50 px-4 py-2.5 text-xs text-stone-500">
-          Sin datos de {prevLabel} para comparar — no se puede calcular el bono.
-        </div>
-      )}
     </Card>
   );
 }
@@ -245,7 +234,7 @@ function Metric({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Ranking de vendedoras (YoY) con badge "Bono $50"
+// Ranking de vendedoras (YoY) con badge "Bono $50" — solo en meses evaluables
 // ─────────────────────────────────────────────────────────────────────────────
 
 function VendedorasRanking({ resp }: { resp: BonosMultifashion }) {
@@ -264,7 +253,6 @@ function VendedorasRanking({ resp }: { resp: BonosMultifashion }) {
     <div className="space-y-2">
       <p className="text-[11px] text-stone-500">
         Ranking de vendedoras · {mesLabel} · Δ vs mismo mes {resp.mes_evaluado.year - 1}
-        {!resp.es_elegible && " · bono pendiente de cierre"}
       </p>
 
       {/* Desktop */}

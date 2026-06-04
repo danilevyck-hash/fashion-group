@@ -111,9 +111,12 @@ interface VendedorasSubtabProps {
    *  Es la base de los modos del toggle: "Mes" usa este mes directo y
    *  "Trimestre" usa el trimestre que lo contiene. "YTD" lo ignora. */
   mes: number;
+  /** Cambia el mes del selector único (usado por el link "ver último mes
+   *  evaluable" de la sección de Bonos). */
+  onMesChange: (mes: number) => void;
 }
 
-export function VendedorasSubtab({ data, selectedYear, mes }: VendedorasSubtabProps) {
+export function VendedorasSubtab({ data, selectedYear, mes, onMesChange }: VendedorasSubtabProps) {
   const year = selectedYear;
 
   // Meses con data RETAIL en el año actual. 1..12. Wholesale se reporta en
@@ -221,8 +224,8 @@ export function VendedorasSubtab({ data, selectedYear, mes }: VendedorasSubtabPr
       )}
 
       {/* 0. Bonos del mes (año contra año) — bono gerente + bono vendedoras.
-          Tiene su propio selector de mes (default: último mes cerrado). */}
-      <BonosSection selectedYear={year} />
+          Usa el mes del selector único del header (no tiene selector propio). */}
+      <BonosSection selectedYear={year} mes={mes} onMesChange={onMesChange} />
 
       <div className="border-t border-stone-200 pt-2">
         <p className="text-[11px] font-medium uppercase tracking-wider text-stone-400">
