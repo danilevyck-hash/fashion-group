@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
 
-  const { data, error } = await supabaseServer.rpc("multifashion_bonos_v1", {
+  const { data, error } = await supabaseServer.rpc("multifashion_bonos_v2", {
     p_year: year,
     p_mes: mes,
   });
