@@ -3,28 +3,33 @@
 // Sub-tab Comisiones del módulo Ventas (empresas B2B / mayoreo).
 // Patrón visual del subtab Vendedoras de Multifashion: tabla simple por período.
 //
-// Regla (server, RPC comision_b2b): base = facturas con utilidad>20% − todas las
-// NC, excluyendo intercompañía/clientes internos; comisión = base × tasa por
-// cartera (vendedor dueño del cliente). Fuente: reporte de utilidad de Switch.
+// Regla (server, RPC comision_b2b_v2): base = facturas con utilidad>20% − todas
+// las NC, excluyendo intercompañía/clientes internos; comisión = base × tasa
+// GLOBAL del vendedor (default 0.50%). Muestra a TODOS los vendedores activos de
+// la empresa aunque base=$0. Fuente: reporte de utilidad de Switch + maestro de
+// vendedores. Joystep NO comisiona → fuera del selector.
 
 import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Coins, Info } from "lucide-react";
+import { Coins, Info, Settings } from "lucide-react";
 import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { fmtMoney } from "@/lib/ventas/format";
+import { ComisionesConfigModal } from "./ComisionesConfigModal";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
+// Joystep NO comisiona — fuera del selector de ESTE tab únicamente.
+const EMPRESAS = B2B_EMPRESA_KEYS.filter((k) => k !== "joystep");
+
 interface ComisionVendedor {
   vendedor: string;
   base: number;
-  tasa: number | null;
-  comision: number | null;
-  tiene_tasa: boolean;
+  tasa: number;
+  comision: number;
   facturas_comisionables: number;
   notas_credito: number;
 }
@@ -41,12 +46,20 @@ interface ComisionesViewProps {
 
 export function ComisionesView({ availableYears }: ComisionesViewProps) {
   const now = new Date();
-  const [empresa, setEmpresa] = useState<string>(B2B_EMPRESA_KEYS[0]);
+  const [empresa, setEmpresa] = useState<string>(EMPRESAS[0]);
   const [year, setYear] = useState<number>(now.getFullYear());
   const [mes, setMes] = useState<number>(now.getMonth() + 1);
   const [data, setData] = useState<ComisionResp | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [canConfig, setCanConfig] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
+  const [savedMsg, setSavedMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const r = sessionStorage.getItem("cxc_role") || "";
+    setCanConfig(r === "admin" || r === "director");
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -79,12 +92,12 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
 
   return (
     <div className="space-y-4">
-      {/* Selectores */}
+      {/* Selectores + acción */}
       <div className="flex flex-wrap items-center gap-2">
         <Select value={empresa} onValueChange={setEmpresa}>
           <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {B2B_EMPRESA_KEYS.map((k) => (
+            {EMPRESAS.map((k) => (
               <SelectItem key={k} value={k}>{EMPRESA_KEY_TO_NAME[k] ?? k}</SelectItem>
             ))}
           </SelectContent>
@@ -105,7 +118,20 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
             ))}
           </SelectContent>
         </Select>
+
+        {canConfig && (
+          <button
+            onClick={() => setConfigOpen(true)}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
+          >
+            <Settings className="h-3.5 w-3.5" /> Configurar
+          </button>
+        )}
       </div>
+
+      {savedMsg && (
+        <p className="text-xs text-teal-700">{savedMsg}</p>
+      )}
 
       {/* Nota de la regla (visible, requerida) */}
       <div className="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
@@ -125,7 +151,7 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
           <div className="p-8 text-center text-sm text-rose-600">{error}</div>
         ) : vendedores.length === 0 ? (
           <div className="p-8 text-center text-sm text-gray-500">
-            Sin comisiones para {MESES[mes - 1]} {year}.
+            Sin vendedores para {MESES[mes - 1]} {year}.
           </div>
         ) : (
           <table className="w-full text-sm">
@@ -143,12 +169,10 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
                   <td className="px-4 py-2.5 text-gray-900">{v.vendedor}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">{fmtMoney(v.base)}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">
-                    {v.tiene_tasa ? `${(v.tasa! * 100).toFixed(2)}%` : (
-                      <span className="text-amber-600">sin tasa</span>
-                    )}
+                    {`${(v.tasa * 100).toFixed(2)}%`}
                   </td>
                   <td className="px-4 py-2.5 text-right font-medium tabular-nums text-gray-900">
-                    {v.comision != null ? fmtMoney(v.comision) : <span className="text-gray-400">—</span>}
+                    {fmtMoney(v.comision)}
                   </td>
                 </tr>
               ))}
@@ -167,8 +191,20 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
 
       <p className="flex items-center gap-1.5 text-xs text-gray-400">
         <Coins className="h-3.5 w-3.5" />
-        Vendedores sin tasa configurada aparecen con comisión en blanco (no se asume ningún %).
+        Todos los vendedores activos aparecen aquí, aunque no hayan vendido en el mes.
       </p>
+
+      {canConfig && (
+        <ComisionesConfigModal
+          open={configOpen}
+          onClose={() => setConfigOpen(false)}
+          onSaved={(msg) => {
+            setSavedMsg(msg);
+            void load();
+            window.setTimeout(() => setSavedMsg(null), 3000);
+          }}
+        />
+      )}
     </div>
   );
 }
