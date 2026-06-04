@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import Image from "next/image";
 import { validateCsvImport, type CsvImportRow } from "@/lib/csv-import-validator";
+import { csvBlob, stripBom } from "@/lib/csv-export";
 import { ConfirmModal } from "@/components/ui";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -92,7 +93,7 @@ function downloadCSV(
     return includeCategory ? `${base},${escapeCsvField(p.category)}` : base;
   });
   const csv = [header, ...rows].join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const blob = csvBlob(csv);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -109,7 +110,7 @@ function categoryToSpanish(cat: string): string {
 }
 
 function parseCSV(text: string): Record<string, string>[] {
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  const lines = stripBom(text).split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return [];
   const headers = lines[0].split(",").map(h => h.trim().replace(/^"(.*)"$/, "$1"));
   const rows: Record<string, string>[] = [];

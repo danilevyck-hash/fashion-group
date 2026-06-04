@@ -8,6 +8,7 @@ import { Toast, SkeletonTable, EmptyState, ConfirmDeleteModal, ConfirmModal, Acc
 import UndoToast from "@/components/UndoToast";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { fmtDate } from "@/lib/format";
+import { csvBlob, stripBom } from "@/lib/csv-export";
 import { usePersistedState, usePersistedScroll } from "@/lib/hooks/usePersistedState";
 
 export interface Cliente {
@@ -221,7 +222,7 @@ export default function DirectorioClient({ initialData }: { initialData: Directo
   }
 
   async function handleImport(file: File) {
-    const text = await file.text();
+    const text = stripBom(await file.text());
     const lines = text.split("\n").filter((l) => l.trim());
     const delimiter = detectDelimiter(text);
     let start = 0;
@@ -374,7 +375,7 @@ export default function DirectorioClient({ initialData }: { initialData: Directo
               </button>
               <button onClick={() => {
                 const headers = "Nombre;Empresa;Teléfono;Celular;Correo;Contacto;Notas";
-                const blob = new Blob([headers + "\n"], { type: "text/csv;charset=utf-8;" });
+                const blob = csvBlob(headers + "\n");
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
                 a.href = url;

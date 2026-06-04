@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
+import { csvWithBom, CSV_MIME } from "@/lib/csv-export";
 
 const DIRECTORIO_ROLES = ["admin", "secretaria", "contabilidad", "vendedor"];
 
@@ -33,9 +34,9 @@ export async function GET(req: NextRequest) {
           .join(";")
       );
       const csv = [header, ...rows].join("\n");
-      return new NextResponse(csv, {
+      return new NextResponse(csvWithBom(csv), {
         headers: {
-          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Type": CSV_MIME,
           "Content-Disposition": `attachment; filename="directorio_${new Date().toISOString().slice(0, 10)}.csv"`,
         },
       });

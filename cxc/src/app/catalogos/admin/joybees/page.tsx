@@ -7,6 +7,7 @@ import AppHeader from "@/components/AppHeader";
 import Image from "next/image";
 import Link from "next/link";
 import { validateCsvImport, type CsvImportRow } from "@/lib/csv-import-validator";
+import { csvBlob, stripBom } from "@/lib/csv-export";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ function downloadCSV(products: { sku: string; name: string; price: number; stock
     `${escapeCsvField(p.sku)},${escapeCsvField(p.name)},${p.price},${p.stock},${escapeCsvField(p.gender)},${p.badge || ""}`
   );
   const csv = [header, ...rows].join("\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const blob = csvBlob(csv);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -78,7 +79,7 @@ function downloadCSV(products: { sku: string; name: string; price: number; stock
 }
 
 function parseCSV(text: string): Record<string, string>[] {
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  const lines = stripBom(text).split(/\r?\n/).filter(l => l.trim());
   if (lines.length < 2) return [];
   const headers = lines[0].split(",").map(h => h.trim().replace(/^"(.*)"$/, "$1"));
   const rows: Record<string, string>[] = [];

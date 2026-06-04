@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { fmt } from "@/lib/format";
+import { csvBlob } from "@/lib/csv-export";
 import { COMPANIES, B2B_COMPANIES } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
@@ -72,8 +73,7 @@ function exportCSV(data: ConsolidatedClient[], label?: string, riskLabel?: strin
     const estado = c.overdue > 0 ? "Vencido crítico" : c.watch > 0 ? "Vencido reciente" : "Por vencer";
     return `"${c.nombre_normalized}",${(c.d0_30 ?? c.current).toFixed(2)},${(c.d31_60 ?? 0).toFixed(2)},${(c.d61_90 ?? 0).toFixed(2)},${(c.d91_120 ?? c.watch).toFixed(2)},${(c.d121_plus ?? c.overdue).toFixed(2)},${c.total.toFixed(2)},"${estado}","${c.correo}","${c.telefono}","${c.celular}","${c.contacto}"`;
   }).join("\n");
-  const BOM = "\uFEFF";
-  const blob = new Blob([BOM + meta + header + rows], { type: "text/csv;charset=utf-8" });
+  const blob = csvBlob(meta + header + rows);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
