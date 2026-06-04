@@ -8,7 +8,7 @@
 -- anterior/año anterior, inflando el %.
 --
 -- Caso real: mayo 2026 no tuvo ventas el 31 → corte = día 30 → YoY comparaba
--- may 1–30 → dejaba fuera el 31-may-2025 ($1,310) → +21% en vez del +16.9% real
+-- may 1–30 → dejaba fuera el 31-may-2025 (~1,310 USD) → +21% en vez del +16.9% real
 -- de mes completo (que es lo que muestran Overview y la card del bono).
 --
 -- v2: para meses CERRADOS el corte es el MES COMPLETO (compara mes vs mes). Para
