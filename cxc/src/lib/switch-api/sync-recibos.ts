@@ -126,7 +126,10 @@ async function loadImpuestoMap(empresaKey: EmpresaKey, from: string, to: string)
 }
 
 const RET_WINDOW_MS = 35 * 864e5;
-/** Retención = total ≈ impuesto/2 de una factura del mismo cliente, fecha ≤ recibo (≤35d). */
+/** Retención = total ≈ impuesto/2 de una factura del mismo cliente, dentro de ±35d.
+ *  Ventana SIMÉTRICA (|rf - ff|): Switch estampa la retención el mismo día o hasta
+ *  un día ANTES que su factura, así que exigir factura ≤ recibo perdía esos casos
+ *  (ej. FW mayo: recibos 111.02/55.44/7.28 cuya factura quedó 1 día después). */
 function esRetencion(cliId: number | null, fecha: string | null, total: number, map: ImpuestoMap): boolean {
   if (cliId == null || !fecha) return false;
   const list = map.get(cliId);
@@ -134,7 +137,7 @@ function esRetencion(cliId: number | null, fecha: string | null, total: number, 
   const rf = Date.parse(fecha);
   return list.some((f) => {
     const ff = Date.parse(f.fecha);
-    return ff <= rf && rf - ff <= RET_WINDOW_MS && Math.abs(total - f.imp / 2) <= 0.01;
+    return Math.abs(rf - ff) <= RET_WINDOW_MS && Math.abs(total - f.imp / 2) <= 0.01;
   });
 }
 
