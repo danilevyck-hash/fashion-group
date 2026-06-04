@@ -4,10 +4,11 @@ import { useState, useTransition, useCallback } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, TrendingUp, Contact } from "lucide-react";
+import { Download, TrendingUp, Contact, Coins } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ResumenView } from "@/components/ventas/ResumenView";
 import { ClientesView } from "@/components/ventas/ClientesView";
+import { ComisionesView } from "@/components/ventas/ComisionesView";
 import { exportResumenToExcel } from "@/lib/ventas/excel";
 import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/types";
 
@@ -154,6 +155,12 @@ export function VentasShell({
           >
             <Contact className="h-3.5 w-3.5" /> Clientes
           </TabsTrigger>
+          <TabsTrigger
+            value="comisiones"
+            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none"
+          >
+            <Coins className="h-3.5 w-3.5" /> Comisiones
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="resumen" className="mt-5">
@@ -181,6 +188,9 @@ export function VentasShell({
               isClosedYear={isClosedYear}
             />
           ) : <ErrorState scope="clientes" />}
+        </TabsContent>
+        <TabsContent value="comisiones" className="mt-5">
+          <ComisionesView availableYears={availableYears} />
         </TabsContent>
       </Tabs>
     </main>
