@@ -134,3 +134,86 @@ export async function exportComisionDetalle(d: ComisionDetalle, empresaNombre: s
   const safe = d.vendedor.replace(/[^\w\s-]/g, "").trim().replace(/\s+/g, "-");
   XLSX.writeFile(wb, `Comision-${safe}-${empresaNombre.replace(/\s+/g, "")}-${d.year}-${String(d.mes).padStart(2, "0")}.xlsx`);
 }
+
+// ── Export del RESUMEN del tab (vista actual: empresa + mes + año) ────────────
+// Una fila por vendedor + fila Total. Misma regla del banner en el encabezado.
+export interface ComisionResumenRow {
+  vendedor: string;
+  base: number;           // ventas base
+  comision: number;       // com. venta
+  base_cobro: number;     // cobros
+  comision_cobro: number; // com. cobro
+  comision_total: number;
+}
+export interface ComisionResumen {
+  empresaKey: string;
+  empresaNombre: string;
+  year: number;
+  mes: number;
+  vendedores: ComisionResumenRow[];
+}
+
+// Misma nota que el banner del tab (regla visible).
+const REGLA_NOTA =
+  "Venta: facturas con utilidad >20% menos notas de crédito. Cobro: recibos del mes, " +
+  "excluyendo retenciones de ITBMS. Ambas excluyen intercompañía y clientes internos, " +
+  "y se asignan al vendedor dueño del cliente. Fuente: reportes de Switch.";
+
+export async function exportComisionesResumen(r: ComisionResumen): Promise<void> {
+  const XLSX = (await import("xlsx-js-style")).default;
+  const periodo = `${MESES[r.mes - 1]} ${r.year}`;
+  const rows: (string | number | null)[][] = [];
+
+  rows.push([`Comisiones — ${r.empresaNombre}`]);
+  rows.push([periodo]);
+  rows.push([REGLA_NOTA]);
+  rows.push([]);
+  rows.push(["Vendedor", "Ventas", "Com. Venta", "Cobros", "Com. Cobro", "Com. Total"]);
+  const dataStart = rows.length;
+
+  for (const v of r.vendedores) {
+    rows.push([v.vendedor, v.base, v.comision, v.base_cobro, v.comision_cobro, v.comision_total]);
+  }
+
+  // Total = suma de las filas (no recálculo), consistente con el tab.
+  const tot = r.vendedores.reduce(
+    (a, v) => ({
+      base: a.base + (v.base ?? 0),
+      comision: a.comision + (v.comision ?? 0),
+      base_cobro: a.base_cobro + (v.base_cobro ?? 0),
+      comision_cobro: a.comision_cobro + (v.comision_cobro ?? 0),
+      comision_total: a.comision_total + (v.comision_total ?? 0),
+    }),
+    { base: 0, comision: 0, base_cobro: 0, comision_cobro: 0, comision_total: 0 },
+  );
+  rows.push(["Total", tot.base, tot.comision, tot.base_cobro, tot.comision_cobro, tot.comision_total]);
+  const totalRow = rows.length - 1;
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws["!cols"] = [{ wch: 26 }, { wch: 14 }, { wch: 13 }, { wch: 14 }, { wch: 13 }, { wch: 13 }];
+  ws["!merges"] = [{ s: { r: 2, c: 0 }, e: { r: 2, c: 5 } }];
+
+  const cell = (rr: number, cc: number) => ws[XLSX.utils.encode_cell({ r: rr, c: cc })];
+  const money = { numFmt: MONEY };
+
+  if (cell(0, 0)) cell(0, 0)!.s = { font: { bold: true, sz: 14 } };
+  if (cell(1, 0)) cell(1, 0)!.s = { font: { italic: true, sz: 10, color: { rgb: "666666" } } };
+  if (cell(2, 0)) cell(2, 0)!.s = { font: { italic: true, sz: 9, color: { rgb: "888888" } }, alignment: { wrapText: true, vertical: "top" } };
+
+  // headers
+  for (let c = 0; c < 6; c++) if (cell(4, c)) cell(4, c)!.s = { font: { bold: true }, alignment: { horizontal: c === 0 ? "left" : "right" } };
+
+  // datos: moneda en columnas 1..5
+  for (let rr = dataStart; rr <= totalRow; rr++) {
+    for (let c = 1; c < 6; c++) if (cell(rr, c)) cell(rr, c)!.s = { ...money };
+  }
+  // fila Total en negrita
+  for (let c = 0; c < 6; c++) {
+    if (!cell(totalRow, c)) continue;
+    cell(totalRow, c)!.s = c === 0 ? { font: { bold: true } } : { font: { bold: true }, ...money };
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Comisiones");
+  XLSX.writeFile(wb, `comisiones-${r.empresaKey}-${String(r.mes).padStart(2, "0")}-${r.year}.xlsx`);
+}

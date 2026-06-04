@@ -12,9 +12,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Coins, Info, Settings } from "lucide-react";
+import { Coins, FileSpreadsheet, Info, Settings } from "lucide-react";
 import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { fmtMoney } from "@/lib/ventas/format";
+import { exportComisionesResumen } from "@/lib/ventas/comisionExcel";
 import { ComisionesConfigModal } from "./ComisionesConfigModal";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
 
@@ -97,6 +98,17 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
   const totalComisionCobro = vendedores.reduce((a, v) => a + (v.comision_cobro ?? 0), 0);
   const totalGeneral = vendedores.reduce((a, v) => a + (v.comision_total ?? 0), 0);
 
+  const handleExport = () => {
+    if (vendedores.length === 0) return;
+    void exportComisionesResumen({
+      empresaKey: empresa,
+      empresaNombre: EMPRESA_KEY_TO_NAME[empresa] ?? empresa,
+      year,
+      mes,
+      vendedores,
+    });
+  };
+
   return (
     <div className="space-y-4">
       {/* Selectores + acción */}
@@ -126,14 +138,23 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
           </SelectContent>
         </Select>
 
-        {canConfig && (
+        <div className="ml-auto flex items-center gap-2">
           <button
-            onClick={() => setConfigOpen(true)}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
+            onClick={handleExport}
+            disabled={vendedores.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            <Settings className="h-3.5 w-3.5" /> Configurar
+            <FileSpreadsheet className="h-3.5 w-3.5" /> Excel
           </button>
-        )}
+          {canConfig && (
+            <button
+              onClick={() => setConfigOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
+            >
+              <Settings className="h-3.5 w-3.5" /> Configurar
+            </button>
+          )}
+        </div>
       </div>
 
       {savedMsg && (
