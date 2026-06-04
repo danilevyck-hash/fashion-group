@@ -21,6 +21,7 @@ import type {
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { formatDelta, formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
+import { BonosSection } from "./BonosSection";
 
 const MES_FULL = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -218,6 +219,16 @@ export function VendedorasSubtab({ data, selectedYear, mes }: VendedorasSubtabPr
           No se pudo cargar el ranking: {error}
         </div>
       )}
+
+      {/* 0. Bonos del mes (año contra año) — bono gerente + bono vendedoras.
+          Tiene su propio selector de mes (default: último mes cerrado). */}
+      <BonosSection selectedYear={year} />
+
+      <div className="border-t border-stone-200 pt-2">
+        <p className="text-[11px] font-medium uppercase tracking-wider text-stone-400">
+          Explorar ranking
+        </p>
+      </div>
 
       {/* 1. Toggle de período (Mes / Trimestre / YTD). El mes base lo fija el
           selector único del header de Multifashion; aquí solo se elige el modo. */}

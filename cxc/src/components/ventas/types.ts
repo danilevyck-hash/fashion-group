@@ -267,6 +267,57 @@ export type VendedorasPeriodo = {
   dia_corte_anio_anterior: string | null;
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Bonos Multifashion (RPC multifashion_bonos_v1). Año-contra-año (YoY), NO
+// confundir con VendedorasPeriodo (MoM). Ver migration 20260604130000.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Mes/año de referencia devuelto por el RPC de bonos. */
+export type MesRef = { year: number; mes: number };
+
+/** Bono de la gerente: ventas totales de la tienda del mes cerrado vs el mismo
+ *  mes del año anterior. */
+export type BonoGerente = {
+  /** Nombre de la gerente (primer manager configurado). null si no hay. */
+  nombre: string | null;
+  ventas_mes: number;
+  ventas_mes_prev: number;
+  /** Ratio (0.08 = +8%). null cuando no hay mes comparable el año anterior. */
+  delta_pct: number | null;
+  tiene_comparacion: boolean;
+  /** 0 | 50 | 100. 0 si el mes no es elegible o no hay comparación. */
+  bono: number;
+};
+
+/** Una fila del ranking de bonos de vendedoras (delta YoY). */
+export type BonoVendedora = {
+  nombre: string;
+  tickets: number;
+  ventas: number;
+  ticket_promedio: number;
+  manager: boolean;
+  /** Ratio vs mismo mes año anterior. null = sin actividad para comparar. */
+  delta_ventas_pct: number | null;
+  tiene_comparacion: boolean;
+  /** true → recibe el bono $50 (mayor venta del mes entre no-gerentes). */
+  bono_vendedora: boolean;
+};
+
+/** Shape JSON del RPC multifashion_bonos_v1. */
+export type BonosMultifashion = {
+  mes_evaluado: MesRef;
+  /** Mes cerrado y sincronizado completo (no parcial, no en curso). */
+  es_elegible: boolean;
+  /** MAX(fecha) sincronizada de american_classic. ISO YYYY-MM-DD. */
+  fecha_max_data: string;
+  /** Último mes evaluable global (sync-aware). Default del selector. */
+  ultimo_mes_elegible: MesRef;
+  gerente: BonoGerente;
+  vendedoras: BonoVendedora[];
+  /** Solo presente cuando no hay nada de data en american_classic. */
+  sin_data?: boolean;
+};
+
 export type WholesaleMonthly = {
   mes: string;
   ventas: number;
