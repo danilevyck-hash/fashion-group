@@ -1,0 +1,236 @@
+/**
+ * Sync del reporte de UTILIDAD por documento (comisiones B2B) → switch_factura_utilidad.
+ *
+ * Fuente: reporte web de Switch /reportesventa/facturas (ver web-client.ts) —
+ * única fuente de costo/utilidad por documento. NO existe en el API JSON.
+ *
+ * ATRIBUCIÓN POR CARTERA: cada documento se atribuye al vendedor DUEÑO del
+ * cliente (maestro /apicliente/lista), NO al vendedor de la factura. Fallback:
+ * vendedor de la factura si el cliente no tiene dueño asignado. (Validado al
+ * centavo: FS/Reinaldo abr=65,051.50, FW/Reinaldo abr=217,793.00.)
+ *
+ * Tolerante a fallos: si una empresa falla, las demás siguen. Log en switch_sync_log.
+ * Single-session: el login web EXPULSA al humano logueado → correr off-hours.
+ */
+
+import type { EmpresaKey } from "@/lib/empresa-mapping";
+import { supabaseServer } from "../supabase-server";
+import { createSwitchClient } from "./client";
+import { loginSwitchWeb, fetchUtilidadMes, type UtilidadRow } from "./web-client";
+
+/** Empresas B2B con comisión sobre venta (excluye Multifashion/Boston/Joystep). */
+export const B2B_COMISION_KEYS: EmpresaKey[] = [
+  "vistana",
+  "fashion_wear",
+  "fashion_shoes",
+  "active_shoes",
+  "active_wear",
+];
+
+export interface Mes {
+  year: number;
+  month: number;
+}
+
+export interface SyncUtilidadResult {
+  empresaKey: EmpresaKey;
+  ok: boolean;
+  meses: number;
+  documentos: number;
+  vendedoresNuevos: number;
+  error?: string;
+}
+
+// ─── Cartera: cliente → vendedor dueño (maestro API) ─────────────────────────
+
+async function buildCarteraMap(empresaKey: EmpresaKey): Promise<Map<number, string>> {
+  const client = createSwitchClient(empresaKey);
+  const map = new Map<number, string>();
+  let pagina = 1;
+  for (;;) {
+    const data = await client.listClientes({ porPagina: 500, paginaActual: pagina });
+    const clientes = data.clientes ?? [];
+    for (const c of clientes) {
+      if (c.vendedor && String(c.vendedor).trim()) map.set(c.id, String(c.vendedor).trim());
+    }
+    const total = data.paginacion?.total ?? clientes.length;
+    if (map.size >= total || clientes.length === 0) break;
+    pagina += 1;
+  }
+  return map;
+}
+
+// ─── Mapeo fila reporte → fila cache (con atribución por cartera) ────────────
+
+// pct_utilidad es numeric(8,4) → rango ±9999.9999. Docs basura (subtotal≈0 con
+// costo) pueden dar pct absurdos (ej. −221792%). Se clampea: no afecta la regla
+// (>20% para facturas; las NC no se filtran por utilidad) y capa el ruido.
+const PCT_CAP = 9999.9999;
+const clampPct = (p: number | null): number | null =>
+  p == null ? null : Math.max(-PCT_CAP, Math.min(PCT_CAP, p));
+
+function toCacheRow(empresaKey: EmpresaKey, r: UtilidadRow, cartera: Map<number, string>) {
+  const vendedorCartera =
+    (r.clienteSwitchId != null ? cartera.get(r.clienteSwitchId) : undefined) ?? r.vendedor;
+  return {
+    empresa_key: empresaKey,
+    secuencial: r.secuencial,
+    fecha: r.fecha,
+    tipo_comprobante: r.tipoComprobante,
+    vendedor: vendedorCartera, // ← dueño de cartera (fallback: vendedor de factura)
+    cliente: r.cliente,
+    subtotal_con_descuento: r.subtotalConDescuento,
+    costo: r.costo,
+    utilidad: r.utilidad,
+    pct_utilidad: clampPct(r.pctUtilidad),
+    synced_at: new Date().toISOString(),
+  };
+}
+
+// ─── Auto-seed de tasas: vendedores nuevos → 1% (excepto DEFAULT) ────────────
+
+async function autoSeedTasas(
+  empresaKey: EmpresaKey,
+  vendedores: Set<string>,
+): Promise<number> {
+  const rows = [...vendedores]
+    .filter((v) => v && v.toUpperCase() !== "DEFAULT")
+    .map((v) => ({
+      empresa_key: empresaKey,
+      vendedor_nombre: v,
+      tasa_venta: 0.01,
+      tasa_cobro: 0.01,
+    }));
+  if (rows.length === 0) return 0;
+  // ignoreDuplicates: no pisa tasas ya configuradas (ej. Edwin 0.5%).
+  const { error } = await supabaseServer
+    .from("comision_tasas")
+    .upsert(rows, { onConflict: "empresa_key,vendedor_nombre", ignoreDuplicates: true });
+  if (error) console.error(`[sync-utilidad ${empresaKey}] auto-seed tasas falló: ${error.message}`);
+  return rows.length;
+}
+
+// ─── Persistencia ────────────────────────────────────────────────────────────
+
+async function upsertCacheRows(rows: ReturnType<typeof toCacheRow>[]): Promise<void> {
+  const CHUNK = 500;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const chunk = rows.slice(i, i + CHUNK);
+    const { error } = await supabaseServer
+      .from("switch_factura_utilidad")
+      .upsert(chunk, { onConflict: "empresa_key,secuencial" });
+    if (error) throw new Error(`upsert switch_factura_utilidad: ${error.message}`);
+  }
+}
+
+// ─── Log (best-effort) ───────────────────────────────────────────────────────
+
+async function createLog(empresaKey: EmpresaKey, meses: Mes[], triggeredBy: string): Promise<string | null> {
+  const sorted = [...meses].sort((a, b) => a.year * 12 + a.month - (b.year * 12 + b.month));
+  const f = sorted[0];
+  const l = sorted[sorted.length - 1];
+  const { data, error } = await supabaseServer
+    .from("switch_sync_log")
+    .insert({
+      empresa_key: empresaKey,
+      sync_type: "utilidad",
+      status: "running",
+      range_from: `${f.year}-${String(f.month).padStart(2, "0")}-01`,
+      range_to: `${l.year}-${String(l.month).padStart(2, "0")}-01`,
+      triggered_by: triggeredBy,
+      records_inserted: 0,
+      records_updated: 0,
+      records_skipped: 0,
+    })
+    .select("id")
+    .single();
+  if (error || !data) {
+    console.error(`[sync-utilidad ${empresaKey}] no pude crear log: ${error?.message}`);
+    return null;
+  }
+  return (data as { id: string }).id;
+}
+
+async function finishLog(
+  logId: string | null,
+  status: "success" | "error",
+  records: number,
+  errorMessage?: string,
+): Promise<void> {
+  if (!logId) return;
+  await supabaseServer
+    .from("switch_sync_log")
+    .update({
+      status,
+      finished_at: new Date().toISOString(),
+      records_inserted: records,
+      error_message: errorMessage ?? null,
+    })
+    .eq("id", logId);
+}
+
+// ─── Sync por empresa ────────────────────────────────────────────────────────
+
+export async function syncEmpresaUtilidad(
+  empresaKey: EmpresaKey,
+  meses: Mes[],
+  triggeredBy = "manual",
+): Promise<SyncUtilidadResult> {
+  const logId = await createLog(empresaKey, meses, triggeredBy);
+  try {
+    const cartera = await buildCarteraMap(empresaKey);
+    const session = await loginSwitchWeb(empresaKey);
+
+    const cacheRows: ReturnType<typeof toCacheRow>[] = [];
+    const vendedores = new Set<string>();
+    for (const { year, month } of meses) {
+      const rows = await fetchUtilidadMes(session, year, month);
+      for (const r of rows) {
+        const cr = toCacheRow(empresaKey, r, cartera);
+        cacheRows.push(cr);
+        if (cr.vendedor) vendedores.add(cr.vendedor);
+      }
+    }
+
+    await upsertCacheRows(cacheRows);
+    const vendedoresNuevos = await autoSeedTasas(empresaKey, vendedores);
+
+    await finishLog(logId, "success", cacheRows.length);
+    return {
+      empresaKey,
+      ok: true,
+      meses: meses.length,
+      documentos: cacheRows.length,
+      vendedoresNuevos,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    await finishLog(logId, "error", 0, msg);
+    return { empresaKey, ok: false, meses: meses.length, documentos: 0, vendedoresNuevos: 0, error: msg };
+  }
+}
+
+// ─── Sync todas las B2B (tolerante: una falla → las demás siguen) ────────────
+
+export async function syncAllUtilidad(
+  meses: Mes[],
+  triggeredBy = "cron",
+): Promise<SyncUtilidadResult[]> {
+  const results: SyncUtilidadResult[] = [];
+  for (const empresaKey of B2B_COMISION_KEYS) {
+    // secuencial por empresa: single-session web + evita pisar sesiones en paralelo.
+    results.push(await syncEmpresaUtilidad(empresaKey, meses, triggeredBy));
+  }
+  return results;
+}
+
+/** Helper: el mes en curso (UTC). */
+export function mesActual(): Mes {
+  const now = new Date();
+  return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
+}
+
+/** Helper: todos los meses de un año hasta el mes dado (para backfill). */
+export function mesesDeAnio(year: number, hastaMes: number): Mes[] {
+  return Array.from({ length: hastaMes }, (_, i) => ({ year, month: i + 1 }));
+}
