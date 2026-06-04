@@ -16,6 +16,7 @@ import { Coins, Info, Settings } from "lucide-react";
 import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import { fmtMoney } from "@/lib/ventas/format";
 import { ComisionesConfigModal } from "./ComisionesConfigModal";
+import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -57,6 +58,7 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
   const [canConfig, setCanConfig] = useState(false);
   const [configOpen, setConfigOpen] = useState(false);
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
+  const [detalleVendedor, setDetalleVendedor] = useState<string | null>(null);
 
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role") || "";
@@ -173,8 +175,13 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
             </thead>
             <tbody>
               {vendedores.map((v) => (
-                <tr key={v.vendedor} className="border-b border-gray-100 last:border-0">
-                  <td className="px-4 py-2.5 text-gray-900">{v.vendedor}</td>
+                <tr
+                  key={v.vendedor}
+                  onClick={() => setDetalleVendedor(v.vendedor)}
+                  className="cursor-pointer border-b border-gray-100 last:border-0 transition hover:bg-gray-50"
+                  title="Ver reporte detallado"
+                >
+                  <td className="px-4 py-2.5 font-medium text-gray-900 underline-offset-2 hover:underline">{v.vendedor}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">{fmtMoney(v.base)}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-gray-600">{fmtMoney(v.comision)}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums text-gray-700">{fmtMoney(v.base_cobro)}</td>
@@ -211,6 +218,17 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
             void load();
             window.setTimeout(() => setSavedMsg(null), 3000);
           }}
+        />
+      )}
+
+      {detalleVendedor && (
+        <ComisionesDetalleModal
+          empresa={empresa}
+          empresaNombre={EMPRESA_KEY_TO_NAME[empresa] ?? empresa}
+          year={year}
+          mes={mes}
+          vendedor={detalleVendedor}
+          onClose={() => setDetalleVendedor(null)}
         />
       )}
     </div>
