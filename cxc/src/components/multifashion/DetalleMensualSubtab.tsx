@@ -293,7 +293,7 @@ export function DetalleMensualSubtab({ year, mes }: DetalleMensualSubtabProps) {
           subTieneData={`$${Math.round(mes_anterior.ventas).toLocaleString()} mes anterior`}
         />
         <DeltaKpi
-          label={`VS ${year - 1}`}
+          label={`VS ${year - 1} (retail)`}
           delta={deltaYoy}
           comp={yoy}
           subTieneData={`$${Math.round(yoy.ventas).toLocaleString()} en ${year - 1}`}

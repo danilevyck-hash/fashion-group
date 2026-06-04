@@ -2,22 +2,23 @@
 
 // Sección "Bonos del mes" del subtab Vendedoras (/multifashion).
 //
-// Dos bonos sobre el MES CERRADO (año contra año):
-//   1. Bono gerente — ventas totales retail de la tienda vs el mismo mes del año
-//      anterior. ≥5% y <10% → $50 · ≥10% → $100.
+// Dos bonos sobre el MES CERRADO (año contra año), universo TIENDA COMPLETA
+// (retail + mayoreo):
+//   1. Bono gerente — ventas totales de la tienda vs el mismo mes del año
+//      anterior. ≥5% y <10% → $50 · ≥10% → $100. Se muestra como línea de
+//      contexto sobre el ranking; la gerente lleva su badge en su propia fila.
 //   2. Bono vendedoras — $50 a la de mayor venta del mes (empate → todas).
 //
-// El mes lo fija el selector ÚNICO del header de Multifashion (prop `mes`); esta
-// sección no tiene selector propio. Si el mes no es evaluable (en curso o data
-// incompleta) NO se muestran cifras: solo el aviso "pendiente" + link al último
+// El mes lo fija el selector ÚNICO del header. Si el mes no es evaluable (en
+// curso o data incompleta) NO se muestran cifras: solo aviso + link al último
 // mes evaluable.
 //
-// Server-side: RPC multifashion_bonos_v2 (migration 20260604160000). Lee de la
-// MISMA fuente y blend que Overview (_multifashion_sf_vw / switch_facturas).
+// Server-side: RPC multifashion_bonos_v3 (migration 20260604180000). Misma
+// fuente que Overview (_multifashion_sf_vw / switch_facturas), tienda completa.
 
 import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Trophy, Award, Clock } from "lucide-react";
+import { Trophy, Award, Clock, Info } from "lucide-react";
 import type { BonosMultifashion, BonoVendedora } from "@/components/ventas/types";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
@@ -28,11 +29,20 @@ const MES_FULL = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
+const REGLA_BONO =
+  "Crecimiento ≥ 5% y < 10% → $50 · ≥ 10% → $100. Tienda completa (retail + mayoreo) vs el mismo mes del año anterior.";
+
 const TONE_LIGHT: Record<DeltaTone, string> = {
   emerald: "text-emerald-600",
   orange:  "text-red-600",
   stone:   "text-stone-500",
 };
+
+function bonoColor(bono: number): string {
+  if (bono === 100) return "text-emerald-600";
+  if (bono === 50) return "text-teal-600";
+  return "text-stone-400";
+}
 
 interface BonosSectionProps {
   /** Año del selector global del shell de Multifashion. */
@@ -94,10 +104,10 @@ export function BonosSection({ selectedYear, mes, onMesChange }: BonosSectionPro
       )}
 
       {resp && !resp.sin_data && (
-        <div className={cn("space-y-4", loading && "opacity-60 pointer-events-none transition-opacity")}>
+        <div className={cn("space-y-3", loading && "opacity-60 pointer-events-none transition-opacity")}>
           {resp.es_elegible ? (
             <>
-              <GerenteCard resp={resp} />
+              <GerenteLine resp={resp} />
               <VendedorasRanking resp={resp} />
             </>
           ) : (
@@ -106,6 +116,48 @@ export function BonosSection({ selectedYear, mes, onMesChange }: BonosSectionPro
         </div>
       )}
     </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Línea de contexto del bono gerente (compacta, sobre el ranking)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function GerenteLine({ resp }: { resp: BonosMultifashion }) {
+  const g = resp.gerente;
+  const mesLabel = `${MES_FULL[resp.mes_evaluado.mes - 1]} ${resp.mes_evaluado.year}`;
+  const delta = formatDeltaRatio(g.delta_pct);
+  const deltaExact = g.delta_pct != null
+    ? `${g.delta_pct >= 0 ? "+" : ""}${(g.delta_pct * 100).toFixed(1)}%`
+    : "—";
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-teal-100 bg-teal-50/50 px-3.5 py-2.5 text-sm">
+      <span className="font-medium text-stone-700">Tienda {mesLabel}:</span>
+      {g.tiene_comparacion ? (
+        <>
+          <span className="font-mono tabular-nums text-stone-900">{fmtMoney(g.ventas_mes)}</span>
+          <span className="text-stone-400">vs</span>
+          <span className="font-mono tabular-nums text-stone-600">{fmtMoney(g.ventas_mes_prev)}</span>
+          <span className="text-[11px] text-stone-400">(tienda completa, incl. mayoreo)</span>
+          <span className="text-stone-400">→</span>
+          <span className={cn("font-mono tabular-nums font-medium", TONE_LIGHT[delta.tone])}>
+            {delta.arrow && <span className="mr-0.5">{delta.arrow}</span>}{deltaExact}
+          </span>
+          <span className="text-stone-400">→</span>
+          <span className={cn("font-semibold", bonoColor(g.bono))}>bono gerente ${g.bono}</span>
+        </>
+      ) : (
+        <>
+          <span className="font-mono tabular-nums text-stone-900">{fmtMoney(g.ventas_mes)}</span>
+          <span className="text-[11px] text-stone-400">(tienda completa, incl. mayoreo)</span>
+          <span className="text-stone-500">· sin comparativo {resp.mes_evaluado.year - 1} para el bono</span>
+        </>
+      )}
+      <span title={REGLA_BONO} className="ml-0.5 inline-flex cursor-help text-stone-400" aria-label="Regla del bono">
+        <Info className="h-3.5 w-3.5" />
+      </span>
+    </div>
   );
 }
 
@@ -124,7 +176,6 @@ function PendienteCard({
   const ult = resp.ultimo_mes_elegible;
   const ultLabel = `${MES_FULL[ult.mes - 1]} ${ult.year}`;
   const distinto = ult.mes !== resp.mes_evaluado.mes || ult.year !== resp.mes_evaluado.year;
-  // El link solo navega el mes (el año lo fija el selector global).
   const puedeNavegar = distinto && ult.year === selectedYear;
 
   return (
@@ -151,94 +202,12 @@ function PendienteCard({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Card del bono de la gerente (solo en meses evaluables)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function GerenteCard({ resp }: { resp: BonosMultifashion }) {
-  const g = resp.gerente;
-  const mesLabel = `${MES_FULL[resp.mes_evaluado.mes - 1]} ${resp.mes_evaluado.year}`;
-  const prevLabel = `${MES_FULL[resp.mes_evaluado.mes - 1]} ${resp.mes_evaluado.year - 1}`;
-  const delta = formatDeltaRatio(g.delta_pct);
-  const deltaExact = g.delta_pct != null
-    ? `${g.delta_pct >= 0 ? "+" : ""}${(g.delta_pct * 100).toFixed(1)}%`
-    : "—";
-
-  const bonoColor = g.bono === 100
-    ? "text-emerald-600"
-    : g.bono === 50
-      ? "text-teal-600"
-      : "text-stone-400";
-
-  return (
-    <Card className="overflow-hidden border-teal-100 p-0">
-      <div className="border-b border-teal-100 bg-teal-50/60 px-4 py-2.5">
-        <p className="text-[11px] font-medium uppercase tracking-wider text-teal-700">
-          Bono gerente · {mesLabel}
-        </p>
-        <p className="mt-0.5 text-sm font-semibold text-stone-950">
-          {g.nombre ?? "Sin gerente configurada"}
-        </p>
-      </div>
-
-      {g.tiene_comparacion ? (
-        <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-4">
-          <Metric label={`Ventas ${resp.mes_evaluado.year}`} value={fmtMoney(g.ventas_mes)} />
-          <Metric label={`Ventas ${prevLabel}`} value={fmtMoney(g.ventas_mes_prev)} />
-          <Metric
-            label="Crecimiento"
-            value={deltaExact}
-            valueClass={cn("tabular-nums", TONE_LIGHT[delta.tone])}
-            arrow={delta.arrow}
-          />
-          <div className="flex flex-col">
-            <span className="text-[11px] uppercase tracking-wider text-stone-500">Bono</span>
-            <span className={cn("font-display text-2xl font-bold tabular-nums", bonoColor)}>
-              ${g.bono}
-            </span>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between gap-3 p-4">
-          <Metric label={`Ventas ${resp.mes_evaluado.year}`} value={fmtMoney(g.ventas_mes)} />
-          <p className="text-xs text-stone-500">
-            Sin datos de {prevLabel} para comparar — no se puede calcular el bono.
-          </p>
-        </div>
-      )}
-
-      <div className="border-t border-stone-100 px-4 py-2.5 text-[11px] text-stone-500">
-        Regla: crecimiento ≥ 5% y &lt; 10% → <span className="font-medium text-teal-600">$50</span> ·
-        {" "}≥ 10% → <span className="font-medium text-emerald-600">$100</span> · vs mismo mes año anterior.
-      </div>
-    </Card>
-  );
-}
-
-function Metric({
-  label, value, valueClass, arrow,
-}: {
-  label: string;
-  value: string;
-  valueClass?: string;
-  arrow?: "▲" | "▼" | null;
-}) {
-  return (
-    <div className="flex flex-col">
-      <span className="text-[11px] uppercase tracking-wider text-stone-500">{label}</span>
-      <span className={cn("font-mono text-base font-medium text-stone-950", valueClass)}>
-        {arrow && <span className="mr-1">{arrow}</span>}
-        {value}
-      </span>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Ranking de vendedoras (YoY) con badge "Bono $50" — solo en meses evaluables
+// Ranking de vendedoras (YoY) con badges de bono — solo en meses evaluables
 // ─────────────────────────────────────────────────────────────────────────────
 
 function VendedorasRanking({ resp }: { resp: BonosMultifashion }) {
   const list = resp.vendedoras;
+  const gerenteBono = resp.gerente.bono;
   const mesLabel = `${MES_FULL[resp.mes_evaluado.mes - 1]} ${resp.mes_evaluado.year}`;
 
   if (list.length === 0) {
@@ -271,7 +240,7 @@ function VendedorasRanking({ resp }: { resp: BonosMultifashion }) {
             </thead>
             <tbody>
               {list.map((v, i) => (
-                <Row key={v.nombre} v={v} rank={i + 1} />
+                <Row key={v.nombre} v={v} rank={i + 1} gerenteBono={gerenteBono} />
               ))}
             </tbody>
           </table>
@@ -281,14 +250,15 @@ function VendedorasRanking({ resp }: { resp: BonosMultifashion }) {
       {/* Mobile */}
       <div className="space-y-2 md:hidden">
         {list.map((v, i) => (
-          <MobileCard key={v.nombre} v={v} rank={i + 1} />
+          <MobileCard key={v.nombre} v={v} rank={i + 1} gerenteBono={gerenteBono} />
         ))}
       </div>
     </div>
   );
 }
 
-function Tags({ v }: { v: BonoVendedora }) {
+// Badges de la fila: bono vendedora $50, bono gerente (monto del mes), y tag Gerente.
+function Tags({ v, gerenteBono }: { v: BonoVendedora; gerenteBono: number }) {
   return (
     <>
       {v.manager && (
@@ -301,19 +271,28 @@ function Tags({ v }: { v: BonoVendedora }) {
           <Award className="h-3 w-3" /> Bono $50
         </span>
       )}
+      {v.manager && gerenteBono > 0 && (
+        <span className="inline-flex items-center gap-0.5 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
+          <Award className="h-3 w-3" /> Bono ${gerenteBono}
+        </span>
+      )}
     </>
   );
 }
 
-function Row({ v, rank }: { v: BonoVendedora; rank: number }) {
+function rowHighlight(v: BonoVendedora, gerenteBono: number): boolean {
+  return v.bono_vendedora || (v.manager && gerenteBono > 0);
+}
+
+function Row({ v, rank, gerenteBono }: { v: BonoVendedora; rank: number; gerenteBono: number }) {
   const dv = formatDeltaRatio(v.delta_ventas_pct);
   return (
-    <tr className={v.bono_vendedora ? "bg-amber-50/60" : ""}>
+    <tr className={rowHighlight(v, gerenteBono) ? "bg-amber-50/60" : ""}>
       <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">{rank}</td>
       <td className="border-b border-stone-200 px-3.5 py-3 text-sm text-stone-950">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-medium">{v.nombre}</span>
-          <Tags v={v} />
+          <Tags v={v} gerenteBono={gerenteBono} />
         </div>
       </td>
       <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm text-stone-700 tabular-nums">
@@ -333,17 +312,17 @@ function Row({ v, rank }: { v: BonoVendedora; rank: number }) {
   );
 }
 
-function MobileCard({ v, rank }: { v: BonoVendedora; rank: number }) {
+function MobileCard({ v, rank, gerenteBono }: { v: BonoVendedora; rank: number; gerenteBono: number }) {
   const dv = formatDeltaRatio(v.delta_ventas_pct);
   return (
     <div className={cn(
       "rounded-lg border bg-white px-4 py-3.5",
-      v.bono_vendedora ? "border-amber-200 bg-amber-50/40" : "border-stone-200"
+      rowHighlight(v, gerenteBono) ? "border-amber-200 bg-amber-50/40" : "border-stone-200"
     )}>
-      <div className="flex items-baseline gap-2">
+      <div className="flex flex-wrap items-baseline gap-1.5">
         <span className="font-mono text-xs text-stone-500 tabular-nums">{rank}.</span>
-        <span className="flex-1 truncate text-[15px] font-medium leading-tight text-stone-950">{v.nombre}</span>
-        <Tags v={v} />
+        <span className="truncate text-[15px] font-medium leading-tight text-stone-950">{v.nombre}</span>
+        <Tags v={v} gerenteBono={gerenteBono} />
       </div>
       <div className="mt-2 flex items-baseline gap-3">
         <span className="font-mono text-base font-medium tabular-nums text-stone-950">
