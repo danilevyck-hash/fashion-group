@@ -375,6 +375,9 @@ export interface SwitchClient {
   /** Reporte "Total de ventas" del mes EN CURSO (tipo=03): totales diarios con
    *  costo completo (incluye B2B). Único endpoint con costo recuperable. */
   getReporteMesActual(): Promise<SwitchTotalVentasData>;
+  /** Ventas por sucursal/dia/articulo con costo (/apireporte/ventasucursal). Por
+   *  UN dia. NC vienen POSITIVAS; firmar por tipo al leer. Sin ND. Paginacion 50. */
+  getVentaSucursal(params: { fecha: string; sucursalId: number; porPagina: number; paginaActual: number }): Promise<SwitchVentaSucursalData>;
   /** Reporte de recibos (cobros) del rango. Un row por recibo. Paginación de 50. */
   listRecibos(params: ListFacturasParams): Promise<SwitchRecibosData>;
   /** Limpia el token cacheado de esta empresa (fuerza re-auth en la próxima llamada). */
@@ -395,6 +398,26 @@ export interface SwitchReciboReporte {
 export interface SwitchRecibosData {
   recibos: SwitchReciboReporte[];
   paginacion: SwitchPaginacion;
+}
+
+/** Item de /apireporte/ventasucursal (data.ventasucursal[]). Agregado por
+ *  articulo x dia x tipo. ventatotal/costototal son MAGNITUD (NC viene positiva). */
+export interface SwitchArticuloVenta {
+  fecha: string;
+  articuloId: number;
+  codigo: string | null;
+  descripcion: string | null;
+  unidadmedidaId: number | null;
+  tipo: string;                 // FA | NC | CNF | ...
+  totalcomprobantes: number;
+  cantidadtotal: string | number;
+  ventatotal: string | number;
+  costototal: string | number;
+  [key: string]: unknown;
+}
+export interface SwitchVentaSucursalData {
+  ventasucursal: SwitchArticuloVenta[];
+  paginacion?: SwitchPaginacion;
 }
 
 export function createSwitchClient(empresaKey: string): SwitchClient {
@@ -513,6 +536,21 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         empresaKey,
         cfg,
         `/apireporte/totalventas?tipo=03`,
+        "GET",
+      );
+    },
+
+    async getVentaSucursal(params) {
+      const qs = new URLSearchParams({
+        sucursalId: String(params.sucursalId),
+        fecha: params.fecha,
+        porPagina: String(params.porPagina),
+        paginaActual: String(params.paginaActual),
+      });
+      return authedCall<SwitchVentaSucursalData>(
+        empresaKey,
+        cfg,
+        `/apireporte/ventasucursal?${qs.toString()}`,
         "GET",
       );
     },
