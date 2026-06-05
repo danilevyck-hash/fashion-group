@@ -10,6 +10,7 @@ import type { Clientes, Cliente } from "./types";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { formatDeltaRatio, type DeltaTone } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 import { ClienteHoverCard, type HistorialState } from "./ClienteHoverCard";
 import { ClienteSheet } from "./ClienteSheet";
 import { OtrosClientesDialog } from "./OtrosClientesDialog";
@@ -391,7 +392,6 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                     histState={histStateFor(c)}
                     empresaScope={empresa}
                     onTriggerHistorial={() => loadHistorial(c.id, c.empresaKey)}
-                    onMobileTap={() => setSheetCliente(c)}
                   />
                 );
               })}
@@ -474,7 +474,6 @@ function ClienteRow({
   histState,
   empresaScope,
   onTriggerHistorial,
-  onMobileTap,
 }: {
   c: Cliente;
   /** Rank visual 1..N según el sort actual. Reemplaza c.rank (DB rank
@@ -484,7 +483,6 @@ function ClienteRow({
   histState: HistorialState;
   empresaScope: string;
   onTriggerHistorial: () => void;
-  onMobileTap: () => void;
 }) {
   const fmt = formatDeltaRatio(c.delta);
   const isMultiEmpresa = c.empresas_count > 1 && (c.empresas_breakdown?.length ?? 0) > 1;
@@ -507,22 +505,16 @@ function ClienteRow({
             botón dispara onMobileTap → abre ClienteSheet en el padre. */}
         <HoverCard openDelay={250} closeDelay={100}>
           <HoverCardTrigger asChild>
-            <button
-              type="button"
+            {/* El nombre es link directo a la ficha (/clientes/[codigo]); el
+                HoverCard sigue mostrando el preview al hover en desktop. */}
+            <Link
+              href={`/clientes/${encodeURIComponent(c.id)}`}
               onMouseEnter={handleHoverEnter}
               onFocus={handleHoverEnter}
-              onClick={(e) => {
-                // En desktop el HoverCard maneja el open via hover; el click
-                // sólo activa el flow mobile. md+ ignora el tap-to-open.
-                if (typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches) {
-                  e.preventDefault();
-                  onMobileTap();
-                }
-              }}
-              className="block max-w-full text-left font-medium leading-tight hover:text-teal-700 md:cursor-help"
+              className="block max-w-full text-left font-medium leading-tight hover:text-teal-700"
             >
               {c.nombre}
-            </button>
+            </Link>
           </HoverCardTrigger>
           <HoverCardContent
             side={hoverSide}
@@ -650,9 +642,13 @@ function ClienteCard({
     >
       <div className="px-4 py-3.5">
         <div className="flex items-baseline justify-between gap-2">
-          <div className="min-w-0 flex-1 truncate text-[15px] font-medium leading-tight text-stone-950">
+          <Link
+            href={`/clientes/${encodeURIComponent(c.id)}`}
+            onClick={(e) => e.stopPropagation()}
+            className="min-w-0 flex-1 truncate text-[15px] font-medium leading-tight text-stone-950 hover:text-teal-700"
+          >
             {c.nombre}
-          </div>
+          </Link>
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] text-stone-500">
           <span className="font-mono">{c.id}</span>

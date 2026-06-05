@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { fmtDate } from "@/lib/format";
 import { formatDelta, type DeltaTone } from "@/lib/ventas/formatDelta";
@@ -231,9 +232,12 @@ export function ClienteHoverCard({
     <div className="space-y-3">
       {/* Header: nombre + empresa·código + chip CXC */}
       <div className="space-y-1.5">
-        <div className="font-display text-[17px] font-medium leading-tight text-stone-950">
+        <Link
+          href={`/clientes/${encodeURIComponent(codigo)}`}
+          className="block font-display text-[17px] font-medium leading-tight text-stone-950 hover:text-teal-700 transition"
+        >
           {nombre}
-        </div>
+        </Link>
         <div className="text-xs text-stone-600">
           {empresa} · <span className="font-mono">{codigo}</span>
         </div>
