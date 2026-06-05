@@ -78,6 +78,36 @@ interface TokenEntry {
 const tokenCache = new Map<string, TokenEntry>();
 const TOKEN_TTL_MS = 55 * 60 * 1000;
 
+// ─── Reintentos ante fallos transitorios de Switch ───────────────────────────
+//
+// Switch flaquea de forma intermitente de tres maneras observadas en producción
+// (switch_sync_log, 5-jun-2026): (1) `/autenticacion` con timeout >30s,
+// (2) `TOKEN INVALIDO` a media paginación cuando otra invocación a la MISMA
+// empresa mata la sesión única (single-session), (3) 5xx upstream. El cliente
+// ya hace UN re-auth dentro de authedCall, pero si el 2do token también muere
+// (colisión de sesión) o si el propio /autenticacion expira, la corrida fallaba
+// sin reintento → la empresa quedaba stale un día entero (caso active_shoes /
+// active_wear). Este es el mismo patrón "robusto" de los backfills de FASE C:
+// re-auth + reintentos con backoff. Solo se activa ante errores TRANSITORIOS;
+// errores de config (env faltante) o 4xx de datos NO se reintentan.
+const MAX_AUTH_ATTEMPTS = 3;
+const MAX_CALL_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 1_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientSwitchError(err: unknown): boolean {
+  if (!(err instanceof SwitchApiError)) return false;
+  if (err.endpoint === "(config)") return false;            // env var faltante → no reintentar
+  if (err.httpCode === null) return true;                   // timeout / error de red
+  if (err.httpCode >= 500) return true;                     // 5xx upstream
+  if (err.httpCode === 401 || err.httpCode === 403) return true;
+  if (err.code !== null && SWITCH_TOKEN_ERROR_CODES.has(err.code)) return true; // token inválido en body 200
+  return false;
+}
+
 // ─── Config por empresa ──────────────────────────────────────────────────────
 
 interface EmpresaConfig {
@@ -228,7 +258,7 @@ function isTokenInvalidResponse(httpCode: number, parsed: unknown): boolean {
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
-async function authenticate(
+async function authenticateOnce(
   empresaKey: string,
   cfg: EmpresaConfig,
 ): Promise<string> {
@@ -268,6 +298,25 @@ async function authenticate(
   return token;
 }
 
+// Re-auth con reintentos ante timeout/red/5xx del propio /autenticacion.
+async function authenticate(
+  empresaKey: string,
+  cfg: EmpresaConfig,
+): Promise<string> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MAX_AUTH_ATTEMPTS; attempt++) {
+    try {
+      return await authenticateOnce(empresaKey, cfg);
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientSwitchError(err) || attempt === MAX_AUTH_ATTEMPTS) throw err;
+      console.warn(`[switch ${empresaKey}] auth intento ${attempt}/${MAX_AUTH_ATTEMPTS} falló (${err instanceof Error ? err.message : err}); reintentando`);
+      await sleep(RETRY_BASE_DELAY_MS * attempt);
+    }
+  }
+  throw lastErr;
+}
+
 async function getToken(
   empresaKey: string,
   cfg: EmpresaConfig,
@@ -281,7 +330,7 @@ async function getToken(
 
 // ─── Llamada autenticada con re-auth automático ──────────────────────────────
 
-async function authedCall<T>(
+async function authedCallOnce<T>(
   empresaKey: string,
   cfg: EmpresaConfig,
   endpoint: string,
@@ -349,6 +398,32 @@ async function authedCall<T>(
     empresaKey,
     endpoint,
   });
+}
+
+// Retry externo con backoff ante fallos transitorios que sobreviven al re-auth
+// inmediato de authedCallOnce (timeout, token muerto por colisión de sesión,
+// 5xx). Entre intentos limpiamos el token cacheado para forzar una sesión
+// fresca — es justo lo que destraba el "TOKEN INVALIDO" de single-session.
+async function authedCall<T>(
+  empresaKey: string,
+  cfg: EmpresaConfig,
+  endpoint: string,
+  method: "GET" | "POST",
+  body?: unknown,
+): Promise<T> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= MAX_CALL_ATTEMPTS; attempt++) {
+    try {
+      return await authedCallOnce<T>(empresaKey, cfg, endpoint, method, body);
+    } catch (err) {
+      lastErr = err;
+      if (!isTransientSwitchError(err) || attempt === MAX_CALL_ATTEMPTS) throw err;
+      tokenCache.delete(empresaKey); // sesión fresca en el próximo intento
+      console.warn(`[switch ${empresaKey}] ${endpoint} intento ${attempt}/${MAX_CALL_ATTEMPTS} falló (${err instanceof Error ? err.message : err}); reintentando`);
+      await sleep(RETRY_BASE_DELAY_MS * attempt);
+    }
+  }
+  throw lastErr;
 }
 
 // ─── API pública ─────────────────────────────────────────────────────────────
