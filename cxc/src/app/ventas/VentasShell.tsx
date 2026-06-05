@@ -4,10 +4,11 @@ import { useState, useTransition, useCallback } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, TrendingUp, Contact } from "lucide-react";
+import { Download, TrendingUp, Contact, Package } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ResumenView } from "@/components/ventas/ResumenView";
 import { ClientesView } from "@/components/ventas/ClientesView";
+import { ProductosView } from "@/components/ventas/ProductosView";
 import { exportResumenToExcel } from "@/lib/ventas/excel";
 import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/types";
 
@@ -134,9 +135,13 @@ export function VentasShell({
               ))}
             </SelectContent>
           </Select>
-          <Button variant="outline" size="sm" onClick={onExportExcel} disabled={!resumen}>
-            <Download className="mr-1.5 h-3.5 w-3.5" /> Excel
-          </Button>
+          {/* Excel global = export del Resumen. En el tab Productos se oculta
+              porque ese tab trae su propio export (por empresa + período). */}
+          {tab !== "productos" && (
+            <Button variant="outline" size="sm" onClick={onExportExcel} disabled={!resumen}>
+              <Download className="mr-1.5 h-3.5 w-3.5" /> Excel
+            </Button>
+          )}
         </div>
       </header>
 
@@ -153,6 +158,12 @@ export function VentasShell({
             className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none"
           >
             <Contact className="h-3.5 w-3.5" /> Clientes
+          </TabsTrigger>
+          <TabsTrigger
+            value="productos"
+            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none"
+          >
+            <Package className="h-3.5 w-3.5" /> Productos
           </TabsTrigger>
         </TabsList>
 
@@ -181,6 +192,11 @@ export function VentasShell({
               isClosedYear={isClosedYear}
             />
           ) : <ErrorState scope="clientes" />}
+        </TabsContent>
+        <TabsContent value="productos" className="mt-5">
+          {/* key={selectedYear} remonta al cambiar año global → resetea empresa/
+              período/sort internos al universo del año cargado. */}
+          <ProductosView key={selectedYear} selectedYear={selectedYear} />
         </TabsContent>
       </Tabs>
     </main>
