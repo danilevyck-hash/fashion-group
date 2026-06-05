@@ -136,7 +136,8 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
           </div>
           {cliente.last_synced_at && (
             <div className="text-[11px] text-gray-400 mt-3">
-              Última sincronización: {fmtDate(cliente.last_synced_at)}
+              {/* last_synced_at es timestamptz; fmtDate espera fecha (YYYY-MM-DD). */}
+              Última sincronización: {fmtDate(cliente.last_synced_at.slice(0, 10))}
             </div>
           )}
         </section>
