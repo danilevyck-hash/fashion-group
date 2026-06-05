@@ -31,17 +31,19 @@ export default function useAdminData() {
         }
       } catch { /* vendor map is optional */ }
 
-      const { data: uploadData } = await supabase
-        .from("cxc_uploads")
-        .select("*")
-        .order("uploaded_at", { ascending: false });
-
+      // Frescura por empresa vía API server-side: /api/upload lee
+      // switch_estadocuenta.synced_at con service_role (la tabla tiene RLS y el
+      // cliente browser/anon no la lee). UploadFreshness solo usa uploaded_at.
       const latestUploads: Record<string, CxcUpload> = {};
-      if (uploadData) {
-        for (const u of uploadData) {
-          if (!latestUploads[u.company_key]) latestUploads[u.company_key] = u;
+      try {
+        const upRes = await fetch("/api/upload", { cache: "no-store" });
+        if (upRes.ok) {
+          const upRows = (await upRes.json()) as { company_key: string; uploaded_at: string }[];
+          for (const u of upRows) {
+            if (!latestUploads[u.company_key]) latestUploads[u.company_key] = u as CxcUpload;
+          }
         }
-      }
+      } catch { /* frescura es opcional */ }
       setUploads(latestUploads);
 
       // Aging vía API server-side: aplica la restricción por empresa asociada

@@ -48,21 +48,21 @@ export async function GET(req: NextRequest) {
       .eq("estado", "Pendiente Bodega")
       .eq("deleted", false),
 
-    // CXC: latest upload per company
+    // CXC: última sincronización del API por empresa (switch_estadocuenta).
     supabaseServer
-      .from("cxc_uploads")
-      .select("company_key, uploaded_at")
-      .order("uploaded_at", { ascending: false }),
+      .from("switch_estadocuenta")
+      .select("empresa_key, synced_at")
+      .order("synced_at", { ascending: false }),
   ]);
 
-  // Count CXC stale companies (any company with last upload > 7 days ago)
+  // Count CXC stale companies (any company with last sync > 7 days ago)
   let cxcStale = 0;
   if (cxcUploadsRes.data) {
     const seen = new Set<string>();
     for (const row of cxcUploadsRes.data) {
-      if (seen.has(row.company_key)) continue;
-      seen.add(row.company_key);
-      if (row.uploaded_at < sevenDaysAgo) cxcStale++;
+      if (seen.has(row.empresa_key)) continue;
+      seen.add(row.empresa_key);
+      if (row.synced_at < sevenDaysAgo) cxcStale++;
     }
   }
 

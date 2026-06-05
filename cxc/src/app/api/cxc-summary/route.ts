@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
   const vigilanciaPct = totalCxc > 0 ? (vigilancia / totalCxc) * 100 : 0;
   const vencidoPct = totalCxc > 0 ? (vencido / totalCxc) * 100 : 0;
 
-  const { data: uploads } = await supabaseServer.from("cxc_uploads").select("uploaded_at, company_key").order("uploaded_at", { ascending: false });
+  // Frescura CXC = última sincronización del API (switch_estadocuenta), no el CSV legacy.
+  const { data: uploads } = await supabaseServer.from("switch_estadocuenta").select("empresa_key, synced_at").order("synced_at", { ascending: false });
 
   // CAMBIO 4: Count unique companies with data
   const empresasSet = new Set((rows || []).map((r: { company_key: string }) => r.company_key));
@@ -40,8 +41,8 @@ export async function GET(req: NextRequest) {
     corrientePct: Math.round(corrientePct),
     vigilanciaPct: Math.round(vigilanciaPct),
     vencidoPct: Math.round(vencidoPct),
-    lastUpload: uploads?.[0]?.uploaded_at || null,
-    lastUploadEmpresa: uploads?.[0]?.company_key || null,
+    lastUpload: uploads?.[0]?.synced_at || null,
+    lastUploadEmpresa: uploads?.[0]?.empresa_key || null,
     empresasCount: empresasSet.size,
   });
 }

@@ -37,7 +37,7 @@ function daysBetween(a: string | Date, b: string | Date): number {
   return Math.abs(Math.floor((ta - tb) / (1000 * 60 * 60 * 24)));
 }
 
-async function tableMaxFecha(table: "cxc_rows" | "ventas_raw"): Promise<string | null> {
+async function tableMaxFecha(table: "ventas_raw"): Promise<string | null> {
   const { data, error } = await supabaseServer
     .from(table)
     .select("fecha")
@@ -53,116 +53,25 @@ async function tableMaxFecha(table: "cxc_rows" | "ventas_raw"): Promise<string |
 
 // ── Checks ───────────────────────────────────────────────────────────────────
 
-// CHECK 1a: cxc_rows con fecha de emisión NULL. Solo "Saldo Anterior" es
-// legítimamente sin fecha — el resto (Facturas, NDs, NCs, Recibos) siempre
-// trae fecha en Switch.
-async function checkCxcFechaEmisionNull(): Promise<CheckResult> {
-  const { data, error } = await supabaseServer
-    .from("cxc_rows")
-    .select("comprobante, n_sistema, n_fiscal, fecha")
-    .is("fecha", null)
-    .not("comprobante", "in", '("Saldo Anterior")')
-    .limit(100);
-
-  if (error) {
-    return checkError("cxc_fecha_emision_null", "cxc_rows", error.message);
-  }
-
-  const count = data?.length ?? 0;
-  const severity: Severity = count === 0 ? "ok" : count <= 5 ? "warning" : "critical";
-  const top = (data ?? []).slice(0, 10).map(r => ({
-    comprobante: r.comprobante, n_sistema: r.n_sistema, n_fiscal: r.n_fiscal,
-  }));
-
-  return {
-    check_name: "cxc_fecha_emision_null",
-    table_name: "cxc_rows",
-    severity,
-    rows_affected: count,
-    threshold_exceeded: count > 5,
-    details: { sample: top, threshold: { warning: "1-5", critical: ">5" }, excluded: ["Saldo Anterior"] },
-  };
-}
-
-// CHECK 1b: cxc_rows con fecha_vencimiento NULL. NCs y Recibos no tienen
-// vencimiento por naturaleza (NC compensa, Recibo es pago). Saldo Anterior
-// también queda sin vencimiento. Cualquier otro comprobante sin vencimiento
-// es anómalo.
-async function checkCxcFechaVencimientoNull(): Promise<CheckResult> {
-  const { data, error } = await supabaseServer
-    .from("cxc_rows")
-    .select("comprobante, n_sistema, n_fiscal, fecha_vencimiento")
-    .is("fecha_vencimiento", null)
-    .not("comprobante", "in", '("Saldo Anterior","Nota de Crédito","Recibo")')
-    .limit(100);
-
-  if (error) {
-    return checkError("cxc_fecha_vencimiento_null", "cxc_rows", error.message);
-  }
-
-  const count = data?.length ?? 0;
-  const severity: Severity = count === 0 ? "ok" : count <= 5 ? "warning" : "critical";
-  const top = (data ?? []).slice(0, 10).map(r => ({
-    comprobante: r.comprobante, n_sistema: r.n_sistema, n_fiscal: r.n_fiscal,
-  }));
-
-  return {
-    check_name: "cxc_fecha_vencimiento_null",
-    table_name: "cxc_rows",
-    severity,
-    rows_affected: count,
-    threshold_exceeded: count > 5,
-    details: {
-      sample: top,
-      threshold: { warning: "1-5", critical: ">5" },
-      excluded: ["Saldo Anterior", "Nota de Crédito", "Recibo"],
-    },
-  };
-}
-
-// CHECK 2: dias_vencidos > 0 con fecha NULL — anomalía lógica imposible
-// (Switch no debería calcular vencimiento sin fecha base).
-async function checkCxcDiasVencidosSinFecha(): Promise<CheckResult> {
-  const { count, error } = await supabaseServer
-    .from("cxc_rows")
-    .select("id", { count: "exact", head: true })
-    .gt("dias_vencidos", 0)
-    .is("fecha", null);
-
-  if (error) {
-    return checkError("cxc_dias_vencidos_sin_fecha", "cxc_rows", error.message);
-  }
-
-  const c = count ?? 0;
-  return {
-    check_name: "cxc_dias_vencidos_sin_fecha",
-    table_name: "cxc_rows",
-    severity: c === 0 ? "ok" : "warning",
-    rows_affected: c,
-    threshold_exceeded: c > 0,
-    details: { threshold: { warning: ">0" } },
-  };
-}
-
-// CHECK 3: Desync entre la última fecha de upload de CXC vs Ventas. Si los
+// CHECK 3: Desync entre la última sincronización de CXC vs el upload de Ventas. Si los
 // uploads se desincronizaron mucho, los reportes cruzados quedan stale.
 async function checkUploadDesync(): Promise<CheckResult> {
   const [cxcRes, ventasRes] = await Promise.all([
-    supabaseServer.from("cxc_uploads").select("uploaded_at").order("uploaded_at", { ascending: false }).limit(1),
+    supabaseServer.from("switch_estadocuenta").select("synced_at").order("synced_at", { ascending: false }).limit(1),
     supabaseServer.from("ventas_raw").select("uploaded_at").order("uploaded_at", { ascending: false }).limit(1),
   ]);
 
-  const cxcLast = cxcRes.data?.[0]?.uploaded_at ?? null;
+  const cxcLast = cxcRes.data?.[0]?.synced_at ?? null;
   const ventasLast = ventasRes.data?.[0]?.uploaded_at ?? null;
 
   if (!cxcLast || !ventasLast) {
     return {
       check_name: "upload_desync_cxc_ventas",
-      table_name: "cxc_uploads,ventas_raw",
+      table_name: "switch_estadocuenta,ventas_raw",
       severity: "warning",
       rows_affected: 0,
       threshold_exceeded: true,
-      details: { cxc_last: cxcLast, ventas_last: ventasLast, reason: "missing one of the two uploads" },
+      details: { cxc_last: cxcLast, ventas_last: ventasLast, reason: "missing CXC sync or ventas upload" },
     };
   }
 
@@ -171,7 +80,7 @@ async function checkUploadDesync(): Promise<CheckResult> {
 
   return {
     check_name: "upload_desync_cxc_ventas",
-    table_name: "cxc_uploads,ventas_raw",
+    table_name: "switch_estadocuenta,ventas_raw",
     severity,
     rows_affected: gapDays,
     threshold_exceeded: gapDays >= 7,
@@ -282,11 +191,13 @@ async function checkLastUploadAge(): Promise<CheckResult[]> {
   const now = new Date();
   const results: CheckResult[] = [];
 
-  for (const [name, table] of [
-    ["last_upload_age_cxc", "cxc_rows"],
-    ["last_upload_age_ventas", "ventas_raw"],
+  for (const [name, table, source] of [
+    ["last_upload_age_cxc", "switch_estadocuenta", "sync"],
+    ["last_upload_age_ventas", "ventas_raw", "fecha"],
   ] as const) {
-    const maxFecha = await tableMaxFecha(table);
+    const maxFecha = source === "sync"
+      ? (await supabaseServer.from("switch_estadocuenta").select("synced_at").order("synced_at", { ascending: false }).limit(1)).data?.[0]?.synced_at ?? null
+      : await tableMaxFecha("ventas_raw");
     if (!maxFecha) {
       results.push({
         check_name: name, table_name: table,
@@ -307,116 +218,6 @@ async function checkLastUploadAge(): Promise<CheckResult[]> {
     });
   }
   return results;
-}
-
-// CHECK 8: Facturas en CXC sin venta correspondiente (caso Quality Shoes).
-// Cliente con MAX(fecha) en cxc_rows mucho más nuevo que MAX(fecha) en
-// ventas_raw → la factura está en cobranza pero no en el reporte de ventas.
-async function checkCxcSinVentaCorrespondiente(): Promise<CheckResult> {
-  // No hay RPC dedicada — corremos como SQL via supabaseServer.rpc no aplica;
-  // hacemos las dos agregaciones cliente por cliente y comparamos en JS.
-  // Para volumen razonable (~ pocos miles de cliente_codigo) es manejable.
-  const [cxcRes, ventasRes] = await Promise.all([
-    supabaseServer
-      .from("cxc_rows")
-      .select("cliente_codigo, fecha")
-      .gt("saldo", 0)
-      .not("fecha", "is", null)
-      .not("cliente_codigo", "is", null),
-    supabaseServer
-      .from("ventas_raw")
-      .select("cliente_codigo, fecha")
-      .not("cliente_codigo", "is", null),
-  ]);
-
-  if (cxcRes.error || ventasRes.error) {
-    return checkError(
-      "cxc_sin_venta_correspondiente",
-      "cxc_rows,ventas_raw",
-      cxcRes.error?.message || ventasRes.error?.message || "unknown",
-    );
-  }
-
-  const cxcMaxByCliente = new Map<string, string>();
-  for (const r of cxcRes.data ?? []) {
-    const k = r.cliente_codigo as string;
-    const f = r.fecha as string;
-    const prev = cxcMaxByCliente.get(k);
-    if (!prev || f > prev) cxcMaxByCliente.set(k, f);
-  }
-
-  const ventasMaxByCliente = new Map<string, string>();
-  for (const r of ventasRes.data ?? []) {
-    const k = r.cliente_codigo as string;
-    const f = (r.fecha as string).slice(0, 10);
-    const prev = ventasMaxByCliente.get(k);
-    if (!prev || f > prev) ventasMaxByCliente.set(k, f);
-  }
-
-  const gaps: { cliente_codigo: string; cxc_max: string; ventas_max: string | null; gap_days: number }[] = [];
-  for (const [cliente, cxcMax] of cxcMaxByCliente) {
-    const ventasMax = ventasMaxByCliente.get(cliente) ?? null;
-    const baseline = ventasMax ?? "1900-01-01";
-    if (cxcMax > baseline) {
-      const gap = daysBetween(cxcMax, baseline);
-      if (gap > 30) gaps.push({ cliente_codigo: cliente, cxc_max: cxcMax, ventas_max: ventasMax, gap_days: gap });
-    }
-  }
-
-  gaps.sort((a, b) => b.gap_days - a.gap_days);
-  const count = gaps.length;
-  // Recalibrado: en una operación con 6 B2B y ~100 clientes activos, 50-100 NDs/
-  // intereses/refacturación sin contraparte en ventas es esperado. Solo volumen
-  // muy alto (>150) sugiere problema real de pipeline.
-  const severity: Severity =
-    count === 0 ? "ok" :
-    count <= 20 ? "ok" :
-    count <= 50 ? "info" :
-    count <= 150 ? "warning" :
-    "critical";
-
-  return {
-    check_name: "cxc_sin_venta_correspondiente",
-    table_name: "cxc_rows,ventas_raw",
-    severity,
-    rows_affected: count,
-    threshold_exceeded: count > 20,
-    details: {
-      top_10: gaps.slice(0, 10),
-      threshold: { ok: "0-20", info: "21-50", warning: "51-150", critical: ">150", filter: "gap > 30 días" },
-    },
-  };
-}
-
-// CHECK 9: Headers zombie en cxc_uploads (sin filas asociadas).
-async function checkCxcUploadsZombie(): Promise<CheckResult> {
-  const { data: uploads, error: upErr } = await supabaseServer
-    .from("cxc_uploads")
-    .select("id, company_key, uploaded_at, row_count");
-  if (upErr) {
-    return checkError("cxc_uploads_zombie", "cxc_uploads", upErr.message);
-  }
-
-  // Para cada upload, contar cxc_rows. Usamos head:true para no traer data.
-  const zombies: { id: string; company_key: string; uploaded_at: string; row_count: number }[] = [];
-  await Promise.all((uploads ?? []).map(async u => {
-    const { count, error } = await supabaseServer
-      .from("cxc_rows")
-      .select("id", { count: "exact", head: true })
-      .eq("upload_id", u.id);
-    if (error) return;
-    if ((count ?? 0) === 0) zombies.push(u as typeof zombies[number]);
-  }));
-
-  const c = zombies.length;
-  return {
-    check_name: "cxc_uploads_zombie",
-    table_name: "cxc_uploads",
-    severity: c === 0 ? "ok" : "warning",
-    rows_affected: c,
-    threshold_exceeded: c > 0,
-    details: { sample: zombies.slice(0, 10), threshold: { warning: ">0" } },
-  };
 }
 
 // CHECK 10: tipos de comprobante fuera de las whitelists de signo del aging
@@ -593,17 +394,15 @@ function checkError(name: string, table: string, message: string): CheckResult {
 // ── Runner ───────────────────────────────────────────────────────────────────
 
 export async function runAllChecks(): Promise<CheckResult[]> {
+  // CXC ahora vive en switch_estadocuenta (sync API). Los checks de esquema del
+  // CSV legacy (cxc_rows fecha/vencimiento/dias, zombie uploads, sin-venta) se
+  // retiraron; la integridad de CXC la cubren aging_tipos/aging_dias + frescura.
   const grouped = await Promise.all([
-    checkCxcFechaEmisionNull(),
-    checkCxcFechaVencimientoNull(),
-    checkCxcDiasVencidosSinFecha(),
     checkUploadDesync(),
     checkChequesCriticosNull(),
     checkPrestamosSaldoAnomalo(),
     checkVentasClienteVacio(),
     checkLastUploadAge(),
-    checkCxcSinVentaCorrespondiente(),
-    checkCxcUploadsZombie(),
     checkAgingTiposSinClasificar(),
     checkSwitchFacturasContinuidad(),
     checkAgingDiasAnomalo(),
