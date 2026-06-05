@@ -127,9 +127,15 @@ function GerenteLine({ resp }: { resp: BonosMultifashion }) {
   const g = resp.gerente;
   const mesLabel = `${MES_FULL[resp.mes_evaluado.mes - 1]} ${resp.mes_evaluado.year}`;
   const delta = formatDeltaRatio(g.delta_pct);
-  const deltaExact = g.delta_pct != null
+  // Display sin decimales (delta.displayValue ya redondea a 0). El % exacto con
+  // 1 decimal va al tooltip para explicar casos límite (ej. 4.6% se muestra +5%
+  // pero NO genera bono).
+  const deltaExactPrecise = g.delta_pct != null
     ? `${g.delta_pct >= 0 ? "+" : ""}${(g.delta_pct * 100).toFixed(1)}%`
-    : "—";
+    : null;
+  const tooltipRegla = deltaExactPrecise
+    ? `${REGLA_BONO} · Crecimiento exacto este mes: ${deltaExactPrecise} → bono $${g.bono}.`
+    : REGLA_BONO;
 
   return (
     <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-lg border border-teal-100 bg-teal-50/50 px-3.5 py-2.5 text-sm">
@@ -142,7 +148,7 @@ function GerenteLine({ resp }: { resp: BonosMultifashion }) {
           <span className="text-[11px] text-stone-400">(tienda completa, incl. mayoreo)</span>
           <span className="text-stone-400">→</span>
           <span className={cn("font-mono tabular-nums font-medium", TONE_LIGHT[delta.tone])}>
-            {delta.arrow && <span className="mr-0.5">{delta.arrow}</span>}{deltaExact}
+            {delta.arrow && <span className="mr-0.5">{delta.arrow}</span>}{delta.displayValue}
           </span>
           <span className="text-stone-400">→</span>
           <span className={cn("font-semibold", bonoColor(g.bono))}>bono gerente ${g.bono}</span>
@@ -154,7 +160,7 @@ function GerenteLine({ resp }: { resp: BonosMultifashion }) {
           <span className="text-stone-500">· sin comparativo {resp.mes_evaluado.year - 1} para el bono</span>
         </>
       )}
-      <span title={REGLA_BONO} className="ml-0.5 inline-flex cursor-help text-stone-400" aria-label="Regla del bono">
+      <span title={tooltipRegla} className="ml-0.5 inline-flex cursor-help text-stone-400" aria-label="Regla del bono">
         <Info className="h-3.5 w-3.5" />
       </span>
     </div>

@@ -300,7 +300,7 @@ function buildMargenSub(margen: number | null, margenPrev: number | null, prevYe
 // FASE 2.1b: '—' cuando margen no es un número finito (null/undefined/NaN).
 function fmtMargen(margen: number | null): string {
   return typeof margen === "number" && Number.isFinite(margen)
-    ? `${(margen * 100).toFixed(1)}%`
+    ? `${(margen * 100).toFixed(0)}%`
     : "—";
 }
 
