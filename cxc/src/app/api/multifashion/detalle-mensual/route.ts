@@ -43,9 +43,12 @@ export async function GET(req: NextRequest) {
   // Detalle mensual + ventas por hora (hora pico) en paralelo. La hora pico es
   // aditiva: si su RPC falla, el detalle igual responde (la sección de horas
   // simplemente no se renderiza) — no bloquea el resto del subtab.
-  const [detalleRes, horasRes] = await Promise.all([
+  // Detalle + hora pico + margen mensual tienda completa, en paralelo. Tanto
+  // horas como margen son aditivos: si su RPC falla, el detalle igual responde.
+  const [detalleRes, horasRes, margenRes] = await Promise.all([
     supabaseServer.rpc("multifashion_detalle_mensual_v2", { p_year: year, p_mes: mes }),
     supabaseServer.rpc("multifashion_horas_pico_v1", { p_year: year, p_mes: mes }),
+    supabaseServer.rpc("multifashion_margen_tienda_mensual", { p_year: year, p_mes: mes }),
   ]);
 
   if (detalleRes.error) {
@@ -60,8 +63,20 @@ export async function GET(req: NextRequest) {
     ? { horas: [], hora_pico: null, hora_pico_ventas: null }
     : (horasRes.data ?? { horas: [], hora_pico: null, hora_pico_ventas: null });
 
+  // Inyectar el margen tienda completa del mes en totales.margen (el RPC de
+  // detalle lo deja en null porque switch_facturas no trae costo per-factura).
+  const detalle = detalleRes.data as Record<string, unknown>;
+  const margenMes = margenRes.error
+    ? null
+    : ((margenRes.data as { margen?: number | null } | null)?.margen ?? null);
+  const totales = (detalle?.totales ?? {}) as Record<string, unknown>;
+  if (margenRes.error) {
+    console.error("[multifashion/detalle-mensual] margen rpc error", margenRes.error);
+  }
+
   return NextResponse.json({
-    ...(detalleRes.data as Record<string, unknown>),
+    ...detalle,
+    totales: { ...totales, margen: margenMes },
     ...(horas as Record<string, unknown>),
   });
 }
