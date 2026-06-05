@@ -121,9 +121,11 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
     <div className="w-full">
       {/* Selector único de período (mes) con flechas ‹ › a los lados. Alineado
           a la derecha, mismo alto (h-9) que el selector de año global de Ventas.
-          El año lo fija ese selector global; aquí solo el mes. Siempre visible
-          para placement estable; solo tiene efecto en Detalle mensual y
-          Vendedoras. Flechas y dropdown comparten el rango [minMonth, maxMonth]. */}
+          El año lo fija ese selector global; aquí solo el mes. Solo se muestra en
+          los subtabs que lo usan (Detalle mensual y Vendedoras); Overview (YTD) y
+          Clientes (pills propias) lo ocultan para no parecer un control roto.
+          Flechas y dropdown comparten el rango [minMonth, maxMonth]. */}
+      {(subtab === "mes" || subtab === "vendedoras") && (
       <div className="mb-4">
         <div className="flex items-center justify-end gap-2">
         <span className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Mes</span>
@@ -166,6 +168,7 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
           </p>
         )}
       </div>
+      )}
 
       <Tabs value={subtab} onValueChange={setSubtab} className="w-full">
         <TabsList className="-mx-4 flex h-auto w-auto justify-start gap-0 overflow-x-auto rounded-none border-b border-stone-200 bg-transparent px-4 p-0 md:mx-0 md:px-0">
