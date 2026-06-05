@@ -67,9 +67,9 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
       .eq("cliente_id", cliente.id)
       .gte("fecha", yearStart),
     supabaseServer
-      .from("cxc_rows")
-      .select("company_key, debito, credito")
-      .eq("cliente_id", cliente.id),
+      .from("switch_estadocuenta_aging")
+      .select("company_key, total")
+      .eq("codigo", cliente.codigo),
     supabaseServer
       .from("ventas_raw")
       .select("fecha")
@@ -85,8 +85,8 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
     ventasMap.set(r.empresa, (ventasMap.get(r.empresa) ?? 0) + Number(r.total ?? 0));
   }
   const cxcMap = new Map<string, number>();
-  for (const r of (cxcRes.data ?? []) as { company_key: string; debito: number; credito: number }[]) {
-    cxcMap.set(r.company_key, (cxcMap.get(r.company_key) ?? 0) + (Number(r.debito ?? 0) - Number(r.credito ?? 0)));
+  for (const r of (cxcRes.data ?? []) as { company_key: string; total: number }[]) {
+    cxcMap.set(r.company_key, (cxcMap.get(r.company_key) ?? 0) + Number(r.total ?? 0));
   }
   const empresas = B2B_EMPRESA_KEYS.map(e => ({
     empresa: e,

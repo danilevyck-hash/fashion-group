@@ -55,9 +55,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
       .eq("cliente_id", clienteId)
       .gte("fecha", yearStart),
     supabaseServer
-      .from("cxc_rows")
-      .select("company_key, debito, credito")
-      .eq("cliente_id", clienteId),
+      .from("switch_estadocuenta_aging")
+      .select("company_key, total")
+      .eq("codigo", codigo),
     supabaseServer
       .from("ventas_raw")
       .select("fecha")
@@ -73,10 +73,11 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
     ventasMap.set(r.empresa, (ventasMap.get(r.empresa) ?? 0) + Number(r.total ?? 0));
   }
 
+  // CXC saldo neto por empresa desde la vista del API (switch_estadocuenta_aging).
+  // `total` ya viene firmado (NC/Recibo negativos), una fila por (empresa, codigo).
   const cxcMap = new Map<string, number>();
-  for (const r of (cxcRes.data ?? []) as { company_key: string; debito: number; credito: number }[]) {
-    const net = Number(r.debito ?? 0) - Number(r.credito ?? 0);
-    cxcMap.set(r.company_key, (cxcMap.get(r.company_key) ?? 0) + net);
+  for (const r of (cxcRes.data ?? []) as { company_key: string; total: number }[]) {
+    cxcMap.set(r.company_key, (cxcMap.get(r.company_key) ?? 0) + Number(r.total ?? 0));
   }
 
   const empresas: EmpresaTotals[] = B2B_EMPRESA_KEYS.map(e => ({
