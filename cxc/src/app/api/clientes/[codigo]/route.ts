@@ -23,6 +23,7 @@ interface EmpresaTotals {
   ventas_ytd: number;
   cobrado_ytd: number;
   cxc: number;
+  ultima_factura: string | null;
 }
 
 export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: string }> }) {
@@ -61,12 +62,10 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
       .eq("codigo", codigo),
     supabaseServer
       .from("ventas_raw")
-      .select("fecha")
+      .select("empresa, fecha")
       .eq("cliente_id", clienteId)
       .in("tipo", ["Factura", "Tiquete", "Transacción"])
-      .order("fecha", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .order("fecha", { ascending: false }),
     // Cobrado YTD = pagos del año (switch_recibos) EXCLUYENDO retenciones.
     supabaseServer
       .from("switch_recibos")
@@ -91,12 +90,17 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   for (const r of (cobradoRes.data ?? []) as { empresa_key: string; total: number }[]) {
     cobradoMap.set(r.empresa_key, (cobradoMap.get(r.empresa_key) ?? 0) + Number(r.total ?? 0));
   }
+  const ultimaFacturaMap = new Map<string, string>();
+  for (const r of (ultimaRes.data ?? []) as { empresa: string; fecha: string }[]) {
+    if (r.fecha && !ultimaFacturaMap.has(r.empresa)) ultimaFacturaMap.set(r.empresa, r.fecha);
+  }
 
   const empresas: EmpresaTotals[] = B2B_EMPRESA_KEYS.map(e => ({
     empresa: e,
     ventas_ytd: Math.round((ventasMap.get(e) ?? 0) * 100) / 100,
     cobrado_ytd: Math.round((cobradoMap.get(e) ?? 0) * 100) / 100,
     cxc: Math.round((cxcMap.get(e) ?? 0) * 100) / 100,
+    ultima_factura: ultimaFacturaMap.get(e) ?? null,
   }));
 
   const totalGrupo = {
@@ -112,8 +116,8 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
       ventas_ytd:  Math.round(totalGrupo.ventas_ytd * 100) / 100,
       cobrado_ytd: Math.round(totalGrupo.cobrado_ytd * 100) / 100,
       cxc:         Math.round(totalGrupo.cxc * 100) / 100,
+      ultima_factura: (ultimaRes.data?.[0] as { fecha: string } | undefined)?.fecha ?? null,
     },
-    ultima_factura: (ultimaRes.data as { fecha: string } | null)?.fecha ?? null,
   });
 }
 

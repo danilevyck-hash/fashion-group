@@ -70,14 +70,14 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
       .from("switch_estadocuenta_aging")
       .select("company_key, total")
       .eq("codigo", cliente.codigo),
+    // Última factura por empresa: orden desc → la primera fila de cada empresa
+    // es su fecha más reciente (las más recientes vienen en el top, default 1000).
     supabaseServer
       .from("ventas_raw")
-      .select("fecha")
+      .select("empresa, fecha")
       .eq("cliente_id", cliente.id)
       .in("tipo", ["Factura", "Tiquete", "Transacción"])
-      .order("fecha", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
+      .order("fecha", { ascending: false }),
     // Cobrado YTD = pagos reales del año (switch_recibos), EXCLUYENDO retenciones
     // (es_retencion ya está clasificado por el sync). Join por cliente_codigo.
     supabaseServer
@@ -100,24 +100,30 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
   for (const r of (cobradoRes.data ?? []) as { empresa_key: string; total: number }[]) {
     cobradoMap.set(r.empresa_key, (cobradoMap.get(r.empresa_key) ?? 0) + Number(r.total ?? 0));
   }
+  // Última factura por empresa (primera fila por empresa = más reciente, orden desc).
+  const ultimaFacturaMap = new Map<string, string>();
+  for (const r of (ultimaRes.data ?? []) as { empresa: string; fecha: string }[]) {
+    if (r.fecha && !ultimaFacturaMap.has(r.empresa)) ultimaFacturaMap.set(r.empresa, r.fecha);
+  }
   const empresas = B2B_EMPRESA_KEYS.map(e => ({
     empresa: e,
-    ventas_ytd:  Math.round((ventasMap.get(e) ?? 0) * 100) / 100,
-    cobrado_ytd: Math.round((cobradoMap.get(e) ?? 0) * 100) / 100,
-    cxc:         Math.round((cxcMap.get(e) ?? 0) * 100) / 100,
+    ventas_ytd:     Math.round((ventasMap.get(e) ?? 0) * 100) / 100,
+    cobrado_ytd:    Math.round((cobradoMap.get(e) ?? 0) * 100) / 100,
+    cxc:            Math.round((cxcMap.get(e) ?? 0) * 100) / 100,
+    ultima_factura: ultimaFacturaMap.get(e) ?? null,
   }));
   const totalGrupo = {
-    ventas_ytd:  Math.round(empresas.reduce((s, e) => s + e.ventas_ytd, 0) * 100) / 100,
-    cobrado_ytd: Math.round(empresas.reduce((s, e) => s + e.cobrado_ytd, 0) * 100) / 100,
-    cxc:         Math.round(empresas.reduce((s, e) => s + e.cxc, 0) * 100) / 100,
+    ventas_ytd:     Math.round(empresas.reduce((s, e) => s + e.ventas_ytd, 0) * 100) / 100,
+    cobrado_ytd:    Math.round(empresas.reduce((s, e) => s + e.cobrado_ytd, 0) * 100) / 100,
+    cxc:            Math.round(empresas.reduce((s, e) => s + e.cxc, 0) * 100) / 100,
+    // La más reciente del grupo = el top de la lista ya ordenada desc.
+    ultima_factura: (ultimaRes.data?.[0] as { fecha: string } | undefined)?.fecha ?? null,
   };
-  const ultimaFactura = (ultimaRes.data as { fecha: string } | null)?.fecha ?? null;
 
   const data: ClienteDetailData = {
     cliente,
     empresas,
     total_grupo: totalGrupo,
-    ultima_factura: ultimaFactura,
   };
 
   return <ClienteDetail initialData={data} />;

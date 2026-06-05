@@ -30,13 +30,13 @@ interface EmpresaTotals {
   ventas_ytd: number;
   cobrado_ytd: number;
   cxc: number;
+  ultima_factura: string | null;
 }
 
 export interface ClienteDetailData {
   cliente: Cliente;
   empresas: EmpresaTotals[];
-  total_grupo: { ventas_ytd: number; cobrado_ytd: number; cxc: number };
-  ultima_factura: string | null;
+  total_grupo: { ventas_ytd: number; cobrado_ytd: number; cxc: number; ultima_factura: string | null };
 }
 
 const EDITABLE_ROLES = ["admin", "secretaria"];
@@ -192,6 +192,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                 <th className="py-2 font-normal text-right">Ventas YTD</th>
                 <th className="py-2 font-normal text-right">Cobrado YTD</th>
                 <th className="py-2 font-normal text-right">CXC actual</th>
+                <th className="py-2 font-normal text-right">Última factura</th>
               </tr>
             </thead>
             <tbody>
@@ -203,6 +204,9 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                   <td className={`py-2 text-right tabular-nums ${e.cxc > 0 ? "text-amber-700" : e.cxc < 0 ? "text-emerald-700" : "text-gray-400"}`}>
                     ${fmt(e.cxc)}
                   </td>
+                  <td className={`py-2 text-right tabular-nums ${e.ultima_factura ? "text-gray-600" : "text-gray-300"}`}>
+                    {e.ultima_factura ? fmtDate(e.ultima_factura.slice(0, 10)) : "—"}
+                  </td>
                 </tr>
               ))}
               <tr className="font-medium">
@@ -212,14 +216,12 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                 <td className={`py-2.5 text-right tabular-nums ${initialData.total_grupo.cxc > 0 ? "text-amber-700" : initialData.total_grupo.cxc < 0 ? "text-emerald-700" : "text-gray-400"}`}>
                   ${fmt(initialData.total_grupo.cxc)}
                 </td>
+                <td className={`py-2.5 text-right tabular-nums ${initialData.total_grupo.ultima_factura ? "text-gray-600" : "text-gray-300"}`}>
+                  {initialData.total_grupo.ultima_factura ? fmtDate(initialData.total_grupo.ultima_factura.slice(0, 10)) : "—"}
+                </td>
               </tr>
             </tbody>
           </table>
-          {initialData.ultima_factura && (
-            <div className="text-xs text-gray-500 mt-3">
-              Última factura: <span className="text-gray-700">{fmtDate(initialData.ultima_factura)}</span>
-            </div>
-          )}
         </section>
       </main>
       <Toast message={toast} type="success" onDismiss={() => setToast(null)} />
