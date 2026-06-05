@@ -21,6 +21,7 @@ const WRITE_ROLES = ["admin", "secretaria"];
 interface EmpresaTotals {
   empresa: string;
   ventas_ytd: number;
+  cobrado_ytd: number;
   cxc: number;
 }
 
@@ -48,7 +49,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10);
 
   // 2. Ventas YTD por empresa, CXC saldo por empresa, última factura
-  const [ventasRes, cxcRes, ultimaRes] = await Promise.all([
+  const [ventasRes, cxcRes, ultimaRes, cobradoRes] = await Promise.all([
     supabaseServer
       .from("ventas_raw")
       .select("empresa, total")
@@ -66,6 +67,13 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
       .order("fecha", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // Cobrado YTD = pagos del año (switch_recibos) EXCLUYENDO retenciones.
+    supabaseServer
+      .from("switch_recibos")
+      .select("empresa_key, total")
+      .eq("cliente_codigo", codigo)
+      .eq("es_retencion", false)
+      .gte("fecha", yearStart),
   ]);
 
   const ventasMap = new Map<string, number>();
@@ -79,24 +87,31 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   for (const r of (cxcRes.data ?? []) as { company_key: string; total: number }[]) {
     cxcMap.set(r.company_key, (cxcMap.get(r.company_key) ?? 0) + Number(r.total ?? 0));
   }
+  const cobradoMap = new Map<string, number>();
+  for (const r of (cobradoRes.data ?? []) as { empresa_key: string; total: number }[]) {
+    cobradoMap.set(r.empresa_key, (cobradoMap.get(r.empresa_key) ?? 0) + Number(r.total ?? 0));
+  }
 
   const empresas: EmpresaTotals[] = B2B_EMPRESA_KEYS.map(e => ({
     empresa: e,
     ventas_ytd: Math.round((ventasMap.get(e) ?? 0) * 100) / 100,
+    cobrado_ytd: Math.round((cobradoMap.get(e) ?? 0) * 100) / 100,
     cxc: Math.round((cxcMap.get(e) ?? 0) * 100) / 100,
   }));
 
   const totalGrupo = {
-    ventas_ytd: empresas.reduce((s, e) => s + e.ventas_ytd, 0),
-    cxc:        empresas.reduce((s, e) => s + e.cxc, 0),
+    ventas_ytd:  empresas.reduce((s, e) => s + e.ventas_ytd, 0),
+    cobrado_ytd: empresas.reduce((s, e) => s + e.cobrado_ytd, 0),
+    cxc:         empresas.reduce((s, e) => s + e.cxc, 0),
   };
 
   return NextResponse.json({
     cliente,
     empresas,
     total_grupo: {
-      ventas_ytd: Math.round(totalGrupo.ventas_ytd * 100) / 100,
-      cxc:        Math.round(totalGrupo.cxc * 100) / 100,
+      ventas_ytd:  Math.round(totalGrupo.ventas_ytd * 100) / 100,
+      cobrado_ytd: Math.round(totalGrupo.cobrado_ytd * 100) / 100,
+      cxc:         Math.round(totalGrupo.cxc * 100) / 100,
     },
     ultima_factura: (ultimaRes.data as { fecha: string } | null)?.fecha ?? null,
   });

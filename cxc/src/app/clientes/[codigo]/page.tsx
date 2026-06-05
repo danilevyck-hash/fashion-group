@@ -60,7 +60,7 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
   if (!cliente) notFound();
 
   const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10);
-  const [ventasRes, cxcRes, ultimaRes] = await Promise.all([
+  const [ventasRes, cxcRes, ultimaRes, cobradoRes] = await Promise.all([
     supabaseServer
       .from("ventas_raw")
       .select("empresa, total")
@@ -78,6 +78,14 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
       .order("fecha", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // Cobrado YTD = pagos reales del año (switch_recibos), EXCLUYENDO retenciones
+    // (es_retencion ya está clasificado por el sync). Join por cliente_codigo.
+    supabaseServer
+      .from("switch_recibos")
+      .select("empresa_key, total")
+      .eq("cliente_codigo", cliente.codigo)
+      .eq("es_retencion", false)
+      .gte("fecha", yearStart),
   ]);
 
   const ventasMap = new Map<string, number>();
@@ -88,14 +96,20 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
   for (const r of (cxcRes.data ?? []) as { company_key: string; total: number }[]) {
     cxcMap.set(r.company_key, (cxcMap.get(r.company_key) ?? 0) + Number(r.total ?? 0));
   }
+  const cobradoMap = new Map<string, number>();
+  for (const r of (cobradoRes.data ?? []) as { empresa_key: string; total: number }[]) {
+    cobradoMap.set(r.empresa_key, (cobradoMap.get(r.empresa_key) ?? 0) + Number(r.total ?? 0));
+  }
   const empresas = B2B_EMPRESA_KEYS.map(e => ({
     empresa: e,
-    ventas_ytd: Math.round((ventasMap.get(e) ?? 0) * 100) / 100,
-    cxc:        Math.round((cxcMap.get(e) ?? 0) * 100) / 100,
+    ventas_ytd:  Math.round((ventasMap.get(e) ?? 0) * 100) / 100,
+    cobrado_ytd: Math.round((cobradoMap.get(e) ?? 0) * 100) / 100,
+    cxc:         Math.round((cxcMap.get(e) ?? 0) * 100) / 100,
   }));
   const totalGrupo = {
-    ventas_ytd: Math.round(empresas.reduce((s, e) => s + e.ventas_ytd, 0) * 100) / 100,
-    cxc:        Math.round(empresas.reduce((s, e) => s + e.cxc, 0) * 100) / 100,
+    ventas_ytd:  Math.round(empresas.reduce((s, e) => s + e.ventas_ytd, 0) * 100) / 100,
+    cobrado_ytd: Math.round(empresas.reduce((s, e) => s + e.cobrado_ytd, 0) * 100) / 100,
+    cxc:         Math.round(empresas.reduce((s, e) => s + e.cxc, 0) * 100) / 100,
   };
   const ultimaFactura = (ultimaRes.data as { fecha: string } | null)?.fecha ?? null;
 

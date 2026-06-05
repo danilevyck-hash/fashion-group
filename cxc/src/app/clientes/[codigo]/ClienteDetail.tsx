@@ -28,13 +28,14 @@ interface Cliente {
 interface EmpresaTotals {
   empresa: string;
   ventas_ytd: number;
+  cobrado_ytd: number;
   cxc: number;
 }
 
 export interface ClienteDetailData {
   cliente: Cliente;
   empresas: EmpresaTotals[];
-  total_grupo: { ventas_ytd: number; cxc: number };
+  total_grupo: { ventas_ytd: number; cobrado_ytd: number; cxc: number };
   ultima_factura: string | null;
 }
 
@@ -189,6 +190,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
               <tr className="text-left text-[11px] uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
                 <th className="py-2 font-normal">Empresa</th>
                 <th className="py-2 font-normal text-right">Ventas YTD</th>
+                <th className="py-2 font-normal text-right">Cobrado YTD</th>
                 <th className="py-2 font-normal text-right">CXC actual</th>
               </tr>
             </thead>
@@ -197,6 +199,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                 <tr key={e.empresa} className="border-b border-gray-100">
                   <td className="py-2 text-gray-700">{empresaName(e.empresa)}</td>
                   <td className="py-2 text-right tabular-nums">${fmt(e.ventas_ytd)}</td>
+                  <td className={`py-2 text-right tabular-nums ${e.cobrado_ytd > 0 ? "text-emerald-700" : "text-gray-400"}`}>${fmt(e.cobrado_ytd)}</td>
                   <td className={`py-2 text-right tabular-nums ${e.cxc > 0 ? "text-amber-700" : e.cxc < 0 ? "text-emerald-700" : "text-gray-400"}`}>
                     ${fmt(e.cxc)}
                   </td>
@@ -205,6 +208,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
               <tr className="font-medium">
                 <td className="py-2.5">Total grupo</td>
                 <td className="py-2.5 text-right tabular-nums">${fmt(initialData.total_grupo.ventas_ytd)}</td>
+                <td className="py-2.5 text-right tabular-nums">${fmt(initialData.total_grupo.cobrado_ytd)}</td>
                 <td className={`py-2.5 text-right tabular-nums ${initialData.total_grupo.cxc > 0 ? "text-amber-700" : initialData.total_grupo.cxc < 0 ? "text-emerald-700" : "text-gray-400"}`}>
                   ${fmt(initialData.total_grupo.cxc)}
                 </td>
