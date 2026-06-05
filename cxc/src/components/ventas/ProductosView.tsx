@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Download, Search, ChevronRight } from "lucide-react";
 import { MONTHS, fmtMoney } from "@/lib/ventas/format";
 import {
   PRODUCTOS_EMPRESAS,
+  PRODUCTOS_EMPRESA_KEYS,
   DEFAULT_PRODUCTOS_EMPRESA,
   fmtMargen,
   exportProductosToExcel,
@@ -20,7 +22,15 @@ type SortKey = "cantidad" | "venta" | "margen";
 const PAGE = 20;
 
 export function ProductosView({ selectedYear }: { selectedYear: number }) {
-  const [empresa, setEmpresa] = useState(DEFAULT_PRODUCTOS_EMPRESA);
+  // Deep-link: /ventas?tab=productos&empresa=american_classic preselecciona la
+  // empresa (ej. desde el link "Top productos" del módulo Multifashion). Es solo
+  // semilla inicial; el usuario puede cambiarla con el selector después.
+  const searchParams = useSearchParams();
+  const initialEmpresa = (() => {
+    const e = searchParams.get("empresa");
+    return e && PRODUCTOS_EMPRESA_KEYS.includes(e) ? e : DEFAULT_PRODUCTOS_EMPRESA;
+  })();
+  const [empresa, setEmpresa] = useState(initialEmpresa);
   const [mes, setMes] = useState<number | null>(null); // null = YTD
   const [data, setData] = useState<ProductosResponse | null>(null);
   const [loading, setLoading] = useState(true);
