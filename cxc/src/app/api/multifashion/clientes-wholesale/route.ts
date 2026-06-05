@@ -1,5 +1,6 @@
 // Endpoint del sub-tab Clientes Multifashion — sección Wholesale.
-// Wrapper de la RPC multifashion_wholesale_clientes(p_fecha_inicio, p_fecha_fin).
+// Wrapper de la RPC multifashion_wholesale_clientes_v2(p_fecha_inicio, p_fecha_fin).
+// v2 excluye clientes intercompañía / empresas del grupo (ver migración 20260604190000).
 //
 // Query params:
 //   fecha_inicio  YYYY-MM-DD (default: 1 ene del año actual)
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "fecha_inicio > fecha_fin" }, { status: 400 });
   }
 
-  const { data, error } = await supabaseServer.rpc("multifashion_wholesale_clientes", {
+  const { data, error } = await supabaseServer.rpc("multifashion_wholesale_clientes_v2", {
     p_fecha_inicio: fecha_inicio,
     p_fecha_fin: fecha_fin,
   });

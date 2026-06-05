@@ -1,5 +1,6 @@
 // Endpoint del sub-tab Clientes Multifashion — sección Retail recurrentes.
-// Wrapper de la RPC multifashion_retail_recurrentes(p_fecha_inicio, p_fecha_fin, p_limit).
+// Wrapper de la RPC multifashion_retail_recurrentes_v2(p_fecha_inicio, p_fecha_fin, p_limit).
+// v2 excluye clientes intercompañía / empresas del grupo (ver migración 20260604190000).
 //
 // Query params:
 //   fecha_inicio  YYYY-MM-DD (default: 1 ene del año actual)
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "limit inválido (1..500)" }, { status: 400 });
   }
 
-  const { data, error } = await supabaseServer.rpc("multifashion_retail_recurrentes", {
+  const { data, error } = await supabaseServer.rpc("multifashion_retail_recurrentes_v2", {
     p_fecha_inicio: fecha_inicio,
     p_fecha_fin: fecha_fin,
     p_limit: limit,
