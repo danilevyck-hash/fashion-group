@@ -1,0 +1,1042 @@
+[
+  {
+    "id": "f7fec1a3-dfeb-4111-8f71-5af60cff342b",
+    "cliente_id": "885502b6-b8f6-43fb-a05a-9736e339f0f1",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "09df55cc-2046-4b52-9d91-d010c8b43bb4",
+    "cliente_id": "464a2aec-57f6-4ec0-a17e-5e373472f753",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "adbd15fe-f369-4e23-b96c-fa1fe5a6b093",
+    "cliente_id": "21a10229-8a70-4e68-a6fb-b547eca6c243",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 7,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "9e28c1be-daa6-4724-8450-93c9954b93fa",
+    "cliente_id": "876a6293-ec83-4164-ac3d-b142b0bbd651",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 3,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "8c7c9905-2333-4ae4-9ad8-39dbed96fd1f",
+    "cliente_id": "885502b6-b8f6-43fb-a05a-9736e339f0f1",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "dd7089a2-5ac7-437d-81f8-e3ce96f49f3d",
+    "cliente_id": "774d3afa-0f51-4962-a666-0f7f9cff5ecf",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "6d6e808d-2f41-43f2-a461-39394f91cb8e",
+    "cliente_id": "9b465287-d8c5-4d31-93bb-c0d852fd9957",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "987135b0-65ef-409c-90dd-b0dab81d012d",
+    "cliente_id": "8421b257-ff82-4a28-9b25-704a3547c33c",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 30,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "9afde1c2-a7ef-4ede-8d1d-0d7930157069",
+    "cliente_id": "6ae460ab-fd3d-433e-bc38-ed4ecc1c76f8",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "04322bb7-5a0b-4110-a304-56852166c250",
+    "cliente_id": "013389f2-6cf5-42b3-b174-c710ed59d153",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 6,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "1ec08e4a-593e-4639-a29b-6a33c6f7e7d1",
+    "cliente_id": "5f1137c6-6a39-4af8-9224-4689ddbb07ef",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "33d6429b-69b3-4e84-81e3-06099fdddad3",
+    "cliente_id": "8375822e-9634-495c-8e79-aa5b76de2aa7",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "76cbf64c-d429-49bf-907c-f4a0f1650532",
+    "cliente_id": "495bf6e4-77ea-440a-a729-c899c3acd7f8",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 30,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "c1dbe269-e379-48cb-98cc-b82ccb99b468",
+    "cliente_id": "80614201-4074-4cca-91b7-dcd1183924d6",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 13,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "e80658e0-b44a-4c3d-98ac-e648ea4fd73c",
+    "cliente_id": "8efb871d-b5a6-4756-95d1-9b9743307cc9",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "a541ccb8-4b50-4e6f-8063-22ee3986d681",
+    "cliente_id": "464a2aec-57f6-4ec0-a17e-5e373472f753",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "25b1b167-3f34-4371-94ba-3ab020c02af7",
+    "cliente_id": "21a10229-8a70-4e68-a6fb-b547eca6c243",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "5fd6406a-4892-4b76-98a3-e2ad0aebcfc7",
+    "cliente_id": "876a6293-ec83-4164-ac3d-b142b0bbd651",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "5592d55a-cbf6-43f6-b435-96bf69e07635",
+    "cliente_id": "885502b6-b8f6-43fb-a05a-9736e339f0f1",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "bd308351-b672-4d2b-b725-c39a170b1286",
+    "cliente_id": "774d3afa-0f51-4962-a666-0f7f9cff5ecf",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "47f1fa1f-88a7-4e3d-8296-682143c259cf",
+    "cliente_id": "9b465287-d8c5-4d31-93bb-c0d852fd9957",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "ca087123-eea2-460c-9506-517bc41bc286",
+    "cliente_id": "8421b257-ff82-4a28-9b25-704a3547c33c",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 15,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "412c25ce-f533-480d-ac95-b46faeb57c68",
+    "cliente_id": "6ae460ab-fd3d-433e-bc38-ed4ecc1c76f8",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "51a94b40-5804-46c6-8bdf-13f2a131e78a",
+    "cliente_id": "013389f2-6cf5-42b3-b174-c710ed59d153",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 3,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "3b1e54c8-5ce7-4a49-ab5e-57898fe3aa3e",
+    "cliente_id": "5f1137c6-6a39-4af8-9224-4689ddbb07ef",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "99584e05-8feb-48c7-9c8f-aee4eaf162b0",
+    "cliente_id": "8375822e-9634-495c-8e79-aa5b76de2aa7",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "5875a688-dce1-4e17-b816-30b2e408e95b",
+    "cliente_id": "495bf6e4-77ea-440a-a729-c899c3acd7f8",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 20,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "f5353629-3c97-426c-ba55-c54466e29997",
+    "cliente_id": "80614201-4074-4cca-91b7-dcd1183924d6",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "13ad883a-9a08-4367-bff9-8229ce1b7204",
+    "cliente_id": "b508ce37-c2dd-43f8-8d50-191c9097db0f",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "d6f54dcb-8ac1-44e5-b7b0-3d80da2d8be8",
+    "cliente_id": "8efb871d-b5a6-4756-95d1-9b9743307cc9",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "e97a303a-61d2-4df6-ac3c-7ecdbaa44aaf",
+    "cliente_id": "21a10229-8a70-4e68-a6fb-b547eca6c243",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "fa9291b4-4a52-4c4f-a279-dc83876c3ba2",
+    "cliente_id": "876a6293-ec83-4164-ac3d-b142b0bbd651",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "ded86502-f16c-4518-99f0-597ba31efd94",
+    "cliente_id": "8efb871d-b5a6-4756-95d1-9b9743307cc9",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "c5ea9b7f-457e-4996-9f34-bd2dff6382cb",
+    "cliente_id": "774d3afa-0f51-4962-a666-0f7f9cff5ecf",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "1a92de12-d0ac-42b4-a939-f4c4c99bc94e",
+    "cliente_id": "8421b257-ff82-4a28-9b25-704a3547c33c",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 15,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "a712c9cf-04dd-4dd3-afa8-b7c65a7b4f09",
+    "cliente_id": "6ae460ab-fd3d-433e-bc38-ed4ecc1c76f8",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "cef3d563-bad1-4a9a-b58f-61bb831bd67c",
+    "cliente_id": "5f1137c6-6a39-4af8-9224-4689ddbb07ef",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "33544e45-abc2-41f4-8759-e6ef76879edb",
+    "cliente_id": "495bf6e4-77ea-440a-a729-c899c3acd7f8",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 20,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "445588a9-a4f8-4a55-989e-ca046b581633",
+    "cliente_id": "80614201-4074-4cca-91b7-dcd1183924d6",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 9,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "b40acdda-e314-45c4-abf2-160b101c4fa4",
+    "cliente_id": "8efb871d-b5a6-4756-95d1-9b9743307cc9",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "050144e6-4e39-4811-84f8-9743ea5e667e",
+    "cliente_id": "464a2aec-57f6-4ec0-a17e-5e373472f753",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "3c3d7062-a5aa-4df5-8b67-1b2e957fe76e",
+    "cliente_id": "876a6293-ec83-4164-ac3d-b142b0bbd651",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 3,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "a89c5f0b-31a2-4e43-b81f-398dc3b029c8",
+    "cliente_id": "885502b6-b8f6-43fb-a05a-9736e339f0f1",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "58e288ac-451d-451b-a5fb-0070ab4c65b4",
+    "cliente_id": "774d3afa-0f51-4962-a666-0f7f9cff5ecf",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "e6aa2338-47e8-49d6-a90c-7907ce9c025f",
+    "cliente_id": "9b465287-d8c5-4d31-93bb-c0d852fd9957",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "c04da189-7692-44fe-9afb-b34a621c137e",
+    "cliente_id": "8421b257-ff82-4a28-9b25-704a3547c33c",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 15,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "b7fd6402-66b4-4e62-9269-5124a50fda56",
+    "cliente_id": "6ae460ab-fd3d-433e-bc38-ed4ecc1c76f8",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "c83942a5-7d56-4bbc-b39b-82cbf5f9e6f1",
+    "cliente_id": "013389f2-6cf5-42b3-b174-c710ed59d153",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 6,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "78586ec9-b54a-4efd-b1f5-c69a86daa708",
+    "cliente_id": "5f1137c6-6a39-4af8-9224-4689ddbb07ef",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "e8c279b3-e8c3-4735-ad49-7dd575f49de4",
+    "cliente_id": "8375822e-9634-495c-8e79-aa5b76de2aa7",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "5e0c5007-ab75-44db-94f7-9502883661fd",
+    "cliente_id": "495bf6e4-77ea-440a-a729-c899c3acd7f8",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 20,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "afdcdea1-b5b6-4e7a-a8b6-58bcd95bd5f6",
+    "cliente_id": "80614201-4074-4cca-91b7-dcd1183924d6",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 10,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "da652117-cf49-41a8-9d09-4068e170d23b",
+    "cliente_id": "8efb871d-b5a6-4756-95d1-9b9743307cc9",
+    "producto_id": "4524c2a6-60a6-4e4d-bbf7-b730fead84f6",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "fa89086d-1f46-4a66-af90-dd76fc769064",
+    "cliente_id": "464a2aec-57f6-4ec0-a17e-5e373472f753",
+    "producto_id": "4524c2a6-60a6-4e4d-bbf7-b730fead84f6",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "029b7c5d-d4c0-4965-8057-add65df2ca4e",
+    "cliente_id": "876a6293-ec83-4164-ac3d-b142b0bbd651",
+    "producto_id": "4524c2a6-60a6-4e4d-bbf7-b730fead84f6",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "ba159f95-f68d-44ff-9cab-beff029bb986",
+    "cliente_id": "885502b6-b8f6-43fb-a05a-9736e339f0f1",
+    "producto_id": "4524c2a6-60a6-4e4d-bbf7-b730fead84f6",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "57d1292d-c9bf-45d6-99a2-cf9b01be3c3c",
+    "cliente_id": "774d3afa-0f51-4962-a666-0f7f9cff5ecf",
+    "producto_id": "4524c2a6-60a6-4e4d-bbf7-b730fead84f6",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "30fda855-2600-43a9-be4a-10354cb5492d",
+    "cliente_id": "8421b257-ff82-4a28-9b25-704a3547c33c",
+    "producto_id": "4524c2a6-60a6-4e4d-bbf7-b730fead84f6",
+    "paquetes": 8,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "5f6c3a8f-ff01-49bd-ad9d-948fd26b755a",
+    "cliente_id": "6ae460ab-fd3d-433e-bc38-ed4ecc1c76f8",
+    "producto_id": "4524c2a6-60a6-4e4d-bbf7-b730fead84f6",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "6c7a943b-abbd-4e7c-8d40-006f6953b3e6",
+    "cliente_id": "013389f2-6cf5-42b3-b174-c710ed59d153",
+    "producto_id": "4524c2a6-60a6-4e4d-bbf7-b730fead84f6",
+    "paquetes": 3,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "e80a1a09-c16b-4d43-8ab3-f5d7506a06b4",
+    "cliente_id": "5f1137c6-6a39-4af8-9224-4689ddbb07ef",
+    "producto_id": "4524c2a6-60a6-4e4d-bbf7-b730fead84f6",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "c75c333c-dfa1-4c46-bf81-f5fe8eb0cb24",
+    "cliente_id": "8375822e-9634-495c-8e79-aa5b76de2aa7",
+    "producto_id": "4524c2a6-60a6-4e4d-bbf7-b730fead84f6",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "22c109d1-1db5-4e23-a15f-8b023b6a789d",
+    "cliente_id": "495bf6e4-77ea-440a-a729-c899c3acd7f8",
+    "producto_id": "4524c2a6-60a6-4e4d-bbf7-b730fead84f6",
+    "paquetes": 20,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "908d21f4-f055-4b1f-813a-f13d4a2bac4f",
+    "cliente_id": "8efb871d-b5a6-4756-95d1-9b9743307cc9",
+    "producto_id": "3c2253b3-7352-41f8-a081-5ec079170697",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "ad80dd7a-ae7a-48f0-b1cd-a939313abe0e",
+    "cliente_id": "876a6293-ec83-4164-ac3d-b142b0bbd651",
+    "producto_id": "3c2253b3-7352-41f8-a081-5ec079170697",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "aeb26a57-fe97-4b15-a94f-ec51ffb69202",
+    "cliente_id": "885502b6-b8f6-43fb-a05a-9736e339f0f1",
+    "producto_id": "3c2253b3-7352-41f8-a081-5ec079170697",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "9e757b79-0778-479d-839d-c3700be21d20",
+    "cliente_id": "774d3afa-0f51-4962-a666-0f7f9cff5ecf",
+    "producto_id": "3c2253b3-7352-41f8-a081-5ec079170697",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "2f38730c-215e-40f6-b170-0341b6883362",
+    "cliente_id": "8421b257-ff82-4a28-9b25-704a3547c33c",
+    "producto_id": "3c2253b3-7352-41f8-a081-5ec079170697",
+    "paquetes": 8,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "fdc24fec-6542-4116-ab75-cfc0088ecdab",
+    "cliente_id": "6ae460ab-fd3d-433e-bc38-ed4ecc1c76f8",
+    "producto_id": "3c2253b3-7352-41f8-a081-5ec079170697",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "89d7adb4-38a0-4bf3-ae04-c43ca4dc43dd",
+    "cliente_id": "5f1137c6-6a39-4af8-9224-4689ddbb07ef",
+    "producto_id": "3c2253b3-7352-41f8-a081-5ec079170697",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "063e4d5a-a46b-44e1-99fd-e3d622fbf05d",
+    "cliente_id": "8375822e-9634-495c-8e79-aa5b76de2aa7",
+    "producto_id": "3c2253b3-7352-41f8-a081-5ec079170697",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "0b61c4ea-4ebe-42e4-bc96-fc7afd00ed63",
+    "cliente_id": "495bf6e4-77ea-440a-a729-c899c3acd7f8",
+    "producto_id": "3c2253b3-7352-41f8-a081-5ec079170697",
+    "paquetes": 20,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "6fc4fd98-38fa-41c3-b233-59621274aa67",
+    "cliente_id": "80614201-4074-4cca-91b7-dcd1183924d6",
+    "producto_id": "3c2253b3-7352-41f8-a081-5ec079170697",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "f41c43fd-b974-40ba-b3f9-236b0f3b1900",
+    "cliente_id": "8efb871d-b5a6-4756-95d1-9b9743307cc9",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "f550163d-ac9e-4027-9609-499aa29187fb",
+    "cliente_id": "21a10229-8a70-4e68-a6fb-b547eca6c243",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 7,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "446ac0e5-ad75-4590-940a-9a08ea18a898",
+    "cliente_id": "876a6293-ec83-4164-ac3d-b142b0bbd651",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "c44f974c-7376-46f0-b438-6880e88d0a30",
+    "cliente_id": "ec8f2630-a055-494e-aecd-4d3ee01f670c",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 9,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "60ba16d3-1b0b-4a6e-9e25-9e89c2777fb5",
+    "cliente_id": "ec8f2630-a055-494e-aecd-4d3ee01f670c",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 9,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "043d674c-3179-4086-ab17-73d67dfd2813",
+    "cliente_id": "ec8f2630-a055-494e-aecd-4d3ee01f670c",
+    "producto_id": "3c2253b3-7352-41f8-a081-5ec079170697",
+    "paquetes": 9,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "ed999c72-356d-4bd1-8f53-ec42989448cd",
+    "cliente_id": "ec8f2630-a055-494e-aecd-4d3ee01f670c",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 9,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "d38f44cd-13df-4eb4-bc8c-acefb90b2475",
+    "cliente_id": "8375822e-9634-495c-8e79-aa5b76de2aa7",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "960db01b-6405-461b-b5d0-3529c327a76d",
+    "cliente_id": "774d3afa-0f51-4962-a666-0f7f9cff5ecf",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "bfabcf6d-a39e-487c-ab6e-583d977f3e3e",
+    "cliente_id": "8421b257-ff82-4a28-9b25-704a3547c33c",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 15,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "df5011f2-6d45-444f-a5c3-f33713f3a286",
+    "cliente_id": "6ae460ab-fd3d-433e-bc38-ed4ecc1c76f8",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "dad740fe-af10-47b0-9df8-3cb6166ece09",
+    "cliente_id": "013389f2-6cf5-42b3-b174-c710ed59d153",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 3,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "d651c106-1014-4e53-b175-cd1799d05916",
+    "cliente_id": "5f1137c6-6a39-4af8-9224-4689ddbb07ef",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "5294ee9b-89a7-4738-b89d-779d0e723db1",
+    "cliente_id": "8375822e-9634-495c-8e79-aa5b76de2aa7",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "e148d567-3bb7-47a7-accf-533d757f5221",
+    "cliente_id": "495bf6e4-77ea-440a-a729-c899c3acd7f8",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 10,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "0db231a1-e226-44c2-a20c-bb84cfdcc967",
+    "cliente_id": "80614201-4074-4cca-91b7-dcd1183924d6",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 8,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "b25dfbda-5f7c-4c82-9db3-547123e3dfd1",
+    "cliente_id": "21a10229-8a70-4e68-a6fb-b547eca6c243",
+    "producto_id": "22756ff3-6250-42f7-8a9e-d80b6a822d3d",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "a2bafcab-aded-49c9-b11b-fa9bfed8918c",
+    "cliente_id": "8421b257-ff82-4a28-9b25-704a3547c33c",
+    "producto_id": "22756ff3-6250-42f7-8a9e-d80b6a822d3d",
+    "paquetes": 8,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "a6b38bc7-3e24-4736-98bd-77e1568622a2",
+    "cliente_id": "495bf6e4-77ea-440a-a729-c899c3acd7f8",
+    "producto_id": "22756ff3-6250-42f7-8a9e-d80b6a822d3d",
+    "paquetes": 10,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "b5b9d931-77a3-4150-8712-c11f35ca25c6",
+    "cliente_id": "8efb871d-b5a6-4756-95d1-9b9743307cc9",
+    "producto_id": "ea133990-136e-4e6e-8e8e-44cb1535ea32",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "7a4986dd-a4a1-4315-b724-85abe93d77c7",
+    "cliente_id": "21a10229-8a70-4e68-a6fb-b547eca6c243",
+    "producto_id": "ea133990-136e-4e6e-8e8e-44cb1535ea32",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "b3870394-0b0e-4b9e-849c-081bea828dd9",
+    "cliente_id": "774d3afa-0f51-4962-a666-0f7f9cff5ecf",
+    "producto_id": "ea133990-136e-4e6e-8e8e-44cb1535ea32",
+    "paquetes": 2,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "8bb23989-a06a-4721-8cf9-c6e60d892dd8",
+    "cliente_id": "8421b257-ff82-4a28-9b25-704a3547c33c",
+    "producto_id": "ea133990-136e-4e6e-8e8e-44cb1535ea32",
+    "paquetes": 8,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "7b3a1dff-d491-4652-8448-dcc2f98d64d4",
+    "cliente_id": "6ae460ab-fd3d-433e-bc38-ed4ecc1c76f8",
+    "producto_id": "ea133990-136e-4e6e-8e8e-44cb1535ea32",
+    "paquetes": 1,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "0ec5f79a-e14f-43e3-9441-eb638789cf92",
+    "cliente_id": "5f1137c6-6a39-4af8-9224-4689ddbb07ef",
+    "producto_id": "ea133990-136e-4e6e-8e8e-44cb1535ea32",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "5a4fe48f-6caa-4249-a5f2-7907dc8d54d5",
+    "cliente_id": "8375822e-9634-495c-8e79-aa5b76de2aa7",
+    "producto_id": "ea133990-136e-4e6e-8e8e-44cb1535ea32",
+    "paquetes": 4,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "698377dd-7022-4c57-8643-08d49c48afbf",
+    "cliente_id": "495bf6e4-77ea-440a-a729-c899c3acd7f8",
+    "producto_id": "ea133990-136e-4e6e-8e8e-44cb1535ea32",
+    "paquetes": 10,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "84ca949c-7f80-4a8e-9e78-074c4e21d13f",
+    "cliente_id": "80614201-4074-4cca-91b7-dcd1183924d6",
+    "producto_id": "ea133990-136e-4e6e-8e8e-44cb1535ea32",
+    "paquetes": 6,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "9a0fad7b-0af1-4d88-8ef4-479f77d4336c",
+    "cliente_id": "ec8f2630-a055-494e-aecd-4d3ee01f670c",
+    "producto_id": "ea133990-136e-4e6e-8e8e-44cb1535ea32",
+    "paquetes": 6,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "0bd1a34c-d97f-48e1-bf88-dd0f0c37a8ce",
+    "cliente_id": "ec8f2630-a055-494e-aecd-4d3ee01f670c",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 6,
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "deleted": false
+  },
+  {
+    "id": "22bab53d-d260-493f-9d4d-6c7ece85f97a",
+    "cliente_id": "8efb871d-b5a6-4756-95d1-9b9743307cc9",
+    "producto_id": "22756ff3-6250-42f7-8a9e-d80b6a822d3d",
+    "paquetes": 2,
+    "created_at": "2026-03-28T04:45:45.007566+00:00",
+    "deleted": false
+  },
+  {
+    "id": "935f7181-80ce-4c9f-b2bd-515b765e7e17",
+    "cliente_id": "774d3afa-0f51-4962-a666-0f7f9cff5ecf",
+    "producto_id": "22756ff3-6250-42f7-8a9e-d80b6a822d3d",
+    "paquetes": 2,
+    "created_at": "2026-03-28T04:53:14.402368+00:00",
+    "deleted": false
+  },
+  {
+    "id": "3fccb041-8df6-4e56-bcc9-88550dd4496f",
+    "cliente_id": "885502b6-b8f6-43fb-a05a-9736e339f0f1",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 1,
+    "created_at": "2026-03-28T04:54:08.456917+00:00",
+    "deleted": false
+  },
+  {
+    "id": "e7ef307b-b0e8-46b6-9c99-2c3f9e60e3d7",
+    "cliente_id": "464a2aec-57f6-4ec0-a17e-5e373472f753",
+    "producto_id": "22756ff3-6250-42f7-8a9e-d80b6a822d3d",
+    "paquetes": 1,
+    "created_at": "2026-03-28T04:54:36.953114+00:00",
+    "deleted": false
+  },
+  {
+    "id": "b4a9b072-9690-44ff-af29-0138f9ab79ab",
+    "cliente_id": "464a2aec-57f6-4ec0-a17e-5e373472f753",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 1,
+    "created_at": "2026-03-28T04:54:38.171771+00:00",
+    "deleted": false
+  },
+  {
+    "id": "6faa40f3-a924-42bf-a0f6-5e87d974671d",
+    "cliente_id": "9b465287-d8c5-4d31-93bb-c0d852fd9957",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 1,
+    "created_at": "2026-04-10T21:32:04.976688+00:00",
+    "deleted": false
+  },
+  {
+    "id": "8132d965-ed08-4653-86f5-216eb2a5d53f",
+    "cliente_id": "9b465287-d8c5-4d31-93bb-c0d852fd9957",
+    "producto_id": "3c2253b3-7352-41f8-a081-5ec079170697",
+    "paquetes": 1,
+    "created_at": "2026-04-10T21:32:18.754592+00:00",
+    "deleted": false
+  },
+  {
+    "id": "18b52d56-adf4-4d4f-99af-ce8018e4b368",
+    "cliente_id": "9b465287-d8c5-4d31-93bb-c0d852fd9957",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 1,
+    "created_at": "2026-04-10T21:32:39.767899+00:00",
+    "deleted": false
+  },
+  {
+    "id": "9fbabe28-af0c-4a63-8864-82f01f5d11b1",
+    "cliente_id": "67de0e86-737b-4bcc-96d2-dbd557e53998",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 3,
+    "created_at": "2026-04-15T18:49:11.323195+00:00",
+    "deleted": false
+  },
+  {
+    "id": "6a07fe2a-e363-4fb5-9838-791b3157dd59",
+    "cliente_id": "7b98cbb8-cc4c-4fae-88e4-e2f0090c6b25",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 1,
+    "created_at": "2026-04-17T22:17:09.60853+00:00",
+    "deleted": false
+  },
+  {
+    "id": "3075fbf5-764d-471e-96eb-6f17b5ebebd6",
+    "cliente_id": "7b98cbb8-cc4c-4fae-88e4-e2f0090c6b25",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 1,
+    "created_at": "2026-04-17T22:17:10.453686+00:00",
+    "deleted": false
+  },
+  {
+    "id": "6189f0a7-12e5-4a74-ad26-62bd2bfc99ae",
+    "cliente_id": "7b98cbb8-cc4c-4fae-88e4-e2f0090c6b25",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 1,
+    "created_at": "2026-04-17T22:17:11.257911+00:00",
+    "deleted": false
+  },
+  {
+    "id": "b184d009-000b-4512-90c7-935b5c397e83",
+    "cliente_id": "7b98cbb8-cc4c-4fae-88e4-e2f0090c6b25",
+    "producto_id": "3c2253b3-7352-41f8-a081-5ec079170697",
+    "paquetes": 1,
+    "created_at": "2026-04-17T22:17:12.05312+00:00",
+    "deleted": false
+  },
+  {
+    "id": "5f85238b-cea0-42a0-846c-63efc6594787",
+    "cliente_id": "7b98cbb8-cc4c-4fae-88e4-e2f0090c6b25",
+    "producto_id": "4524c2a6-60a6-4e4d-bbf7-b730fead84f6",
+    "paquetes": 1,
+    "created_at": "2026-04-17T22:17:12.77552+00:00",
+    "deleted": false
+  },
+  {
+    "id": "a3de229a-dac1-40cd-b636-dbd0eaafeb52",
+    "cliente_id": "7b98cbb8-cc4c-4fae-88e4-e2f0090c6b25",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 1,
+    "created_at": "2026-04-17T22:17:13.426162+00:00",
+    "deleted": false
+  },
+  {
+    "id": "fd348aef-4299-4906-bcb2-6cfed116a1f0",
+    "cliente_id": "7b98cbb8-cc4c-4fae-88e4-e2f0090c6b25",
+    "producto_id": "ea133990-136e-4e6e-8e8e-44cb1535ea32",
+    "paquetes": 1,
+    "created_at": "2026-04-17T22:17:14.030528+00:00",
+    "deleted": false
+  },
+  {
+    "id": "2d5e87b2-79d7-4c46-89a3-89b6076f2742",
+    "cliente_id": "7b98cbb8-cc4c-4fae-88e4-e2f0090c6b25",
+    "producto_id": "22756ff3-6250-42f7-8a9e-d80b6a822d3d",
+    "paquetes": 1,
+    "created_at": "2026-04-17T22:17:14.667539+00:00",
+    "deleted": false
+  },
+  {
+    "id": "c1b7437e-55e4-4a9c-b4c3-28200f5a5c07",
+    "cliente_id": "7b98cbb8-cc4c-4fae-88e4-e2f0090c6b25",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 1,
+    "created_at": "2026-04-17T22:17:15.392548+00:00",
+    "deleted": false
+  },
+  {
+    "id": "616d4a18-857f-4ef6-8666-f7533569dfdd",
+    "cliente_id": "16587b01-b46b-4ef5-b693-9dfcb80c18f5",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 1,
+    "created_at": "2026-04-22T14:32:07.510394+00:00",
+    "deleted": false
+  },
+  {
+    "id": "f30580c0-14d6-4282-a33a-ca33368cfb92",
+    "cliente_id": "16587b01-b46b-4ef5-b693-9dfcb80c18f5",
+    "producto_id": "49123c8c-c97d-4d25-8fc3-dd4d014dbec1",
+    "paquetes": 1,
+    "created_at": "2026-04-22T14:32:08.638591+00:00",
+    "deleted": false
+  },
+  {
+    "id": "f29a505e-9f46-45bb-a91d-6547c622b73c",
+    "cliente_id": "16587b01-b46b-4ef5-b693-9dfcb80c18f5",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 1,
+    "created_at": "2026-04-22T14:32:31.265178+00:00",
+    "deleted": false
+  },
+  {
+    "id": "bbc854cf-48bf-47b6-81ce-be0f91e6b071",
+    "cliente_id": "c39179e3-1d71-4382-b236-3c379d65397b",
+    "producto_id": "62e62c10-a05a-4341-8581-b2c71bbde8da",
+    "paquetes": 1,
+    "created_at": "2026-04-24T15:53:16.882165+00:00",
+    "deleted": false
+  },
+  {
+    "id": "982e8cbf-d5bb-4747-bd33-0fb05eb572d9",
+    "cliente_id": "c39179e3-1d71-4382-b236-3c379d65397b",
+    "producto_id": "b72b1f1c-8afc-4624-bd76-9f64097fa7b4",
+    "paquetes": 1,
+    "created_at": "2026-04-24T15:53:17.768006+00:00",
+    "deleted": false
+  },
+  {
+    "id": "2a1ed8c0-f6dc-46ce-b94a-c10609e78932",
+    "cliente_id": "c39179e3-1d71-4382-b236-3c379d65397b",
+    "producto_id": "add2a63c-2636-482c-8449-e64389d2e655",
+    "paquetes": 1,
+    "created_at": "2026-04-24T15:53:18.645462+00:00",
+    "deleted": false
+  },
+  {
+    "id": "724c255e-226e-45c2-b676-6c649631f202",
+    "cliente_id": "c39179e3-1d71-4382-b236-3c379d65397b",
+    "producto_id": "3c2253b3-7352-41f8-a081-5ec079170697",
+    "paquetes": 1,
+    "created_at": "2026-04-24T15:53:19.824035+00:00",
+    "deleted": false
+  },
+  {
+    "id": "bc391a6e-6682-42d8-abf0-1648a7b7ca61",
+    "cliente_id": "c39179e3-1d71-4382-b236-3c379d65397b",
+    "producto_id": "4524c2a6-60a6-4e4d-bbf7-b730fead84f6",
+    "paquetes": 1,
+    "created_at": "2026-04-24T15:53:20.639694+00:00",
+    "deleted": false
+  },
+  {
+    "id": "29ca119d-90f5-404e-a3c9-3f2302bdd335",
+    "cliente_id": "c39179e3-1d71-4382-b236-3c379d65397b",
+    "producto_id": "bf08eaf6-f127-44a2-b75c-2b0e51b77cf6",
+    "paquetes": 1,
+    "created_at": "2026-04-24T15:53:21.400673+00:00",
+    "deleted": false
+  }
+]

@@ -1,0 +1,142 @@
+[
+  {
+    "id": "80614201-4074-4cca-91b7-dcd1183924d6",
+    "nombre": "Sporting",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "ec8f2630-a055-494e-aecd-4d3ee01f670c",
+    "nombre": "Machetazo",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "8375822e-9634-495c-8e79-aa5b76de2aa7",
+    "nombre": "City David",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "5f1137c6-6a39-4af8-9224-4689ddbb07ef",
+    "nombre": "City P.Canoas",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "013389f2-6cf5-42b3-b174-c710ed59d153",
+    "nombre": "Punto Poderoso",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "6ae460ab-fd3d-433e-bc38-ed4ecc1c76f8",
+    "nombre": "Sportsam",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "8421b257-ff82-4a28-9b25-704a3547c33c",
+    "nombre": "Hanna",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "9b465287-d8c5-4d31-93bb-c0d852fd9957",
+    "nombre": "Reina Boquete",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "774d3afa-0f51-4962-a666-0f7f9cff5ecf",
+    "nombre": "Shopping Center",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "885502b6-b8f6-43fb-a05a-9736e339f0f1",
+    "nombre": "Jerusalem",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "876a6293-ec83-4164-ac3d-b142b0bbd651",
+    "nombre": "MetroShoes",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "21a10229-8a70-4e68-a6fb-b547eca6c243",
+    "nombre": "Luty Luis",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "464a2aec-57f6-4ec0-a17e-5e373472f753",
+    "nombre": "Wolf Mall",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "8efb871d-b5a6-4756-95d1-9b9743307cc9",
+    "nombre": "Xtreme Shoes",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "b508ce37-c2dd-43f8-8d50-191c9097db0f",
+    "nombre": "Malek",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "495bf6e4-77ea-440a-a729-c899c3acd7f8",
+    "nombre": "City Moda",
+    "created_at": "2026-03-27T18:45:42.756805+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "67de0e86-737b-4bcc-96d2-dbd557e53998",
+    "nombre": "top shop changinola",
+    "created_at": "2026-04-15T18:49:10.194659+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "7b98cbb8-cc4c-4fae-88e4-e2f0090c6b25",
+    "nombre": "Reina chorrera",
+    "created_at": "2026-04-17T22:17:08.761674+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "16587b01-b46b-4ef5-b693-9dfcb80c18f5",
+    "nombre": "colon mohamed",
+    "created_at": "2026-04-22T14:32:06.482756+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  },
+  {
+    "id": "c39179e3-1d71-4382-b236-3c379d65397b",
+    "nombre": "Combate",
+    "created_at": "2026-04-24T15:53:15.413811+00:00",
+    "estado": "Pendiente",
+    "deleted": false
+  }
+]
