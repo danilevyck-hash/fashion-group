@@ -176,26 +176,66 @@ function PublicJoybeesCatalog() {
   }
 
   const [sendingOrder, setSendingOrder] = useState(false);
+  // Si window.open lo bloquea el navegador (común en iOS), guardamos el pedido
+  // para que el cliente pueda reintentar o copiarlo — sin vaciar el carrito.
+  const [failedOrder, setFailedOrder] = useState<{ msg: string; url: string } | null>(null);
+
+  function buildOrderMessage() {
+    const total = cart.reduce((s, i) => s + i.quantity * BULTO_SIZE * i.unit_price, 0);
+    const itemLines = cart.map(i => {
+      return `${i.name} (${i.sku}) x${i.quantity} bulto${i.quantity !== 1 ? "s" : ""} (${i.quantity * BULTO_SIZE} pzas) — $${(i.quantity * BULTO_SIZE * i.unit_price).toFixed(2)}`;
+    }).join("\n");
+    const msg = `Hola, quiero hacer un pedido de Joybees:\n\n${itemLines}\n\nTotal: $${total.toFixed(2)}`;
+    return { msg, url: `https://wa.me/50766745522?text=${encodeURIComponent(msg)}` };
+  }
+
+  function clearCartAfterSend() {
+    setCart([]);
+    try { localStorage.removeItem("joybees_public_cart"); } catch { /* */ }
+  }
 
   async function handleSendWhatsApp() {
     if (cart.length === 0 || sendingOrder) return;
     setSendingOrder(true);
     try {
-      const total = cart.reduce((s, i) => s + i.quantity * BULTO_SIZE * i.unit_price, 0);
-      const itemLines = cart.map(i => {
-        return `${i.name} (${i.sku}) x${i.quantity} bulto${i.quantity !== 1 ? "s" : ""} (${i.quantity * BULTO_SIZE} pzas) — $${(i.quantity * BULTO_SIZE * i.unit_price).toFixed(2)}`;
-      }).join("\n");
-      const msg = `Hola, quiero hacer un pedido de Joybees:\n\n${itemLines}\n\nTotal: $${total.toFixed(2)}`;
-      const url = `https://wa.me/50766745522?text=${encodeURIComponent(msg)}`;
-      window.open(url, "_blank");
-
-      setCart([]);
-      try { localStorage.removeItem("joybees_public_cart"); } catch { /* */ }
-      setToast("Pedido enviado");
+      const { msg, url } = buildOrderMessage();
+      const win = window.open(url, "_blank");
+      if (!win) {
+        // Popup bloqueado: NO vaciamos el carrito. El pedido aún no salió.
+        setFailedOrder({ msg, url });
+        setToast("WhatsApp no se abrió. Tócalo de nuevo o copia tu pedido.");
+        return;
+      }
+      // WhatsApp abrió: el pedido está en el chat, falta que el cliente toque Enviar.
+      clearCartAfterSend();
+      setFailedOrder(null);
+      setToast("Abriendo WhatsApp… toca Enviar para confirmar tu pedido");
     } catch {
       setToast("Error al enviar el pedido. Intenta de nuevo.");
     } finally {
       setSendingOrder(false);
+    }
+  }
+
+  function retryWhatsApp() {
+    if (!failedOrder) return;
+    const win = window.open(failedOrder.url, "_blank");
+    if (win) {
+      clearCartAfterSend();
+      setFailedOrder(null);
+      setToast("Abriendo WhatsApp… toca Enviar para confirmar tu pedido");
+    } else {
+      setToast("Tu navegador bloqueó WhatsApp. Copia el pedido y pégalo en el chat.");
+    }
+  }
+
+  async function copyOrder() {
+    if (!failedOrder) return;
+    try {
+      await navigator.clipboard.writeText(failedOrder.msg);
+      setToast("Pedido copiado. Pégalo en WhatsApp al +507 6674-5522");
+    } catch {
+      setToast("No se pudo copiar. Toma una captura de tu pedido.");
     }
   }
 
@@ -313,6 +353,32 @@ function PublicJoybeesCatalog() {
           actionLabel={sendingOrder ? "Enviando..." : undefined}
           formatTotal={fmt}
         />
+
+        {failedOrder && (
+          <div
+            className="fixed inset-x-0 bottom-0 z-40 bg-white border-t border-[#404041]/10 px-4 pt-4 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]"
+            style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+          >
+            <p className="text-sm font-semibold text-[#404041]">Tu pedido todavía NO se ha enviado</p>
+            <p className="text-xs text-[#404041]/60 mt-0.5 mb-3">
+              WhatsApp no se abrió. Ábrelo de nuevo o copia tu pedido y pégalo en el chat al +507 6674-5522.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={retryWhatsApp}
+                className="flex-1 bg-[#25D366] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition"
+              >
+                Abrir WhatsApp
+              </button>
+              <button
+                onClick={copyOrder}
+                className="flex-1 bg-[#404041] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition"
+              >
+                Copiar pedido
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <style jsx global>{`

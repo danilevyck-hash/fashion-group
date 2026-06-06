@@ -5,7 +5,6 @@ import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useAuth } from "@/lib/hooks/useAuth";
 import AppHeader from "@/components/AppHeader";
 import Image from "next/image";
-import Link from "next/link";
 import { validateCsvImport, type CsvImportRow } from "@/lib/csv-import-validator";
 import { csvBlob, stripBom } from "@/lib/csv-export";
 
@@ -25,15 +24,6 @@ interface JoybeesProduct {
   created_at: string;
 }
 
-interface JoybeesPedido {
-  id: string;
-  short_id: string;
-  items: { product_id: string; sku: string; name: string; image_url: string; quantity: number; unit_price: number }[];
-  total: number;
-  status: string;
-  created_at: string;
-}
-
 interface ImportRow {
   sku: string;
   name: string;
@@ -43,17 +33,12 @@ interface ImportRow {
   badge: string;
 }
 
-type Tab = "productos" | "pedidos" | "importar";
+type Tab = "productos" | "importar";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtMoney(n: number) {
   return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function fmtDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("es-PA", { day: "numeric", month: "short", year: "numeric" }).replace(".", "");
 }
 
 function escapeCsvField(val: string): string {
@@ -120,7 +105,6 @@ function JoybeesAdminInner() {
 
   const [tab, setTab] = useUrlState<Tab>("tab", "productos");
   const [products, setProducts] = useState<JoybeesProduct[]>([]);
-  const [pedidos, setPedidos] = useState<JoybeesPedido[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -139,27 +123,16 @@ function JoybeesAdminInner() {
     } catch { /* ignore */ }
   }, []);
 
-  const loadPedidos = useCallback(async () => {
-    try {
-      const res = await fetch("/api/catalogo/joybees/pedidos");
-      if (res.ok) {
-        const data = await res.json();
-        setPedidos(data);
-      }
-    } catch { /* ignore */ }
-  }, []);
-
   useEffect(() => {
     if (!authChecked) return;
     setLoading(true);
-    Promise.all([loadProducts(), loadPedidos()]).finally(() => setLoading(false));
-  }, [authChecked, loadProducts, loadPedidos]);
+    loadProducts().finally(() => setLoading(false));
+  }, [authChecked, loadProducts]);
 
   if (!authChecked) return null;
 
   const tabs: { key: Tab; label: string }[] = [
     { key: "productos", label: "Productos" },
-    { key: "pedidos", label: "Pedidos" },
     { key: "importar", label: "Importar" },
   ];
 
@@ -210,9 +183,6 @@ function JoybeesAdminInner() {
           <>
             {tab === "productos" && (
               <ProductosTab products={products} />
-            )}
-            {tab === "pedidos" && (
-              <PedidosTab pedidos={pedidos} />
             )}
             {tab === "importar" && (
               <ImportarTab
@@ -329,54 +299,6 @@ function ProductosTab({ products }: { products: JoybeesProduct[] }) {
           );
         })}
       </div>
-    </div>
-  );
-}
-
-// ── PEDIDOS TAB ───────────────────────────────────────────────────────────────
-
-function PedidosTab({ pedidos }: { pedidos: JoybeesPedido[] }) {
-  if (pedidos.length === 0) {
-    return (
-      <div className="text-center py-16">
-        <p className="text-gray-400 text-sm">No hay pedidos aun</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-gray-50 border-b border-gray-200">
-            <th className="text-left px-4 py-3 font-medium text-gray-500">Fecha</th>
-            <th className="text-left px-4 py-3 font-medium text-gray-500">Pedido</th>
-            <th className="text-right px-4 py-3 font-medium text-gray-500">Items</th>
-            <th className="text-right px-4 py-3 font-medium text-gray-500">Total</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {pedidos.map((pedido) => (
-            <tr key={pedido.id} className="hover:bg-gray-50 transition">
-              <td className="px-4 py-3 text-gray-500 text-xs">{fmtDate(pedido.created_at)}</td>
-              <td className="px-4 py-3">
-                <Link
-                  href={`/pedido-joybees/${pedido.short_id}`}
-                  className="text-[#404041] font-medium hover:underline"
-                >
-                  {pedido.short_id}
-                </Link>
-              </td>
-              <td className="px-4 py-3 text-right text-gray-500 tabular-nums">
-                {Array.isArray(pedido.items) ? pedido.items.length : 0}
-              </td>
-              <td className="px-4 py-3 text-right font-semibold text-gray-900 tabular-nums">
-                ${fmtMoney(pedido.total)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
