@@ -440,11 +440,18 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
               }
             } catch { /* si falla el GET, escribimos solo la línea nueva */ }
             const resultado_contacto = previo ? `${previo}\n${linea}` : linea;
-            await fetch("/api/overrides", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ nombre_normalized: nombre, resultado_contacto }),
-            }).catch(() => {});
+            // El cheque YA quedó rebotado (PUT arriba OK). Esta nota a CXC es
+            // secundaria: si falla, avisamos pero NO revertimos el rebotado.
+            try {
+              const ovRes = await fetch("/api/overrides", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ nombre_normalized: nombre, resultado_contacto }),
+              });
+              if (!ovRes.ok) showToast("Cheque rebotado, pero no se pudo registrar la nota en CXC.");
+            } catch {
+              showToast("Cheque rebotado, pero no se pudo registrar la nota en CXC.");
+            }
           }
           loadCheques();
         } catch { setCheques(snapshot); showToast("Error de conexion. Intenta de nuevo."); }

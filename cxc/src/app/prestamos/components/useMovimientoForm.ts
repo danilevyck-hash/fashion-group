@@ -63,9 +63,11 @@ export function useMovimientoForm({ empleadoId, deduccionQuincenal, onSuccess, s
     if (!confirmDeleteMovId) return;
     const movId = confirmDeleteMovId;
     setConfirmDeleteMovId(null);
-    const res = await fetch(`/api/prestamos/movimientos/${movId}`, { method: "DELETE" });
-    if (res.ok) { showToast("Movimiento eliminado"); onSuccess(); }
-    else showToast("Error al eliminar");
+    try {
+      const res = await fetch(`/api/prestamos/movimientos/${movId}`, { method: "DELETE" });
+      if (res.ok) { showToast("Movimiento eliminado"); onSuccess(); }
+      else { const err = await res.json().catch(() => null); showToast(err?.error || "Error al eliminar"); }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
   }
 
   async function approveMov(movId: string) {

@@ -34,6 +34,7 @@ export default function PrestamoDetallePage() {
   const [empleado, setEmpleado] = useState<Empleado | null>(null);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
+  const [confirmArchive, setConfirmArchive] = useState(false);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
@@ -117,7 +118,11 @@ export default function PrestamoDetallePage() {
           empleado={empleado}
           saldo={saldo}
           onEdit={actions.openEditModal}
-          onToggleArchive={actions.toggleArchive}
+          onToggleArchive={() => {
+            // Archivar pide confirmación; reactivar (no destructivo) va directo.
+            if (empleado.activo) setConfirmArchive(true);
+            else actions.toggleArchive();
+          }}
           onBack={() => router.push("/prestamos")}
         />
 
@@ -247,6 +252,15 @@ export default function PrestamoDetallePage() {
           : ""}
         confirmLabel="Eliminar"
         destructive
+      />
+
+      <ConfirmModal
+        open={confirmArchive}
+        onClose={() => setConfirmArchive(false)}
+        onConfirm={() => { setConfirmArchive(false); actions.toggleArchive(); }}
+        title="¿Archivar colaborador?"
+        message={`${empleado.nombre} dejará de aparecer en la lista activa de préstamos. Podrás reactivarlo cuando quieras.`}
+        confirmLabel="Archivar"
       />
 
       {movForm.pendingUndoMov && <UndoToast message={movForm.pendingUndoMov.message} startedAt={movForm.pendingUndoMov.startedAt} onUndo={movForm.undoActionMov} />}
