@@ -373,12 +373,16 @@ function normalizeWa(raw: string): string {
  * Devuelve siempre al menos el año actual, ordenado descendente.
  */
 export async function fetchAvailableYears(): Promise<number[]> {
+  // Fuente única switch_facturas: el rango de años sale de fecha (no hay columna
+  // anio). switch_facturas tiene toda la historia backfilleada (2022+).
   const [minRes, maxRes] = await Promise.all([
-    supabaseServer.from("ventas_raw").select("anio").order("anio", { ascending: true }).limit(1),
-    supabaseServer.from("ventas_raw").select("anio").order("anio", { ascending: false }).limit(1),
+    supabaseServer.from("switch_facturas").select("fecha").order("fecha", { ascending: true }).limit(1),
+    supabaseServer.from("switch_facturas").select("fecha").order("fecha", { ascending: false }).limit(1),
   ]);
-  const minYear = (minRes.data?.[0]?.anio as number | undefined) ?? null;
-  const maxYear = (maxRes.data?.[0]?.anio as number | undefined) ?? null;
+  const minF = minRes.data?.[0]?.fecha as string | undefined;
+  const maxF = maxRes.data?.[0]?.fecha as string | undefined;
+  const minYear = minF ? new Date(minF).getFullYear() : null;
+  const maxYear = maxF ? new Date(maxF).getFullYear() : null;
   const years = new Set<number>();
   if (minYear && maxYear) {
     for (let y = minYear; y <= maxYear; y++) years.add(y);

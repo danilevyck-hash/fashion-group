@@ -9,14 +9,14 @@ export async function GET(req: NextRequest) {
   // Fetch distinct years efficiently using a simple query with ordering
   const years = new Set<number>();
 
-  // Get min and max year in one query each (uses index, instant)
+  // Fuente única switch_facturas (rango de años desde fecha; historia backfilleada).
   const [{ data: minData }, { data: maxData }] = await Promise.all([
-    supabaseServer.from("ventas_raw").select("anio").order("anio", { ascending: true }).limit(1),
-    supabaseServer.from("ventas_raw").select("anio").order("anio", { ascending: false }).limit(1),
+    supabaseServer.from("switch_facturas").select("fecha").order("fecha", { ascending: true }).limit(1),
+    supabaseServer.from("switch_facturas").select("fecha").order("fecha", { ascending: false }).limit(1),
   ]);
 
-  const minYear = minData?.[0]?.anio;
-  const maxYear = maxData?.[0]?.anio;
+  const minYear = minData?.[0]?.fecha ? new Date(minData[0].fecha).getFullYear() : undefined;
+  const maxYear = maxData?.[0]?.fecha ? new Date(maxData[0].fecha).getFullYear() : undefined;
 
   if (minYear && maxYear) {
     for (let y = minYear; y <= maxYear; y++) {

@@ -81,12 +81,13 @@ export async function GET(req: NextRequest) {
     ventasMesLabel = `${MESES_LABEL[prevMonth]} ${prevYear}`;
     const compMonth = prevMonth === 1 ? 12 : prevMonth - 1;
     const compYear = prevMonth === 1 ? prevYear - 1 : prevYear;
+    // Fuente única switch_facturas (vía la vista unificada switch-only del Paso 2).
+    const compMonthStart = `${compYear}-${String(compMonth).padStart(2, "0")}-01`;
     const { data: compData } = await supabaseServer
-      .from("ventas_raw")
-      .select("subtotal")
-      .eq("anio", compYear)
-      .eq("mes", compMonth);
-    ventasPrev = (compData || []).reduce((s, x) => s + (Number(x.subtotal) || 0), 0);
+      .from("switch_ventas_unificado_vw")
+      .select("ventas_netas")
+      .eq("mes", compMonthStart);
+    ventasPrev = (compData || []).reduce((s, x) => s + (Number(x.ventas_netas) || 0), 0);
   }
 
   const cxcStale = r.lastUpload ? new Date(r.lastUpload) < new Date(staleDate) : true;
