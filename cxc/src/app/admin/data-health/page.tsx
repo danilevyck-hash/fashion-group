@@ -40,6 +40,42 @@ const SEVERITY_DOT: Record<Severity | "missing", string> = {
   missing:  "bg-gray-200",
 };
 
+// Qué significa cada severidad + qué hacer (para un director, no ingeniero).
+const SEVERITY_MEANING: Record<Severity, string> = {
+  critical: "Dato posiblemente incorrecto (afecta CXC/Ventas). Revisar ahora.",
+  warning:  "Posible problema; monitorear. Sin acción inmediata.",
+  info:     "Informativo o condición de borde. Revisar sin urgencia.",
+  ok:       "Sin problemas detectados.",
+};
+
+// Explicación en lenguaje natural + acción sugerida por check.
+const CHECK_INFO: Record<string, { desc: string; action: string }> = {
+  cheques_criticos_null: {
+    desc: "Cheques con campos críticos (monto, fecha o cliente) vacíos.",
+    action: "Abre esos cheques y completa los datos faltantes.",
+  },
+  prestamos_saldo_anomalo: {
+    desc: "Empleados con saldo de préstamo negativo (pagaron más de lo prestado).",
+    action: "Revisa sus movimientos: puede haber un pago duplicado o un abono mal cargado.",
+  },
+  last_upload_age_cxc: {
+    desc: "Días desde la última actualización del estado de cuenta (CXC) desde Switch.",
+    action: "Si está atrasado, revisa el cron switch-sync y la conexión con Switch.",
+  },
+  aging_tipos_sin_clasificar: {
+    desc: "Tipos de comprobante del estado de cuenta sin clasificar (crédito vs débito).",
+    action: "Clasifícalos en una migración para que el aging de CXC sea correcto.",
+  },
+  aging_dias_anomalo: {
+    desc: "Filas con días NULL o negativos y saldo: no entran en ningún rango del aging.",
+    action: "Revisa fechaCreacion/días de esas filas en el estado de cuenta.",
+  },
+  switch_facturas_continuidad: {
+    desc: "Empresa-mes sin facturas en switch_facturas (el dashboard lo cuenta como $0).",
+    action: "Backfill de ese período con scripts/switch-backfill.ts.",
+  },
+};
+
 function fmtRelative(iso: string | null): string {
   if (!iso) return "nunca";
   const t = new Date(iso).getTime();
@@ -164,6 +200,7 @@ export default function DataHealthPage() {
               <div key={sev} className="border border-gray-200 rounded-lg px-4 py-3">
                 <div className="text-[11px] uppercase tracking-wider text-gray-500 font-medium">{SEVERITY_BADGE[sev].label}</div>
                 <div className={`text-2xl font-semibold tabular-nums mt-1 ${SEVERITY_BADGE[sev].text}`}>{summary[sev]}</div>
+                <div className="text-[11px] text-gray-400 mt-1 leading-snug">{SEVERITY_MEANING[sev]}</div>
               </div>
             ))}
           </div>
@@ -209,7 +246,10 @@ export default function DataHealthPage() {
                       </td>
                       <td className="px-4 py-2.5 text-right tabular-nums font-medium">{r.rows_affected}</td>
                       <td className="px-4 py-2.5 text-gray-500 text-xs">
-                        <span title={fmtAbsolute(r.checked_at)} className="cursor-default">{fmtRelative(r.checked_at)}</span>
+                        <span className="flex items-center justify-between gap-2">
+                          <span title={fmtAbsolute(r.checked_at)}>{fmtRelative(r.checked_at)}</span>
+                          <span className="text-gray-300 group-hover:text-gray-500" aria-hidden>›</span>
+                        </span>
                       </td>
                     </tr>
                   );
@@ -299,8 +339,28 @@ export default function DataHealthPage() {
                     <span className="font-medium">{selectedCheck.rows_affected}</span> rows afectados
                   </span>
                 </div>
+
+                {/* El check falló al correr (≠ "sin datos") */}
+                {selectedCheck.details && typeof selectedCheck.details.error === "string" && (
+                  <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                    <p className="font-medium">El check no pudo correr.</p>
+                    <p className="mt-0.5 text-xs">{String(selectedCheck.details.error)}</p>
+                  </div>
+                )}
+
+                {/* Explicación + acción en lenguaje natural */}
+                {CHECK_INFO[selectedCheck.check_name] && (
+                  <div className="mb-4 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm">
+                    <p className="text-gray-700">{CHECK_INFO[selectedCheck.check_name].desc}</p>
+                    <p className="mt-1.5 text-gray-600">
+                      <span className="font-medium text-gray-800">Qué hacer:</span> {CHECK_INFO[selectedCheck.check_name].action}
+                    </p>
+                  </div>
+                )}
+
+                <p className="text-[11px] uppercase tracking-wider text-gray-400 mb-1.5">Detalles técnicos</p>
                 <div className="text-xs font-mono bg-gray-50 border border-gray-200 rounded p-3 whitespace-pre-wrap break-all text-gray-700">
-                  {selectedCheck.details ? JSON.stringify(selectedCheck.details, null, 2) : "Sin detalles."}
+                  {selectedCheck.details ? JSON.stringify(selectedCheck.details, null, 2) : "El check corrió sin observaciones (sin detalles)."}
                 </div>
               </div>
             </div>

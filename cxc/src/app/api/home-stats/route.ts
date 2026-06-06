@@ -65,9 +65,11 @@ export async function GET(req: NextRequest) {
   const vencenHoy = cheques.filter((c) => c.fecha_deposito === todayStr);
   const chequesTotalPendiente = cheques.reduce((s, c) => s + (Number(c.monto) || 0), 0);
 
-  // Caja: cálculo trivial
+  // Caja: disponible = fondo real − gastos. Sin período abierto → null (la UI
+  // muestra "Sin período abierto"). Antes un fondo faltante se enmascaraba como
+  // $200 inventado.
   const cajaDisponible = r.cajaPeriodoId
-    ? (Number(r.cajaFondo) || 200) - Number(r.cajaGastosTotal || 0)
+    ? (Number(r.cajaFondo) || 0) - Number(r.cajaGastosTotal || 0)
     : null;
 
   // Ventas: si mes actual sin data, usar mes previo
