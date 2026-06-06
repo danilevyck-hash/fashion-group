@@ -447,6 +447,21 @@ function ImportSection({
         </button>
       </div>
 
+      {/* Aviso de reemplazo total: el archivo es la fuente de verdad completa */}
+      <div className="mb-4 bg-amber-50 border border-amber-300 rounded-lg p-3">
+        <div className="flex gap-2">
+          <svg className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <div className="text-xs text-amber-900 leading-relaxed">
+            <p className="font-semibold mb-1">Importante</p>
+            <p>
+              El archivo debe contener <strong>TODOS</strong> los productos de Joybees. Cualquier producto que no este en el archivo se desactiva y su stock pasa a 0. Para actualizar solo algunos, descarga primero la plantilla &mdash; ya trae todos los productos actuales &mdash; y edita sobre ella.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Drop zone */}
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}

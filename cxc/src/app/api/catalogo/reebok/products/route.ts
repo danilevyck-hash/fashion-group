@@ -48,12 +48,14 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })
 
-  await reebokServer.from('inventory').delete().eq('product_id', id)
-
-  const { data, error } = await reebokServer.from('products').delete().eq('id', id).select('id').maybeSingle()
+  // Soft-delete: desactivamos el producto en vez de borrarlo de forma
+  // irreversible. Preserva la fila Y su inventario → reversible (reactivable
+  // con active=true). El catalogo publico ya filtra active=true, asi que un
+  // producto "borrado" desaparece de las listas activas sin perdida de datos.
+  const { data, error } = await reebokServer.from('products').update({ active: false }).eq('id', id).select('id').maybeSingle()
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   if (!data) return NextResponse.json({ error: 'Producto no encontrado' }, { status: 404 })
   const s = getSession(req)
-  await logActivity(s?.role || 'admin', 'product_delete', 'reebok', { productId: id }, s?.userName)
+  await logActivity(s?.role || 'admin', 'product_soft_delete', 'reebok', { productId: id }, s?.userName)
   return NextResponse.json({ success: true, deleted: data.id })
 }
