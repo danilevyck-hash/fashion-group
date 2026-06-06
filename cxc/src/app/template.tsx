@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 /**
  * Calculate a "depth" score from the pathname.
- * / = 0, /prestamos = 1, /prestamos/123 = 2, /catalogo/reebok/admin/productos = 4, etc.
+ * / = 0, /prestamos = 1, /prestamos/123 = 2, /catalogo/reebok/producto/123 = 4, etc.
  */
 function getDepth(pathname: string): number {
   const segments = pathname.split("/").filter(Boolean);
