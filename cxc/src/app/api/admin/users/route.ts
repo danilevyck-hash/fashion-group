@@ -1,11 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireAuth } from "@/lib/require-auth";
+import { SYSTEM_ROLE_KEYS, ALL_MODULE_KEYS } from "@/lib/modules";
 
 export const dynamic = "force-dynamic";
 
 function isBcryptHash(s: string): boolean {
   return s.startsWith("$2a$") || s.startsWith("$2b$");
+}
+
+/**
+ * Valida server-side `role` y `modulos_override` contra las fuentes de verdad
+ * (SYSTEM_ROLE_KEYS / ALL_MODULE_KEYS). El frontend ya restringe vía select y
+ * checkboxes, pero una llamada directa a la API podría inyectar valores inválidos.
+ * Devuelve un mensaje de error o null si todo es válido.
+ */
+function validateRoleAndModulos(role: unknown, modulos_override: unknown): string | null {
+  if (role !== undefined && role !== null) {
+    if (typeof role !== "string" || !SYSTEM_ROLE_KEYS.includes(role)) {
+      return `Rol inválido. Roles permitidos: ${SYSTEM_ROLE_KEYS.join(", ")}`;
+    }
+  }
+  if (Array.isArray(modulos_override)) {
+    const invalid = modulos_override.find((m) => typeof m !== "string" || !ALL_MODULE_KEYS.includes(m));
+    if (invalid !== undefined) {
+      return `Módulo inválido: '${invalid}'. Módulos válidos: ${ALL_MODULE_KEYS.join(", ")}`;
+    }
+  } else if (modulos_override !== undefined && modulos_override !== null) {
+    return "modulos_override debe ser un arreglo de módulos o null.";
+  }
+  return null;
+}
+
+/**
+ * ¿Aplicar este cambio (desactivar o quitar el rol admin) al usuario `targetId`
+ * dejaría al sistema con CERO administradores activos? Previene el auto-lockout:
+ * que nadie pueda volver a entrar a administrar.
+ */
+async function wouldLeaveNoActiveAdmin(targetId: string): Promise<boolean> {
+  const { data } = await supabaseServer
+    .from("fg_users")
+    .select("id")
+    .eq("role", "admin")
+    .eq("active", true);
+  const activeAdmins = data || [];
+  return activeAdmins.length === 1 && activeAdmins[0].id === targetId;
 }
 
 /**
@@ -54,6 +93,9 @@ export async function POST(req: NextRequest) {
   if (name.trim().length < 3) return NextResponse.json({ error: "El nombre debe tener al menos 3 caracteres" }, { status: 400 });
   if (password.length < 8) return NextResponse.json({ error: "La contraseña debe tener al menos 8 caracteres" }, { status: 400 });
 
+  const validationError = validateRoleAndModulos(role, modulos_override);
+  if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
+
   // Check for duplicate name
   const { data: existing } = await supabaseServer.from("fg_users").select("id").eq("name", name.trim()).limit(1);
   if (existing && existing.length > 0) return NextResponse.json({ error: "Ya existe un usuario con ese nombre" }, { status: 400 });
@@ -75,7 +117,7 @@ export async function POST(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: "Error al crear usuario" }, { status: 500 });
 
-  // Modules are now inherited from role — no per-user module assignment
+  // modulos_override (array) = permisos custom por usuario; null = hereda del rol.
   return NextResponse.json(user);
 }
 
@@ -85,6 +127,18 @@ export async function PUT(req: NextRequest) {
 
   const { id, name, password, role, associated_company, modulos_override } = await req.json();
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  const validationError = validateRoleAndModulos(role, modulos_override);
+  if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
+
+  // Guard de auto-lockout: quitar el rol admin al único admin activo dejaría el
+  // sistema sin administradores.
+  if (role !== undefined && role !== "admin" && (await wouldLeaveNoActiveAdmin(id))) {
+    return NextResponse.json(
+      { error: "No puedes quitar el rol de administrador al único admin activo." },
+      { status: 400 },
+    );
+  }
 
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (name !== undefined) {
@@ -123,7 +177,7 @@ export async function PUT(req: NextRequest) {
   const { error } = await supabaseServer.from("fg_users").update(update).eq("id", id);
   if (error) return NextResponse.json({ error: "Error al actualizar" }, { status: 500 });
 
-  // Modules are now inherited from role — no per-user module assignment
+  // modulos_override (array) = permisos custom por usuario; null = hereda del rol.
   return NextResponse.json({ ok: true });
 }
 
@@ -133,6 +187,15 @@ export async function PATCH(req: NextRequest) {
 
   const { id, active } = await req.json();
   if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+  // Guard de auto-lockout: desactivar al único admin activo dejaría el sistema
+  // sin nadie que pueda administrar.
+  if (active === false && (await wouldLeaveNoActiveAdmin(id))) {
+    return NextResponse.json(
+      { error: "No puedes desactivar al único administrador activo." },
+      { status: 400 },
+    );
+  }
 
   const { error } = await supabaseServer
     .from("fg_users")
