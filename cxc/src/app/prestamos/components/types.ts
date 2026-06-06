@@ -63,6 +63,9 @@ export const MOV_TYPES = [
   { key: "pago_resp", label: "Pago de responsabilidad", concepto: "Pago de responsabilidad", icon: "✅", color: "bg-purple-50 border-purple-200 text-purple-700 hover:border-purple-400", sign: "−", effect: "Reduce la deuda", effectColor: "text-green-600" },
 ] as const;
 
+/** Conceptos válidos de movimiento (fuente de verdad para validación server). */
+export const MOV_CONCEPTOS: string[] = [...new Set(MOV_TYPES.map((t) => t.concepto))];
+
 export const CONCEPTO_COLORS: Record<string, string> = {
   "Préstamo": "text-red-600",
   "Pago": "text-green-600",

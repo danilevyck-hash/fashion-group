@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
+import { MOV_CONCEPTOS } from "@/app/prestamos/components/types";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,14 @@ export async function POST(req: NextRequest) {
   }
   if (Number(monto) <= 0) {
     return NextResponse.json({ error: "El monto debe ser positivo" }, { status: 400 });
+  }
+  if (typeof concepto !== "string" || !MOV_CONCEPTOS.includes(concepto)) {
+    return NextResponse.json({ error: "Concepto inválido" }, { status: 400 });
+  }
+  // Panamá es UTC-5 todo el año (sin DST). La fecha no puede ser futura.
+  const hoyPanama = new Date(Date.now() - 5 * 3600 * 1000).toISOString().slice(0, 10);
+  if (typeof fecha !== "string" || fecha > hoyPanama) {
+    return NextResponse.json({ error: "La fecha no puede ser futura. Usa hoy o una fecha anterior." }, { status: 400 });
   }
 
   // Validate payment does not exceed pending balance
