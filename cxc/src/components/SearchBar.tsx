@@ -154,7 +154,7 @@ function flatten(r: SearchResults): FlatItem[] {
       module: "Directorio",
       label: d.nombre,
       sub: [d.empresa, d.correo, d.celular].filter(Boolean).join(" · "),
-      href: "/directorio",
+      href: "/clientes",
       icon: "📋",
     });
   }
@@ -209,7 +209,7 @@ const SEARCH_MODULES = [
   { label: "Cheques", href: "/cheques", keywords: ["cheque", "deposito", "posfechado", "banco"] },
   { label: "Guias", href: "/guias", keywords: ["guia", "despacho", "envio", "transporte"] },
   { label: "Ventas", href: "/ventas", keywords: ["venta", "factura", "ingreso", "vendedor"] },
-  { label: "Directorio", href: "/directorio", keywords: ["directorio", "contacto", "correo", "telefono", "whatsapp"] },
+  { label: "Directorio", href: "/clientes", keywords: ["directorio", "contacto", "correo", "telefono", "whatsapp", "clientes"] },
   { label: "Prestamos", href: "/prestamos", keywords: ["prestamo", "empleado", "descuento", "planilla"] },
   { label: "Caja", href: "/caja", keywords: ["caja", "gasto", "pago", "proveedor", "efectivo"] },
 ];

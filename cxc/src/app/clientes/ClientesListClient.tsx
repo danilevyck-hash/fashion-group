@@ -36,6 +36,14 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
   const [provincia, setProvincia] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Pre-llenar búsqueda desde ?search= (enlaces como "Ver en directorio" de
+  // CXC, antes apuntaban a /directorio?search=). Se lee tras montar para no
+  // romper la hidratación (el render del server usa q="").
+  useEffect(() => {
+    const s = new URLSearchParams(window.location.search).get("search");
+    if (s) setQ(s);
+  }, []);
+
   const totalPages = useMemo(() => Math.max(1, Math.ceil(total / pageSize)), [total, pageSize]);
 
   const fetchPage = useCallback(async (p: number, query: string, prov: string) => {

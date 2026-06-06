@@ -5,7 +5,7 @@
 // No edita facturas individuales — esas se eliminan y vuelven a subir.
 
 import { useEffect, useMemo, useState } from "react";
-import { Modal } from "@/components/ui";
+import { Modal, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ToastSystem";
 import type {
   MarcaPorcentajeInput,
@@ -36,6 +36,7 @@ export default function EditarProyectoModal({
     new Set(proyecto.marcas.map((m) => m.marca.id)),
   );
   const [guardando, setGuardando] = useState(false);
+  const [confirmReparto, setConfirmReparto] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -43,6 +44,7 @@ export default function EditarProyectoModal({
     setTienda(proyecto.tienda);
     setFechaInicio(proyecto.fecha_inicio);
     setMarcasSel(new Set(proyecto.marcas.map((m) => m.marca.id)));
+    setConfirmReparto(false);
   }, [open, proyecto]);
 
   const tipoActivo = useMemo<"externa" | "interna" | null>(() => {
@@ -69,14 +71,18 @@ export default function EditarProyectoModal({
   const puedeGuardar =
     tiendaValida && fechaValida && marcasValidas && !guardando;
 
-  const handleGuardar = async () => {
-    if (!puedeGuardar) return;
-    setGuardando(true);
-
+  // ¿El usuario cambió el set de marcas? Cambiarlo reescribe el reparto en
+  // TODAS las facturas del proyecto, por eso pedimos confirmación explícita.
+  const cambioMarcas = useMemo(() => {
     const marcasOriginales = new Set(proyecto.marcas.map((m) => m.marca.id));
-    const cambioMarcas =
+    return (
       marcasOriginales.size !== marcasSel.size ||
-      Array.from(marcasSel).some((id) => !marcasOriginales.has(id));
+      Array.from(marcasSel).some((id) => !marcasOriginales.has(id))
+    );
+  }, [proyecto.marcas, marcasSel]);
+
+  const ejecutarGuardado = async () => {
+    setGuardando(true);
 
     const marcasPayload: MarcaPorcentajeInput[] = Array.from(marcasSel).map(
       (marcaId) => ({ marcaId, porcentaje: 50 }), // ignorado server-side
@@ -112,7 +118,19 @@ export default function EditarProyectoModal({
     }
   };
 
+  const handleGuardar = () => {
+    if (!puedeGuardar) return;
+    // Cambiar el reparto es destructivo (reescribe todas las facturas):
+    // confirmar antes. Si solo cambian nombre/tienda/fecha, guardar directo.
+    if (cambioMarcas) {
+      setConfirmReparto(true);
+      return;
+    }
+    void ejecutarGuardado();
+  };
+
   return (
+    <>
     <Modal open={open} onClose={onClose} title="Editar proyecto" maxWidth="max-w-lg">
       <div className="space-y-4">
         <div>
@@ -231,5 +249,20 @@ export default function EditarProyectoModal({
         </div>
       </div>
     </Modal>
+
+    <ConfirmModal
+      open={confirmReparto}
+      onClose={() => setConfirmReparto(false)}
+      onConfirm={async () => {
+        setConfirmReparto(false);
+        await ejecutarGuardado();
+      }}
+      title="¿Cambiar el reparto de marcas?"
+      message="Cambiar las marcas asignadas sobrescribe el reparto en TODAS las facturas de este proyecto. ¿Quieres continuar?"
+      confirmLabel="Sí, cambiar reparto"
+      destructive
+      loading={guardando}
+    />
+    </>
   );
 }
