@@ -47,7 +47,7 @@ export default function OrderDetailPage() {
   const [toast, setToast] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<DirClient[]>([]);
   const [showSugg, setShowSugg] = useState(false);
-  const [autoSaveStatus, setAutoSaveStatus] = useState<"saved" | "saving" | "dirty" | null>(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<"saved" | "saving" | "dirty" | "error" | null>(null);
   const [editedAt, setEditedAt] = useState<string | null>(null);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
   const nameRef = useRef<HTMLDivElement>(null);
@@ -129,18 +129,28 @@ export default function OrderDetailPage() {
     saveInFlight.current = true;
     setAutoSaveStatus("saving");
     try {
-      await fetch(`/api/catalogo/reebok/orders/${id}`, {
+      const res = await fetch(`/api/catalogo/reebok/orders/${id}`, {
         method: "PUT", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ client_name: clientNameRef.current, items: itemsRef.current }),
       });
-      const now = new Date().toISOString();
-      setAutoSaveStatus("saved");
-      setLastSavedAt(now);
-      // Marca de editado para pedidos confirmados (registro interno difiere
-      // de lo enviado). No reenvia correo: solo persiste y deja constancia.
-      if (order?.status === "confirmado") setEditedAt(now);
+      // El server respondio pero con error (ej. 500): NO mostrar "Guardado".
+      // Marcamos error visible para que el vendedor reintente y no crea que
+      // se guardo. El boton "Guardar" sigue activo para reintentar.
+      if (!res.ok) {
+        setAutoSaveStatus("error");
+        showToast("No se pudo guardar. Revisa tu conexion e intenta de nuevo.");
+      } else {
+        const now = new Date().toISOString();
+        setAutoSaveStatus("saved");
+        setLastSavedAt(now);
+        // Marca de editado para pedidos confirmados (registro interno difiere
+        // de lo enviado). No reenvia correo: solo persiste y deja constancia.
+        if (order?.status === "confirmado") setEditedAt(now);
+      }
     } catch {
-      setAutoSaveStatus("dirty");
+      // Fallo de red: tampoco se guardo. Error visible, no "Guardado".
+      setAutoSaveStatus("error");
+      showToast("No se pudo guardar. Revisa tu conexion e intenta de nuevo.");
     }
     saveInFlight.current = false;
     if (pendingSave.current) { pendingSave.current = false; performSave(); }
@@ -149,7 +159,7 @@ export default function OrderDetailPage() {
   // Aviso nativo si hay cambios sin guardar al cerrar/navegar.
   useEffect(() => {
     function handler(e: BeforeUnloadEvent) {
-      if (autoSaveStatus === "dirty" || saveInFlight.current) { e.preventDefault(); e.returnValue = ""; }
+      if (autoSaveStatus === "dirty" || autoSaveStatus === "error" || saveInFlight.current) { e.preventDefault(); e.returnValue = ""; }
     }
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
@@ -409,6 +419,11 @@ export default function OrderDetailPage() {
               <>
                 <span className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
                 <span className="text-amber-600 font-medium">Guardando...</span>
+              </>
+            ) : autoSaveStatus === "error" ? (
+              <>
+                <span className="w-2 h-2 rounded-full bg-red-500" />
+                <span className="text-red-600 font-medium">No se pudo guardar — toca Guardar para reintentar</span>
               </>
             ) : autoSaveStatus === "dirty" ? (
               <>
