@@ -12,9 +12,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncCostoDiario, type CostoDiarioResult } from "@/lib/switch-api/sync-empresa";
 import { empresasConFacturas } from "@/lib/switch-api/empresas";
+import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
+
+const CRON_NAME = "switch-costo-diario";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const secret = process.env.CRON_SECRET;
@@ -35,6 +38,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       errors.push({ empresaKey, error: err instanceof Error ? err.message : String(err) });
     }
   }
+
+  await recordCronHeartbeat(CRON_NAME);
 
   return NextResponse.json(
     { ok: errors.length === 0, results, errors },

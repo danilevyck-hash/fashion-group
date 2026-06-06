@@ -24,7 +24,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
 import { sendTelegramAlert } from "@/lib/telegram";
+import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
+
+const CRON_NAME = "switch-reconciliacion";
+// Watchdog: alerta si algún cron lleva más de 30h sin registrar success.
+const WATCHDOG_STALE_HOURS = 30;
 
 export const dynamic = "force-dynamic";
 // El App Router cachea fetch() por defecto (Data Cache) — incluye los fetch
@@ -152,6 +157,36 @@ async function retriggerSwitchSync(
   }
 }
 
+/**
+ * Watchdog de heartbeats: revisa cron_heartbeats y alerta por Telegram si algún
+ * cron lleva más de WATCHDOG_STALE_HOURS sin un success. Devuelve la lista de
+ * crons stale. No lanza: si la tabla no existe aún (migración pendiente) o la
+ * query falla, devuelve [] y sigue.
+ */
+async function checkStaleCrons(): Promise<string[]> {
+  const { data, error } = await supabaseServer
+    .from("cron_heartbeats")
+    .select("cron_name, last_success_at");
+  if (error) {
+    console.error(`[watchdog] no pude leer cron_heartbeats: ${error.message}`);
+    return [];
+  }
+  const cutoffMs = Date.now() - WATCHDOG_STALE_HOURS * 3600 * 1000;
+  const stale = (data || [])
+    .filter((h) => {
+      const t = new Date(h.last_success_at).getTime();
+      return Number.isFinite(t) && t < cutoffMs;
+    })
+    .map((h) => `${h.cron_name} (último: ${h.last_success_at})`);
+  if (stale.length > 0) {
+    await sendTelegramAlert(
+      `⏰ Watchdog crons — ${stale.length} sin success >${WATCHDOG_STALE_HOURS}h:\n` +
+        stale.map((s) => `• ${s}`).join("\n"),
+    );
+  }
+  return stale;
+}
+
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
@@ -168,6 +203,10 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const sinceIso = panamaDayStartIso();
   const expected = expectedPairs();
 
+  // 0. Watchdog de heartbeats (corre en ambos desenlaces) + registrar el propio.
+  const staleCrons = await checkStaleCrons();
+  await recordCronHeartbeat(CRON_NAME);
+
   // 1. Detección inicial.
   const logBefore = await fetchTodayLog(sinceIso);
   const missingBefore = findMissing(expected, logBefore);
@@ -181,6 +220,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       reconciled: [],
       stillFailing: [],
       telegram: "none",
+      staleCrons,
     });
   }
 
@@ -234,6 +274,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
         lastError: lastErrorFor(p, logAfter),
       })),
       telegram,
+      staleCrons,
     },
     { status: missingAfter.length === 0 ? 200 : 207 },
   );

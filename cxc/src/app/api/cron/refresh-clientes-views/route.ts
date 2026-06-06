@@ -21,8 +21,11 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
+
+const CRON_NAME = "refresh-clientes-views";
 
 export async function GET(req: NextRequest) {
   // Auth: Bearer header preferido, ?secret= como fallback, admin cookie para
@@ -67,6 +70,7 @@ export async function GET(req: NextRequest) {
     } catch (logErr) {
       console.error("[cron/refresh-clientes-views] cron_email_errors insert threw:", logErr);
     }
+    await logCronError("refresh_clientes_views_failed", error.message);
     return NextResponse.json(
       { ok: false, error: error.message, durationMs, refreshedAt: startedAtIso },
       { status: 500 }
@@ -76,5 +80,6 @@ export async function GET(req: NextRequest) {
   const refreshedAt = new Date().toISOString();
   const durationMs = Date.now() - startedAt;
   console.log(`[cron/refresh-clientes-views] ok in ${durationMs}ms`);
+  await recordCronHeartbeat(CRON_NAME);
   return NextResponse.json({ ok: true, refreshedAt, durationMs });
 }

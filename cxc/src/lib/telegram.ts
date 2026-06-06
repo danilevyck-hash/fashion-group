@@ -15,6 +15,17 @@
 
 const TELEGRAM_API = "https://api.telegram.org";
 
+/**
+ * Error legible para Telegram: solo el primer renglón útil, truncado a ~200
+ * chars. Switch (y otros) a veces devuelven una página HTML de excepción
+ * completa como mensaje de error — sin esto la alerta queda ilegible.
+ */
+export function shortError(msg: string | null | undefined, max = 200): string {
+  if (!msg) return "—";
+  const firstLine = msg.split(/\r?\n/)[0].trim();
+  return firstLine.length > max ? `${firstLine.slice(0, max)}…` : firstLine;
+}
+
 export async function sendTelegramAlert(text: string): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;

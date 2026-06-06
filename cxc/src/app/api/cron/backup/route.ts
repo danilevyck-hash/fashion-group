@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { Resend } from "resend";
+import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-const BACKUP_EMAIL = "daniel@fashionfitnessgroup.com";
-const MAX_ATTACHMENT_BYTES = 24 * 1024 * 1024; // 24MB safe limit
+const CRON_NAME = "backup";
+const BUCKET = "backups";
+const RETENTION_DAYS = 30;
 
 export const dynamic = "force-dynamic";
 
@@ -131,163 +131,47 @@ export async function GET(req: NextRequest) {
     fg_users: usersRaw || [],
   };
 
-  const jsonStr = JSON.stringify(backup);
-  const jsonBytes = Buffer.from(jsonStr, "utf-8");
+  const jsonBytes = Buffer.from(JSON.stringify(backup), "utf-8");
 
-  // Upload to Supabase Storage
+  // Subir a Storage organizado por fecha: backups/YYYY-MM-DD/backup.json
+  const objectPath = `${today}/backup.json`;
   const { error: storageErr } = await supabaseServer.storage
-    .from("backups")
-    .upload(`backup_${today}.json`, jsonBytes, {
+    .from(BUCKET)
+    .upload(objectPath, jsonBytes, {
       contentType: "application/json",
       upsert: true,
     });
 
   if (storageErr) {
-    console.error("Storage upload error:", storageErr);
-    // Persistir el fallo en cron_email_errors. Best-effort: si el propio
-    // INSERT falla, no rompemos el flujo — el cron sigue al envío de email.
-    try {
-      const { error: logErr } = await supabaseServer
-        .from("cron_email_errors")
-        .insert({
-          tipo: "backup_storage_failed",
-          cheque_context: null,
-          error_message: storageErr.message,
-        });
-      if (logErr) {
-        console.error("[backup] cron_email_errors insert failed:", logErr.message);
-      }
-    } catch (logErr) {
-      console.error("[backup] cron_email_errors insert threw:", logErr);
-    }
+    console.error("[backup] storage upload error:", storageErr.message);
+    // El backup FALLÓ → alerta Telegram (única condición de alerta).
+    await logCronError("backup_storage_failed", storageErr.message);
+    return NextResponse.json({ ok: false, date: today, error: storageErr.message }, { status: 500 });
   }
 
-  // Clean old backups (keep last 30 days)
+  // Limpieza de backups > RETENTION_DAYS (carpetas de fecha + legacy flat files).
+  // Housekeeping: si falla, solo log a consola (se reintenta mañana, no alerta).
   try {
-    const { data: files } = await supabaseServer.storage.from("backups").list("", { limit: 200 });
-    if (files && files.length > 30) {
-      const sorted = files
-        .filter((f) => f.name.startsWith("backup_"))
-        .sort((a, b) => a.name.localeCompare(b.name));
-      const toDelete = sorted.slice(0, sorted.length - 30).map((f) => f.name);
-      if (toDelete.length > 0) {
-        await supabaseServer.storage.from("backups").remove(toDelete);
+    const cutoff = new Date(now.getTime() - RETENTION_DAYS * 86400000).toISOString().slice(0, 10);
+    const { data: entries } = await supabaseServer.storage.from(BUCKET).list("", { limit: 1000 });
+    const removePaths: string[] = [];
+    for (const e of entries || []) {
+      // Carpetas de fecha (YYYY-MM-DD): borrar su contenido si son viejas.
+      if (/^\d{4}-\d{2}-\d{2}$/.test(e.name) && e.name < cutoff) {
+        const { data: inner } = await supabaseServer.storage.from(BUCKET).list(e.name, { limit: 1000 });
+        for (const f of inner || []) removePaths.push(`${e.name}/${f.name}`);
       }
+      // Legacy flat: backup_YYYY-MM-DD.json en la raíz.
+      const legacy = e.name.match(/^backup_(\d{4}-\d{2}-\d{2})\.json$/);
+      if (legacy && legacy[1] < cutoff) removePaths.push(e.name);
+    }
+    if (removePaths.length > 0) {
+      await supabaseServer.storage.from(BUCKET).remove(removePaths);
     }
   } catch (e) {
-    console.error("Cleanup error:", e);
-    // Persistir el fallo en cron_email_errors. Best-effort: si el propio
-    // INSERT falla, no rompemos el flujo — el cron sigue al envío de email.
-    try {
-      const { error: logErr } = await supabaseServer
-        .from("cron_email_errors")
-        .insert({
-          tipo: "backup_cleanup_failed",
-          cheque_context: null,
-          error_message: e instanceof Error ? e.message : String(e),
-        });
-      if (logErr) {
-        console.error("[backup] cron_email_errors insert failed:", logErr.message);
-      }
-    } catch (logErr) {
-      console.error("[backup] cron_email_errors insert threw:", logErr);
-    }
+    console.error("[backup] cleanup error:", e instanceof Error ? e.message : String(e));
   }
 
-  // Send email(s) via Resend
-  try {
-    if (jsonBytes.length <= MAX_ATTACHMENT_BYTES) {
-      // Single email
-      await resend.emails.send({
-        from: "notificaciones@fashiongr.com",
-        to: BACKUP_EMAIL,
-        subject: `Backup Diario Fashion Group — ${today}`,
-        html: buildEmailHtml(counts, today, jsonBytes.length),
-        attachments: [{
-          filename: `backup_${today}.json`,
-          content: jsonBytes.toString("base64"),
-        }],
-      });
-    } else {
-      // Split into chunks by table groups
-      const groups = [
-        { name: "CXC_Ventas", tables: { cxc_rows: backup.cxc_rows, ventas_raw: backup.ventas_raw } },
-        { name: "Operaciones", tables: { cheques: backup.cheques, reclamos: backup.reclamos, guias: backup.guias } },
-        { name: "Admin", tables: { caja_periodos: backup.caja_periodos, prestamos: backup.prestamos, directorio: backup.directorio, fg_users: backup.fg_users, meta: backup.meta } },
-      ];
-
-      for (let i = 0; i < groups.length; i++) {
-        const g = groups[i];
-        const chunk = JSON.stringify(g.tables);
-        const chunkBuf = Buffer.from(chunk, "utf-8");
-        await resend.emails.send({
-          from: "notificaciones@fashiongr.com",
-          to: BACKUP_EMAIL,
-          subject: `Backup Diario Fashion Group — ${today} (${i + 1}/${groups.length}: ${g.name})`,
-          html: buildEmailHtml(counts, today, jsonBytes.length, i + 1, groups.length, g.name),
-          attachments: [{
-            filename: `backup_${today}_${g.name.toLowerCase()}.json`,
-            content: chunkBuf.toString("base64"),
-          }],
-        });
-      }
-    }
-  } catch (e) {
-    console.error("Email error:", e);
-    // Persistir el fallo en cron_email_errors. Best-effort: si el propio
-    // INSERT falla, igual devolvemos el 200 con email:"failed".
-    try {
-      const { error: logErr } = await supabaseServer
-        .from("cron_email_errors")
-        .insert({
-          tipo: "backup_email_failed",
-          cheque_context: null,
-          error_message: e instanceof Error ? e.message : String(e),
-        });
-      if (logErr) {
-        console.error("[backup] cron_email_errors insert failed:", logErr.message);
-      }
-    } catch (logErr) {
-      console.error("[backup] cron_email_errors insert threw:", logErr);
-    }
-    return NextResponse.json({ ok: true, date: today, counts, email: "failed", storage: !storageErr });
-  }
-
-  return NextResponse.json({ ok: true, date: today, counts, email: "sent", storage: !storageErr });
-}
-
-function buildEmailHtml(counts: Record<string, number>, date: string, totalBytes: number, part?: number, totalParts?: number, groupName?: string): string {
-  const sizeMB = (totalBytes / 1024 / 1024).toFixed(1);
-  const totalRecords = Object.values(counts).reduce((s, n) => s + n, 0);
-  const partLabel = part ? ` — Parte ${part}/${totalParts} (${groupName})` : "";
-
-  const rows = Object.entries(counts)
-    .map(([table, count]) => `<tr><td style="padding:6px 12px;border-bottom:1px solid #eee;font-size:13px;color:#333">${table}</td><td style="padding:6px 12px;border-bottom:1px solid #eee;font-size:13px;color:#333;text-align:right;font-weight:600">${count.toLocaleString()}</td></tr>`)
-    .join("");
-
-  return `
-    <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:500px;margin:0 auto">
-      <div style="background:#1B3A5C;padding:20px 24px;border-radius:12px 12px 0 0">
-        <h1 style="color:white;font-size:16px;margin:0;font-weight:600">Backup Diario${partLabel}</h1>
-        <p style="color:#93B5D3;font-size:12px;margin:4px 0 0">${date}</p>
-      </div>
-      <div style="border:1px solid #e5e7eb;border-top:none;padding:20px 24px;border-radius:0 0 12px 12px">
-        <div style="display:flex;gap:16px;margin-bottom:16px">
-          <div style="flex:1;background:#f0fdf4;border-radius:8px;padding:12px;text-align:center">
-            <div style="font-size:20px;font-weight:700;color:#15803d">${totalRecords.toLocaleString()}</div>
-            <div style="font-size:10px;color:#666;text-transform:uppercase;margin-top:2px">Registros</div>
-          </div>
-          <div style="flex:1;background:#eff6ff;border-radius:8px;padding:12px;text-align:center">
-            <div style="font-size:20px;font-weight:700;color:#1d4ed8">${sizeMB} MB</div>
-            <div style="font-size:10px;color:#666;text-transform:uppercase;margin-top:2px">Tamaño</div>
-          </div>
-        </div>
-        <table style="width:100%;border-collapse:collapse">
-          <thead><tr><th style="padding:6px 12px;text-align:left;font-size:10px;color:#999;text-transform:uppercase;border-bottom:2px solid #e5e7eb">Tabla</th><th style="padding:6px 12px;text-align:right;font-size:10px;color:#999;text-transform:uppercase;border-bottom:2px solid #e5e7eb">Registros</th></tr></thead>
-          <tbody>${rows}</tbody>
-        </table>
-        <p style="font-size:11px;color:#999;margin-top:16px;text-align:center">Fashion Group — Sistema CXC</p>
-      </div>
-    </div>
-  `;
+  await recordCronHeartbeat(CRON_NAME);
+  return NextResponse.json({ ok: true, date: today, counts, path: objectPath, bytes: jsonBytes.length });
 }

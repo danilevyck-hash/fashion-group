@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
-import { Resend } from "resend";
 import { getCompanyDisplay } from "@/lib/companies";
+import { sendTelegramAlert } from "@/lib/telegram";
+import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-const NOTIFY_EMAILS = ["daniel@fashiongr.com", "info@fashiongr.com"];
+const CRON_NAME = "cheques-alert";
 const WA_NUMBERS = ["+50766745522", "+50766494096"];
 
 function getPanamaDate(offset = 0) {
@@ -13,6 +13,8 @@ function getPanamaDate(offset = 0) {
   panama.setDate(panama.getDate() + offset);
   return panama.toISOString().slice(0, 10);
 }
+
+const money = (n: number) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const dynamic = "force-dynamic";
 
@@ -30,30 +32,12 @@ export async function GET(req: NextRequest) {
   }
   if (!authorized) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Test mode: send test email with fake cheque data
+  // Test mode: dispara un mensaje Telegram de prueba.
   if (req.nextUrl.searchParams.get("test") === "true") {
-    const tomorrow = getPanamaDate(1);
-    try {
-      const result = await resend.emails.send({
-        from: "Fashion Group <notificaciones@fashiongr.com>",
-        to: NOTIFY_EMAILS,
-        subject: "🧪 Test — 1 cheque por vencer — $1,000",
-        html: `
-          <h2 style="color:#1a1a1a">🧪 Cheques por vencer (PRUEBA)</h2>
-          <p>1 cheque por un total de <strong>$1,000</strong></p>
-          <table style="border-collapse:collapse;width:100%;font-size:14px">
-            <tr style="background:#f5f5f5"><th style="padding:8px;text-align:left">Cliente</th><th style="padding:8px">Empresa</th><th style="padding:8px;text-align:right">Monto</th><th style="padding:8px">Vence</th></tr>
-            <tr style="border-bottom:1px solid #eee"><td style="padding:8px">PRUEBA TEST</td><td style="padding:8px">Vistana</td><td style="padding:8px;text-align:right">$1,000.00</td><td style="padding:8px">MAÑANA (${tomorrow})</td></tr>
-          </table>
-          <p style="margin-top:16px;padding:12px;background:#fff3cd;border-radius:8px;font-size:13px">⚠️ Este es un email de prueba. Si lo recibes, el sistema de notificaciones funciona correctamente.</p>
-          <p style="margin-top:16px;color:#888;font-size:12px">WhatsApp para seguimiento: ${WA_NUMBERS.join(", ")}</p>
-          <p style="color:#888;font-size:11px">Fashion Group Panamá — ${new Date().toLocaleString("es-PA", { timeZone: "America/Panama" })}</p>
-        `,
-      });
-      return NextResponse.json({ message: "Email de prueba enviado", to: NOTIFY_EMAILS, result });
-    } catch (err) {
-      return NextResponse.json({ error: "Error al enviar email", details: String(err) }, { status: 500 });
-    }
+    const sent = await sendTelegramAlert(
+      `🧪 Cheques por vencer (PRUEBA)\n1 cheque — ${money(1000)}\n• PRUEBA TEST (Vistana) ${money(1000)} — MAÑANA`,
+    );
+    return NextResponse.json({ message: "Telegram de prueba", sent });
   }
 
   const today = getPanamaDate();
@@ -68,73 +52,32 @@ export async function GET(req: NextRequest) {
 
   if (queryErr) {
     console.error("[cheques-alert] query failed:", queryErr.message);
-    // Persistir el fallo en cron_email_errors — los logs de Vercel rotan
-    // en 24h y el dashboard de salud necesita historial. Best-effort: si
-    // el propio INSERT falla, igual devolvemos el 500 con el error real.
-    try {
-      const { error: logErr } = await supabaseServer
-        .from("cron_email_errors")
-        .insert({
-          tipo: "cheques_query_failed",
-          cheque_context: null,
-          error_message: queryErr.message,
-        });
-      if (logErr) {
-        console.error("[cheques-alert] cron_email_errors insert failed:", logErr.message);
-      }
-    } catch (logErr) {
-      console.error("[cheques-alert] cron_email_errors insert threw:", logErr);
-    }
+    await logCronError("cheques_query_failed", queryErr.message);
     return NextResponse.json({ error: queryErr.message }, { status: 500 });
   }
 
   if (!cheques || cheques.length === 0) {
+    await recordCronHeartbeat(CRON_NAME);
     return NextResponse.json({ message: "No hay cheques por vencer", count: 0 });
   }
 
   const totalMonto = cheques.reduce((s, c) => s + (Number(c.monto) || 0), 0);
 
-  const html = `
-    <h2 style="color:#1a1a1a">Cheques por vencer</h2>
-    <p>${cheques.length} cheque${cheques.length > 1 ? "s" : ""} por un total de <strong>$${totalMonto.toLocaleString()}</strong></p>
-    <table style="border-collapse:collapse;width:100%;font-size:14px">
-      <tr style="background:#f5f5f5"><th style="padding:8px;text-align:left">Cliente</th><th style="padding:8px">Empresa</th><th style="padding:8px;text-align:right">Monto</th><th style="padding:8px">Fecha Depósito</th><th style="padding:8px">Vendedor</th><th style="padding:8px">Vence</th></tr>
-      ${cheques.map(c => `<tr style="border-bottom:1px solid #eee"><td style="padding:8px">${c.cliente}</td><td style="padding:8px">${getCompanyDisplay(c.empresa)}</td><td style="padding:8px;text-align:right">$${Number(c.monto).toLocaleString()}</td><td style="padding:8px">${c.fecha_deposito}</td><td style="padding:8px">${c.vendedor || "—"}</td><td style="padding:8px;font-weight:600;color:${c.fecha_deposito === today ? "#d97706" : "#2563eb"}">${c.fecha_deposito === today ? "HOY" : "MAÑANA"}</td></tr>`).join("")}
-    </table>
-    <p style="margin-top:16px;color:#888;font-size:12px">WhatsApp para seguimiento: ${WA_NUMBERS.join(", ")}</p>
-    <p style="color:#888;font-size:11px">Fashion Group Panamá — Alerta automática</p>
-  `;
+  // Un solo mensaje compacto por corrida (no uno por cheque).
+  const lineas = cheques
+    .map((c) => {
+      const vence = c.fecha_deposito === today ? "HOY" : "MAÑANA";
+      return `• ${c.cliente} (${getCompanyDisplay(c.empresa)}) ${money(Number(c.monto))} — ${vence}${c.vendedor ? ` · ${c.vendedor}` : ""}`;
+    })
+    .join("\n");
 
-  let emailError: string | null = null;
-  try {
-    const { error: sendErr } = await resend.emails.send({
-      from: "Fashion Group <notificaciones@fashiongr.com>",
-      to: NOTIFY_EMAILS,
-      subject: `⚠️ ${cheques.length} cheque${cheques.length > 1 ? "s" : ""} por vencer — $${totalMonto.toLocaleString()}`,
-      html,
-    });
-    if (sendErr) {
-      emailError = sendErr.message;
-      console.error(`[cheques-alert] Resend error: ${sendErr.message}`, { chequeCount: cheques.length, to: NOTIFY_EMAILS });
-    }
-  } catch (err) {
-    emailError = String(err);
-    console.error(`[cheques-alert] Email send failed:`, err, { chequeCount: cheques.length, to: NOTIFY_EMAILS });
-  }
+  const mensaje =
+    `⚠️ ${cheques.length} cheque${cheques.length > 1 ? "s" : ""} por vencer — ${money(totalMonto)}\n` +
+    `${lineas}\n` +
+    `WhatsApp seguimiento: ${WA_NUMBERS.join(", ")}`;
 
-  // Log email errors to cron_email_errors table
-  if (emailError) {
-    try {
-      await supabaseServer.from("cron_email_errors").insert(
-        cheques.map((c: { cliente: string }) => ({
-          tipo: "cheque_reminder",
-          cheque_context: c.cliente,
-          error_message: emailError,
-        }))
-      );
-    } catch {
-    }
-  }
+  const sent = await sendTelegramAlert(mensaje);
 
-  return NextResponse.json({ message: emailError ? "Alerta enviada con errores" : "Alerta enviada", count: cheques.length, total: totalMonto, emailError });
+  await recordCronHeartbeat(CRON_NAME);
+  return NextResponse.json({ message: sent ? "Alerta enviada" : "Alerta no enviada (Telegram falló)", count: cheques.length, total: totalMonto, sent });
 }

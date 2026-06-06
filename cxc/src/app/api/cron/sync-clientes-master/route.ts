@@ -21,9 +21,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+const CRON_NAME = "sync-clientes-master";
 
 // N2: UPPER + quita [.,] + colapsa espacios (mismo algoritmo que cxc / ventas).
 const N2 = (s: string | null | undefined): string =>
@@ -70,6 +73,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   if (error) {
     console.error("[cron/sync-clientes-master] read switch_clientes:", error.message);
+    await logCronError("sync_clientes_master_failed", error.message);
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
   }
 
@@ -107,6 +111,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   if (payload.length === 0) {
+    await logCronError("sync_clientes_master_failed", "switch_clientes vacío o sin filas válidas");
     return NextResponse.json({ ok: false, error: "switch_clientes vacío o sin filas válidas" }, { status: 500 });
   }
 
@@ -121,6 +126,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       .upsert(slice, { onConflict: "codigo", ignoreDuplicates: false });
     if (upErr) {
       console.error(`[cron/sync-clientes-master] upsert batch [${i}..${i + slice.length}):`, upErr.message);
+      await logCronError("sync_clientes_master_failed", upErr.message);
       return NextResponse.json(
         { ok: false, error: upErr.message, upserted_before_error: upserted },
         { status: 500 },
@@ -130,6 +136,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   console.log(`[cron/sync-clientes-master] ${upserted} clientes refrescados (fiscal) desde switch_clientes`);
+  await recordCronHeartbeat(CRON_NAME);
   return NextResponse.json({
     ok: true,
     source_rows: data?.length ?? 0,

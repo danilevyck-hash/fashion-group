@@ -4,9 +4,34 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 import { transportistaLabel } from "@/lib/transportistaLabel";
+import { sendTelegramAlert } from "@/lib/telegram";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"];
+
+interface GuiaForNotify {
+  numero: number;
+  modo_entrega?: string | null;
+  transportista_id?: string | null;
+  transportistas?: { nombre: string | null } | { nombre: string | null }[] | null;
+  guia_items?: Array<{ cliente?: string | null; deleted?: boolean }> | null;
+}
+
+/** Aviso Telegram al despachar una guía (interno, solo chat de Daniel). No lanza. */
+async function notifyGuiaDespachada(guia: GuiaForNotify): Promise<void> {
+  const numero = `GT-${String(guia.numero).padStart(3, "0")}`;
+  const transp = transportistaLabel(guia) || "—";
+  const clientes = [
+    ...new Set(
+      (guia.guia_items || [])
+        .filter((i) => !i.deleted)
+        .map((i) => (i.cliente || "").trim())
+        .filter(Boolean),
+    ),
+  ];
+  const cliente = clientes.length ? clientes.join(", ") : "—";
+  await sendTelegramAlert(`📦 Guía despachada ${numero}\nCliente: ${cliente}\nTransportista: ${transp}`);
+}
 
 // ── GET ──
 
@@ -174,7 +199,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     await logActivity(session?.role || "unknown", estado ? "guia_dispatch" : "guia_edit", "guias", { guiaId: id, changes }, session?.userName);
   }
 
-  // Dispatch email removed — now handled by daily summary cron at 6pm
+  // Aviso de despacho por Telegram (solo al transicionar a "Completada").
+  if (estado === "Completada" && previous?.estado !== "Completada" && data) {
+    await notifyGuiaDespachada(data as GuiaForNotify);
+  }
 
   return NextResponse.json(data);
 }
@@ -216,7 +244,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!updated) return NextResponse.json({ error: "Guía no encontrada o ya fue despachada" }, { status: 404 });
 
-  // Dispatch email removed — now handled by daily summary cron at 6pm
+  // Aviso de despacho por Telegram (solo cuando esta corrida lo dejó en "Completada";
+  // `updated` no es null gracias al guard neq → fue esta corrida la que despachó).
+  if (body.estado === "Completada") {
+    const { data: guia } = await supabaseServer
+      .from("guia_transporte")
+      .select("numero, modo_entrega, transportista_id, transportistas(nombre), guia_items(cliente, deleted)")
+      .eq("id", params.id)
+      .single();
+    if (guia) await notifyGuiaDespachada(guia as GuiaForNotify);
+  }
 
   return NextResponse.json({ ok: true });
 }
