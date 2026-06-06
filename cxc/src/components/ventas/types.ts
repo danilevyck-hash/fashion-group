@@ -359,11 +359,36 @@ export type MultifashionTotal = {
   margenPrev: number | null;
 };
 
+export type MultifashionSerieDia = { fecha: string; ventas: number; acumulado: number };
+export type MultifashionSerieMes = { mes: number; ventas: number; acumulado: number };
+export type MultifashionSerieAnio = {
+  year: number;
+  corte: string;
+  es_anio_actual: boolean;
+  dias: MultifashionSerieDia[];
+  meses: MultifashionSerieMes[];
+};
+export type MultifashionProyeccion = {
+  year: number;
+  tiene_proyeccion: boolean;
+  proyeccion: number | null;
+  cierre_prev: number;
+  delta_pct: number | null;
+  ytd_actual: number;
+  ytd_prev: number;
+};
+
 export type Multifashion = {
   tienda: string;
   ubicacion: string;
   manager: string;
   metaAnual: number;
+  /** Serie diaria acumulada del año en curso (RPC multifashion_overview_serie_v1). */
+  serieActual: MultifashionSerieAnio;
+  /** Serie diaria acumulada del año anterior (completo). */
+  seriePrevio: MultifashionSerieAnio;
+  /** Proyección de cierre ponderada por temporada (RPC multifashion_proyeccion_cierre_v1). */
+  proyeccionCierre: MultifashionProyeccion;
   /** 0..1 fraction of year elapsed at "today" — used for progress marker.
    *  Calculado contra TOTAL (retail + wholesale) porque la meta anual del
    *  negocio se mide históricamente sobre el total. */
