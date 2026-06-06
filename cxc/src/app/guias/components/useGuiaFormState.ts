@@ -245,21 +245,9 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     if (res.ok) {
       setError(null);
       clearGuiaDraft();
-      const guia = await res.json();
-      if (!editingId && !silent) {
-        const totalB = validItems.reduce((s, i) => s + (i.bultos || 0), 0);
-        const transpLabel = modoEntrega === "entrega_directa"
-          ? "Entrega directa"
-          : transportistas.find((t) => t.id === transportistaId)?.nombre || "—";
-        fetch("/api/guias/notify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            subject: `Nueva Guía GT-${String(guia.numero).padStart(3, "0")} — Pendiente Bodega`,
-            body: `<h2>Guía GT-${String(guia.numero).padStart(3, "0")}</h2><p><strong>Transportista:</strong> ${transpLabel}</p><p><strong>Total bultos:</strong> ${totalB}</p><p>Pendiente de completar en bodega.</p>`,
-          }),
-        }).catch(() => {});
-      }
+      // Aviso de creación eliminado (antes mandaba email interno a info@).
+      // El único aviso de guías ahora es el de DESPACHO (Telegram), en
+      // /api/guias/[id] al pasar a estado "Completada".
       // En silent (auto-save) NO navega ni resetea — preserva contexto.
       if (!silent) {
         router.push("/guias");

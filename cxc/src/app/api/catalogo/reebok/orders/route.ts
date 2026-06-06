@@ -3,6 +3,9 @@ import { reebokServer } from "@/lib/reebok-supabase-server";
 import { getSession } from "@/lib/require-auth";
 import { calculateReebokOrderTotal } from "@/lib/reebok-order-total";
 import { fetchReebokCategoryMap } from "@/lib/reebok-category-lookup";
+import { sendTelegramAlert } from "@/lib/telegram";
+
+const money = (n: number) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 const VIEW_ROLES = ["admin", "secretaria", "vendedor"];
 const CREATE_ROLES = ["admin", "secretaria", "vendedor", "cliente"];
@@ -103,6 +106,8 @@ export async function POST(req: NextRequest) {
     }));
     await reebokServer.from("reebok_order_items").insert(rows);
   }
+
+  await sendTelegramAlert(`🛒 Nuevo pedido Reebok — ${client_name} — ${money(total)} (${order_number})`);
 
   return NextResponse.json(order);
 }

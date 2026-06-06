@@ -12,9 +12,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { syncArticulosDiario, type ArticulosSyncResult } from "@/lib/switch-api/sync-articulos";
 import { empresasConFacturas } from "@/lib/switch-api/empresas";
+import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
+
+const CRON_NAME = "switch-articulos";
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -57,6 +60,8 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       errors.push({ empresaKey, error: err instanceof Error ? err.message : String(err) });
     }
   }
+
+  await recordCronHeartbeat(CRON_NAME);
 
   return NextResponse.json(
     { ok: errors.length === 0, range: { desde, hasta }, results, errors },

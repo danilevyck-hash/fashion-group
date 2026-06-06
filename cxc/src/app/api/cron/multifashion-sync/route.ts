@@ -14,9 +14,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { syncMultifashionTickets } from "@/lib/switch-api/sync";
+import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
+
+const CRON_NAME = "multifashion-sync";
 
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_RANGE_DAYS = 365;
@@ -147,6 +150,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
 
   try {
     const r = await syncMultifashionTickets({ desde, hasta, triggeredBy });
+    await recordCronHeartbeat(CRON_NAME);
     return NextResponse.json({
       ok: true,
       logId: r.logId,
@@ -158,6 +162,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
+    await logCronError("multifashion_sync_failed", message);
     return NextResponse.json(
       { ok: false, error: message, range: { desde, hasta } },
       { status: 500 },

@@ -27,9 +27,12 @@ import {
 } from "@/lib/switch-api/sync-utilidad";
 import { isEmpresaKey } from "@/lib/switch-api/empresas";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
+import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
+
+const CRON_NAME = "sync-utilidad";
 
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const secret = process.env.CRON_SECRET;
@@ -85,6 +88,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   }
 
   const errors = results.filter((r) => !r.ok);
+  await recordCronHeartbeat(CRON_NAME);
   return NextResponse.json(
     { ok: errors.length === 0, meses, results },
     { status: errors.length === 0 ? 200 : 207 },

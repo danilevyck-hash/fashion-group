@@ -47,11 +47,16 @@ import {
   isEmpresaKey,
 } from "@/lib/switch-api/empresas";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
+import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 
 type SyncTipo = "facturas" | "estadocuenta" | "all";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
+// Los errors[] por-empresa son transientes esperados (la reconciliación de las
+// 10:00 los reintenta) → NO disparan alerta aquí. Solo registramos heartbeat de
+// liveness; el watchdog avisa si el cron deja de correr del todo.
+const CRON_NAME = "switch-sync";
 
 const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_RANGE_DAYS = 365;
@@ -194,6 +199,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     }
   }
 
+  await recordCronHeartbeat(CRON_NAME);
   return NextResponse.json(
     {
       ok: errors.length === 0,

@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
+import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
 
 export const dynamic = "force-dynamic";
+
+const CRON_NAME = "cleanup-packing-lists";
 
 // Borra packing_lists creados hace más de 7 días. pl_items caen por FK CASCADE
 // (ver supabase/migrations/packing-lists-fk-cascade.sql). Schedule diario 03:00 UTC.
@@ -39,6 +42,7 @@ export async function GET(req: NextRequest) {
     } catch (logErr) {
       console.error("[cleanup-packing-lists] cron_email_errors insert threw:", logErr);
     }
+    await logCronError("cleanup_packing_lists_failed", error.message);
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 
@@ -50,5 +54,6 @@ export async function GET(req: NextRequest) {
     { deleted_count: count, cutoff_date: cutoff },
   );
 
+  await recordCronHeartbeat(CRON_NAME);
   return NextResponse.json({ deleted: count, cutoff });
 }

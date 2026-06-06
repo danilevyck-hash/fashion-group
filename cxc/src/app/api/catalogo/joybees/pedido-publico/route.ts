@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { sendTelegramAlert } from "@/lib/telegram";
+
+const money = (n: number) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +37,8 @@ export async function POST(req: NextRequest) {
       console.error("Error saving joybees order:", error);
       return NextResponse.json({ error: "No se pudo guardar el pedido" }, { status: 500 });
     }
+
+    await sendTelegramAlert(`🛒 Nuevo pedido Joybees (público) — Sin nombre — ${money(total)}`);
 
     return NextResponse.json({ short_id });
   } catch (err) {
