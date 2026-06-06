@@ -546,6 +546,22 @@ export function PullToRefresh({
     return window.scrollY <= 0;
   }, []);
 
+  // Si el toque empezó dentro de un contenedor con scroll propio (ScrollableTable,
+  // panel sticky, etc.) que NO está en su tope, NO es un pull-to-refresh: dejamos
+  // que ese contenedor scrollee. Sin esto, window.scrollY se queda en 0 mientras
+  // el scroll vive en un hijo → refresh fantasma a mitad de lista.
+  const startedAtScrollableTop = useCallback((target: EventTarget | null): boolean => {
+    let el = target as HTMLElement | null;
+    while (el && el !== document.body) {
+      const oy = getComputedStyle(el).overflowY;
+      if ((oy === "auto" || oy === "scroll") && el.scrollHeight > el.clientHeight + 1) {
+        return el.scrollTop <= 0;
+      }
+      el = el.parentElement;
+    }
+    return true;
+  }, []);
+
   useEffect(() => {
     let isTouchDevice = false;
     const checkTouch = () => { isTouchDevice = true; };
@@ -553,7 +569,7 @@ export function PullToRefresh({
 
     const onTouchStart = (e: TouchEvent) => {
       if (!isTouchDevice || refreshing) return;
-      if (isAtTop()) {
+      if (isAtTop() && startedAtScrollableTop(e.target)) {
         startY.current = e.touches[0].clientY;
         pulling.current = true;
       }
@@ -610,7 +626,7 @@ export function PullToRefresh({
         el.removeEventListener("touchend", onTouchEnd);
       }
     };
-  }, [onRefresh, refreshing, isAtTop]);
+  }, [onRefresh, refreshing, isAtTop, startedAtScrollableTop]);
 
   const showIndicator = pull > 10 || refreshing;
   const rotation = Math.min((pull / threshold) * 360, 360);

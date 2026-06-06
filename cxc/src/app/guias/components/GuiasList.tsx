@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { fmtDate, fmtGuia } from "@/lib/format";
 import type { Guia, GuiaItem } from "./types";
-import { clientesSummary } from "./constants";
+import { clientesSummary, destinosSummary } from "./constants";
 import { SkeletonTable, EmptyState, StatusBadge, AccordionContent, ScrollableTable, SwipeableRow } from "@/components/ui";
 import type { SwipeAction } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
@@ -334,6 +334,15 @@ export default function GuiasList({
                                   <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : isDispatched ? "despachada" : "pendiente"} />
                                 </span>
                               </div>
+                              {/* Cliente + destino visibles sin expandir (bodega ve a quién va) */}
+                              {(clientesSummary(g.guia_items || []) || destinosSummary(g.guia_items || [])) && (
+                                <div className="mt-1.5 text-xs text-gray-700 truncate">
+                                  <span className="font-medium">{clientesSummary(g.guia_items || []) || "Sin cliente"}</span>
+                                  {destinosSummary(g.guia_items || []) && (
+                                    <span className="text-gray-400"> · {destinosSummary(g.guia_items || [])}</span>
+                                  )}
+                                </div>
+                              )}
                               {!isDispatched && g.estado === "Pendiente Bodega" && (
                                 <div className="mt-1.5">
                                   <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 whitespace-nowrap">
@@ -352,12 +361,12 @@ export default function GuiasList({
                               ) : expandedGuia ? (
                                 <>
                                   {/* Acciones rápidas (header de la card expandida) */}
-                                  <div className="flex items-center justify-end gap-2 pt-3">
+                                  <div className="flex items-center justify-end gap-3 pt-3">
                                     {canEdit && !isDispatched && (
                                       <button
                                         type="button"
                                         onClick={() => onEdit(expandedGuia.id)}
-                                        className="inline-flex items-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-2 py-1.5 rounded hover:bg-gray-100 min-h-[36px]"
+                                        className="inline-flex items-center justify-center gap-1.5 text-xs text-gray-700 hover:text-black transition px-3.5 rounded-md border border-gray-200 hover:bg-gray-100 min-h-[44px]"
                                       >
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                                           <path d="M12 20h9" />

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
+import { mailtoHref } from "@/lib/contact-links";
 import { Reclamo, Contacto } from "./types";
 import { ESTADOS, daysSince, calcSub, FACTOR_TOTAL, estadoLabel } from "./constants";
 import { EmptyState, StatusBadge, Toast } from "@/components/ui";
@@ -141,7 +142,7 @@ export default function EmpresaList({
       <div className="flex items-end justify-between mb-4 sm:mb-6 flex-wrap gap-4">
         <div>
           <h1 className="text-xl font-light tracking-tight">{activeEmpresa}</h1>
-          {c && <p className="text-xs text-gray-400 mt-1">Contacto: {(c.nombre_contacto || c.nombre || "equipo")} | {c.correo}</p>}
+          {c && <p className="text-xs text-gray-400 mt-1">Contacto: {(c.nombre_contacto || c.nombre || "equipo")} | {mailtoHref(c.correo) ? <a href={mailtoHref(c.correo)!} className="text-blue-600 hover:underline">{c.correo}</a> : c.correo}</p>}
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           {hasSelection ? (
