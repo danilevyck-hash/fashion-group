@@ -23,6 +23,7 @@ export interface Guia {
   transportista_id?: string | null;
   placa: string;
   observaciones: string;
+  motivo_rechazo?: string;
   total_bultos: number;
   item_count: number;
   monto_total: number;
