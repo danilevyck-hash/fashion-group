@@ -1,14 +1,11 @@
 "use client";
 
-// Sub-tab "Clientes" de Multifashion — layout tabla compacta con pills
-// de período arriba.
+// Sub-tab "Clientes" de Multifashion — layout tabla compacta.
 //
-// Pills (afectan ambas secciones):
-//   - Último mes:     1er día del mes corriente a hoy
-//   - Últimos 3 meses: today - 90 días a today
-//   - Últimos 6 meses: today - 180 días a today
-//   - Últimos 12 meses: today - 365 días a today (DEFAULT)
-//   - Año {selectedYear}: 1 ene a 31 dic del año del header global
+// Período: respeta el SELECTOR ÚNICO de mes del shell (selectedYear + mes),
+// igual que Detalle mensual y Vendedoras. El rango es el mes seleccionado
+// (1er a último día). (Antes tenía pills de período propios — retirados para
+// unificar el selector en todo el módulo.)
 //
 // Dos secciones:
 //   1. Wholesale: clientes con is_wholesale=true.
@@ -24,8 +21,6 @@ import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
-
-type PeriodoType = "last_month" | "last_3m" | "last_6m" | "last_12m" | "year";
 
 interface MesRow {
   mes_anio: number;
@@ -65,6 +60,7 @@ interface RetailResp {
 
 interface ClientesMultifashionSubtabProps {
   selectedYear: number;
+  mes: number;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -81,61 +77,25 @@ function formatFechaShort(iso: string | null): string {
   return `${d.getDate()} ${MES[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-function toIsoDate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-// Resuelve el rango (fecha_inicio, fecha_fin) según el pill activo.
-function resolveDateRange(periodo: PeriodoType, selectedYear: number): { fecha_inicio: string; fecha_fin: string } {
-  const today = new Date();
-  switch (periodo) {
-    case "last_month": {
-      const inicio = new Date(today.getFullYear(), today.getMonth(), 1);
-      return { fecha_inicio: toIsoDate(inicio), fecha_fin: toIsoDate(today) };
-    }
-    case "last_3m": {
-      const inicio = new Date(today.getTime() - 90 * 86400000);
-      return { fecha_inicio: toIsoDate(inicio), fecha_fin: toIsoDate(today) };
-    }
-    case "last_6m": {
-      const inicio = new Date(today.getTime() - 180 * 86400000);
-      return { fecha_inicio: toIsoDate(inicio), fecha_fin: toIsoDate(today) };
-    }
-    case "last_12m": {
-      const inicio = new Date(today.getTime() - 365 * 86400000);
-      return { fecha_inicio: toIsoDate(inicio), fecha_fin: toIsoDate(today) };
-    }
-    case "year": {
-      return { fecha_inicio: `${selectedYear}-01-01`, fecha_fin: `${selectedYear}-12-31` };
-    }
-  }
-}
-
-function periodoLabel(periodo: PeriodoType, selectedYear: number): string {
-  switch (periodo) {
-    case "last_month": return "último mes";
-    case "last_3m":    return "últimos 3 meses";
-    case "last_6m":    return "últimos 6 meses";
-    case "last_12m":   return "últimos 12 meses";
-    case "year":       return String(selectedYear);
-  }
-}
-
-const PILLS: { id: PeriodoType; label: string }[] = [
-  { id: "last_month", label: "Último mes" },
-  { id: "last_3m",    label: "Últimos 3 meses" },
-  { id: "last_6m",    label: "Últimos 6 meses" },
-  { id: "last_12m",   label: "Últimos 12 meses" },
-  { id: "year",       label: "" },  // label dinámico (Año X)
+const MES_NOMBRES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
+
+// Rango = el MES seleccionado (1er a último día). Clientes respeta el selector
+// único de mes del shell de Multifashion (igual que Detalle y Vendedoras).
+function monthRange(selectedYear: number, mes: number): { fecha_inicio: string; fecha_fin: string } {
+  const lastDay = new Date(selectedYear, mes, 0).getDate();
+  const mm = String(mes).padStart(2, "0");
+  return {
+    fecha_inicio: `${selectedYear}-${mm}-01`,
+    fecha_fin: `${selectedYear}-${mm}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
 
 // ─── Component ─────────────────────────────────────────────────────────────
 
-export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashionSubtabProps) {
-  const [periodo, setPeriodo] = useState<PeriodoType>("last_12m");
+export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultifashionSubtabProps) {
   const [wholesale, setWholesale] = useState<WholesaleResp | null>(null);
   const [retail, setRetail] = useState<RetailResp | null>(null);
   const [loading, setLoading] = useState(true);
@@ -143,8 +103,8 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  const range = useMemo(() => resolveDateRange(periodo, selectedYear), [periodo, selectedYear]);
-  const periodoStr = useMemo(() => periodoLabel(periodo, selectedYear), [periodo, selectedYear]);
+  const range = useMemo(() => monthRange(selectedYear, mes), [selectedYear, mes]);
+  const periodoStr = useMemo(() => `${MES_NOMBRES[mes - 1]} ${selectedYear}`, [selectedYear, mes]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -209,30 +169,6 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
 
   return (
     <div className={cn("space-y-5", loading && "opacity-60 pointer-events-none transition-opacity")}>
-      {/* Pills de período */}
-      <div className="flex flex-wrap items-center gap-1.5">
-        {PILLS.map(p => {
-          const label = p.id === "year" ? `Año ${selectedYear}` : p.label;
-          const active = periodo === p.id;
-          return (
-            <button
-              key={p.id}
-              type="button"
-              onClick={() => setPeriodo(p.id)}
-              className={cn(
-                "whitespace-nowrap rounded-full border px-3.5 py-1.5 text-xs font-medium transition",
-                active
-                  ? "border-teal-700 bg-teal-700 text-white"
-                  : "border-stone-300 bg-white text-stone-700 hover:border-stone-400",
-              )}
-              aria-pressed={active}
-            >
-              {label}
-            </button>
-          );
-        })}
-      </div>
-
       {error ? (
         <Card className="rounded-md border border-orange-200 bg-orange-50 p-4 text-xs text-orange-900">
           No se pudo cargar la lista: {error}

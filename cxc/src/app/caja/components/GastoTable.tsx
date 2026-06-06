@@ -20,8 +20,10 @@ interface Props {
   onSaveEdit: () => void;
   onDeleteGasto: (id: string) => void;
   recentlyAddedIds?: Set<string>;
-  /** When provided (period is open), renders a "+ Nuevo gasto" button in the header row. */
+  /** Link de fallback (deep-link) para "+ Nuevo gasto". Si viene onNuevoGasto, ese tiene prioridad. */
   nuevoHref?: string;
+  /** Callback para abrir el Drawer inline de nuevo gasto (camino normal). */
+  onNuevoGasto?: () => void;
 }
 
 /* Curated dot colors per common category — fall back to stone-400 for the rest. */
@@ -112,6 +114,7 @@ export default function GastoTable({
   onDeleteGasto,
   recentlyAddedIds = new Set(),
   nuevoHref,
+  onNuevoGasto,
 }: Props) {
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [showFiscal, setShowFiscal] = useState(false);
@@ -188,7 +191,15 @@ export default function GastoTable({
             <span className="caja-mono">${fmt(grandTotal)}</span> total
           </p>
         </div>
-        {nuevoHref && (
+        {onNuevoGasto ? (
+          <button
+            onClick={onNuevoGasto}
+            className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 h-9 rounded-md transition-transform active:scale-[0.97]"
+            style={{ background: "var(--caja-accent)", color: "#fff" }}
+          >
+            <PlusIcon /> Nuevo gasto
+          </button>
+        ) : nuevoHref ? (
           <Link
             href={nuevoHref}
             className="inline-flex items-center gap-1.5 text-sm font-medium px-3.5 h-9 rounded-md transition-transform active:scale-[0.97]"
@@ -196,7 +207,7 @@ export default function GastoTable({
           >
             <PlusIcon /> Nuevo gasto
           </Link>
-        )}
+        ) : null}
       </div>
 
       {/* Category chips */}
