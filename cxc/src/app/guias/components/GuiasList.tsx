@@ -423,6 +423,14 @@ export default function GuiasList({
                                     <p className="text-xs text-gray-500 mt-3 italic">{expandedGuia.observaciones}</p>
                                   )}
 
+                                  {/* Motivo de rechazo */}
+                                  {expandedGuia.estado === "Rechazada" && expandedGuia.motivo_rechazo && (
+                                    <div className="mt-3 rounded-md bg-red-50 border border-red-100 px-3 py-2">
+                                      <p className="text-[10px] font-medium uppercase tracking-wide text-red-500">Motivo de rechazo</p>
+                                      <p className="text-xs text-red-700 mt-0.5">{expandedGuia.motivo_rechazo}</p>
+                                    </div>
+                                  )}
+
                                   {/* Dispatched: read-only despacho data */}
                                   {isDispatched && (
                                     <div className="mt-4 pt-4 border-t border-gray-200">
