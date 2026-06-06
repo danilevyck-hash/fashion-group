@@ -12,7 +12,18 @@ export async function POST(req: NextRequest) {
   const file = formData.get("file") as File;
   if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
 
+  // Validacion: solo imagenes reales y de tamano razonable. Evita que un .txt
+  // renombrado o un archivo de 0 bytes pase como "foto subida".
+  const ALLOWED = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+  if (!ALLOWED.includes(file.type)) {
+    return NextResponse.json({ error: "El archivo no es una imagen valida (usa JPG, PNG, WEBP o AVIF)." }, { status: 400 });
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer());
+  if (buffer.length < 5 * 1024) {
+    return NextResponse.json({ error: "La imagen es muy pequena o esta danada (minimo 5KB)." }, { status: 400 });
+  }
+
   const filename = `joybees/${Date.now()}-${file.name}`;
 
   const { error: uploadError } = await supabaseServer.storage
