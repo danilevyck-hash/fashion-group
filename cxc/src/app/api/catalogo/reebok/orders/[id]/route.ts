@@ -69,29 +69,40 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       quantity: number;
       unit_price: number;
       category?: string;
+      is_preorder?: boolean;
     };
     const typedItems = items as IncomingItem[];
 
-    await reebokServer.from("reebok_order_items").delete().eq("order_id", params.id);
-    if (typedItems.length > 0) {
-      await reebokServer.from("reebok_order_items").insert(
-        typedItems.map((i) => ({
-          order_id: params.id, product_id: i.product_id, sku: i.sku || null, name: i.name || null,
-          image_url: i.image_url || null, quantity: i.quantity || 1, unit_price: Number(i.unit_price) || 0,
-        })),
-      );
-    }
-
     const categoryMap = await fetchReebokCategoryMap(typedItems.map((i) => i.product_id));
-    update.total = calculateReebokOrderTotal(
+    const total = calculateReebokOrderTotal(
       typedItems.map((i) => ({
         quantity: i.quantity || 1,
         unit_price: Number(i.unit_price) || 0,
         category: categoryMap.get(i.product_id) || i.category || FALLBACK_CATEGORY,
       })),
     );
+
+    // Reemplazo atómico de items + total vía RPC (delete+insert+update en UNA
+    // transacción). Si el insert falla tras el delete, todo hace rollback y el
+    // pedido nunca queda vacío (antes era delete()+insert() sin transacción).
+    const { error: rpcErr } = await reebokServer.rpc("reebok_order_replace_items", {
+      p_order_id: params.id,
+      p_total: total,
+      p_items: typedItems.map((i) => ({
+        product_id: i.product_id,
+        sku: i.sku || null,
+        name: i.name || null,
+        image_url: i.image_url || null,
+        quantity: i.quantity || 1,
+        unit_price: Number(i.unit_price) || 0,
+        is_preorder: i.is_preorder === true,
+      })),
+    });
+    if (rpcErr) return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 
+  // Campos escalares (client_name, vendor_name, etc.): update seguro aparte.
+  // El total y updated_at de los items ya los fijó la RPC.
   const { error } = await reebokServer.from("reebok_orders").update(update).eq("id", params.id);
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
 
