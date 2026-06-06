@@ -369,7 +369,7 @@ function normalizeWa(raw: string): string {
 }
 
 /**
- * Años con data en ventas_raw — alimenta el dropdown del tab Resumen.
+ * Años con data en switch_facturas (fuente única, historia 2022+) — alimenta el dropdown del tab Resumen.
  * Devuelve siempre al menos el año actual, ordenado descendente.
  */
 export async function fetchAvailableYears(): Promise<number[]> {
@@ -410,7 +410,7 @@ export async function fetchMultifashion({
 
   // v6 devuelve el shape exacto Multifashion con bloques retail/wholesale/total.
   // Ventas/tickets de switch_facturas (v3 fase 2.1b) + total.margen tienda completa
-  // (v5) + vs2025 de retail.meses con prev-year BLEND switch∪ventas_raw (v6: Ene-Abr
-  // 2025 vienen de ventas_raw, que switch_facturas no cubre).
+  // (v5) + vs2025 de retail.meses con prev-year SOLO switch_facturas (Fuente Única
+  // API Paso 4b: el blend con ventas_raw fue retirado; switch_facturas cubre 2022+).
   return data as Multifashion;
 }
