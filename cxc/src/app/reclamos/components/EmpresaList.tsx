@@ -7,6 +7,7 @@ import { Reclamo, Contacto } from "./types";
 import { ESTADOS, daysSince, calcSub, FACTOR_TOTAL, estadoLabel } from "./constants";
 import { EmptyState, StatusBadge, Toast } from "@/components/ui";
 import FotoBadge from "./FotoBadge";
+import EnviarProveedorModal from "./EnviarProveedorModal";
 
 interface Props {
   role: string;
@@ -41,6 +42,7 @@ export default function EmpresaList({
 }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState<BulkAction | null>(null);
+  const [sendOpen, setSendOpen] = useState(false);
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   const allEmpresaRecs = reclamos.filter((r) => r.empresa === activeEmpresa);
@@ -148,10 +150,18 @@ export default function EmpresaList({
                 {selCount} seleccionado{selCount === 1 ? "" : "s"}
               </span>
               <button
+                onClick={() => setSendOpen(true)}
+                disabled={busy !== null}
+                title="Enviar por correo al proveedor el Excel resumen + fotos"
+                className="text-sm bg-black text-white px-5 py-2 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
+              >
+                Enviar al proveedor
+              </button>
+              <button
                 onClick={downloadBulkZip}
                 disabled={busy !== null}
                 title="Descargar Excel resumen + fotos comprimidas en un solo ZIP"
-                className="text-sm bg-black text-white px-5 py-2 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50"
+                className="text-sm border border-gray-200 px-4 py-2 rounded-md text-gray-500 hover:text-black transition disabled:opacity-50"
               >
                 {busy === "zip" ? "Generando ZIP..." : "Descargar ZIP"}
               </button>
@@ -316,6 +326,17 @@ export default function EmpresaList({
 
       <Toast message={toast} />
       </div>
+
+      <EnviarProveedorModal
+        open={sendOpen}
+        empresa={activeEmpresa}
+        reclamoIds={selectedIds}
+        defaultTo={c?.correo || ""}
+        contactoNombre={c?.nombre_contacto || c?.nombre}
+        count={selCount}
+        onClose={() => setSendOpen(false)}
+        onSent={(msg) => { showToast(msg); cancelSelection(); }}
+      />
     </div>
   );
 }
