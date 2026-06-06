@@ -114,6 +114,17 @@ function lastErrorFor(pair: Pair, rows: SyncLogRow[]): string | null {
 }
 
 /**
+ * Error legible para Telegram: solo el primer renglón útil, truncado a ~200
+ * chars. Switch a veces devuelve una página HTML de excepción completa
+ * ("<!DOCTYPE html>...") como error_message — sin esto la alerta queda ilegible.
+ */
+function shortError(msg: string | null, max = 200): string {
+  if (!msg) return "—";
+  const firstLine = msg.split(/\r?\n/)[0].trim();
+  return firstLine.length > max ? `${firstLine.slice(0, max)}…` : firstLine;
+}
+
+/**
  * Re-dispara el cron switch-sync (tipo=all) para las empresas dadas, en una sola
  * llamada HTTP — switch-sync las procesa SERIALMENTE adentro (requisito de la
  * sesión única de Switch). Usamos el mismo origin de este request para construir
@@ -191,7 +202,7 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   if (missingAfter.length > 0) {
     telegram = "alert";
     const lineas = missingAfter
-      .map((p) => `• ${p.empresa} / ${p.syncType}: ${lastErrorFor(p, logAfter)}`)
+      .map((p) => `• ${p.empresa} / ${p.syncType}: ${shortError(lastErrorFor(p, logAfter))}`)
       .join("\n");
     const recuperadas = recovered.length
       ? `\n\nRecuperadas en esta corrida: ${recovered.map((p) => `${p.empresa}/${p.syncType}`).join(", ")}`
