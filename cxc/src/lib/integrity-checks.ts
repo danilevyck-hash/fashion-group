@@ -37,59 +37,7 @@ function daysBetween(a: string | Date, b: string | Date): number {
   return Math.abs(Math.floor((ta - tb) / (1000 * 60 * 60 * 24)));
 }
 
-async function tableMaxFecha(table: "ventas_raw"): Promise<string | null> {
-  const { data, error } = await supabaseServer
-    .from(table)
-    .select("fecha")
-    .not("fecha", "is", null)
-    .order("fecha", { ascending: false })
-    .limit(1);
-  if (error) {
-    console.error(`[integrity] tableMaxFecha ${table}:`, error.message);
-    return null;
-  }
-  return data?.[0]?.fecha ?? null;
-}
-
 // ── Checks ───────────────────────────────────────────────────────────────────
-
-// CHECK 3: Desync entre la última sincronización de CXC vs el upload de Ventas. Si los
-// uploads se desincronizaron mucho, los reportes cruzados quedan stale.
-async function checkUploadDesync(): Promise<CheckResult> {
-  const [cxcRes, ventasRes] = await Promise.all([
-    supabaseServer.from("switch_estadocuenta").select("synced_at").order("synced_at", { ascending: false }).limit(1),
-    supabaseServer.from("ventas_raw").select("uploaded_at").order("uploaded_at", { ascending: false }).limit(1),
-  ]);
-
-  const cxcLast = cxcRes.data?.[0]?.synced_at ?? null;
-  const ventasLast = ventasRes.data?.[0]?.uploaded_at ?? null;
-
-  if (!cxcLast || !ventasLast) {
-    return {
-      check_name: "upload_desync_cxc_ventas",
-      table_name: "switch_estadocuenta,ventas_raw",
-      severity: "warning",
-      rows_affected: 0,
-      threshold_exceeded: true,
-      details: { cxc_last: cxcLast, ventas_last: ventasLast, reason: "missing CXC sync or ventas upload" },
-    };
-  }
-
-  const gapDays = daysBetween(cxcLast, ventasLast);
-  const severity: Severity = gapDays < 7 ? "ok" : gapDays <= 14 ? "warning" : "critical";
-
-  return {
-    check_name: "upload_desync_cxc_ventas",
-    table_name: "switch_estadocuenta,ventas_raw",
-    severity,
-    rows_affected: gapDays,
-    threshold_exceeded: gapDays >= 7,
-    details: {
-      cxc_last: cxcLast, ventas_last: ventasLast, gap_days: gapDays,
-      threshold: { warning: ">=7d", critical: ">14d" },
-    },
-  };
-}
 
 // CHECK 4: Cheques con campos críticos NULL (monto o fecha_deposito).
 async function checkChequesCriticosNull(): Promise<CheckResult> {
@@ -164,40 +112,15 @@ async function checkPrestamosSaldoAnomalo(): Promise<CheckResult> {
   };
 }
 
-// CHECK 6: ventas_raw con cliente vacío.
-async function checkVentasClienteVacio(): Promise<CheckResult> {
-  const { count, error } = await supabaseServer
-    .from("ventas_raw")
-    .select("id", { count: "exact", head: true })
-    .or("cliente.is.null,cliente.eq.");
-
-  if (error) {
-    return checkError("ventas_cliente_vacio", "ventas_raw", error.message);
-  }
-
-  const c = count ?? 0;
-  return {
-    check_name: "ventas_cliente_vacio",
-    table_name: "ventas_raw",
-    severity: c === 0 ? "ok" : "warning",
-    rows_affected: c,
-    threshold_exceeded: c > 0,
-    details: { threshold: { warning: ">0" } },
-  };
-}
-
 // CHECK 7: Edad del último upload (uno por módulo). Devuelve 2 results.
 async function checkLastUploadAge(): Promise<CheckResult[]> {
   const now = new Date();
   const results: CheckResult[] = [];
 
-  for (const [name, table, source] of [
-    ["last_upload_age_cxc", "switch_estadocuenta", "sync"],
-    ["last_upload_age_ventas", "ventas_raw", "fecha"],
+  for (const [name, table] of [
+    ["last_upload_age_cxc", "switch_estadocuenta"],
   ] as const) {
-    const maxFecha = source === "sync"
-      ? (await supabaseServer.from("switch_estadocuenta").select("synced_at").order("synced_at", { ascending: false }).limit(1)).data?.[0]?.synced_at ?? null
-      : await tableMaxFecha("ventas_raw");
+    const maxFecha = (await supabaseServer.from("switch_estadocuenta").select("synced_at").order("synced_at", { ascending: false }).limit(1)).data?.[0]?.synced_at ?? null;
     if (!maxFecha) {
       results.push({
         check_name: name, table_name: table,
@@ -398,17 +321,15 @@ export async function runAllChecks(): Promise<CheckResult[]> {
   // CSV legacy (cxc_rows fecha/vencimiento/dias, zombie uploads, sin-venta) se
   // retiraron; la integridad de CXC la cubren aging_tipos/aging_dias + frescura.
   const grouped = await Promise.all([
-    checkUploadDesync(),
     checkChequesCriticosNull(),
     checkPrestamosSaldoAnomalo(),
-    checkVentasClienteVacio(),
     checkLastUploadAge(),
     checkAgingTiposSinClasificar(),
     checkSwitchFacturasContinuidad(),
     checkAgingDiasAnomalo(),
   ]);
 
-  // checkLastUploadAge devuelve un array de 2 — el resto devuelve uno solo.
+  // checkLastUploadAge devuelve un array (ahora solo CXC) — el resto, uno solo.
   return grouped.flatMap(r => Array.isArray(r) ? r : [r]);
 }
 
