@@ -20,7 +20,6 @@ import {
   ShoppingBag,
   Megaphone,
   BookOpen,
-  Shirt,
   Users,
   Briefcase,
   BarChart3,
@@ -80,7 +79,6 @@ export const ALL_MODULES: AppModule[] = [
 
   // Productos
   { key: "catalogos",     label: "Catálogos",           subtitle: "Reebok, Joybees",                                    href: "/catalogos/marcas",icon: BookOpen,        roles: ["admin", "secretaria", "vendedor", "bodega"],       group: "productos" },
-  { key: "camisetas",     label: "Camisetas Selección", subtitle: "Pedidos y stock",                                    href: "/camisetas",      icon: Shirt,            roles: ["admin", "vendedor"],                               group: "productos" },
 
   // Sistema
   { key: "usuarios",      label: "Usuarios",            subtitle: "Gestión de usuarios y permisos",                     href: "/admin/usuarios", icon: Users,            roles: ["admin"],                                           group: "sistema" },

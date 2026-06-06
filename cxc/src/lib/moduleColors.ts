@@ -43,7 +43,6 @@ export function getModuleKeyFromPath(pathname: string): string | null {
   if (pathname.startsWith("/marketing"))       return "marketing";
   if (pathname.startsWith("/catalogo/reebok")) return "reebok";
   if (pathname.startsWith("/packing-lists"))   return "packing-lists";
-  if (pathname.startsWith("/camisetas"))       return null; // no color assigned
   return null;
 }
 
