@@ -145,21 +145,29 @@ function Productos() {
       setToast("Actualizando pedido...");
       try {
         for (const item of cart) {
-          await fetch(`/api/catalogo/reebok/orders/${draftId}/item`, {
+          const res = await fetch(`/api/catalogo/reebok/orders/${draftId}/item`, {
             method: "PATCH", headers: { "Content-Type": "application/json" },
             body: JSON.stringify(item),
           });
+          // Si un item no se guardo, abortamos: NO navegamos como exito.
+          if (!res.ok) throw new Error("PATCH item fallido");
         }
         for (const pid of draftOriginalIds) {
           if (!cart.find(i => i.product_id === pid)) {
-            await fetch(`/api/catalogo/reebok/orders/${draftId}/item`, {
+            const res = await fetch(`/api/catalogo/reebok/orders/${draftId}/item`, {
               method: "PATCH", headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ product_id: pid, quantity: 0 }),
             });
+            if (!res.ok) throw new Error("PATCH remove fallido");
           }
         }
         router.push(`/catalogo/reebok/pedido/${draftId}`);
-      } catch { setToast("Error al actualizar pedido"); setSaving(false); }
+      } catch {
+        // Algun item fallo (o sin conexion): no navegamos. El carrito queda
+        // intacto para reintentar (el PATCH por product_id es idempotente).
+        setToast("No se pudo actualizar el pedido. Revisa tu conexion e intenta de nuevo.");
+        setSaving(false);
+      }
     } else {
       setToast("Creando pedido...");
       try {
