@@ -57,18 +57,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   }
 
-  const { client_name, vendor_name, client_email, items } = await req.json();
+  const { client_name, vendor_name, client_email, items, idempotency_key } = await req.json();
   if (!client_name) return NextResponse.json({ error: "client_name required" }, { status: 400 });
   if (!items || !Array.isArray(items) || items.length === 0) return NextResponse.json({ error: "El pedido debe tener al menos un producto" }, { status: 400 });
-
-  const { data: maxRow } = await reebokServer
-    .from("reebok_orders").select("order_number").like("order_number", "PED-%").order("created_at", { ascending: false }).limit(1);
-  let nextNum = 1;
-  if (maxRow?.[0]?.order_number) {
-    const match = maxRow[0].order_number.match(/PED-(\d+)/);
-    if (match) nextNum = parseInt(match[1]) + 1;
-  }
-  const order_number = `PED-${String(nextNum).padStart(3, "0")}`;
 
   // Resuelve category via products. Si el frontend manda category en el
   // CartItem la usamos como respaldo, pero priorizamos la DB para evitar
@@ -85,29 +76,45 @@ export async function POST(req: NextRequest) {
   };
   const typedItems = items as IncomingItem[];
   const categoryMap = await fetchReebokCategoryMap(typedItems.map((i) => i.product_id));
-  const itemsForTotal = typedItems.map((i) => ({
-    quantity: i.quantity,
-    unit_price: Number(i.unit_price) || 0,
-    category: categoryMap.get(i.product_id) || i.category || FALLBACK_CATEGORY,
-  }));
-  const total = calculateReebokOrderTotal(itemsForTotal);
+  const total = calculateReebokOrderTotal(
+    typedItems.map((i) => ({
+      quantity: i.quantity,
+      unit_price: Number(i.unit_price) || 0,
+      category: categoryMap.get(i.product_id) || i.category || FALLBACK_CATEGORY,
+    })),
+  );
 
-  const { data: order, error } = await reebokServer
-    .from("reebok_orders")
-    .insert({ order_number, client_name, vendor_name: vendor_name || session.userName || null, client_email: client_email || null, total, status: "borrador" })
-    .select().single();
-  if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
-
-  if (typedItems.length) {
-    const rows = typedItems.map((i) => ({
-      order_id: order.id, product_id: i.product_id, sku: i.sku || null, name: i.name || null,
-      image_url: i.image_url || null, quantity: i.quantity || 1, unit_price: Number(i.unit_price) || 0,
+  // Creación atómica e idempotente vía RPC: numera PED-### sin race (advisory
+  // lock) e inserta pedido + items en una transacción. Si llega un retry con el
+  // mismo idempotency_key, devuelve el pedido ya creado en vez de duplicarlo.
+  const { data: result, error } = await reebokServer.rpc("reebok_create_order", {
+    p_client_name: client_name,
+    p_vendor_name: vendor_name || session.userName || null,
+    p_client_email: client_email || null,
+    p_total: total,
+    p_idempotency_key: idempotency_key || null,
+    p_items: typedItems.map((i) => ({
+      product_id: i.product_id,
+      sku: i.sku || null,
+      name: i.name || null,
+      image_url: i.image_url || null,
+      quantity: i.quantity || 1,
+      unit_price: Number(i.unit_price) || 0,
       is_preorder: i.is_preorder === true,
-    }));
-    await reebokServer.from("reebok_order_items").insert(rows);
+    })),
+  });
+  if (error || !result) return NextResponse.json({ error: "Error interno" }, { status: 500 });
+
+  const { order_id, order_number, already_created } = result as {
+    order_id: string; order_number: string; already_created: boolean;
+  };
+
+  // Telegram solo en creación real (un retry idempotente NO reenvía la alerta).
+  if (!already_created) {
+    await sendTelegramAlert(`🛒 Nuevo pedido Reebok — ${client_name} — ${money(total)} (${order_number})`);
   }
 
-  await sendTelegramAlert(`🛒 Nuevo pedido Reebok — ${client_name} — ${money(total)} (${order_number})`);
-
-  return NextResponse.json(order);
+  // Respuesta compatible con el front (espera order.id para navegar al detalle).
+  const { data: order } = await reebokServer.from("reebok_orders").select("*").eq("id", order_id).single();
+  return NextResponse.json(order ?? { id: order_id, order_number });
 }

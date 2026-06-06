@@ -170,6 +170,17 @@ function Productos() {
       }
     } else {
       setToast("Creando pedido...");
+      // Token idempotente: se genera una vez y se PERSISTE en sessionStorage.
+      // Si este POST falla y el vendedor toca de nuevo, el retry reusa el MISMO
+      // token → el server (reebok_create_order) devuelve el pedido ya creado en
+      // vez de duplicarlo. Solo se borra al confirmar un exito.
+      let token = sessionStorage.getItem("reebok_create_token");
+      if (!token) {
+        token = (typeof crypto !== "undefined" && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        sessionStorage.setItem("reebok_create_token", token);
+      }
       try {
         const res = await fetch("/api/catalogo/reebok/orders", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -178,6 +189,7 @@ function Productos() {
             vendor_name: sessionStorage.getItem("fg_user_name") || null,
             client_email: sessionStorage.getItem("reebok_draft_client_email") || null,
             items: cart,
+            idempotency_key: token,
           }),
         });
         if (res.ok) {
@@ -185,6 +197,7 @@ function Productos() {
           sessionStorage.removeItem("reebok_draft_client");
           sessionStorage.removeItem("reebok_draft_client_email");
           sessionStorage.removeItem("reebok_cart");
+          sessionStorage.removeItem("reebok_create_token"); // exito → el proximo pedido usa un token nuevo
           sessionStorage.setItem("reebok_draft_id", order.id);
           router.push(`/catalogo/reebok/pedido/${order.id}`);
         } else {
