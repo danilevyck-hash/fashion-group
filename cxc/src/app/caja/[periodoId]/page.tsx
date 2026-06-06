@@ -11,21 +11,37 @@ import { useCajaState } from "../hooks/useCajaState";
 import PeriodoDetailHeader from "../components/PeriodoDetailHeader";
 import GastoTable from "../components/GastoTable";
 import DeletedGastosModal from "../components/DeletedGastosModal";
+import NuevoGastoDrawer from "../components/NuevoGastoDrawer";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import "../skin.css";
 
 export default function PeriodoDetailPage() {
   const router = useRouter();
   const params = useParams<{ periodoId: string }>();
   const periodoId = params?.periodoId ?? "";
-  const { authChecked } = useAuth({
+  const { authChecked, isOwner } = useAuth({
     moduleKey: "caja",
     allowedRoles: ["admin", "secretaria"],
   });
 
   const [showDeletedModal, setShowDeletedModal] = useState(false);
+
+  // Drawer de nuevo gasto inline. El back del navegador lo cierra (pushState al
+  // abrir; popstate listener cierra; cerrar explícito hace history.back()).
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const openGastoDrawer = useCallback(() => {
+    window.history.pushState({ cajaGastoDrawer: true }, "");
+    setDrawerOpen(true);
+  }, []);
+  const closeGastoDrawer = useCallback(() => { window.history.back(); }, []);
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onPop = () => setDrawerOpen(false);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [drawerOpen]);
 
   const {
     current, error,
@@ -131,10 +147,24 @@ export default function PeriodoDetailPage() {
             setEditGasto={setEditGasto}
             onSaveEdit={saveEditGasto}
             onDeleteGasto={requestDeleteGasto}
-            nuevoHref={detailIsOpen ? `/caja/${current.id}/nuevo` : undefined}
+            onNuevoGasto={detailIsOpen ? openGastoDrawer : undefined}
           />
         </div>
       </div>
+
+      {detailIsOpen && (
+        <NuevoGastoDrawer
+          open={drawerOpen}
+          onClose={closeGastoDrawer}
+          periodo={{ id: current.id, fondo_inicial: detailFondoInicial }}
+          totalGastado={detailTotalGastado}
+          isOwner={isOwner}
+          onSaved={({ keepOpen }) => {
+            loadDetail(periodoId);
+            if (!keepOpen) closeGastoDrawer();
+          }}
+        />
+      )}
 
       <DeletedGastosModal
         open={showDeletedModal}

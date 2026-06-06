@@ -198,7 +198,7 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
           <VendedorasSubtab data={data} selectedYear={selectedYear} mes={mes} onMesChange={setMes} />
         </TabsContent>
         <TabsContent value="clientes" className="mt-5">
-          <ClientesMultifashionSubtab selectedYear={selectedYear} />
+          <ClientesMultifashionSubtab selectedYear={selectedYear} mes={mes} />
         </TabsContent>
       </Tabs>
     </div>
