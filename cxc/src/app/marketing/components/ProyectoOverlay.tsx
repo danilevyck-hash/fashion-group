@@ -261,21 +261,6 @@ export default function ProyectoOverlay({
           <div className="rounded-lg border border-gray-200 p-4">
             <div className="flex items-start justify-between gap-3 mb-3">
               <div className="min-w-0">
-                <div className="text-[11px] text-gray-400 mb-0.5 inline-flex items-center gap-1">
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                  Guardado automáticamente
-                </div>
                 <div className="text-lg font-semibold text-gray-900 truncate">
                   {proyecto.nombre || proyecto.tienda}
                 </div>

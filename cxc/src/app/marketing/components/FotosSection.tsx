@@ -5,7 +5,9 @@ import { useToast } from "@/components/ToastSystem";
 import { FotoUploader } from "@/components/marketing";
 import type { MkAdjunto } from "@/lib/marketing/types";
 import type { UploadResult } from "@/components/marketing";
-import { ConfirmModal, FotoLightbox } from "@/components/ui";
+import { FotoLightbox } from "@/components/ui";
+import UndoToast from "@/components/UndoToast";
+import { useUndoAction } from "@/lib/hooks/useUndoAction";
 import { subirAdjunto } from "./uploadHelpers";
 
 interface FotosSectionProps {
@@ -20,8 +22,9 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
   const [errorCarga, setErrorCarga] = useState<string | null>(null);
   const [fotosConError, setFotosConError] = useState<Set<string>>(new Set());
   const [lightbox, setLightbox] = useState<string | null>(null);
-  const [eliminando, setEliminando] = useState<string | null>(null);
-  const [confirmar, setConfirmar] = useState<MkAdjunto | null>(null);
+  // Borrar foto usa el patrón universal de "deshacer 5s": se quita de la UI al
+  // instante y el DELETE real (foto + Storage) corre tras la ventana de undo.
+  const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
   // Token monotónico para descartar respuestas obsoletas de cargar().
   const reqIdRef = useRef(0);
 
@@ -83,24 +86,30 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
     };
   };
 
-  const eliminar = async (id: string) => {
-    setEliminando(id);
-    try {
-      const res = await fetch(`/api/marketing/adjuntos/${id}`, {
-        method: "DELETE",
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo eliminar la foto");
-      }
-      setFotos((prev) => prev.filter((f) => f.id !== id));
-      toast("Foto eliminada", "success");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Error al eliminar";
-      toast(msg, "error");
-    } finally {
-      setEliminando(null);
-    }
+  const solicitarEliminar = (foto: MkAdjunto) => {
+    // Snapshot para revertir si el usuario deshace o el DELETE falla.
+    const snapshot = fotos;
+    scheduleAction({
+      id: foto.id,
+      message: "Foto eliminada",
+      onOptimistic: () => setFotos((prev) => prev.filter((f) => f.id !== foto.id)),
+      onRevert: () => setFotos(snapshot),
+      execute: async () => {
+        try {
+          const res = await fetch(`/api/marketing/adjuntos/${foto.id}`, {
+            method: "DELETE",
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => null);
+            throw new Error(err?.error ?? "No se pudo eliminar la foto");
+          }
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Error al eliminar";
+          toast(msg, "error");
+          throw err; // el hook revierte la UI al fallar execute
+        }
+      },
+    });
   };
 
   const hayFotos = fotos.length > 0;
@@ -187,10 +196,9 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
                 {!readonly && (
                   <button
                     type="button"
-                    onClick={() => setConfirmar(f)}
-                    disabled={eliminando === f.id}
+                    onClick={() => solicitarEliminar(f)}
                     aria-label="Eliminar foto"
-                    className="absolute top-1 right-1 bg-white/90 rounded-full w-6 h-6 flex items-center justify-center text-red-600 opacity-0 group-hover:opacity-100 transition disabled:opacity-50"
+                    className="absolute top-1 right-1 bg-white/90 rounded-full w-6 h-6 flex items-center justify-center text-red-600 opacity-0 group-hover:opacity-100 transition"
                   >
                     <svg
                       width="12"
@@ -234,21 +242,13 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
         />
       )}
 
-      <ConfirmModal
-        open={confirmar !== null}
-        onClose={() => setConfirmar(null)}
-        onConfirm={async () => {
-          if (!confirmar) return;
-          const id = confirmar.id;
-          setConfirmar(null);
-          await eliminar(id);
-        }}
-        title="¿Eliminar foto?"
-        message="Se borrará la foto del proyecto y del Storage. No se puede deshacer."
-        confirmLabel="Eliminar"
-        destructive
-        loading={eliminando !== null}
-      />
+      {pendingUndo && (
+        <UndoToast
+          message={pendingUndo.message}
+          startedAt={pendingUndo.startedAt}
+          onUndo={undoAction}
+        />
+      )}
 
       <FotoLightbox src={lightbox} onClose={() => setLightbox(null)} />
     </section>

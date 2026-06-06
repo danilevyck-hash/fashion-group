@@ -4,18 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import type { ReporteProyectoItem } from "@/lib/marketing/reportes";
 import { fmtDate } from "@/lib/format";
-import type { EstadoProyecto, MkMarca } from "@/lib/marketing/types";
-import { EstadoBadge } from "@/components/marketing/EstadoBadge";
+import type { MkMarca } from "@/lib/marketing/types";
 
 const ANIO_ACTUAL = new Date().getFullYear();
 const ANIOS = [ANIO_ACTUAL, ANIO_ACTUAL - 1, ANIO_ACTUAL - 2];
-
-const ESTADOS: Array<{ value: "todos" | EstadoProyecto; label: string }> = [
-  { value: "todos", label: "Todos" },
-  { value: "abierto", label: "Abierto" },
-  { value: "enviado", label: "Enviado" },
-  { value: "cobrado", label: "Cobrado" },
-];
 
 function fmtMoney(n: number): string {
   return `$${n.toLocaleString("en-US", {
@@ -40,7 +32,6 @@ export function ReportePorProyectoView() {
   const [anio, setAnio] = useState<number | "todos">(ANIO_ACTUAL);
   const [marcaId, setMarcaId] = useState<string>("");
   const [tienda, setTienda] = useState<string>("");
-  const [estado, setEstado] = useState<"todos" | EstadoProyecto>("todos");
 
   const [marcas, setMarcas] = useState<MkMarca[]>([]);
   const [tiendas, setTiendas] = useState<string[]>([]);
@@ -83,7 +74,6 @@ export function ReportePorProyectoView() {
       if (anio !== "todos") params.set("anio", String(anio));
       if (marcaId) params.set("marca_id", marcaId);
       if (tienda.trim()) params.set("tienda", tienda.trim());
-      if (estado !== "todos") params.set("estado", estado);
       const url = `/api/marketing/reportes/proyecto${params.toString() ? `?${params.toString()}` : ""}`;
       const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -95,7 +85,7 @@ export function ReportePorProyectoView() {
     } finally {
       setLoading(false);
     }
-  }, [anio, marcaId, tienda, estado, toast]);
+  }, [anio, marcaId, tienda, toast]);
 
   useEffect(() => {
     void cargar();
@@ -122,12 +112,11 @@ export function ReportePorProyectoView() {
   function limpiarFiltros() {
     setMarcaId("");
     setTienda("");
-    setEstado("todos");
     setAnio(ANIO_ACTUAL);
   }
 
   const hayFiltros =
-    marcaId !== "" || tienda.trim() !== "" || estado !== "todos" || anio !== ANIO_ACTUAL;
+    marcaId !== "" || tienda.trim() !== "" || anio !== ANIO_ACTUAL;
 
   return (
     <div className="space-y-4">
@@ -183,21 +172,6 @@ export function ReportePorProyectoView() {
           </datalist>
         </label>
 
-        <label className="text-sm text-gray-600">
-          <div className="mb-1">Estado</div>
-          <select
-            value={estado}
-            onChange={(e) => setEstado(e.target.value as "todos" | EstadoProyecto)}
-            className="px-3 py-1.5 rounded-md border border-gray-200 text-sm bg-white"
-          >
-            {ESTADOS.map((e) => (
-              <option key={e.value} value={e.value}>
-                {e.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
         {hayFiltros && (
           <button
             onClick={limpiarFiltros}
@@ -232,7 +206,6 @@ export function ReportePorProyectoView() {
                 <th className="text-left font-medium px-4 py-2">Proyecto</th>
                 <th className="text-left font-medium px-4 py-2">Tienda</th>
                 <th className="text-left font-medium px-4 py-2">Inicio</th>
-                <th className="text-left font-medium px-4 py-2">Estado</th>
                 <th className="text-left font-medium px-4 py-2">Marcas</th>
                 <th className="text-right font-medium px-4 py-2">Gasto real</th>
               </tr>
@@ -253,9 +226,6 @@ export function ReportePorProyectoView() {
                   >
                     {fmtDate(it.proyecto.fecha_inicio)}
                   </td>
-                  <td className="px-4 py-3">
-                    <EstadoBadge tipo="proyecto" estado={it.proyecto.estado} />
-                  </td>
                   <td className="px-4 py-3 text-xs text-gray-600">
                     {it.marcas.length === 0 ? (
                       <span className="text-gray-300">—</span>
@@ -273,7 +243,7 @@ export function ReportePorProyectoView() {
               <tr>
                 <td
                   className="px-4 py-2 text-sm font-medium text-gray-700"
-                  colSpan={5}
+                  colSpan={4}
                 >
                   Total
                 </td>

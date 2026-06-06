@@ -76,7 +76,7 @@ export default function ClientTable({
         label: "Ver en directorio",
         shortcut: "D",
         icon: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
-        onClick: () => { window.open(`/directorio?search=${encodeURIComponent(client.nombre_normalized)}`, "_blank"); },
+        onClick: () => { window.open(`/clientes?search=${encodeURIComponent(client.nombre_normalized)}`, "_blank"); },
       },
     ];
   }, [onOpenEmail]);

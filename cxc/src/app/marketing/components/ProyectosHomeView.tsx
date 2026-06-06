@@ -138,12 +138,6 @@ export default function ProyectosHomeView({
     cargar();
   }, [cargar, refreshKey]);
 
-  // Para contadores de cada pill: fetch aparte con filtro_estado=todos sin marca
-  // ni búsqueda, para mostrar conteos correctos. Simpler: usamos el array actual
-  // si filtroEstado==='todos' sin filtros extra; si no, omitimos contadores
-  // exactos y mostramos solo la lista filtrada.
-  const conteoActual = proyectos.length;
-
   const ejecutarAnular = async () => {
     if (!anularPendiente || !anularMotivo.trim()) return;
     setAnulando(true);
@@ -236,14 +230,6 @@ export default function ProyectosHomeView({
             </option>
           ))}
         </select>
-      </div>
-
-      {/* Pill única: Todos N. El módulo es archivo plano sin estados. */}
-      <div className="flex flex-wrap gap-2 items-center">
-        <span className="text-xs px-3 py-1 rounded-full bg-black text-white">
-          Todos{" "}
-          <span className="ml-1 opacity-60 tabular-nums">{conteoActual}</span>
-        </span>
       </div>
 
       {/* Lista */}
