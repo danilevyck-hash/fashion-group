@@ -95,18 +95,17 @@ export async function GET(req: NextRequest) {
     utilidad: Number(r.total_utilidad) || 0,
   }));
 
-  // topClientes — shape esperada por el frontend: { cliente, subtotal, utilidad }
+  // topClientes — ranking por ventas (sin utilidad; el costo por cliente no existe
+  // en el API sincronizado — sprint de costo, Opción 3).
   const topClientes = (topRes.data as TopClienteRow[] | null ?? []).map(r => ({
     cliente: r.cliente,
     subtotal: Number(r.total_subtotal) || 0,
-    utilidad: Number(r.total_utilidad) || 0,
   }));
 
-  // clientesDetalle — renombrar campos y mapEmpresa en sub-array
+  // clientesDetalle — renombrar campos y mapEmpresa en sub-array (sin utilidad).
   const clientesDetalle = (detalleRes.data as ClienteDetalleRow[] | null ?? []).map(r => ({
     cliente: r.cliente,
     subtotal: Number(r.subtotal_actual) || 0,
-    utilidad: Number(r.utilidad_actual) || 0,
     lastFecha: r.last_fecha ?? "",
     prevSubtotal: Number(r.prev_subtotal) || 0,
     last12mTotal: Number(r.last12m_total) || 0,
@@ -114,7 +113,6 @@ export async function GET(req: NextRequest) {
     empresas: (r.empresas ?? []).map(e => ({
       empresa: mapEmpresaName(e.empresa),
       subtotal: Number(e.subtotal) || 0,
-      utilidad: Number(e.utilidad) || 0,
       lastFecha: "",
     })),
   }));

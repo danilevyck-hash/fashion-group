@@ -13,7 +13,6 @@ interface VentaRow { empresa: string; mes: number; ventas_brutas: number; costo:
 interface ClienteDetalle {
   cliente: string;
   subtotal: number;
-  utilidad: number;
   ultima_compra?: string;
 }
 
@@ -220,15 +219,12 @@ function ReportePage() {
               <tr className="border-b border-gray-300">
                 <th className="text-left py-1.5 font-semibold">Cliente</th>
                 <th className="text-right py-1.5 font-semibold">Ventas B/.</th>
-                <th className="text-right py-1.5 font-semibold">Utilidad B/.</th>
-                <th className="text-right py-1.5 font-semibold">Margen %</th>
                 <th className="text-right py-1.5 font-semibold">% del Total</th>
                 <th className="text-right py-1.5 font-semibold">Última Compra</th>
               </tr>
             </thead>
             <tbody>
               {top10Clients.map(c => {
-                const mg = c.subtotal > 0 ? (c.utilidad / c.subtotal) * 100 : 0;
                 const pct = ventasNetas > 0 ? (c.subtotal / ventasNetas) * 100 : 0;
                 const ultima = c.ultima_compra
                   ? fmtDate(c.ultima_compra)
@@ -237,10 +233,6 @@ function ReportePage() {
                   <tr key={c.cliente} className="border-b border-gray-200">
                     <td className="py-1.5">{c.cliente}</td>
                     <td className="text-right py-1.5 tabular-nums">{fmt(c.subtotal)}</td>
-                    <td className="text-right py-1.5 tabular-nums">{fmt(c.utilidad)}</td>
-                    <td className={`text-right py-1.5 tabular-nums ${mg < 15 ? "text-red-600" : ""}`}>
-                      {mg > 0 ? mg.toFixed(1) + "%" : "—"}
-                    </td>
                     <td className="text-right py-1.5 tabular-nums">{pct.toFixed(1)}%</td>
                     <td className="text-right py-1.5 text-gray-500">{ultima}</td>
                   </tr>
