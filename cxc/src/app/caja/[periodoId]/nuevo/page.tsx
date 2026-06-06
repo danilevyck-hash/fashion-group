@@ -35,6 +35,7 @@ function NuevoGastoPage() {
   const [responsablesCatalog, setResponsablesCatalog] = useState<CajaResponsable[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   // Form state
   const prefillDescripcion = searchParams.get("descripcion") || "";
@@ -83,14 +84,15 @@ function NuevoGastoPage() {
   useEffect(() => {
     if (!periodoId) return;
     loadPeriodo();
+    setCatalogError(null);
     fetch("/api/caja/categorias")
-      .then((r) => (r.ok ? r.json() : []))
+      .then((r) => { if (!r.ok) throw new Error("categorias"); return r.json(); })
       .then((d: string[]) => setCategorias(Array.isArray(d) ? d : []))
-      .catch(() => setCategorias([]));
+      .catch(() => setCatalogError("No se pudieron cargar las categorías. Recarga la página."));
     fetch("/api/caja/responsables")
-      .then((r) => (r.ok ? r.json() : []))
+      .then((r) => { if (!r.ok) throw new Error("responsables"); return r.json(); })
       .then((d: CajaResponsable[]) => setResponsablesCatalog(Array.isArray(d) ? d : []))
-      .catch(() => setResponsablesCatalog([]));
+      .catch(() => setCatalogError("No se pudieron cargar las categorías o responsables. Recarga la página."));
   }, [periodoId, loadPeriodo]);
 
   function resetForm() {
@@ -207,6 +209,7 @@ function NuevoGastoPage() {
     !!gDescripcion.trim() &&
     subtotalNum > 0 &&
     !!gResponsableId &&
+    !!gCategoria.trim() &&
     !!gProveedor.trim() &&
     !addingGasto;
 
@@ -280,6 +283,18 @@ function NuevoGastoPage() {
                   }}
                 >
                   {error}
+                </p>
+              )}
+              {catalogError && (
+                <p
+                  className="text-sm mb-4 px-3 py-2 rounded-md"
+                  style={{
+                    color: "var(--caja-danger-onSoft)",
+                    background: "var(--caja-danger-soft)",
+                    border: "1px solid var(--caja-danger-border)",
+                  }}
+                >
+                  {catalogError}
                 </p>
               )}
 
