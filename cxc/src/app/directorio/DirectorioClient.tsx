@@ -43,8 +43,6 @@ export default function DirectorioClient({ initialData }: { initialData: Directo
   const PAGE_SIZE = 50;
   const [expanded, setExpanded] = usePersistedState<string | null>("directorio", "expanded", null);
   usePersistedScroll("directorio", !loading && clientes.length > 0);
-  const [editing, setEditing] = useState<string | null>(null);
-  const [editData, setEditData] = useState<Partial<Cliente>>({});
   const [showNew, setShowNew] = useState(false);
   const [newData, setNewData] = useState({ nombre: "", empresa: "", whatsapp: "", correo: "", contacto: "", notas: "" });
   const [toast, setToast] = useState<string | null>(null);
@@ -52,9 +50,6 @@ export default function DirectorioClient({ initialData }: { initialData: Directo
   const [savingNew, setSavingNew] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Cliente | null>(null);
   const [cxcClients, setCxcClients] = useState<Set<string>>(() => new Set(initialData.cxcNombres));
-  const [isDirty, setIsDirty] = useState(false);
-  const [autoSaveStatus, setAutoSaveStatus] = useState<"" | "saving" | "saved">("");
-  const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [empresaFilter, setEmpresaFilter] = useState("");
   const [empresas, setEmpresas] = useState<string[]>(initialData.empresas);
   const importRef = useRef<HTMLInputElement>(null);
@@ -66,7 +61,6 @@ export default function DirectorioClient({ initialData }: { initialData: Directo
   const [empresaDropdownOpen, setEmpresaDropdownOpen] = useState(false);
   const [mobileContactId, setMobileContactId] = useState<string | null>(null);
   const [confirmDupCreate, setConfirmDupCreate] = useState<{ match: Cliente } | null>(null);
-  const [confirmUnsavedTarget, setConfirmUnsavedTarget] = useState<{ action: () => void } | null>(null);
 
   const loadClientes = useCallback(async (searchTerm: string, pg: number, empFilter?: string) => {
     setLoading(true);
@@ -105,14 +99,6 @@ export default function DirectorioClient({ initialData }: { initialData: Directo
     }
     loadClientes(debouncedSearch, page, empresaFilter);
   }, [authChecked, debouncedSearch, page, empresaFilter, loadClientes]);
-
-  // Warn on unsaved changes (beforeunload)
-  useEffect(() => {
-    if (!isDirty) return;
-    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [isDirty]);
 
   if (!authChecked) return null;
 
@@ -169,37 +155,6 @@ export default function DirectorioClient({ initialData }: { initialData: Directo
       } catch { /* proceed if dedup check fails */ }
       await doCreateContact();
     } catch { setToast("Error de conexión. Intenta de nuevo."); setSavingNew(false); }
-  }
-
-  async function handleUpdate(id: string) {
-    try {
-      const res = await fetch(`/api/directorio/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editData),
-      });
-      if (!res.ok) { showToast("Error al actualizar contacto"); return; }
-      setEditing(null);
-      setIsDirty(false);
-      showToast("Contacto actualizado");
-      loadClientes(debouncedSearch, page);
-      // Sync to CXC overrides
-      const cliente = editData as Partial<Cliente>;
-      if (cliente.nombre) {
-        const normalized = cliente.nombre.toUpperCase().trim().replace(/\s+/g, " ");
-        await fetch("/api/overrides", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            nombre_normalized: normalized,
-            correo: cliente.correo || "",
-            telefono: cliente.telefono || "",
-            celular: cliente.celular || "",
-            contacto: cliente.contacto || "",
-          }),
-        }).catch(() => {}); // Don't fail if CXC override doesn't exist
-      }
-    } catch { showToast("Error al actualizar contacto"); }
   }
 
   function handleDelete(id: string) {
@@ -556,7 +511,6 @@ export default function DirectorioClient({ initialData }: { initialData: Directo
             <tbody>
               {clientes.map((c) => {
                 const isExpanded = expanded === c.id;
-                const isEditing = editing === c.id;
                 return (
                   <tr key={c.id} className="border-b border-gray-200 hover:bg-gray-50 transition-colors align-top">
                     <td colSpan={selectionMode ? 7 : 6} className="p-0">
@@ -565,10 +519,6 @@ export default function DirectorioClient({ initialData }: { initialData: Directo
                         className={`grid gap-1 py-3 cursor-pointer ${selectionMode ? "grid-cols-[auto_1fr_1fr] sm:grid-cols-[auto_1fr_1fr_1fr] lg:grid-cols-[auto_1fr_1fr_1fr_1fr_1fr_auto]" : "grid-cols-2 sm:grid-cols-3 lg:grid-cols-6"}`}
                         onClick={() => {
                           if (selectionMode) { toggleSelect(c.id); return; }
-                          if (isDirty && editing && editing !== c.id) {
-                            setConfirmUnsavedTarget({ action: () => { setEditing(null); setIsDirty(false); if (window.innerWidth < 768) { setMobileContactId(c.id); setExpanded(null); } else { setExpanded(expanded === c.id ? null : c.id); } } });
-                            return;
-                          }
                           // On mobile, open bottom sheet; on tablet/desktop, expand inline
                           if (window.innerWidth < 768) {
                             setMobileContactId(isExpanded ? null : c.id);
@@ -576,18 +526,6 @@ export default function DirectorioClient({ initialData }: { initialData: Directo
                           } else {
                             setExpanded(isExpanded ? null : c.id);
                           }
-                        }}
-                        onDoubleClick={(e) => {
-                          e.preventDefault();
-                          if (role !== "admin" && role !== "secretaria") return;
-                          if (isDirty && editing && editing !== c.id) {
-                            setConfirmUnsavedTarget({ action: () => { setEditing(c.id); setEditData(c); setIsDirty(false); setExpanded(c.id); } });
-                            return;
-                          }
-                          setExpanded(c.id);
-                          setEditing(c.id);
-                          setEditData(c);
-                          setIsDirty(false);
                         }}
                       >
                         {selectionMode && (
@@ -614,78 +552,20 @@ export default function DirectorioClient({ initialData }: { initialData: Directo
                         </div>
                       </div>
 
-                      {/* Expanded detail / Edit form */}
+                      {/* Expanded detail (solo lectura) */}
                       <AccordionContent open={isExpanded}>
-                        {isExpanded && !isEditing && (
+                        {isExpanded && (
                           <div className="bg-gray-50 px-4 py-3 mb-1 rounded-lg text-sm">
                             <div className="text-gray-500 mb-1">Teléfono: {c.telefono || <span className="text-gray-300">—</span>}</div>
                             <div className="text-gray-500 mb-1">Notas: {c.notas || <span className="text-gray-300">—</span>}</div>
                             <div className="text-gray-400 text-xs mb-3">Creado: {fmtDate(c.created_at.slice(0, 10))}</div>
                             <div className="flex gap-3">
-                              {(role === "admin" || role === "secretaria") && (
-                              <button onClick={(e) => { e.stopPropagation(); setEditing(c.id); setEditData(c); setIsDirty(false); }}
-                                className="text-sm text-gray-400 hover:text-black transition py-2.5 sm:py-1.5 min-h-[44px]">Editar</button>
-                              )}
                               <button onClick={(e) => { e.stopPropagation(); router.push(`/admin?search=${encodeURIComponent(c.nombre)}`); }}
                                 title="Ver deuda de este cliente en Cuentas por Cobrar" className="text-xs text-gray-400 hover:text-black transition py-2.5 sm:py-1.5 min-h-[44px]">Ver en CXC →</button>
                               {role === "admin" && (
                                 <button onClick={(e) => { e.stopPropagation(); handleDelete(c.id); }}
                                   className="text-sm text-gray-400 hover:text-red-500 transition py-2.5 sm:py-1.5 min-h-[44px]">Eliminar Contacto</button>
                               )}
-                            </div>
-                          </div>
-                        )}
-
-                        {isExpanded && isEditing && (role === "admin" || role === "secretaria") && (
-                          <div className="bg-gray-50 px-4 py-3 mb-1 rounded-lg" onClick={(e) => e.stopPropagation()}>
-                            <div className="grid grid-cols-2 gap-3">
-                              {(["nombre", "empresa", "whatsapp", "correo", "contacto", "notas"] as const).map((field) => (
-                                <div key={field}>
-                                  <label className="text-[10px] text-gray-400 uppercase tracking-widest block mb-1">{field}</label>
-                                  <input type="text" value={(editData as Record<string, string>)[field] || ""}
-                                    onChange={(e) => {
-                                      const next = { ...editData, [field]: e.target.value };
-                                      setEditData(next);
-                                      setIsDirty(true);
-                                      if (autoSaveRef.current) clearTimeout(autoSaveRef.current);
-                                      autoSaveRef.current = setTimeout(async () => {
-                                        setAutoSaveStatus("saving");
-                                        try {
-                                          const res = await fetch(`/api/directorio/${c.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(next) });
-                                          if (res.ok) {
-                                            setIsDirty(false);
-                                            setAutoSaveStatus("saved");
-                                            setTimeout(() => setAutoSaveStatus(""), 2000);
-                                            loadClientes(debouncedSearch, page);
-                                            // Sync to CXC overrides
-                                            const nombre = (next as Partial<Cliente>).nombre;
-                                            if (nombre) {
-                                              const normalized = nombre.toUpperCase().trim().replace(/\s+/g, " ");
-                                              fetch("/api/overrides", {
-                                                method: "POST",
-                                                headers: { "Content-Type": "application/json" },
-                                                body: JSON.stringify({
-                                                  nombre_normalized: normalized,
-                                                  correo: (next as Partial<Cliente>).correo || "",
-                                                  telefono: (next as Partial<Cliente>).telefono || "",
-                                                  celular: (next as Partial<Cliente>).celular || "",
-                                                  contacto: (next as Partial<Cliente>).contacto || "",
-                                                }),
-                                              }).catch(() => {});
-                                            }
-                                          } else { setAutoSaveStatus(""); }
-                                        } catch { setAutoSaveStatus(""); }
-                                      }, 2000);
-                                    }}
-                                    className="w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition bg-transparent" />
-                                </div>
-                              ))}
-                            </div>
-                            <div className="flex items-center gap-3 mt-4">
-                              <button onClick={() => { if (autoSaveRef.current) clearTimeout(autoSaveRef.current); if (isDirty) { setConfirmUnsavedTarget({ action: () => { setEditing(null); setIsDirty(false); setAutoSaveStatus(""); } }); return; } setEditing(null); setIsDirty(false); setAutoSaveStatus(""); }} className="text-sm text-gray-400 hover:text-black transition">Cerrar edición</button>
-                              {autoSaveStatus === "saving" && <span className="text-xs text-gray-400">Guardando...</span>}
-                              {autoSaveStatus === "saved" && <span className="text-xs text-green-600">Listo, guardado</span>}
-                              {autoSaveStatus === "" && !isDirty && <span className="text-xs text-gray-400">Guardado automáticamente</span>}
                             </div>
                           </div>
                         )}
@@ -837,14 +717,6 @@ export default function DirectorioClient({ initialData }: { initialData: Directo
 
                 {/* Action buttons */}
                 <div className="flex flex-wrap gap-3 mt-6 pt-4 border-t border-gray-100">
-                  {(role === "admin" || role === "secretaria") && (
-                    <button
-                      onClick={() => { setMobileContactId(null); setExpanded(mc.id); setEditing(mc.id); setEditData(mc); setIsDirty(false); }}
-                      className="text-sm text-gray-500 hover:text-black transition min-h-[44px] px-4"
-                    >
-                      Editar
-                    </button>
-                  )}
                   <button
                     onClick={() => { setMobileContactId(null); router.push(`/admin?search=${encodeURIComponent(mc.nombre)}`); }}
                     className="text-sm text-gray-500 hover:text-black transition min-h-[44px] px-4"
@@ -880,14 +752,6 @@ export default function DirectorioClient({ initialData }: { initialData: Directo
         title="Contacto similar encontrado"
         message={confirmDupCreate ? `Ya existe un contacto similar: ${confirmDupCreate.match.nombre} en ${confirmDupCreate.match.empresa || "(sin empresa)"}. ¿Crear de todos modos?` : ""}
         confirmLabel="Crear de todos modos"
-      />
-      <ConfirmModal
-        open={!!confirmUnsavedTarget}
-        onClose={() => setConfirmUnsavedTarget(null)}
-        onConfirm={() => { const action = confirmUnsavedTarget?.action; setConfirmUnsavedTarget(null); if (action) action(); }}
-        title="Cambios sin guardar"
-        message="Tienes cambios sin guardar. ¿Salir sin guardar?"
-        confirmLabel="Salir sin guardar"
       />
       <Toast message={toast} />
       {pendingUndoDir && <UndoToast message={pendingUndoDir.message} startedAt={pendingUndoDir.startedAt} onUndo={undoActionDir} />}

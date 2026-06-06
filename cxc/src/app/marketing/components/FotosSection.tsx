@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useToast } from "@/components/ToastSystem";
 import { FotoUploader } from "@/components/marketing";
 import type { MkAdjunto } from "@/lib/marketing/types";
@@ -22,8 +22,11 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
   const [lightbox, setLightbox] = useState<string | null>(null);
   const [eliminando, setEliminando] = useState<string | null>(null);
   const [confirmar, setConfirmar] = useState<MkAdjunto | null>(null);
+  // Token monotónico para descartar respuestas obsoletas de cargar().
+  const reqIdRef = useRef(0);
 
   const cargar = useCallback(async () => {
+    const myReqId = ++reqIdRef.current;
     setLoading(true);
     setErrorCarga(null);
     try {
@@ -41,18 +44,20 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
       if (!Array.isArray(raw)) {
         throw new Error("Respuesta inesperada del servidor");
       }
-      const data = raw as MkAdjunto[];
-      console.log(
-        `[fotos] proyecto=${proyectoId} recibidas=${data.length}`,
-      );
-      setFotos(data);
+      // Subidas múltiples en paralelo disparan varios cargar() a la vez. Solo
+      // el más reciente debe aplicar su resultado: si esta respuesta ya no es
+      // la última, descartarla para que ninguna foto recién subida quede
+      // pisada por una respuesta vieja que llegó tarde.
+      if (myReqId !== reqIdRef.current) return;
+      setFotos(raw as MkAdjunto[]);
     } catch (err) {
+      if (myReqId !== reqIdRef.current) return;
       const msg =
         err instanceof Error ? err.message : "Error al cargar fotos";
       setErrorCarga(msg);
       toast(`No se pudieron cargar las fotos: ${msg}`, "error");
     } finally {
-      setLoading(false);
+      if (myReqId === reqIdRef.current) setLoading(false);
     }
   }, [proyectoId, toast]);
 
@@ -171,9 +176,6 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
                     loading="lazy"
                     onClick={() => setLightbox(f.url)}
                     onError={() => {
-                      console.warn(
-                        `[fotos] no se pudo cargar: ${f.nombre_original} (${f.url.slice(0, 80)}…)`,
-                      );
                       setFotosConError((prev) => {
                         const next = new Set(prev);
                         next.add(f.id);
