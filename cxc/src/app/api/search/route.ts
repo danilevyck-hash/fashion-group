@@ -60,11 +60,13 @@ export async function GET(req: NextRequest) {
       .order("fecha_deposito", { ascending: false })
       .limit(5),
 
-    // Ventas: buscar por cliente en ventas_raw
+    // Ventas: buscar por cliente en switch_facturas (fuente única, fresco).
+    // Alias PostgREST → el consumidor sigue leyendo row.cliente/empresa/subtotal/fecha.
+    // Búsqueda fuzzy: total indicativo (subtotal_descuento magnitud, sin firmar NC).
     supabaseServer
-      .from("ventas_raw")
-      .select("cliente, mes, empresa, subtotal, fecha")
-      .ilike("cliente", pattern)
+      .from("switch_facturas")
+      .select("cliente:cliente_nombre, empresa:empresa_key, subtotal:subtotal_descuento, fecha")
+      .ilike("cliente_nombre", pattern)
       .order("fecha", { ascending: false })
       .limit(50),
 

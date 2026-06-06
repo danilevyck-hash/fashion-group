@@ -22,7 +22,6 @@ import { requireAuth } from "@/lib/require-auth";
 export const dynamic = "force-dynamic";
 
 const DEFAULT_RATE = 0.05;
-const PAGE = 1000;
 
 interface YearTotal {
   anio: number;
@@ -39,26 +38,21 @@ export async function GET(req: NextRequest) {
   const targetYear = parseInt(anioParam, 10);
   if (isNaN(targetYear)) return NextResponse.json({ error: "anio inválido" }, { status: 400 });
 
-  // Fetch all yearly totals grouped by empresa and year
-  // We need empresa, anio, sum(subtotal) for all years
-  let allRows: { empresa: string; anio: number; subtotal: number; mes: number }[] = [];
-  let offset = 0;
-  while (true) {
-    const { data, error } = await supabaseServer
-      .from("ventas_raw")
-      .select("empresa, anio, mes, subtotal")
-      .order("fecha", { ascending: true })
-      .order("n_sistema", { ascending: true })
-      .range(offset, offset + PAGE - 1);
-    if (error) {
-      console.error("[metas-auto]", error.code, error.message);
-      if (error.code === "42P01") return NextResponse.json({ empresas: [], groupAvgCAGR: 0, ceiling: 0 });
-      return NextResponse.json({ error: "Error interno" }, { status: 500 });
-    }
-    allRows = allRows.concat((data ?? []) as typeof allRows);
-    if (!data || data.length < PAGE) break;
-    offset += PAGE;
+  // Totales por empresa × año desde la vista unificada (switch-only, mensual,
+  // hora-Panamá; Paso 2). Antes era un scan paginado de ventas_raw.
+  const { data: vwData, error: vwErr } = await supabaseServer
+    .from("switch_ventas_unificado_vw")
+    .select("empresa_key, mes, ventas_netas");
+  if (vwErr) {
+    console.error("[metas-auto]", vwErr.code, vwErr.message);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
+  let allRows = (vwData ?? []).map(r => ({
+    empresa: r.empresa_key as string,
+    anio: new Date(r.mes as string).getUTCFullYear(),
+    mes: new Date(r.mes as string).getUTCMonth() + 1,
+    subtotal: Number(r.ventas_netas) || 0,
+  }));
 
   // Map empresa keys to display names
   const { mapEmpresaName } = await import("@/lib/empresa-mapping");

@@ -78,14 +78,9 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   const fromDate = new Date(now.getFullYear(), now.getMonth() - 24, 1);
   const fromIso = fromDate.toISOString().slice(0, 10);
 
-  // 3. Fuente migrada (igual que clientes_empresa_12m_vw): switch_facturas
-  //    (>= 2025-05-02, puenteado por ID vía switch_clientes) + ventas_raw
-  //    (< 2025-05-02, histórico pre-Switch). Corte hermético en 2025-05-02 →
-  //    sin doble conteo. Base pre-impuesto (subtotal_descuento / subtotal),
-  //    consistente con el ytd de la fila y el resto del módulo (antes usaba
-  //    ventas_raw.total con ITBMS y quedaba incompleto post-migración).
-  const SWITCH_START = "2025-05-02";
-  const switchFrom = fromIso > SWITCH_START ? fromIso : SWITCH_START;
+  // 3. Fuente única switch_facturas (historia completa backfilleada del API),
+  //    puenteada por ID vía switch_clientes. Base pre-impuesto neto
+  //    (subtotal_descuento firmado por tipo). Proyecto Fuente Única API.
 
   // 3a. Puente: cids del cliente para esta empresa. empresa es fija (una sola),
   //     así que (empresa_key + cliente_switch_id) mapea sin ambigüedad.
@@ -111,7 +106,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
       .select("fecha, tipo_comprobante, subtotal_descuento")
       .eq("empresa_key", empresaKey)
       .in("cliente_switch_id", cids)
-      .gte("fecha", switchFrom);
+      .gte("fecha", fromIso);
     if (sErr) {
       console.error("[historial-mensual] switch_facturas query error:", sErr.message);
       return NextResponse.json({ error: sErr.message }, { status: 500 });
@@ -134,29 +129,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
       // fecha de switch es timestamptz → recortar a YYYY-MM-DD para el bucketing.
       rows.push({ anio: null, mes: null, fecha: f.fecha ? String(f.fecha).slice(0, 10) : null, total: signed });
     }
-  }
-
-  // 3c. ventas_raw histórico (< 2025-05-02). subtotal ya viene firmado
-  //     (las Notas de Crédito son filas negativas).
-  const { data: vr, error: vErr } = await supabaseServer
-    .from("ventas_raw")
-    .select("anio, mes, fecha, subtotal")
-    .eq("cliente_id", cliente.id)
-    .eq("empresa", empresaKey)
-    .gte("fecha", fromIso)
-    .lt("fecha", SWITCH_START);
-
-  if (vErr) {
-    console.error("[historial-mensual] ventas_raw query error:", vErr.message);
-    return NextResponse.json({ error: vErr.message }, { status: 500 });
-  }
-  for (const r of (vr ?? []) as {
-    anio: number | null;
-    mes: number | null;
-    fecha: string | null;
-    subtotal: number | string | null;
-  }[]) {
-    rows.push({ anio: r.anio, mes: r.mes, fecha: r.fecha, total: Number(r.subtotal ?? 0) });
   }
 
   // 3. Agregar por (anio, mes) y trackear fecha máxima

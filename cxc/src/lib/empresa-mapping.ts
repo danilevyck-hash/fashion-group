@@ -104,34 +104,24 @@ export function mapEmpresaName(key: string): string {
 export async function getVentasMensuales(year: number, month?: number): Promise<{
   empresa: string; mes: number; ventas_netas: number; utilidad: number; costo: number;
 }[]> {
-  const PAGE = 1000;
-  let allRows: { empresa: string; mes: number; subtotal: number; utilidad: number; costo: number }[] = [];
-  let offset = 0;
-  while (true) {
-    let q = supabaseServer
-      .from("ventas_raw")
-      .select("empresa, mes, subtotal, utilidad, costo")
-      .eq("anio", year)
-      .order("fecha", { ascending: true })
-      .order("n_sistema", { ascending: true })
-      .range(offset, offset + PAGE - 1);
-    if (month) q = q.eq("mes", month);
-    const { data, error } = await q;
-    if (error) break;
-    allRows = allRows.concat(data ?? []);
-    if (!data || data.length < PAGE) break;
-    offset += PAGE;
-  }
+  // Fuente única switch_facturas vía la vista unificada (switch-only, mensual,
+  // hora-Panamá; Paso 2). utilidad/costo quedan en 0: los consumidores (metas,
+  // metas-auto) solo usan ventas_netas; el costo va al sprint de costo (Opción A).
+  const { data } = await supabaseServer
+    .from("switch_ventas_unificado_vw")
+    .select("empresa_key, mes, ventas_netas")
+    .gte("mes", `${year}-01-01`)
+    .lte("mes", `${year}-12-31`);
 
   // Aggregate by empresa + mes
   const map = new Map<string, { ventas_netas: number; utilidad: number; costo: number }>();
-  for (const r of allRows) {
-    const name = mapEmpresaName(r.empresa);
-    const key = `${name}|${r.mes}`;
+  for (const r of (data ?? []) as { empresa_key: string; mes: string; ventas_netas: number | string }[]) {
+    const m = new Date(r.mes).getUTCMonth() + 1;
+    if (month && m !== month) continue;
+    const name = mapEmpresaName(r.empresa_key);
+    const key = `${name}|${m}`;
     const entry = map.get(key) ?? { ventas_netas: 0, utilidad: 0, costo: 0 };
-    entry.ventas_netas += Number(r.subtotal) || 0;
-    entry.utilidad += Number(r.utilidad) || 0;
-    entry.costo += Number(r.costo) || 0;
+    entry.ventas_netas += Number(r.ventas_netas) || 0;
     map.set(key, entry);
   }
 
