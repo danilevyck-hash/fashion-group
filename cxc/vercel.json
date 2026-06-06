@@ -14,6 +14,7 @@
     { "path": "/api/cron/sync-utilidad", "schedule": "0 8 * * *" },
     { "path": "/api/cron/sync-recibos", "schedule": "30 8 * * *" },
     { "path": "/api/cron/switch-articulos", "schedule": "0 9 * * *" },
-    { "path": "/api/cron/sync-clientes-master", "schedule": "0 7 * * *" }
+    { "path": "/api/cron/sync-clientes-master", "schedule": "0 7 * * *" },
+    { "path": "/api/cron/switch-reconciliacion", "schedule": "0 10 * * *" }
   ]
 }
