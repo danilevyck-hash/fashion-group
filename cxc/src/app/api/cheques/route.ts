@@ -26,6 +26,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { cliente, empresa, numero_cheque, monto, fecha_deposito, notas, vendedor } = body;
 
+  if (typeof cliente !== "string" || !cliente.trim()) return NextResponse.json({ error: "cliente requerido" }, { status: 400 });
   if (!monto || monto <= 0) return NextResponse.json({ error: "El monto debe ser mayor a 0" }, { status: 400 });
   if (typeof vendedor !== "string" || !vendedor.trim()) return NextResponse.json({ error: "vendedor requerido" }, { status: 400 });
   if (typeof empresa !== "string" || !getCompany(empresa)) return NextResponse.json({ error: "empresa inválida" }, { status: 400 });
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabaseServer
     .from("cheques")
-    .insert({ cliente, empresa, numero_cheque: numero_cheque.trim(), monto, fecha_deposito, notas: notas || "", vendedor: vendedor.trim(), estado: "pendiente" })
+    .insert({ cliente: cliente.trim(), empresa, numero_cheque: numero_cheque.trim(), monto, fecha_deposito, notas: notas || "", vendedor: vendedor.trim(), estado: "pendiente" })
     .select()
     .single();
 

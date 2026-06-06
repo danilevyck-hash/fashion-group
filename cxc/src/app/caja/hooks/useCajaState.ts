@@ -64,18 +64,24 @@ export function useCajaState(opts?: UseCajaOptions) {
 
   useEffect(() => {
     fetch("/api/caja/categorias")
-      .then((r) => (r.ok ? r.json() : []))
+      .then((r) => { if (!r.ok) throw new Error("categorias"); return r.json(); })
       .then((data: string[]) => {
         setCategorias(Array.isArray(data) ? data : []);
       })
-      .catch(() => { console.error('Failed to load categorias'); });
+      .catch(() => {
+        console.error('Failed to load categorias');
+        setError("No se pudieron cargar las categorías. Recarga la página.");
+      });
     loadPeriodos();
     fetch("/api/caja/responsables")
-      .then((r) => (r.ok ? r.json() : []))
+      .then((r) => { if (!r.ok) throw new Error("responsables"); return r.json(); })
       .then((data: CajaResponsable[]) => {
         setResponsablesCatalog(Array.isArray(data) ? data : []);
       })
-      .catch(() => { console.error('Failed to load responsables'); });
+      .catch(() => {
+        console.error('Failed to load responsables');
+        setError("No se pudieron cargar los responsables. Recarga la página.");
+      });
   }, [loadPeriodos]);
 
   const loadDetail = useCallback(async (id: string) => {

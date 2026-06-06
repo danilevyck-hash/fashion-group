@@ -1,7 +1,28 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, type CSSProperties } from "react";
 import { CajaResponsable } from "./types";
+import SearchableSelect from "@/components/ui/SearchableSelect";
+
+// Estilo que iguala el look de los <select> nativos de Caja para los
+// SearchableSelect (responsable/categoría).
+const cajaInputStyle: CSSProperties = {
+  width: "100%",
+  height: 36,
+  padding: "0 10px",
+  fontFamily: "var(--caja-font-sans)",
+  fontSize: 13,
+  color: "var(--caja-fg-strong)",
+  background: "#fff",
+  outline: "none",
+  borderRadius: 6,
+  border: "1px solid var(--caja-border-default)",
+  transition: "border-color 120ms ease, box-shadow 120ms ease",
+};
+const cajaInputFocusStyle: CSSProperties = {
+  borderColor: "var(--caja-accent)",
+  boxShadow: "var(--caja-focus-shadow)",
+};
 
 export interface GastoFormValues {
   gFecha: string;
@@ -384,24 +405,26 @@ export default function GastoForm({
           className="caja-grid-clasif"
         >
           <Field label="Responsable" required>
-            <SelectInput value={gResponsableId} onChange={setGResponsableId}>
-              <option value="">—</option>
-              {responsablesCatalog.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.nombre}
-                </option>
-              ))}
-            </SelectInput>
+            <SearchableSelect
+              value={gResponsableId}
+              onChange={setGResponsableId}
+              options={responsablesCatalog.map((r) => ({ value: r.id, label: r.nombre }))}
+              placeholder="Buscar responsable…"
+              ariaLabel="Responsable"
+              style={cajaInputStyle}
+              focusStyle={cajaInputFocusStyle}
+            />
           </Field>
           <Field label="Categoría" required>
-            <SelectInput value={gCategoria} onChange={setGCategoria}>
-              {categorias.length === 0 && <option value="">—</option>}
-              {categorias.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </SelectInput>
+            <SearchableSelect
+              value={gCategoria}
+              onChange={setGCategoria}
+              options={categorias.map((c) => ({ value: c, label: c }))}
+              placeholder="Buscar categoría…"
+              ariaLabel="Categoría"
+              style={cajaInputStyle}
+              focusStyle={cajaInputFocusStyle}
+            />
           </Field>
         </div>
         {isOwner && (

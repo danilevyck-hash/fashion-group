@@ -15,6 +15,7 @@ import TimeGroupHeader from "@/components/TimeGroupHeader";
 
 import { ALL_COMPANIES, getCompanyDisplay } from "@/lib/companies";
 import { getVencenSemanaRange } from "@/lib/cheques-dates";
+import SearchableSelect from "@/components/ui/SearchableSelect";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
@@ -782,10 +783,15 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             </div>
             <div className="flex flex-col gap-1">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa <span className="text-red-500">*</span></label>
-              <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} onBlur={() => handleChequeBlur("empresa")} className={`border-b ${chequeFieldError("empresa", fEmpresa) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`}>
-                <option value="">Seleccionar...</option>
-                {ALL_COMPANIES.map((c) => <option key={c.key} value={c.key}>{c.name}</option>)}
-              </select>
+              <SearchableSelect
+                value={fEmpresa}
+                onChange={setFEmpresa}
+                options={ALL_COMPANIES.map((c) => ({ value: c.key, label: c.name }))}
+                placeholder="Seleccionar..."
+                ariaLabel="Empresa"
+                onBlur={() => handleChequeBlur("empresa")}
+                className={`w-full border-b ${chequeFieldError("empresa", fEmpresa) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`}
+              />
               {chequeFieldError("empresa", fEmpresa) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
@@ -806,25 +812,17 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             <div className="flex flex-col gap-1 relative">
               <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Vendedor <span className="text-red-500">*</span></label>
               {!showAddVendedor ? (
-                <select
+                <SearchableSelect
                   value={fVendedor}
-                  onChange={(e) => {
-                    if (e.target.value === "__add__") {
-                      setShowAddVendedor(true);
-                    } else {
-                      setFVendedor(e.target.value);
-                    }
-                  }}
+                  onChange={setFVendedor}
+                  options={vendedores.map((v) => ({ value: v, label: v }))}
+                  placeholder="Seleccionar vendedor"
+                  ariaLabel="Vendedor"
                   onBlur={() => handleChequeBlur("vendedor")}
-                  className={`border-b ${chequeFieldError("vendedor", fVendedor) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition appearance-none cursor-pointer`}
-                >
-                  <option value="">Seleccionar vendedor</option>
-                  {vendedores.map((v) => (
-                    <option key={v} value={v}>{v}</option>
-                  ))}
-                  <option disabled>──────────</option>
-                  <option value="__add__">+ Agregar vendedor</option>
-                </select>
+                  actionLabel="+ Agregar vendedor"
+                  onAction={() => setShowAddVendedor(true)}
+                  className={`w-full border-b ${chequeFieldError("vendedor", fVendedor) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`}
+                />
               ) : (
                 <div className="flex items-center gap-2">
                   <input
