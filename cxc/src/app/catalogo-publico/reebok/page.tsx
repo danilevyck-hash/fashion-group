@@ -178,6 +178,9 @@ function PublicCatalog() {
 
   const [sendingOrder, setSendingOrder] = useState(false);
   const [clientName, setClientName] = useState("");
+  // Si el navegador bloquea window.open (común en iOS), el pedido YA quedó
+  // guardado en el server; guardamos el mensaje para reintentar/copiar.
+  const [failedOrder, setFailedOrder] = useState<{ msg: string; url: string } | null>(null);
 
   useEffect(() => {
     try {
@@ -225,15 +228,45 @@ function PublicCatalog() {
       const link = `https://www.fashiongr.com/pedido-reebok/${short_id}`;
       const msg = `Hola, soy ${trimmedName}. Quiero hacer un pedido de Reebok:\n\n${sections.join("\n\n")}\n\nTotal: $${total.toFixed(2)}\n\n${link}`;
       const url = `https://wa.me/50766745522?text=${encodeURIComponent(msg)}`;
-      window.open(url, "_blank");
+      const win = window.open(url, "_blank");
 
+      // El pedido ya quedó guardado en el server (short_id), así que vaciar el
+      // carrito es seguro aunque WhatsApp no haya abierto.
       setCart([]);
       try { localStorage.removeItem("reebok_public_cart"); } catch { /* */ }
-      setToast("Pedido enviado");
+
+      if (!win) {
+        setFailedOrder({ msg, url });
+        setToast("Recibimos tu pedido. Ábrelo en WhatsApp para confirmar o cópialo.");
+        return;
+      }
+      setFailedOrder(null);
+      setToast("Abriendo WhatsApp… toca Enviar para confirmar tu pedido");
     } catch {
       setToast("Error al enviar el pedido. Intenta de nuevo.");
     } finally {
       setSendingOrder(false);
+    }
+  }
+
+  function retryWhatsApp() {
+    if (!failedOrder) return;
+    const win = window.open(failedOrder.url, "_blank");
+    if (win) {
+      setFailedOrder(null);
+      setToast("Abriendo WhatsApp… toca Enviar para confirmar tu pedido");
+    } else {
+      setToast("Tu navegador bloqueó WhatsApp. Copia el pedido y pégalo en el chat.");
+    }
+  }
+
+  async function copyOrder() {
+    if (!failedOrder) return;
+    try {
+      await navigator.clipboard.writeText(failedOrder.msg);
+      setToast("Pedido copiado. Pégalo en WhatsApp al +507 6674-5522");
+    } catch {
+      setToast("No se pudo copiar. Toma una captura de tu pedido.");
     }
   }
 
@@ -367,6 +400,32 @@ function PublicCatalog() {
           actionLabel={sendingOrder ? "Enviando..." : undefined}
           formatTotal={fmt}
         />
+
+        {failedOrder && (
+          <div
+            className="fixed inset-x-0 bottom-0 z-40 bg-white border-t border-[#1A2656]/10 px-4 pt-4 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]"
+            style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+          >
+            <p className="text-sm font-semibold text-[#1A2656]">Recibimos tu pedido — falta confirmarlo</p>
+            <p className="text-xs text-[#1A2656]/60 mt-0.5 mb-3">
+              WhatsApp no se abrió. Ábrelo de nuevo o copia tu pedido y pégalo en el chat al +507 6674-5522.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={retryWhatsApp}
+                className="flex-1 bg-[#25D366] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition"
+              >
+                Abrir WhatsApp
+              </button>
+              <button
+                onClick={copyOrder}
+                className="flex-1 bg-[#1A2656] text-white text-sm font-semibold rounded-lg min-h-[44px] active:scale-[0.97] transition"
+              >
+                Copiar pedido
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <style jsx global>{`

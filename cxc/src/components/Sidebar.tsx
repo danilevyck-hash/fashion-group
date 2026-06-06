@@ -14,7 +14,7 @@ const ROLE_LABELS: Record<string, string> = {
  contabilidad: "Contabilidad", vendedor: "Vendedor", cliente: "Cliente",
 };
 
-const PUBLIC_PATH_PREFIXES = ["/catalogo-publico", "/pedido-reebok", "/pedido-joybees"];
+const PUBLIC_PATH_PREFIXES = ["/catalogo-publico", "/pedido-reebok"];
 const STORAGE_KEY = "fg_sidebar_collapsed";
 const TOGGLE_EVENT = "fg-sidebar-toggle";
 
