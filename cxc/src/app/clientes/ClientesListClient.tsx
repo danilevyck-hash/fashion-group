@@ -4,7 +4,8 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { SkeletonTable, EmptyState, ScrollableTable } from "@/components/ui";
+import { SkeletonTable, EmptyState, ScrollableTable, PullToRefresh } from "@/components/ui";
+import { telHref, mailtoHref } from "@/lib/contact-links";
 
 export interface Cliente {
   id: string;
@@ -73,11 +74,15 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q, provincia]);
 
+  // Pull-to-refresh (mobile): recarga la página actual con los filtros vigentes.
+  const onRefresh = useCallback(() => fetchPage(page, q, provincia), [fetchPage, page, q, provincia]);
+
   if (!authChecked) return null;
 
   return (
     <div className="min-h-screen bg-white">
       <AppHeader module="Reportes" breadcrumbs={[{ label: "Clientes" }]} />
+      <PullToRefresh onRefresh={onRefresh}>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div className="mb-6">
           <h1 className="text-xl font-semibold tracking-tight">Clientes</h1>
@@ -139,8 +144,15 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
                         {c.nombre}
                       </Link>
                     </td>
-                    <td className="py-2 px-3 text-gray-600">{c.telefono || c.celular || "—"}</td>
-                    <td className="py-2 px-3 text-gray-600 max-w-[14rem] truncate">{c.email || "—"}</td>
+                    <td className="py-2 px-3 text-gray-600">{(() => {
+                      const tel = c.telefono || c.celular;
+                      const href = telHref(tel);
+                      return href ? <a href={href} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>{tel}</a> : (tel || "—");
+                    })()}</td>
+                    <td className="py-2 px-3 text-gray-600 max-w-[14rem] truncate">{(() => {
+                      const href = mailtoHref(c.email);
+                      return href ? <a href={href} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>{c.email}</a> : (c.email || "—");
+                    })()}</td>
                     <td className="py-2 px-3 text-gray-600">{c.provincia || "—"}</td>
                   </tr>
                 ))}
@@ -174,6 +186,7 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
           </div>
         )}
       </main>
+      </PullToRefresh>
     </div>
   );
 }

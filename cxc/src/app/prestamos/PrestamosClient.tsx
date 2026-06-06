@@ -115,6 +115,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   // Bottom sheet (mobile detail preview)
   const [sheetEmp, setSheetEmp] = useState<Empleado | null>(null);
   const [savingPagoQ, setSavingPagoQ] = useState(false);
+  const [confirmPagoQ, setConfirmPagoQ] = useState<Empleado | null>(null);
 
   // Batch approval state
   const [selectedPending, setSelectedPending] = useState<Set<string>>(new Set());
@@ -454,9 +455,9 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
                       <span className="text-xs text-gray-400">{fmtDate(m.fecha)}</span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button disabled={processingId === m.id} onClick={async () => { setProcessingId(m.id); try { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "aprobado" }) }); if (res.ok) { showToast("Movimiento aprobado"); loadEmpleados(); } else showToast("Error al aprobar"); } finally { setProcessingId(null); } }} className="text-xs bg-green-600 text-white px-5 py-2.5 rounded-md hover:bg-green-700 transition disabled:opacity-50 font-medium">{processingId === m.id ? "Procesando..." : "Aprobar"}</button>
-                    <button disabled={processingId === m.id} onClick={async () => { setProcessingId(m.id); try { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rechazado" }) }); if (res.ok) { showToast("Movimiento rechazado"); loadEmpleados(); } else showToast("Error al rechazar"); } finally { setProcessingId(null); } }} className="text-xs text-red-600 border border-red-200 hover:bg-red-50 transition px-5 py-2.5 rounded-md disabled:opacity-50 font-medium">{processingId === m.id ? "..." : "Rechazar"}</button>
+                  <div className="flex items-center gap-3">
+                    <button disabled={processingId === m.id} onClick={async () => { setProcessingId(m.id); try { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "aprobado" }) }); if (res.ok) { showToast("Movimiento aprobado"); loadEmpleados(); } else showToast("Error al aprobar"); } finally { setProcessingId(null); } }} className="text-xs bg-green-600 text-white px-5 min-h-[44px] rounded-md hover:bg-green-700 transition disabled:opacity-50 font-medium">{processingId === m.id ? "Procesando..." : "Aprobar"}</button>
+                    <button disabled={processingId === m.id} onClick={async () => { setProcessingId(m.id); try { const res = await fetch(`/api/prestamos/movimientos/${m.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "rechazado" }) }); if (res.ok) { showToast("Movimiento rechazado"); loadEmpleados(); } else showToast("Error al rechazar"); } finally { setProcessingId(null); } }} className="text-xs text-red-600 border border-red-200 hover:bg-red-50 transition px-5 min-h-[44px] rounded-md disabled:opacity-50 font-medium">{processingId === m.id ? "..." : "Rechazar"}</button>
                   </div>
                 </div>
               ))}
@@ -747,6 +748,15 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         destructive
       />
 
+      <ConfirmModal
+        open={!!confirmPagoQ}
+        onClose={() => setConfirmPagoQ(null)}
+        onConfirm={() => { const emp = confirmPagoQ; setConfirmPagoQ(null); if (emp) handlePagoQuincenal(emp); }}
+        title="Registrar pago quincenal"
+        message={`¿Registrar el pago quincenal de $${fmt(confirmPagoQ?.deduccion_quincenal || 0)} para ${confirmPagoQ?.nombre}? Se descuenta del saldo del préstamo.`}
+        confirmLabel="Registrar pago"
+      />
+
       {/* ── Bottom Sheet: Mobile Employee Preview ── */}
       <BottomSheet open={!!sheetEmp} onClose={() => setSheetEmp(null)}>
         {sheetEmp && sheetCalc && (
@@ -812,7 +822,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             <div className="space-y-2">
               {sheetEmp.deduccion_quincenal > 0 && sheetCalc.saldo > 0 && (
                 <button
-                  onClick={() => handlePagoQuincenal(sheetEmp)}
+                  onClick={() => setConfirmPagoQ(sheetEmp)}
                   disabled={savingPagoQ}
                   className="w-full bg-black text-white py-3 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.98] transition-all disabled:opacity-50"
                 >

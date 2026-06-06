@@ -60,6 +60,14 @@ export function clientesSummary(items: GuiaItem[]): string {
   return `${uniqueClientes[0]} y ${uniqueClientes.length - 1} más`;
 }
 
+export function destinosSummary(items: GuiaItem[]): string {
+  if (!items || items.length === 0) return "";
+  const uniqueDestinos = [...new Set(items.map((i) => i.direccion).filter(Boolean))];
+  if (uniqueDestinos.length === 0) return "";
+  if (uniqueDestinos.length === 1) return uniqueDestinos[0];
+  return `${uniqueDestinos[0]} y ${uniqueDestinos.length - 1} más`;
+}
+
 export function getMonthOptions(): { value: string; label: string }[] {
   const options: { value: string; label: string }[] = [];
   const now = new Date();

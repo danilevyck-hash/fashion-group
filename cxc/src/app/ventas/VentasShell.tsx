@@ -10,6 +10,7 @@ import { ResumenView } from "@/components/ventas/ResumenView";
 import { ClientesView } from "@/components/ventas/ClientesView";
 import { ProductosView } from "@/components/ventas/ProductosView";
 import { exportResumenToExcel } from "@/lib/ventas/excel";
+import { PullToRefresh } from "@/components/ui";
 import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/types";
 
 interface VentasShellProps {
@@ -40,9 +41,7 @@ export function VentasShell({
   // a su propio módulo (/multifashion); Ventas queda con Resumen + Clientes.
   const [tab, setTab] = useUrlState("tab", "resumen");
 
-  const onYearChange = useCallback(async (year: number) => {
-    if (year === selectedYear) return;
-    setSelectedYear(year);
+  const loadData = useCallback(async (year: number) => {
     setLoading(true);
     setFetchError(null);
     try {
@@ -79,7 +78,18 @@ export function VentasShell({
     } finally {
       setLoading(false);
     }
-  }, [selectedYear]);
+  }, []);
+
+  const onYearChange = useCallback(async (year: number) => {
+    if (year === selectedYear) return;
+    setSelectedYear(year);
+    await loadData(year);
+  }, [selectedYear, loadData]);
+
+  // Pull-to-refresh (mobile): recarga el año actual sin cambiarlo.
+  const onRefresh = useCallback(async () => {
+    await loadData(selectedYear);
+  }, [selectedYear, loadData]);
 
   const onExportExcel = async () => {
     if (!resumen) return;
@@ -105,6 +115,7 @@ export function VentasShell({
         : "sin cierres aún");
 
   return (
+    <PullToRefresh onRefresh={onRefresh}>
     <main className="mx-auto w-full max-w-[1280px] px-4 py-5 md:px-7 md:py-6">
       {/* Page head — `relative z-20` para garantizar stacking context propio
           encima del TabsList (que tiene overflow-x-auto y crea su propio
@@ -200,6 +211,7 @@ export function VentasShell({
         </TabsContent>
       </Tabs>
     </main>
+    </PullToRefresh>
   );
 }
 

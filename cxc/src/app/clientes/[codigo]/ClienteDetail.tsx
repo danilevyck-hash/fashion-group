@@ -6,6 +6,7 @@ import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast } from "@/components/ui";
 import { fmt, fmtDate } from "@/lib/format";
+import { telHref, mailtoHref } from "@/lib/contact-links";
 import { ALL_COMPANIES } from "@/lib/companies";
 
 interface Cliente {
@@ -172,9 +173,9 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-sm">
-              <Field label="Teléfono" value={cliente.telefono} />
-              <Field label="Celular"  value={cliente.celular}  />
-              <Field label="Email"    value={cliente.email}    />
+              <Field label="Teléfono" value={cliente.telefono} href={telHref(cliente.telefono)} />
+              <Field label="Celular"  value={cliente.celular}  href={telHref(cliente.celular)} />
+              <Field label="Email"    value={cliente.email}    href={mailtoHref(cliente.email)} />
               <Field label="Notas"    value={cliente.notas} fullWidth />
             </div>
           )}
@@ -229,12 +230,14 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
   );
 }
 
-function Field({ label, value, tabularNums, fullWidth }: { label: string; value: string | null | undefined; tabularNums?: boolean; fullWidth?: boolean }) {
+function Field({ label, value, tabularNums, fullWidth, href }: { label: string; value: string | null | undefined; tabularNums?: boolean; fullWidth?: boolean; href?: string | null }) {
   return (
     <div className={fullWidth ? "sm:col-span-2" : undefined}>
       <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400">{label}</div>
       <div className={`text-sm mt-0.5 ${tabularNums ? "tabular-nums" : ""} ${value ? "text-gray-900" : "text-gray-400"}`}>
-        {value || "—"}
+        {value && href ? (
+          <a href={href} className="text-blue-600 hover:underline">{value}</a>
+        ) : (value || "—")}
       </div>
     </div>
   );
