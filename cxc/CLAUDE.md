@@ -212,7 +212,7 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 - Removed old auth system and CartProvider (dead code)
 
 ### Reclamos (April 10-11)
-- States renamed: Borrador → Enviado → Confirmado → Aplicado with progress indicator
+- Pipeline lineal de 3 estados: Borrador → Enviado → Pagado (con progress indicator). Definido en `src/app/reclamos/components/constants.ts` (ESTADOS) y `VALID_TRANSITIONS`. Los estados Confirmado/Aplicado/Aplicada fueron descartados; siguen en el CHECK constraint de DB como legacy (limpieza pendiente en Sprint B).
 
 ### CXC (April 10-11)
 - Simplified ContactPanel (6 clear sections)
