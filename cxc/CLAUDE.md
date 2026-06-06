@@ -36,7 +36,7 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 - Forgot password: link en login → "Contacta al administrador"
 
 ## Base de datos
-- **Tablas grandes:** cxc_rows (~50K), ventas_raw (~100K)
+- **Tablas grandes:** cxc_rows (~50K), switch_facturas (historia 2022+, fuente única de ventas), ventas_raw (~100K, congelada — solo la lee costo)
 - **Soft delete:** `deleted` boolean en: reclamos, cheques, guias, prestamos, caja, directorio
 - **Tablas UX audit (abril 2026):**
   - `cxc_favorites` — favoritos ⭐ por usuario (antes localStorage)
@@ -102,7 +102,7 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 - **Drill-down a un nivel más profundo → `push`** (selector→empresa, lista→detalle, módulo→sub-route). Cada nivel deja entrada → Back deshace un nivel a la vez.
 - **Filtro / tab / sort en el MISMO nivel → `replace`** (no debe crear entrada; Back no debe ciclar por tabs/filtros).
 - `useUrlState(key, default, { history: "push" })` para params que representan un nivel; default `"replace"` para filtros/tabs.
-- **SPAs de un solo route** (varios niveles bajo un mismo `/route`): el patrón de referencia es **Camisetas** (`src/app/camisetas/page.tsx`) — `pushState` para drill-down, `replaceState` para tabs, listener `popstate` que reconstruye el estado desde la URL. Reclamos (`src/app/reclamos/ReclamosClient.tsx`) sigue el mismo modelo vía router de Next.
+- **SPAs de un solo route** (varios niveles bajo un mismo `/route`): el patrón de referencia es **Reclamos** (`src/app/reclamos/ReclamosClient.tsx`) — drill-down/tabs/back-forward vía el router de Next reconstruyendo el estado desde la URL. (El ejemplo anterior, Camisetas, fue eliminado en #35.)
 - Módulos con **routes reales** (Caja, Préstamos, Guías, Clientes detalle) ya son correctos: cada nivel es una URL distinta empujada con `router.push`/`<Link>`. No requieren tratamiento especial.
 
 ## Keyboard Shortcuts (Desktop)
@@ -189,9 +189,6 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 - Copies and microcopy refined
 - Dead code removed across modules
 
-### Camisetas
-- Batch edit with "Guardar cambios" button
-- force-dynamic on API route
 
 ### API & Cache
 - All 58 API routes now have `export const dynamic = 'force-dynamic'` (no more stale cache on Vercel)
@@ -225,9 +222,7 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 ### Préstamos (April 10-11)
 - Visual status badges + filter tabs + batch undo
 
-### Camisetas (April 10-11)
-- Batch edit with "Guardar cambios" sticky bar, force-dynamic fixed cache bug
-- Tab subtitles, cleaner layout, overflow menu for destructive actions
+### Camisetas — módulo eliminado por completo en #35 (jun 2026)
 
 ### Ventas (April 10-11)
 - View preference saved to localStorage
