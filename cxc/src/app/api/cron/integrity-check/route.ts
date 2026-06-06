@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { runAllChecks, persistCheckResults, summarize, type CheckResult } from "@/lib/integrity-checks";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
+import { verifySession } from "@/lib/session-cookie";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -26,15 +27,8 @@ function isAuthorized(req: NextRequest): boolean {
     || req.nextUrl.searchParams.get("secret");
   if (process.env.CRON_SECRET && secret === process.env.CRON_SECRET) return true;
 
-  // Fallback: admin con cookie de sesión (botón del dashboard).
-  try {
-    const sessionRaw = req.cookies.get("cxc_session")?.value;
-    if (!sessionRaw) return false;
-    const parsed = JSON.parse(Buffer.from(sessionRaw, "base64url").toString("utf-8"));
-    return parsed?.role === "admin";
-  } catch {
-    return false;
-  }
+  // Fallback: admin con cookie de sesión firmada (botón del dashboard).
+  return verifySession(req.cookies.get("cxc_session")?.value)?.role === "admin";
 }
 
 function buildCriticalAlert(criticals: CheckResult[]): string {

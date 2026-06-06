@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { logActivity } from "@/lib/log-activity";
 import { getDefaultModulesForRole } from "@/lib/modules";
+import { signSession, verifySession } from "@/lib/session-cookie";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 
@@ -25,7 +26,7 @@ function isRateLimited(ip: string): boolean {
 }
 
 function setSessionCookie(res: NextResponse, payload: Record<string, unknown>) {
-  const value = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  const value = signSession(payload);
   res.cookies.set(COOKIE_NAME, value, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -56,6 +57,12 @@ export async function POST(req: NextRequest) {
       .eq("active", true);
 
     if (users) {
+      // Recolectar TODOS los matches en vez de cortar en el primero.
+      // Si dos usuarios comparten contraseña el login es AMBIGUO: no se puede
+      // determinar la identidad, así que se rechaza (evita que un usuario entre
+      // con la identidad/rol de otro). Mismo mensaje genérico que "no encontrado"
+      // para no revelar que existe una colisión.
+      const matches: typeof users = [];
       for (const user of users) {
         if (!isHash(user.password)) {
           console.warn(`[auth] User "${user.name}" has non-bcrypt password — login skipped. Re-hash required.`);
@@ -63,8 +70,16 @@ export async function POST(req: NextRequest) {
         }
         const match = await bcrypt.compare(password, user.password)
           || await bcrypt.compare(password.toLowerCase(), user.password);
+        if (match) matches.push(user);
+      }
 
-        if (match) {
+      if (matches.length > 1) {
+        return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
+      }
+
+      if (matches.length === 1) {
+        const user = matches[0];
+        {
           // Módulos por rol — fuente única: role_permissions.
           // (Antes consultábamos fg_user_modules per-user, pero el sistema migró a
           // permisos por rol; filas residuales en fg_user_modules overrideaban
@@ -163,17 +178,14 @@ export async function POST(req: NextRequest) {
 
 // DELETE — logout (clear cookie + revoke session)
 export async function DELETE(req: NextRequest) {
-  // Revoke session in DB
-  const raw = req.cookies.get(COOKIE_NAME)?.value;
-  if (raw) {
+  // Revoke session in DB (verifica la firma para extraer el sessionToken).
+  const parsed = verifySession(req.cookies.get(COOKIE_NAME)?.value);
+  if (parsed?.sessionToken) {
     try {
-      const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf-8"));
-      if (parsed.sessionToken) {
-        await supabaseServer
-          .from("user_sessions")
-          .update({ revoked: true })
-          .eq("session_token", parsed.sessionToken);
-      }
+      await supabaseServer
+        .from("user_sessions")
+        .update({ revoked: true })
+        .eq("session_token", parsed.sessionToken);
     } catch { /* */ }
   }
 

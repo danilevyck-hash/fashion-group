@@ -1,29 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { verifySession, type SessionPayload } from "@/lib/session-cookie";
 
 const COOKIE_NAME = "cxc_session";
 
-interface SessionPayload {
-  role: string;
-  userId?: string;
-  userName?: string;
-  modules?: string[];
-  isOwner?: boolean;
-}
-
 /**
- * Parses the session cookie set by /api/auth on login.
- * Returns the payload or null if missing/invalid.
+ * Parses + verifies the signed session cookie set by /api/auth on login.
+ * Returns the payload or null if missing/invalid/unsigned.
  */
 export function getSession(req: NextRequest): SessionPayload | null {
-  const raw = req.cookies.get(COOKIE_NAME)?.value;
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf-8"));
-    if (!parsed.role) return null;
-    return parsed as SessionPayload;
-  } catch {
-    return null;
-  }
+  return verifySession(req.cookies.get(COOKIE_NAME)?.value);
 }
 
 /**

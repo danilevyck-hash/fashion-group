@@ -7,6 +7,7 @@
 import { cookies } from "next/headers";
 import { redirect, notFound } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase-server";
+import { verifySession } from "@/lib/session-cookie";
 import { B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import ClienteDetail, { type ClienteDetailData } from "./ClienteDetail";
 
@@ -20,14 +21,7 @@ interface SessionPayload {
 }
 
 function parseSession(raw: string | undefined): SessionPayload | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf-8"));
-    if (!parsed.role) return null;
-    return parsed as SessionPayload;
-  } catch {
-    return null;
-  }
+  return verifySession(raw);
 }
 
 async function isSessionValid(token: string | undefined): Promise<boolean> {

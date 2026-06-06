@@ -3,19 +3,14 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { fetchVentasResumen, fetchClientes, fetchMultifashion, fetchAvailableYears } from "@/lib/ventas/queries";
 import { VentasShell } from "./VentasShell";
+import { verifySession } from "@/lib/session-cookie";
 
 export const dynamic = "force-dynamic";
 
 // Ventas es admin-only. Guard SSR (antes de cargar data) para que ningún otro
 // rol (ej. secretaria) vea Resumen/Clientes ni escribiendo la URL.
 function sessionRole(raw: string | undefined): string | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf-8"));
-    return parsed?.role ?? null;
-  } catch {
-    return null;
-  }
+  return verifySession(raw)?.role ?? null;
 }
 
 export default async function VentasPage() {

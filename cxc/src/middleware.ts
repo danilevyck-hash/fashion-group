@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as Sentry from "@sentry/nextjs";
+import { verifySessionEdge } from "@/lib/session-cookie-edge";
 
 const COOKIE_NAME = "cxc_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
@@ -32,7 +34,11 @@ const PUBLIC_PREFIXES = [
 async function isSessionValid(sessionToken: string): Promise<boolean> {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseKey) return true; // fail open if not configured
+  if (!supabaseUrl || !supabaseKey) {
+    // Fail CLOSED: sin config no podemos validar la sesión → tratar como inválida.
+    Sentry.captureMessage("[auth] Supabase env ausente en middleware — sesión rechazada (fail-closed)", "error");
+    return false;
+  }
 
   try {
     const res = await fetch(
@@ -44,11 +50,18 @@ async function isSessionValid(sessionToken: string): Promise<boolean> {
         },
       }
     );
-    if (!res.ok) return true; // fail open on network error
+    if (!res.ok) {
+      // Fail CLOSED en error de red/5xx (antes fail-open: una caída de DB
+      // revivía sesiones revocadas). Loggeado para que el outage sea observable.
+      Sentry.captureMessage(`[auth] Supabase respondió ${res.status} validando sesión — fail-closed`, "error");
+      return false;
+    }
     const rows = await res.json();
     return Array.isArray(rows) && rows.length > 0;
-  } catch {
-    return true; // fail open on error
+  } catch (err) {
+    // Fail CLOSED ante cualquier excepción.
+    Sentry.captureException(err);
+    return false;
   }
 }
 
@@ -122,25 +135,21 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL("/", req.url));
   }
 
-  // Validate session is parseable
-  let parsed: { role?: string; sessionToken?: string };
-  try {
-    parsed = JSON.parse(Buffer.from(session, "base64url").toString("utf-8"));
-    if (!parsed.role) throw new Error("no role");
-  } catch {
-    // Invalid cookie — clear it and redirect
+  // Verify HMAC signature + parse. Rechaza cookies sin firmar o forjadas, y
+  // exige sessionToken (verifySessionEdge ya lo garantiza, pero lo re-chequeamos).
+  const parsed = await verifySessionEdge(session);
+  if (!parsed || !parsed.sessionToken) {
+    // Cookie inválida/forjada/sin token — limpiar y redirigir
     return clearSessionAndRedirect(req, pathname);
   }
 
-  // Validate session token against DB (if present)
-  if (parsed.sessionToken) {
-    const valid = await isSessionValid(parsed.sessionToken);
-    if (!valid) {
-      return clearSessionAndRedirect(req, pathname);
-    }
-    // Update last_seen (fire and forget — non-blocking)
-    touchSession(parsed.sessionToken);
+  // Validate session token against DB (fail-closed)
+  const valid = await isSessionValid(parsed.sessionToken);
+  if (!valid) {
+    return clearSessionAndRedirect(req, pathname);
   }
+  // Update last_seen (fire and forget — non-blocking)
+  touchSession(parsed.sessionToken);
 
   // Auto-refresh: re-set cookie with fresh 7-day maxAge on every request
   const res = NextResponse.next();
