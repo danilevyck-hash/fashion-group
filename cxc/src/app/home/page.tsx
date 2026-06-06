@@ -20,6 +20,8 @@ export default function HomePage() {
   const [userName, setUserName] = useState("");
   const [fgModules, setFgModules] = useState<string[] | null>(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [dhAlert, setDhAlert] = useState<{ critical: number; warning: number } | null>(null);
+  const [dhDismissed, setDhDismissed] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -51,6 +53,24 @@ export default function HomePage() {
       router.push(visible[0].href);
     }
   }, [authChecked, role, fgModules, router]);
+
+  // Aviso proactivo de Data Health (solo admin): si hay checks critical/warning,
+  // avisa al entrar en vez de esperar a que abra el dashboard. (Tras PR #33 los
+  // warnings solo viven en el dashboard.)
+  useEffect(() => {
+    if (!authChecked || role !== "admin") return;
+    let cancelled = false;
+    fetch("/api/admin/data-health", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { latest?: { severity: string }[] } | null) => {
+        if (cancelled || !j?.latest) return;
+        const critical = j.latest.filter((x) => x.severity === "critical").length;
+        const warning = j.latest.filter((x) => x.severity === "warning").length;
+        if (critical + warning > 0) setDhAlert({ critical, warning });
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [authChecked, role]);
 
   const visibleGroups = role ? getVisibleGroups(role, fgModules) : [];
   const displayName = userName || "";
@@ -92,6 +112,22 @@ export default function HomePage() {
         {/* Global Search — admin, secretaria, director */}
         {["admin", "secretaria"].includes(role) && (
           <SearchBar darkMode={darkMode} />
+        )}
+
+        {/* Aviso proactivo de Data Health (solo admin) */}
+        {role === "admin" && dhAlert && !dhDismissed && (
+          <div className={`mb-4 flex items-center justify-between gap-3 rounded-lg border px-4 py-2.5 text-sm ${
+            dhAlert.critical > 0
+              ? "border-red-200 bg-red-50 text-red-800"
+              : "border-amber-200 bg-amber-50 text-amber-900"
+          }`}>
+            <button onClick={() => router.push("/admin/data-health")} className="text-left font-medium hover:underline">
+              {dhAlert.critical > 0
+                ? `${dhAlert.critical} check${dhAlert.critical === 1 ? "" : "s"} crítico${dhAlert.critical === 1 ? "" : "s"} en Data Health`
+                : `${dhAlert.warning} check${dhAlert.warning === 1 ? "" : "s"} en alerta en Data Health`} — toca para revisar
+            </button>
+            <button onClick={() => setDhDismissed(true)} aria-label="Descartar" className="shrink-0 px-1 opacity-60 hover:opacity-100">×</button>
+          </div>
         )}
 
         {/* Group cards — 4 max, una por grupo visible */}

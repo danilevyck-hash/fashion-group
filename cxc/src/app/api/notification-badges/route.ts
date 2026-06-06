@@ -12,8 +12,11 @@ export async function GET(req: NextRequest) {
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
   const endOfWeek = getEndOfWeek(today);
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000).toISOString();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 86400000).toISOString();
+  // Reclamos "viejos": misma definición que home_dashboard_summary.reclamosViejos
+  // (estado NO terminal + fecha_reclamo > 45 días). Antes el badge usaba un
+  // whitelist [Borrador,Enviado] + 30d/created_at → subcontaba (p.ej. "Confirmado").
+  const dias45 = new Date(now.getTime() - 45 * 86400000).toISOString().slice(0, 10);
 
   // All queries in parallel for speed
   const [chequesRes, reclamosRes, prestamosRes, guiasRes, cxcUploadsRes] = await Promise.all([
@@ -26,13 +29,13 @@ export async function GET(req: NextRequest) {
       .lte("fecha_deposito", endOfWeek)
       .gte("fecha_deposito", today),
 
-    // Reclamos: Borrador o Enviado con más de 30 días
+    // Reclamos viejos: NO terminal + fecha_reclamo > 45 días (igual que el RPC del home).
     supabaseServer
       .from("reclamos")
       .select("id", { count: "exact", head: true })
       .eq("deleted", false)
-      .in("estado", ["Borrador", "Enviado"])
-      .lt("created_at", thirtyDaysAgo),
+      .not("estado", "in", "(Aplicado,Rechazado,Aplicada,Pagado)")
+      .lt("fecha_reclamo", dias45),
 
     // Préstamos: movimientos pendientes de aprobación
     supabaseServer
