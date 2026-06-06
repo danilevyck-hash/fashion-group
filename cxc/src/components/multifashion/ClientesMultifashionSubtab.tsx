@@ -141,6 +141,7 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const range = useMemo(() => resolveDateRange(periodo, selectedYear), [periodo, selectedYear]);
   const periodoStr = useMemo(() => periodoLabel(periodo, selectedYear), [periodo, selectedYear]);
@@ -187,7 +188,7 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
       .finally(() => setLoading(false));
 
     return () => ctrl.abort();
-  }, [range.fecha_inicio, range.fecha_fin]);
+  }, [range.fecha_inicio, range.fecha_fin, reloadKey]);
 
   // Pico mensual compartido (escala visual unificada entre ambas secciones).
   const peakMes = useMemo(() => Math.max(
@@ -235,6 +236,7 @@ export function ClientesMultifashionSubtab({ selectedYear }: ClientesMultifashio
       {error ? (
         <Card className="rounded-md border border-orange-200 bg-orange-50 p-4 text-xs text-orange-900">
           No se pudo cargar la lista: {error}
+          <button onClick={() => setReloadKey((k) => k + 1)} className="ml-2 font-medium underline underline-offset-2 hover:text-orange-700">Reintentar</button>
         </Card>
       ) : loading && !wholesale && !retail ? (
         <Card className="flex min-h-[200px] items-center justify-center p-12 text-sm text-stone-500">

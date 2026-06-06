@@ -18,6 +18,7 @@ import { fmtMoney } from "@/lib/ventas/format";
 import { exportComisionesResumen } from "@/lib/ventas/comisionExcel";
 import { ComisionesConfigModal } from "./ComisionesConfigModal";
 import { ComisionesDetalleModal } from "./ComisionesDetalleModal";
+import SyncStatus from "@/components/shared/SyncStatus";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -98,6 +99,13 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
   const totalComisionCobro = vendedores.reduce((a, v) => a + (v.comision_cobro ?? 0), 0);
   const totalGeneral = vendedores.reduce((a, v) => a + (v.comision_total ?? 0), 0);
 
+  // Vendedores sin actividad del mes (sin venta ni cobro) se colapsan a una línea
+  // al pie para no inflar la tabla con ceros. Los totales siguen sumando todo.
+  const isInactivo = (v: ComisionVendedor) =>
+    (v.base ?? 0) === 0 && (v.base_cobro ?? 0) === 0 && (v.comision_total ?? 0) === 0;
+  const activos = vendedores.filter((v) => !isInactivo(v));
+  const inactivos = vendedores.filter(isInactivo);
+
   const handleExport = () => {
     if (vendedores.length === 0) return;
     void exportComisionesResumen({
@@ -138,6 +146,14 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
           </SelectContent>
         </Select>
 
+        <SyncStatus
+          tabla="facturas"
+          empresasEsperadas={EMPRESAS}
+          empresaLabels={EMPRESA_KEY_TO_NAME}
+          variant="pill"
+          prefix="Data actualizada al"
+        />
+
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={handleExport}
@@ -177,7 +193,15 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-500">Cargando…</div>
         ) : error ? (
-          <div className="p-8 text-center text-sm text-rose-600">{error}</div>
+          <div className="p-8 text-center text-sm">
+            <p className="text-rose-600">{error}</p>
+            <button
+              onClick={() => void load()}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs text-gray-700 transition hover:border-black hover:text-black active:scale-[0.97]"
+            >
+              Reintentar
+            </button>
+          </div>
         ) : vendedores.length === 0 ? (
           <div className="p-8 text-center text-sm text-gray-500">
             Sin vendedores para {MESES[mes - 1]} {year}.
@@ -195,7 +219,7 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
               </tr>
             </thead>
             <tbody>
-              {vendedores.map((v) => (
+              {activos.map((v) => (
                 <tr
                   key={v.vendedor}
                   onClick={() => setDetalleVendedor(v.vendedor)}
@@ -210,6 +234,13 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
                   <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-gray-900">{fmtMoney(v.comision_total)}</td>
                 </tr>
               ))}
+              {inactivos.length > 0 && (
+                <tr className="border-b border-gray-100 last:border-0">
+                  <td colSpan={6} className="px-4 py-2 text-center text-xs italic text-gray-400">
+                    {inactivos.length} {inactivos.length === 1 ? "vendedor" : "vendedores"} sin actividad este mes
+                  </td>
+                </tr>
+              )}
             </tbody>
             <tfoot>
               <tr className="border-t border-gray-200 bg-gray-50 font-medium text-gray-900">
@@ -227,7 +258,7 @@ export function ComisionesView({ availableYears }: ComisionesViewProps) {
 
       <p className="flex items-center gap-1.5 text-xs text-gray-400">
         <Coins className="h-3.5 w-3.5" />
-        Todos los vendedores activos aparecen aquí, aunque no hayan vendido en el mes.
+        Los vendedores sin venta ni cobro del mes se agrupan en una línea al pie.
       </p>
 
       {canConfig && (

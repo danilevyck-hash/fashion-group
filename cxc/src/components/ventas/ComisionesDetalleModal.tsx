@@ -115,7 +115,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                           <td className="px-3 py-1.5">{v.cliente}</td>
                           <td className="px-3 py-1.5 tabular-nums text-gray-500">{v.secuencial}{v.tipo === "Nota de Crédito" ? " (NC)" : ""}</td>
                           <td className="px-3 py-1.5 text-right tabular-nums">{fmtMoney(v.subtotal)}</td>
-                          <td className="px-3 py-1.5 text-right tabular-nums text-gray-500">{v.pct_utilidad == null ? "—" : `${v.pct_utilidad.toFixed(1)}%`}</td>
+                          <td className="px-3 py-1.5 text-right tabular-nums text-gray-500">{v.tipo === "Nota de Crédito" || v.pct_utilidad == null || !Number.isFinite(v.pct_utilidad) ? "—" : `${v.pct_utilidad.toFixed(1)}%`}</td>
                         </tr>
                       ))}
                     </tbody>

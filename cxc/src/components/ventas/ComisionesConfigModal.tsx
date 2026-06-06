@@ -23,7 +23,9 @@ interface ComisionesConfigModalProps {
 
 // decimal ↔ % humano
 const toPct = (dec: number): string => (dec * 100).toFixed(2);
-const fromPct = (pct: string): number => Math.round(parseFloat(pct) * 100) / 10000;
+// % humano → decimal. parseFloat(pct)/100 evita la pérdida de precisión del
+// Math.round previo (que mal-redondeaba tasas con >2 decimales).
+const fromPct = (pct: string): number => (parseFloat(pct) || 0) / 100;
 
 export function ComisionesConfigModal({ open, onClose, onSaved }: ComisionesConfigModalProps) {
   const [mounted, setMounted] = useState(false);
