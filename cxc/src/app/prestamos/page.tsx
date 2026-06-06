@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/supabase-server";
+import { verifySession } from "@/lib/session-cookie";
 import { filterEmpleadosMovimientos } from "@/lib/prestamos-helpers";
 import PrestamosClient, { type Empleado } from "./PrestamosClient";
 
@@ -14,14 +15,7 @@ interface SessionPayload {
 }
 
 function parseSession(raw: string | undefined): SessionPayload | null {
-  if (!raw) return null;
-  try {
-    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf-8"));
-    if (!parsed.role) return null;
-    return parsed as SessionPayload;
-  } catch {
-    return null;
-  }
+  return verifySession(raw);
 }
 
 async function isSessionValid(token: string | undefined): Promise<boolean> {

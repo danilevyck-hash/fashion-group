@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
+import { verifySession } from "@/lib/session-cookie";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +36,8 @@ export async function GET(req: NextRequest) {
   let authorized = !!secret && secret === process.env.CRON_SECRET;
   if (!authorized) {
     try {
-      const session = req.cookies.get("cxc_session")?.value;
-      if (session) {
-        const parsed = JSON.parse(Buffer.from(session, "base64url").toString("utf-8"));
-        if (parsed.role === "admin") authorized = true;
+      if (verifySession(req.cookies.get("cxc_session")?.value)?.role === "admin") {
+        authorized = true;
       }
     } catch { /* invalid cookie */ }
   }

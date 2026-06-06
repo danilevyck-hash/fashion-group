@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { verifySession } from '@/lib/session-cookie'
 
 const ADMIN_ROLES = ['admin', 'secretaria']
 
 export function getRole(req: NextRequest): string | null {
-  const session = req.cookies.get('cxc_session')?.value
-  if (!session) return null
-  try {
-    const parsed = JSON.parse(Buffer.from(session, 'base64url').toString('utf-8'))
-    return parsed.role || null
-  } catch { return null }
+  return verifySession(req.cookies.get('cxc_session')?.value)?.role ?? null
 }
 
 export function requireAdmin(req: NextRequest): NextResponse | null {

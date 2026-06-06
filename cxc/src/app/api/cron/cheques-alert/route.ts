@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { getCompanyDisplay } from "@/lib/companies";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat, logCronError } from "@/lib/cron-telemetry";
+import { verifySession } from "@/lib/session-cookie";
 
 const CRON_NAME = "cheques-alert";
 const WA_NUMBERS = ["+50766745522", "+50766494096"];
@@ -23,10 +24,8 @@ export async function GET(req: NextRequest) {
   let authorized = secret === process.env.CRON_SECRET;
   if (!authorized) {
     try {
-      const session = req.cookies.get("cxc_session")?.value;
-      if (session) {
-        const parsed = JSON.parse(Buffer.from(session, "base64url").toString("utf-8"));
-        if (parsed.role === "admin") authorized = true;
+      if (verifySession(req.cookies.get("cxc_session")?.value)?.role === "admin") {
+        authorized = true;
       }
     } catch { /* invalid cookie */ }
   }
