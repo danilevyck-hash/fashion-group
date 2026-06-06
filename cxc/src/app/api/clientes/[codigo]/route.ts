@@ -46,26 +46,47 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   }
   if (!cliente) return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
 
-  const clienteId = cliente.id as string;
   const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10);
 
-  // 2. Ventas YTD por empresa, CXC saldo por empresa, última factura
-  const [ventasRes, cxcRes, ultimaRes, cobradoRes] = await Promise.all([
-    supabaseServer
-      .from("ventas_raw")
-      .select("empresa, total")
-      .eq("cliente_id", clienteId)
-      .gte("fecha", yearStart),
+  // Puente por ID: pares (empresa_key, cliente_switch_id) del cliente. El id es
+  // por-empresa → matcheamos el par exacto, no solo el cliente_switch_id.
+  const { data: pares } = await supabaseServer
+    .from("switch_clientes")
+    .select("empresa_key, cliente_switch_id")
+    .eq("codigo", codigo);
+  const cids = [...new Set((pares ?? [])
+    .map(p => (p as { cliente_switch_id: number | null }).cliente_switch_id)
+    .filter((x): x is number => typeof x === "number"))];
+  const pairSet = new Set((pares ?? []).map(p => {
+    const x = p as { empresa_key: string; cliente_switch_id: number | null };
+    return `${x.empresa_key}|${x.cliente_switch_id}`;
+  }));
+
+  // 2. Ventas YTD (switch_facturas año en curso, acotado) · última factura
+  //    (switch_facturas ordenada desc) · CXC (switch_estadocuenta_aging) · Cobrado
+  //    (switch_recibos). Dos queries switch separadas para NO topar el límite de
+  //    1000 filas en clientes grandes (una sola .in() sin acotar las perdía). Las
+  //    dos últimas YA eran switch → idénticas; solo ventas/última dejan ventas_raw.
+  const [ventasRes, ultimaRes, cxcRes, cobradoRes] = await Promise.all([
+    cids.length > 0
+      ? supabaseServer
+          .from("switch_facturas")
+          .select("empresa_key, cliente_switch_id, fecha, tipo_comprobante, total")
+          .in("cliente_switch_id", cids)
+          .gte("fecha", yearStart)
+      : Promise.resolve({ data: [] as unknown[] }),
+    cids.length > 0
+      ? supabaseServer
+          .from("switch_facturas")
+          .select("empresa_key, cliente_switch_id, fecha")
+          .in("cliente_switch_id", cids)
+          .in("tipo_comprobante", ["Factura", "Tiquete", "Transacción"])
+          .order("fecha", { ascending: false })
+      : Promise.resolve({ data: [] as unknown[] }),
     supabaseServer
       .from("switch_estadocuenta_aging")
       .select("company_key, total")
       .eq("codigo", codigo),
-    supabaseServer
-      .from("ventas_raw")
-      .select("empresa, fecha")
-      .eq("cliente_id", clienteId)
-      .in("tipo", ["Factura", "Tiquete", "Transacción"])
-      .order("fecha", { ascending: false }),
     // Cobrado YTD = pagos del año (switch_recibos) EXCLUYENDO retenciones.
     supabaseServer
       .from("switch_recibos")
@@ -75,13 +96,34 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
       .gte("fecha", yearStart),
   ]);
 
+  // Ventas YTD (base CON ITBMS = total, igual que antes → solo cambia por frescura),
+  // neto firmado por tipo, re-filtrada a hora-Panamá del año en curso.
+  const POS = new Set(["Factura", "Tiquete", "Transacción", "Nota de Débito"]);
+  const panamaYmd = (iso: string) => new Date(Date.parse(iso) - 5 * 3600 * 1000).toISOString().slice(0, 10);
   const ventasMap = new Map<string, number>();
-  for (const r of (ventasRes.data ?? []) as { empresa: string; total: number }[]) {
-    ventasMap.set(r.empresa, (ventasMap.get(r.empresa) ?? 0) + Number(r.total ?? 0));
+  for (const r of (ventasRes.data ?? []) as {
+    empresa_key: string; cliente_switch_id: number; fecha: string;
+    tipo_comprobante: string; total: number | string;
+  }[]) {
+    if (!pairSet.has(`${r.empresa_key}|${r.cliente_switch_id}`)) continue;
+    if (!r.fecha || panamaYmd(r.fecha) < yearStart) continue;
+    const base = Number(r.total ?? 0);
+    const signed = POS.has(r.tipo_comprobante) ? base : (r.tipo_comprobante === "Nota de Crédito" ? -base : 0);
+    ventasMap.set(r.empresa_key, (ventasMap.get(r.empresa_key) ?? 0) + signed);
   }
 
-  // CXC saldo neto por empresa desde la vista del API (switch_estadocuenta_aging).
-  // `total` ya viene firmado (NC/Recibo negativos), una fila por (empresa, codigo).
+  // Última factura: la lista viene ordenada desc → la primera fila (pairSet match)
+  // de cada empresa es su fecha más reciente; la primera global = la del grupo.
+  const ultimaFacturaMap = new Map<string, string>();
+  let ultimaGlobal: string | null = null;
+  for (const r of (ultimaRes.data ?? []) as { empresa_key: string; cliente_switch_id: number; fecha: string }[]) {
+    if (!r.fecha || !pairSet.has(`${r.empresa_key}|${r.cliente_switch_id}`)) continue;
+    const ymd = panamaYmd(r.fecha);
+    if (!ultimaFacturaMap.has(r.empresa_key)) ultimaFacturaMap.set(r.empresa_key, ymd);
+    if (!ultimaGlobal || ymd > ultimaGlobal) ultimaGlobal = ymd;
+  }
+
+  // CXC + Cobrado: sin cambio (ya eran switch). CXC `total` ya viene firmado.
   const cxcMap = new Map<string, number>();
   for (const r of (cxcRes.data ?? []) as { company_key: string; total: number }[]) {
     cxcMap.set(r.company_key, (cxcMap.get(r.company_key) ?? 0) + Number(r.total ?? 0));
@@ -89,10 +131,6 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
   const cobradoMap = new Map<string, number>();
   for (const r of (cobradoRes.data ?? []) as { empresa_key: string; total: number }[]) {
     cobradoMap.set(r.empresa_key, (cobradoMap.get(r.empresa_key) ?? 0) + Number(r.total ?? 0));
-  }
-  const ultimaFacturaMap = new Map<string, string>();
-  for (const r of (ultimaRes.data ?? []) as { empresa: string; fecha: string }[]) {
-    if (r.fecha && !ultimaFacturaMap.has(r.empresa)) ultimaFacturaMap.set(r.empresa, r.fecha);
   }
 
   const empresas: EmpresaTotals[] = B2B_EMPRESA_KEYS.map(e => ({
@@ -116,7 +154,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ codigo: str
       ventas_ytd:  Math.round(totalGrupo.ventas_ytd * 100) / 100,
       cobrado_ytd: Math.round(totalGrupo.cobrado_ytd * 100) / 100,
       cxc:         Math.round(totalGrupo.cxc * 100) / 100,
-      ultima_factura: (ultimaRes.data?.[0] as { fecha: string } | undefined)?.fecha ?? null,
+      ultima_factura: ultimaGlobal,
     },
   });
 }
