@@ -16,7 +16,6 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
-  const t0 = Date.now();
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
   if (!uuidRegex.test(params.id)) {
@@ -25,9 +24,6 @@ export async function GET(
   try {
     const adjuntos = await getAdjuntosByProyecto(params.id);
     const firmados = await firmarAdjuntos(adjuntos);
-    console.log(
-      `[fotos] proyecto=${params.id} rows=${adjuntos.length} firmados=${firmados.length} (${Date.now() - t0}ms)`,
-    );
     const res = NextResponse.json(firmados);
     res.headers.set("Cache-Control", "no-store, no-cache, must-revalidate");
     res.headers.set("x-fotos-count", String(firmados.length));
