@@ -140,6 +140,7 @@ export function VendedorasSubtab({ data, selectedYear, mes, onMesChange }: Vende
 
   const [sortBy, setSortBy] = useState<SortKey>("ventas");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Fetch on change
   useEffect(() => {
@@ -168,7 +169,7 @@ export function VendedorasSubtab({ data, selectedYear, mes, onMesChange }: Vende
       })
       .finally(() => setLoading(false));
     return () => ctrl.abort();
-  }, [year, periodo, mes, trimestre]);
+  }, [year, periodo, mes, trimestre, reloadKey]);
 
   const sortedVendedoras = useMemo(() => {
     if (!resp) return [];
@@ -220,6 +221,7 @@ export function VendedorasSubtab({ data, selectedYear, mes, onMesChange }: Vende
       {error && (
         <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
           No se pudo cargar el ranking: {error}
+          <button onClick={() => setReloadKey((k) => k + 1)} className="ml-2 font-medium underline underline-offset-2 hover:text-orange-700">Reintentar</button>
         </div>
       )}
 

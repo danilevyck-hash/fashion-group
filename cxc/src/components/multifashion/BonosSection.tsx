@@ -57,6 +57,7 @@ export function BonosSection({ selectedYear, mes, onMesChange }: BonosSectionPro
   const [resp, setResp] = useState<BonosMultifashion | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -82,7 +83,7 @@ export function BonosSection({ selectedYear, mes, onMesChange }: BonosSectionPro
       })
       .finally(() => setLoading(false));
     return () => ctrl.abort();
-  }, [selectedYear, mes]);
+  }, [selectedYear, mes, reloadKey]);
 
   return (
     <section className="space-y-3">
@@ -94,6 +95,7 @@ export function BonosSection({ selectedYear, mes, onMesChange }: BonosSectionPro
       {error && (
         <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
           No se pudieron cargar los bonos: {error}
+          <button onClick={() => setReloadKey((k) => k + 1)} className="ml-2 font-medium underline underline-offset-2 hover:text-orange-700">Reintentar</button>
         </div>
       )}
 

@@ -15,6 +15,8 @@ import {
 } from "recharts";
 import type { Multifashion, RetailMonthly, WholesaleMonthly, MultifashionSerieAnio, MultifashionSerieMes } from "@/components/ventas/types";
 import { fmtMoney, fmtPct, deltaSymbol, MONTHS } from "@/lib/ventas/format";
+import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import SyncStatus from "@/components/shared/SyncStatus";
 import { cn } from "@/lib/utils";
 import { VendedorasSubtab } from "./VendedorasSubtab";
 import { DetalleMensualSubtab } from "./DetalleMensualSubtab";
@@ -369,6 +371,15 @@ function OverviewSubtab({
             <p className="mt-0.5 text-xs text-stone-500">
               Multifashion · {data.ubicacion} · Manager {data.manager}
             </p>
+            <div className="mt-1.5">
+              <SyncStatus
+                tabla="facturas"
+                empresasEsperadas={["american_classic"]}
+                empresaLabels={EMPRESA_KEY_TO_NAME}
+                variant="pill"
+                prefix="Data actualizada al"
+              />
+            </div>
           </div>
         </div>
         <div className="text-right">
