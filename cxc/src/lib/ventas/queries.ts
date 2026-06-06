@@ -18,6 +18,8 @@ import type {
   VentasResumen,
   Clientes,
   Multifashion,
+  MultifashionSerieAnio,
+  MultifashionProyeccion,
   Empresa,
   EmpresaMonthlySales,
   MonthlySeries,
@@ -402,15 +404,24 @@ export async function fetchMultifashion({
   year: number;
   mes: number;
 }): Promise<Multifashion> {
-  const { data, error } = await supabaseServer.rpc("multifashion_mensual_v6", {
-    p_year: year,
-    p_mes: mes,
-  });
-  if (error) throw new Error(`multifashion_mensual_v6: ${error.message}`);
+  // v6 = shape Multifashion (retail/wholesale/total). serie_v1 ×2 (year y year-1)
+  // alimenta la línea acumulada diaria del Overview; proyeccion_cierre_v1 la
+  // proyección ponderada por temporada del header. Todo en paralelo.
+  const [mv6, serieAct, seriePrev, proy] = await Promise.all([
+    supabaseServer.rpc("multifashion_mensual_v6", { p_year: year, p_mes: mes }),
+    supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year }),
+    supabaseServer.rpc("multifashion_overview_serie_v1", { p_year: year - 1 }),
+    supabaseServer.rpc("multifashion_proyeccion_cierre_v1", { p_year: year }),
+  ]);
+  if (mv6.error) throw new Error(`multifashion_mensual_v6: ${mv6.error.message}`);
+  if (serieAct.error) throw new Error(`multifashion_overview_serie_v1(${year}): ${serieAct.error.message}`);
+  if (seriePrev.error) throw new Error(`multifashion_overview_serie_v1(${year - 1}): ${seriePrev.error.message}`);
+  if (proy.error) throw new Error(`multifashion_proyeccion_cierre_v1: ${proy.error.message}`);
 
-  // v6 devuelve el shape exacto Multifashion con bloques retail/wholesale/total.
-  // Ventas/tickets de switch_facturas (v3 fase 2.1b) + total.margen tienda completa
-  // (v5) + vs2025 de retail.meses con prev-year SOLO switch_facturas (Fuente Única
-  // API Paso 4b: el blend con ventas_raw fue retirado; switch_facturas cubre 2022+).
-  return data as Multifashion;
+  return {
+    ...(mv6.data as Multifashion),
+    serieActual: serieAct.data as MultifashionSerieAnio,
+    seriePrevio: seriePrev.data as MultifashionSerieAnio,
+    proyeccionCierre: proy.data as MultifashionProyeccion,
+  };
 }
