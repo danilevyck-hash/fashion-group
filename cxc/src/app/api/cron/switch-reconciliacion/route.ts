@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
+import { chunk } from "@/lib/chunk";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
@@ -56,6 +57,14 @@ interface Pair {
 }
 
 const key = (empresa: string, syncType: string) => `${empresa}|${syncType}`;
+
+// Tamaño de grupo para re-disparar switch-sync. Es el MISMO patrón que los crons
+// de producción (2 empresas por cron). switch-sync corre cada empresa EN SERIE
+// adentro; 6 empresas en una sola llamada superan maxDuration y la corrida muere
+// por timeout sin recuperar nada (incidente 6-jun: el retry de las 6 juntas hizo
+// timeout → la reconciliación alertó pero no autorrecuperó). 2 por batch mantiene
+// cada llamada bajo el límite; los batches corren SECUENCIALES (no se solapan).
+const RETRIGGER_BATCH_SIZE = 2;
 
 /** Fecha de HOY en Panamá (YYYY-MM-DD). Panamá es UTC-5 fijo (sin horario de verano). */
 function panamaToday(): string {
@@ -130,11 +139,12 @@ function shortError(msg: string | null, max = 200): string {
 }
 
 /**
- * Re-dispara el cron switch-sync (tipo=all) para las empresas dadas, en una sola
- * llamada HTTP — switch-sync las procesa SERIALMENTE adentro (requisito de la
- * sesión única de Switch). Usamos el mismo origin de este request para construir
- * la URL absoluta. No lanza: si la llamada falla, lo registramos y dejamos que la
- * re-consulta de switch_sync_log sea la fuente de verdad del estado final.
+ * Re-dispara el cron switch-sync (tipo=all) para UN GRUPO de empresas (≤2) en una
+ * llamada HTTP — switch-sync las procesa SERIALMENTE adentro. El caller invoca esto
+ * por grupos secuenciales (ver RETRIGGER_BATCH_SIZE) para no exceder maxDuration.
+ * Usamos el mismo origin de este request para construir la URL absoluta. No lanza:
+ * si la llamada falla, lo registramos y dejamos que la re-consulta de
+ * switch_sync_log sea la fuente de verdad del estado final.
  */
 async function retriggerSwitchSync(
   origin: string,
@@ -224,9 +234,18 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     });
   }
 
-  // 2. Re-disparar SOLO las empresas afectadas (distintas), en serie vía switch-sync.
+  // 2. Re-disparar SOLO las empresas afectadas (distintas), en GRUPOS de 2 y
+  //    SECUENCIALMENTE (await por grupo). Una sola llamada con todas las afectadas
+  //    excede maxDuration y muere por timeout sin recuperar nada (ver
+  //    RETRIGGER_BATCH_SIZE). Cada switch-sync corre como invocación independiente,
+  //    así que aunque esta reconciliación se quede sin tiempo en el peor caso, los
+  //    batches ya disparados completan igual.
   const empresasAfectadas = [...new Set(missingBefore.map((p) => p.empresa))] as EmpresaKey[];
-  const retrigger = await retriggerSwitchSync(req.nextUrl.origin, secret, empresasAfectadas);
+  const retrigger: Array<{ empresas: EmpresaKey[]; ok: boolean; detail: string }> = [];
+  for (const grupo of chunk(empresasAfectadas, RETRIGGER_BATCH_SIZE)) {
+    const r = await retriggerSwitchSync(req.nextUrl.origin, secret, grupo);
+    retrigger.push({ empresas: grupo, ...r });
+  }
 
   // 3. Re-consultar el log: fuente de verdad del estado final.
   const logAfter = await fetchTodayLog(sinceIso);
