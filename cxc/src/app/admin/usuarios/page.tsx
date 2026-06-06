@@ -327,7 +327,7 @@ export default function UsuariosPage() {
                       type={showModalPw ? "text" : "password"}
                       value={uPassword}
                       onChange={e => setUPassword(e.target.value)}
-                      placeholder={editUserId ? "Dejar vacío para no cambiar" : "Mínimo 3 caracteres"}
+                      placeholder={editUserId ? "Dejar vacío para no cambiar" : "Mínimo 8 caracteres"}
                       className="w-full bg-white border border-stone-200 rounded-md px-3 py-3 pr-10 text-sm font-mono placeholder:text-stone-400 placeholder:font-sans focus:outline-none focus:border-teal-700 transition"
                     />
                     <button

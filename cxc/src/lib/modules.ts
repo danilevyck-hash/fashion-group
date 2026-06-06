@@ -88,6 +88,19 @@ export const ALL_MODULES: AppModule[] = [
 /** Lista de keys de todos los módulos del sistema. */
 export const ALL_MODULE_KEYS: string[] = ALL_MODULES.map(m => m.key);
 
+/** Roles del sistema. Fuente de verdad para validación server-side de `role`
+ *  (antes vivía solo en el endpoint /api/admin/usuarios, ya retirado). */
+export const SYSTEM_ROLES: { key: string; label: string }[] = [
+  { key: "admin", label: "Administrador" },
+  { key: "contabilidad", label: "Contabilidad" },
+  { key: "secretaria", label: "Secretaria" },
+  { key: "bodega", label: "Bodega" },
+  { key: "vendedor", label: "Vendedor" },
+];
+
+/** Lista de keys de todos los roles del sistema. */
+export const SYSTEM_ROLE_KEYS: string[] = SYSTEM_ROLES.map(r => r.key);
+
 /** Devuelve los módulos por defecto para un rol, derivado de `roles[]` por módulo.
  *  Admin recibe todo. Para otros roles, retorna las keys de los módulos cuyo
  *  `roles[]` incluye ese rol. Esta es la única fuente de verdad para defaults
