@@ -10,8 +10,6 @@
 // roles se definen después.
 
 import { useState, useTransition, useCallback } from "react";
-import Link from "next/link";
-import { Package } from "lucide-react";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultifashionView } from "@/components/multifashion/MultifashionView";
@@ -76,14 +74,6 @@ export function MultifashionShell({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {/* Deep-link al tab Productos de Ventas con Multifashion preseleccionado.
-              No duplica la tabla: reusa Ventas → Productos. */}
-          <Link
-            href="/ventas?tab=productos&empresa=american_classic"
-            className="inline-flex h-9 items-center gap-1.5 rounded-md border border-stone-200 bg-white px-3 text-xs font-medium text-stone-700 transition hover:bg-stone-50 active:scale-[0.97]"
-          >
-            <Package className="h-3.5 w-3.5" /> Top productos
-          </Link>
           <Select value={String(selectedYear)} onValueChange={v => onYearChange(parseInt(v, 10))}>
             <SelectTrigger className="h-9 w-auto min-w-[88px] gap-1.5 text-xs font-mono tabular-nums" disabled={loading}>
               <SelectValue />
