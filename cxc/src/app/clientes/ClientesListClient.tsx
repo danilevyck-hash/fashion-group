@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { SkeletonTable, EmptyState, ScrollableTable, PullToRefresh } from "@/components/ui";
@@ -29,6 +30,7 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
     moduleKey: "directorio",
     allowedRoles: ["admin", "secretaria", "vendedor", "bodega"],
   });
+  const router = useRouter();
 
   const [clientes, setClientes] = useState<Cliente[]>(initialClientes);
   const [total, setTotal] = useState(initialTotal);
@@ -124,41 +126,74 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
             subtitle={q || provincia ? "Probá con otros filtros." : "No hay clientes cargados aún."}
           />
         ) : (
-          <ScrollableTable>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-[11px] uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
-                  <th className="py-2 px-3">Código</th>
-                  <th className="py-2 px-3">Nombre</th>
-                  <th className="py-2 px-3">Teléfono</th>
-                  <th className="py-2 px-3">Email</th>
-                  <th className="py-2 px-3">Provincia</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientes.map((c) => (
-                  <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
-                    <td className="py-2 px-3 tabular-nums text-gray-500">{c.codigo}</td>
-                    <td className="py-2 px-3 font-medium">
-                      <Link href={`/clientes/${encodeURIComponent(c.codigo)}`} className="hover:underline">
-                        {c.nombre}
-                      </Link>
-                    </td>
-                    <td className="py-2 px-3 text-gray-600">{(() => {
-                      const tel = c.telefono || c.celular;
-                      const href = telHref(tel);
-                      return href ? <a href={href} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>{tel}</a> : (tel || "—");
-                    })()}</td>
-                    <td className="py-2 px-3 text-gray-600 max-w-[14rem] truncate">{(() => {
-                      const href = mailtoHref(c.email);
-                      return href ? <a href={href} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>{c.email}</a> : (c.email || "—");
-                    })()}</td>
-                    <td className="py-2 px-3 text-gray-600">{c.provincia || "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </ScrollableTable>
+          <>
+            {/* Desktop: tabla */}
+            <div className="hidden sm:block">
+              <ScrollableTable>
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-[11px] uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
+                      <th className="py-2 px-3">Código</th>
+                      <th className="py-2 px-3">Nombre</th>
+                      <th className="py-2 px-3">Teléfono</th>
+                      <th className="py-2 px-3">Email</th>
+                      <th className="py-2 px-3">Provincia</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {clientes.map((c) => (
+                      <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50 transition">
+                        <td className="py-2 px-3 tabular-nums text-gray-500">{c.codigo}</td>
+                        <td className="py-2 px-3 font-medium">
+                          <Link href={`/clientes/${encodeURIComponent(c.codigo)}`} className="hover:underline">
+                            {c.nombre}
+                          </Link>
+                        </td>
+                        <td className="py-2 px-3 text-gray-600">{(() => {
+                          const tel = c.telefono || c.celular;
+                          const href = telHref(tel);
+                          return href ? <a href={href} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>{tel}</a> : (tel || "—");
+                        })()}</td>
+                        <td className="py-2 px-3 text-gray-600 max-w-[14rem] truncate">{(() => {
+                          const href = mailtoHref(c.email);
+                          return href ? <a href={href} className="text-blue-600 hover:underline" onClick={(e) => e.stopPropagation()}>{c.email}</a> : (c.email || "—");
+                        })()}</td>
+                        <td className="py-2 px-3 text-gray-600">{c.provincia || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </ScrollableTable>
+            </div>
+
+            {/* Mobile: card-list (toda la card navega a la ficha) */}
+            <ul className="sm:hidden border-t border-gray-100">
+              {clientes.map((c) => {
+                const tel = c.telefono || c.celular;
+                const tHref = telHref(tel);
+                return (
+                  <li
+                    key={c.id}
+                    onClick={() => router.push(`/clientes/${encodeURIComponent(c.codigo)}`)}
+                    className="border-b border-gray-100 px-1 py-3 active:bg-gray-50 cursor-pointer"
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="font-medium truncate">{c.nombre}</span>
+                      <span className="shrink-0 text-[11px] tabular-nums text-gray-400">{c.codigo}</span>
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
+                      {tHref ? (
+                        <a href={tHref} className="text-blue-600" onClick={(e) => e.stopPropagation()}>{tel}</a>
+                      ) : (
+                        <span>{tel || "Sin teléfono"}</span>
+                      )}
+                      {c.provincia && <span className="text-gray-400">· {c.provincia}</span>}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </>
         )}
 
         {/* Paginación */}
@@ -171,14 +206,14 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
               <button
                 disabled={page <= 1 || loading}
                 onClick={() => fetchPage(page - 1, q, provincia)}
-                className="border border-gray-200 rounded-md px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition"
+                className="border border-gray-200 rounded-md px-4 min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition"
               >
                 ← Anterior
               </button>
               <button
                 disabled={page >= totalPages || loading}
                 onClick={() => fetchPage(page + 1, q, provincia)}
-                className="border border-gray-200 rounded-md px-3 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition"
+                className="border border-gray-200 rounded-md px-4 min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-50 transition"
               >
                 Siguiente →
               </button>

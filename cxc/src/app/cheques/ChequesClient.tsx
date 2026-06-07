@@ -1075,6 +1075,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                             </div>
                             <span className="text-sm font-medium tabular-nums ml-2">${fmt(c.monto)}</span>
                           </div>
+                          <div className="text-[11px] text-gray-400 mt-0.5 ml-1">N° {c.numero_cheque} · {getCompanyDisplay(c.empresa)}</div>
                           {(ve === "pendiente" || ve === "vencido") && (
                             <div className="flex gap-3 mt-1 ml-1">
                               <button onClick={() => setConfirmDepositId(c.id)} className="text-xs text-emerald-600 hover:underline py-1">Confirmar depósito</button>
