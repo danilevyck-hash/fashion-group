@@ -64,20 +64,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </ContextMenuProviderWrapper>
 
         </OnlineProvider>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(function(regs) {
-                  regs.forEach(function(r) { r.unregister(); });
-                });
-                caches.keys().then(function(keys) {
-                  keys.forEach(function(k) { caches.delete(k); });
-                });
-              }
-            `,
-          }}
-        />
+        {/* El SW (Serwist) lo registra @serwist/next automáticamente (register:true).
+            Antes había aquí un <script> que en cada carga desregistraba el SW y
+            borraba todos los caches — removido en Modo viaje PR-1. */}
       </body>
     </html>
   );

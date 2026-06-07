@@ -10,6 +10,11 @@ node_modules/
 # Build cache
 tsconfig.tsbuildinfo
 
+# Serwist — service worker generado en build (no versionar; lo emite @serwist/next)
+public/sw.js
+public/sw.js.map
+public/swe-worker-*.js
+
 # Scripts de análisis: outputs puntuales, no versionados
 scripts/output/
 scripts/switch-api-discovery-output.json
