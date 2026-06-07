@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback, ReactNode, createContext, useContext } from "react";
+import { usePathname } from "next/navigation";
+import { useSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
 
 export { Avatar } from "./ui/Avatar";
 export type { AvatarProps } from "./ui/Avatar";
@@ -93,6 +95,54 @@ export function Toast({ message, type = "success", onDismiss }: { message: strin
 }
 
 // ── ESTÉTICA 7: Modal Component ──
+// ── Overlay compartido de modales ──
+// Centra el panel sobre el ÁREA VISIBLE (descontando el ancho del sidebar en
+// desktop), no sobre el viewport completo — así el modal no queda recortado
+// "bajo el sidebar". El offset se sincroniza con el estado colapsado del
+// sidebar (md:pl-56 expandido / md:pl-16 colapsado). En mobile (<md) no hay
+// sidebar → sin offset, los bottom-sheets se comportan exactamente igual.
+export function ModalOverlay({
+  children,
+  onBackdropClick,
+  align = "center",
+  backdropClassName = "bg-black/50",
+  className = "",
+}: {
+  children: ReactNode;
+  onBackdropClick?: () => void;
+  // "center": bottom-sheet en mobile, centrado en desktop (items-end sm:items-center).
+  // "start":  alineado arriba (modales largos con scroll propio).
+  // "middle": centrado vertical en TODAS las medidas (no bottom-sheet).
+  align?: "center" | "start" | "middle";
+  backdropClassName?: string;
+  className?: string;
+}) {
+  const collapsed = useSidebarCollapsed();
+  const pathname = usePathname() || "";
+  const items =
+    align === "start"
+      ? "items-start"
+      : align === "middle"
+        ? "items-center"
+        : "items-end sm:items-center";
+  // Mismo criterio que SidebarAwareMain: en rutas públicas (login, catálogos
+  // públicos, vista de pedido compartible) no hay sidebar → sin offset, si no
+  // el modal quedaría descentrado al revés.
+  const isPublic =
+    pathname === "/" ||
+    pathname.startsWith("/catalogo-publico") ||
+    pathname.startsWith("/pedido-reebok");
+  const sidebarPad = isPublic ? "" : collapsed ? "md:pl-16" : "md:pl-56";
+  return (
+    <div
+      onClick={onBackdropClick}
+      className={`fixed inset-0 z-50 flex justify-center ${items} ${sidebarPad} print:!pl-0 ${backdropClassName} ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
 export function Modal({
   open,
   onClose,
@@ -123,12 +173,12 @@ export function Modal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+    <ModalOverlay>
       <div ref={ref} className={`bg-white sm:rounded-lg rounded-t-2xl p-6 ${maxWidth} w-full mx-0 sm:mx-4 border border-gray-200 max-h-[90vh] overflow-y-auto`}>
         {title && <h2 className="text-base font-medium mb-4">{title}</h2>}
         {children}
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -156,7 +206,7 @@ export function ConfirmModal({
 }) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" onClick={onClose}>
+    <ModalOverlay onBackdropClick={onClose}>
       <div className="bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-base font-medium mb-1">{title}</h3>
         {message && <p className="text-sm text-gray-500 mb-6">{message}</p>}
@@ -177,7 +227,7 @@ export function ConfirmModal({
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -217,8 +267,7 @@ export function ConfirmDeleteModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onCancel}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+    <ModalOverlay onBackdropClick={onCancel} backdropClassName="bg-black/40 backdrop-blur-sm">
       <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-base font-semibold mb-1">{title}</h3>
         <p className="text-sm text-gray-500 mb-6">{description}</p>
@@ -235,7 +284,7 @@ export function ConfirmDeleteModal({
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 
@@ -281,8 +330,7 @@ export function ConfirmTypeNameModal({
   const matches = typed.trim() === expectedName.trim();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center" onClick={onCancel}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+    <ModalOverlay onBackdropClick={onCancel} backdropClassName="bg-black/40 backdrop-blur-sm">
       <div className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-sm w-full mx-0 sm:mx-4 border border-gray-200" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-base font-semibold mb-1">{title}</h3>
         <p className="text-sm text-gray-500 mb-4">{description}</p>
@@ -311,7 +359,7 @@ export function ConfirmTypeNameModal({
           </button>
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 

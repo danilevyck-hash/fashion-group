@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { Toast } from "@/components/ui";
+import { Toast, ModalOverlay } from "@/components/ui";
 
 type Severity = "ok" | "info" | "warning" | "critical";
 
@@ -314,9 +314,11 @@ export default function DataHealthPage() {
 
         {/* Modal con detalles JSON */}
         {selectedCheck && (
-          <>
-            <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setSelectedCheck(null)} />
-            <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-white rounded-lg shadow-xl border border-gray-200 w-[min(720px,calc(100vw-2rem))] max-h-[80vh] overflow-hidden flex flex-col">
+          <ModalOverlay onBackdropClick={() => setSelectedCheck(null)} backdropClassName="bg-black/40" align="middle">
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-lg shadow-xl border border-gray-200 w-[min(720px,calc(100vw-2rem))] max-h-[80vh] overflow-hidden flex flex-col"
+            >
               <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
                 <div>
                   <div className="font-mono text-sm font-semibold">{selectedCheck.check_name}</div>
@@ -364,7 +366,7 @@ export default function DataHealthPage() {
                 </div>
               </div>
             </div>
-          </>
+          </ModalOverlay>
         )}
 
         <Toast message={toast} />

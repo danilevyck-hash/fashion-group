@@ -8,6 +8,7 @@ import {
   ALL_MODULES, GROUPS, getVisibleGroups, getModulesInGroup,
   type AppGroup, type AppModule,
 } from "@/lib/modules";
+import { useSidebarCollapsed, writeSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
 
 const ROLE_LABELS: Record<string, string> = {
   admin: "Admin", secretaria: "Secretaria", bodega: "Bodega",
@@ -15,37 +16,6 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const PUBLIC_PATH_PREFIXES = ["/catalogo-publico", "/pedido-reebok"];
-const STORAGE_KEY = "fg_sidebar_collapsed";
-const TOGGLE_EVENT = "fg-sidebar-toggle";
-
-function readCollapsed(): boolean {
-  if (typeof window === "undefined") return false;
-  return window.localStorage.getItem(STORAGE_KEY) === "1";
-}
-
-function writeCollapsed(value: boolean): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, value ? "1" : "0");
-  window.dispatchEvent(
-    new CustomEvent<boolean>(TOGGLE_EVENT, { detail: value }),
-  );
-}
-
-function useCollapsedSync(): boolean {
-  const [collapsed, setCollapsed] = useState(false);
-
-  useEffect(() => {
-    setCollapsed(readCollapsed());
-    const handler = (e: Event) => {
-      const ce = e as CustomEvent<boolean>;
-      setCollapsed(Boolean(ce.detail));
-    };
-    window.addEventListener(TOGGLE_EVENT, handler);
-    return () => window.removeEventListener(TOGGLE_EVENT, handler);
-  }, []);
-
-  return collapsed;
-}
 
 // Acordeón EXCLUSIVO: un solo grupo abierto a la vez. Persistencia simple
 // (no crítica) del grupo abierto.
@@ -153,7 +123,7 @@ export default function Sidebar() {
   const [userRole, setUserRole] = useState("");
   const [userName, setUserName] = useState("");
   const [fgModules, setFgModules] = useState<string[] | null>(null);
-  const collapsed = useCollapsedSync();
+  const collapsed = useSidebarCollapsed();
 
   useEffect(() => {
     setUserRole(sessionStorage.getItem("cxc_role") || "");
@@ -165,7 +135,7 @@ export default function Sidebar() {
   }, [pathname]);
 
   const toggleCollapsed = useCallback(() => {
-    writeCollapsed(!collapsed);
+    writeSidebarCollapsed(!collapsed);
   }, [collapsed]);
 
   const activeGroup = activeGroupForPath(pathname);
@@ -417,7 +387,7 @@ export default function Sidebar() {
 /** Wrapper del main content: deja espacio para el Sidebar en desktop. */
 export function SidebarAwareMain({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "";
-  const collapsed = useCollapsedSync();
+  const collapsed = useSidebarCollapsed();
   const isPublic = pathname === "/" || PUBLIC_PATH_PREFIXES.some(p => pathname.startsWith(p));
   if (isPublic) return <div>{children}</div>;
   return (
