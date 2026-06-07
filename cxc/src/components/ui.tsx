@@ -800,12 +800,26 @@ export function BottomSheet({
     return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  // Lock body scroll when open
+  // Lock body scroll when open. En iOS, `overflow:hidden` no congela el scroll
+  // de forma fiable (el fondo sigue haciendo rubber-band detrás del backdrop).
+  // El patrón robusto es position:fixed guardando/restaurando scrollY.
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-      return () => { document.body.style.overflow = ""; };
-    }
+    if (!open) return;
+    const scrollY = window.scrollY;
+    const body = document.body;
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.overflow = "hidden";
+    return () => {
+      body.style.position = "";
+      body.style.top = "";
+      body.style.left = "";
+      body.style.right = "";
+      body.style.overflow = "";
+      window.scrollTo(0, scrollY);
+    };
   }, [open]);
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
@@ -875,7 +889,9 @@ export function BottomSheet({
 
   if (!open) return null;
 
-  const sheetTop = mode === "half" ? "45vh" : "5vh";
+  // dvh = dynamic viewport: cuenta la barra de URL de iOS, así el fondo del
+  // sheet no queda calculado contra un viewport más grande que el visible.
+  const sheetTop = mode === "half" ? "45dvh" : "5dvh";
 
   return (
     <div className="fixed inset-0 z-50 sm:hidden">
@@ -888,7 +904,7 @@ export function BottomSheet({
       <div
         ref={sheetRef}
         className={`absolute left-0 right-0 bottom-0 bg-white rounded-t-2xl shadow-xl flex flex-col ${
-          dragging ? "" : "transition-all duration-300 ease-out"
+          dragging ? "" : "transition-[transform,opacity] duration-300 ease-out"
         }`}
         style={{
           top: sheetTop,
@@ -900,12 +916,17 @@ export function BottomSheet({
         onTouchMove={onTouchMove}
         onTouchEnd={onTouchEnd}
       >
-        {/* Drag handle */}
-        <div data-bottomsheet-handle="" className="flex justify-center pt-3 pb-2 cursor-grab">
+        {/* Drag handle — área agarrable de 44px */}
+        <div data-bottomsheet-handle="" className="flex items-center justify-center min-h-[44px] cursor-grab">
           <div className="w-10 h-1 bg-gray-300 rounded-full" />
         </div>
-        {/* Content */}
-        <div data-bottomsheet-scroll="" className="flex-1 overflow-y-auto px-5 pb-8">
+        {/* Content — overscroll-contain evita que el scroll se filtre al fondo;
+            safe-area-inset-bottom mantiene el contenido sobre el home indicator. */}
+        <div
+          data-bottomsheet-scroll=""
+          className="flex-1 overflow-y-auto overscroll-contain px-5"
+          style={{ paddingBottom: "calc(2rem + env(safe-area-inset-bottom))" }}
+        >
           {children}
         </div>
       </div>

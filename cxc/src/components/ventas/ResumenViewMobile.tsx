@@ -4,8 +4,9 @@
 // el contenedor. El layout desktop existente queda intacto detrás de
 // hidden md:block en ResumenView.tsx.
 //
-// Estructura: 2 KPI cards → Toggles segmented → Heatmap con sticky col +
-// mes actual highlighted + total grupo dark row.
+// Estructura: pill de frescura → 3 KPI cards (Ventas/Utilidad/Margen YTD) →
+// Toggles segmented → Heatmap con sticky col + mes actual highlighted +
+// total grupo dark row.
 // Sin tooltips (no hover en touch); drill-down al detalle queda para el
 // siguiente sprint.
 
@@ -18,6 +19,8 @@ import type {
 import { MONTHS, QUARTERS, formatCompactCurrency } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
+import SyncStatus from "@/components/shared/SyncStatus";
+import { SWITCH_FACTURAS_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 
 type Granularity = "mensual" | "trimestral";
 type ViewMode = "ventas" | "utilidad" | "margen";
@@ -58,7 +61,14 @@ export function ResumenViewMobile({
 
   return (
     <div className="md:hidden space-y-4">
-      <MobileKpis data={data} prevYear={prevYear} />
+      <SyncStatus
+        tabla="facturas"
+        empresasEsperadas={SWITCH_FACTURAS_EMPRESA_KEYS}
+        empresaLabels={EMPRESA_KEY_TO_NAME}
+        variant="pill"
+        prefix="Data al"
+      />
+      <MobileKpis data={data} prevYear={prevYear} isClosedYear={isClosedYear} selectedYear={selectedYear} />
       <MobileToggles
         viewMode={viewMode}
         setViewMode={setViewMode}
@@ -76,29 +86,33 @@ export function ResumenViewMobile({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// KPI cards — Ventas YTD + Mejor mes
+// KPI cards — Ventas / Utilidad / Margen YTD (paridad con desktop)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function MobileKpis({ data, prevYear }: { data: VentasResumen; prevYear: number }) {
+function MobileKpis({ data, prevYear, isClosedYear, selectedYear }: { data: VentasResumen; prevYear: number; isClosedYear: boolean; selectedYear: number }) {
   const k = data.kpis;
-  const ventasDelta = k.ventas2025YTD > 0
-    ? (k.ventasNetasYTD - k.ventas2025YTD) / k.ventas2025YTD
-    : null;
-  const best = bestMonthAcrossEmpresas(data.empresas);
+  const periodo = isClosedYear ? String(selectedYear) : "YTD";
+  const ventasDelta   = k.ventas2025YTD   > 0 ? (k.ventasNetasYTD - k.ventas2025YTD) / k.ventas2025YTD : null;
+  const utilidadDelta = k.utilidad2025YTD > 0 ? (k.utilidadYTD    - k.utilidad2025YTD) / k.utilidad2025YTD : null;
+  const margenDeltaPts = (k.margenYTD - k.margen2025YTD) * 100;
+  const pct = (r: number) => `${r >= 0 ? "+" : ""}${(r * 100).toFixed(0)}% vs '${String(prevYear).slice(-2)}`;
 
   return (
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-3 gap-2">
       <KpiTile
-        label="Ventas YTD"
+        label={`Ventas ${periodo}`}
         value={formatCompactCurrency(k.ventasNetasYTD)}
-        sub={ventasDelta == null
-          ? null
-          : { text: `${ventasDelta >= 0 ? "+" : ""}${(ventasDelta * 100).toFixed(0)}% vs '${String(prevYear).slice(-2)}`, sign: ventasDelta }}
+        sub={ventasDelta == null ? null : { text: pct(ventasDelta), sign: ventasDelta }}
       />
       <KpiTile
-        label="Mejor mes"
-        value={best ? formatCompactCurrency(best.value) : "—"}
-        sub={best ? { text: best.label, sign: null } : null}
+        label={`Utilidad ${periodo}`}
+        value={formatCompactCurrency(k.utilidadYTD)}
+        sub={utilidadDelta == null ? null : { text: pct(utilidadDelta), sign: utilidadDelta }}
+      />
+      <KpiTile
+        label={`Margen ${periodo}`}
+        value={`${(k.margenYTD * 100).toFixed(1)}%`}
+        sub={{ text: `${margenDeltaPts >= 0 ? "+" : ""}${margenDeltaPts.toFixed(1)} pts`, sign: margenDeltaPts }}
       />
     </div>
   );
@@ -117,36 +131,18 @@ function KpiTile({
     ? "text-stone-500"
     : sub.sign > 0 ? "text-emerald-700" : sub.sign < 0 ? "text-rose-700" : "text-stone-500";
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-3">
-      <p className="text-[10px] font-medium uppercase tracking-widest text-stone-500">{label}</p>
-      <p className="mt-1 font-mono text-[22px] font-medium leading-tight tracking-tight tabular-nums text-stone-950">
+    <div className="rounded-xl border border-stone-200 bg-white p-2.5">
+      <p className="text-[9.5px] font-medium uppercase tracking-wider text-stone-500">{label}</p>
+      <p className="mt-1 font-mono text-[17px] font-medium leading-tight tracking-tight tabular-nums text-stone-950">
         {value}
       </p>
       {sub && (
-        <p className={cn("mt-1 text-[11px] font-medium", subTone)}>
+        <p className={cn("mt-0.5 text-[10px] font-medium leading-tight", subTone)}>
           {sub.text}
         </p>
       )}
     </div>
   );
-}
-
-function bestMonthAcrossEmpresas(empresas: EmpresaMonthlySales[]): { label: string; value: number } | null {
-  const totals = Array<number>(12).fill(0);
-  const hasAny = Array<boolean>(12).fill(false);
-  for (const e of empresas) {
-    e.ventas2026.forEach((v, i) => {
-      if (v != null) { totals[i] += v; hasAny[i] = true; }
-    });
-  }
-  let bestIdx = -1;
-  for (let i = 0; i < 12; i++) {
-    if (!hasAny[i]) continue;
-    if (bestIdx < 0 || totals[i] > totals[bestIdx]) bestIdx = i;
-  }
-  if (bestIdx < 0) return null;
-  const MES_FULL = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
-  return { label: MES_FULL[bestIdx], value: totals[bestIdx] };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
