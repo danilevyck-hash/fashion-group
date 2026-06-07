@@ -14,6 +14,9 @@ export default function PrintView({ current, onBack }: Props) {
   const totalSubtotal = gastos.reduce((s, g) => s + (g.subtotal || 0), 0);
   const totalItbms = gastos.reduce((s, g) => s + (g.itbms || 0), 0);
   const saldo = current.fondo_inicial - totalGastado;
+  // Responsable a nivel período (derivado de los gastos), no por gasto.
+  const responsablesPeriodo = [...new Set(gastos.map((g) => (g.responsable || "").trim()).filter(Boolean))];
+  const responsableLabel = responsablesPeriodo.length ? responsablesPeriodo.join(", ") : "—";
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-12">
@@ -51,8 +54,11 @@ export default function PrintView({ current, onBack }: Props) {
             ? ` — Cierre: ${fmtDate(current.fecha_cierre)}`
             : " — Abierto"}
         </p>
-        <p className="text-center text-sm mb-6">
+        <p className="text-center text-sm mb-1">
           Fondo Inicial: ${fmt(current.fondo_inicial)}
+        </p>
+        <p className="text-center text-sm mb-6">
+          Responsable del período: {responsableLabel}
         </p>
 
         <table className="w-full text-xs border-collapse mb-4">
@@ -66,9 +72,6 @@ export default function PrintView({ current, onBack }: Props) {
               </th>
               <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">
                 Proveedor
-              </th>
-              <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">
-                Responsable
               </th>
               <th className="border border-gray-300 px-2 py-1.5 font-medium text-left">
                 Categoría
@@ -97,9 +100,6 @@ export default function PrintView({ current, onBack }: Props) {
                   {g.proveedor || "—"}
                 </td>
                 <td className="border border-gray-300 px-2 py-1">
-                  {g.responsable || "—"}
-                </td>
-                <td className="border border-gray-300 px-2 py-1">
                   {g.categoria || "Varios"}
                 </td>
                 <td className="border border-gray-300 px-2 py-1 text-right">
@@ -115,7 +115,7 @@ export default function PrintView({ current, onBack }: Props) {
             ))}
             <tr className="font-bold">
               <td
-                colSpan={5}
+                colSpan={4}
                 className="border border-gray-300 px-2 py-1.5 text-right uppercase"
               >
                 Totales

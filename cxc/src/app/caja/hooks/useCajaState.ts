@@ -264,6 +264,26 @@ export function useCajaState(opts?: UseCajaOptions) {
     }
   }
 
+  // Cambio rápido de SOLO la categoría desde el chip inline (PATCH parcial).
+  async function quickUpdateCategoria(gastoId: string, categoria: string) {
+    if (!current) return;
+    try {
+      const res = await fetch(`/api/caja/gastos/${gastoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categoria: normalizeStr(categoria) || "Varios" }),
+      });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null);
+        setError((payload && typeof payload.error === "string" ? payload.error : null) || "Error al cambiar categoría");
+        return;
+      }
+      await loadDetail(current.id); loadPeriodos();
+    } catch {
+      setError("Error al cambiar categoría");
+    }
+  }
+
   async function exportExcel() {
     if (!current) return;
     const res = await fetch("/api/caja/export-excel", {
@@ -294,7 +314,7 @@ export function useCajaState(opts?: UseCajaOptions) {
     requestClosePeriodo, doClosePeriodo,
     requestDeletePeriodo, doDeletePeriodo,
     aprobarReposicion,
-    requestDeleteGasto, saveEditGasto, exportExcel,
+    requestDeleteGasto, saveEditGasto, quickUpdateCategoria, exportExcel,
     pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto,
     pendingRestoreGasto, requestRestoreGasto, doRestoreGasto, cancelRestoreGasto,
   };

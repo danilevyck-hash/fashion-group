@@ -54,7 +54,7 @@ export default function PeriodoDetailPage() {
     requestClosePeriodo, doClosePeriodo,
     requestDeletePeriodo, doDeletePeriodo,
     aprobarReposicion,
-    requestDeleteGasto, saveEditGasto, exportExcel,
+    requestDeleteGasto, saveEditGasto, quickUpdateCategoria, exportExcel,
     pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto,
     pendingRestoreGasto, requestRestoreGasto, doRestoreGasto, cancelRestoreGasto,
   } = useCajaState({ onPeriodoDeleted: () => router.push("/caja") });
@@ -118,6 +118,7 @@ export default function PeriodoDetailPage() {
           onAprobarReposicion={aprobarReposicion}
           deletedCount={(current.deleted_gastos || []).length}
           onViewDeleted={() => setShowDeletedModal(true)}
+          suggestionVisible={!!cajaSuggestion}
         />
 
         <div className="max-w-6xl mx-auto px-5 sm:px-9 pt-6 pb-14">
@@ -148,6 +149,7 @@ export default function PeriodoDetailPage() {
             onSaveEdit={saveEditGasto}
             onDeleteGasto={requestDeleteGasto}
             onNuevoGasto={detailIsOpen ? openGastoDrawer : undefined}
+            onQuickCategoria={quickUpdateCategoria}
           />
         </div>
       </div>
