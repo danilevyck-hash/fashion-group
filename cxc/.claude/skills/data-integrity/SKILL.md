@@ -1,6 +1,6 @@
 ---
 name: data-integrity
-description: Sistema de monitoreo automático de integridad de datos. Cron diario que corre 9 checks contra cxc_rows, ventas_raw, cheques, prestamos. Resultados en data_integrity_checks; dashboard /admin/data-health; alerta por email a daniel@ si hay críticos.
+description: Sistema de monitoreo automático de integridad de datos. Cron diario que corre 6 checks vivos contra cheques, prestamos_movimientos, switch_estadocuenta y switch_facturas (los del CSV legacy ya se retiraron). Resultados en data_integrity_checks; dashboard /admin/data-health filtra por LIVE_CHECK_NAMES; alerta por email a daniel@ si hay críticos.
 ---
 
 # Data Integrity Monitoring
@@ -14,7 +14,7 @@ Shoes (factura en CXC sin venta correspondiente) y el RPC home roto.
 | Pieza | Path |
 |---|---|
 | Tabla histórica | `data_integrity_checks` (migration `20260524000000_data_integrity_checks.sql`) |
-| Runner + 9 checks | `src/lib/integrity-checks.ts` |
+| Runner (6 checks vivos) + `LIVE_CHECK_NAMES` | `src/lib/integrity-checks.ts` |
 | Endpoint cron | `src/app/api/cron/integrity-check/route.ts` |
 | Endpoint para dashboard | `src/app/api/admin/data-health/route.ts` |
 | Dashboard | `src/app/admin/data-health/page.tsx` |
@@ -22,39 +22,46 @@ Shoes (factura en CXC sin venta correspondiente) y el RPC home roto.
 
 ## Los checks
 
-| # | check_name | Tabla | Severity por threshold |
+Los checks VIVOS son los que produce `runAllChecks()`. La fuente única de verdad
+de esa lista es `LIVE_CHECK_NAMES` (exportada de `src/lib/integrity-checks.ts`);
+el dashboard `/api/admin/data-health` filtra por ella para no mostrar el historial
+stale de los checks legacy retirados.
+
+| # | check_name | Tabla / fuente | Severity por threshold |
 |---|---|---|---|
-| 1a | `cxc_fecha_emision_null` | cxc_rows | 0=ok, 1-5=warning, >5=critical (excluye `Saldo Anterior`) |
-| 1b | `cxc_fecha_vencimiento_null` | cxc_rows | 0=ok, 1-5=warning, >5=critical (excluye `Saldo Anterior`, `Nota de Crédito`, `Recibo`) |
-| 2 | `cxc_dias_vencidos_sin_fecha` | cxc_rows | 0=ok, >0=warning |
-| 3 | `upload_desync_cxc_ventas` | cxc_uploads, ventas_raw | <7d=ok, 7-14=warning, >14=critical |
-| 4 | `cheques_criticos_null` | cheques | 0=ok, >0=warning |
-| 5 | `prestamos_saldo_anomalo` | prestamos_movimientos | 0=ok, >0=info (saldo<-100, derivado de movs aprobados) |
-| 6 | `ventas_cliente_vacio` | ventas_raw | 0=ok, >0=warning |
-| 7a | `last_upload_age_cxc` | cxc_rows | <7d=ok, 7-14=warning, >14=critical |
-| 7b | `last_upload_age_ventas` | ventas_raw | igual |
-| 8 | `cxc_sin_venta_correspondiente` | cxc_rows + ventas_raw | 0-20=ok, 21-50=info, 51-150=warning, >150=critical (filtro gap > 30d) |
-| 9 | `cxc_uploads_zombie` | cxc_uploads | 0=ok, >0=warning |
+| 1 | `cheques_criticos_null` | cheques | 0=ok, >0=warning (monto o fecha_deposito NULL, no deleted) |
+| 2 | `prestamos_saldo_anomalo` | prestamos_movimientos | 0=ok, >0=info (saldo<-100 derivado de movs aprobados) |
+| 3 | `last_upload_age_cxc` | switch_estadocuenta (`synced_at`) | <7d=ok, 7-14=warning, >14=critical |
+| 4 | `aging_tipos_sin_clasificar` | vista `switch_estadocuenta_tipos_sin_clasificar` | tipo nuevo sin saldo=warning, con saldo<>0=critical |
+| 5 | `switch_facturas_continuidad` | vista `switch_facturas_cobertura_mensual` | 0=ok, >0 huecos interiores=warning (excluye ceros conocidos) |
+| 6 | `aging_dias_anomalo` | vista `switch_estadocuenta_dias_anomalo` | 0=ok, >0 filas con `dias` NULL/negativo y saldo<>0=warning |
 
 **Errores técnicos**: si un check no puede correr (query falla, schema cambió), queda como `warning` con `details.error` — no `critical`. Esto evita confundir "monitor roto" con "data corrupta" y no dispara email.
+
+### Checks RETIRADOS (CSV legacy — histórico, no corren)
+
+CXC migró del CSV manual a `switch_estadocuenta` (sync API). Estos checks del
+pipeline CSV (`cxc_rows` / `ventas_raw` / `cxc_uploads`) **se retiraron del runner**
+(última corrida ~05-jun-2026). Sus filas siguen en `data_integrity_checks` como
+**archivo** (no se borran), pero el dashboard ya **no las muestra** (filtradas por
+`LIVE_CHECK_NAMES`). No restaurar sin re-agregarlos a `runAllChecks` + la allowlist.
+
+`cxc_fecha_emision_null` · `cxc_fecha_vencimiento_null` · `cxc_dias_vencidos_sin_fecha` · `cxc_sin_venta_correspondiente` · `cxc_uploads_zombie` · `upload_desync_cxc_ventas` · `last_upload_age_ventas` · `ventas_cliente_vacio` (+ el viejo `cxc_fecha_null` pre-split).
 
 ## Reaccionar a una alerta
 
 ### CRITICAL — email + dashboard rojo
-- **cxc_fecha_emision_null > 5**: Switch cambió formato de fecha en el campo principal o el parser regresionó. Revisar `src/lib/cxc-fecha.ts` y los rejects del último upload.
-- **cxc_fecha_vencimiento_null > 5**: anómalo — facturas/NDs sin vencimiento (NCs y Recibos ya están excluidos). Probablemente bug nuevo en el parser de `parseFechaFlexible` o un comprobante nuevo en Switch que no está en la lista de exclusión.
-- **upload_desync > 14**: alguien dejó de subir uno de los dos CSVs hace tiempo. Pingear a quien hace los uploads.
-- **last_upload_age > 14**: nadie ha actualizado data en 2+ semanas. Recordatorio.
-- **cxc_sin_venta_correspondiente > 150**: pipeline roto — clientes en CXC sin contraparte en ventas a gran escala. Buscar problemas en el upload de ventas o clientes_master desincronizado. Caso típico: Quality Shoes.
+- **last_upload_age_cxc > 14**: nadie sincronizó CXC (`switch_estadocuenta`) en 2+ semanas, o el sync de Switch está caído. Revisar los crons `switch-sync` / `switch-reconciliacion`.
+- **aging_tipos_sin_clasificar con saldo<>0**: apareció un `tipo_comprobante` nuevo en `switch_estadocuenta` fuera de las whitelists de signo del aging y YA distorsiona CXC (subcuenta un débito o ignora un crédito). Clasificarlo (crédito vs débito) en una migration nueva.
 
 ### WARNING — solo dashboard
-- **cxc_uploads_zombie > 0**: header de upload sin filas. Limpiar con `DELETE FROM cxc_uploads WHERE id = ...`. Si recurrente, hay un crash silencioso en el upload.
 - **cheques_criticos_null > 0**: alguien guardó un cheque sin monto o fecha_deposito desde la UI. Revisar `/cheques/nuevo`.
-- **ventas_cliente_vacio > 0**: filas en ventas_raw con cliente vacío (debería ser imposible — el parser no las dejaría pasar).
+- **switch_facturas_continuidad > 0**: empresa-mes interior sin filas en `switch_facturas` → el dashboard lo cuenta como $0 (indistinguible de mes futuro). Backfill con `scripts/switch-backfill.ts --tipo=facturas --empresa=X`. Si es un mes con cero ventas reales, agregarlo a `CONTINUIDAD_CEROS_CONOCIDOS`.
+- **aging_dias_anomalo > 0**: filas de estado de cuenta con `dias` NULL/negativo y saldo → no entran a ningún bucket del aging, `cxcVencida` los subestima. Revisar `fechaCreacion`/`dias` en `switch_estadocuenta`.
+- **aging_tipos_sin_clasificar sin saldo**: tipo nuevo apareció pero aún no pesa. Clasificarlo antes de que tenga saldo.
 
 ### INFO — log nada más
 - **prestamos_saldo_anomalo > 0**: empleado con saldo más negativo que -$100 (calculado como `SUM(Préstamo+Responsabilidad) - SUM(Pago+Abono+Pago_responsabilidad)` sobre movimientos aprobados no deleted). Casi siempre es un préstamo mal capturado o devolución duplicada.
-- **cxc_sin_venta_correspondiente entre 21-50**: volumen normal de NDs/intereses/refacturación sin contraparte directa en ventas_raw. Vale la pena revisar el top_10 del details para descartar caso sistémico.
 
 ## Cómo agregar un check nuevo
 
@@ -93,9 +100,11 @@ const grouped = await Promise.all([
 ]);
 ```
 
-3. **No hace falta ALTER TABLE** — `data_integrity_checks` es genérica.
+3. **Sumar el `check_name` a `LIVE_CHECK_NAMES`** (en el mismo archivo). Si no, el dashboard lo OCULTA (filtra por esa allowlist). El guard de `runAllChecks` avisa en logs si se te olvida.
 
-4. **Documentarlo acá**: agregar fila a la tabla "Los 9 checks" + sección "Reaccionar a una alerta".
+4. **No hace falta ALTER TABLE** — `data_integrity_checks` es genérica.
+
+5. **Documentarlo acá**: agregar fila a la tabla de checks vivos + sección "Reaccionar a una alerta".
 
 ## Correr checks manualmente
 
@@ -120,7 +129,7 @@ ORDER BY check_name, checked_at DESC;
 
 -- Detalles de un check específico
 SELECT details FROM data_integrity_checks
-WHERE check_name = 'cxc_fecha_null'
+WHERE check_name = 'aging_tipos_sin_clasificar'
 ORDER BY checked_at DESC LIMIT 1;
 ```
 
@@ -133,6 +142,7 @@ ORDER BY checked_at DESC LIMIT 1;
 
 ### Histórico de calibraciones
 
+- 2026-06-07: **`LIVE_CHECK_NAMES` + filtro del dashboard.** El runner ya solo corre 6 checks (los del CSV legacy se habían retirado el 05-jun), pero el dashboard seguía mostrando ~9 check_name stale de `data_integrity_checks` dentro de la ventana de 30d (severidades congeladas engañosas, ej. `cxc_fecha_null=critical` del 13-may). Se exportó `LIVE_CHECK_NAMES` (fuente única de verdad) y `/api/admin/data-health` filtra por ella. `data_integrity_checks` queda INTACTA (historial = archivo). Agregar un check ahora exige sumarlo a la allowlist (guard en `runAllChecks` lo avisa).
 - 2026-05-13: thresholds de `cxc_sin_venta_correspondiente` recalibrados de `0=ok, 1-5=info, 6-20=warning, >20=critical` a `0-20=ok, 21-50=info, 51-150=warning, >150=critical`. Razón: NDs/intereses/refacturación normal alcanzan ~50-100 sin ser anómalos. Solo volumen >150 sugiere pipeline roto.
 - 2026-05-13: `cxc_fecha_null` split en `cxc_fecha_emision_null` (excluye solo `Saldo Anterior`) y `cxc_fecha_vencimiento_null` (excluye `Saldo Anterior`, `Nota de Crédito`, `Recibo`). Razón: Recibos son pagos sin vencimiento por naturaleza — quedaban marcados como anómalos.
 - 2026-05-13: `prestamos_saldo_anomalo` reescrito para calcular saldo en runtime desde `prestamos_movimientos` (no existe columna `saldo` en `prestamos_empleados`). Razón: el query original siempre fallaba y el check tiraba CRITICAL por error técnico.
