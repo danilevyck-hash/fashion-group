@@ -8,7 +8,7 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, ConfirmModal } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 
-import { Empleado } from "../components/types";
+import { Empleado, getQuincenaRange, hasDeduccionEnQuincena } from "../components/types";
 import EmpleadoHeader from "../components/EmpleadoHeader";
 import SummaryCards from "../components/SummaryCards";
 import MovimientoTable from "../components/MovimientoTable";
@@ -85,6 +85,13 @@ export default function PrestamoDetallePage() {
   const saldo = prestado - pagado;
   const pct = prestado > 0 ? (pagado / prestado) * 100 : 0;
 
+  // Estado de la quincena vigente para el chip del header (mismo helper que la lista).
+  const quincena = getQuincenaRange();
+  const tieneDeduccion = empleado.deduccion_quincenal > 0;
+  const deducidaQ = tieneDeduccion && hasDeduccionEnQuincena(movs, quincena.start, quincena.end);
+  const quincenaEstado: "deducida" | "pendiente" | null =
+    !tieneDeduccion ? null : deducidaQ ? "deducida" : saldo > 0 ? "pendiente" : null;
+
   // Saldo corriente por movimiento (solo aprobados afectan el balance)
   const saldoByMov = new Map<string, number>();
   const ascAprobados = [...movs]
@@ -127,7 +134,7 @@ export default function PrestamoDetallePage() {
           onBack={() => router.push("/prestamos")}
         />
 
-        <SummaryCards prestado={prestado} pagado={pagado} saldo={saldo} pct={pct} />
+        <SummaryCards prestado={prestado} pagado={pagado} saldo={saldo} pct={pct} quincenaEstado={quincenaEstado} />
 
         <div className="flex flex-wrap gap-3 mb-6">
           <button
