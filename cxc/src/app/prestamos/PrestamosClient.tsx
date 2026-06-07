@@ -7,6 +7,7 @@ import { fmt, fmtDate } from "@/lib/format";
 import { EMPRESAS } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, AnimatedNumber, BottomSheet } from "@/components/ui";
+import OverflowMenu from "@/components/ui/OverflowMenu";
 import UndoToast from "@/components/UndoToast";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
 
@@ -81,14 +82,12 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   const [empleados, setEmpleados] = useState<Empleado[]>(initialData.empleados);
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-  const [kpiTooltip, setKpiTooltip] = useState<string | null>(null);
 
   // Filters
   const [filterEmpresa, setFilterEmpresa] = useState("all");
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
   const [filterPendientes, setFilterPendientes] = useState(false);
-  const [filterEstadoMov, setFilterEstadoMov] = useState<string>("todos");
 
   // Confirm delete employee
   const [confirmDeleteEmp, setConfirmDeleteEmp] = useState<Empleado | null>(null);
@@ -159,15 +158,8 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
 
   // ── Computed ──
   const allCalcs = empleados.map(e => ({ emp: e, ...calcEmpleado(e) }));
-  const totalPrestado = allCalcs.reduce((s, c) => s + c.prestado, 0);
   const totalSaldo = allCalcs.filter(c => c.emp.activo).reduce((s, c) => s + c.saldo, 0);
-  const empleadosActivos = empleados.filter(e => e.activo).length;
   const totalPendientes = allCalcs.reduce((s, c) => s + c.pendientes, 0);
-
-  // Movement status counts for filter tabs
-  const allMovimientos = allCalcs.flatMap(c => (c.emp.prestamos_movimientos || []));
-  const countAprobados = allMovimientos.filter(m => m.estado === "aprobado").length;
-  const countRechazados = allMovimientos.filter(m => m.estado === "rechazado").length;
 
   const quincena = getQuincenaRange();
   const empleadosConDeduccion = allCalcs.filter(c => c.emp.activo && c.emp.deduccion_quincenal > 0);
@@ -338,6 +330,27 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
     setConfirmAplicarQ(false);
   }
 
+  async function descargarHistorial() {
+    setExportingExcel(true);
+    try {
+      const qs = filterEmpresa && filterEmpresa !== "all" ? `?empresa=${encodeURIComponent(filterEmpresa)}` : "";
+      const res = await fetch(`/api/prestamos/export-excel${qs}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        const today = new Date();
+        const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
+        const slug = filterEmpresa && filterEmpresa !== "all" ? filterEmpresa.toLowerCase().replace(/\s+/g, "_") : "todos";
+        link.download = `historial_prestamos_${slug}_${ymd}.xlsx`;
+        link.click();
+        URL.revokeObjectURL(url);
+      } else { showToast("Error al descargar"); }
+    } catch { showToast("Error al descargar"); }
+    setExportingExcel(false);
+  }
+
   function togglePendingSelect(id: string) {
     setSelectedPending(prev => {
       const next = new Set(prev);
@@ -386,60 +399,25 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
       <AppHeader module="Préstamos a Colaboradores" />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-5">
-          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-            <div className="flex items-center">
-              <div className="text-xs text-gray-400 uppercase tracking-wide">Total Prestado</div>
-              <button onClick={() => setKpiTooltip(kpiTooltip === "prestado" ? null : "prestado")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
-            </div>
-            <div className="text-lg font-semibold mt-0.5 tabular-nums">$<AnimatedNumber value={totalPrestado} formatter={(n: number) => fmt(n)} /></div>
-            {kpiTooltip === "prestado" && <p className="text-xs text-gray-500 mt-1">Suma total de préstamos otorgados a colaboradores</p>}
+        {/* Resumen: 2 chips + acción de quincena masiva (confirmación con resumen) */}
+        <div className="flex flex-wrap items-center gap-2 mb-5">
+          <div className="rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2">
+            <div className="text-[11px] text-gray-400 uppercase tracking-wide">Saldo pendiente total</div>
+            <div className={`text-lg font-semibold tabular-nums ${totalSaldo > 0 ? "text-red-600" : "text-gray-400"}`}>$<AnimatedNumber value={totalSaldo} formatter={(n: number) => fmt(n)} /></div>
           </div>
-          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-            <div className="flex items-center">
-              <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo Pendiente</div>
-              <button onClick={() => setKpiTooltip(kpiTooltip === "saldo" ? null : "saldo")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
-            </div>
-            <div className={`text-lg font-semibold mt-0.5 tabular-nums ${totalSaldo > 0 ? "text-red-600" : "text-gray-400"}`}>$<AnimatedNumber value={totalSaldo} formatter={(n: number) => fmt(n)} /></div>
-            {kpiTooltip === "saldo" && <p className="text-xs text-gray-500 mt-1">Lo que falta por cobrar de todos los préstamos</p>}
+          <div className={`rounded-lg border px-3.5 py-2 ${deduccionesCompletas ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}`}>
+            <div className="text-[11px] text-gray-400 uppercase tracking-wide">Quincena · {quincena.label}</div>
+            <div className={`text-lg font-semibold tabular-nums ${deduccionesCompletas ? "text-green-600" : "text-amber-600"}`}>{deduccionesAplicadas} / {deduccionesTotal}</div>
           </div>
-          <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-            <div className="flex items-center">
-              <div className="text-xs text-gray-400 uppercase tracking-wide">Empleados Activos</div>
-              <button onClick={() => setKpiTooltip(kpiTooltip === "empleados" ? null : "empleados")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
-            </div>
-            <div className="text-lg font-semibold mt-0.5 tabular-nums">{empleadosActivos}</div>
-            {kpiTooltip === "empleados" && <p className="text-xs text-gray-500 mt-1">Colaboradores con préstamos en curso</p>}
-          </div>
-          <div className={`rounded-lg p-3 ${deduccionesCompletas ? "bg-green-50" : "bg-amber-50"}`}>
-            <div className="flex items-center">
-              <div className="text-xs text-gray-400 uppercase tracking-wide">Deducciones Quincena</div>
-              <button onClick={() => setKpiTooltip(kpiTooltip === "deducciones" ? null : "deducciones")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
-            </div>
-            <div className={`text-lg font-semibold mt-0.5 tabular-nums ${deduccionesCompletas ? "text-green-600" : "text-amber-600"}`}>
-              {deduccionesAplicadas} / {deduccionesTotal}
-            </div>
-            <div className="text-[11px] text-gray-500 mt-0.5">{deduccionesAplicadas} deducidos de {deduccionesTotal} empleados</div>
-            <div className="text-xs text-gray-400">{quincena.label}</div>
-            {kpiTooltip === "deducciones" && <p className="text-xs text-gray-500 mt-1">Cantidad de empleados a los que ya se les aplicó la deducción quincenal vs. el total que tienen deducción configurada</p>}
-          </div>
-        </div>
-
-        {/* Aplicar quincena masiva — confirmación con resumen, registros financieros */}
-        {quincenaPendientesN > 0 && (
-          <div className="mb-5 flex flex-wrap items-center gap-3">
+          {quincenaPendientesN > 0 && (
             <button
               onClick={() => setConfirmAplicarQ(true)}
-              className="bg-emerald-600 text-white px-5 py-2.5 sm:py-2 rounded-md text-sm font-medium hover:bg-emerald-700 active:scale-[0.97] transition"
+              className="sm:ml-auto bg-emerald-600 text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-emerald-700 active:scale-[0.97] transition"
             >
               Aplicar quincena ({quincenaPendientesN})
             </button>
-            <span className="text-xs text-gray-500">
-              Registra la deducción de {quincenaPendientesN} empleado{quincenaPendientesN !== 1 ? "s" : ""} pendiente{quincenaPendientesN !== 1 ? "s" : ""} en esta quincena.
-            </span>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Pending approval banner */}
         {totalPendientes > 0 && (role === "admin") && (
@@ -515,59 +493,16 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
           );
         })()}
 
-        {/* Movement status filter tabs */}
-        {(role === "admin") && (
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-0.5 mb-4 max-w-lg overflow-x-auto">
-            {[
-              { key: "todos", label: "Todos", count: 0, color: "" },
-              { key: "pendiente_aprobacion", label: "Pendientes", count: totalPendientes, color: "text-amber-600" },
-              { key: "aprobado", label: "Aprobados", count: countAprobados, color: "text-green-600" },
-              { key: "rechazado", label: "Rechazados", count: countRechazados, color: "text-red-600" },
-            ].map(tab => (
-              <button
-                key={tab.key}
-                onClick={() => { setFilterEstadoMov(tab.key); if (tab.key === "pendiente_aprobacion") setFilterPendientes(true); else if (filterPendientes && tab.key !== "pendiente_aprobacion") setFilterPendientes(false); }}
-                className={`flex items-center gap-1.5 py-2 px-3 text-sm rounded-md transition whitespace-nowrap ${filterEstadoMov === tab.key ? "bg-white text-black font-medium shadow-sm" : "text-gray-500"}`}
-              >
-                {tab.label}
-                {"count" in tab && tab.count !== undefined && tab.count > 0 && (
-                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${filterEstadoMov === tab.key ? `${tab.color} bg-white` : "text-gray-400 bg-gray-200"}`}>{tab.count}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* Actions + Filters */}
         <div className="flex flex-wrap items-center gap-3 mb-6">
-          <button onClick={openNewEmp} className="border border-gray-200 px-5 py-2.5 sm:py-2 rounded-md text-sm hover:border-gray-400 transition">+ Nuevo Empleado</button>
-          <button onClick={openNewMov} className="bg-black text-white px-5 py-2.5 sm:py-2 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo Préstamo</button>
-          <button
-            disabled={exportingExcel}
-            onClick={async () => {
-              setExportingExcel(true);
-              try {
-                const qs = filterEmpresa && filterEmpresa !== "all" ? `?empresa=${encodeURIComponent(filterEmpresa)}` : "";
-                const res = await fetch(`/api/prestamos/export-excel${qs}`);
-                if (res.ok) {
-                  const blob = await res.blob();
-                  const url = URL.createObjectURL(blob);
-                  const link = document.createElement("a");
-                  link.href = url;
-                  const today = new Date();
-                  const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, "0")}${String(today.getDate()).padStart(2, "0")}`;
-                  const slug = filterEmpresa && filterEmpresa !== "all"
-                    ? filterEmpresa.toLowerCase().replace(/\s+/g, "_")
-                    : "todos";
-                  link.download = `historial_prestamos_${slug}_${ymd}.xlsx`;
-                  link.click();
-                  URL.revokeObjectURL(url);
-                } else { showToast("Error al descargar"); }
-              } catch { showToast("Error al descargar"); }
-              setExportingExcel(false);
-            }}
-            className="border border-gray-200 px-5 py-2.5 sm:py-2 rounded-md text-sm hover:border-gray-400 transition disabled:opacity-50"
-          >{exportingExcel ? "Descargando..." : "Descargar Historial"}</button>
+          <button onClick={openNewMov} className="bg-black text-white px-5 py-2.5 sm:py-2 rounded-md text-sm hover:bg-gray-800 transition">+ Nuevo préstamo</button>
+          <OverflowMenu
+            align="left"
+            items={[
+              { label: "Nuevo empleado", onClick: openNewEmp },
+              { label: exportingExcel ? "Descargando…" : "Descargar historial", onClick: descargarHistorial, disabled: exportingExcel },
+            ]}
+          />
 
           <div className="flex-1" />
 
@@ -591,128 +526,69 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
           </label>
         </div>
 
-        {/* Table */}
+        {/* Lista de empleados — fila de 4 elementos: nombre/empresa · progreso · chip quincena · SALDO */}
         {loading ? (
-          <SkeletonTable rows={5} cols={5} />
+          <SkeletonTable rows={5} cols={4} />
         ) : filtered.length === 0 ? (
-          <EmptyState title="No se encontraron empleados" subtitle="Registra el primer empleado para gestionar préstamos" actionLabel="+ Nuevo Empleado" onAction={openNewEmp} />
+          <EmptyState title="No se encontraron empleados" subtitle="Registra el primer empleado para gestionar préstamos" actionLabel="+ Nuevo empleado" onAction={openNewEmp} />
         ) : (
-          <>
-          <div className="hidden sm:block overflow-x-auto -mx-4 sm:mx-0">
-            <div className="min-w-[600px] px-4 sm:px-0">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white z-10">
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Empleado</th>
-                  <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Empresa</th>
-                  <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Ded. Quincenal</th>
-                  <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Total Prestado</th>
-                  <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Pagado</th>
-                  <th className="text-right py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Saldo</th>
-                  <th className="py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal w-32">Progreso</th>
-                  <th className="text-left py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Notas</th>
-                  <th className="py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal hidden sm:table-cell">Deducción</th>
-                  <th className="py-3 px-4 text-xs uppercase tracking-[0.05em] text-gray-400 font-normal">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(({ emp, prestado, pagado, saldo, pct, pendientes }, i) => {
-                  const hasRejected = (emp.prestamos_movimientos || []).some(m => m.estado === "rechazado");
-                  return (
-                  <tr key={emp.id} onClick={() => handleRowClick(emp)} className={`${pendientes > 0 ? "border-l-4 border-l-amber-400 bg-amber-50/30" : hasRejected ? "border-l-4 border-l-red-300" : i % 2 === 1 ? "bg-gray-50/50" : ""} ${!emp.activo ? "opacity-50" : ""} cursor-pointer hover:bg-gray-50 transition-colors`}>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1.5">
-                        {pendientes > 0 ? (
-                          <span className="text-amber-500 flex-shrink-0" title="Tiene movimientos pendientes de aprobacion">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10" opacity="0.2"/><path d="M12 8v4M12 16h.01" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                          </span>
-                        ) : saldo <= 0 && prestado > 0 ? (
-                          <span className="text-green-500 flex-shrink-0" title="Prestamo completado">
-                            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-                          </span>
-                        ) : null}
-                        <span className="font-medium">{emp.nombre}</span>
-                      </div>
-                      {!emp.activo && <span className="ml-5 text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span>}
-                      {pendientes > 0 && <span className="ml-5 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-medium">{pendientes} pendiente{pendientes > 1 ? "s" : ""}</span>}
-                      {saldo <= 0 && prestado > 0 && <span className="ml-5 text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md font-medium">Saldado</span>}
-                    </td>
-                    <td className="py-3 px-4 text-gray-500 hidden sm:table-cell">{emp.empresa || "—"}</td>
-                    <td className="py-3 px-4 text-right tabular-nums">${fmt(emp.deduccion_quincenal)}</td>
-                    <td className="py-3 px-4 text-right tabular-nums hidden sm:table-cell">${fmt(prestado)}</td>
-                    <td className="py-3 px-4 text-right tabular-nums hidden sm:table-cell">${fmt(pagado)}</td>
-                    <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(saldo)}</td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 h-2 bg-gray-200 rounded-md overflow-hidden">
-                          <div className={`h-full ${progressColor(pct)} rounded-md transition-all`} style={{ width: `${Math.min(pct, 100)}%` }} />
-                        </div>
-                        <span className="text-xs text-gray-400 tabular-nums w-10 text-right">{pct.toFixed(0)}%</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-gray-400 text-xs max-w-[120px] truncate hidden sm:table-cell" title={emp.notas || ""}>{emp.notas || "—"}</td>
-                    <td className="py-3 px-4 hidden sm:table-cell">
-                      {emp.deduccion_quincenal > 0 ? (
-                        hasDeduccionEnQuincena(emp.prestamos_movimientos || [], quincena.start, quincena.end)
-                          ? <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-md">✓ Deducida</span>
-                          : <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md">⚠ Pendiente</span>
-                      ) : null}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-1">
-                        <button onClick={(e) => { e.stopPropagation(); openEditEmp(emp); }} className="p-2.5 sm:p-1.5 hover:bg-gray-100 rounded-lg transition" title="Editar">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
-                        </button>
-                        {isAdmin && (
-                          <button onClick={(e) => { e.stopPropagation(); requestDeleteEmp(emp); }} className="p-2.5 sm:p-1.5 hover:bg-red-50 rounded-lg transition text-gray-400 hover:text-red-500" title="Eliminar">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
-          </div>
-
-          {/* Mobile: card-list (tap abre el detalle; muestra estado de deducción) */}
-          <ul className="sm:hidden space-y-2">
-            {filtered.map(({ emp, prestado, pagado, saldo, pct, pendientes }) => {
+          <ul className="space-y-2">
+            {filtered.map(({ emp, prestado, saldo, pct, pendientes }) => {
+              const saldado = saldo <= 0 && prestado > 0;
               const deducida = emp.deduccion_quincenal > 0 && hasDeduccionEnQuincena(emp.prestamos_movimientos || [], quincena.start, quincena.end);
-              const pendienteDed = emp.deduccion_quincenal > 0 && !deducida;
+              const pendienteDed = emp.deduccion_quincenal > 0 && !deducida && saldo > 0;
               return (
                 <li
                   key={emp.id}
                   onClick={() => handleRowClick(emp)}
-                  className={`rounded-lg border p-3 active:bg-gray-50 cursor-pointer ${pendientes > 0 ? "border-l-4 border-l-amber-400 bg-amber-50/30" : "border-gray-200"} ${!emp.activo ? "opacity-50" : ""}`}
+                  className={`flex items-center gap-3 sm:gap-4 rounded-lg border p-3 sm:px-4 cursor-pointer hover:bg-gray-50 active:bg-gray-50 transition-colors ${pendientes > 0 ? "border-l-4 border-l-amber-400" : "border-gray-200"} ${!emp.activo ? "opacity-50" : ""}`}
                 >
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="font-medium truncate">{emp.nombre}</span>
-                    <span className="shrink-0 font-medium tabular-nums">${fmt(saldo)}</span>
+                  {/* 1 · Nombre + empresa */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium truncate">{emp.nombre}</span>
+                      {pendientes > 0 && <span className="shrink-0 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-medium">{pendientes} pend.</span>}
+                      {saldado && <span className="shrink-0 text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md font-medium">Saldado</span>}
+                      {!emp.activo && <span className="shrink-0 text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span>}
+                    </div>
+                    <div className="text-xs text-gray-500 truncate">{emp.empresa || "Sin empresa"}</div>
                   </div>
-                  <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
-                    <span>{emp.empresa || "Sin empresa"}</span>
-                    <span className="text-gray-300">·</span>
-                    <span className="tabular-nums">Ded. ${fmt(emp.deduccion_quincenal)}</span>
-                    <span className="ml-auto tabular-nums text-gray-400">{pct.toFixed(0)}%</span>
+
+                  {/* 2 · Progreso (fino) — desktop */}
+                  <div className="hidden sm:flex items-center gap-2 w-36 shrink-0">
+                    <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                      <div className={`h-full ${progressColor(pct)} rounded-full`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                    </div>
+                    <span className="text-[11px] text-gray-400 tabular-nums w-8 text-right">{pct.toFixed(0)}%</span>
                   </div>
-                  <div className="mt-1.5 h-2 bg-gray-200 rounded-md overflow-hidden">
-                    <div className={`h-full ${progressColor(pct)} rounded-md`} style={{ width: `${Math.min(pct, 100)}%` }} />
+
+                  {/* 3 · Chip quincena */}
+                  <div className="shrink-0 text-center sm:w-24">
+                    {emp.deduccion_quincenal <= 0 ? null
+                      : deducida ? <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md">✓ Deducida</span>
+                      : pendienteDed ? <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md">⚠ Pendiente</span>
+                      : null}
                   </div>
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    {pendientes > 0 && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-medium">{pendientes} pendiente{pendientes > 1 ? "s" : ""}</span>}
-                    {deducida && <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-md">✓ Deducida esta quincena</span>}
-                    {pendienteDed && <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md">⚠ Deducción pendiente</span>}
-                    {!emp.activo && <span className="text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span>}
+
+                  {/* 4 · SALDO héroe */}
+                  <div className="shrink-0 text-right min-w-[72px]">
+                    <div className={`text-base sm:text-lg font-semibold tabular-nums ${saldo > 0 ? "text-gray-900" : saldo < 0 ? "text-blue-600" : "text-gray-400"}`}>${fmt(Math.abs(saldo))}</div>
+                    {saldo < 0 && <div className="text-[10px] text-blue-500 -mt-0.5">a favor</div>}
+                  </div>
+
+                  {/* Acciones */}
+                  <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <OverflowMenu
+                      items={[
+                        { label: "Editar", onClick: () => openEditEmp(emp) },
+                        ...(isAdmin ? [{ label: "Eliminar", onClick: () => requestDeleteEmp(emp), destructive: true }] : []),
+                      ]}
+                    />
                   </div>
                 </li>
               );
             })}
           </ul>
-          </>
         )}
       </div>
 
