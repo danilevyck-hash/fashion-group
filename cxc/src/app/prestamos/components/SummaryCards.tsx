@@ -24,8 +24,8 @@ export default function SummaryCards({ prestado, pagado, saldo, pct }: Props) {
           <div className="text-2xl font-semibold mt-1 tabular-nums text-green-600">${fmt(pagado)}</div>
         </div>
         <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-          <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo Pendiente</div>
-          <div className="text-2xl font-semibold mt-1 tabular-nums text-red-600">${fmt(saldo)}</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide">{saldo < 0 ? "Saldo a favor" : "Saldo Pendiente"}</div>
+          <div className={`text-2xl font-semibold mt-1 tabular-nums ${saldo > 0 ? "text-red-600" : saldo < 0 ? "text-blue-600" : "text-gray-400"}`}>${fmt(Math.abs(saldo))}</div>
         </div>
       </div>
 

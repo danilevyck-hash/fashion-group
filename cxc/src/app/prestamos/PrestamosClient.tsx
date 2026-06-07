@@ -126,6 +126,12 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   const [exportingExcel, setExportingExcel] = useState(false);
   const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
 
+  // Aplicar quincena masiva (bulk): confirmación con resumen previo + toast de
+  // resultado (NO UndoToast — son registros financieros). La RPC es la fuente
+  // autoritativa; estos cómputos client-side solo arman el resumen del modal.
+  const [confirmAplicarQ, setConfirmAplicarQ] = useState(false);
+  const [aplicandoQ, setAplicandoQ] = useState(false);
+
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
 
   const loadEmpleados = useCallback(async () => {
@@ -169,6 +175,13 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   const deduccionesAplicadas = empleadosDeducidos.length;
   const deduccionesTotal = empleadosConDeduccion.length;
   const deduccionesCompletas = deduccionesTotal > 0 && deduccionesAplicadas === deduccionesTotal;
+
+  // Elegibles para la quincena masiva: con deducción, saldo>0 y aún no deducidos.
+  const quincenaElegibles = empleadosConDeduccion.filter(
+    c => c.saldo > 0 && !hasDeduccionEnQuincena(c.emp.prestamos_movimientos || [], quincena.start, quincena.end),
+  );
+  const quincenaPendientesN = quincenaElegibles.length;
+  const quincenaTotalEstimado = quincenaElegibles.reduce((s, c) => s + Math.min(c.emp.deduccion_quincenal, c.saldo), 0);
 
   // Filtered
   const filtered = allCalcs.filter(c => {
@@ -303,6 +316,28 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         .slice(0, 5)
     : [];
 
+  async function aplicarQuincena() {
+    setAplicandoQ(true);
+    try {
+      const res = await fetch("/api/prestamos/aplicar-quincena", { method: "POST" });
+      const json = await res.json();
+      if (res.ok) {
+        const ok = json.count_aplicados ?? 0;
+        const om = json.count_omitidos ?? 0;
+        const total = json.total ?? 0;
+        showToast(
+          `Aplicada${ok !== 1 ? "s" : ""} ${ok} deducción${ok !== 1 ? "es" : ""} ($${fmt(total)})` +
+          (om ? ` · ${om} omitida${om !== 1 ? "s" : ""}` : ""),
+        );
+        loadEmpleados();
+      } else {
+        showToast(json.error || "Error al aplicar la quincena");
+      }
+    } catch { showToast("Sin conexión. Verifica tu internet e intenta de nuevo."); }
+    setAplicandoQ(false);
+    setConfirmAplicarQ(false);
+  }
+
   function togglePendingSelect(id: string) {
     setSelectedPending(prev => {
       const next = new Set(prev);
@@ -366,7 +401,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
               <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo Pendiente</div>
               <button onClick={() => setKpiTooltip(kpiTooltip === "saldo" ? null : "saldo")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
             </div>
-            <div className="text-lg font-semibold mt-0.5 tabular-nums text-red-600">$<AnimatedNumber value={totalSaldo} formatter={(n: number) => fmt(n)} /></div>
+            <div className={`text-lg font-semibold mt-0.5 tabular-nums ${totalSaldo > 0 ? "text-red-600" : "text-gray-400"}`}>$<AnimatedNumber value={totalSaldo} formatter={(n: number) => fmt(n)} /></div>
             {kpiTooltip === "saldo" && <p className="text-xs text-gray-500 mt-1">Lo que falta por cobrar de todos los préstamos</p>}
           </div>
           <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
@@ -390,6 +425,21 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             {kpiTooltip === "deducciones" && <p className="text-xs text-gray-500 mt-1">Cantidad de empleados a los que ya se les aplicó la deducción quincenal vs. el total que tienen deducción configurada</p>}
           </div>
         </div>
+
+        {/* Aplicar quincena masiva — confirmación con resumen, registros financieros */}
+        {quincenaPendientesN > 0 && (
+          <div className="mb-5 flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => setConfirmAplicarQ(true)}
+              className="bg-emerald-600 text-white px-5 py-2.5 sm:py-2 rounded-md text-sm font-medium hover:bg-emerald-700 active:scale-[0.97] transition"
+            >
+              Aplicar quincena ({quincenaPendientesN})
+            </button>
+            <span className="text-xs text-gray-500">
+              Registra la deducción de {quincenaPendientesN} empleado{quincenaPendientesN !== 1 ? "s" : ""} pendiente{quincenaPendientesN !== 1 ? "s" : ""} en esta quincena.
+            </span>
+          </div>
+        )}
 
         {/* Pending approval banner */}
         {totalPendientes > 0 && (role === "admin") && (
@@ -585,6 +635,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
                       </div>
                       {!emp.activo && <span className="ml-5 text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span>}
                       {pendientes > 0 && <span className="ml-5 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-medium">{pendientes} pendiente{pendientes > 1 ? "s" : ""}</span>}
+                      {saldo <= 0 && prestado > 0 && <span className="ml-5 text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md font-medium">Saldado</span>}
                     </td>
                     <td className="py-3 px-4 text-gray-500 hidden sm:table-cell">{emp.empresa || "—"}</td>
                     <td className="py-3 px-4 text-right tabular-nums">${fmt(emp.deduccion_quincenal)}</td>
@@ -894,6 +945,15 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         confirmLabel="Rechazar"
         destructive
       />
+      <ConfirmModal
+        open={confirmAplicarQ}
+        onClose={() => setConfirmAplicarQ(false)}
+        onConfirm={aplicarQuincena}
+        title="Aplicar deducción quincenal"
+        message={`Vas a registrar la deducción quincenal a ${quincenaPendientesN} empleado${quincenaPendientesN !== 1 ? "s" : ""} por un total de $${fmt(quincenaTotalEstimado)}. Los que ya tienen deducción esta quincena o saldo en $0 se omiten. La última cuota se ajusta al saldo automáticamente.`}
+        confirmLabel={aplicandoQ ? "Aplicando..." : "Aplicar a todos"}
+      />
+
       {pendingUndo && <UndoToast message={pendingUndo.message} startedAt={pendingUndo.startedAt} onUndo={undoAction} />}
       <Toast message={toast} />
     </div>

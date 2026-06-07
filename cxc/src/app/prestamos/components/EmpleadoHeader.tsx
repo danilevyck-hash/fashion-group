@@ -5,12 +5,13 @@ import { Empleado } from "./types";
 interface Props {
   empleado: Empleado;
   saldo: number;
+  saldado?: boolean;
   onEdit: () => void;
   onToggleArchive: () => void;
   onBack: () => void;
 }
 
-export default function EmpleadoHeader({ empleado, saldo, onEdit, onToggleArchive, onBack }: Props) {
+export default function EmpleadoHeader({ empleado, saldo, saldado, onEdit, onToggleArchive, onBack }: Props) {
   return (
     <div className="flex items-start justify-between mb-6">
       <div>
@@ -20,6 +21,9 @@ export default function EmpleadoHeader({ empleado, saldo, onEdit, onToggleArchiv
           <span className={`text-xs px-2 py-0.5 rounded-full ${empleado.activo ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"}`}>
             {empleado.activo ? "Activo" : "Archivado"}
           </span>
+          {saldado && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 font-medium">Saldado</span>
+          )}
         </div>
       </div>
       <div className="flex flex-wrap gap-3">
