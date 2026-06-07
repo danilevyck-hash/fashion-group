@@ -180,6 +180,13 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
         </Card>
       ) : (
         <div className="space-y-8">
+          {/* Rótulo de período (ítem 6): el alcance es el MES seleccionado,
+              para que no parezca contradecir el Mayoreo YTD del Overview. */}
+          <div>
+            <h3 className="font-display text-base font-semibold text-stone-950">Clientes · {periodoStr}</h3>
+            <p className="mt-0.5 text-[11px] text-stone-400">Período: el mes seleccionado (no acumulado anual).</p>
+          </div>
+
           {/* Sección 1: Wholesale */}
           <ClientesSection
             prefix="ws"

@@ -11,10 +11,10 @@ import {
   TrendingUp, CalendarRange, Users, UserCircle, Package, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import {
-  LineChart, Line, XAxis, Tooltip as RTooltip, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, Tooltip as RTooltip, ResponsiveContainer,
 } from "recharts";
-import type { Multifashion, RetailMonthly, WholesaleMonthly, MultifashionSerieAnio, MultifashionSerieMes } from "@/components/ventas/types";
-import { fmtMoney, fmtPct, deltaSymbol, MONTHS } from "@/lib/ventas/format";
+import type { Multifashion, RetailMonthly, MultifashionSerieAnio, MultifashionSerieMes } from "@/components/ventas/types";
+import { fmtMoney, fmtMoneyCompact, MONTHS } from "@/lib/ventas/format";
 import { EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import SyncStatus from "@/components/shared/SyncStatus";
 import { cn } from "@/lib/utils";
@@ -64,13 +64,10 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
     const max = isCurrentYear
       ? currentCalMonth
       : (withData.length > 0 ? withData[withData.length - 1] : 12);
-    // default = último con data excluyendo el mes calendario en curso.
-    const closed = withData.filter(m => !(isCurrentYear && m === currentCalMonth));
-    const def = closed.length > 0
-      ? closed[closed.length - 1]
-      : withData.length > 0
-        ? withData[withData.length - 1]
-        : (isClosedYear ? 12 : currentCalMonth);
+    // default = mes EN CURSO (tope navegable): mes calendario actual para el año
+    // en curso, último mes con data para año cerrado. (Antes era el último mes
+    // cerrado; Daniel pidió arrancar en el mes en curso/recurrente.)
+    const def = max;
     return { minMonth: min, maxMonth: max, mesDefault: def };
   }, [data.retail.meses, selectedYear, isClosedYear]);
 
@@ -127,7 +124,7 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
           los subtabs que lo usan (Detalle mensual y Vendedoras); Overview (YTD) y
           Clientes (pills propias) lo ocultan para no parecer un control roto.
           Flechas y dropdown comparten el rango [minMonth, maxMonth]. */}
-      {(subtab === "mes" || subtab === "vendedoras") && (
+      {subtab === "mes" && (
       <div className="mb-4">
         <div className="flex items-center justify-end gap-2">
         <span className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Mes</span>
@@ -213,16 +210,6 @@ const MES_FULL_OVERVIEW = [
 function parseIsoDateOverview(iso: string): Date {
   const [y, m, d] = iso.split("-").map(Number);
   return new Date(y, m - 1, d);
-}
-
-// "Mayo 2026 en curso · Comparativo vs Mayo 1–9 2025"
-function buildPartialMonthDisclaimer(row: RetailMonthly): string | null {
-  if (!row.fecha_corte || !row.dia_corte_anio_anterior) return null;
-  const cur = parseIsoDateOverview(row.fecha_corte);
-  const prev = parseIsoDateOverview(row.dia_corte_anio_anterior);
-  const curMonthName = MES_FULL_OVERVIEW[cur.getMonth()];
-  const prevMonthName = MES_FULL_OVERVIEW[prev.getMonth()];
-  return `${curMonthName} ${cur.getFullYear()} en curso · Comparativo vs ${prevMonthName} 1–${prev.getDate()} ${prev.getFullYear()}`;
 }
 
 // "Ene–May 2026 · ajustado al día de corte (9 may)" (cuando hay mes parcial)
@@ -339,11 +326,6 @@ function OverviewSubtab({
   const mesMapAct = new Map<number, MultifashionSerieMes>(serieAct.meses.map((m) => [m.mes, m]));
   const mesMapPrev = new Map<number, MultifashionSerieMes>(seriePrev.meses.map((m) => [m.mes, m]));
 
-  // Disclaimer del mes parcial para el footer de la tabla retail.
-  // Para años cerrados no aplica (no hay mes parcial).
-  const partialMonth = isClosedYear ? null : retail.meses.find(m => m.es_periodo_parcial);
-  const partialDisclaimer = partialMonth ? buildPartialMonthDisclaimer(partialMonth) : null;
-
   const retailYtdSub = buildRetailYtdSub(retail.meses, year, isClosedYear);
   // Margen a nivel TIENDA COMPLETA (retail + mayoreo): la API (tipo=03) da costo
   // agregado, no separa retail puro, así que el margen solo es honesto a nivel
@@ -358,6 +340,11 @@ function OverviewSubtab({
     ? `${wholesale.totalClientes} clientes wholesale`
     : (wholesale.topClienteName ?? "—");
 
+  // Desglose mayoreo por mes (preservado del detalle mensual eliminado, ítem 4).
+  const wholesaleMeses = wholesale.meses
+    .filter(m => m.ventas > 0)
+    .map(m => `${m.mes} $${Math.round(m.ventas).toLocaleString()}`);
+
   return (
     <div className="space-y-5">
       {/* 1. Header card — store identity + meta */}
@@ -369,7 +356,7 @@ function OverviewSubtab({
           <div>
             <h2 className="font-display text-xl font-semibold leading-tight text-stone-950">{data.tienda}</h2>
             <p className="mt-0.5 text-xs text-stone-500">
-              Multifashion · {data.ubicacion} · Manager {data.manager}
+              Multifashion · {data.ubicacion} · Gerente {data.manager}
             </p>
             <div className="mt-1.5">
               <SyncStatus
@@ -410,22 +397,30 @@ function OverviewSubtab({
         <RetailKpi label="MARGEN BRUTO · TIENDA COMPLETA" value={fmtMargen(total.margen)} sub={margenSub} />
       </div>
 
-      {/* 3. Wholesale card (debajo de los 4 retail KPIs) */}
+      {/* 3. Wholesale card (debajo de los 4 retail KPIs). Incluye el desglose
+          por mes que antes vivía en la tabla "Detalle mensual · retail" (ítem 4). */}
       {wholesale.ytdVentas > 0 && (
-        <Card className="flex flex-wrap items-center gap-4 p-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-amber-100 bg-amber-50 text-amber-700">
-            <Package className="h-5 w-5" />
+        <Card className="p-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-amber-100 bg-amber-50 text-amber-700">
+              <Package className="h-5 w-5" />
+            </div>
+            <div className="flex-1 min-w-[140px]">
+              <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Mayoreo {ytdSuffix}</p>
+              <p className="mt-0.5 font-mono text-xl font-medium text-stone-950 tabular-nums">{fmtMoney(wholesale.ytdVentas)}</p>
+            </div>
+            <div className="text-right text-xs text-stone-500">
+              <p><span className="font-mono tabular-nums text-stone-700">{wholesale.ytdTickets}</span> tickets</p>
+              <p className="mt-0.5 truncate max-w-[260px]" title={wholesaleClienteLabel}>
+                {wholesaleClienteLabel}
+              </p>
+            </div>
           </div>
-          <div className="flex-1 min-w-[140px]">
-            <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Mayoreo YTD</p>
-            <p className="mt-0.5 font-mono text-xl font-medium text-stone-950 tabular-nums">{fmtMoney(wholesale.ytdVentas)}</p>
-          </div>
-          <div className="text-right text-xs text-stone-500">
-            <p><span className="font-mono tabular-nums text-stone-700">{wholesale.ytdTickets}</span> tickets</p>
-            <p className="mt-0.5 truncate max-w-[260px]" title={wholesaleClienteLabel}>
-              {wholesaleClienteLabel}
+          {wholesaleMeses.length > 0 && (
+            <p className="mt-2 border-t border-stone-100 pt-2 font-mono text-[11px] tabular-nums text-stone-500">
+              {wholesaleMeses.join(" · ")}
             </p>
-          </div>
+          )}
         </Card>
       )}
 
@@ -438,42 +433,9 @@ function OverviewSubtab({
         prevYear={prevYear}
       />
 
-      {/* 5. Tabla detalle mensual retail + fila resumen wholesale */}
-      <section>
-        <h3 className="mb-2 font-display text-base font-semibold text-stone-950">Detalle mensual · retail</h3>
-        <Card className="overflow-hidden p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse" style={{ minWidth: 640 }}>
-              <thead>
-                <tr className="bg-stone-100">
-                  {["Mes", "Ventas", "Tickets", "Ticket prom.", `vs ${prevYear}`].map((h, i) => (
-                    <th key={h} className={cn(
-                      "border-b border-stone-200 px-3.5 py-2.5 text-[11px] font-medium uppercase tracking-wider text-stone-500",
-                      i === 0 ? "text-left" : "text-right"
-                    )}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {retail.meses.map(row => <RetailRow key={row.mes} row={row} year={year} />)}
-                {wholesale.ytdVentas > 0 && (
-                  <WholesaleSummaryRow
-                    wholesale={wholesale}
-                    label={wholesale.totalClientes > 1
-                      ? `Mayoreo · ${wholesale.totalClientes} clientes`
-                      : `Mayoreo · ${wholesale.topClienteName ?? "—"}`}
-                  />
-                )}
-              </tbody>
-            </table>
-          </div>
-          {partialDisclaimer && (
-            <p className="border-t border-stone-200 bg-stone-50 px-3.5 py-2 text-xs text-stone-500">
-              {partialDisclaimer}
-            </p>
-          )}
-        </Card>
-      </section>
+      {/* (Tabla "Detalle mensual · retail" eliminada — duplicaba el subtab
+          Detalle mensual. El desglose mayoreo se preservó en el card de arriba.
+          Ítem 4 del sprint "Multifashion claridad".) */}
 
     </div>
   );
@@ -510,6 +472,13 @@ function CumulativeChartCard({
               axisLine={{ stroke: "#e7e5e4" }}
               tickLine={false}
             />
+            <YAxis
+              width={48}
+              tickFormatter={(v) => fmtMoneyCompact(Number(v))}
+              tick={{ fontSize: 10, fill: "#78716c" }}
+              axisLine={false}
+              tickLine={false}
+            />
             <RTooltip
               cursor={{ stroke: "#d6d3d1", strokeWidth: 1 }}
               content={(p) => (
@@ -523,8 +492,8 @@ function CumulativeChartCard({
                 />
               )}
             />
-            {/* Año previo — ámbar, fino, año completo. */}
-            <Line type="monotone" dataKey="prev" stroke="#BA7517" strokeWidth={1.5} dot={false} connectNulls isAnimationActive={false} />
+            {/* Año previo — ámbar, fino, punteado, año completo. */}
+            <Line type="monotone" dataKey="prev" stroke="#BA7517" strokeWidth={1.5} strokeDasharray="5 3" dot={false} connectNulls isAnimationActive={false} />
             {/* Año en curso — azul, grueso, hasta hoy. */}
             <Line type="monotone" dataKey="cur" stroke="#185FA5" strokeWidth={3} dot={false} connectNulls isAnimationActive={false} />
           </LineChart>
@@ -593,83 +562,3 @@ function RetailKpi({ label, value, sub }: { label: string; value: string; sub?: 
   );
 }
 
-function RetailRow({ row, year }: { row: RetailMonthly; year: number }) {
-  const isEmpty = row.tickets === 0 && row.ventas === 0;
-  const vs = row.vs2025;
-  // Bug #2 fix: cuando prev_year era casi cero el RPC devolvía deltas
-  // gigantes (ej. +363024900% en Mayo 2025 retail). Heurística:
-  //   - vs null               → "— —"  (sin comparativo)
-  //   - |vs| > 100 (10000%)   → "n/a"   (divisor cercano a cero, no informativo)
-  //   - resto                 → "▲/▼ X%" normal
-  const vsAbsHuge = vs != null && Math.abs(vs) > 100;
-  const tone = vs == null || vsAbsHuge
-    ? "text-stone-400"
-    : vs > 0.05  ? "text-emerald-600"
-    : vs < -0.05 ? "text-red-600"
-    : "text-stone-500";
-  const empty = "border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-400 tabular-nums";
-  return (
-    <tr>
-      <td className="border-b border-stone-200 px-3.5 py-2.5 text-sm text-stone-950">{row.mes} {year}</td>
-      {isEmpty ? (
-        <>
-          <td className={empty}>—</td>
-          <td className={empty}>—</td>
-          <td className={empty}>—</td>
-          <td className={empty}>—</td>
-        </>
-      ) : (
-        <>
-          <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-950 tabular-nums">{fmtMoney(row.ventas)}</td>
-          <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-700 tabular-nums">{row.tickets.toLocaleString()}</td>
-          <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-700 tabular-nums">${row.ticketProm.toFixed(2)}</td>
-          <td className={cn("border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-xs tabular-nums", tone)}>
-            {vs == null
-              ? "—"
-              : vsAbsHuge
-                ? "n/a"
-                : `${deltaSymbol(vs)} ${fmtPct(vs)}`}
-          </td>
-        </>
-      )}
-    </tr>
-  );
-}
-
-/** Fila resumen al pie del detalle mensual retail. Suma el wholesale YTD
- *  agregado + breakdown de meses con actividad inline. */
-function WholesaleSummaryRow({
-  wholesale, label,
-}: {
-  wholesale: { ytdVentas: number; ytdTickets: number; meses: WholesaleMonthly[] };
-  label: string;
-}) {
-  const mesesConData = wholesale.meses
-    .filter(m => m.ventas > 0)
-    .map(m => `${m.mes} $${Math.round(m.ventas).toLocaleString()}`);
-  const ticketProm = wholesale.ytdTickets > 0 ? wholesale.ytdVentas / wholesale.ytdTickets : 0;
-  return (
-    <tr className="bg-amber-50/60">
-      <td className="border-b border-stone-200 px-3.5 py-2.5 text-sm text-stone-950">
-        <div className="font-medium">{label}</div>
-        {mesesConData.length > 0 && (
-          <div className="mt-0.5 text-[11px] font-mono text-stone-500 tabular-nums">
-            {mesesConData.join(" · ")}
-          </div>
-        )}
-      </td>
-      <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm font-medium text-stone-950 tabular-nums">
-        {fmtMoney(wholesale.ytdVentas)}
-      </td>
-      <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-700 tabular-nums">
-        {wholesale.ytdTickets.toLocaleString()}
-      </td>
-      <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-sm text-stone-700 tabular-nums">
-        ${ticketProm.toFixed(2)}
-      </td>
-      <td className="border-b border-stone-200 px-3.5 py-2.5 text-right font-mono text-xs text-stone-400 tabular-nums">
-        —
-      </td>
-    </tr>
-  );
-}
