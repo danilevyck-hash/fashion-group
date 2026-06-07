@@ -15,7 +15,7 @@ import {
 } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useToast } from "@/components/ToastSystem";
-import { ConfirmTypeNameModal } from "@/components/ui";
+import { ConfirmTypeNameModal, ModalOverlay } from "@/components/ui";
 import { useDescargarZip } from "@/lib/marketing/useDescargarZip";
 import {
   formatearFecha,
@@ -170,14 +170,14 @@ export default function ProyectoOverlay({
 
   if (loading || !proyecto) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center sm:justify-center">
+      <ModalOverlay backdropClassName="bg-black/30">
         <div className="relative w-full bg-white sm:max-w-4xl lg:max-w-5xl sm:rounded-lg rounded-t-2xl max-h-[95vh] overflow-y-auto border border-gray-200 p-6">
           <div className="space-y-4">
             <div className="h-24 bg-gray-100 rounded-lg animate-pulse" />
             <div className="h-48 bg-gray-100 rounded-lg animate-pulse" />
           </div>
         </div>
-      </div>
+      </ModalOverlay>
     );
   }
 
@@ -206,7 +206,7 @@ export default function ProyectoOverlay({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center sm:justify-center">
+    <ModalOverlay backdropClassName="bg-black/30">
       <div
         className="relative w-full bg-white sm:max-w-4xl lg:max-w-5xl sm:rounded-lg rounded-t-2xl max-h-[95vh] overflow-y-auto border border-gray-200"
         onClick={(e) => e.stopPropagation()}
@@ -431,6 +431,6 @@ export default function ProyectoOverlay({
         onConfirm={handleEliminar}
         loading={eliminandoLoading}
       />
-    </div>
+    </ModalOverlay>
   );
 }

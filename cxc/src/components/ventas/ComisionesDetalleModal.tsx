@@ -9,6 +9,7 @@ import { X, Download, Printer } from "lucide-react";
 import { fmtMoney } from "@/lib/ventas/format";
 import { fmtDate } from "@/lib/format";
 import { exportComisionDetalle, type ComisionDetalle } from "@/lib/ventas/comisionExcel";
+import { ModalOverlay } from "@/components/ui";
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
@@ -57,7 +58,11 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
   const pctTasaC = data ? (data.tasa_cobro * 100).toFixed(2) : "";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 print:static print:block print:bg-white print:p-0">
+    <ModalOverlay
+      align="start"
+      backdropClassName="bg-black/40"
+      className="overflow-y-auto p-4 print:static print:block print:bg-white print:p-0"
+    >
       <div className="my-6 w-full max-w-3xl rounded-lg border border-gray-200 bg-white shadow-lg print:my-0 print:max-w-full print:border-0 print:shadow-none">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 border-b border-gray-200 p-4">
@@ -186,6 +191,6 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
           ) : null}
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
