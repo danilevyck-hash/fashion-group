@@ -6,7 +6,9 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
 import { ConfirmModal, PullToRefresh } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
+import FreshnessChip from "@/components/FreshnessChip";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
+import { persistentCacheSet, persistentCacheGet, CACHE_KEYS } from "@/lib/offlineCache";
 import { Reclamo, RItem, Foto, Contacto, RView } from "./components/types";
 
 export interface ReclamosInitialData {
@@ -35,6 +37,9 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [reclamos, setReclamos] = useState<Reclamo[]>(initialData.reclamos);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Modo viaje: timestamp del snapshot mostrado + si vino del cache (offline).
+  const [dataTs, setDataTs] = useState<number | null>(null);
+  const [fromCache, setFromCache] = useState(false);
   const [current, setCurrent] = useState<Reclamo | null>(initialData.detail);
   const [saving, setSaving] = useState(false);
 
@@ -149,13 +154,39 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     try {
       const res = await fetch("/api/reclamos");
       if (res.status === 401) { sessionStorage.clear(); router.push("/"); return; }
-      if (res.ok) { const d = await res.json(); setReclamos(Array.isArray(d) ? d : []); }
-    } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
+      if (res.ok) {
+        const d = await res.json();
+        const arr = Array.isArray(d) ? d : [];
+        setReclamos(arr);
+        // Snapshot persistente para lectura offline (modo viaje).
+        persistentCacheSet(CACHE_KEYS.RECLAMOS, arr);
+        setDataTs(Date.now());
+        setFromCache(false);
+      }
+    } catch {
+      // Sin red: mostrar el último snapshot guardado en vez de solo el toast.
+      const cached = persistentCacheGet<Reclamo[]>(CACHE_KEYS.RECLAMOS);
+      if (cached) {
+        setReclamos(cached.data);
+        setDataTs(cached.ts);
+        setFromCache(true);
+      }
+      setToast("Sin conexión. Mostrando datos guardados.");
+      setTimeout(() => setToast(null), 3000);
+    }
     setLoading(false);
   }, [router]);
 
   const loadContactos = useCallback(async () => {
     try { const res = await fetch("/api/reclamos/contactos"); if (res.ok) setContactos(await res.json()); } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
+  }, []);
+
+  // initialData viene del SSR fresco al cargar la página → sembrar el snapshot
+  // y el timestamp para que el chip de frescura aparezca de inmediato.
+  useEffect(() => {
+    persistentCacheSet(CACHE_KEYS.RECLAMOS, initialData.reclamos);
+    setDataTs(Date.now());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Skipear el primer mount cuando ya tenemos initialData del SSR.
@@ -307,6 +338,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
             onNewReclamo={() => { resetForm(); setView("form"); }}
             onSelectEmpresa={(empresa) => { changeEmpresa(empresa); setSearch(""); setFilterEstado("all"); }}
             onLoadDetail={(id, empresa) => { changeEmpresa(empresa, { view: "detail", id }); loadDetail(id); }}
+            freshness={<FreshnessChip ts={dataTs} fromCache={fromCache} />}
           />
           {deleteModal}
         </PullToRefresh>

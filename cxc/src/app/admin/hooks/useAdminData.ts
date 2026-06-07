@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import { VENDOR_MAP } from "@/lib/vendors";
 import type { VendorMap } from "@/lib/vendors";
 import type { CxcRow, CxcUpload, ConsolidatedClient } from "@/lib/types";
+import { persistentCacheSet, persistentCacheGet, CACHE_KEYS } from "@/lib/offlineCache";
 
 export default function useAdminData() {
   const [clients, setClients] = useState<ConsolidatedClient[]>([]);
@@ -10,6 +11,9 @@ export default function useAdminData() {
   const [contactLog, setContactLog] = useState<Record<string, { date: string; method: string }>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Modo viaje: timestamp del snapshot mostrado + si vino del cache (offline).
+  const [dataTs, setDataTs] = useState<number | null>(null);
+  const [fromCache, setFromCache] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -143,7 +147,12 @@ export default function useAdminData() {
         client.d91_120 = gd3; client.d121_plus = gd4;
       }
 
-      setClients(Array.from(map.values()).filter((c) => c.total !== 0));
+      const clientsArr = Array.from(map.values()).filter((c) => c.total !== 0);
+      setClients(clientsArr);
+      // Snapshot persistente para lectura offline (modo viaje).
+      persistentCacheSet(CACHE_KEYS.CXC_AGING, clientsArr);
+      setDataTs(Date.now());
+      setFromCache(false);
 
       // Last contact per client, sourced from cxc_contact_log
       const latestLog: Record<string, { date: string; method: string }> = {};
@@ -160,11 +169,20 @@ export default function useAdminData() {
       }
       setContactLog(latestLog);
     } catch {
-      setLoadError("Error al cargar datos. Intenta de nuevo.");
+      // Sin red (o falla del aging): mostrar el último snapshot guardado en vez
+      // de un error en blanco. El chip de frescura avisa qué tan viejo es.
+      const cached = persistentCacheGet<ConsolidatedClient[]>(CACHE_KEYS.CXC_AGING);
+      if (cached) {
+        setClients(cached.data);
+        setDataTs(cached.ts);
+        setFromCache(true);
+      } else {
+        setLoadError("Error al cargar datos. Intenta de nuevo.");
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
-  return { clients, uploads, contactLog, loading, loadError, loadData, setContactLog };
+  return { clients, uploads, contactLog, loading, loadError, loadData, setContactLog, dataTs, fromCache };
 }
