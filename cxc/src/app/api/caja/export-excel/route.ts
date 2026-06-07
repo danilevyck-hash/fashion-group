@@ -37,12 +37,16 @@ export async function POST(req: NextRequest) {
   const heights: number[] = [];
   let r = 0;
 
+  // Responsable a nivel período (derivado de los gastos), no por gasto.
+  const responsablesPeriodo = [...new Set((gastos || []).map((g) => (g.responsable || "").trim()).filter(Boolean))];
+  const responsableLabel = responsablesPeriodo.length ? responsablesPeriodo.join(", ") : "—";
+
   // Title
-  for (let c = 0; c <= 8; c++) ws[addr(r, c)] = band(c === 0 ? "FASHION GROUP — CAJA MENUDA" : "", "000000", "FFFFFF", 14, true);
+  for (let c = 0; c <= 7; c++) ws[addr(r, c)] = band(c === 0 ? "FASHION GROUP — CAJA MENUDA" : "", "000000", "FFFFFF", 14, true);
   heights[r] = 30; r++;
 
   // Subtitle
-  for (let c = 0; c <= 8; c++) ws[addr(r, c)] = band(c === 0 ? `Período N° ${periodo?.numero || ""}  ·  Apertura: ${fmtDate(periodo?.fecha_apertura || "")}` : "", "1A1A1A", "AAAAAA", 10, false, true);
+  for (let c = 0; c <= 7; c++) ws[addr(r, c)] = band(c === 0 ? `Período N° ${periodo?.numero || ""}  ·  Apertura: ${fmtDate(periodo?.fecha_apertura || "")}  ·  Responsable: ${responsableLabel}` : "", "1A1A1A", "AAAAAA", 10, false, true);
   heights[r] = 18; r++;
 
   // Fondo info
@@ -54,8 +58,8 @@ export async function POST(req: NextRequest) {
   heights[r] = 6; r++;
 
   // Table header
-  const cols = ["Fecha", "Descripción", "Proveedor", "Responsable", "Categoría", "N° Factura", "Sub-total", "ITBMS", "Total"];
-  cols.forEach((h, i) => { ws[addr(r, i)] = hdr(h, i >= 6); });
+  const cols = ["Fecha", "Descripción", "Proveedor", "Categoría", "N° Factura", "Sub-total", "ITBMS", "Total"];
+  cols.forEach((h, i) => { ws[addr(r, i)] = hdr(h, i >= 5); });
   heights[r] = 20; r++;
 
   // Data rows
@@ -65,12 +69,11 @@ export async function POST(req: NextRequest) {
     ws[addr(r, 0)] = td(fmtDate(g.fecha), alt, { sz: 9, fg: "555555" });
     ws[addr(r, 1)] = td(g.descripcion || g.nombre || "", alt, { fg: "111111" });
     ws[addr(r, 2)] = td(g.proveedor || "", alt, { sz: 9, fg: "666666" });
-    ws[addr(r, 3)] = td(g.responsable || "", alt, { sz: 9, fg: "444444" });
-    ws[addr(r, 4)] = td(g.categoria || "Varios", alt, { sz: 9, fg: "555555" });
-    ws[addr(r, 5)] = td(g.nro_factura || "", alt, { sz: 9, fg: "999999", italic: true });
-    ws[addr(r, 6)] = tdN(g.subtotal || 0, alt);
-    ws[addr(r, 7)] = tdN(g.itbms || 0, alt, false, 9, "888888");
-    ws[addr(r, 8)] = tdN(g.total || 0, alt, true);
+    ws[addr(r, 3)] = td(g.categoria || "Varios", alt, { sz: 9, fg: "555555" });
+    ws[addr(r, 4)] = td(g.nro_factura || "", alt, { sz: 9, fg: "999999", italic: true });
+    ws[addr(r, 5)] = tdN(g.subtotal || 0, alt);
+    ws[addr(r, 6)] = tdN(g.itbms || 0, alt, false, 9, "888888");
+    ws[addr(r, 7)] = tdN(g.total || 0, alt, true);
     totalSub += g.subtotal || 0; totalItbms += g.itbms || 0; totalTotal += g.total || 0;
     heights[r] = 18; r++;
   });
@@ -79,10 +82,10 @@ export async function POST(req: NextRequest) {
   heights[r] = 6; r++;
 
   // Totals row
-  for (let c = 0; c <= 5; c++) ws[addr(r, c)] = { v: c === 5 ? "TOTALES" : "", t: "s", s: { font: { bold: true, sz: 9, name: "Calibri" }, fill: { fgColor: { rgb: "F0F0F0" } }, alignment: { horizontal: c === 5 ? "right" : "left" }, border: { ...B, top: { style: "medium", color: { rgb: "CCCCCC" } } } } };
-  ws[addr(r, 6)] = { v: totalSub, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "F0F0F0" } }, alignment: { horizontal: "right" }, border: { ...B, top: { style: "medium", color: { rgb: "CCCCCC" } } } } };
-  ws[addr(r, 7)] = { v: totalItbms, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "F0F0F0" } }, alignment: { horizontal: "right" }, border: { ...B, top: { style: "medium", color: { rgb: "CCCCCC" } } } } };
-  ws[addr(r, 8)] = { v: totalTotal, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "F0F0F0" } }, alignment: { horizontal: "right" }, border: { ...B, top: { style: "medium", color: { rgb: "CCCCCC" } } } } };
+  for (let c = 0; c <= 4; c++) ws[addr(r, c)] = { v: c === 4 ? "TOTALES" : "", t: "s", s: { font: { bold: true, sz: 9, name: "Calibri" }, fill: { fgColor: { rgb: "F0F0F0" } }, alignment: { horizontal: c === 4 ? "right" : "left" }, border: { ...B, top: { style: "medium", color: { rgb: "CCCCCC" } } } } };
+  ws[addr(r, 5)] = { v: totalSub, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "F0F0F0" } }, alignment: { horizontal: "right" }, border: { ...B, top: { style: "medium", color: { rgb: "CCCCCC" } } } } };
+  ws[addr(r, 6)] = { v: totalItbms, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "F0F0F0" } }, alignment: { horizontal: "right" }, border: { ...B, top: { style: "medium", color: { rgb: "CCCCCC" } } } } };
+  ws[addr(r, 7)] = { v: totalTotal, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: "F0F0F0" } }, alignment: { horizontal: "right" }, border: { ...B, top: { style: "medium", color: { rgb: "CCCCCC" } } } } };
   heights[r] = 20; r++;
 
   // Summary
@@ -92,15 +95,15 @@ export async function POST(req: NextRequest) {
   const sumLbl = (v: string) => ({ v, t: "s", s: { font: { sz: 9, color: { rgb: "888888" }, name: "Calibri" }, alignment: { horizontal: "right" } } });
   const sumNum = (v: number, style = {}) => ({ v, t: "n", z: '"$"#,##0.00', s: { font: { sz: 10, name: "Calibri", ...style }, alignment: { horizontal: "right" } } });
 
-  ws[addr(r, 6)] = sumLbl("Fondo inicial:"); ws[addr(r, 8)] = sumNum(fondo); heights[r] = 18; r++;
-  ws[addr(r, 6)] = sumLbl("Total gastado:"); ws[addr(r, 8)] = sumNum(totalTotal, totalTotal > fondo * 0.8 ? { color: { rgb: "DC2626" } } : {}); heights[r] = 18; r++;
-  ws[addr(r, 6)] = { v: "Saldo disponible:", t: "s", s: { font: { bold: true, sz: 10, name: "Calibri" }, alignment: { horizontal: "right" } } };
-  ws[addr(r, 8)] = { v: saldo, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 11, color: { rgb: saldoColor.fg }, name: "Calibri" }, fill: { fgColor: { rgb: saldoColor.bg } }, alignment: { horizontal: "right" }, border: B } };
+  ws[addr(r, 5)] = sumLbl("Fondo inicial:"); ws[addr(r, 7)] = sumNum(fondo); heights[r] = 18; r++;
+  ws[addr(r, 5)] = sumLbl("Total gastado:"); ws[addr(r, 7)] = sumNum(totalTotal, totalTotal > fondo * 0.8 ? { color: { rgb: "DC2626" } } : {}); heights[r] = 18; r++;
+  ws[addr(r, 5)] = { v: "Saldo disponible:", t: "s", s: { font: { bold: true, sz: 10, name: "Calibri" }, alignment: { horizontal: "right" } } };
+  ws[addr(r, 7)] = { v: saldo, t: "n", z: '"$"#,##0.00', s: { font: { bold: true, sz: 11, color: { rgb: saldoColor.fg }, name: "Calibri" }, fill: { fgColor: { rgb: saldoColor.bg } }, alignment: { horizontal: "right" }, border: B } };
   heights[r] = 20; r++;
 
-  ws["!ref"] = `A1:I${r}`;
-  ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 8 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 8 } }];
-  ws["!cols"] = [{ wch: 11 }, { wch: 26 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 11 }, { wch: 9 }, { wch: 11 }];
+  ws["!ref"] = `A1:H${r}`;
+  ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }];
+  ws["!cols"] = [{ wch: 11 }, { wch: 26 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 11 }, { wch: 9 }, { wch: 11 }];
   ws["!rows"] = heights.map((h) => ({ hpt: h || 16 }));
 
   // Sheet 2 — Category summary

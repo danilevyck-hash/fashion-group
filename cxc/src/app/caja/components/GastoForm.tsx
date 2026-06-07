@@ -307,6 +307,31 @@ function MoneyInputFlat({
   );
 }
 
+/* ---------- Sugerencia de categoría por keywords del concepto ---------- */
+// Preselecciona (no fuerza): solo sugiere si la categoría existe en la lista.
+const CATEGORIA_KEYWORDS: { cat: string; kws: string[] }[] = [
+  { cat: "Transporte", kws: ["taxi", "uber", "didi", "bus", "pasaje", "transporte", "peaje", "estacionamiento", "parqueo"] },
+  { cat: "Combustible", kws: ["gasolina", "combustible", "diesel"] },
+  { cat: "Alimentacion", kws: ["comida", "almuerzo", "desayuno", "cena", "restaurante", "cafe", "café", "snack", "agua", "refresco", "soda", "merienda"] },
+  { cat: "Limpieza", kws: ["limpieza", "detergente", "cloro", "escoba", "jabon", "jabón", "toalla", "desinfectante"] },
+  { cat: "Papeleria", kws: ["papeleria", "papelería", "tinta", "toner", "tóner", "resma", "boligrafo", "bolígrafo", "lapiz", "lápiz", "impresion", "impresión", "fotocopia", "sobre", "carpeta"] },
+  { cat: "Envios", kws: ["correo", "encomienda", "envio", "envío", "courier", "flete"] },
+  { cat: "Servicios", kws: ["internet", "telefono", "teléfono", "electricidad", "recarga"] },
+  { cat: "Mantenimiento", kws: ["ferreteria", "ferretería", "tornillo", "herramienta", "reparacion", "reparación", "mantenimiento", "pintura", "bombillo", "foco"] },
+];
+
+function suggestCategoria(desc: string, categorias: string[]): string | null {
+  const d = desc.toLowerCase();
+  if (d.trim().length < 3) return null;
+  for (const { cat, kws } of CATEGORIA_KEYWORDS) {
+    if (kws.some((k) => d.includes(k))) {
+      const match = categorias.find((c) => c.toLowerCase() === cat.toLowerCase());
+      if (match) return match;
+    }
+  }
+  return null;
+}
+
 /* ---------- Form ---------- */
 
 export default function GastoForm({
@@ -335,6 +360,17 @@ export default function GastoForm({
   } = setters;
 
   const [catError, setCatError] = useState<string | null>(null);
+  // Mientras el usuario no toque la categoría a mano, la preseleccionamos según
+  // las keywords del concepto. Tras un cambio manual, dejamos de sugerir.
+  const [categoriaTouched, setCategoriaTouched] = useState(false);
+
+  function handleDescripcionChange(v: string) {
+    setGDescripcion(v);
+    if (!categoriaTouched) {
+      const s = suggestCategoria(v, categorias);
+      if (s) setGCategoria(s);
+    }
+  }
 
   // Live ITBMS amount derived from the percent + subtotal.
   const itbmsAmount = Math.round(subtotalNum * (parseFloat(gItbmsPct) / 100) * 100) / 100;
@@ -357,7 +393,7 @@ export default function GastoForm({
           <Field label="Descripción" required>
             <TextInput
               value={gDescripcion}
-              onChange={setGDescripcion}
+              onChange={handleDescripcionChange}
               placeholder="¿En qué se gastó?"
               ariaLabel="Descripción"
             />
@@ -418,7 +454,7 @@ export default function GastoForm({
           <Field label="Categoría" required>
             <SearchableSelect
               value={gCategoria}
-              onChange={setGCategoria}
+              onChange={(v) => { setCategoriaTouched(true); setGCategoria(v); }}
               options={categorias.map((c) => ({ value: c, label: c }))}
               placeholder="Buscar categoría…"
               ariaLabel="Categoría"

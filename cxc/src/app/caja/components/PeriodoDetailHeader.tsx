@@ -18,6 +18,9 @@ interface Props {
   deletedCount?: number;
   /** When provided and deletedCount > 0, the menu entry appears. */
   onViewDeleted?: () => void;
+  /** Si la SuggestionCard de "cerrar período" está visible, ocultamos el texto
+   *  pasivo "N días abierto" para no duplicar el dato. Si se descarta, reaparece. */
+  suggestionVisible?: boolean;
 }
 
 function fmtRepuestoDate(iso: string | null): string {
@@ -162,6 +165,7 @@ export default function PeriodoDetailHeader({
   onAprobarReposicion,
   deletedCount,
   onViewDeleted,
+  suggestionVisible,
 }: Props) {
   const isOpen = current.estado === "abierto";
   const fondoInicial = current.fondo_inicial;
@@ -169,6 +173,19 @@ export default function PeriodoDetailHeader({
   const daysSinceOpen = isOpen
     ? Math.floor((Date.now() - new Date(current.fecha_apertura).getTime()) / (24 * 60 * 60 * 1000))
     : 0;
+
+  // Responsable a NIVEL PERÍODO (derivado de los gastos): aparece una sola vez
+  // en el encabezado en lugar de repetirse por gasto. El dato por gasto se
+  // sigue guardando en DB.
+  const responsablesPeriodo = [
+    ...new Set((current.caja_gastos || []).map((g) => (g.responsable || "").trim()).filter(Boolean)),
+  ];
+  const responsableLabel =
+    responsablesPeriodo.length === 0
+      ? null
+      : responsablesPeriodo.length === 1
+        ? responsablesPeriodo[0]
+        : `${responsablesPeriodo[0]} +${responsablesPeriodo.length - 1}`;
 
   // Used percentage (0 → 100). pctUsed (passed in) is the *remaining* percentage.
   const pctSpent = fondoInicial > 0 ? (totalGastado / fondoInicial) * 100 : 0;
@@ -221,7 +238,12 @@ export default function PeriodoDetailHeader({
               {fmtDate(current.fecha_apertura)}
             </span>
             <StatusPill open={isOpen} fechaCierre={current.fecha_cierre} />
-            {isOpen && daysSinceOpen > 30 && (
+            {responsableLabel && (
+              <span className="text-xs" style={{ color: "var(--caja-fg-muted)" }}>
+                Responsable: <span style={{ color: "var(--caja-fg-default)", fontWeight: 500 }}>{responsableLabel}</span>
+              </span>
+            )}
+            {isOpen && daysSinceOpen > 30 && !suggestionVisible && (
               <span
                 className="text-xs"
                 style={{

@@ -24,6 +24,8 @@ interface Props {
   nuevoHref?: string;
   /** Callback para abrir el Drawer inline de nuevo gasto (camino normal). */
   onNuevoGasto?: () => void;
+  /** Cambio rápido de categoría desde el chip inline de la fila. */
+  onQuickCategoria?: (gastoId: string, categoria: string) => void;
 }
 
 /* Curated dot colors per common category — fall back to stone-400 for the rest. */
@@ -105,7 +107,6 @@ export default function GastoTable({
   gastos,
   isOpen,
   categorias,
-  responsables,
   editingGastoId,
   editGasto,
   setEditingGastoId,
@@ -115,9 +116,11 @@ export default function GastoTable({
   recentlyAddedIds = new Set(),
   nuevoHref,
   onNuevoGasto,
+  onQuickCategoria,
 }: Props) {
   const [selectedCat, setSelectedCat] = useState<string | null>(null);
   const [showFiscal, setShowFiscal] = useState(false);
+  const [quickCatId, setQuickCatId] = useState<string | null>(null);
 
   const catTotals = useMemo(() => {
     const map: Record<string, number> = {};
@@ -168,9 +171,10 @@ export default function GastoTable({
     ];
   }
 
-  // Desktop column count (excluding actions/⋯).
-  const dataCols = 6 + (showFiscal ? 2 : 0); // Fecha, Desc, Prov, Resp, Cat, (Sub, ITBMS,) Total
-  const totalColSpan = 5; // first 5 cols before Sub/ITBMS/Total break
+  // Desktop column count (excluding actions/⋯). Responsable salió de la tabla
+  // (ahora es a nivel período); el dato por gasto se sigue guardando en DB.
+  const dataCols = 5 + (showFiscal ? 2 : 0); // Fecha, Desc, Prov, Cat, (Sub, ITBMS,) Total
+  const totalColSpan = 4; // first 4 cols before Sub/ITBMS/Total break
 
   return (
     <div className="mb-10 mt-8">
@@ -267,11 +271,6 @@ export default function GastoTable({
                 </div>
                 <div className="mb-1">
                   <CategoryDot categoria={g.categoria || "Varios"} />
-                  {g.responsable && (
-                    <span className="text-xs ml-2" style={{ color: "var(--caja-fg-muted)" }}>
-                      · {g.responsable}
-                    </span>
-                  )}
                 </div>
                 <p
                   className="text-[11px] caja-mono"
@@ -317,7 +316,6 @@ export default function GastoTable({
                 <th className="text-left py-2.5 px-4 font-medium">Fecha</th>
                 <th className="text-left py-2.5 px-4 font-medium">Descripción</th>
                 <th className="text-left py-2.5 px-4 font-medium">Proveedor</th>
-                <th className="text-left py-2.5 px-4 font-medium">Responsable</th>
                 <th className="text-left py-2.5 px-4 font-medium">Categoría</th>
                 {showFiscal && (
                   <>
@@ -375,15 +373,6 @@ export default function GastoTable({
                             onChange={(e) => setEditGasto({ ...editGasto, proveedor: e.target.value })}
                             className="w-full py-1 text-xs outline-none bg-transparent"
                             style={{ borderBottom: "1px solid var(--caja-border-default)" }}
-                          />
-                        </td>
-                        <td className="py-2 pr-1 px-4">
-                          <AutocompleteInput
-                            value={editGasto.responsable || ""}
-                            onChange={(v) => setEditGasto({ ...editGasto, responsable: v })}
-                            options={responsables}
-                            placeholder="Responsable"
-                            className="w-full py-1 text-xs outline-none bg-transparent"
                           />
                         </td>
                         <td className="py-2 pr-1 px-4">
@@ -479,11 +468,33 @@ export default function GastoTable({
                             </div>
                           )}
                         </td>
-                        <td className="py-3 px-4" style={{ color: "var(--caja-fg-default)" }}>
-                          {g.responsable || "—"}
-                        </td>
                         <td className="py-3 px-4">
-                          <CategoryDot categoria={g.categoria || "Varios"} />
+                          {isOpen && onQuickCategoria && quickCatId === g.id ? (
+                            <select
+                              autoFocus
+                              value={g.categoria || "Varios"}
+                              onChange={(e) => { onQuickCategoria(g.id, e.target.value); setQuickCatId(null); }}
+                              onBlur={() => setQuickCatId(null)}
+                              className="text-xs py-1 px-1.5 rounded-md outline-none bg-white"
+                              style={{ border: "1px solid var(--caja-border-default)" }}
+                            >
+                              {(categorias.includes(g.categoria || "Varios") ? categorias : [g.categoria || "Varios", ...categorias]).map((c) => (
+                                <option key={c} value={c}>{c}</option>
+                              ))}
+                            </select>
+                          ) : isOpen && onQuickCategoria ? (
+                            <button
+                              type="button"
+                              onClick={() => setQuickCatId(g.id)}
+                              title="Cambiar categoría"
+                              className="cursor-pointer rounded-md hover:bg-[var(--caja-bg-page)] -mx-1 px-1 py-0.5 transition-colors"
+                              style={{ background: "transparent", border: 0 }}
+                            >
+                              <CategoryDot categoria={g.categoria || "Varios"} />
+                            </button>
+                          ) : (
+                            <CategoryDot categoria={g.categoria || "Varios"} />
+                          )}
                         </td>
                         {showFiscal && (
                           <>

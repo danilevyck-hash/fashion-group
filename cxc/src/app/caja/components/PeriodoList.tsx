@@ -194,15 +194,16 @@ export default function PeriodoList({
             })}
           </div>
 
-          {/* Desktop table */}
+          {/* Desktop table — scroll horizontal para que SALDO/Acciones no se corten */}
           <div
-            className="hidden md:block overflow-hidden"
+            className="hidden md:block overflow-x-auto"
             style={{
               background: "var(--caja-bg-surface)",
               border: "1px solid var(--caja-border-subtle)",
               borderRadius: 8,
             }}
           >
+            <div style={{ minWidth: 920 }}>
             <div
               className="grid items-center caja-eyebrow"
               style={{
@@ -334,6 +335,7 @@ export default function PeriodoList({
                 </div>
               );
             })}
+            </div>
           </div>
           <style jsx>{`
             :global(.caja-row) {
