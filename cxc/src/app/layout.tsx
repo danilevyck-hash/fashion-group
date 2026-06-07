@@ -12,6 +12,7 @@ const playfair = Playfair_Display({
 });
 import { OnlineProvider } from "@/lib/OnlineContext";
 import OfflineBanner from "@/components/OfflineBanner";
+import InstallPrompt from "@/components/InstallPrompt";
 import Sidebar, { SidebarAwareMain } from "@/components/Sidebar";
 import "./globals.css";
 
@@ -62,7 +63,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Sidebar />
             <SidebarAwareMain>{children}</SidebarAwareMain>
           </ContextMenuProviderWrapper>
-
+          <InstallPrompt />
         </OnlineProvider>
         {/* El SW (Serwist) lo registra @serwist/next automáticamente (register:true).
             Antes había aquí un <script> que en cada carga desregistraba el SW y
