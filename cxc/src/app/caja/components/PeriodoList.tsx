@@ -60,6 +60,33 @@ function StatusPill({ estado }: { estado: string }) {
   );
 }
 
+/** Saldo del período: pill rojo si es negativo, ámbar si queda <10% del fondo,
+ *  texto normal si está sano. Estilo pill consistente con StatusPill. */
+function SaldoValue({ saldo, fondo }: { saldo: number; fondo: number }) {
+  const neg = saldo < 0;
+  const low = !neg && fondo > 0 && saldo < 0.1 * fondo;
+  if (neg || low) {
+    const tone = neg ? "danger" : "warning";
+    return (
+      <span
+        className="inline-flex items-center caja-mono text-[12px] font-medium px-2 py-0.5 rounded-full"
+        style={{
+          background: `var(--caja-${tone}-soft)`,
+          color: `var(--caja-${tone}-onSoft)`,
+          border: `1px solid var(--caja-${tone}-border)`,
+        }}
+      >
+        ${fmt(saldo)}
+      </span>
+    );
+  }
+  return (
+    <span className="caja-money caja-money-strong" style={{ color: "var(--caja-fg-strong)" }}>
+      ${fmt(saldo)}
+    </span>
+  );
+}
+
 export default function PeriodoList({
   periodos,
   loading,
@@ -177,17 +204,7 @@ export default function PeriodoList({
                       Gastado{" "}
                       <span className="caja-money">${fmt(p.total_gastado)}</span>
                     </span>
-                    <span
-                      className="caja-money caja-money-strong"
-                      style={{
-                        color:
-                          saldo < 0
-                            ? "var(--caja-danger)"
-                            : "var(--caja-fg-strong)",
-                      }}
-                    >
-                      ${fmt(saldo)}
-                    </span>
+                    <SaldoValue saldo={saldo} fondo={p.fondo_inicial} />
                   </div>
                 </div>
               );
@@ -288,16 +305,8 @@ export default function PeriodoList({
                   <div className="caja-money px-4 text-right">
                     ${fmt(p.total_gastado)}
                   </div>
-                  <div
-                    className="caja-money caja-money-strong px-4 text-right"
-                    style={{
-                      color:
-                        saldo < 0
-                          ? "var(--caja-danger)"
-                          : "var(--caja-fg-strong)",
-                    }}
-                  >
-                    ${fmt(saldo)}
+                  <div className="px-4 text-right">
+                    <SaldoValue saldo={saldo} fondo={p.fondo_inicial} />
                   </div>
                   <div className="px-4 flex items-center justify-end gap-1.5">
                     <button
