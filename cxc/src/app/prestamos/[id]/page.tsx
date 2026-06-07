@@ -117,6 +117,7 @@ export default function PrestamoDetallePage() {
         <EmpleadoHeader
           empleado={empleado}
           saldo={saldo}
+          saldado={prestado > 0 && saldo <= 0}
           onEdit={actions.openEditModal}
           onToggleArchive={() => {
             // Archivar pide confirmación; reactivar (no destructivo) va directo.
@@ -129,7 +130,12 @@ export default function PrestamoDetallePage() {
         <SummaryCards prestado={prestado} pagado={pagado} saldo={saldo} pct={pct} />
 
         <div className="flex flex-wrap gap-3 mb-6">
-          <button onClick={actions.pagoQuincenal} className="bg-emerald-600 text-white px-5 py-2 rounded-md text-sm hover:bg-emerald-700 transition font-medium">
+          <button
+            onClick={actions.pagoQuincenal}
+            disabled={saldo <= 0}
+            title={saldo <= 0 ? "Préstamo saldado — no hay saldo por deducir" : undefined}
+            className="bg-emerald-600 text-white px-5 py-2 rounded-md text-sm hover:bg-emerald-700 transition font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+          >
             Pago Quincenal · ${fmt(empleado.deduccion_quincenal)}
           </button>
           <button onClick={movForm.openMovModal} className="bg-black text-white px-5 py-2 rounded-md text-sm hover:bg-gray-800 transition">

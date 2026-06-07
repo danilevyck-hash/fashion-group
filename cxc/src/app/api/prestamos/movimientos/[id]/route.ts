@@ -29,6 +29,38 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const update: Record<string, unknown> = {};
   for (const k of allowed) { if (body[k] !== undefined) update[k] = body[k]; }
 
+  // Cierre del hueco: revalidar saldo al editar monto / aprobar un pago. Sin esto,
+  // subir el monto de un pago (o aprobarlo) podía dejar el saldo negativo — el
+  // POST sí valida, el PUT no lo hacía.
+  const PAGO_CONCEPTOS = ["Pago", "Abono extra", "Pago de responsabilidad"];
+  if (update.monto !== undefined || update.estado === "aprobado") {
+    const { data: mov } = await supabaseServer
+      .from("prestamos_movimientos")
+      .select("concepto, monto, estado, empleado_id")
+      .eq("id", params.id)
+      .single();
+    if (mov && PAGO_CONCEPTOS.includes(mov.concepto) && mov.empleado_id) {
+      const efImporte = update.monto !== undefined ? Number(update.monto) : Number(mov.monto);
+      const efEstado = update.estado !== undefined ? (update.estado as string) : mov.estado;
+      if (efEstado === "aprobado") {
+        const { data: otros } = await supabaseServer
+          .from("prestamos_movimientos")
+          .select("concepto, monto")
+          .eq("empleado_id", mov.empleado_id)
+          .eq("estado", "aprobado")
+          .neq("id", params.id)
+          .or("deleted.is.null,deleted.eq.false");
+        const rows = otros || [];
+        const prestado = rows.filter(m => m.concepto === "Préstamo" || m.concepto === "Responsabilidad por daño").reduce((s, m) => s + Number(m.monto), 0);
+        const pagadoOtros = rows.filter(m => PAGO_CONCEPTOS.includes(m.concepto)).reduce((s, m) => s + Number(m.monto), 0);
+        const disponible = prestado - pagadoOtros;
+        if (efImporte > disponible) {
+          return NextResponse.json({ error: `El pago excede el saldo pendiente de $${disponible.toFixed(2)}` }, { status: 400 });
+        }
+      }
+    }
+  }
+
   const { data, error } = await supabaseServer.from("prestamos_movimientos").update(update).eq("id", params.id).select().single();
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
 

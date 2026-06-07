@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { getSession } from "@/lib/require-auth";
 import { MOV_CONCEPTOS } from "@/app/prestamos/components/types";
+import { getQuincenaRangePanama } from "@/lib/prestamos-quincena";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,30 @@ export async function POST(req: NextRequest) {
 
     if (Number(monto) > saldo) {
       return NextResponse.json({ error: `El pago excede el saldo pendiente de $${saldo.toFixed(2)}` }, { status: 400 });
+    }
+  }
+
+  // Dedup de deducción quincenal: el guard del cliente (hasDeduccionEnQuincena)
+  // no protege contra retries / otra pestaña. Bloqueamos una SEGUNDA deducción
+  // quincenal del mismo empleado en la quincena vigente. Solo aplica al pago
+  // marcado como "Deducción quincenal" (no a abonos/pagos manuales).
+  if (concepto === "Pago" && typeof notas === "string" && notas.startsWith("Deducción quincenal")) {
+    const { start, end } = getQuincenaRangePanama();
+    const tolStart = new Date(Date.parse(start + "T00:00:00Z") - 3 * 86400000).toISOString().slice(0, 10);
+    const tolEnd = new Date(Date.parse(end + "T00:00:00Z") + 3 * 86400000).toISOString().slice(0, 10);
+    const { data: yaDed } = await supabaseServer
+      .from("prestamos_movimientos")
+      .select("id")
+      .eq("empleado_id", empleado_id)
+      .eq("estado", "aprobado")
+      .eq("concepto", "Pago")
+      .ilike("notas", "Deducción quincenal%")
+      .gte("fecha", tolStart)
+      .lte("fecha", tolEnd)
+      .or("deleted.is.null,deleted.eq.false")
+      .limit(1);
+    if (yaDed && yaDed.length > 0) {
+      return NextResponse.json({ error: "Este empleado ya tiene la deducción quincenal registrada en esta quincena." }, { status: 409 });
     }
   }
 
