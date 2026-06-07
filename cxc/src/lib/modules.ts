@@ -51,26 +51,26 @@ export interface AppGroup {
 // Las páginas de grupo viven en una ruta dinámica /g/[grupo] para evitar
 // colisión con rutas de módulo (ej: grupo "ventas" vs módulo /ventas).
 export const GROUPS: AppGroup[] = [
-  { key: "finanzas",  label: "Finanzas",  href: "/g/finanzas",  icon: Wallet },
   { key: "ventas",    label: "Ventas",    href: "/g/ventas",    icon: BarChart3 },
+  { key: "finanzas",  label: "Finanzas",  href: "/g/finanzas",  icon: Wallet },
   { key: "operacion", label: "Operación", href: "/g/operacion", icon: Briefcase },
   { key: "productos", label: "Productos", href: "/g/productos", icon: ShoppingBag },
   { key: "sistema",   label: "Sistema",   href: "/g/sistema",   icon: Settings },
 ];
 
 export const ALL_MODULES: AppModule[] = [
-  // Finanzas
-  { key: "comisiones",    label: "Comisiones",          subtitle: "Comisión por vendedor (venta y cobro)",              href: "/comisiones",     icon: Coins,            roles: ["admin", "secretaria"],                             group: "finanzas" },
-  { key: "cheques",       label: "Cheques",             subtitle: "Control de cheques por cobrar",                      href: "/cheques",        icon: FileText,         roles: ["admin", "secretaria"],                             group: "finanzas" },
-  { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones de empleados",               href: "/prestamos",      icon: HandCoins,        roles: ["admin", "contabilidad"],                           group: "finanzas" },
-  { key: "caja",          label: "Caja Menuda",         subtitle: "Registrar gastos del día a día",                     href: "/caja",           icon: Wallet,           roles: ["admin", "secretaria"],                             group: "finanzas" },
-
   // Ventas
-  { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",                    href: "/ventas",         icon: TrendingUp,       roles: ["admin"],                                           group: "ventas" },
   { key: "cxc",           label: "Cuentas por Cobrar",  subtitle: "Quién debe, cuánto y desde cuándo",                  href: "/admin",          icon: CircleDollarSign, roles: ["admin", "vendedor"],                               group: "ventas" },
+  { key: "ventas",        label: "Ventas",              subtitle: "Ver por mes y comparar períodos",                    href: "/ventas",         icon: TrendingUp,       roles: ["admin"],                                           group: "ventas" },
   { key: "multifashion",  label: "Multifashion",        subtitle: "Retail tienda física · vendedoras y clientes",       href: "/multifashion",   icon: ShoppingBag,      roles: ["admin"],                                           group: "ventas" },
-  { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)",href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria"],                             group: "ventas" },
   { key: "directorio",    label: "Clientes",            subtitle: "Datos fiscales, contacto y CXC actual",              href: "/clientes",       icon: Contact,          roles: ["admin", "secretaria", "vendedor"],                 group: "ventas" },
+  { key: "marketing",     label: "Marketing",           subtitle: "Gastos compartidos a marcas (Tommy, Calvin, Reebok)",href: "/marketing",      icon: Megaphone,        roles: ["admin", "secretaria"],                             group: "ventas" },
+
+  // Finanzas
+  { key: "cheques",       label: "Cheques",             subtitle: "Control de cheques por cobrar",                      href: "/cheques",        icon: FileText,         roles: ["admin", "secretaria"],                             group: "finanzas" },
+  { key: "caja",          label: "Caja Menuda",         subtitle: "Registrar gastos del día a día",                     href: "/caja",           icon: Wallet,           roles: ["admin", "secretaria"],                             group: "finanzas" },
+  { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones de empleados",               href: "/prestamos",      icon: HandCoins,        roles: ["admin", "contabilidad"],                           group: "finanzas" },
+  { key: "comisiones",    label: "Comisiones",          subtitle: "Comisión por vendedor (venta y cobro)",              href: "/comisiones",     icon: Coins,            roles: ["admin", "secretaria"],                             group: "finanzas" },
 
   // Operación
   { key: "guias",         label: "Guías de Despacho",   subtitle: "Crear y rastrear envíos",                            href: "/guias",          icon: Truck,            roles: ["admin", "secretaria", "bodega", "vendedor"],       group: "operacion" },
@@ -133,7 +133,7 @@ export function getModulesInGroup(group: ModuleGroup, role: string, fgModules?: 
   return getVisibleModules(role, fgModules).filter(m => m.group === group);
 }
 
-export const GROUP_ORDER: ModuleGroup[] = ["finanzas", "ventas", "operacion", "productos", "sistema"];
+export const GROUP_ORDER: ModuleGroup[] = ["ventas", "finanzas", "operacion", "productos", "sistema"];
 export const GROUP_LABELS: Record<ModuleGroup, { title: string; description: string }> = {
   finanzas:  { title: "Finanzas",  description: "Cobros, pagos y gastos del grupo" },
   ventas:    { title: "Ventas",    description: "Ventas, cuentas por cobrar y clientes" },
