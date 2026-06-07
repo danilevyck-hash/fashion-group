@@ -316,6 +316,21 @@ function checkError(name: string, table: string, message: string): CheckResult {
 
 // ── Runner ───────────────────────────────────────────────────────────────────
 
+// Allowlist de checks VIVOS = exactamente los check_name que produce runAllChecks.
+// ÚNICA FUENTE DE VERDAD para el dashboard (/api/admin/data-health la usa para
+// filtrar el historial stale de los checks legacy del CSV ya retirados —
+// cxc_rows/ventas_raw/cxc_uploads — sin borrar nada de data_integrity_checks).
+// MANTENER en sync con runAllChecks: el guard de abajo avisa en logs si se
+// desincroniza (un check emite un nombre fuera de esta lista).
+export const LIVE_CHECK_NAMES = new Set<string>([
+  "cheques_criticos_null",
+  "prestamos_saldo_anomalo",
+  "last_upload_age_cxc",
+  "aging_tipos_sin_clasificar",
+  "switch_facturas_continuidad",
+  "aging_dias_anomalo",
+]);
+
 export async function runAllChecks(): Promise<CheckResult[]> {
   // CXC ahora vive en switch_estadocuenta (sync API). Los checks de esquema del
   // CSV legacy (cxc_rows fecha/vencimiento/dias, zombie uploads, sin-venta) se
@@ -330,7 +345,17 @@ export async function runAllChecks(): Promise<CheckResult[]> {
   ]);
 
   // checkLastUploadAge devuelve un array (ahora solo CXC) — el resto, uno solo.
-  return grouped.flatMap(r => Array.isArray(r) ? r : [r]);
+  const flat = grouped.flatMap(r => Array.isArray(r) ? r : [r]);
+
+  // Guard de sincronía: si un check emite un check_name fuera de LIVE_CHECK_NAMES,
+  // el dashboard lo ocultaría. Avisar en logs (no rompe la corrida).
+  for (const r of flat) {
+    if (!LIVE_CHECK_NAMES.has(r.check_name)) {
+      console.warn(`[integrity] check_name "${r.check_name}" no está en LIVE_CHECK_NAMES — el dashboard lo ocultará. Actualizar la allowlist.`);
+    }
+  }
+
+  return flat;
 }
 
 export async function persistCheckResults(results: CheckResult[]): Promise<void> {

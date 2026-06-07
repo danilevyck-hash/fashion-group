@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
+import { LIVE_CHECK_NAMES } from "@/lib/integrity-checks";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,11 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const rows = (data ?? []) as CheckRow[];
+  // Solo checks VIVOS (los que produce runAllChecks). Oculta el historial stale
+  // de los checks legacy del CSV ya retirados (cxc_fecha_null, last_upload_age_ventas,
+  // upload_desync_cxc_ventas, etc.). data_integrity_checks queda INTACTA — el
+  // historial sigue como archivo; esto es solo filtro de presentación.
+  const rows = ((data ?? []) as CheckRow[]).filter(r => LIVE_CHECK_NAMES.has(r.check_name));
 
   // Latest por check_name (la lista viene ordenada desc → primer match gana).
   const latestByCheck = new Map<string, CheckRow>();
