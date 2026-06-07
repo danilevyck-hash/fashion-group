@@ -20,7 +20,8 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
-import { cacheSet, cacheGet, CACHE_KEYS } from "@/lib/offlineCache";
+import FreshnessChip from "@/components/FreshnessChip";
+import { persistentCacheSet, persistentCacheGet, CACHE_KEYS } from "@/lib/offlineCache";
 import { useOnline } from "@/lib/OnlineContext";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 
@@ -106,6 +107,8 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
   const isOnline = useOnline();
   const [cheques, setCheques] = useState<Cheque[]>(initialData.cheques);
   const [chequesCached, setChequesCached] = useState(false);
+  // Modo viaje: timestamp del snapshot mostrado (para el chip "datos de hace X").
+  const [dataTs, setDataTs] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   usePersistedScroll("cheques", !loading && cheques.length > 0);
   const [error, setError] = useState<string | null>(null);
@@ -250,15 +253,17 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         const arr = Array.isArray(d) ? d : [];
         setCheques(arr);
         setChequesCached(false);
-        // Cache last 50 cheques
-        cacheSet(CACHE_KEYS.CHEQUES, arr.slice(0, 50));
+        // Snapshot persistente (localStorage, 7d) — últimos 50 para uso offline.
+        persistentCacheSet(CACHE_KEYS.CHEQUES_SNAP, arr.slice(0, 50));
+        setDataTs(Date.now());
       }
     } catch {
-      // Offline — try cache
-      const cached = cacheGet<Cheque[]>(CACHE_KEYS.CHEQUES);
+      // Offline — mostrar el último snapshot guardado.
+      const cached = persistentCacheGet<Cheque[]>(CACHE_KEYS.CHEQUES_SNAP);
       if (cached) {
-        setCheques(cached);
+        setCheques(cached.data);
         setChequesCached(true);
+        setDataTs(cached.ts);
         showToast("Mostrando datos guardados. No se pudo actualizar.");
       } else {
         setError("No se pudieron cargar los cheques. Recarga la página.");
@@ -274,8 +279,9 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
     if (!authChecked) return;
     if (initialLoadRef.current) {
       initialLoadRef.current = false;
-      // Pre-cachear el SSR data para soporte offline en próximas visitas
-      cacheSet(CACHE_KEYS.CHEQUES, initialData.cheques.slice(0, 50));
+      // Pre-cachear el SSR data (fresco) para soporte offline + sembrar el chip.
+      persistentCacheSet(CACHE_KEYS.CHEQUES_SNAP, initialData.cheques.slice(0, 50));
+      setDataTs(Date.now());
       return;
     }
     loadCheques();
@@ -671,9 +677,9 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
       <AppHeader module="Cheques Posfechados" />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
       <div className="flex items-center justify-between mb-5">
-        <div>
+        <div className="flex items-center gap-3">
           <h1 className="text-xl font-light tracking-tight">Cheques Posfechados</h1>
-          {chequesCached && <p className="text-xs text-amber-600 mt-0.5">(datos cacheados)</p>}
+          <FreshnessChip ts={dataTs} fromCache={chequesCached} financial />
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={exportCheques} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-md active:bg-gray-100 transition-all">

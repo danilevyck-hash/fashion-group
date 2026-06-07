@@ -10,6 +10,7 @@ import { COMPANIES, B2B_COMPANIES } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { normalizeName } from "@/lib/normalize";
 import AppHeader from "@/components/AppHeader";
+import FreshnessChip from "@/components/FreshnessChip";
 import { Toast, PullToRefresh } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import KpiCards from "./components/KpiCards";
@@ -96,7 +97,7 @@ export default function AdminDashboard() {
 
 function AdminDashboardInner() {
   const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "vendedor"] });
-  const { clients, uploads, contactLog, loading, loadError, loadData, setContactLog } = useAdminData();
+  const { clients, uploads, contactLog, loading, loadError, loadData, setContactLog, dataTs, fromCache } = useAdminData();
   usePersistedScroll("cxc", !loading && clients.length > 0);
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("search") || "");
@@ -445,6 +446,12 @@ function AdminDashboardInner() {
     <PullToRefresh onRefresh={loadData}>
     <div>
       <AppHeader module="Panel CXC" />
+
+      {dataTs != null && (
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-3 flex justify-end">
+          <FreshnessChip ts={dataTs} fromCache={fromCache} financial />
+        </div>
+      )}
 
       <PanelCxcMobile
         filtered={filtered}
