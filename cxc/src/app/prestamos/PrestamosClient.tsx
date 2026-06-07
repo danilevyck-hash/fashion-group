@@ -547,7 +547,8 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         ) : filtered.length === 0 ? (
           <EmptyState title="No se encontraron empleados" subtitle="Registra el primer empleado para gestionar préstamos" actionLabel="+ Nuevo Empleado" onAction={openNewEmp} />
         ) : (
-          <div className="overflow-x-auto -mx-4 sm:mx-0">
+          <>
+          <div className="hidden sm:block overflow-x-auto -mx-4 sm:mx-0">
             <div className="min-w-[600px] px-4 sm:px-0">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-white z-10">
@@ -625,6 +626,42 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             </table>
             </div>
           </div>
+
+          {/* Mobile: card-list (tap abre el detalle; muestra estado de deducción) */}
+          <ul className="sm:hidden space-y-2">
+            {filtered.map(({ emp, prestado, pagado, saldo, pct, pendientes }) => {
+              const deducida = emp.deduccion_quincenal > 0 && hasDeduccionEnQuincena(emp.prestamos_movimientos || [], quincena.start, quincena.end);
+              const pendienteDed = emp.deduccion_quincenal > 0 && !deducida;
+              return (
+                <li
+                  key={emp.id}
+                  onClick={() => handleRowClick(emp)}
+                  className={`rounded-lg border p-3 active:bg-gray-50 cursor-pointer ${pendientes > 0 ? "border-l-4 border-l-amber-400 bg-amber-50/30" : "border-gray-200"} ${!emp.activo ? "opacity-50" : ""}`}
+                >
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-medium truncate">{emp.nombre}</span>
+                    <span className="shrink-0 font-medium tabular-nums">${fmt(saldo)}</span>
+                  </div>
+                  <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
+                    <span>{emp.empresa || "Sin empresa"}</span>
+                    <span className="text-gray-300">·</span>
+                    <span className="tabular-nums">Ded. ${fmt(emp.deduccion_quincenal)}</span>
+                    <span className="ml-auto tabular-nums text-gray-400">{pct.toFixed(0)}%</span>
+                  </div>
+                  <div className="mt-1.5 h-2 bg-gray-200 rounded-md overflow-hidden">
+                    <div className={`h-full ${progressColor(pct)} rounded-md`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                  </div>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    {pendientes > 0 && <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-medium">{pendientes} pendiente{pendientes > 1 ? "s" : ""}</span>}
+                    {deducida && <span className="text-[10px] bg-green-50 text-green-700 px-1.5 py-0.5 rounded-md">✓ Deducida esta quincena</span>}
+                    {pendienteDed && <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md">⚠ Deducción pendiente</span>}
+                    {!emp.activo && <span className="text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span>}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+          </>
         )}
       </div>
 

@@ -194,7 +194,7 @@ export default function ReclamoForm({
             </div>
           </div>
         )}
-        <div className="overflow-x-auto">
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
@@ -251,6 +251,75 @@ export default function ReclamoForm({
             </tbody>
           </table>
         </div>
+
+        {/* Mobile: una card por ítem con campos apilados y etiquetados */}
+        <div className="sm:hidden space-y-3">
+          {fItems.map((item, idx) => (
+            <div key={idx} className="rounded-lg border border-gray-200 p-3 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-wider text-gray-400">Ítem {idx + 1}</span>
+                {fItems.length > 1 && (
+                  <button type="button" onClick={() => setFItems((p) => p.filter((_, i) => i !== idx))} className="text-xs text-gray-400 hover:text-red-500 min-h-[44px] px-2">Quitar</button>
+                )}
+              </div>
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-wider text-gray-400">Código</span>
+                <input type="text" value={item.referencia} onChange={(e) => updateItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
+              </label>
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-wider text-gray-400">Descripción</span>
+                <input type="text" value={item.descripcion} onChange={(e) => updateItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Talla</span>
+                  {(!TALLAS.includes(item.talla) && item.talla !== "") ? (
+                    <div className="flex items-center gap-1">
+                      <input type="text" value={item.talla} onChange={(e) => updateItem(idx, "talla", e.target.value)} placeholder="Talla" className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
+                      <button type="button" onClick={() => updateItem(idx, "talla", "")} className="text-gray-300 hover:text-black text-xs">×</button>
+                    </div>
+                  ) : (
+                    <select value={item.talla} onChange={(e) => { if (e.target.value === "Otros") updateItem(idx, "talla", " "); else updateItem(idx, "talla", e.target.value); }} className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent">
+                      <option value="">—</option>
+                      {TALLAS.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  )}
+                </label>
+                <label className="block">
+                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Cantidad</span>
+                  <input type="number" inputMode="numeric" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
+                </label>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Precio U.</span>
+                  <input type="number" inputMode="decimal" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
+                </label>
+                <div className="block">
+                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Subtotal</span>
+                  <p className="py-2 text-sm tabular-nums text-gray-600">${fmt((item.cantidad || 0) * (item.precio_unitario || 0))}</p>
+                </div>
+              </div>
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-wider text-gray-400">Motivo</span>
+                {addingMotivo === idx ? (
+                  <div className="flex items-center gap-1">
+                    <input type="text" value={newMotivoText} onChange={(e) => setNewMotivoText(e.target.value)} placeholder="Nuevo motivo..." className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" autoFocus />
+                    <button type="button" onClick={() => { if (newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateItem(idx, "motivo", newMotivoText.trim()); } setNewMotivoText(""); setAddingMotivo(null); }} className="text-xs text-gray-400 hover:text-black px-1">OK</button>
+                    <button type="button" onClick={() => { setNewMotivoText(""); setAddingMotivo(null); }} className="text-xs text-gray-300 hover:text-black px-1">x</button>
+                  </div>
+                ) : (
+                  <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingMotivo(idx); setNewMotivoText(""); } else updateItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent">
+                    <option value="">--</option>
+                    {MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}
+                    <option value="__add__">+ Agregar motivo</option>
+                  </select>
+                )}
+              </label>
+            </div>
+          ))}
+        </div>
+
         <button onClick={() => setFItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition mt-3">+ Agregar fila</button>
         <div className="mt-6 text-right text-sm space-y-1">
           <div>Subtotal: <span className="tabular-nums font-medium">${fmt(fSubtotal)}</span></div>
