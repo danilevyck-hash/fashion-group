@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef, Suspense, Fragment } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense, Fragment, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import AppHeader from "@/components/AppHeader";
-import { SkeletonTable, EmptyState, Toast, StatusBadge, ConfirmModal, AnimatedNumber, useContextMenu, PullToRefresh, SwipeableRow } from "@/components/ui";
+import { SkeletonTable, EmptyState, Toast, StatusBadge, ConfirmModal, Modal, AnimatedNumber, useContextMenu, PullToRefresh, SwipeableRow } from "@/components/ui";
 import type { ContextMenuItem, SwipeAction } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import Drawer from "@/components/Drawer";
@@ -129,7 +129,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
   const [batchProcessing, setBatchProcessing] = useState(false);
   const [confirmBatch, setConfirmBatch] = useState<{ ids: Set<string>; clearFn: (v: Set<string>) => void } | null>(null);
   const [confirmDepositId, setConfirmDepositId] = useState<string | null>(null);
-  const [kpiTooltip, setKpiTooltip] = useState<string | null>(null);
+  const [detailCheque, setDetailCheque] = useState<Cheque | null>(null);
 
   // Undo actions
   const { pendingUndo, scheduleAction, undoAction } = useUndoAction();
@@ -316,7 +316,6 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
   const vencidos = cheques.filter((c) => visualEstado(c) === "vencido");
   const rebotados = cheques.filter((c) => visualEstado(c) === "rebotado");
   const totalPendiente = pendientes.reduce((s, c) => s + (Number(c.monto) || 0), 0);
-  const proximo = pendientes.length > 0 ? pendientes[0].fecha_deposito : null;
 
   // Alert banners data
   const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
@@ -383,7 +382,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
           const res = await fetch(`/api/cheques/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "depositado", fecha_depositado: hoy }) });
           if (!res.ok) { setCheques(snapshot); showToast("No se pudo depositar. Intenta de nuevo."); }
           else { /* deposited successfully */ }
-        } catch { setCheques(snapshot); showToast("Sin conexion. Intenta de nuevo."); }
+        } catch { setCheques(snapshot); showToast("Sin conexión. Intenta de nuevo."); }
       },
       onRevert: () => setCheques(snapshot),
     });
@@ -655,12 +654,16 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
     }
   })();
 
+  // Al buscar, cruzamos TODOS los cheques (no solo la pestaña activa) — así un
+  // N° o cliente se encuentra esté pendiente, depositado o vencido. Sin término,
+  // se respeta la pestaña.
   const filtered = searchLower
-    ? filteredByTab.filter((c) =>
+    ? cheques.filter((c) =>
         c.numero_cheque.toLowerCase().includes(searchLower) ||
         c.cliente.toLowerCase().includes(searchLower)
       )
     : filteredByTab;
+  const searchAcrossTabs = searchLower.length > 0;
 
   return (
     <PullToRefresh onRefresh={loadCheques}>
@@ -676,7 +679,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
           <button onClick={exportCheques} className="text-sm text-gray-400 hover:text-black border border-gray-200 px-3 py-1.5 rounded-md active:bg-gray-100 transition-all">
             ↓ Exportar {exportFilterLabel()}
           </button>
-          <button onClick={() => { resetForm(); setShowForm(true); }} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+          <button onClick={() => { resetForm(); setShowForm(true); }} disabled={!isOnline} title={!isOnline ? "Sin conexión" : undefined} className="text-sm bg-black text-white px-6 py-2.5 rounded-md font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">
             Nuevo Cheque
           </button>
         </div>
@@ -702,45 +705,36 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         </button>
       )}
 
-      {/* KPIs */}
+      {/* KPIs — chips compactos de una línea (label + monto + conteo), patrón CXC */}
       {(() => {
         const vencenSemanaKPI = pendientes.filter((c) => c.fecha_deposito >= today && c.fecha_deposito <= weekFromNow);
+        const vencenSemanaMonto = vencenSemanaKPI.reduce((s, c) => s + (Number(c.monto) || 0), 0);
+        const depositadosMonto = depositados.reduce((s, c) => s + (Number(c.monto) || 0), 0);
         return (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-              <div className="flex items-center mb-1">
-                <div className="text-xs uppercase tracking-widest text-gray-500">Total a cobrar</div>
-                <button onClick={() => setKpiTooltip(kpiTooltip === "total" ? null : "total")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
-              </div>
-              <div className="text-xl font-semibold tabular-nums">$<AnimatedNumber value={totalPendiente} formatter={(n: number) => fmt(n)} /></div>
-              <div className="text-xs text-gray-400 mt-0.5">{pendientes.length} cheques</div>
-              {kpiTooltip === "total" && <p className="text-xs text-gray-500 mt-1">Suma de todos los cheques pendientes de cobro</p>}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-8">
+            {/* Total a cobrar */}
+            <div className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg border border-gray-200 px-3 py-2">
+              <span className="text-[11px] uppercase tracking-wider text-gray-500">Total a cobrar</span>
+              <span className="flex items-baseline gap-1.5">
+                <span className="font-mono text-sm font-semibold tabular-nums">$<AnimatedNumber value={totalPendiente} formatter={(n: number) => fmt(n)} /></span>
+                <span className="text-[11px] text-gray-400 tabular-nums">{pendientes.length} chq</span>
+              </span>
             </div>
-            <div className={`rounded-lg p-3 border border-gray-200 ${vencenSemanaKPI.length > 0 ? "bg-amber-50" : "bg-gray-50"}`}>
-              <div className="flex items-center mb-1">
-                <div className="text-xs uppercase tracking-widest text-gray-500">Vencen esta semana</div>
-                <button onClick={() => setKpiTooltip(kpiTooltip === "semana" ? null : "semana")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
-              </div>
-              <div className={`text-xl font-semibold tabular-nums ${vencenSemanaKPI.length > 0 ? "text-amber-600" : ""}`}>{vencenSemanaKPI.length}</div>
-              <div className="text-xs text-gray-400 mt-0.5">${fmt(vencenSemanaKPI.reduce((s, c) => s + (Number(c.monto) || 0), 0))}</div>
-              {kpiTooltip === "semana" && <p className="text-xs text-gray-500 mt-1">Cheques que se pueden depositar esta semana</p>}
+            {/* Vencen esta semana */}
+            <div className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 ${vencenSemanaKPI.length > 0 ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-200"}`}>
+              <span className="text-[11px] uppercase tracking-wider text-gray-500">Vencen esta semana</span>
+              <span className="flex items-baseline gap-1.5">
+                <span className={`font-mono text-sm font-semibold tabular-nums ${vencenSemanaKPI.length > 0 ? "text-amber-600" : ""}`}>{vencenSemanaKPI.length}</span>
+                <span className="text-[11px] text-gray-400 tabular-nums">${fmt(vencenSemanaMonto)}</span>
+              </span>
             </div>
-            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-              <div className="flex items-center mb-1">
-                <div className="text-xs uppercase tracking-widest text-gray-500">Próximo depósito</div>
-                <button onClick={() => setKpiTooltip(kpiTooltip === "proximo" ? null : "proximo")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
-              </div>
-              <div className="text-xl font-semibold">{proximo ? fmtDate(proximo) : "—"}</div>
-              {kpiTooltip === "proximo" && <p className="text-xs text-gray-500 mt-1">Fecha del próximo cheque que vence</p>}
-            </div>
-            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-              <div className="flex items-center mb-1">
-                <div className="text-xs uppercase tracking-widest text-gray-500">Depositados</div>
-                <button onClick={() => setKpiTooltip(kpiTooltip === "depositados" ? null : "depositados")} className="text-gray-300 hover:text-gray-500 text-xs ml-1">?</button>
-              </div>
-              <div className="text-xl font-semibold tabular-nums text-green-600"><AnimatedNumber value={depositados.length} /></div>
-              <div className="text-xs text-gray-400 mt-0.5">${fmt(depositados.reduce((s, c) => s + (Number(c.monto) || 0), 0))}</div>
-              {kpiTooltip === "depositados" && <p className="text-xs text-gray-500 mt-1">Cheques ya depositados en el banco</p>}
+            {/* Depositados */}
+            <div className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg border border-gray-200 px-3 py-2">
+              <span className="text-[11px] uppercase tracking-wider text-gray-500">Depositados</span>
+              <span className="flex items-baseline gap-1.5">
+                <span className="font-mono text-sm font-semibold tabular-nums text-green-600">{depositados.length}</span>
+                <span className="text-[11px] text-gray-400 tabular-nums">${fmt(depositadosMonto)}</span>
+              </span>
             </div>
           </div>
         );
@@ -755,7 +749,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         title={editingId ? "Editar Cheque" : "Nuevo Cheque"}
         footer={
           <div className="flex items-center gap-4">
-            <button onClick={saveCheque} disabled={saving || !isOnline} title={!isOnline ? "Sin conexion" : undefined} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">{!isOnline ? "Sin conexion" : saving ? "Guardando..." : "Guardar Cheque"}</button>
+            <button onClick={saveCheque} disabled={saving || !isOnline} title={!isOnline ? "Sin conexión" : undefined} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed">{!isOnline ? "Sin conexión" : saving ? "Guardando..." : "Guardar Cheque"}</button>
             <button onClick={() => { resetForm(); setShowForm(false); }} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
           </div>
         }
@@ -996,7 +990,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <button onClick={goPrev} className="w-8 h-8 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full border border-gray-200 hover:border-gray-400 transition text-gray-500">‹</button>
-                <h2 className="text-sm font-medium capitalize w-40 text-center">{monthLabel}</h2>
+                <h2 className="text-sm font-medium first-letter:uppercase w-40 text-center">{monthLabel}</h2>
                 <button onClick={goNext} className="w-8 h-8 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full border border-gray-200 hover:border-gray-400 transition text-gray-500">›</button>
                 <button onClick={goToday} className="text-xs text-gray-400 hover:text-black transition ml-2">Hoy</button>
               </div>
@@ -1023,8 +1017,10 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                           return (
                           <div key={c.id} className="relative">
                             <button onClick={() => setCalPopover(calPopover === c.id ? null : c.id)}
-                              className={`w-full text-left text-[10px] px-1.5 py-0.5 rounded truncate ${pillColor(ve)}`}>
-                              {c.cliente.length > 12 ? c.cliente.slice(0, 12) + "…" : c.cliente} ${fmt(c.monto)}
+                              title={`N° ${c.numero_cheque} · $${fmt(c.monto)} · ${c.cliente}`}
+                              className={`w-full flex items-center gap-1 text-left text-[10px] px-1.5 py-0.5 rounded ${pillColor(ve)}`}>
+                              <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ve === "depositado" ? "bg-gray-400" : ve === "pendiente" ? "bg-emerald-500" : "bg-red-500"}`} />
+                              <span className="truncate">{c.cliente.length > 12 ? c.cliente.slice(0, 12) + "…" : c.cliente} ${fmt(c.monto)}</span>
                             </button>
                             {calPopover === c.id && (
                               <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg p-3 w-56" onClick={e => e.stopPropagation()}>
@@ -1099,6 +1095,11 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Vencido / Rebotado</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300" /> Depositado</span>
         </div>
+      )}
+
+      {/* Hint: la búsqueda cruza todas las pestañas */}
+      {viewMode === "lista" && searchAcrossTabs && filtered.length > 0 && (
+        <p className="text-xs text-gray-400 mb-2">Mostrando coincidencias en todos los cheques (pendientes, depositados y vencidos).</p>
       )}
 
       {/* Table */}
@@ -1215,12 +1216,12 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h18M3 12l6-6M3 12l6 6" /></svg>
                       Marcar como rebotado
                     </button>
-                    <span className="text-[10px] text-gray-300">Si el banco lo devolvio</span>
+                    <span className="text-[10px] text-gray-300">Si el banco lo devolvió</span>
                   </div>
                 )}
                 {isRebotado && (
                   <div className="mt-2 pt-2 border-t border-red-100 bg-red-50/40 -mx-4 px-4 pb-1 rounded-b-lg">
-                    <div className="text-[10px] text-red-400 mb-1">Este cheque reboto{c.motivo_rebote ? ` — ${c.motivo_rebote}` : ""}</div>
+                    <div className="text-[10px] text-red-400 mb-1">Este cheque rebotó{c.motivo_rebote ? ` — ${c.motivo_rebote}` : ""}</div>
                     <button onClick={(e) => { e.stopPropagation(); redepositar(c.id); }} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-md font-medium min-h-[44px] flex items-center gap-1.5 hover:bg-emerald-700 transition">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
                       Re-depositar cheque
@@ -1249,15 +1250,15 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
           const _df = filter === "depositado" ? "fecha_depositado" as keyof Cheque : "fecha_deposito" as keyof Cheque;
           const _cg = filter === "pendiente" || filter === "depositado";
           const _tg = _cg ? groupByTimePeriod(filtered, _df, _gm) : null;
-          const _th = (<thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500"><th className="w-8"></th><th className="text-left py-3 px-4 font-normal">Cliente</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell">N° Cheque</th><th className="text-right py-3 px-4 font-normal">Monto</th><th className="text-left py-3 px-4 font-normal whitespace-nowrap">Fecha Dep.</th><th className="text-left py-3 px-4 font-normal">Estado</th><th className="text-right py-3 px-2 font-normal"></th></tr></thead>);
+          const _th = (<thead className="sticky top-0 bg-white z-10"><tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-500"><th className="w-8"></th><th className="text-left py-3 px-4 font-normal">Cliente</th><th className="text-left py-3 px-4 font-normal hidden lg:table-cell">N° Cheque</th><th className="text-right py-3 px-4 font-normal">Monto</th><th className="text-left py-3 px-4 font-normal whitespace-nowrap">Vence</th><th className="text-left py-3 px-4 font-normal whitespace-nowrap">Depositado</th>{filter !== "depositado" && <th className="text-left py-3 px-4 font-normal">Estado</th>}<th className="text-right py-3 px-2 font-normal"></th></tr></thead>);
           const _rr = (c: Cheque) => {
               const ve = visualEstado(c);
               const isPending = ve === "pendiente" || ve === "vencido";
               const isDep = ve === "depositado";
               const isRebotado = ve === "rebotado";
               return (
-                <tr key={c.id} className={`border-b border-gray-200 hover:bg-gray-50 transition-colors ${urgencyBorder(c, ve)} ${isDep ? "text-gray-400" : isRebotado ? "bg-red-50/20" : ""}`} onContextMenu={(e) => showContextMenu(e, buildChequeContextMenu(c, ve))}>
-                  <td className="py-3 pl-2 pr-0 w-8">
+                <tr key={c.id} onClick={() => setDetailCheque(c)} className={`border-b border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer ${urgencyBorder(c, ve)} ${isDep ? "text-gray-400" : isRebotado ? "bg-red-50/20" : ""}`} onContextMenu={(e) => showContextMenu(e, buildChequeContextMenu(c, ve))}>
+                  <td className="py-3 pl-2 pr-0 w-8" onClick={(e) => e.stopPropagation()}>
                     {ve === "pendiente" && (
                       <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} className="accent-emerald-600 w-3.5 h-3.5" />
                     )}
@@ -1268,34 +1269,38 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                   <td className="py-3 px-4"><div className="font-medium">{c.cliente}</div><div className="text-xs text-gray-400">{getCompanyDisplay(c.empresa)}</div></td>
                   <td className="py-3 px-4 text-gray-500 hidden lg:table-cell">{c.numero_cheque}</td>
                   <td className="py-3 px-4 text-right tabular-nums font-medium">${fmt(c.monto)}</td>
-                  <td className="py-3 px-4 text-gray-500 whitespace-nowrap">
-                    <div>{fmtDate(c.fecha_deposito)}</div>
-                    {isDep && c.fecha_depositado && c.fecha_depositado !== c.fecha_deposito && (
-                      <div className={`text-[10px] mt-0.5 ${c.fecha_depositado > c.fecha_deposito ? "text-amber-600" : "text-gray-500"}`}>Depositado: {fmtDate(c.fecha_depositado)}</div>
+                  <td className="py-3 px-4 text-gray-500 whitespace-nowrap">{fmtDate(c.fecha_deposito)}</td>
+                  <td className="py-3 px-4 whitespace-nowrap">
+                    {c.fecha_depositado ? (
+                      <span className={`tabular-nums ${c.fecha_depositado > c.fecha_deposito ? "text-amber-600" : "text-gray-500"}`}>{fmtDate(c.fecha_depositado)}</span>
+                    ) : (
+                      <span className="text-gray-300">—</span>
                     )}
                   </td>
-                  <td className="py-3 px-4">
-                    <StatusBadge estado={ve} />
-                  </td>
-                  <td className="py-3 px-4 text-right">
+                  {filter !== "depositado" && (
+                    <td className="py-3 px-4">
+                      <StatusBadge estado={ve} />
+                    </td>
+                  )}
+                  <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-2">
                     {/* State machine: only show valid primary actions */}
                     {isPending && (
-                      <button onClick={() => setConfirmDepositId(c.id)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">Depositar</button>
+                      <button onClick={() => setConfirmDepositId(c.id)} disabled={!isOnline} title={!isOnline ? "Sin conexión" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap">Depositar</button>
                     )}
                     {isDep && (
-                      <button onClick={() => setRebotandoId(c.id)} disabled={!isOnline} title="Si el banco devolvio este cheque, marcalo como rebotado" className="text-xs text-gray-400 hover:text-red-500 transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1">
+                      <button onClick={() => setRebotandoId(c.id)} disabled={!isOnline} title="Si el banco devolvió este cheque, márcalo como rebotado" className="text-xs text-gray-400 hover:text-red-500 transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1">
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h18M3 12l6-6M3 12l6 6" /></svg>
                         Rebotado
                       </button>
                     )}
                     {isRebotado && (
-                      <button onClick={() => redepositar(c.id)} disabled={!isOnline} title="Este cheque reboto. Click para re-depositarlo." className="text-sm bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-3 py-1 rounded-md transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 font-medium">
+                      <button onClick={() => redepositar(c.id)} disabled={!isOnline} title="Este cheque rebotó. Click para re-depositarlo." className="text-sm bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-3 py-1 rounded-md transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 font-medium">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
                         Re-depositar
                       </button>
                     )}
-                    <button onClick={() => startEdit(c)} disabled={!isOnline} title={!isOnline ? "Sin conexion" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Editar</button>
+                    <button onClick={() => startEdit(c)} disabled={!isOnline} title={!isOnline ? "Sin conexión" : undefined} className="text-sm text-gray-500 hover:text-black transition min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed">Editar</button>
                     <ChequeMoreMenu
                       cheque={c}
                       ve={ve}
@@ -1316,7 +1321,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                 {_tg.map((g) => (
                   <Fragment key={g.key}>
                     <tr className="bg-gray-50/90 border-b border-gray-200">
-                      <td colSpan={7} className="px-4 py-2">
+                      <td colSpan={filter !== "depositado" ? 8 : 7} className="px-4 py-2">
                         <span className={`text-sm font-semibold ${g.color}`}>{"▸ "}{g.label}</span>
                         <span className="text-[11px] text-gray-400 tabular-nums ml-2">({g.items.length})</span>
                       </td>
@@ -1419,6 +1424,37 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         message={confirmBatch ? `¿Depositar ${confirmBatch.ids.size} cheques por un total de $${fmt(cheques.filter(c => confirmBatch.ids.has(c.id)).reduce((s, c) => s + c.monto, 0))}?` : ""}
         confirmLabel="Si, depositar todos"
       />
+
+      {/* Detalle de solo lectura (click en fila) — separado del botón Editar */}
+      <Modal open={!!detailCheque} onClose={() => setDetailCheque(null)} title="Detalle del cheque">
+        {detailCheque && (() => {
+          const ve = visualEstado(detailCheque);
+          const Row = ({ label, value }: { label: string; value: ReactNode }) => (
+            <div className="flex items-baseline justify-between gap-3 py-1.5 border-b border-gray-100 last:border-0">
+              <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">{label}</span>
+              <span className="text-sm text-gray-900 text-right">{value}</span>
+            </div>
+          );
+          return (
+            <div>
+              <Row label="Cliente" value={detailCheque.cliente} />
+              <Row label="Empresa" value={getCompanyDisplay(detailCheque.empresa)} />
+              <Row label="N° Cheque" value={detailCheque.numero_cheque} />
+              <Row label="Monto" value={<span className="font-medium tabular-nums">${fmt(detailCheque.monto)}</span>} />
+              <Row label="Vence" value={fmtDate(detailCheque.fecha_deposito)} />
+              <Row label="Depositado" value={detailCheque.fecha_depositado ? fmtDate(detailCheque.fecha_depositado) : "—"} />
+              <Row label="Estado" value={<StatusBadge estado={ve} />} />
+              {detailCheque.vendedor && <Row label="Vendedor" value={detailCheque.vendedor} />}
+              {detailCheque.notas && <Row label="Notas" value={detailCheque.notas} />}
+              {detailCheque.motivo_rebote && <Row label="Motivo rebote" value={detailCheque.motivo_rebote} />}
+              <div className="flex gap-3 mt-5">
+                <button onClick={() => { const c = detailCheque; setDetailCheque(null); startEdit(c); }} className="flex-1 bg-black text-white px-4 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition min-h-[44px]">Editar</button>
+                <button onClick={() => setDetailCheque(null)} className="flex-1 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-md text-sm hover:bg-gray-50 transition min-h-[44px]">Cerrar</button>
+              </div>
+            </div>
+          );
+        })()}
+      </Modal>
     </div>
     </div>
     </PullToRefresh>
