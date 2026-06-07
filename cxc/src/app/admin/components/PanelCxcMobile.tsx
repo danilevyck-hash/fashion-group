@@ -6,11 +6,12 @@
 // padre (AdminDashboardInner) y se pasan acá para que persistan al rotar
 // entre breakpoints.
 //
-// NO incluye: contacto/email/whatsapp/phone, modal de email, export PDF
-// detallado, ContactPanel del desktop. Drill-down a ruta dedicada queda
-// para sprint siguiente — "Ver facturas pendientes" es CTA placeholder.
+// NO incluye contacto (telefono/whatsapp/email/marcar-contactado) — decisión de
+// producto. El desglose por empresa muestra total exacto + último pago, y
+// "Ver facturas pendientes" enlaza a la ficha /clientes/[codigo].
 
 import { useMemo, useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import type { ConsolidatedClient } from "@/lib/types";
 import type { Company } from "@/lib/companies";
 import SyncStatus from "@/components/shared/SyncStatus";
@@ -22,6 +23,15 @@ import { formatCompactCurrency } from "@/lib/ventas/format";
 import { fmt } from "@/lib/format";
 
 type RiskFilter = "all" | "current" | "watch" | "overdue";
+
+// "Último pago $X · hace N días" por empresa, o "Sin pagos registrados".
+function ultimoPagoLabel(fecha: string | null, monto: number | null): string {
+  if (!fecha) return "Sin pagos registrados";
+  const d = new Date(fecha + "T00:00:00");
+  const days = Math.floor((new Date().getTime() - d.getTime()) / 86400000);
+  const rel = days <= 0 ? "hoy" : days === 1 ? "ayer" : `hace ${days} días`;
+  return monto != null ? `Último pago $${fmt(monto)} · ${rel}` : `Último pago · ${rel}`;
+}
 
 interface PanelCxcMobileProps {
   filtered: ConsolidatedClient[];
@@ -536,15 +546,28 @@ function MobileClientExpanded({
         current: d.d0_30 + d.d31_60 + d.d61_90,
         watch: d.d91_120,
         overdue: d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365,
+        ultimoPagoFecha: d.ultimoPagoFecha ?? null,
+        ultimoPagoMonto: d.ultimoPagoMonto ?? null,
       }))
       .sort((a, b) => b.total - a.total);
   }, [client.companies, nameByKey]);
 
+  // Código del cliente para enlazar a su ficha (misma fuente que el desktop).
+  const codigo = useMemo(
+    () => Object.values(client.companies).find(c => c?.codigo)?.codigo ?? null,
+    [client.companies],
+  );
+
   return (
     <div className="border-t border-stone-100 bg-stone-50 px-3 py-3">
-      <p className="mb-2 text-[10.5px] font-medium uppercase tracking-widest text-stone-500">
-        Desglose por empresa ({rows.length})
-      </p>
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">
+          Desglose por empresa ({rows.length})
+        </p>
+        <span className={`shrink-0 font-mono text-xs font-semibold tabular-nums ${client.total < 0 ? "text-stone-500" : "text-stone-900"}`}>
+          ${fmt(client.total)}
+        </span>
+      </div>
       <ul className="divide-y divide-stone-200/70 overflow-hidden rounded-md bg-white">
         {rows.map(row => (
           <li key={row.key} className="px-3 py-2.5">
@@ -559,20 +582,23 @@ function MobileClientExpanded({
               <EmpresaBucketMini variant="watch" value={row.watch} />
               <EmpresaBucketMini variant="overdue" value={row.overdue} />
             </div>
+            <p className={`mt-1.5 text-[10.5px] ${row.ultimoPagoFecha ? "text-stone-500" : "text-stone-400"}`}>
+              {ultimoPagoLabel(row.ultimoPagoFecha, row.ultimoPagoMonto)}
+            </p>
           </li>
         ))}
       </ul>
-      <button
-        type="button"
-        disabled
-        title="Próximamente en el siguiente sprint"
-        className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-stone-400"
-      >
-        Ver facturas pendientes
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
-        </svg>
-      </button>
+      {codigo && (
+        <Link
+          href={`/clientes/${encodeURIComponent(codigo)}`}
+          className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 active:opacity-70"
+        >
+          Ver facturas pendientes
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+          </svg>
+        </Link>
+      )}
     </div>
   );
 }
