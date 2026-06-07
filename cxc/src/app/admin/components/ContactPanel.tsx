@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { Company } from "@/lib/companies";
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt, fmtDate } from "@/lib/format";
+import { daysSince, daysAgingColor } from "@/lib/cxc-aging";
 
 interface Props {
   client: ConsolidatedClient;
@@ -41,7 +42,7 @@ export default function ContactPanel({
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
             <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${desgloseOpen ? "rotate-90" : ""}`} fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg>
-            {roleCompanies.length === 1 || companyFilter !== "all" ? "Detalle de aging" : `Desglose por empresa (${visibleCompanies.length})`}
+            {roleCompanies.length === 1 || companyFilter !== "all" ? "Detalle de saldo" : `Desglose por empresa (${visibleCompanies.length})`}
           </button>
           {desgloseOpen && (
             <div className="overflow-x-auto">
@@ -64,6 +65,7 @@ export default function ContactPanel({
                   const overdue = d.d121_180 + d.d181_270 + d.d271_365 + d.mas_365;
                   const tipCurrent = `0-30: $${fmt(d.d0_30)} · 31-60: $${fmt(d.d31_60)} · 61-90: $${fmt(d.d61_90)}`;
                   const tipOverdue = `121-180: $${fmt(d.d121_180)} · 181-270: $${fmt(d.d181_270)} · 271-365: $${fmt(d.d271_365)} · +365: $${fmt(d.mas_365)}`;
+                  const ultDias = daysSince(d.ultimoPagoFecha);
                   return (
                     <tr key={co.key} className="border-t border-gray-200 hover:bg-white transition">
                       {roleCompanies.length > 1 && <td className="py-1.5 font-medium">{co.name}</td>}
@@ -71,10 +73,20 @@ export default function ContactPanel({
                       <td className="text-right py-1.5 tabular-nums text-amber-600 cursor-help" title="91-120 días">{fmt(watch)}</td>
                       <td className="text-right py-1.5 tabular-nums text-red-600 cursor-help" title={tipOverdue}>{fmt(overdue)}</td>
                       <td className="text-right py-1.5 tabular-nums font-semibold">{fmt(d.total)}</td>
-                      <td className="text-right py-1.5 tabular-nums text-gray-500 whitespace-nowrap">
-                        {d.ultimoPagoFecha
-                          ? `${fmtDate(d.ultimoPagoFecha)}${d.ultimoPagoMonto != null ? ` · $${fmt(d.ultimoPagoMonto)}` : ""}`
-                          : <span className="text-gray-300">—</span>}
+                      <td
+                        className="text-right py-1.5 tabular-nums whitespace-nowrap"
+                        title={d.ultimoPagoFecha ? `Último pago: ${fmtDate(d.ultimoPagoFecha)}` : undefined}
+                      >
+                        {d.ultimoPagoFecha ? (
+                          <span>
+                            {d.ultimoPagoMonto != null && (
+                              <span className="text-gray-600">${fmt(d.ultimoPagoMonto)} · </span>
+                            )}
+                            <span className={daysAgingColor(ultDias)}>{ultDias != null ? `${ultDias} d` : ""}</span>
+                          </span>
+                        ) : (
+                          <span className="text-gray-300">—</span>
+                        )}
                       </td>
                     </tr>
                   );

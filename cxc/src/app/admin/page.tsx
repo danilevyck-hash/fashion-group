@@ -13,6 +13,7 @@ import AppHeader from "@/components/AppHeader";
 import { Toast, PullToRefresh } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import KpiCards from "./components/KpiCards";
+import AgingLegend from "./components/AgingLegend";
 import ClientTable from "./components/ClientTable";
 import { SkeletonRow } from "./components/Skeleton";
 import PanelCxcMobile from "./components/PanelCxcMobile";
@@ -571,8 +572,11 @@ function AdminDashboardInner() {
         />
       </div>
 
-      {/* Clickable KPI cards = risk filter */}
+      {/* Clickable KPI chips = risk filter */}
       <KpiCards roleClients={kpiClients} riskFilter={riskFilter} onRiskFilterChange={setRiskFilter} />
+
+      {/* Leyenda / clave de colores del aging, arriba de la lista */}
+      <AgingLegend />
 
       <ClientTable
         filtered={filtered}

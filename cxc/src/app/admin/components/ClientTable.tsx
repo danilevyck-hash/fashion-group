@@ -113,6 +113,36 @@ export default function ClientTable({
     </button>
   );
 
+  // Saldo positivo (deuda) en la lista principal; saldo negativo (crédito a
+  // favor) en su propia sección al pie, fuera de la lista de cobro.
+  const positivos = filtered.filter((c) => c.total >= 0);
+  const negativos = filtered.filter((c) => c.total < 0);
+
+  const renderClientRow = (client: ConsolidatedClient) => {
+    const isExpanded = expanded === client.nombre_normalized;
+    return (
+      <div key={client.nombre_normalized}>
+        <ClientRow
+          client={client}
+          isExpanded={isExpanded}
+          onToggle={() => setExpanded(isExpanded ? null : client.nombre_normalized)}
+          userRole={userRole}
+          isFavorite={favorites?.has(client.nombre_normalized)}
+          onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(client.nombre_normalized) : undefined}
+          onRowContextMenu={(e) => showContextMenu(e, buildClientContextMenu(client))}
+        />
+        <AccordionContent open={isExpanded}>
+          <ContactPanel
+            client={client}
+            onSaveEdit={onSaveEdit}
+            companyFilter={companyFilter}
+            roleCompanies={roleCompanies}
+          />
+        </AccordionContent>
+      </div>
+    );
+  };
+
   return (
     <>
       {/* Company filter + mobile filter button (search & risk tabs moved to parent page) */}
@@ -255,16 +285,16 @@ export default function ClientTable({
           <div className="col-span-4 cursor-pointer hover:text-gray-900 transition" onClick={() => toggleSort("name")}>
             Cliente{sortArrow("name")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Corriente: deuda con 0 a 90 dias" onClick={() => toggleSort("current")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Por vencer (0-90d) · clic para ordenar" onClick={() => toggleSort("current")}>
             0-90d{sortArrow("current")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Vigilancia: deuda con 91 a 120 dias" onClick={() => toggleSort("watch")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Vencido reciente (91-120d) · clic para ordenar" onClick={() => toggleSort("watch")}>
             91-120d{sortArrow("watch")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Vencido: deuda con mas de 121 dias" onClick={() => toggleSort("overdue")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition font-semibold text-gray-600" data-tooltip="Vencido crítico (+120d) · clic para ordenar por monto vencido" onClick={() => toggleSort("overdue")}>
             121d+{sortArrow("overdue")}
           </div>
-          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" onClick={() => toggleSort("total")}>
+          <div className="col-span-2 text-right cursor-pointer hover:text-gray-900 transition" data-tooltip="Saldo total · clic para ordenar" onClick={() => toggleSort("total")}>
             Total{sortArrow("total")}
           </div>
         </div>
@@ -279,35 +309,20 @@ export default function ClientTable({
           </div>
         )}
 
-        {filtered.map((client) => {
-            const isExpanded = expanded === client.nombre_normalized;
-            return (
-              <div key={client.nombre_normalized}>
-                <ClientRow
-                  client={client}
-                  isExpanded={isExpanded}
-                  onToggle={() => setExpanded(isExpanded ? null : client.nombre_normalized)}
-                  userRole={userRole}
-                  isFavorite={favorites?.has(client.nombre_normalized)}
-                  onToggleFavorite={onToggleFavorite ? () => onToggleFavorite(client.nombre_normalized) : undefined}
-                  onRowContextMenu={(e) => showContextMenu(e, buildClientContextMenu(client))}
-                />
-                <AccordionContent open={isExpanded}>
-                  <ContactPanel
-                    client={client}
-                    onSaveEdit={onSaveEdit}
-                    companyFilter={companyFilter}
-                    roleCompanies={roleCompanies}
-                  />
-                </AccordionContent>
-              </div>
-            );
-          })}
+        {positivos.map((client) => renderClientRow(client))}
       </div>
 
-      <div className="mt-3 text-[11px] text-gray-400 text-center">
-        {filtered.length} clientes &middot; Politica: 0-90d corriente &middot; 91-120d vigilancia &middot; 121d+ vencido
-      </div>
+      {/* Saldo a favor (crédito): fuera de la lista de cobro principal */}
+      {negativos.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-2">
+            Saldo a favor <span className="text-gray-400 font-normal normal-case">({negativos.length})</span>
+          </h3>
+          <div className="border border-blue-100 rounded-lg overflow-hidden">
+            {negativos.map((client) => renderClientRow(client))}
+          </div>
+        </div>
+      )}
     </>
   );
 }
