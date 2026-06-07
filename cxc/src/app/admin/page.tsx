@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -126,6 +126,19 @@ function AdminDashboardInner() {
     try { return new Set(JSON.parse(localStorage.getItem("cxc_favorites") || "[]")); } catch { return new Set(); }
   });
 
+  // Snapshot de favoritos usado SOLO para el orden de la lista (favoritos arriba).
+  // Se re-sincroniza al cargar/refrescar datos, NO en cada toggle → marcar una
+  // estrella ya no re-ordena la lista en vivo (el salto reportado en la auditoría).
+  // El re-anclaje arriba ocurre en el próximo refresh. La estrella visible sigue
+  // usando `favorites` (estado vivo), así que el marcado es instantáneo.
+  const [pinnedFavorites, setPinnedFavorites] = useState<Set<string>>(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("cxc_favorites") || "[]")); } catch { return new Set(); }
+  });
+  const favoritesRef = useRef(favorites);
+  useEffect(() => { favoritesRef.current = favorites; }, [favorites]);
+  // Re-sincronizar el pin cuando los datos (re)cargan, no al togglear.
+  useEffect(() => { setPinnedFavorites(new Set(favoritesRef.current)); }, [clients]);
+
   // Load favorites from DB (overrides localStorage on success)
   useEffect(() => {
     if (!authChecked) return;
@@ -134,6 +147,7 @@ function AdminDashboardInner() {
       .then((data: { favorites: string[] }) => {
         const dbSet = new Set(data.favorites);
         setFavorites(dbSet);
+        setPinnedFavorites(dbSet);
         localStorage.setItem("cxc_favorites", JSON.stringify(data.favorites));
       })
       .catch(() => {
@@ -236,8 +250,8 @@ function AdminDashboardInner() {
 
     result.sort((a, b) => {
       // Favorites always first
-      const aFav = favorites.has(a.nombre_normalized) ? 0 : 1;
-      const bFav = favorites.has(b.nombre_normalized) ? 0 : 1;
+      const aFav = pinnedFavorites.has(a.nombre_normalized) ? 0 : 1;
+      const bFav = pinnedFavorites.has(b.nombre_normalized) ? 0 : 1;
       if (aFav !== bFav) return aFav - bFav;
 
       // Negative totals (credit) always last
@@ -260,7 +274,7 @@ function AdminDashboardInner() {
     });
 
     return result;
-  }, [clients, cxcCompanies, companyFilter, riskFilter, search, sortKey, sortDir, favorites]);
+  }, [clients, cxcCompanies, companyFilter, riskFilter, search, sortKey, sortDir, pinnedFavorites]);
 
   // ── Role-filtered clients ──
   const roleClients = useMemo(() => {
