@@ -44,6 +44,7 @@ import { syncAllRecibos } from "@/lib/switch-api/sync-recibos";
 import { syncArticulosDiario } from "@/lib/switch-api/sync-articulos";
 import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 import { syncMultifashionTickets } from "@/lib/switch-api/sync";
+import { syncAllProveedores } from "@/lib/switch-api/sync-proveedores";
 import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
@@ -236,6 +237,21 @@ const COLATERAL_CRONS: ColateralCron[] = [
         triggeredBy: "cron",
       });
       return { ok: true, detail: `${r.inserted}+${r.updated} tickets` };
+    },
+  },
+  {
+    // Cuentas por Pagar (proveedores). Itera /apiproveedor/info por las 6 B2B y
+    // upserta switch_proveedor_estadocuenta. Igual que los demás colaterales: si
+    // su cron diario (09:30) se pierde, la reconciliación lo detecta y re-ejecuta.
+    cronName: "sync-proveedores",
+    label: "proveedores",
+    recover: async () => {
+      const rs = await syncAllProveedores();
+      const bad = rs.filter((r) => !r.ok);
+      return {
+        ok: bad.length === 0,
+        detail: bad.length === 0 ? `${rs.length} empresas` : `falló: ${bad.map((b) => b.empresaKey).join(",")}`,
+      };
     },
   },
 ];

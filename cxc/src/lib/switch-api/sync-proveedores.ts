@@ -1,0 +1,262 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Sync de Cuentas por Pagar (proveedores) — Fase 1.
+//
+// Por empresa B2B (empresasConCxc): itera /apiproveedor/lista y luego
+// /apiproveedor/info?proveedorId=X (NO documentado; trae saldoTotal + aging
+// bucketizado + ledger facturas/pagos). Calcula agregados y upserta una fila por
+// (empresa, proveedor) en switch_proveedor_estadocuenta.
+//
+// Espejo del sync de CXC (switch_estadocuenta) pero AGREGADO por proveedor, porque
+// Switch ya da el aging calculado. SECUENCIAL por empresa (token único de Switch).
+//
+// CAVEAT del endpoint: /apiproveedor/info devuelve HTTP 200 incluso en excepción
+// (página HTML). Por eso validamos el SHAPE (estadodecuenta.saldos/elements son
+// arrays); si no, ese proveedor se marca fallido y NO se escribe basura.
+//
+// buildProveedorRows() es READ-ONLY (no escribe) → lo reusa el preview de Fase 1
+// antes de que exista la tabla.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { supabaseServer } from "@/lib/supabase-server";
+import { createSwitchClient, type SwitchProveedorElement } from "./client";
+import { empresasConCxc } from "./empresas";
+import type { EmpresaKey } from "@/lib/empresa-mapping";
+
+const PROVEEDORES_PAGE = 50;
+const MAX_PROVEEDOR_PAGES = 200; // tope defensivo de paginación
+const UPSERT_BATCH = 200;
+
+export interface ProveedorCxpRow {
+  empresa_key: string;
+  proveedor_switch_id: number;
+  codigo: string | null;
+  nombre: string;
+  identificacion: string | null;
+  dv: string | null;
+  direccion: string | null;
+  contacto: string | null;
+  telefono: string | null;
+  celular: string | null;
+  email: string | null;
+  tipo_proveedor: string | null;
+  saldo_total: number;
+  aging: unknown[];
+  comprado_ytd: number;
+  pagado_ytd: number;
+  num_facturas: number;
+  num_pagos: number;
+  ultimo_pago_monto: number | null;
+  ultimo_pago_fecha: string | null; // YYYY-MM-DD
+  ultimo_pago_dias: number | null;
+  elements: unknown[];
+}
+
+export interface ProveedorSyncResult {
+  empresaKey: string;
+  ok: boolean;
+  proveedores: number;   // proveedores upserted
+  fallidos: number;      // proveedores con shape inválido (HTML-200) o sin id
+  error?: string;
+}
+
+const num = (x: unknown): number => {
+  const n = typeof x === "number" ? x : Number(String(x ?? "").trim());
+  return Number.isFinite(n) ? n : 0;
+};
+
+const clean = (s: unknown): string | null => {
+  const v = typeof s === "string" ? s.trim() : s == null ? "" : String(s);
+  return v === "" ? null : v;
+};
+
+/** DD-MM-YYYY -> { year, iso:'YYYY-MM-DD', ms } o null si inválida. */
+function parseFecha(s: unknown): { year: number; iso: string; ms: number } | null {
+  if (typeof s !== "string") return null;
+  const m = s.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (!m) return null;
+  const [, dd, mm, yyyy] = m;
+  const iso = `${yyyy}-${mm}-${dd}`;
+  const ms = Date.UTC(Number(yyyy), Number(mm) - 1, Number(dd));
+  if (Number.isNaN(ms)) return null;
+  return { year: Number(yyyy), iso, ms };
+}
+
+/** Agrega los elements del ledger a los campos derivados de la fila. */
+function aggregateElements(elements: SwitchProveedorElement[], anioActual: number) {
+  let comprado_ytd = 0;
+  let pagado_ytd = 0;
+  let num_facturas = 0;
+  let num_pagos = 0;
+  let ultimo: { monto: number; iso: string; dias: number; ms: number } | null = null;
+
+  for (const e of elements) {
+    const credito = num(e.credito); // cargos (facturas de compra)
+    const debito = num(e.debito);   // pagos a proveedor
+    const f = parseFecha(e.fechaCreacion);
+    if (credito > 0) {
+      num_facturas++;
+      if (f && f.year === anioActual) comprado_ytd += credito;
+    }
+    if (debito > 0) {
+      num_pagos++;
+      if (f && f.year === anioActual) pagado_ytd += debito;
+      // último pago = fila de pago (debito>0) con fecha más reciente
+      if (f && (!ultimo || f.ms > ultimo.ms)) {
+        ultimo = { monto: debito, iso: f.iso, dias: Number(e.dias) || 0, ms: f.ms };
+      }
+    }
+  }
+
+  return {
+    comprado_ytd: Math.round(comprado_ytd * 100) / 100,
+    pagado_ytd: Math.round(pagado_ytd * 100) / 100,
+    num_facturas,
+    num_pagos,
+    ultimo_pago_monto: ultimo ? ultimo.monto : null,
+    ultimo_pago_fecha: ultimo ? ultimo.iso : null,
+    ultimo_pago_dias: ultimo ? ultimo.dias : null,
+  };
+}
+
+/**
+ * READ-ONLY: trae proveedores + estado de cuenta de UNA empresa y devuelve las
+ * filas calculadas (NO escribe). Reusado por el preview y por el sync.
+ * Devuelve también el conteo de proveedores con shape inválido (fallidos).
+ */
+export async function buildProveedorRows(
+  empresaKey: EmpresaKey,
+): Promise<{ rows: ProveedorCxpRow[]; fallidos: number }> {
+  const client = createSwitchClient(empresaKey);
+  const anioActual = new Date().getUTCFullYear();
+
+  // 1) Listar todos los proveedores (paginación segura: cortar por accumulated>=total).
+  const proveedores: { id: number; nombre?: string }[] = [];
+  let totalReportado = 0;
+  for (let page = 1; page <= MAX_PROVEEDOR_PAGES; page++) {
+    const resp = await client.listProveedores({ porPagina: PROVEEDORES_PAGE, paginaActual: page });
+    const batch = Array.isArray(resp?.proveedores) ? resp.proveedores : [];
+    if (batch.length === 0) break;
+    proveedores.push(...batch);
+    const total = Number(resp?.paginacion?.total ?? 0);
+    if (page === 1) totalReportado = total;
+    if (total > 0 && proveedores.length >= total) break;
+  }
+
+  const rows: ProveedorCxpRow[] = [];
+  let fallidos = 0;
+
+  // 2) Estado de cuenta por proveedor (secuencial: token único).
+  for (const p of proveedores) {
+    if (typeof p.id !== "number") { fallidos++; continue; }
+    let info;
+    try {
+      info = await client.getProveedorInfo(p.id);
+    } catch {
+      fallidos++;
+      continue;
+    }
+    // Validar SHAPE (el endpoint da 200 con HTML en error).
+    const ec = info?.estadodecuenta;
+    if (!ec || !Array.isArray(ec.saldos) || !Array.isArray(ec.elements)) {
+      fallidos++;
+      continue;
+    }
+
+    const prov = info.proveedor ?? {};
+    const agg = aggregateElements(ec.elements, anioActual);
+
+    rows.push({
+      empresa_key: empresaKey,
+      proveedor_switch_id: p.id,
+      codigo: clean(prov.codigo),
+      nombre: clean(prov.nombre) ?? clean(p.nombre) ?? `Proveedor ${p.id}`,
+      identificacion: clean(prov.identificacion),
+      dv: clean(prov.dv),
+      direccion: clean(prov.direccion),
+      contacto: clean(prov.contacto),
+      telefono: clean(prov.telefono),
+      celular: clean(prov.celular),
+      email: clean(prov.email),
+      tipo_proveedor: clean(prov.tipoproveedor),
+      saldo_total: Math.round(num(ec.saldoTotal) * 100) / 100,
+      aging: ec.saldos,
+      ...agg,
+      elements: ec.elements,
+    });
+  }
+
+  return { rows, fallidos };
+}
+
+// ─── Logging a switch_sync_log (tolerante: no bloquea si falla) ───────────────
+async function createLog(empresaKey: string, triggeredBy: string): Promise<string | null> {
+  const { data, error } = await supabaseServer
+    .from("switch_sync_log")
+    .insert({
+      empresa_key: empresaKey,
+      sync_type: "proveedores",
+      status: "running",
+      started_at: new Date().toISOString(),
+      triggered_by: triggeredBy,
+      records_inserted: 0,
+      records_updated: 0,
+    })
+    .select("id")
+    .single();
+  if (error) {
+    console.error(`[sync ${empresaKey} proveedores] createLog falló (sigue igual): ${error.message}`);
+    return null;
+  }
+  return data?.id ?? null;
+}
+
+async function finishLog(
+  logId: string | null,
+  status: "success" | "error",
+  n: number,
+  err?: string,
+): Promise<void> {
+  if (!logId) return;
+  await supabaseServer
+    .from("switch_sync_log")
+    .update({ status, finished_at: new Date().toISOString(), records_updated: n, error_message: err ?? null })
+    .eq("id", logId);
+}
+
+/** Sync de UNA empresa: build + upsert + log. */
+export async function syncEmpresaProveedores(
+  empresaKey: EmpresaKey,
+  triggeredBy = "cron",
+): Promise<ProveedorSyncResult> {
+  const logId = await createLog(empresaKey, triggeredBy);
+  try {
+    const { rows, fallidos } = await buildProveedorRows(empresaKey);
+
+    const now = new Date().toISOString();
+    let upserted = 0;
+    for (let i = 0; i < rows.length; i += UPSERT_BATCH) {
+      const slice = rows.slice(i, i + UPSERT_BATCH).map((r) => ({ ...r, synced_at: now, updated_at: now }));
+      const { error } = await supabaseServer
+        .from("switch_proveedor_estadocuenta")
+        .upsert(slice, { onConflict: "empresa_key,proveedor_switch_id" });
+      if (error) throw new Error(`upsert switch_proveedor_estadocuenta: ${error.message}`);
+      upserted += slice.length;
+    }
+
+    await finishLog(logId, "success", upserted);
+    return { empresaKey, ok: true, proveedores: upserted, fallidos };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    await finishLog(logId, "error", 0, msg);
+    return { empresaKey, ok: false, proveedores: 0, fallidos: 0, error: msg };
+  }
+}
+
+/** Sync de todas las B2B (serial; tolerante: una falla → las demás siguen). */
+export async function syncAllProveedores(triggeredBy = "cron"): Promise<ProveedorSyncResult[]> {
+  const results: ProveedorSyncResult[] = [];
+  for (const empresaKey of empresasConCxc()) {
+    results.push(await syncEmpresaProveedores(empresaKey, triggeredBy));
+  }
+  return results;
+}

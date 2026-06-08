@@ -455,8 +455,80 @@ export interface SwitchClient {
   getVentaSucursal(params: { fecha: string; sucursalId: number; porPagina: number; paginaActual: number }): Promise<SwitchVentaSucursalData>;
   /** Reporte de recibos (cobros) del rango. Un row por recibo. Paginación de 50. */
   listRecibos(params: ListFacturasParams): Promise<SwitchRecibosData>;
+  /** Directorio de proveedores. Paginación de 50. (/apiproveedor/lista) */
+  listProveedores(params: { porPagina: number; paginaActual: number }): Promise<SwitchProveedoresData>;
+  /** Estado de cuenta CxP de un proveedor: saldo total, aging bucketizado y ledger
+   *  (facturas + pagos). Endpoint NO documentado (/apiproveedor/info) — devuelve 200
+   *  incluso en error (página HTML); validar el SHAPE de la respuesta, no el status. */
+  getProveedorInfo(proveedorId: number | string): Promise<SwitchProveedorInfoData>;
   /** Limpia el token cacheado de esta empresa (fuerza re-auth en la próxima llamada). */
   clearTokenCache(): void;
+}
+
+/** Item de /apiproveedor/lista (data.proveedores[]). */
+export interface SwitchProveedor {
+  id: number;
+  nombre: string;
+  identificacion: string | null;
+  dv: string | null;
+  direccion: string | null;
+  contacto: string | null;
+  telefono: string | null;
+  celular: string | null;
+  email: string | null;
+  tipoproveedor: string | null;
+  [key: string]: unknown;
+}
+export interface SwitchProveedoresData {
+  proveedores: SwitchProveedor[];
+  paginacion: SwitchPaginacion;
+}
+
+/** Bucket de aging de estadodecuenta.saldos[] (lo calcula Switch). */
+export interface SwitchProveedorSaldoBucket {
+  title: string;            // "0-30" | "31-60" | ... | "Mas de 365"
+  saldo: number | string;
+}
+/** Fila del ledger estadodecuenta.elements[]. */
+export interface SwitchProveedorElement {
+  ccteId: number;
+  numeroOrden: string | null;
+  numeroComprobante: string | null;
+  secuencial: string | null;
+  total: number | string;
+  saldo: number | string;
+  tipoComprobante: string;  // "Factura" | "Pago a proveedores" | ...
+  abrev: string;            // "FA" | "PP" | ...
+  fechaCreacion: string;    // DD-MM-YYYY
+  dias: number;
+  saldoConsecutivo: number | string;
+  credito: number | string; // cargos (facturas)
+  debito: number | string;  // pagos
+  [key: string]: unknown;
+}
+/** Respuesta de /apiproveedor/info. */
+export interface SwitchProveedorInfoData {
+  proveedor: {
+    id: number;
+    codigo?: string | null;
+    nombre: string;
+    identificacion?: string | null;
+    dv?: string | null;
+    direccion?: string | null;
+    contacto?: string | null;
+    telefono?: string | null;
+    celular?: string | null;
+    email?: string | null;
+    tipoproveedor?: string | null;
+    tipoIdentificacion?: string | null;
+    [key: string]: unknown;
+  };
+  estadodecuenta: {
+    saldoTotal: number | string;
+    saldos: SwitchProveedorSaldoBucket[];
+    proveedor: { proveedorId: number; codigo?: string | null; nombre: string };
+    elements: SwitchProveedorElement[];
+  };
 }
 
 /** Item de /apireporte/recibos (data.recibos[]). Sin id/secuencial de recibo. */
@@ -642,6 +714,29 @@ export function createSwitchClient(empresaKey: string): SwitchClient {
         empresaKey,
         cfg,
         `/apireporte/recibos?${qs.toString()}`,
+        "GET",
+      );
+    },
+
+    async listProveedores(params) {
+      const qs = new URLSearchParams({
+        porPagina: String(params.porPagina),
+        paginaActual: String(params.paginaActual),
+      });
+      return authedCall<SwitchProveedoresData>(
+        empresaKey,
+        cfg,
+        `/apiproveedor/lista?${qs.toString()}`,
+        "GET",
+      );
+    },
+
+    async getProveedorInfo(proveedorId) {
+      const qs = new URLSearchParams({ proveedorId: String(proveedorId) });
+      return authedCall<SwitchProveedorInfoData>(
+        empresaKey,
+        cfg,
+        `/apiproveedor/info?${qs.toString()}`,
         "GET",
       );
     },
