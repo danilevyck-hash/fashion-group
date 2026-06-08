@@ -52,6 +52,9 @@ export interface MkProyecto {
   id: string;
   nombre: string | null;
   tienda: string;
+  // Código del directorio (clientes_master) D-XXX. null = "sin vincular"
+  // (el texto libre de `tienda` se conserva siempre como display).
+  tienda_codigo: string | null;
   fecha_inicio: string; // DATE ISO "YYYY-MM-DD"
   fecha_cierre: string | null;
   estado: EstadoProyecto;
@@ -169,6 +172,9 @@ export interface MarcaPorcentajeInput {
 
 export interface CreateProyectoInput {
   tienda: string;
+  // Código del directorio (D-XXX) si la tienda se eligió del typeahead; null/
+  // omitido = "sin vincular" (texto libre).
+  tiendaCodigo?: string | null;
   nombre?: string;
   notas?: string;
   // Legacy: las marcas a nivel proyecto (mk_proyecto_marcas) se retiraron del
@@ -178,6 +184,7 @@ export interface CreateProyectoInput {
 
 export interface UpdateProyectoInput {
   tienda?: string;
+  tiendaCodigo?: string | null;
   nombre?: string | null;
   fecha_inicio?: string; // "YYYY-MM-DD"
   notas?: string | null;

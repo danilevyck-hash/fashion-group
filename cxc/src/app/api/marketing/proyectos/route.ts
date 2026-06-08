@@ -147,6 +147,7 @@ export async function POST(req: NextRequest) {
     // crea sin marcas; la rama legacy mk_proyecto_marcas se retiró.
     const proyecto = await createProyecto({
       tienda: body.tienda,
+      tiendaCodigo: body.tiendaCodigo ?? null,
       nombre: body.nombre,
       notas: body.notas,
     });

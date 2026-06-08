@@ -89,6 +89,7 @@ export async function PATCH(
     let updated = proyectoBefore;
     const tieneCamposBase =
       patch.tienda !== undefined ||
+      patch.tiendaCodigo !== undefined ||
       patch.nombre !== undefined ||
       patch.fecha_inicio !== undefined ||
       patch.notas !== undefined ||

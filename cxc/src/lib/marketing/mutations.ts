@@ -76,8 +76,14 @@ export async function createProyecto(
 
   const notas = oracionCase(input.notas);
 
+  const tiendaCodigo =
+    typeof input.tiendaCodigo === "string" && input.tiendaCodigo.trim().length > 0
+      ? input.tiendaCodigo.trim()
+      : null;
+
   const payload = {
     tienda,
+    tienda_codigo: tiendaCodigo,
     nombre: nombreFinal,
     notas: notas.length > 0 ? notas : null,
   };
@@ -125,6 +131,13 @@ export async function updateProyecto(
       const n = oracionCase(input.notas);
       payload.notas = n.length > 0 ? n : null;
     }
+  }
+  if (input.tiendaCodigo !== undefined) {
+    const c =
+      typeof input.tiendaCodigo === "string" && input.tiendaCodigo.trim().length > 0
+        ? input.tiendaCodigo.trim()
+        : null;
+    payload.tienda_codigo = c;
   }
   if (input.estado !== undefined) {
     payload.estado = input.estado;
