@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode, useEffect, useRef } from "react";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 interface DrawerProps {
   open: boolean;
@@ -14,6 +15,9 @@ interface DrawerProps {
 export default function Drawer({ open, onClose, title, children, footer }: DrawerProps) {
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // Lock body scroll behind drawer (hook compartido con ref-count).
+  useBodyScrollLock(open);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -23,13 +27,9 @@ export default function Drawer({ open, onClose, title, children, footer }: Drawe
       const first = panelRef.current?.querySelector<HTMLElement>("input, select, textarea, button");
       first?.focus();
     }, 50);
-    // Lock body scroll behind drawer
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
       clearTimeout(t);
-      document.body.style.overflow = prev;
     };
   }, [open, onClose]);
 
