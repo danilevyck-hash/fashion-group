@@ -9,7 +9,12 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
-  let query = supabase.from('products').select('*').order('created_at', { ascending: false })
+  // Columnas explícitas (no select('*')): endpoint público — blinda contra fugas
+  // de columnas futuras agregadas a `products`.
+  let query = supabase
+    .from('products')
+    .select('id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,created_at')
+    .order('created_at', { ascending: false })
 
   if (searchParams.get('active') === 'true') query = query.eq('active', true)
   if (searchParams.get('category')) query = query.eq('category', searchParams.get('category'))

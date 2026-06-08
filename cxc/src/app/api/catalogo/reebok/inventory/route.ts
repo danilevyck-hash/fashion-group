@@ -8,7 +8,8 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const productId = searchParams.get('product_id')
 
-  let query = supabase.from('inventory').select('*').order('size')
+  // Columnas explícitas (no select('*')): endpoint público.
+  let query = supabase.from('inventory').select('id,product_id,size,quantity').order('size')
   if (productId) query = query.eq('product_id', productId)
 
   const { data, error } = await query
