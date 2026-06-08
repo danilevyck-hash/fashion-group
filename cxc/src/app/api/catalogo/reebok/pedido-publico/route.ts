@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { randomInt } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { calculateReebokOrderTotal } from "@/lib/reebok-order-total";
 import { sendTelegramAlert } from "@/lib/telegram";
+
+// short_id: 8 chars base36 generados con aleatoriedad CRIPTOGRÁFICA (randomInt usa
+// crypto). Reemplaza Math.random —predecible— para que el token del link público
+// no sea adivinable. Mismo formato/longitud que antes (cero cambio de UX).
+const SHORT_ID_ALPHABET = "0123456789abcdefghijklmnopqrstuvwxyz";
+function generateShortId(): string {
+  return Array.from({ length: 8 }, () => SHORT_ID_ALPHABET[randomInt(36)]).join("");
+}
 
 const money = (n: number) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -38,7 +47,7 @@ export async function POST(req: NextRequest) {
     }
 
     const total = calculateReebokOrderTotal(items);
-    const short_id = Math.random().toString(36).substring(2, 10);
+    const short_id = generateShortId();
 
     const { error } = await supabase.from("reebok_pedidos_publicos").insert({
       short_id,

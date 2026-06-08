@@ -17,7 +17,11 @@ export async function GET(
 
     const { data, error } = await supabase
       .from("reebok_pedidos_publicos")
-      .select("*")
+      // Columnas explícitas (no select("*")): endpoint público — evita que una
+      // columna futura se filtre sin querer por el link compartido.
+      .select(
+        "short_id,cliente_nombre,items,total,convertida,convertida_at,ped_order_number,created_at,id",
+      )
       .eq("short_id", id)
       .single();
 

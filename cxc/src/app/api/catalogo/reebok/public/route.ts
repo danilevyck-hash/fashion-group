@@ -8,7 +8,11 @@ export async function GET() {
 
   const { data: products, error: pErr } = await reebokServer
     .from("products")
-    .select("*")
+    // Columnas explícitas (no select("*")): catálogo público — blinda contra
+    // fugas de columnas futuras agregadas a `products`.
+    .select(
+      "id,name,sku,description,category,sub_category,gender,color,price,image_url,badge,on_sale,active,created_at",
+    )
     .eq("active", true)
     .order("created_at", { ascending: false });
 
