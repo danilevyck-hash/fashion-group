@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import AddNewInline from "./AddNewInline";
+import ClienteTypeahead from "./ClienteTypeahead";
 import { ScrollableTable } from "@/components/ui";
 
 interface GuiaFormProps {
@@ -29,6 +30,8 @@ interface GuiaFormProps {
   setEntregadoPor: (v: string) => void;
   observaciones: string;
   setObservaciones: (v: string) => void;
+  numeroGuiaTransp: string;
+  setNumeroGuiaTransp: (v: string) => void;
   items: GuiaItem[];
   transportistas: Transportista[];
   clientes: string[];
@@ -41,6 +44,7 @@ interface GuiaFormProps {
   onAddDireccion: (v: string) => void;
   onAddEmpresa: (v: string) => void;
   onUpdateItem: (idx: number, field: keyof GuiaItem, value: string | number) => void;
+  onUpdateItemFields: (idx: number, partial: Partial<GuiaItem>) => void;
   onAddRow: () => void;
   onRemoveRow: (idx: number) => void;
   onSave: (opts?: { silent?: boolean }) => void;
@@ -55,10 +59,11 @@ export default function GuiaForm({
   editingId, formNumero, fecha, setFecha,
   modoEntrega, setModoEntrega, transportistaId, setTransportistaId,
   entregadoPor, setEntregadoPor, observaciones, setObservaciones,
+  numeroGuiaTransp, setNumeroGuiaTransp,
   items, transportistas, clientes, direcciones, empresas,
   validationErrors, error, saving,
   onAddCliente, onAddDireccion, onAddEmpresa,
-  onUpdateItem, onAddRow, onRemoveRow, onSave, onCancel,
+  onUpdateItem, onUpdateItemFields, onAddRow, onRemoveRow, onSave, onCancel,
   hasDraft, draftTimeAgo, onRestoreDraft, onDiscardDraft,
 }: GuiaFormProps) {
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
@@ -124,7 +129,7 @@ export default function GuiaForm({
   useEffect(() => {
     changeCount.current++;
     if (changeCount.current > 1) setDirty(true);
-  }, [fecha, modoEntrega, transportistaId, entregadoPor, observaciones, items]);
+  }, [fecha, modoEntrega, transportistaId, entregadoPor, observaciones, numeroGuiaTransp, items]);
 
   // Auto-save with debounce (only when editing existing guía)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -293,6 +298,22 @@ export default function GuiaForm({
                 className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition mt-3" />
             )}
           </div>
+
+          {/* N° guía del transportista — solo con transportista; opcional al
+              crear (obligatorio al despachar). En entrega directa no aplica. */}
+          {modoEntrega === "transportista" && (
+            <div>
+              <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">
+                N° guía del transportista <span className="text-gray-300 normal-case tracking-normal">(opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={numeroGuiaTransp}
+                onChange={e => setNumeroGuiaTransp(e.target.value)}
+                placeholder="Lo puedes poner ahora o al despachar"
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+            </div>
+          )}
         </div>
       </div>
 
@@ -328,8 +349,15 @@ export default function GuiaForm({
               <tr key={idx} className="border-b border-gray-200">
                 <td className="py-2 text-gray-300">{idx + 1}</td>
                 <td className="py-2 pr-2">
-                  <input list="clientes-list" type="text" value={item.cliente} onChange={e => onUpdateItem(idx, "cliente", e.target.value)} onBlur={() => handleBlur(`item-${idx}-cliente`)}
-                    className={inputClass(`item-${idx}-cliente`, "w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition", `item-${idx}-cliente`, item.cliente)} />
+                  <ClienteTypeahead
+                    value={item.cliente}
+                    codigo={item.cliente_codigo || ""}
+                    onSelect={(nombre, codigo) => onUpdateItemFields(idx, { cliente: nombre, cliente_codigo: codigo })}
+                    onFreeText={(texto) => onUpdateItemFields(idx, { cliente: texto, cliente_codigo: "" })}
+                    onBlur={() => handleBlur(`item-${idx}-cliente`)}
+                    hasError={fieldError(`item-${idx}-cliente`, item.cliente)}
+                    inputClassName={inputClass(`item-${idx}-cliente`, "w-full border-b border-gray-200 py-1 pr-16 text-sm outline-none focus:border-black transition", `item-${idx}-cliente`, item.cliente)}
+                  />
                   {fieldError(`item-${idx}-cliente`, item.cliente) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
                 </td>
                 <td className="py-2 pr-2">

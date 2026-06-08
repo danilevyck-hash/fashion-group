@@ -49,7 +49,7 @@ export function saveList(key: string, defaults: string[], list: string[]) {
 }
 
 export function emptyItem(orden: number): GuiaItem {
-  return { orden, cliente: "", direccion: "", empresa: "", facturas: "", bultos: 0, numero_guia_transp: "" };
+  return { orden, cliente: "", cliente_codigo: "", direccion: "", empresa: "", facturas: "", bultos: 0, numero_guia_transp: "" };
 }
 
 export function clientesSummary(items: GuiaItem[]): string {

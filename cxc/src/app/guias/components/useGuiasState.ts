@@ -29,6 +29,7 @@ export function useGuiasState() {
   const [bReceptor, setBReceptor] = useState("");
   const [bCedula, setBCedula] = useState("");
   const [bChofer, setBChofer] = useState("");
+  const [bNumeroGuiaTransp, setBNumeroGuiaTransp] = useState("");
   const [bSaving, setBSaving] = useState(false);
   const [showPending, setShowPending] = useState(false);
   const [tipoDespacho, setTipoDespacho] = useState<"externo" | "directo">("externo");
@@ -82,6 +83,7 @@ export function useGuiasState() {
         setBReceptor(g.receptor_nombre || "");
         setBCedula(g.cedula || "");
         setBChofer(g.nombre_chofer || "");
+        setBNumeroGuiaTransp(g.numero_guia_transp || "");
         setTipoDespacho(g.tipo_despacho || "externo");
         try {
           const saved1 = localStorage.getItem(`guia_firma_${id}_transportista`);
@@ -99,6 +101,7 @@ export function useGuiasState() {
     setBReceptor("");
     setBCedula("");
     setBChofer("");
+    setBNumeroGuiaTransp("");
     setTipoDespacho("externo");
     setPendingFirma1(null);
     setPendingFirma2(null);
@@ -141,6 +144,7 @@ export function useGuiasState() {
 
     if (tipoDespacho === "externo") {
       payload.placa = bPlaca;
+      payload.numero_guia_transp = bNumeroGuiaTransp;
     } else {
       payload.nombre_chofer = bChofer;
     }
@@ -196,6 +200,7 @@ export function useGuiasState() {
     bReceptor, setBReceptor,
     bCedula, setBCedula,
     bChofer, setBChofer,
+    bNumeroGuiaTransp, setBNumeroGuiaTransp,
     bSaving,
     pendingFirma1, setPendingFirma1,
     pendingFirma2, setPendingFirma2,

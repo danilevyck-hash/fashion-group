@@ -37,6 +37,8 @@ export default function GuiaNuevaPage() {
         setEntregadoPor={s.setEntregadoPor}
         observaciones={s.observaciones}
         setObservaciones={s.setObservaciones}
+        numeroGuiaTransp={s.numeroGuiaTransp}
+        setNumeroGuiaTransp={s.setNumeroGuiaTransp}
         items={s.items}
         transportistas={s.transportistas}
         clientes={s.clientes}
@@ -49,6 +51,7 @@ export default function GuiaNuevaPage() {
         onAddDireccion={s.addDireccion}
         onAddEmpresa={s.addEmpresa}
         onUpdateItem={s.updateItem}
+        onUpdateItemFields={s.updateItemFields}
         onAddRow={s.addRow}
         onRemoveRow={s.removeRow}
         onSave={s.saveGuia}

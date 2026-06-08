@@ -316,7 +316,10 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
   // PDF extraction — group text items by Y position to reconstruct lines
   async function extractTextFromPDF(file: File): Promise<{ text: string; rawLines: RawLine[] }> {
     const pdfjsLib = await import("pdfjs-dist");
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+    // Worker servido LOCAL (fuera unpkg) → funciona offline y sin depender de un
+    // CDN externo. El archivo en /public se copia de pdfjs-dist; si se sube la
+    // versión del paquete, recopiar public/pdf.worker.min.mjs para que coincida.
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
     const arrayBuffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;

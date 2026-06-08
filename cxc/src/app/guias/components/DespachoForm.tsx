@@ -17,6 +17,8 @@ interface DespachoFormProps {
   setBCedula: (v: string) => void;
   bChofer: string;
   setBChofer: (v: string) => void;
+  bNumeroGuiaTransp: string;
+  setBNumeroGuiaTransp: (v: string) => void;
   bSaving: boolean;
   onConfirmar: (firma1: string, firma2: string) => void;
   showToast: (msg: string) => void;
@@ -29,7 +31,8 @@ interface DespachoFormProps {
 export default function DespachoForm({
   tipoDespacho, setTipoDespacho,
   bPlaca, setBPlaca, bReceptor, setBReceptor, bCedula, setBCedula,
-  bChofer, setBChofer, bSaving, onConfirmar, showToast,
+  bChofer, setBChofer, bNumeroGuiaTransp, setBNumeroGuiaTransp,
+  bSaving, onConfirmar, showToast,
   pendingFirma1, pendingFirma2, onFirma1Change, onFirma2Change,
 }: DespachoFormProps) {
   const canvas1Ref = useRef<HTMLCanvasElement>(null);
@@ -37,8 +40,8 @@ export default function DespachoForm({
 
   // Warn before leaving if user has filled any field
   const isDirty = useMemo(() =>
-    !!(bPlaca || bReceptor || bCedula || bChofer || pendingFirma1 || pendingFirma2),
-    [bPlaca, bReceptor, bCedula, bChofer, pendingFirma1, pendingFirma2]
+    !!(bPlaca || bReceptor || bCedula || bChofer || bNumeroGuiaTransp || pendingFirma1 || pendingFirma2),
+    [bPlaca, bReceptor, bCedula, bChofer, bNumeroGuiaTransp, pendingFirma1, pendingFirma2]
   );
   useEffect(() => {
     function handler(e: BeforeUnloadEvent) {
@@ -51,6 +54,7 @@ export default function DespachoForm({
   function handleConfirmar() {
     if (tipoDespacho === "externo") {
       if (!bPlaca.trim()) return showToast("Ingresa la placa del vehiculo");
+      if (!bNumeroGuiaTransp.trim()) return showToast("Falta el N° de guía del transportista");
       if (!bReceptor.trim()) return showToast("Ingresa el nombre del transportista/receptor");
       if (!bCedula.trim()) return showToast("Ingresa la cedula del receptor");
     } else {
@@ -97,6 +101,11 @@ export default function DespachoForm({
           <div>
             <label className="text-xs uppercase tracking-wider text-gray-400 mb-1 block">Placa del vehiculo *</label>
             <input type="text" value={bPlaca} onChange={(e) => setBPlaca(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
+          </div>
+          <div>
+            <label className="text-xs uppercase tracking-wider text-gray-400 mb-1 block">N° guía del transportista *</label>
+            <input type="text" value={bNumeroGuiaTransp} onChange={(e) => setBNumeroGuiaTransp(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
           </div>
           <div>

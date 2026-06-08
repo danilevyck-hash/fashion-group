@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
   const s = getSession(req);
   if (!s || !GUIAS_ROLES.includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const body = await req.json();
-  const { fecha, modo_entrega, transportista_id, placa, observaciones, items, monto_total, estado, firma_transportista, entregado_por } = body;
+  const { fecha, modo_entrega, transportista_id, placa, observaciones, items, monto_total, estado, firma_transportista, entregado_por, numero_guia_transp } = body;
 
   // Validate modo_entrega + transportista_id (Sprint 2 schema)
   if (modo_entrega !== "transportista" && modo_entrega !== "entrega_directa") {
@@ -86,6 +86,7 @@ export async function POST(req: NextRequest) {
       monto_total: monto_total || 0,
       estado: estado || "Pendiente Bodega",
       entregado_por: entregado_por || null,
+      numero_guia_transp: numero_guia_transp || null,
     };
     if (firma_transportista) insertData.firma_transportista = firma_transportista;
 
@@ -115,6 +116,7 @@ export async function POST(req: NextRequest) {
       guia_id: guia.id,
       orden: i + 1,
       cliente: item.cliente || "",
+      cliente_codigo: item.cliente_codigo || null,
       direccion: item.direccion || "",
       empresa: item.empresa || "",
       facturas: item.facturas || "",

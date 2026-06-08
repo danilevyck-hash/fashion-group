@@ -93,6 +93,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (!receptor_nombre) return NextResponse.json({ error: "Nombre del receptor requerido" }, { status: 400 });
     if (!cedula) return NextResponse.json({ error: "Cédula del receptor requerida" }, { status: 400 });
     if (tipo_despacho === "externo" && !placa) return NextResponse.json({ error: "Placa del vehículo requerida para transporte externo" }, { status: 400 });
+    if (tipo_despacho === "externo" && !numero_guia_transp) return NextResponse.json({ error: "Falta el N° de guía del transportista" }, { status: 400 });
     if (tipo_despacho === "directo" && !nombre_chofer) return NextResponse.json({ error: "Nombre del chofer requerido para entrega directa" }, { status: 400 });
   }
 
@@ -133,7 +134,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (items && items.length > 0) {
       const rows = items.map((item: Record<string, unknown>, i: number) => ({
         guia_id: id, orden: -(i + 1), // negative orden = new batch (temp marker)
-        cliente: item.cliente || "", direccion: item.direccion || "",
+        cliente: item.cliente || "", cliente_codigo: item.cliente_codigo || null,
+        direccion: item.direccion || "",
         empresa: item.empresa || "", facturas: item.facturas || "",
         bultos: item.bultos || 0, numero_guia_transp: item.numero_guia_transp || "",
       }));
