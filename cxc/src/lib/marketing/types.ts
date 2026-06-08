@@ -15,7 +15,12 @@ export const EMPRESA_CODIGOS = [
 
 export type EmpresaCodigo = (typeof EMPRESA_CODIGOS)[number];
 
-export type EstadoProyecto = "abierto" | "enviado" | "cobrado";
+// Estados de la UI: solo abierto / cerrado.
+// 'cerrado' es el valor nuevo (CHECK ampliado). Los proyectos legacy en
+// 'enviado'/'cobrado' siguen en DB y se LEEN como 'cerrado' vía
+// normalizarEstadoProyecto() (nunca se reescriben). Al cerrar desde la UI se
+// escribe 'cerrado'; al reabrir, 'abierto'.
+export type EstadoProyecto = "abierto" | "cerrado";
 
 // Tipo de marca:
 //   'externa' — hay contraparte (Tommy, Calvin, Reebok) con quien compartir 50/50.

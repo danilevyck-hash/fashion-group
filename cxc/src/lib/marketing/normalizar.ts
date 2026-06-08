@@ -2,6 +2,28 @@
 // Marketing module — normalización de texto (funciones puras, sin side effects)
 // ============================================================================
 import { fmtDate as fmtDateShared } from "@/lib/format";
+import type { EstadoProyecto } from "./types";
+
+/**
+ * Estado de LECTURA de un proyecto (abierto | cerrado).
+ * Mapea los estados legacy del workflow viejo a la dupla actual:
+ *   - 'abierto'            → 'abierto'
+ *   - 'enviado'|'cobrado'  → 'cerrado'   (legacy, nunca se reescriben)
+ *   - 'cerrado'            → 'cerrado'
+ *   - null/desconocido     → 'abierto'   (default seguro)
+ * Las escrituras solo emiten 'abierto' o 'cerrado'.
+ */
+export function normalizarEstadoProyecto(raw: unknown): EstadoProyecto {
+  const v = String(raw ?? "abierto");
+  return v === "enviado" || v === "cobrado" || v === "cerrado"
+    ? "cerrado"
+    : "abierto";
+}
+
+/** Etiqueta humana del estado para display/Excel. */
+export function etiquetaEstadoProyecto(raw: unknown): string {
+  return normalizarEstadoProyecto(raw) === "cerrado" ? "Cerrado" : "Abierto";
+}
 
 /**
  * Trim + colapsa espacios múltiples a uno solo.

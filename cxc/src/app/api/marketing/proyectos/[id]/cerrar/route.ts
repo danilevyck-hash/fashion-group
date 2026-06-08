@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { reabrirProyecto } from "@/lib/marketing/mutations";
+import { cerrarProyecto } from "@/lib/marketing/mutations";
 
 export const dynamic = "force-dynamic";
 
 const uuidRegex =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// POST /api/marketing/proyectos/[id]/reabrir
-// Transición: cualquier estado → abierto. No toca fechas legacy (se conservan).
-// Devuelve el nuevo estado en { destino }.
+// POST /api/marketing/proyectos/[id]/cerrar
+// Escribe estado='cerrado'. No toca fechas legacy (se conservan en datos).
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -20,11 +19,11 @@ export async function POST(
     return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   }
   try {
-    const destino = await reabrirProyecto(params.id);
-    return NextResponse.json({ ok: true, destino });
+    await cerrarProyecto(params.id);
+    return NextResponse.json({ ok: true, destino: "cerrado" });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error interno";
-    console.error("POST reabrir:", msg);
+    console.error("POST cerrar:", msg);
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 }

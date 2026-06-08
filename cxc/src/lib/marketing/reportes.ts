@@ -5,7 +5,11 @@
 // ============================================================================
 import XLSX from "xlsx-js-style";
 import { supabaseServer } from "@/lib/supabase-server";
-import { formatearFecha } from "./normalizar";
+import {
+  formatearFecha,
+  normalizarEstadoProyecto,
+  etiquetaEstadoProyecto,
+} from "./normalizar";
 import { getMarcas } from "./queries";
 import { getEntregaTotalByProyectoBatch } from "./inventario";
 import type { MkMarca, EstadoProyecto } from "./types";
@@ -95,7 +99,7 @@ async function cargarProyectosVigentes(
       nombre: (x.nombre as string | null) ?? null,
       tienda: String(x.tienda ?? ""),
       fecha_inicio: String(x.fecha_inicio ?? ""),
-      estado: String(x.estado ?? "abierto") as EstadoProyecto,
+      estado: normalizarEstadoProyecto(x.estado),
     };
   });
 }
@@ -475,7 +479,7 @@ export function exportarExcelReporte(tipo: TipoReporte, data: unknown): Blob {
         item.proyecto.nombre ?? item.proyecto.tienda,
         item.proyecto.tienda,
         formatearFecha(item.proyecto.fecha_inicio),
-        item.proyecto.estado,
+        etiquetaEstadoProyecto(item.proyecto.estado),
         marcasTxt,
         item.gastoTotal,
       ]);

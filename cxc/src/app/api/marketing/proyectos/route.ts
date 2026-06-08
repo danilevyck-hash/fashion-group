@@ -5,7 +5,6 @@ import { createProyecto } from "@/lib/marketing/mutations";
 import { resumenFacturasVigentesBatch } from "@/lib/marketing/queries";
 import type {
   CreateProyectoInput,
-  EstadoProyecto,
   MarcaConPorcentaje,
   MkProyecto,
 } from "@/lib/marketing/types";
@@ -35,11 +34,11 @@ export async function GET(req: NextRequest) {
       .is("anulado_en", null)
       .order("fecha_inicio", { ascending: false });
 
-    if (
-      estadoParam &&
-      ["abierto", "por_cobrar", "enviado", "cobrado"].includes(estadoParam)
-    ) {
-      pq = pq.eq("estado", estadoParam as EstadoProyecto);
+    // Modelo abierto/cerrado: 'cerrado' incluye los legacy enviado/cobrado.
+    if (estadoParam === "abierto") {
+      pq = pq.eq("estado", "abierto");
+    } else if (estadoParam === "cerrado") {
+      pq = pq.in("estado", ["cerrado", "enviado", "cobrado"]);
     }
 
     const { data: proyectosData, error: proyectosError } = await pq;
