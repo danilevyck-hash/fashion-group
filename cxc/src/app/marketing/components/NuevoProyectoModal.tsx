@@ -7,36 +7,22 @@ import type { MkMarca, MkProyecto } from "@/lib/marketing/types";
 
 interface Props {
   marcas: MkMarca[];
-  marcaPreseleccionada?: MkMarca | null;
   onClose: () => void;
   onCreated: (proyectoId: string) => void;
 }
 
 export default function NuevoProyectoModal({
   marcas,
-  marcaPreseleccionada,
   onClose,
   onCreated,
 }: Props) {
   const { toast } = useToast();
   const [guardando, setGuardando] = useState(false);
 
-  const initial = marcaPreseleccionada
-    ? {
-        marcas: [
-          {
-            marca: marcaPreseleccionada,
-            porcentaje: 100,
-          },
-        ],
-      }
-    : undefined;
-
   const handleSubmit = async (data: {
     tienda: string;
     nombre: string;
     notas: string;
-    marcas: Array<{ marcaId: string; porcentaje: number }>;
   }) => {
     setGuardando(true);
     try {
@@ -47,7 +33,6 @@ export default function NuevoProyectoModal({
           tienda: data.tienda,
           nombre: data.nombre || undefined,
           notas: data.notas || undefined,
-          marcas: data.marcas,
         }),
       });
       if (!res.ok) {
@@ -91,7 +76,6 @@ export default function NuevoProyectoModal({
         <div className="p-6">
           <ProyectoForm
             marcas={marcas}
-            initial={initial}
             onSubmit={handleSubmit}
             onCancel={onClose}
           />

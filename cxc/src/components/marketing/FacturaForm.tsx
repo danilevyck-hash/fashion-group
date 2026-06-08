@@ -16,14 +16,14 @@ import type {
   ProyectoConMarcas,
 } from "@/lib/marketing/types";
 import { useToast } from "@/components/ToastSystem";
-import { AutocompleteInput } from "./AutocompleteInput";
 import { PasoInstruccion } from "./PasoInstruccion";
 import { PdfUploader, UploadResult } from "./PdfUploader";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import {
   PORCENTAJE_IMPORTACION_ZONA_LIBRE,
-  calcularCostoTotal,
   calcularImportacion,
+  calcularItbms,
+  calcularTotalFactura,
 } from "@/lib/marketing-calc";
 
 export interface FacturaFormValues {
@@ -73,12 +73,6 @@ function fmtFechaCorta(iso: string | null): string {
   return `${dia}/${mes}/${d.getFullYear()}`;
 }
 
-async function fetchProveedorSuggestions(_q: string): Promise<string[]> {
-  return [];
-}
-async function fetchConceptoSuggestions(_q: string): Promise<string[]> {
-  return [];
-}
 
 function isoHoy(): string {
   const d = new Date();
@@ -86,10 +80,6 @@ function isoHoy(): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
-}
-
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
 }
 
 interface RespuestaIA {
@@ -164,19 +154,20 @@ export function FacturaForm({
   );
 
   const subtotal = Number(subtotalStr) || 0;
-  // Zona libre y ITBMS son mutuamente excluyentes: si zona libre, ITBMS = 0.
-  const itbms = useMemo(() => {
-    if (tieneImportacion) return 0;
-    return itbmsOption === "7" ? round2(subtotal * 0.07) : 0;
-  }, [subtotal, itbmsOption, tieneImportacion]);
+  // Zona libre y ITBMS son mutuamente excluyentes (helper compartido single/bulk).
+  const itbmsPct = itbmsOption === "7" ? 7 : 0;
+  const itbms = useMemo(
+    () => calcularItbms(subtotal, itbmsPct, tieneImportacion),
+    [subtotal, itbmsPct, tieneImportacion],
+  );
   const importacion = useMemo(
     () => calcularImportacion(subtotal, tieneImportacion),
     [subtotal, tieneImportacion],
   );
-  const total = useMemo(() => {
-    if (tieneImportacion) return calcularCostoTotal(subtotal, true);
-    return round2(subtotal + itbms);
-  }, [subtotal, itbms, tieneImportacion]);
+  const total = useMemo(
+    () => calcularTotalFactura(subtotal, itbmsPct, tieneImportacion),
+    [subtotal, itbmsPct, tieneImportacion],
+  );
 
   // Payload final: cada marca seleccionada con porcentaje fijo 50.
   const marcasPayload: MarcaPorcentajeInput[] = useMemo(
@@ -414,21 +405,33 @@ export function FacturaForm({
             </div>
           </div>
 
-          <AutocompleteInput
-            label="Proveedor"
-            value={proveedor}
-            onChange={setProveedor}
-            fetchSuggestions={fetchProveedorSuggestions}
-            required
-          />
+          <div>
+            <label htmlFor="factura-proveedor" className="block text-sm text-gray-600 mb-1">
+              Proveedor<span className="text-red-500 ml-0.5">*</span>
+            </label>
+            <input
+              id="factura-proveedor"
+              type="text"
+              value={proveedor}
+              onChange={(e) => setProveedor(e.target.value)}
+              required
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none"
+            />
+          </div>
 
-          <AutocompleteInput
-            label="Concepto"
-            value={concepto}
-            onChange={setConcepto}
-            fetchSuggestions={fetchConceptoSuggestions}
-            required
-          />
+          <div>
+            <label htmlFor="factura-concepto" className="block text-sm text-gray-600 mb-1">
+              Concepto<span className="text-red-500 ml-0.5">*</span>
+            </label>
+            <input
+              id="factura-concepto"
+              type="text"
+              value={concepto}
+              onChange={(e) => setConcepto(e.target.value)}
+              required
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none"
+            />
+          </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div>

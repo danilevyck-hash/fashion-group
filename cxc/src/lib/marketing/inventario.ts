@@ -329,20 +329,11 @@ function normalizarItems(
 ): NormalizedItem[] {
   return items
     .map((it) => {
-      // Compat: si el caller mandó cantidadPorMarca legacy, lo convertimos.
-      let reparto: RepartoItemInput[];
-      if (Array.isArray(it.reparto) && it.reparto.length > 0) {
-        reparto = normalizarReparto(it.reparto);
-      } else if (it.cantidadPorMarca) {
-        reparto = normalizarReparto(
-          Object.entries(it.cantidadPorMarca).map(([marcaId, cant]) => ({
-            marcaId,
-            cantidad: Number(cant),
-          })),
-        );
-      } else {
-        reparto = [];
-      }
+      // La UI siempre emite `reparto` (1 marca por entrega). El shape legacy
+      // cantidadPorMarca se retiró (ningún caller lo enviaba).
+      const reparto = Array.isArray(it.reparto)
+        ? normalizarReparto(it.reparto)
+        : [];
       return {
         productoId: String(it.productoId ?? ""),
         reparto,

@@ -13,6 +13,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { pedirUploadUrl, subirArchivoAStorage } from "@/app/marketing/components/uploadHelpers";
+import { calcularItbms } from "@/lib/marketing-calc";
 import type {
   BorradorFactura,
   DuplicadoItem,
@@ -335,12 +336,9 @@ export function useBulkUploadFacturas({ proyectoId }: UseArgs) {
     try {
       const items = cardsListas.map((b) => {
         const sub = Number(b.subtotalStr);
-        // Zona libre fuerza ITBMS = 0; si no, depende del radio.
-        const itbms = b.tieneImportacion
-          ? 0
-          : b.itbmsOption === "7"
-            ? round2(sub * 0.07)
-            : 0;
+        // Helper compartido single/bulk. Zona libre fuerza ITBMS = 0; si no,
+        // usa el pct real (itbmsOption viene del itbms_pct de la IA o del radio).
+        const itbms = calcularItbms(sub, b.itbmsOption === "7" ? 7 : 0, b.tieneImportacion);
         return {
           cardId: b.cardId,
           numeroFactura: b.numeroFactura.trim(),

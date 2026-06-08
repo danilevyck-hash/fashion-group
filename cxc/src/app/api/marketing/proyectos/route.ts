@@ -143,13 +143,12 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    // Fase 2: marcas opcionales. Si no vienen, el proyecto se crea sin
-    // filas en mk_proyecto_marcas y las marcas se asignan por factura.
+    // Las marcas se asignan por factura (mk_factura_marcas). El proyecto se
+    // crea sin marcas; la rama legacy mk_proyecto_marcas se retiró.
     const proyecto = await createProyecto({
       tienda: body.tienda,
       nombre: body.nombre,
       notas: body.notas,
-      marcas: Array.isArray(body.marcas) ? body.marcas : [],
     });
     return NextResponse.json(proyecto);
   } catch (err) {

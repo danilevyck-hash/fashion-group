@@ -47,3 +47,38 @@ export function calcularImportacion(
   const sub = Number.isFinite(subtotal) ? subtotal : 0;
   return round2(sub * (PORCENTAJE_IMPORTACION_ZONA_LIBRE / 100));
 }
+
+export const PORCENTAJE_ITBMS = 7;
+
+/**
+ * ITBMS de una factura. Fuente única para single y bulk (antes cada uno hacía
+ * `round2(subtotal * 0.07)` por su lado). Zona libre fuerza ITBMS = 0.
+ * `itbmsPct` es el porcentaje REAL (0 | 7) — viene del itbms_pct detectado por
+ * la IA o del toggle del usuario.
+ */
+export function calcularItbms(
+  subtotal: number,
+  itbmsPct: number,
+  tieneImportacion: boolean,
+): number {
+  if (tieneImportacion) return 0;
+  const sub = Number.isFinite(subtotal) ? subtotal : 0;
+  return itbmsPct === PORCENTAJE_ITBMS
+    ? round2(sub * (PORCENTAJE_ITBMS / 100))
+    : 0;
+}
+
+/**
+ * Total final de una factura:
+ *   zona libre  → subtotal × 1.15 (sin ITBMS)
+ *   normal      → subtotal + ITBMS
+ */
+export function calcularTotalFactura(
+  subtotal: number,
+  itbmsPct: number,
+  tieneImportacion: boolean,
+): number {
+  if (tieneImportacion) return calcularCostoTotal(subtotal, true);
+  const sub = Number.isFinite(subtotal) ? subtotal : 0;
+  return round2(sub + calcularItbms(sub, itbmsPct, false));
+}

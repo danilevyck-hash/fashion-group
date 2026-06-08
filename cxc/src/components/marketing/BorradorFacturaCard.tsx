@@ -9,8 +9,9 @@ import { useMemo } from "react";
 import type { MkMarca } from "@/lib/marketing/types";
 import {
   PORCENTAJE_IMPORTACION_ZONA_LIBRE,
-  calcularCostoTotal,
   calcularImportacion,
+  calcularItbms,
+  calcularTotalFactura,
 } from "@/lib/marketing-calc";
 
 export type EstadoBorrador =
@@ -60,10 +61,6 @@ interface Props {
   onDescartar: (cardId: string) => void;
 }
 
-function round2(n: number): number {
-  return Math.round(n * 100) / 100;
-}
-
 function formatearMonto(n: number): string {
   return `$${n.toLocaleString("en-US", {
     minimumFractionDigits: 2,
@@ -79,18 +76,19 @@ export function BorradorFacturaCard({
 }: Props) {
   const subtotal = Number(borrador.subtotalStr) || 0;
   const tieneImportacion = borrador.tieneImportacion;
-  const itbms = useMemo(() => {
-    if (tieneImportacion) return 0;
-    return borrador.itbmsOption === "7" ? round2(subtotal * 0.07) : 0;
-  }, [subtotal, borrador.itbmsOption, tieneImportacion]);
+  const itbmsPct = borrador.itbmsOption === "7" ? 7 : 0;
+  const itbms = useMemo(
+    () => calcularItbms(subtotal, itbmsPct, tieneImportacion),
+    [subtotal, itbmsPct, tieneImportacion],
+  );
   const importacion = useMemo(
     () => calcularImportacion(subtotal, tieneImportacion),
     [subtotal, tieneImportacion],
   );
-  const total = useMemo(() => {
-    if (tieneImportacion) return calcularCostoTotal(subtotal, true);
-    return round2(subtotal + itbms);
-  }, [subtotal, itbms, tieneImportacion]);
+  const total = useMemo(
+    () => calcularTotalFactura(subtotal, itbmsPct, tieneImportacion),
+    [subtotal, itbmsPct, tieneImportacion],
+  );
 
   const estaProcesando =
     borrador.estado.tipo === "ocr-pendiente" ||

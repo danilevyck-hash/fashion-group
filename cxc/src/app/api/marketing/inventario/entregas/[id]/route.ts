@@ -18,13 +18,11 @@ interface UpdateBody {
   items?: Array<{
     productoId?: string;
     reparto?: RepartoEntryBody[];
-    cantidadPorMarca?: Record<string, number | string>;
   }>;
 }
 
 function normalizarRepartoBody(it: {
   reparto?: RepartoEntryBody[];
-  cantidadPorMarca?: Record<string, number | string>;
 }): Array<{ marcaId: string; empresa?: string | null; cantidad: number }> {
   if (Array.isArray(it.reparto) && it.reparto.length > 0) {
     return it.reparto.map((r) => ({
@@ -36,12 +34,6 @@ function normalizarRepartoBody(it: {
             ? null
             : String(r.empresa),
       cantidad: Number(r.cantidad ?? 0),
-    }));
-  }
-  if (it.cantidadPorMarca && typeof it.cantidadPorMarca === "object") {
-    return Object.entries(it.cantidadPorMarca).map(([marcaId, cant]) => ({
-      marcaId: String(marcaId),
-      cantidad: Number(cant ?? 0),
     }));
   }
   return [];
