@@ -123,6 +123,8 @@ export default function GuiasPage() {
           setBCedula={s.setBCedula}
           bChofer={s.bChofer}
           setBChofer={s.setBChofer}
+          bNumeroGuiaTransp={s.bNumeroGuiaTransp}
+          setBNumeroGuiaTransp={s.setBNumeroGuiaTransp}
           bSaving={s.bSaving}
           onConfirmarDespacho={s.confirmarDespacho}
           showToast={s.showToast}

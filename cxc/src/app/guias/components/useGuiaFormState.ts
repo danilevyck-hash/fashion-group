@@ -40,7 +40,15 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
 
   // Form state
   const [editingEstado, setEditingEstado] = useState<string | null>(null);
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  // Fecha default = HOY en hora LOCAL. toISOString() es UTC y en Panamá (UTC-5)
+  // de noche devolvía el día siguiente; construimos la fecha local a mano.
+  const [fecha, setFecha] = useState(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  });
   const [modoEntrega, setModoEntrega] = useState<ModoEntrega>(() => {
     try { return (localStorage.getItem("fg_last_modo_entrega") as ModoEntrega) || "transportista"; } catch { return "transportista"; }
   });
@@ -51,6 +59,9 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     try { return localStorage.getItem("fg_last_entregado_por") || ""; } catch { return ""; }
   });
   const [observaciones, setObservaciones] = useState("");
+  // N° de guía del transportista (nivel guía). Opcional al crear; obligatorio
+  // al despachar cuando el modo es transportista externo (validado en despacho).
+  const [numeroGuiaTransp, setNumeroGuiaTransp] = useState("");
   const [items, setItems] = useState<GuiaItem[]>([emptyItem(1)]);
   const [formNumero, setFormNumero] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -94,6 +105,7 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
         setTransportistaId(g.transportista_id || null);
         setEntregadoPor(g.entregado_por || "");
         setObservaciones(g.observaciones || "");
+        setNumeroGuiaTransp(g.numero_guia_transp || "");
         const guiaItems = (g.guia_items || []) as GuiaItem[];
         setItems(
           guiaItems.length > 0
@@ -238,6 +250,7 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
         transportista_id: modoEntrega === "transportista" ? transportistaId : null,
         entregado_por: entregadoPor,
         observaciones,
+        numero_guia_transp: numeroGuiaTransp.trim() || null,
         estado: editingId && editingEstado ? editingEstado : "Pendiente Bodega",
         items: validItems,
       }),
@@ -277,6 +290,7 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     transportistaId, setTransportistaId,
     entregadoPor, setEntregadoPor,
     observaciones, setObservaciones,
+    numeroGuiaTransp, setNumeroGuiaTransp,
     items,
     saving,
     updateItem, addRow, removeRow,

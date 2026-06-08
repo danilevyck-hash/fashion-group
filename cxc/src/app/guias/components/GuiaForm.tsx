@@ -29,6 +29,8 @@ interface GuiaFormProps {
   setEntregadoPor: (v: string) => void;
   observaciones: string;
   setObservaciones: (v: string) => void;
+  numeroGuiaTransp: string;
+  setNumeroGuiaTransp: (v: string) => void;
   items: GuiaItem[];
   transportistas: Transportista[];
   clientes: string[];
@@ -55,6 +57,7 @@ export default function GuiaForm({
   editingId, formNumero, fecha, setFecha,
   modoEntrega, setModoEntrega, transportistaId, setTransportistaId,
   entregadoPor, setEntregadoPor, observaciones, setObservaciones,
+  numeroGuiaTransp, setNumeroGuiaTransp,
   items, transportistas, clientes, direcciones, empresas,
   validationErrors, error, saving,
   onAddCliente, onAddDireccion, onAddEmpresa,
@@ -124,7 +127,7 @@ export default function GuiaForm({
   useEffect(() => {
     changeCount.current++;
     if (changeCount.current > 1) setDirty(true);
-  }, [fecha, modoEntrega, transportistaId, entregadoPor, observaciones, items]);
+  }, [fecha, modoEntrega, transportistaId, entregadoPor, observaciones, numeroGuiaTransp, items]);
 
   // Auto-save with debounce (only when editing existing guía)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -293,6 +296,22 @@ export default function GuiaForm({
                 className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition mt-3" />
             )}
           </div>
+
+          {/* N° guía del transportista — solo con transportista; opcional al
+              crear (obligatorio al despachar). En entrega directa no aplica. */}
+          {modoEntrega === "transportista" && (
+            <div>
+              <label className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-1 block">
+                N° guía del transportista <span className="text-gray-300 normal-case tracking-normal">(opcional)</span>
+              </label>
+              <input
+                type="text"
+                value={numeroGuiaTransp}
+                onChange={e => setNumeroGuiaTransp(e.target.value)}
+                placeholder="Lo puedes poner ahora o al despachar"
+                className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
+            </div>
+          )}
         </div>
       </div>
 

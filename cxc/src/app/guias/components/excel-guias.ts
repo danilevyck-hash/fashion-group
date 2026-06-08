@@ -89,7 +89,7 @@ export function exportGuiasExcel(guias: Guia[], subtitle?: string) {
   const ws: XLSX.WorkSheet = {};
   const heights: number[] = [];
   const merges: XLSX.Range[] = [];
-  const lastCol = 7; // 8 columns (0-7)
+  const lastCol = 8; // 9 columns (0-8)
   let r = 0;
 
   // Title row
@@ -126,7 +126,7 @@ export function exportGuiasExcel(guias: Guia[], subtitle?: string) {
   r++;
 
   // Header row
-  const headers = ["N\u00b0 Gu\u00eda", "Fecha", "Transportista", "Clientes", "Empresa", "Facturas", "Bultos", "Estado"];
+  const headers = ["N\u00b0 Gu\u00eda", "Fecha", "Transportista", "Clientes", "Empresa", "Facturas", "Bultos", "Estado", "N\u00b0 Gu\u00eda Transp."];
   headers.forEach((h, i) => {
     ws[addr(r, i)] = hdr(h, i === 6 ? "right" : "left");
   });
@@ -147,6 +147,7 @@ export function exportGuiasExcel(guias: Guia[], subtitle?: string) {
     ws[addr(r, 5)] = td(facturasSummary(items), alt, { sz: 9, fg: "666666" });
     ws[addr(r, 6)] = tdN(g.total_bultos || 0, alt);
     ws[addr(r, 7)] = td(g.estado || "", alt, { sz: 9, fg: g.estado === "Completada" ? "15803D" : g.estado === "Rechazada" ? "DC2626" : "C2410C" });
+    ws[addr(r, 8)] = td(g.numero_guia_transp || "—", alt, { sz: 9, fg: "555555" });
 
     totalBultos += g.total_bultos || 0;
     heights[r] = 18;
@@ -168,11 +169,12 @@ export function exportGuiasExcel(guias: Guia[], subtitle?: string) {
   for (let c = 1; c <= 5; c++) ws[addr(r, c)] = { v: "", t: "s", s: tStyle("left") };
   ws[addr(r, 6)] = { v: totalBultos, t: "n", s: tStyle("right") };
   ws[addr(r, 7)] = { v: "", t: "s", s: tStyle("left") };
+  ws[addr(r, 8)] = { v: "", t: "s", s: tStyle("left") };
   heights[r] = 22;
   r++;
 
   // Set worksheet metadata
-  ws["!ref"] = `A1:H${r}`;
+  ws["!ref"] = `A1:I${r}`;
   ws["!merges"] = merges;
   ws["!cols"] = [
     { wch: 12 },  // N Guia
@@ -183,6 +185,7 @@ export function exportGuiasExcel(guias: Guia[], subtitle?: string) {
     { wch: 28 },  // Facturas
     { wch: 10 },  // Bultos
     { wch: 16 },  // Estado
+    { wch: 18 },  // N Guia Transp
   ];
   ws["!rows"] = heights.map((h) => ({ hpt: h || 16 }));
 

@@ -93,6 +93,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (!receptor_nombre) return NextResponse.json({ error: "Nombre del receptor requerido" }, { status: 400 });
     if (!cedula) return NextResponse.json({ error: "Cédula del receptor requerida" }, { status: 400 });
     if (tipo_despacho === "externo" && !placa) return NextResponse.json({ error: "Placa del vehículo requerida para transporte externo" }, { status: 400 });
+    if (tipo_despacho === "externo" && !numero_guia_transp) return NextResponse.json({ error: "Falta el N° de guía del transportista" }, { status: 400 });
     if (tipo_despacho === "directo" && !nombre_chofer) return NextResponse.json({ error: "Nombre del chofer requerido para entrega directa" }, { status: 400 });
   }
 

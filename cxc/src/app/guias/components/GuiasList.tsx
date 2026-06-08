@@ -37,6 +37,8 @@ interface GuiasListProps {
   setBCedula: (v: string) => void;
   bChofer: string;
   setBChofer: (v: string) => void;
+  bNumeroGuiaTransp: string;
+  setBNumeroGuiaTransp: (v: string) => void;
   bSaving: boolean;
   onConfirmarDespacho: (firma1: string, firma2: string) => void;
   showToast: (msg: string) => void;
@@ -64,7 +66,8 @@ export default function GuiasList({
   expandedId, expandedGuia, expandedLoading, onToggleExpand,
   tipoDespacho, setTipoDespacho,
   bPlaca, setBPlaca, bReceptor, setBReceptor, bCedula, setBCedula,
-  bChofer, setBChofer, bSaving, onConfirmarDespacho, showToast,
+  bChofer, setBChofer, bNumeroGuiaTransp, setBNumeroGuiaTransp,
+  bSaving, onConfirmarDespacho, showToast,
   pendingFirma1, pendingFirma2, onFirma1Change, onFirma2Change,
   onEdit, onPrint, onDelete, onReject,
   readOnly,
@@ -108,7 +111,7 @@ export default function GuiasList({
     <div>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
         <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-          <h1 className="text-xl font-light tracking-tight">Guias de Transporte</h1>
+          <h1 className="text-xl font-light tracking-tight">Guías de Transporte</h1>
           <div className="flex items-center gap-2 flex-wrap">
             {selectionMode ? (
               <>
@@ -176,7 +179,7 @@ export default function GuiasList({
           return (
             <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm text-gray-600 mb-6 flex items-center justify-between">
               <span>
-                {pendingCount} guia{pendingCount !== 1 ? "s" : ""} pendiente{pendingCount !== 1 ? "s" : ""} de despachar
+                {pendingCount} guía{pendingCount !== 1 ? "s" : ""} pendiente{pendingCount !== 1 ? "s" : ""} de despachar
               </span>
               <button
                 onClick={() => setShowPending(!showPending)}
@@ -212,7 +215,7 @@ export default function GuiasList({
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por transportista, cliente o factura..."
+                placeholder="Buscar por transportista, cliente, factura o N° de guía..."
                 className="border border-gray-200 rounded-lg px-3 py-3 md:py-2 text-base md:text-sm outline-none focus:border-black w-full max-w-sm transition"
               />
               <button onClick={() => setGroupedView(!groupedView)} className={`text-xs transition whitespace-nowrap ${groupedView ? "text-black font-medium" : "text-gray-400 hover:text-black"}`}>
@@ -228,6 +231,7 @@ export default function GuiasList({
                     const q = search.toLowerCase();
                     return (
                       (g.transportista || "").toLowerCase().includes(q) ||
+                      (g.numero_guia_transp || "").toLowerCase().includes(q) ||
                       (g.guia_items || []).some(
                         (item: GuiaItem) =>
                           (item.facturas || "").toLowerCase().includes(q) ||
@@ -238,7 +242,7 @@ export default function GuiasList({
                   .filter((g) => !showPending || g.estado === "Pendiente Bodega");
 
                 if (filtered.length === 0) {
-                  return <p className="text-sm text-gray-400 py-8 text-center">No hay guias</p>;
+                  return <p className="text-sm text-gray-400 py-8 text-center">No hay guías</p>;
                 }
 
                 const visible = filtered.slice(0, visibleCount);
@@ -291,12 +295,9 @@ export default function GuiasList({
                               <span className="text-gray-400 text-xs w-40 truncate">
                                 {clientesSummary(g.guia_items || [])}
                               </span>
-                              <span className="tabular-nums w-14 text-right shrink-0">{g.total_bultos}</span>
-                              {!isDispatched && g.estado === "Pendiente Bodega" && (
-                                <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 shrink-0 whitespace-nowrap">
-                                  Pendiente despacho
-                                </span>
-                              )}
+                              <span className="tabular-nums w-24 text-right shrink-0">
+                                {g.total_bultos} <span className="text-gray-400">bultos</span>
+                              </span>
                               <span className="w-24 shrink-0">
                                 <StatusBadge estado={g.estado === "Rechazada" ? "rechazada" : isDispatched ? "despachada" : "pendiente"} />
                               </span>
@@ -343,13 +344,6 @@ export default function GuiasList({
                                   )}
                                 </div>
                               )}
-                              {!isDispatched && g.estado === "Pendiente Bodega" && (
-                                <div className="mt-1.5">
-                                  <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 whitespace-nowrap">
-                                    Pendiente despacho
-                                  </span>
-                                </div>
-                              )}
                             </div>
                           </button>
 
@@ -387,17 +381,19 @@ export default function GuiasList({
                                       </svg>
                                       Imprimir
                                     </button>
-                                    {canDelete && (
-                                      <OverflowMenu
-                                        items={[
-                                          {
-                                            label: "Eliminar guía",
-                                            onClick: () => onDelete(expandedGuia.id),
-                                            destructive: true,
-                                          },
-                                        ]}
-                                      />
-                                    )}
+                                    {(() => {
+                                      const canRejectThis =
+                                        canReject && isDispatched && expandedGuia.estado !== "Rechazada";
+                                      const menuItems = [
+                                        ...(canRejectThis
+                                          ? [{ label: "Rechazar/Devolver", onClick: () => setRejectingId(expandedGuia.id) }]
+                                          : []),
+                                        ...(canDelete
+                                          ? [{ label: "Eliminar guía", onClick: () => onDelete(expandedGuia.id), destructive: true }]
+                                          : []),
+                                      ];
+                                      return menuItems.length > 0 ? <OverflowMenu items={menuItems} /> : null;
+                                    })()}
                                   </div>
                                   {/* Items table */}
                                   <ScrollableTable minWidth={600} className="mt-4">
@@ -454,6 +450,12 @@ export default function GuiasList({
                                             <span className="font-medium">{expandedGuia.placa}</span>
                                           </div>
                                         )}
+                                        {expandedGuia.tipo_despacho !== "directo" && (
+                                          <div>
+                                            <span className="text-gray-400 block">N° guía transp.</span>
+                                            <span className="font-medium">{expandedGuia.numero_guia_transp || "—"}</span>
+                                          </div>
+                                        )}
                                         {expandedGuia.nombre_chofer && (
                                           <div>
                                             <span className="text-gray-400 block">Chofer</span>
@@ -504,6 +506,8 @@ export default function GuiasList({
                                       setBCedula={setBCedula}
                                       bChofer={bChofer}
                                       setBChofer={setBChofer}
+                                      bNumeroGuiaTransp={bNumeroGuiaTransp}
+                                      setBNumeroGuiaTransp={setBNumeroGuiaTransp}
                                       bSaving={bSaving}
                                       onConfirmar={onConfirmarDespacho}
                                       showToast={showToast}
@@ -516,17 +520,15 @@ export default function GuiasList({
 
                                   {/* Rechazar (solo en despachadas no-rechazadas) — queda abajo porque
                                       requiere flujo con input de motivo */}
-                                  {canReject && isDispatched && expandedGuia.estado !== "Rechazada" && (
+                                  {/* Input de motivo de rechazo — se dispara desde "Rechazar/Devolver"
+                                      en el menú "···". */}
+                                  {canReject && isDispatched && expandedGuia.estado !== "Rechazada" && rejectingId === expandedGuia.id && (
                                     <div className="mt-6 pt-4 border-t border-gray-200">
-                                      {rejectingId === expandedGuia.id ? (
-                                        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                                          <input type="text" value={rejectMotivo} onChange={e => setRejectMotivo(e.target.value)} placeholder="Motivo de rechazo..." className="border-b border-gray-200 py-1 text-xs outline-none w-full max-w-[200px]" autoFocus />
-                                          <button type="button" onClick={() => { if (rejectMotivo.trim()) { onReject(expandedGuia.id, rejectMotivo.trim()); setRejectingId(null); setRejectMotivo(""); } }} disabled={!rejectMotivo.trim()} className="text-xs text-red-600 hover:text-red-800 transition disabled:opacity-40">Confirmar</button>
-                                          <button type="button" onClick={() => { setRejectingId(null); setRejectMotivo(""); }} className="text-xs text-gray-400 hover:text-black transition">Cancelar</button>
-                                        </div>
-                                      ) : (
-                                        <button type="button" onClick={() => setRejectingId(expandedGuia.id)} className="text-xs text-amber-600 hover:text-red-600 transition">Rechazar/Devolver</button>
-                                      )}
+                                      <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                        <input type="text" value={rejectMotivo} onChange={e => setRejectMotivo(e.target.value)} placeholder="Motivo de rechazo..." className="border-b border-gray-200 py-1 text-xs outline-none w-full max-w-[200px]" autoFocus />
+                                        <button type="button" onClick={() => { if (rejectMotivo.trim()) { onReject(expandedGuia.id, rejectMotivo.trim()); setRejectingId(null); setRejectMotivo(""); } }} disabled={!rejectMotivo.trim()} className="text-xs text-red-600 hover:text-red-800 transition disabled:opacity-40">Confirmar</button>
+                                        <button type="button" onClick={() => { setRejectingId(null); setRejectMotivo(""); }} className="text-xs text-gray-400 hover:text-black transition">Cancelar</button>
+                                      </div>
                                     </div>
                                   )}
                                 </>
@@ -575,7 +577,7 @@ export default function GuiasList({
                     {/* Totals */}
                     <div className="flex items-center justify-between px-4 py-3 text-sm border-t border-gray-200 mt-2">
                       <span className="text-gray-400 text-xs uppercase tracking-wider">
-                        {filtered.length} guia{filtered.length !== 1 ? "s" : ""}
+                        {filtered.length} guía{filtered.length !== 1 ? "s" : ""}
                       </span>
                       <span className="tabular-nums font-medium">{totalBultos} bultos</span>
                     </div>
