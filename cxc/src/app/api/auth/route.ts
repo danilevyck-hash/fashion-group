@@ -5,24 +5,21 @@ import { getDefaultModulesForRole } from "@/lib/modules";
 import { signSession, verifySession } from "@/lib/session-cookie";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
+import { getLoginLock, registerLoginFailure, clearLoginAttempts } from "@/lib/login-rate-limit";
 
 const COOKIE_NAME = "cxc_session";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
-// Rate limiting: max 5 attempts per IP per minute
-const attempts = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 5;
-const RATE_WINDOW = 60_000; // 1 minute
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const entry = attempts.get(ip);
-  if (!entry || now > entry.resetAt) {
-    attempts.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
-    return false;
-  }
-  entry.count++;
-  return entry.count > RATE_LIMIT;
+// Rate limiting: store COMPARTIDO en Supabase (ver src/lib/login-rate-limit.ts).
+// Antes era un Map en-memoria, inefectivo en serverless. Cuenta intentos fallidos
+// por IP y bloquea (lockout) tras MAX_FAILS.
+function lockedResponse(retryAfter: number): NextResponse {
+  const res = NextResponse.json(
+    { error: "Demasiados intentos fallidos. Intenta de nuevo en unos minutos." },
+    { status: 429 },
+  );
+  if (retryAfter > 0) res.headers.set("Retry-After", String(retryAfter));
+  return res;
 }
 
 function setSessionCookie(res: NextResponse, payload: Record<string, unknown>) {
@@ -41,11 +38,20 @@ function isHash(s: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
-  // Rate limiting
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
-  if (isRateLimited(ip)) {
-    return NextResponse.json({ error: "Demasiados intentos. Espera un minuto." }, { status: 429 });
-  }
+
+  // Pre-check: si la IP ya está bloqueada, no gastamos bcrypt.
+  const lock = await getLoginLock(ip);
+  if (lock.locked) return lockedResponse(lock.retryAfter);
+
+  // Helper de fallo: registra el intento fallido (atómico en DB) y devuelve 429
+  // si el lockout se activó con este fallo, o 401 si aún hay margen.
+  const fail = async () => {
+    const r = await registerLoginFailure(ip);
+    return r.locked
+      ? lockedResponse(r.retryAfter)
+      : NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
+  };
 
   const { password } = await req.json();
 
@@ -74,7 +80,7 @@ export async function POST(req: NextRequest) {
       }
 
       if (matches.length > 1) {
-        return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
+        return await fail();
       }
 
       if (matches.length === 1) {
@@ -162,6 +168,8 @@ export async function POST(req: NextRequest) {
             ...(userConfig.guiasReadonly && { guiasReadonly: true }),
           });
           await logActivity(user.role, "login", "auth", { userName: user.name }, user.name);
+          // Login OK → limpiar el contador de fallos de esta IP.
+          await clearLoginAttempts(ip);
           return res;
         }
       }
@@ -173,7 +181,7 @@ export async function POST(req: NextRequest) {
     // named row in fg_users.
   }
 
-  return NextResponse.json({ error: "Contraseña incorrecta" }, { status: 401 });
+  return await fail();
 }
 
 // DELETE — logout (clear cookie + revoke session)
