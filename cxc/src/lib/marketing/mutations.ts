@@ -12,7 +12,6 @@ import {
   normalizarTexto,
 } from "./normalizar";
 import { esPathStorage } from "./storage";
-import { getMarcas } from "./queries";
 import type {
   MkProyecto,
   MkFactura,
@@ -36,22 +35,6 @@ function assertNoVacio(valor: string, campo: string): void {
 
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
-}
-
-function mesEsEs(fecha: Date): string {
-  return fecha.toLocaleString("es-PA", { month: "short" }).replace(".", "");
-}
-
-function autoNombreProyecto(
-  tiendaTitulo: string,
-  marcasNombres: ReadonlyArray<string>,
-  fecha: Date
-): string {
-  const mes = mesEsEs(fecha);
-  const mesCap = mes.charAt(0).toLocaleUpperCase("es") + mes.slice(1);
-  const anio = fecha.getFullYear();
-  const marcasStr = marcasNombres.join("+");
-  return `${tiendaTitulo} · ${marcasStr} · ${mesCap} ${anio}`;
 }
 
 // Regla de negocio 50/50: cada marca asignada cubre 50% fijo, no editable.
@@ -82,32 +65,14 @@ export async function createProyecto(
   const tienda = tituloCase(input.tienda);
   assertNoVacio(tienda, "tienda");
 
-  // Fase 2: marcas a nivel proyecto es opcional. Si vienen, se validan y se
-  // insertan en mk_proyecto_marcas (flow legacy). Si no, el proyecto se crea
-  // sin marcas y estas se asignan por factura en mk_factura_marcas.
-  const tieneMarcas = Array.isArray(input.marcas) && input.marcas.length > 0;
-  if (tieneMarcas) {
-    validarMarcasUnicas(input.marcas);
-  }
-
-  let nombresMarcas: string[] = [];
-  if (tieneMarcas) {
-    const marcasCatalogo = await getMarcas();
-    nombresMarcas = input.marcas
-      .map((m) => marcasCatalogo.find((cm) => cm.id === m.marcaId)?.nombre ?? "")
-      .filter((n) => n.length > 0);
-    if (nombresMarcas.length !== input.marcas.length) {
-      throw new Error("Alguna marca seleccionada no existe");
-    }
-  }
-
+  // Las marcas se asignan a nivel FACTURA (mk_factura_marcas). El proyecto se
+  // crea sin marcas; la rama legacy mk_proyecto_marcas se retiró (el form
+  // siempre manda marcas:[]). La tabla mk_proyecto_marcas se conserva en DB.
   const nombreProvisto = tituloCase(input.nombre);
   const nombreFinal =
     nombreProvisto.length > 0
       ? nombreProvisto
-      : tieneMarcas
-        ? autoNombreProyecto(tienda, nombresMarcas, new Date())
-        : `${tienda} — ${fechaReferenciaEs(new Date())}`;
+      : `${tienda} — ${fechaReferenciaEs(new Date())}`;
 
   const notas = oracionCase(input.notas);
 
@@ -125,24 +90,7 @@ export async function createProyecto(
   if (error || !data) {
     throw new Error(`createProyecto: ${error?.message ?? "sin datos"}`);
   }
-  const proyecto = data as MkProyecto;
-
-  if (tieneMarcas) {
-    const pmPayload = input.marcas.map((m) => ({
-      proyecto_id: proyecto.id,
-      marca_id: m.marcaId,
-      porcentaje: PORCENTAJE_MARCA_FIJO,
-    }));
-    const { error: pmError } = await supabaseServer
-      .from("mk_proyecto_marcas")
-      .insert(pmPayload);
-    if (pmError) {
-      await supabaseServer.from("mk_proyectos").delete().eq("id", proyecto.id);
-      throw new Error(`createProyecto[marcas]: ${pmError.message}`);
-    }
-  }
-
-  return proyecto;
+  return data as MkProyecto;
 }
 
 function fechaReferenciaEs(d: Date): string {

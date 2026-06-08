@@ -171,7 +171,9 @@ export interface CreateProyectoInput {
   tienda: string;
   nombre?: string;
   notas?: string;
-  marcas: MarcaPorcentajeInput[];
+  // Legacy: las marcas a nivel proyecto (mk_proyecto_marcas) se retiraron del
+  // flujo de creación; se asignan por factura. Opcional y ya no se consume.
+  marcas?: MarcaPorcentajeInput[];
 }
 
 export interface UpdateProyectoInput {
