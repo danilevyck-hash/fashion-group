@@ -217,3 +217,88 @@ export async function exportComisionesResumen(r: ComisionResumen): Promise<void>
   XLSX.utils.book_append_sheet(wb, ws, "Comisiones");
   XLSX.writeFile(wb, `comisiones-${r.empresaKey}-${String(r.mes).padStart(2, "0")}-${r.year}.xlsx`);
 }
+
+// ── Export CONSOLIDADO (vista "Todas las empresas") ──────────────────────────
+// Matriz vendedor × empresa con columna TOTAL. Cada celda = comisión total de esa
+// empresa (ya netea sus propios negativos); TOTAL = suma de la fila. Nunca se
+// redistribuye entre empresas.
+export interface ComisionConsolidadoRow {
+  vendedor: string;
+  porEmpresa: Record<string, number>; // empresaKey -> comisión total de esa empresa
+  total: number;
+}
+export interface ComisionConsolidado {
+  year: number;
+  mes: number;
+  empresas: { key: string; nombre: string }[]; // orden de columnas
+  vendedores: ComisionConsolidadoRow[];         // ya ordenados por total desc
+  sinAsignar?: ComisionConsolidadoRow | null;   // fila DEFAULT consolidada
+}
+
+export async function exportComisionesConsolidado(c: ComisionConsolidado): Promise<void> {
+  const XLSX = (await import("xlsx-js-style")).default;
+  const periodo = `${MESES[c.mes - 1]} ${c.year}`;
+  const rows: (string | number | null)[][] = [];
+
+  rows.push(["Comisiones — Todas las empresas"]);
+  rows.push([periodo]);
+  rows.push([REGLA_NOTA]);
+  rows.push([]);
+
+  const header = ["Vendedor", ...c.empresas.map((e) => e.nombre), "Total"];
+  rows.push(header);
+  const dataStart = rows.length;
+
+  const rowFor = (r: ComisionConsolidadoRow) => [
+    r.vendedor,
+    ...c.empresas.map((e) => r.porEmpresa[e.key] ?? 0),
+    r.total,
+  ];
+
+  for (const v of c.vendedores) rows.push(rowFor(v));
+  if (c.sinAsignar) rows.push(rowFor({ ...c.sinAsignar, vendedor: "Sin asignar" }));
+
+  // Total general = suma de TODAS las filas mostradas (vendedores + sin asignar).
+  const allRows = [...c.vendedores, ...(c.sinAsignar ? [c.sinAsignar] : [])];
+  const totalRowVals: (string | number)[] = ["Total"];
+  for (const e of c.empresas) {
+    totalRowVals.push(allRows.reduce((a, r) => a + (r.porEmpresa[e.key] ?? 0), 0));
+  }
+  totalRowVals.push(allRows.reduce((a, r) => a + (r.total ?? 0), 0));
+  rows.push(totalRowVals);
+  const totalRow = rows.length - 1;
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const nCols = header.length;
+  ws["!cols"] = [{ wch: 26 }, ...c.empresas.map(() => ({ wch: 15 })), { wch: 15 }];
+  ws["!merges"] = [{ s: { r: 2, c: 0 }, e: { r: 2, c: nCols - 1 } }];
+
+  const cell = (rr: number, cc: number) => ws[XLSX.utils.encode_cell({ r: rr, c: cc })];
+  const money = { numFmt: MONEY };
+
+  if (cell(0, 0)) cell(0, 0)!.s = { font: { bold: true, sz: 14 } };
+  if (cell(1, 0)) cell(1, 0)!.s = { font: { italic: true, sz: 10, color: { rgb: "666666" } } };
+  if (cell(2, 0)) cell(2, 0)!.s = { font: { italic: true, sz: 9, color: { rgb: "888888" } }, alignment: { wrapText: true, vertical: "top" } };
+
+  // headers
+  for (let c2 = 0; c2 < nCols; c2++) {
+    if (cell(4, c2)) cell(4, c2)!.s = { font: { bold: true }, alignment: { horizontal: c2 === 0 ? "left" : "right" } };
+  }
+  // datos: moneda en columnas 1..nCols-1
+  for (let rr = dataStart; rr <= totalRow; rr++) {
+    for (let c2 = 1; c2 < nCols; c2++) if (cell(rr, c2)) cell(rr, c2)!.s = { ...money };
+  }
+  // columna TOTAL destacada (negrita) por fila de datos
+  for (let rr = dataStart; rr < totalRow; rr++) {
+    if (cell(rr, nCols - 1)) cell(rr, nCols - 1)!.s = { font: { bold: true }, ...money };
+  }
+  // fila Total en negrita
+  for (let c2 = 0; c2 < nCols; c2++) {
+    if (!cell(totalRow, c2)) continue;
+    cell(totalRow, c2)!.s = c2 === 0 ? { font: { bold: true } } : { font: { bold: true }, ...money };
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Consolidado");
+  XLSX.writeFile(wb, `comisiones-consolidado-${String(c.mes).padStart(2, "0")}-${c.year}.xlsx`);
+}
