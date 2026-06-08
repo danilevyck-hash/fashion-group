@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import FGLogo from "@/components/FGLogo";
 import SearchBar from "@/components/SearchBar";
 import NotificationCenter from "@/components/NotificationCenter";
@@ -47,12 +48,8 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
   // Close drawer on route change
   useEffect(() => { setDrawerOpen(false); }, [pathname]);
 
-  // Lock body scroll when drawer open
-  useEffect(() => {
-    if (drawerOpen) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "";
-    return () => { document.body.style.overflow = ""; };
-  }, [drawerOpen]);
+  // Lock body scroll when drawer open (hook compartido con ref-count).
+  useBodyScrollLock(drawerOpen);
 
   const moduleColor = getModuleColor(pathname);
   const currentNav = ALL_MODULES.find(m => moduleColor && pathname.startsWith(m.href));
