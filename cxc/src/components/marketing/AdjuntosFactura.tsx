@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import type { MkAdjunto } from "@/lib/marketing/types";
-import { FotoLightbox } from "@/components/ui";
+import { FotoLightbox, PdfLightbox } from "@/components/ui";
 
 // Muestra los adjuntos de una factura INLINE en la vista del proyecto:
 //   - Imágenes (foto_factura): thumbnail clickable → lightbox full-screen.
-//   - PDFs (pdf_factura): preview embebido en desktop + link "Abrir" siempre.
+//   - PDFs (pdf_factura): fila compacta (nombre + "Ver PDF") → overlay a demanda.
+//     Ya NO se incrusta el PDF (antes mostraba "barras negras").
 // Las URLs ya vienen firmadas desde /api/marketing/proyectos/[id] (signed URL).
 
 function esPdf(a: MkAdjunto): boolean {
@@ -37,6 +38,7 @@ const IconoPdf = (
 
 export default function AdjuntosFactura({ adjuntos }: { adjuntos: MkAdjunto[] }) {
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [pdfLightbox, setPdfLightbox] = useState<{ url: string; nombre: string } | null>(null);
   const [conError, setConError] = useState<Set<string>>(new Set());
 
   if (!adjuntos || adjuntos.length === 0) return null;
@@ -89,35 +91,44 @@ export default function AdjuntosFactura({ adjuntos }: { adjuntos: MkAdjunto[] })
         </div>
       )}
 
-      {pdfs.map((a) => (
-        <div key={a.id} className="rounded-md border border-gray-200 overflow-hidden bg-gray-50">
-          <div className="flex items-center justify-between gap-2 px-2 py-1.5 bg-white border-b border-gray-100">
+      {pdfs.map((a) => {
+        const nombre = a.nombre_original ?? "Factura.pdf";
+        return (
+          <div
+            key={a.id}
+            className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-2"
+          >
             <span className="text-[11px] text-gray-600 truncate flex items-center gap-1.5 min-w-0">
               <span className="text-gray-400 shrink-0">{IconoPdf}</span>
-              <span className="truncate">{a.nombre_original ?? "Factura.pdf"}</span>
+              <span className="truncate">{nombre}</span>
             </span>
-            <a
-              href={a.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[11px] text-gray-600 hover:text-black shrink-0"
-            >
-              Abrir ↗
-            </a>
-          </div>
-          <object data={a.url} type="application/pdf" className="hidden sm:block w-full h-64">
-            <div className="p-3 text-[11px] text-gray-500">
-              No se puede mostrar el PDF aquí.{" "}
-              <a href={a.url} target="_blank" rel="noopener noreferrer" className="underline">
-                Ábrelo en una pestaña nueva
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setPdfLightbox({ url: a.url, nombre })}
+                className="text-[11px] font-medium text-gray-700 hover:text-black border border-gray-200 rounded px-2 py-1 active:scale-[0.97] transition"
+              >
+                Ver PDF
+              </button>
+              <a
+                href={a.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[11px] text-gray-500 hover:text-black"
+              >
+                Abrir ↗
               </a>
-              .
             </div>
-          </object>
-        </div>
-      ))}
+          </div>
+        );
+      })}
 
       <FotoLightbox src={lightbox} onClose={() => setLightbox(null)} />
+      <PdfLightbox
+        src={pdfLightbox?.url ?? null}
+        titulo={pdfLightbox?.nombre}
+        onClose={() => setPdfLightbox(null)}
+      />
     </div>
   );
 }

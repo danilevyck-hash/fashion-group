@@ -131,6 +131,13 @@ export interface FacturaConAdjuntos extends MkFactura {
   adjuntos: MkAdjunto[];
 }
 
+// Factura con adjuntos + marcas embebidas. GET /proyectos/[id] ya devuelve las
+// marcas por factura, así que la UI las consume directo (sin re-fetch por
+// factura). `marcas` es opcional para tolerar fuentes que no las embeben.
+export interface FacturaConAdjuntosYMarcas extends FacturaConAdjuntos {
+  marcas?: MarcaConPorcentaje[];
+}
+
 
 export interface ProyectoResumen extends MkProyecto {
   marcas: MarcaConPorcentaje[];

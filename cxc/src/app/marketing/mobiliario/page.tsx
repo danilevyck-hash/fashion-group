@@ -1,7 +1,9 @@
 "use client";
 
-// Página de inventario de muebles. 4 cards de métricas, tabla de productos
-// editable, tabla de reparto por tienda con expand para editar la entrega.
+// Página de Mobiliario (inventario de muebles). 4 cards de métricas, tabla de
+// productos editable, tabla de reparto por tienda con expand para editar la
+// entrega. Ruta de página: /marketing/mobiliario. La API interna sigue en
+// /api/marketing/inventario/* (plomería, datos intactos).
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -29,7 +31,7 @@ interface ProductoEditState {
   stockTotal: string;
 }
 
-export default function InventarioPage() {
+export default function MobiliarioPage() {
   const router = useRouter();
   const { authChecked, role } = useAuth({
     moduleKey: "marketing",
@@ -334,7 +336,7 @@ export default function InventarioPage() {
       link.href = URL.createObjectURL(blob);
       const cd = res.headers.get("Content-Disposition") ?? "";
       const m = cd.match(/filename="?([^"]+)"?/);
-      link.download = m?.[1] ?? "inventario.xlsx";
+      link.download = m?.[1] ?? "mobiliario.xlsx";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -349,7 +351,7 @@ export default function InventarioPage() {
 
   if (!authChecked) return null;
 
-  const breadcrumbs = [{ label: "Inventario" }];
+  const breadcrumbs = [{ label: "Mobiliario" }];
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -365,7 +367,7 @@ export default function InventarioPage() {
               ← Proyectos
             </button>
             <h1 className="text-xl font-semibold text-gray-900">
-              Inventario de muebles
+              Mobiliario
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">
               Productos, entregas a tiendas y reparto por marca

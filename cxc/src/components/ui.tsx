@@ -382,6 +382,67 @@ export function FotoLightbox({ src, onClose }: { src: string | null; onClose: ()
   );
 }
 
+// PDF en overlay full-screen (a demanda). Reemplaza el preview <object>
+// incrustado (que mostraba "barras negras"). Se abre con un botón "Ver PDF".
+export function PdfLightbox({
+  src,
+  titulo,
+  onClose,
+}: {
+  src: string | null;
+  titulo?: string;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!src) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [src, onClose]);
+
+  if (!src) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      onClick={onClose}
+    >
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-4xl h-[90vh] mx-3 sm:mx-4 bg-white rounded-lg shadow-2xl overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-3 px-3 py-2 border-b border-gray-200">
+          <span className="text-sm font-medium text-gray-700 truncate">
+            {titulo ?? "Factura"}
+          </span>
+          <div className="flex items-center gap-3 shrink-0">
+            <a
+              href={src}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-gray-600 hover:text-black"
+            >
+              Abrir ↗
+            </a>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar"
+              className="text-gray-500 hover:text-black text-lg leading-none"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+        <iframe src={src} title={titulo ?? "Factura PDF"} className="flex-1 w-full" />
+      </div>
+    </div>
+  );
+}
+
 // ── ESTÉTICA 8: Badge Component ──
 const BADGE_COLORS: Record<string, string> = {
   green: "bg-emerald-50 text-emerald-700",

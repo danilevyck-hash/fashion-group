@@ -10,6 +10,7 @@ import {
 } from "@/components/marketing";
 import type {
   FacturaConAdjuntos,
+  FacturaConAdjuntosYMarcas,
   MarcaConPorcentaje,
   MarcaPorcentajeInput,
   MkFactura,
@@ -24,7 +25,7 @@ import { useBulkUploadFacturas } from "@/lib/marketing/useBulkUploadFacturas";
 
 interface FacturasSectionProps {
   proyecto: ProyectoConMarcas;
-  facturasIniciales?: FacturaConAdjuntos[];
+  facturasIniciales?: FacturaConAdjuntosYMarcas[];
   onChange?: () => void;
   readonly?: boolean;
 }
@@ -36,7 +37,7 @@ export default function FacturasSection({
   readonly = false,
 }: FacturasSectionProps) {
   const { toast } = useToast();
-  const [facturas, setFacturas] = useState<FacturaConAdjuntos[]>(
+  const [facturas, setFacturas] = useState<FacturaConAdjuntosYMarcas[]>(
     facturasIniciales ?? [],
   );
   const [loading, setLoading] = useState(!facturasIniciales);
@@ -47,9 +48,10 @@ export default function FacturasSection({
   // Path del PDF pre-subido para IA (antes de tener facturaId)
   const [pdfPathPreSubido, setPdfPathPreSubido] = useState<string | null>(null);
 
-  // Fase 2: catálogo global de marcas + marcas-por-factura para cards
+  // Fase 2: catálogo global de marcas para los selectores del form.
+  // Las marcas POR factura ya vienen embebidas en cada factura (f.marcas),
+  // así que NO se re-fetchean por factura (antes era un N+1).
   const [marcasCatalogo, setMarcasCatalogo] = useState<MkMarca[]>([]);
-  const [marcasByFactura, setMarcasByFactura] = useState<Record<string, MarcaConPorcentaje[]>>({});
   // Edición de una factura específica
   const [editando, setEditando] = useState<FacturaConAdjuntos | null>(null);
   const [editandoMarcas, setEditandoMarcas] = useState<MarcaPorcentajeInput[] | null>(null);
@@ -124,38 +126,6 @@ export default function FacturasSection({
     })();
     return () => { cancelado = true; };
   }, []);
-
-  // Cargar marcas por factura en batch cuando cambia la lista (Fase 2)
-  const cargarMarcasPorFactura = useCallback(
-    async (facturaIds: string[]) => {
-      if (facturaIds.length === 0) return;
-      const entries = await Promise.all(
-        facturaIds.map(async (id) => {
-          try {
-            const res = await fetch(`/api/marketing/facturas/${id}/marcas`, {
-              cache: "no-store",
-            });
-            if (!res.ok) return [id, [] as MarcaConPorcentaje[]] as const;
-            const data = (await res.json()) as MarcaConPorcentaje[];
-            return [id, Array.isArray(data) ? data : []] as const;
-          } catch {
-            return [id, [] as MarcaConPorcentaje[]] as const;
-          }
-        }),
-      );
-      setMarcasByFactura((prev) => {
-        const next = { ...prev };
-        for (const [id, arr] of entries) next[id] = arr;
-        return next;
-      });
-    },
-    [],
-  );
-
-  useEffect(() => {
-    const vigentes = facturas.filter((f) => !f.anulado_en).map((f) => f.id);
-    cargarMarcasPorFactura(vigentes);
-  }, [facturas, cargarMarcasPorFactura]);
 
   // Cuando el usuario sube el PDF, lo subimos a Storage bajo el path del
   // proyecto (sin facturaId todavía) y devolvemos el path para que el form
@@ -671,7 +641,12 @@ export default function FacturasSection({
       ) : (
         <div className="grid grid-cols-1 gap-2">
           {facturas.map((f) => {
-            const marcasDeEsta = marcasByFactura[f.id] ?? proyecto.marcas ?? [];
+            // Marcas embebidas en la factura (de GET /proyectos/[id]); fallback
+            // a las marcas del proyecto si una factura aún no las trae.
+            const marcasDeEsta =
+              f.marcas && f.marcas.length > 0
+                ? f.marcas
+                : proyecto.marcas ?? [];
             return (
               <div key={f.id} className="relative group">
                 <FacturaCard factura={f} porcentajesMarcas={marcasDeEsta} />
