@@ -2,19 +2,31 @@
 // GET /api/cron/switch-reconciliacion
 //
 // Red de seguridad del ciclo diario de syncs Switch. Corre DESPUÉS de toda la
-// cadena (switch-sync 05:30-06:30, costo, etc., que terminan ~09:00). Detecta
-// qué empresas quedaron SIN success de HOY (fecha Panamá) en los sync_type que
-// produce el cron switch-sync —facturas, estadocuenta, costo— y SOLO para esas
-// re-dispara el mismo mecanismo de switch-sync (tipo=all&empresas=...), en serie.
+// cadena (switch-sync 05:30-06:30, clientes-master 07:00, utilidad 08:00, recibos
+// 08:30, articulos 09:00). Detecta qué quedó SIN success de HOY (fecha Panamá) y
+// lo RE-EJECUTA IN-PROCESS —llamando las funciones de sync directamente, NO por
+// self-fetch HTTP.
 //
-// El retry in-process de client.ts (commit 3224bb4) cubre los fallos transitorios
-// DENTRO de una corrida; este cron cubre el caso en que una corrida entera murió
-// (timeout de auth, colisión single-session sostenida) y quedó sin re-intento en
-// todo el día. Es la pieza cross-invocación que faltaba.
+// POR QUÉ IN-PROCESS (incidente 7-jun-2026): el scheduler de Vercel pierde
+// invocaciones de cron (3 de 4 switch-sync + utilidad + clientes-master murieron
+// sin dejar ni fila `running`). La versión vieja recuperaba por
+// `fetch(${origin}/api/cron/switch-sync?...)` en lotes de 2 con maxDuration=300:
+// 6 empresas × ~200s excedían el límite → la mataban a media recuperación y los
+// switch-sync self-fetched no sobrevivían a la muerte del caller → recuperó 0/16.
+// Ahora ejecuta el trabajo dentro de ESTA invocación (maxDuration=800), serial
+// por empresa (token único de Switch), idempotente (upserts), acotado por un
+// presupuesto de tiempo. Lo que no entre en una pasada lo toma la siguiente:
+// corre 3×/día (10:00, 14:00, 18:00 UTC), todas idempotentes.
+//
+// COBERTURA: switch-sync (facturas/estadocuenta/costo, por par vía
+// switch_sync_log) + los crons "de una sola unidad" (clientes-master, utilidad,
+// recibos, articulos, detectados por cron_heartbeats sin success hoy). NO cubre
+// multifashion-sync (no registra heartbeat → sin señal fiable; su data igual
+// entra por american_classic en switch-sync).
 //
 // Telegram:
-//   - Re-disparó algo y TODO quedó OK   → mensaje informativo (qué se recuperó).
-//   - Alguna empresa sigue sin success  → ALERTA (empresa, sync_type, último error).
+//   - Re-ejecutó algo y TODO quedó OK   → mensaje informativo (qué se recuperó).
+//   - Algo sigue sin success / sin tiempo → ALERTA (qué, último error).
 //   - Todo estaba OK desde el inicio     → no envía nada (cero ruido).
 //
 // Auth: Bearer con CRON_SECRET (igual que el resto de crons).
@@ -22,8 +34,16 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import {
+  syncEmpresaFacturas,
+  syncEmpresaEstadoCuenta,
+  syncCostoDiario,
+} from "@/lib/switch-api/sync-empresa";
+import { syncAllUtilidad, mesActual } from "@/lib/switch-api/sync-utilidad";
+import { syncAllRecibos } from "@/lib/switch-api/sync-recibos";
+import { syncArticulosDiario } from "@/lib/switch-api/sync-articulos";
+import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
-import { chunk } from "@/lib/chunk";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
 import type { EmpresaKey } from "@/lib/empresa-mapping";
@@ -34,10 +54,15 @@ const WATCHDOG_STALE_HOURS = 30;
 
 export const dynamic = "force-dynamic";
 // El App Router cachea fetch() por defecto (Data Cache) — incluye los fetch
-// internos de supabase-js Y nuestro fetch a switch-sync. Sin esto, la re-consulta
-// del log devuelve datos stale y la re-corrida se sirve cacheada (mismo logId).
+// internos de supabase-js. Sin esto, la re-consulta del log devuelve datos stale.
 export const fetchCache = "force-no-store";
-export const maxDuration = 300;
+// Recuperación in-process: una corrida puede re-ejecutar varios syncs pesados en
+// serie (estadocuenta ~85-120s/empresa). 800s con Fluid Compute (ya activo) da
+// holgura; lo que no entre lo toma la siguiente pasada (10:00/14:00/18:00).
+export const maxDuration = 800;
+// Dejar de ARRANCAR trabajo nuevo pasado este umbral (headroom antes del kill a
+// 800s). El trabajo ya iniciado termina; lo no arrancado lo toma la otra pasada.
+const RECOVERY_BUDGET_MS = 760_000;
 
 // sync_type que el cron switch-sync (tipo=all) escribe a switch_sync_log.
 const DAILY_SYNC_TYPES = ["facturas", "estadocuenta", "costo"] as const;
@@ -58,24 +83,22 @@ interface Pair {
 
 const key = (empresa: string, syncType: string) => `${empresa}|${syncType}`;
 
-// Tamaño de grupo para re-disparar switch-sync. Es el MISMO patrón que los crons
-// de producción (2 empresas por cron). switch-sync corre cada empresa EN SERIE
-// adentro; 6 empresas en una sola llamada superan maxDuration y la corrida muere
-// por timeout sin recuperar nada (incidente 6-jun: el retry de las 6 juntas hizo
-// timeout → la reconciliación alertó pero no autorrecuperó). 2 por batch mantiene
-// cada llamada bajo el límite; los batches corren SECUENCIALES (no se solapan).
-const RETRIGGER_BATCH_SIZE = 2;
-
-/** Fecha de HOY en Panamá (YYYY-MM-DD). Panamá es UTC-5 fijo (sin horario de verano). */
+/** Fecha de HOY en Panamá (YYYY-MM-DD). Panamá es UTC-5 fijo (sin DST). */
 function panamaToday(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Panama" }).format(
-    new Date(),
-  );
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Panama" }).format(new Date());
 }
 
-/** Inicio del día de Panamá (medianoche) expresado en ISO UTC, para filtrar started_at. */
+/** Inicio del día de Panamá (medianoche) en ISO UTC, para filtrar started_at. */
 function panamaDayStartIso(): string {
   return new Date(`${panamaToday()}T00:00:00-05:00`).toISOString();
+}
+
+/** Fecha Panamá con offset de días (YYYY-MM-DD) — replica switch-sync/articulos. */
+function panamaDate(offsetDays = 0): string {
+  const now = new Date();
+  const panama = new Date(now.toLocaleString("en-US", { timeZone: "America/Panama" }));
+  panama.setDate(panama.getDate() + offsetDays);
+  return panama.toISOString().slice(0, 10);
 }
 
 /**
@@ -119,18 +142,15 @@ function findMissing(expected: Pair[], rows: SyncLogRow[]): Pair[] {
 
 /** Último mensaje de error registrado hoy para un par (o null si no corrió). */
 function lastErrorFor(pair: Pair, rows: SyncLogRow[]): string | null {
-  // rows viene ordenado por started_at desc → el primero que matchea es el más reciente.
-  const row = rows.find(
-    (r) => r.empresa_key === pair.empresa && r.sync_type === pair.syncType,
-  );
+  const row = rows.find((r) => r.empresa_key === pair.empresa && r.sync_type === pair.syncType);
   if (!row) return "sin corrida hoy";
   return row.error_message ?? `status=${row.status}`;
 }
 
 /**
  * Error legible para Telegram: solo el primer renglón útil, truncado a ~200
- * chars. Switch a veces devuelve una página HTML de excepción completa
- * ("<!DOCTYPE html>...") como error_message — sin esto la alerta queda ilegible.
+ * chars. Switch a veces devuelve una página HTML de excepción completa como
+ * error_message — sin esto la alerta queda ilegible.
  */
 function shortError(msg: string | null, max = 200): string {
   if (!msg) return "—";
@@ -138,40 +158,91 @@ function shortError(msg: string | null, max = 200): string {
   return firstLine.length > max ? `${firstLine.slice(0, max)}…` : firstLine;
 }
 
-/**
- * Re-dispara el cron switch-sync (tipo=all) para UN GRUPO de empresas (≤2) en una
- * llamada HTTP — switch-sync las procesa SERIALMENTE adentro. El caller invoca esto
- * por grupos secuenciales (ver RETRIGGER_BATCH_SIZE) para no exceder maxDuration.
- * Usamos el mismo origin de este request para construir la URL absoluta. No lanza:
- * si la llamada falla, lo registramos y dejamos que la re-consulta de
- * switch_sync_log sea la fuente de verdad del estado final.
- */
-async function retriggerSwitchSync(
-  origin: string,
-  secret: string,
-  empresas: EmpresaKey[],
-): Promise<{ ok: boolean; detail: string }> {
-  const url = `${origin}/api/cron/switch-sync?tipo=all&empresas=${empresas.join(",")}`;
-  try {
-    const res = await fetch(url, {
-      headers: { authorization: `Bearer ${secret}` },
-      cache: "no-store",
-    });
-    const body = await res.text().catch(() => "");
-    return { ok: res.ok, detail: `HTTP ${res.status} ${body.slice(0, 300)}` };
-  } catch (err) {
-    return {
-      ok: false,
-      detail: `fetch falló: ${err instanceof Error ? err.message : String(err)}`,
-    };
+// ─── Crons "de una sola unidad" recuperables in-process ──────────────────────
+// Detección por heartbeat (success hoy o no). Recuperación llamando su función
+// de sync directamente; si recupera OK, registramos su heartbeat (las funciones
+// lib NO lo hacen — eso es del route/orquestador).
+interface ColateralCron {
+  cronName: string;
+  label: string;
+  recover: () => Promise<{ ok: boolean; detail: string }>;
+}
+
+const COLATERAL_CRONS: ColateralCron[] = [
+  {
+    cronName: "sync-clientes-master",
+    label: "clientes-master",
+    recover: async () => {
+      const r = await syncClientesMaster();
+      return { ok: r.ok, detail: r.ok ? `${r.upserted} upserted` : r.error ?? "error" };
+    },
+  },
+  {
+    cronName: "sync-utilidad",
+    label: "utilidad",
+    recover: async () => {
+      const rs = await syncAllUtilidad([mesActual()]);
+      const bad = rs.filter((r) => !r.ok);
+      return {
+        ok: bad.length === 0,
+        detail: bad.length === 0 ? `${rs.length} empresas` : `falló: ${bad.map((b) => b.empresaKey).join(",")}`,
+      };
+    },
+  },
+  {
+    cronName: "sync-recibos",
+    label: "recibos",
+    recover: async () => {
+      const rs = await syncAllRecibos([mesActual()]);
+      const bad = rs.filter((r) => !r.ok);
+      return {
+        ok: bad.length === 0,
+        detail: bad.length === 0 ? `${rs.length} empresas` : `falló: ${bad.map((b) => b.empresaKey).join(",")}`,
+      };
+    },
+  },
+  {
+    cronName: "switch-articulos",
+    label: "articulos",
+    recover: async () => {
+      const desde = panamaDate(-3);
+      const hasta = panamaDate(0);
+      const bad: string[] = [];
+      for (const empresaKey of empresasConFacturas()) {
+        try {
+          await syncArticulosDiario(empresaKey, desde, hasta);
+        } catch (err) {
+          bad.push(empresaKey);
+          console.error(`[reconciliacion] articulos ${empresaKey}: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+      return { ok: bad.length === 0, detail: bad.length === 0 ? "ok" : `falló: ${bad.join(",")}` };
+    },
+  },
+];
+
+/** Heartbeats de los colaterales que NO tienen success de hoy (= se perdieron). */
+async function findMissingColaterales(dayStartIso: string): Promise<ColateralCron[]> {
+  const names = COLATERAL_CRONS.map((c) => c.cronName);
+  const { data, error } = await supabaseServer
+    .from("cron_heartbeats")
+    .select("cron_name, last_success_at")
+    .in("cron_name", names);
+  if (error) {
+    console.error(`[reconciliacion] no pude leer cron_heartbeats: ${error.message}`);
+    return []; // sin señal fiable → no recuperar a ciegas (evita trabajo innecesario)
   }
+  const successHoy = new Set(
+    (data ?? [])
+      .filter((h) => h.last_success_at && h.last_success_at >= dayStartIso)
+      .map((h) => h.cron_name),
+  );
+  return COLATERAL_CRONS.filter((c) => !successHoy.has(c.cronName));
 }
 
 /**
  * Watchdog de heartbeats: revisa cron_heartbeats y alerta por Telegram si algún
- * cron lleva más de WATCHDOG_STALE_HOURS sin un success. Devuelve la lista de
- * crons stale. No lanza: si la tabla no existe aún (migración pendiente) o la
- * query falla, devuelve [] y sigue.
+ * cron lleva más de WATCHDOG_STALE_HOURS sin un success. No lanza.
  */
 async function checkStaleCrons(): Promise<string[]> {
   const { data, error } = await supabaseServer
@@ -200,29 +271,31 @@ async function checkStaleCrons(): Promise<string[]> {
 export async function GET(req: NextRequest): Promise<NextResponse> {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
-    return NextResponse.json(
-      { ok: false, error: "CRON_SECRET no configurado" },
-      { status: 500 },
-    );
+    return NextResponse.json({ ok: false, error: "CRON_SECRET no configurado" }, { status: 500 });
   }
   if ((req.headers.get("authorization") ?? "") !== `Bearer ${secret}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  const startedMs = Date.now();
+  const elapsed = () => Date.now() - startedMs;
+  const budgetLeft = () => elapsed() < RECOVERY_BUDGET_MS;
+
   const fecha = panamaToday();
   const sinceIso = panamaDayStartIso();
   const expected = expectedPairs();
 
-  // 0. Watchdog de heartbeats (corre en ambos desenlaces) + registrar el propio.
+  // 0. Watchdog de heartbeats + registrar el propio.
   const staleCrons = await checkStaleCrons();
   await recordCronHeartbeat(CRON_NAME);
 
-  // 1. Detección inicial.
+  // 1. Detección inicial (switch-sync por par + colaterales por heartbeat).
   const logBefore = await fetchTodayLog(sinceIso);
-  const missingBefore = findMissing(expected, logBefore);
+  const missingPairs = findMissing(expected, logBefore);
+  const missingColaterales = await findMissingColaterales(sinceIso);
 
   // Todo OK desde el inicio → cero ruido, no se toca nada.
-  if (missingBefore.length === 0) {
+  if (missingPairs.length === 0 && missingColaterales.length === 0) {
     return NextResponse.json({
       ok: true,
       fecha,
@@ -234,67 +307,126 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     });
   }
 
-  // 2. Re-disparar SOLO las empresas afectadas (distintas), en GRUPOS de 2 y
-  //    SECUENCIALMENTE (await por grupo). Una sola llamada con todas las afectadas
-  //    excede maxDuration y muere por timeout sin recuperar nada (ver
-  //    RETRIGGER_BATCH_SIZE). Cada switch-sync corre como invocación independiente,
-  //    así que aunque esta reconciliación se quede sin tiempo en el peor caso, los
-  //    batches ya disparados completan igual.
-  const empresasAfectadas = [...new Set(missingBefore.map((p) => p.empresa))] as EmpresaKey[];
-  const retrigger: Array<{ empresas: EmpresaKey[]; ok: boolean; detail: string }> = [];
-  for (const grupo of chunk(empresasAfectadas, RETRIGGER_BATCH_SIZE)) {
-    const r = await retriggerSwitchSync(req.nextUrl.origin, secret, grupo);
-    retrigger.push({ empresas: grupo, ...r });
+  // 2. RECUPERACIÓN IN-PROCESS, serial, en orden de dependencia/prioridad, acotada
+  //    por presupuesto de tiempo. Lo que no entre lo toma la próxima pasada.
+  const win = { desde: panamaDate(-7), hasta: panamaDate(0), triggeredBy: "cron" as const };
+  const skipped: string[] = [];
+
+  // 2a. switch-sync: agrupar pares faltantes por empresa y correr SOLO los tipos
+  //     faltantes de esa empresa, en orden canónico (reusa el token: facturas →
+  //     estadocuenta → costo). Las funciones escriben switch_sync_log (fuente de
+  //     verdad del re-chequeo); si lanzan, lo capturamos y seguimos.
+  const empresasConPares = new Map<EmpresaKey, Set<DailySyncType>>();
+  for (const p of missingPairs) {
+    if (!empresasConPares.has(p.empresa)) empresasConPares.set(p.empresa, new Set());
+    empresasConPares.get(p.empresa)!.add(p.syncType);
+  }
+  let switchSyncRecoveryRan = false;
+  for (const [empresaKey, tipos] of empresasConPares) {
+    if (!budgetLeft()) {
+      skipped.push(`switch-sync/${empresaKey}`);
+      continue;
+    }
+    switchSyncRecoveryRan = true;
+    for (const tipo of DAILY_SYNC_TYPES) {
+      if (!tipos.has(tipo)) continue;
+      try {
+        if (tipo === "facturas") await syncEmpresaFacturas(empresaKey, win);
+        else if (tipo === "estadocuenta") await syncEmpresaEstadoCuenta(empresaKey, win);
+        else await syncCostoDiario(empresaKey, win.triggeredBy);
+      } catch (err) {
+        console.error(`[reconciliacion] ${empresaKey}/${tipo}: ${err instanceof Error ? err.message : err}`);
+      }
+    }
   }
 
-  // 3. Re-consultar el log: fuente de verdad del estado final.
-  const logAfter = await fetchTodayLog(sinceIso);
-  const missingAfter = findMissing(expected, logAfter);
+  // 2b. colaterales (orden: clientes-master primero — lee switch_clientes que
+  //     facturas acaba de refrescar; luego utilidad/recibos/articulos).
+  const colateralResults: Array<{ cronName: string; label: string; ok: boolean; detail: string }> = [];
+  for (const c of missingColaterales) {
+    if (!budgetLeft()) {
+      skipped.push(c.cronName);
+      continue;
+    }
+    try {
+      const r = await c.recover();
+      if (r.ok) await recordCronHeartbeat(c.cronName);
+      colateralResults.push({ cronName: c.cronName, label: c.label, ...r });
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      console.error(`[reconciliacion] ${c.cronName}: ${detail}`);
+      colateralResults.push({ cronName: c.cronName, label: c.label, ok: false, detail });
+    }
+  }
+  // Si switch-sync recuperó algo OK, refrescar su heartbeat (el watchdog usa el
+  // heartbeat 'switch-sync'; las funciones lib no lo tocan).
+  if (switchSyncRecoveryRan) await recordCronHeartbeat("switch-sync");
 
-  const recovered = missingBefore.filter(
-    (p) => !missingAfter.some((m) => m.empresa === p.empresa && m.syncType === p.syncType),
+  // 3. Re-consultar: fuente de verdad del estado final.
+  const logAfter = await fetchTodayLog(sinceIso);
+  const stillMissingPairs = findMissing(expected, logAfter);
+  const recoveredPairs = missingPairs.filter(
+    (p) => !stillMissingPairs.some((m) => m.empresa === p.empresa && m.syncType === p.syncType),
   );
+  const failedColaterales = colateralResults.filter((c) => !c.ok);
+  const recoveredColaterales = colateralResults.filter((c) => c.ok);
 
   // 4. Telegram.
+  const hayProblemas = stillMissingPairs.length > 0 || failedColaterales.length > 0 || skipped.length > 0;
   let telegram: "info" | "alert" | "none" = "none";
 
-  if (missingAfter.length > 0) {
+  if (hayProblemas) {
     telegram = "alert";
-    const lineas = missingAfter
-      .map((p) => `• ${p.empresa} / ${p.syncType}: ${shortError(lastErrorFor(p, logAfter))}`)
-      .join("\n");
-    const recuperadas = recovered.length
-      ? `\n\nRecuperadas en esta corrida: ${recovered.map((p) => `${p.empresa}/${p.syncType}`).join(", ")}`
-      : "";
+    const lineasPares = stillMissingPairs.map(
+      (p) => `• ${p.empresa}/${p.syncType}: ${shortError(lastErrorFor(p, logAfter))}`,
+    );
+    const lineasCol = failedColaterales.map((c) => `• ${c.label}: ${shortError(c.detail)}`);
+    const lineasSkip = skipped.length ? [`• sin tiempo (próxima pasada): ${skipped.join(", ")}`] : [];
+    const recuperadas =
+      recoveredPairs.length || recoveredColaterales.length
+        ? `\n\nRecuperadas: ${[
+            ...recoveredPairs.map((p) => `${p.empresa}/${p.syncType}`),
+            ...recoveredColaterales.map((c) => c.label),
+          ].join(", ")}`
+        : "";
     await sendTelegramAlert(
       `🚨 ALERTA sync Switch (${fecha})\n` +
-        `${missingAfter.length} sin success tras reconciliación:\n${lineas}${recuperadas}`,
+        `Sin success tras reconciliación:\n${[...lineasPares, ...lineasCol, ...lineasSkip].join("\n")}${recuperadas}`,
     );
-  } else if (recovered.length > 0) {
+  } else if (recoveredPairs.length > 0 || recoveredColaterales.length > 0) {
     telegram = "info";
     await sendTelegramAlert(
       `✅ Reconciliación Switch (${fecha})\n` +
-        `Recuperadas ${recovered.length}: ${recovered.map((p) => `${p.empresa}/${p.syncType}`).join(", ")}\n` +
+        `Recuperadas ${recoveredPairs.length + recoveredColaterales.length}: ${[
+          ...recoveredPairs.map((p) => `${p.empresa}/${p.syncType}`),
+          ...recoveredColaterales.map((c) => c.label),
+        ].join(", ")}\n` +
         `Todo el ciclo diario quedó en success.`,
     );
   }
 
   return NextResponse.json(
     {
-      ok: missingAfter.length === 0,
+      ok: !hayProblemas,
       fecha,
       allHealthy: false,
-      empresasReDisparadas: empresasAfectadas,
-      retrigger,
-      reconciled: recovered.map((p) => ({ empresa: p.empresa, syncType: p.syncType })),
-      stillFailing: missingAfter.map((p) => ({
-        empresa: p.empresa,
-        syncType: p.syncType,
-        lastError: lastErrorFor(p, logAfter),
-      })),
+      elapsedMs: elapsed(),
+      reconciled: [
+        ...recoveredPairs.map((p) => ({ empresa: p.empresa, syncType: p.syncType })),
+        ...recoveredColaterales.map((c) => ({ cron: c.cronName })),
+      ],
+      stillFailing: [
+        ...stillMissingPairs.map((p) => ({
+          empresa: p.empresa,
+          syncType: p.syncType,
+          lastError: lastErrorFor(p, logAfter),
+        })),
+        ...failedColaterales.map((c) => ({ cron: c.cronName, detail: c.detail })),
+      ],
+      skipped,
       telegram,
       staleCrons,
     },
-    { status: missingAfter.length === 0 ? 200 : 207 },
+    { status: hayProblemas ? 207 : 200 },
   );
 }
