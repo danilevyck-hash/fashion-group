@@ -37,7 +37,15 @@ interface EmpresaTotals {
 export interface ClienteDetailData {
   cliente: Cliente;
   empresas: EmpresaTotals[];
-  total_grupo: { ventas_ytd: number; cobrado_ytd: number; cxc: number; ultima_factura: string | null };
+  total_grupo: {
+    ventas_ytd: number;
+    cobrado_ytd: number;
+    cxc: number;
+    cxc_vencido?: number; // CXC con +90d (vencido reciente + crítico)
+    cxc_critico?: number; // CXC con +120d
+    ultima_factura: string | null;
+  };
+  ultimas_guias?: { id: string; numero: number; fecha: string }[];
 }
 
 const EDITABLE_ROLES = ["admin", "secretaria"];
@@ -60,10 +68,27 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showInactivas, setShowInactivas] = useState(false);
 
   if (!authChecked) return null;
 
   const empresaName = (key: string) => ALL_COMPANIES.find(c => c.key === key)?.name || key;
+
+  // (1) Filas de empresa sin actividad ($0 en todo) se colapsan; el Total grupo
+  // siempre se muestra completo.
+  const hasActividad = (e: EmpresaTotals) => e.ventas_ytd !== 0 || e.cobrado_ytd !== 0 || e.cxc !== 0;
+  const empresasActivas = initialData.empresas.filter(hasActividad);
+  const empresasInactivas = initialData.empresas.filter((e) => !hasActividad(e));
+
+  // (2) Dedup de teléfono: si TELÉFONO === CELULAR, mostrar uno solo (lectura).
+  const telTrim = (cliente.telefono ?? "").trim();
+  const celTrim = (cliente.celular ?? "").trim();
+  const telDuplicado = telTrim !== "" && telTrim === celTrim;
+
+  // (3) Pill de antigüedad del grupo (cuando hay vencido +90d).
+  const cxcVencido = initialData.total_grupo.cxc_vencido ?? 0;
+  const cxcCritico = initialData.total_grupo.cxc_critico ?? 0;
+  const verEnCxcHref = `/admin?search=${encodeURIComponent(cliente.nombre)}`;
 
   async function save() {
     setSaving(true);
@@ -174,7 +199,10 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-sm">
               <Field label="Teléfono" value={cliente.telefono} href={telHref(cliente.telefono)} />
-              <Field label="Celular"  value={cliente.celular}  href={telHref(cliente.celular)} />
+              {/* Si celular == teléfono, no repetir la misma línea. */}
+              {!telDuplicado && (
+                <Field label="Celular" value={cliente.celular} href={telHref(cliente.celular)} />
+              )}
               <Field label="Email"    value={cliente.email}    href={mailtoHref(cliente.email)} />
               <Field label="Notas"    value={cliente.notas} fullWidth />
             </div>
@@ -183,9 +211,31 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
 
         {/* Historial por empresa */}
         <section className="border border-gray-200 rounded-lg p-4 mb-4">
-          <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">
-            Historial · YTD {new Date().getFullYear()}
-          </h2>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400">
+              Historial · YTD {new Date().getFullYear()}
+            </h2>
+            <div className="flex items-center gap-2">
+              {cxcVencido > 0 && (
+                <span
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums ${
+                    cxcCritico > 0
+                      ? "bg-red-50 text-red-700 border border-red-200"
+                      : "bg-amber-50 text-amber-700 border border-amber-200"
+                  }`}
+                  title="Saldo vencido (más de 90 días)"
+                >
+                  {cxcCritico > 0 ? "Vencido crítico" : "Vencido"} ${fmt(cxcVencido)}
+                </span>
+              )}
+              <Link
+                href={verEnCxcHref}
+                className="text-xs text-blue-600 hover:underline whitespace-nowrap"
+              >
+                Ver en CXC →
+              </Link>
+            </div>
+          </div>
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-[11px] uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
@@ -197,26 +247,47 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
               </tr>
             </thead>
             <tbody>
-              {initialData.empresas.map(e => (
+              {empresasActivas.map(e => (
                 <tr key={e.empresa} className="border-b border-gray-100">
                   <td className="py-2 text-gray-700">{empresaName(e.empresa)}</td>
                   <td className="py-2 text-right tabular-nums">${fmt(e.ventas_ytd)}</td>
                   <td className={`py-2 text-right tabular-nums ${e.cobrado_ytd > 0 ? "text-emerald-700" : "text-gray-400"}`}>${fmt(e.cobrado_ytd)}</td>
-                  <td className={`py-2 text-right tabular-nums ${e.cxc > 0 ? "text-amber-700" : e.cxc < 0 ? "text-emerald-700" : "text-gray-400"}`}>
-                    ${fmt(e.cxc)}
-                  </td>
+                  <CxcCell value={e.cxc} />
                   <td className={`py-2 text-right tabular-nums ${e.ultima_factura ? "text-gray-600" : "text-gray-300"}`}>
                     {e.ultima_factura ? fmtDate(e.ultima_factura.slice(0, 10)) : "—"}
                   </td>
                 </tr>
               ))}
+
+              {/* (1) Empresas sin actividad: colapsadas tras una línea con el conteo. */}
+              {empresasInactivas.length > 0 && (
+                <tr className="border-b border-gray-100">
+                  <td colSpan={5} className="py-1">
+                    <button
+                      onClick={() => setShowInactivas(v => !v)}
+                      className="text-[11px] text-gray-400 hover:text-gray-600 transition"
+                    >
+                      {showInactivas ? "▾" : "▸"} {empresasInactivas.length}{" "}
+                      {empresasInactivas.length === 1 ? "empresa sin actividad" : "empresas sin actividad"}
+                    </button>
+                  </td>
+                </tr>
+              )}
+              {showInactivas && empresasInactivas.map(e => (
+                <tr key={e.empresa} className="border-b border-gray-100 text-gray-400">
+                  <td className="py-2">{empresaName(e.empresa)}</td>
+                  <td className="py-2 text-right tabular-nums">${fmt(e.ventas_ytd)}</td>
+                  <td className="py-2 text-right tabular-nums">${fmt(e.cobrado_ytd)}</td>
+                  <CxcCell value={e.cxc} />
+                  <td className="py-2 text-right tabular-nums text-gray-300">—</td>
+                </tr>
+              ))}
+
               <tr className="font-medium">
                 <td className="py-2.5">Total grupo</td>
                 <td className="py-2.5 text-right tabular-nums">${fmt(initialData.total_grupo.ventas_ytd)}</td>
                 <td className="py-2.5 text-right tabular-nums">${fmt(initialData.total_grupo.cobrado_ytd)}</td>
-                <td className={`py-2.5 text-right tabular-nums ${initialData.total_grupo.cxc > 0 ? "text-amber-700" : initialData.total_grupo.cxc < 0 ? "text-emerald-700" : "text-gray-400"}`}>
-                  ${fmt(initialData.total_grupo.cxc)}
-                </td>
+                <CxcCell value={initialData.total_grupo.cxc} className="py-2.5" />
                 <td className={`py-2.5 text-right tabular-nums ${initialData.total_grupo.ultima_factura ? "text-gray-600" : "text-gray-300"}`}>
                   {initialData.total_grupo.ultima_factura ? fmtDate(initialData.total_grupo.ultima_factura.slice(0, 10)) : "—"}
                 </td>
@@ -224,9 +295,46 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
             </tbody>
           </table>
         </section>
+
+        {/* Últimas guías del cliente (vínculo por cliente_codigo). Tappable al detalle. */}
+        {initialData.ultimas_guias && initialData.ultimas_guias.length > 0 && (
+          <section className="border border-gray-200 rounded-lg p-4 mb-4">
+            <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2">Últimas guías</h2>
+            <ul className="divide-y divide-gray-100">
+              {initialData.ultimas_guias.map(g => (
+                <li key={g.id}>
+                  <Link
+                    href={`/guias/${g.id}/imprimir`}
+                    className="-mx-2 flex items-center justify-between rounded px-2 py-2 text-sm transition hover:bg-gray-50"
+                  >
+                    <span className="text-gray-700">Guía #{g.numero}</span>
+                    <span className="tabular-nums text-gray-400">{fmtDate(g.fecha.slice(0, 10))} ›</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </main>
       <Toast message={toast} type="success" onDismiss={() => setToast(null)} />
     </div>
+  );
+}
+
+// Celda de CXC: positivo = ámbar; cero = gris; negativo = "Saldo a favor" en
+// AZUL (no es deuda, es crédito del cliente).
+function CxcCell({ value, className = "py-2" }: { value: number; className?: string }) {
+  if (value < 0) {
+    return (
+      <td className={`${className} text-right tabular-nums text-blue-600`}>
+        Saldo a favor ${fmt(Math.abs(value))}
+      </td>
+    );
+  }
+  return (
+    <td className={`${className} text-right tabular-nums ${value > 0 ? "text-amber-700" : "text-gray-400"}`}>
+      ${fmt(value)}
+    </td>
   );
 }
 
