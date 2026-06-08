@@ -403,9 +403,9 @@ export default function EntregaForm({
       const body = initial
         ? { items }
         : {
-            // proyectoId="" significa "standalone, sin proyecto" → null para
-            // que entre a la bandeja de pendientes.
-            proyectoId: proyectoId ? proyectoId : null,
+            // Toda entrega nueva va atada a su proyecto (se retiró el flujo de
+            // entregas huérfanas/bandeja).
+            proyectoId,
             items,
           };
       const res = await fetch(url, {

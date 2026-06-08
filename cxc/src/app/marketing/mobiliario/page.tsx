@@ -12,7 +12,6 @@ import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/components/ToastSystem";
 import { ConfirmDeleteModal } from "@/components/ui";
 import { formatearMonto } from "@/lib/marketing/normalizar";
-import { getEmpresaStyle } from "@/lib/marketing/empresa-styles";
 import { resumirPorTienda } from "@/lib/marketing/inventario-resumen";
 import EntregaForm from "@/components/marketing/EntregaForm";
 import type {
@@ -60,29 +59,14 @@ export default function MobiliarioPage() {
   const [editEntrega, setEditEntrega] = useState<EntregaConItems | null>(null);
   const [downloading, setDownloading] = useState<string | null>(null);
 
-  // Asignar entrega pendiente (proyecto_id IS NULL) a un proyecto.
-  const [asignarPendiente, setAsignarPendiente] = useState<EntregaConItems | null>(
-    null,
-  );
-  const [asignarProyectoId, setAsignarProyectoId] = useState<string>("");
-  const [asignando, setAsignando] = useState(false);
-  // Lista completa de proyectos no anulados para el dropdown del modal.
-  const [proyectosDropdown, setProyectosDropdown] = useState<
-    Array<{ id: string; tienda: string; nombre: string | null }>
-  >([]);
 
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const [pRes, eRes, mRes, listaRes] = await Promise.all([
+      const [pRes, eRes, mRes] = await Promise.all([
         fetch("/api/marketing/inventario/productos", { cache: "no-store" }),
         fetch("/api/marketing/inventario/entregas", { cache: "no-store" }),
         fetch("/api/marketing/marcas", { cache: "no-store" }),
-        // Lista completa de proyectos (todos los estados) para el dropdown
-        // del modal de asignación. Se ordena por created_at DESC en el backend.
-        fetch("/api/marketing/proyectos-lista?filtro_estado=todos", {
-          cache: "no-store",
-        }),
       ]);
       if (!pRes.ok) throw new Error("No se pudieron cargar productos");
       if (!eRes.ok) throw new Error("No se pudieron cargar entregas");
@@ -92,21 +76,6 @@ export default function MobiliarioPage() {
       setProductos(pData);
       setEntregas(eData);
       setMarcas(mData);
-
-      if (listaRes.ok) {
-        const lista = (await listaRes.json()) as Array<{
-          id: string;
-          tienda: string;
-          nombre: string | null;
-          anulado_en: string | null;
-          created_at: string;
-        }>;
-        setProyectosDropdown(
-          lista
-            .filter((p) => !p.anulado_en)
-            .map((p) => ({ id: p.id, tienda: p.tienda, nombre: p.nombre })),
-        );
-      }
 
       // Cargar proyectos relacionados (solo los que tienen entrega asignada,
       // necesarios para mostrar nombre de tienda en filas asignadas).
@@ -170,18 +139,8 @@ export default function MobiliarioPage() {
     };
   }, [productos, entregas]);
 
-  // Separación pendientes (proyecto_id null) vs asignadas
-  const entregasPendientes = useMemo(
-    () => entregas.filter((e) => !e.proyecto_id),
-    [entregas],
-  );
-  const entregasAsignadas = useMemo(
-    () => entregas.filter((e) => e.proyecto_id),
-    [entregas],
-  );
-
   // Agregado tipo changalo: 1 fila por tienda con paneles + montos por empresa.
-  // Usa todas las entregas (incl. pendientes — derivan tienda de notas).
+  // Toda entrega tiene proyecto_id (la tienda sale de proyecto.tienda).
   const resumenPorTienda = useMemo(() => {
     const proyectos: MkProyecto[] = Array.from(proyectoById.values());
     return resumirPorTienda(entregas, proyectos, productos);
@@ -210,32 +169,6 @@ export default function MobiliarioPage() {
     return t;
   }, [resumenPorTienda]);
 
-  const ejecutarAsignar = async () => {
-    if (!asignarPendiente || !asignarProyectoId) return;
-    setAsignando(true);
-    try {
-      const res = await fetch(
-        `/api/marketing/inventario/entregas/${asignarPendiente.id}/asignar-proyecto`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ proyectoId: asignarProyectoId }),
-        },
-      );
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error ?? "No se pudo asignar");
-      }
-      toast("Entrega asignada al proyecto", "success");
-      setAsignarPendiente(null);
-      setAsignarProyectoId("");
-      cargar();
-    } catch (err) {
-      toast(err instanceof Error ? err.message : "Error al asignar", "error");
-    } finally {
-      setAsignando(false);
-    }
-  };
 
   // Entregado por producto (para columna "Entregado" en tabla)
   const entregadoPorProducto = useMemo(() => {
@@ -392,133 +325,6 @@ export default function MobiliarioPage() {
           </span>{" "}
           · Tiendas: {metricas.tiendas}
         </div>
-
-        {/* Bandeja: entregas pendientes de asignar a un proyecto. Solo se
-            muestra si hay alguna con proyecto_id IS NULL. Stock ya descontado
-            cuando se creó la entrega — el bloqueo de asignación es solo
-            administrativo. */}
-        {entregasPendientes.length > 0 && (
-          <section className="space-y-2">
-            <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
-              <strong className="font-semibold">
-                {entregasPendientes.length}{" "}
-                {entregasPendientes.length === 1
-                  ? "entrega pendiente"
-                  : "entregas pendientes"}
-              </strong>{" "}
-              de asignar a proyecto. Stock ya descontado. Asigná cada una a su
-              proyecto cuando lo tengas creado.
-            </div>
-            <div className="rounded-[10px] border border-gray-200 overflow-hidden bg-white">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50">
-                  <tr className="text-[11px] uppercase tracking-wider text-gray-500">
-                    <th className="text-left font-medium px-3 py-2">Origen</th>
-                    <th className="text-right font-medium px-3 py-2 w-24">
-                      Unidades
-                    </th>
-                    <th className="text-right font-medium px-3 py-2 w-28">
-                      Total
-                    </th>
-                    <th className="text-left font-medium px-3 py-2">Reparto</th>
-                    <th className="text-right font-medium px-3 py-2 w-44">
-                      Acción
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entregasPendientes.map((e) => {
-                    let unidades = 0;
-                    for (const it of e.items) {
-                      for (const r of it.reparto ?? []) {
-                        unidades += Number(r.cantidad ?? 0);
-                      }
-                    }
-                    const empresaByMarcaId = new Map<string, string | null>();
-                    for (const it of e.items) {
-                      for (const r of it.reparto ?? []) {
-                        if (!empresaByMarcaId.has(r.marca_id)) {
-                          empresaByMarcaId.set(r.marca_id, r.empresa ?? null);
-                        }
-                      }
-                    }
-                    const tpm = e.total_por_marca ?? {};
-                    const tpe = e.total_por_empresa_interna ?? {};
-                    return (
-                      <tr key={e.id} className="border-t border-gray-100">
-                        <td className="px-3 py-2 text-gray-900">
-                          {e.notas?.trim() || (
-                            <span className="text-gray-400">
-                              Entrega sin descripción
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums text-gray-700">
-                          {unidades}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-gray-900">
-                          {formatearMonto(e.total)}
-                        </td>
-                        <td className="px-3 py-2">
-                          <div className="flex flex-wrap gap-1">
-                            {Object.entries(tpm).map(([marcaId, monto]) => {
-                              const marca = marcas.find((mm) => mm.id === marcaId);
-                              if (!marca) return null;
-                              const empresaCodigo = empresaByMarcaId.get(marcaId) ?? null;
-                              const esInterna = marca.tipo === "interna";
-                              const empresaMonto =
-                                !esInterna && empresaCodigo
-                                  ? Number(tpe[empresaCodigo] ?? 0)
-                                  : 0;
-                              const par = Number(monto ?? 0) + empresaMonto;
-                              const empresaStyle =
-                                !esInterna && empresaCodigo
-                                  ? getEmpresaStyle(empresaCodigo)
-                                  : null;
-                              const sigla =
-                                marca.codigo +
-                                (empresaStyle ? `+${empresaStyle.code}` : "");
-                              return (
-                                <span
-                                  key={marcaId}
-                                  title={
-                                    empresaStyle
-                                      ? `${marca.nombre} y ${empresaStyle.nombre} cubren parte cada uno`
-                                      : `${marca.nombre} · Fashion Group absorbe todo`
-                                  }
-                                  className="inline-flex items-center gap-1.5 border border-gray-200 bg-white rounded-md px-1.5 py-0.5 text-[11px]"
-                                >
-                                  <span className="font-semibold text-gray-700">
-                                    [{sigla}]
-                                  </span>
-                                  <span className="font-mono tabular-nums text-gray-900">
-                                    {formatearMonto(par)}
-                                  </span>
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setAsignarPendiente(e);
-                              setAsignarProyectoId("");
-                            }}
-                            className="text-xs rounded-md bg-black text-white px-3 py-1.5 active:scale-[0.97] transition"
-                          >
-                            Asignar a proyecto
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </section>
-        )}
 
         {/* Tabla productos */}
         <section className="space-y-1.5">
@@ -912,71 +718,6 @@ export default function MobiliarioPage() {
         );
       })()}
 
-      {/* Modal asignar entrega pendiente a proyecto */}
-      {asignarPendiente && (
-        <div
-          className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center"
-          onClick={() => !asignando && setAsignarPendiente(null)}
-        >
-          <div className="absolute inset-0 bg-black/40" />
-          <div
-            className="relative bg-white sm:rounded-lg rounded-t-2xl p-6 max-w-md w-full mx-0 sm:mx-4 border border-gray-200"
-            onClick={(ev) => ev.stopPropagation()}
-          >
-            <h3 className="text-base font-semibold text-gray-900 mb-1">
-              Asignar entrega a proyecto
-            </h3>
-            <p className="text-xs text-gray-500 mb-4">
-              {asignarPendiente.notas?.trim() || "Entrega sin descripción"} ·{" "}
-              {formatearMonto(asignarPendiente.total)}
-            </p>
-            <label className="block text-sm text-gray-600 mb-1">
-              Proyecto<span className="text-red-500 ml-0.5">*</span>
-            </label>
-            <select
-              value={asignarProyectoId}
-              onChange={(ev) => setAsignarProyectoId(ev.target.value)}
-              disabled={asignando}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white focus:border-black focus:outline-none disabled:bg-gray-50"
-            >
-              <option value="">— Selecciona un proyecto —</option>
-              {proyectosDropdown.map((p) => {
-                const label = p.nombre
-                  ? `${p.tienda} · ${p.nombre}`
-                  : p.tienda;
-                return (
-                  <option key={p.id} value={p.id}>
-                    {label}
-                  </option>
-                );
-              })}
-            </select>
-            {proyectosDropdown.length === 0 && (
-              <p className="text-xs text-amber-700 mt-2">
-                No hay proyectos disponibles. Crea uno primero desde Marketing.
-              </p>
-            )}
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setAsignarPendiente(null)}
-                disabled={asignando}
-                className="rounded-md border border-gray-300 bg-white text-gray-700 px-3 py-2 text-sm hover:bg-gray-50 disabled:opacity-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={ejecutarAsignar}
-                disabled={asignando || !asignarProyectoId}
-                className="rounded-md bg-black text-white px-4 py-2 text-sm font-medium active:scale-[0.97] transition disabled:opacity-50"
-              >
-                {asignando ? "Asignando…" : "Asignar"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

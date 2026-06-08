@@ -40,15 +40,12 @@ function tiendaDeEntrega(
   e: EntregaConItems,
   proyectoById: Map<string, MkProyecto>,
 ): string {
+  // Toda entrega va atada a su proyecto → la tienda sale de proyecto.tienda.
+  // (Se retiró el fallback que derivaba la tienda del campo `notas` de las
+  // entregas huérfanas, ya eliminadas.)
   if (e.proyecto_id) {
     const p = proyectoById.get(e.proyecto_id);
     if (p && p.tienda) return p.tienda;
-  }
-  const notas = (e.notas ?? "").trim();
-  if (notas.length > 0) {
-    const m = notas.match(/^excel\s*changalo\s*:\s*(.+)$/i);
-    if (m) return m[1].trim();
-    return notas;
   }
   return SIN_ASIGNAR;
 }

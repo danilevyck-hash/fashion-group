@@ -292,11 +292,7 @@ export interface RepartoItemInput {
 
 export interface EntregaItemInput {
   productoId: string;
-  // Shape nuevo (preferido).
   reparto?: RepartoItemInput[];
-  // Compat shape legacy {"<marca_id>": <cantidad>}; el backend lo convierte
-  // a `reparto` al recibir el body. Mantener mientras migramos UIs.
-  cantidadPorMarca?: Record<string, number>;
 }
 
 export interface CreateEntregaInput {

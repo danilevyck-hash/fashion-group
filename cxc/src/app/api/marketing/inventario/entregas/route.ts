@@ -21,17 +21,13 @@ interface CreateEntregaBody {
   items?: Array<{
     productoId?: string;
     reparto?: RepartoEntryBody[];
-    // Compat legacy: shape viejo {"<marca_id>": <cantidad>}.
-    cantidadPorMarca?: Record<string, number | string>;
   }>;
 }
 
-// Convierte el shape legacy `cantidadPorMarca` a `reparto[]`. Si vino el
-// nuevo `reparto`, se respeta. La empresa se deja undefined (default desde
-// marca.empresa_codigo lo resuelve el backend).
+// Normaliza el `reparto[]` del body. La empresa se deja undefined (default
+// desde marca.empresa_codigo lo resuelve el backend).
 function normalizarRepartoBody(it: {
   reparto?: RepartoEntryBody[];
-  cantidadPorMarca?: Record<string, number | string>;
 }): Array<{ marcaId: string; empresa?: string | null; cantidad: number }> {
   if (Array.isArray(it.reparto) && it.reparto.length > 0) {
     return it.reparto.map((r) => ({
@@ -43,12 +39,6 @@ function normalizarRepartoBody(it: {
             ? null
             : String(r.empresa),
       cantidad: Number(r.cantidad ?? 0),
-    }));
-  }
-  if (it.cantidadPorMarca && typeof it.cantidadPorMarca === "object") {
-    return Object.entries(it.cantidadPorMarca).map(([marcaId, cant]) => ({
-      marcaId: String(marcaId),
-      cantidad: Number(cant ?? 0),
     }));
   }
   return [];
