@@ -172,7 +172,7 @@ export default function ProyectosHomeView({
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Marketing</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Archivo de gastos cobrables a marcas
+            Archivo de gastos por marca, tienda y proyecto
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0">
