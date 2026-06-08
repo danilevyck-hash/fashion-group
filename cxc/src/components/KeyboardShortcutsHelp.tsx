@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { SHORTCUT_GROUPS } from "@/lib/hooks/useKeyboardShortcuts";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 interface Props {
   open: boolean;
@@ -37,12 +38,8 @@ export default function KeyboardShortcutsHelp({ open, onClose }: Props) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open, onClose]);
 
-  // Lock body scroll
-  useEffect(() => {
-    if (open) document.body.style.overflow = "hidden";
-    else document.body.style.overflow = "";
-    return () => { document.body.style.overflow = ""; };
-  }, [open]);
+  // Lock body scroll (hook compartido con ref-count).
+  useBodyScrollLock(open);
 
   if (!open) return null;
 

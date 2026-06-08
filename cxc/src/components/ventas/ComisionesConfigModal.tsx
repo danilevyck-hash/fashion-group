@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 interface ConfigRow {
   vendedor_nombre: string;
@@ -62,13 +63,8 @@ export function ComisionesConfigModal({ open, onClose, onSaved }: ComisionesConf
     if (open) void load();
   }, [open, load]);
 
-  // Bloquea scroll del body mientras está abierto.
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
-  }, [open]);
+  // Bloquea scroll del body mientras está abierto (hook compartido con ref-count).
+  useBodyScrollLock(open);
 
   // Escape para cerrar.
   useEffect(() => {
