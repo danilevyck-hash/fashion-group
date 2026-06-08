@@ -172,7 +172,7 @@ function MarketingPage() {
             onNuevoProyecto={() => setShowNuevoProyecto(true)}
             onOpenAnulados={() => navegar({ vista: "anulados" })}
             onOpenReportes={() => navegar({ vista: "reportes" })}
-            onOpenInventario={() => router.push("/marketing/inventario")}
+            onOpenInventario={() => router.push("/marketing/mobiliario")}
             refreshKey={refreshKey}
           />
         )}

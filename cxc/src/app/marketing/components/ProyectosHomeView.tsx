@@ -209,7 +209,7 @@ export default function ProyectosHomeView({
             onClick={onOpenInventario}
             className="text-gray-600 hover:text-black transition"
           >
-            Inventario
+            Mobiliario
           </button>
           <span className="text-gray-300">·</span>
           <button
