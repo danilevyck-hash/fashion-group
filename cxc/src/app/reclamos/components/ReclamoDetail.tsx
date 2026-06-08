@@ -10,12 +10,6 @@ import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartS
 import SuggestionCard from "@/components/SuggestionCard";
 import FotoBadge from "./FotoBadge";
 
-const VALID_TRANSITIONS: Record<string, string[]> = {
-  "Borrador": ["Enviado"],
-  "Enviado": ["Pagado", "Borrador"],
-  "Pagado": ["Enviado"],
-};
-
 interface Props {
   current: Reclamo;
   role: string;
@@ -204,7 +198,7 @@ export default function ReclamoDetail({
         <div className="mb-6">
           <button onClick={() => onChangeEstado("Enviado")} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
-            Enviar al proveedor
+            Marcar como enviado
           </button>
         </div>
       )}

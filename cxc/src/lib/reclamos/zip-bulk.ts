@@ -12,7 +12,6 @@ interface ContactoLike {
   nombre?: string;
   nombre_contacto?: string;
   correo?: string;
-  whatsapp?: string;
 }
 
 export interface ZipResult {
