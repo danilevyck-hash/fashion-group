@@ -13,6 +13,7 @@ const playfair = Playfair_Display({
 import { OnlineProvider } from "@/lib/OnlineContext";
 import OfflineBanner from "@/components/OfflineBanner";
 import InstallPrompt from "@/components/InstallPrompt";
+import UpdatePrompt from "@/components/UpdatePrompt";
 import Sidebar, { SidebarAwareMain } from "@/components/Sidebar";
 import "./globals.css";
 
@@ -64,8 +65,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <SidebarAwareMain>{children}</SidebarAwareMain>
           </ContextMenuProviderWrapper>
           <InstallPrompt />
+          <UpdatePrompt />
         </OnlineProvider>
-        {/* El SW (Serwist) lo registra @serwist/next automáticamente (register:true).
+        {/* El SW (Serwist) lo registra UpdatePrompt vía @serwist/window
+            (next.config tiene register:false) para controlar el ciclo
+            waiting→controlling y ofrecer el toast "Nueva versión" (PR-4).
             Antes había aquí un <script> que en cada carga desregistraba el SW y
             borraba todos los caches — removido en Modo viaje PR-1. */}
       </body>

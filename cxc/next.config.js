@@ -2,13 +2,15 @@ const { withSentryConfig } = require("@sentry/nextjs");
 
 // Serwist (PWA / service worker). El plugin compila `swSrc` aparte y emite el
 // SW a `public/sw.js` (gitignored). Deshabilitado en dev para no cachear assets
-// de desarrollo. register:true (default) auto-registra el SW en el cliente.
-// reloadOnOnline:false → nunca recargar la página por su cuenta; el toast
-// "Nueva versión" vive en un PR posterior. Se compone con Sentry abajo.
+// de desarrollo. register:false → el SW lo registra el componente UpdatePrompt
+// vía @serwist/window, para controlar el ciclo waiting→controlling y mostrar el
+// toast "Nueva versión · Recargar" (Modo viaje PR-4).
+// reloadOnOnline:false → nunca recargar la página por su cuenta. Se compone con Sentry abajo.
 const withSerwist = require("@serwist/next").default({
   swSrc: "src/app/sw.ts",
   swDest: "public/sw.js",
   disable: process.env.NODE_ENV !== "production",
+  register: false,
   reloadOnOnline: false,
 });
 
