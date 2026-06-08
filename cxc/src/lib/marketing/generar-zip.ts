@@ -98,7 +98,7 @@ export interface DatosZipProyecto {
   adjuntosFacturas: MkAdjunto[];
   fotosProyecto: MkAdjunto[];
   marcasInvolucradas: MkMarca[];
-  // Entregas de muebles del proyecto. Se suman al cobrable por marca como
+  // Entregas de muebles del proyecto. Se suman al gasto por marca como
   // una sola fila más en el Excel maestro (sin desglose factura/entrega).
   entregas?: EntregaConItems[];
 }
@@ -133,8 +133,10 @@ function mesEjecucion(isoString: string | null): string {
 //   4. Detalle         (proyecto.nombre)
 //   5. Monto factura dólares (factura.total)
 // Columnas dinámicas (marcas asignadas al proyecto, en orden alfabético):
-//   - Cobrable [Marca]  (total × porcentaje/100, donde porcentaje viene de la
-//     asignación factura-marca: 50 para externas, 100 para internas/Joybees).
+//   - Gasto [Marca]  (gasto puro: el total de la factura se distribuye por la
+//     PORCIÓN real de cada marca = porcentaje normalizado entre las marcas de
+//     esa factura. 1 marca = total completo; 2 marcas 50/50 = mitad real a cada
+//     una. Σ por marca == total. SIN co-op — espeja reportes.ts "Por Marca").
 // Última columna: Comentarios (vacía).
 //
 // Estilo: Arial 10/11, header fondo #1F1F1F texto blanco, bordes #BFBFBF,
@@ -155,13 +157,19 @@ function generarRespaldoExcel(
     a.nombre.localeCompare(b.nombre, "es"),
   );
 
+  // empresa_codigo por marca → atribuir el "otro 50%" interno de las entregas
+  // al gasto de la marca pareja (igual que reportes.ts).
+  const empresaByMarca = new Map(
+    marcasDelProyecto.map((m) => [m.id, m.empresa_codigo]),
+  );
+
   const header: string[] = [
     "Mes ejecución",
     "Cliente",
     "Proveedor",
     "Detalle",
     "Monto factura dólares",
-    ...marcasOrden.map((m) => `Cobrable ${m.nombre}`),
+    ...marcasOrden.map((m) => `Gasto ${m.nombre}`),
     "Comentarios",
   ];
 
@@ -174,15 +182,18 @@ function generarRespaldoExcel(
       detalle,
       round2(f.total),
     ];
+    // Gasto puro: distribuir f.total por la porción real de cada marca
+    // (porcentaje normalizado entre las marcas de esa factura). Σ == f.total.
+    const sumPct =
+      f.marcas.reduce((s, m) => s + Number(m.porcentaje ?? 0), 0) || 1;
     for (const marca of marcasOrden) {
       const asignacion = f.marcas.find((m) => m.marca.id === marca.id);
       if (!asignacion) {
         row.push(0);
         continue;
       }
-      // porcentaje viene de mk_factura_marcas: 50 para externa, 100 para interna (Joybees).
-      const pct = Number(asignacion.porcentaje ?? 50);
-      row.push(round2((f.total * pct) / 100));
+      const pct = Number(asignacion.porcentaje ?? 0);
+      row.push(round2(f.total * (pct / sumPct)));
     }
     row.push(""); // Comentarios
     return row;
@@ -199,8 +210,15 @@ function generarRespaldoExcel(
       round2(Number(e.total ?? 0)),
     ];
     for (const marca of marcasOrden) {
-      const monto = Number(e.total_por_marca?.[marca.id] ?? 0);
-      row.push(round2(monto));
+      const base = Number(e.total_por_marca?.[marca.id] ?? 0);
+      // El "otro 50%" interno (que antes absorbía FG) se atribuye al gasto de
+      // la marca pareja vía su empresa_codigo. Σ por marca == e.total.
+      const emp = empresaByMarca.get(marca.id);
+      const interna =
+        emp && e.total_por_empresa_interna?.[emp]
+          ? Number(e.total_por_empresa_interna[emp])
+          : 0;
+      row.push(round2(base + interna));
     }
     row.push(""); // Comentarios
     rows.push(row);
@@ -220,7 +238,7 @@ function generarRespaldoExcel(
   const lastDataRow = 1 + rows.length; // 1-indexed: fila después del header
   const totalesRowIdx = range.e.r; // 0-indexed
   const numMontoCol = 4; // Monto factura dólares
-  const cobrableCols: number[] = marcasOrden.map((_, i) => 5 + i);
+  const gastoCols: number[] = marcasOrden.map((_, i) => 5 + i);
 
   // Inyectar fórmulas SUM en la fila TOTALES.
   function colLetter(idx: number): string {
@@ -234,7 +252,7 @@ function generarRespaldoExcel(
     (ws as Record<string, unknown>)[addr] = { t: "n", f: formula };
   }
   setFormulaSum(numMontoCol);
-  for (const c of cobrableCols) setFormulaSum(c);
+  for (const c of gastoCols) setFormulaSum(c);
 
   // ── Estilos ──
   const borderThin = { style: "thin", color: { rgb: "BFBFBF" } };
@@ -248,7 +266,7 @@ function generarRespaldoExcel(
 
   // Texto: alineación izquierda. Montos: derecha.
   const isMontoCol = (c: number): boolean =>
-    c === numMontoCol || cobrableCols.includes(c);
+    c === numMontoCol || gastoCols.includes(c);
 
   for (let r = range.s.r; r <= range.e.r; r++) {
     for (let c = range.s.c; c <= range.e.c; c++) {
@@ -299,7 +317,7 @@ function generarRespaldoExcel(
     { wch: 26 }, // Proveedor
     { wch: 30 }, // Detalle
     { wch: 18 }, // Monto factura dólares
-    ...marcasOrden.map(() => ({ wch: 18 })), // Cobrable [Marca]
+    ...marcasOrden.map(() => ({ wch: 18 })), // Gasto [Marca]
     { wch: 22 }, // Comentarios
   ];
 

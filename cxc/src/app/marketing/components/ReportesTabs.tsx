@@ -8,7 +8,7 @@ import ReportePorProyectoView from "./ReportePorProyectoView";
 type Tab = "marca" | "tienda" | "proyecto";
 
 const TABS: Array<{ value: Tab; label: string; sub: string }> = [
-  { value: "marca", label: "Por Marca", sub: "Resumen de gasto vs. cobrado por marca" },
+  { value: "marca", label: "Por Marca", sub: "Gasto total por marca" },
   { value: "tienda", label: "Por Tienda", sub: "Gasto por tienda, desglosado por marca" },
   { value: "proyecto", label: "Por Proyecto", sub: "Detalle de cada proyecto" },
 ];

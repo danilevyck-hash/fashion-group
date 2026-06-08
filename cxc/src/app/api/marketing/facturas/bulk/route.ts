@@ -5,6 +5,7 @@ import {
   createFactura,
 } from "@/lib/marketing/mutations";
 import { setMarcasDeFactura } from "@/lib/marketing/factura-marcas";
+import { normalizarEstadoProyecto } from "@/lib/marketing/normalizar";
 import { logActivity } from "@/lib/log-activity";
 import { supabaseServer } from "@/lib/supabase-server";
 
@@ -153,9 +154,9 @@ export async function POST(req: NextRequest) {
       { status: 400 },
     );
   }
-  if (proyRow.estado === "cobrado") {
+  if (normalizarEstadoProyecto(proyRow.estado) === "cerrado") {
     return NextResponse.json(
-      { error: "No se pueden agregar facturas a un proyecto cobrado" },
+      { error: "No se pueden agregar facturas a un proyecto cerrado" },
       { status: 400 },
     );
   }

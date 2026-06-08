@@ -165,6 +165,34 @@ export default function ProyectosHomeView({
     }
   };
 
+  const cambiarEstado = async (
+    id: string,
+    accion: "cerrar" | "reabrir",
+    nombre: string,
+  ) => {
+    try {
+      const res = await fetch(`/api/marketing/proyectos/${id}/${accion}`, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error ?? "No se pudo actualizar");
+      }
+      toast(
+        accion === "cerrar"
+          ? `"${nombre}" se cerró`
+          : `"${nombre}" se reabrió`,
+        "success",
+      );
+      cargar();
+    } catch (err) {
+      toast(
+        err instanceof Error ? err.message : "Error al cambiar estado",
+        "error",
+      );
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -172,7 +200,7 @@ export default function ProyectosHomeView({
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Marketing</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Archivo de gastos cobrables a marcas
+            Archivo de gastos por marca, tienda y proyecto
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0">
@@ -341,6 +369,14 @@ export default function ProyectosHomeView({
                             Muebles
                           </span>
                         )}
+                        {p.estado === "cerrado" && (
+                          <span
+                            title="Proyecto cerrado"
+                            className="inline-flex items-center shrink-0 bg-gray-100 border border-gray-300 text-gray-600 rounded-md px-2 py-0.5 text-xs"
+                          >
+                            Cerrado
+                          </span>
+                        )}
                       </div>
                       <div className="text-[12px] text-gray-500 truncate">
                         {subtituloTipo ? `${subtituloTipo} · ` : ""}
@@ -413,6 +449,17 @@ export default function ProyectosHomeView({
                                   zipEstados[p.id]?.tipo === "trabajando" ||
                                   zipEstados[p.id]?.tipo === "exito",
                               },
+                              p.estado === "cerrado"
+                                ? {
+                                    label: "Reabrir proyecto",
+                                    onClick: () =>
+                                      cambiarEstado(p.id, "reabrir", nombreVis),
+                                  }
+                                : {
+                                    label: "Cerrar proyecto",
+                                    onClick: () =>
+                                      cambiarEstado(p.id, "cerrar", nombreVis),
+                                  },
                               {
                                 label: "Anular proyecto",
                                 onClick: () => {

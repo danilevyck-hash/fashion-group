@@ -10,6 +10,7 @@ import {
   exportarExcelGlobal,
   exportarExcelTienda,
 } from "@/lib/marketing/inventario-excel";
+import { normalizarEstadoProyecto } from "@/lib/marketing/normalizar";
 import type { MkProyecto } from "@/lib/marketing/types";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +25,7 @@ function mapProyecto(row: Record<string, unknown>): MkProyecto {
     tienda: String(row.tienda ?? ""),
     fecha_inicio: String(row.fecha_inicio ?? ""),
     fecha_cierre: (row.fecha_cierre as string | null) ?? null,
-    estado: String(row.estado ?? "abierto") as MkProyecto["estado"],
+    estado: normalizarEstadoProyecto(row.estado),
     fecha_enviado: (row.fecha_enviado as string | null) ?? null,
     fecha_cobrado: (row.fecha_cobrado as string | null) ?? null,
     notas: (row.notas as string | null) ?? null,

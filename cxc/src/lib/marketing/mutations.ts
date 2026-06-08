@@ -254,55 +254,30 @@ export async function restaurarProyecto(id: string): Promise<void> {
   }
 }
 
-// Transiciones de estado (workflow nuevo: abierto → enviado → cobrado)
+// Transiciones de estado (modelo actual: abierto ⇄ cerrado).
+// 'cerrado' es el valor nuevo. Los proyectos legacy en 'enviado'/'cobrado' se
+// leen como 'cerrado' (normalizarEstadoProyecto) y NUNCA se reescriben aquí.
+// Las fechas legacy (fecha_enviado/fecha_cobrado) se conservan en datos: no se
+// tocan ni al cerrar ni al reabrir.
 
-export async function marcarProyectoEnviado(id: string): Promise<void> {
+export async function cerrarProyecto(id: string): Promise<void> {
   if (!id) throw new Error("id requerido");
   const { error } = await supabaseServer
     .from("mk_proyectos")
-    .update({ estado: "enviado", fecha_enviado: new Date().toISOString() })
+    .update({ estado: "cerrado" })
     .eq("id", id);
-  if (error) throw new Error(`marcarProyectoEnviado: ${error.message}`);
+  if (error) throw new Error(`cerrarProyecto: ${error.message}`);
 }
 
-export async function marcarProyectoCobrado(id: string): Promise<void> {
+// Reabrir: cualquier estado → abierto. No limpia fechas legacy (se conservan).
+export async function reabrirProyecto(id: string): Promise<"abierto"> {
   if (!id) throw new Error("id requerido");
   const { error } = await supabaseServer
     .from("mk_proyectos")
-    .update({ estado: "cobrado", fecha_cobrado: new Date().toISOString() })
+    .update({ estado: "abierto" })
     .eq("id", id);
-  if (error) throw new Error(`marcarProyectoCobrado: ${error.message}`);
-}
-
-// Reabrir: cobrado → enviado (limpia fecha_cobrado);
-//          enviado → abierto (limpia fecha_enviado).
-export async function reabrirProyecto(id: string): Promise<"abierto" | "enviado"> {
-  if (!id) throw new Error("id requerido");
-  const { data: row, error: readErr } = await supabaseServer
-    .from("mk_proyectos")
-    .select("estado")
-    .eq("id", id)
-    .maybeSingle();
-  if (readErr) throw new Error(`reabrirProyecto[read]: ${readErr.message}`);
-  if (!row) throw new Error("Proyecto no encontrado");
-  const estadoActual = String((row as { estado: string }).estado);
-  if (estadoActual === "cobrado") {
-    const { error } = await supabaseServer
-      .from("mk_proyectos")
-      .update({ estado: "enviado", fecha_cobrado: null })
-      .eq("id", id);
-    if (error) throw new Error(`reabrirProyecto[cobrado→enviado]: ${error.message}`);
-    return "enviado";
-  }
-  if (estadoActual === "enviado") {
-    const { error } = await supabaseServer
-      .from("mk_proyectos")
-      .update({ estado: "abierto", fecha_enviado: null })
-      .eq("id", id);
-    if (error) throw new Error(`reabrirProyecto[enviado→abierto]: ${error.message}`);
-    return "abierto";
-  }
-  throw new Error(`No se puede reabrir desde estado '${estadoActual}'`);
+  if (error) throw new Error(`reabrirProyecto: ${error.message}`);
+  return "abierto";
 }
 
 export async function updateProyectoMarcas(

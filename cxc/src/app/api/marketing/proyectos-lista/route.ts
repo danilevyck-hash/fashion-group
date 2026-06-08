@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
+import { normalizarEstadoProyecto } from "@/lib/marketing/normalizar";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -21,9 +22,9 @@ export const fetchCache = "force-no-store";
 //              + cobranzas en 'por_cobrar' o 'enviada' (monto ya fijado).
 // No incluye estados 'cobrado'/'cobrada' ni anulados.
 
-// Workflow simplificado (3 estados): abierto | enviado | cobrado
-// Activos = abierto + enviado. Historial = cobrado.
-const ACTIVOS = ["abierto", "enviado"] as const;
+// Modelo abierto / cerrado. Activos = abierto. Historial/cerrado incluye los
+// legacy enviado/cobrado (se leen como cerrado, nunca se reescriben).
+const CERRADO_DB = ["cerrado", "enviado", "cobrado"] as const;
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
@@ -84,17 +85,13 @@ export async function GET(req: NextRequest) {
           )
           .is("anulado_en", null);
         if (filtroEstado === "activos" || filtroEstado === "joybees") {
-          // Tab Joybees comparte el universo de activos (abierto/enviado).
+          // Tab Joybees comparte el universo de activos (abierto).
           // El filtro interno/externo se aplica después vía passTipo().
-          q = q.in("estado", ACTIVOS as unknown as string[]);
-        } else if (filtroEstado === "historial") {
-          q = q.eq("estado", "cobrado");
-        } else if (
-          filtroEstado === "abierto" ||
-          filtroEstado === "enviado" ||
-          filtroEstado === "cobrado"
-        ) {
-          q = q.eq("estado", filtroEstado);
+          q = q.eq("estado", "abierto");
+        } else if (filtroEstado === "historial" || filtroEstado === "cerrado") {
+          q = q.in("estado", CERRADO_DB as unknown as string[]);
+        } else if (filtroEstado === "abierto") {
+          q = q.eq("estado", "abierto");
         }
         if (busqueda.length > 0) {
           const orProyecto = [
@@ -358,13 +355,13 @@ export async function GET(req: NextRequest) {
             monto: d.monto,
           };
         });
-        const esCobrado = p.estado === "cobrado";
+        const esCerrado = normalizarEstadoProyecto(p.estado) === "cerrado";
 
         return {
           id: pid,
           nombre: p.nombre,
           tienda: p.tienda,
-          estado: p.estado,
+          estado: normalizarEstadoProyecto(p.estado),
           created_at: p.created_at,
           anulado_en: p.anulado_en,
           fecha_enviado: p.fecha_enviado,
@@ -376,13 +373,12 @@ export async function GET(req: NextRequest) {
           // Gasto BRUTO real (Σ factura.total con ITBMS + entregas), sin co-op.
           // Es el número grande que se muestra en la columna "Gastado".
           gasto_real: Number((grossByProy.get(pid) ?? 0).toFixed(2)),
-          // Activos: desglose de pendiente; cobrados: 0 (ya cobrado).
-          // Esto alimenta SOLO el tooltip de desglose por marca (cobrable co-op).
-          por_cobrar_total: esCobrado ? 0 : desg.total,
-          por_cobrar_por_marca: esCobrado ? [] : desgloseConNombres,
-          // Historial: monto ya cobrado por marca (mismo cálculo, semántica distinta).
-          cobrado_total: esCobrado ? desg.total : 0,
-          cobrado_por_marca: esCobrado ? desgloseConNombres : [],
+          // Abiertos: desglose de gasto por marca; cerrados: van al otro bucket.
+          // Alimenta SOLO el tooltip de desglose por marca (gasto puro).
+          por_cobrar_total: esCerrado ? 0 : desg.total,
+          por_cobrar_por_marca: esCerrado ? [] : desgloseConNombres,
+          cobrado_total: esCerrado ? desg.total : 0,
+          cobrado_por_marca: esCerrado ? desgloseConNombres : [],
         };
       });
 

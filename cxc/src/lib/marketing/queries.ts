@@ -4,6 +4,7 @@
 // Para papelera: usar getAnulados().
 // ============================================================================
 import { supabaseServer } from "@/lib/supabase-server";
+import { normalizarEstadoProyecto } from "./normalizar";
 import type {
   MkMarca,
   MkProyecto,
@@ -42,7 +43,7 @@ function mapProyecto(row: Record<string, unknown>): MkProyecto {
     tienda: String(row.tienda ?? ""),
     fecha_inicio: String(row.fecha_inicio ?? ""),
     fecha_cierre: (row.fecha_cierre as string | null) ?? null,
-    estado: String(row.estado ?? "abierto") as EstadoProyecto,
+    estado: normalizarEstadoProyecto(row.estado),
     fecha_enviado: (row.fecha_enviado as string | null) ?? null,
     fecha_cobrado: (row.fecha_cobrado as string | null) ?? null,
     notas: (row.notas as string | null) ?? null,
@@ -155,7 +156,12 @@ export async function getProyectosByMarca(
     .in("id", proyectoIds)
     .is("anulado_en", null)
     .order("fecha_inicio", { ascending: false });
-  if (filtros.estado) pq = pq.eq("estado", filtros.estado);
+  // 'cerrado' incluye los legacy enviado/cobrado (se leen como cerrado).
+  if (filtros.estado === "abierto") {
+    pq = pq.eq("estado", "abierto");
+  } else if (filtros.estado === "cerrado") {
+    pq = pq.in("estado", ["cerrado", "enviado", "cobrado"]);
+  }
   if (filtros.anio) {
     const ini = `${filtros.anio}-01-01`;
     const fin = `${filtros.anio}-12-31`;
