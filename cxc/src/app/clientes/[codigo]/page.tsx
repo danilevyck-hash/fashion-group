@@ -91,7 +91,7 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
       : Promise.resolve({ data: [] as unknown[] }),
     supabaseServer
       .from("switch_estadocuenta_aging")
-      .select("company_key, total")
+      .select("company_key, total, d91_120, d121_180, d181_270, d271_365, mas_365")
       .eq("codigo", cliente.codigo),
     supabaseServer
       .from("switch_recibos")
@@ -128,10 +128,22 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
     if (!ultimaGlobal || ymd > ultimaGlobal) ultimaGlobal = ymd;
   }
 
+  // Aging del grupo: "vencido reciente" = d91_120 (ámbar); "crítico" = +120d
+  // (d121_180+d181_270+d271_365+mas_365, rojo). Mismo vocabulario que cxc-aging.ts.
+  // Alimenta el pill de antigüedad de la ficha (solo display, sin migración).
   const cxcMap = new Map<string, number>();
-  for (const r of (cxcRes.data ?? []) as { company_key: string; total: number }[]) {
+  let cxcWatch = 0;
+  let cxcCritico = 0;
+  for (const r of (cxcRes.data ?? []) as {
+    company_key: string; total: number;
+    d91_120?: number; d121_180?: number; d181_270?: number; d271_365?: number; mas_365?: number;
+  }[]) {
     cxcMap.set(r.company_key, (cxcMap.get(r.company_key) ?? 0) + Number(r.total ?? 0));
+    cxcWatch += Number(r.d91_120 ?? 0);
+    cxcCritico += Number(r.d121_180 ?? 0) + Number(r.d181_270 ?? 0) + Number(r.d271_365 ?? 0) + Number(r.mas_365 ?? 0);
   }
+  const cxcVencido = Math.round((cxcWatch + cxcCritico) * 100) / 100;
+  cxcCritico = Math.round(cxcCritico * 100) / 100;
   const cobradoMap = new Map<string, number>();
   for (const r of (cobradoRes.data ?? []) as { empresa_key: string; total: number }[]) {
     cobradoMap.set(r.empresa_key, (cobradoMap.get(r.empresa_key) ?? 0) + Number(r.total ?? 0));
@@ -147,13 +159,42 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
     ventas_ytd:     Math.round(empresas.reduce((s, e) => s + e.ventas_ytd, 0) * 100) / 100,
     cobrado_ytd:    Math.round(empresas.reduce((s, e) => s + e.cobrado_ytd, 0) * 100) / 100,
     cxc:            Math.round(empresas.reduce((s, e) => s + e.cxc, 0) * 100) / 100,
+    cxc_vencido:    cxcVencido,
+    cxc_critico:    cxcCritico,
     ultima_factura: ultimaGlobal,
   };
+
+  // Últimas guías del cliente (por cliente_codigo D-XXX, vínculo de Guías V2).
+  // Dedupe por guía (un cliente puede tener varias líneas en la misma guía) y
+  // tomamos las 3 más recientes. Link al detalle por URL: /guias/[id]/imprimir.
+  const { data: guiaItemRows } = await supabaseServer
+    .from("guia_items")
+    .select("guia_id")
+    .eq("cliente_codigo", cliente.codigo)
+    .eq("deleted", false);
+  const guiaIds = [...new Set(
+    (guiaItemRows ?? [])
+      .map(r => (r as { guia_id: string | null }).guia_id)
+      .filter((x): x is string => !!x),
+  )];
+  let ultimasGuias: { id: string; numero: number; fecha: string }[] = [];
+  if (guiaIds.length > 0) {
+    const { data: gts } = await supabaseServer
+      .from("guia_transporte")
+      .select("id, numero, fecha")
+      .in("id", guiaIds)
+      .eq("deleted", false)
+      .order("fecha", { ascending: false })
+      .order("numero", { ascending: false })
+      .limit(3);
+    ultimasGuias = (gts ?? []) as { id: string; numero: number; fecha: string }[];
+  }
 
   const data: ClienteDetailData = {
     cliente,
     empresas,
     total_grupo: totalGrupo,
+    ultimas_guias: ultimasGuias,
   };
 
   return <ClienteDetail initialData={data} />;
