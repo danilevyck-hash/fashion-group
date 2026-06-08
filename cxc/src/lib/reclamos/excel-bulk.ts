@@ -58,7 +58,6 @@ interface Contacto {
   nombre?: string;
   nombre_contacto?: string;
   correo?: string;
-  whatsapp?: string;
 }
 
 function fmtDate(d: string | undefined): string {

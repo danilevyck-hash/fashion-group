@@ -7,6 +7,8 @@ import { requireRole } from "@/lib/requireRole";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Máquina de estados del pipeline lineal (Borrador → Enviado → Pagado, con
+// correcciones hacia atrás). Validación de transición — fuente de verdad server.
 const VALID_TRANSITIONS: Record<string, string[]> = {
   "Borrador": ["Enviado"],
   "Enviado": ["Pagado", "Borrador"],

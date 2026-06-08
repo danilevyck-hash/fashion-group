@@ -28,7 +28,6 @@ export interface Contacto {
   empresa: string;
   nombre: string;
   nombre_contacto: string;
-  whatsapp: string;
   correo: string;
 }
 

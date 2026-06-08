@@ -3,7 +3,9 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 
 const RECLAMOS_ROLES = ["admin", "secretaria"];
-const ALLOWED_FIELDS = ["empresa", "nombre", "nombre_contacto", "whatsapp", "correo", "activo"];
+// whatsapp se capturaba sin uso (nunca se lee ni muestra); se retira del capture.
+// La columna reclamo_contactos.whatsapp se conserva en DB por si acaso.
+const ALLOWED_FIELDS = ["empresa", "nombre", "nombre_contacto", "correo", "activo"];
 
 function pick(body: Record<string, unknown>, fields: string[]) {
   const result: Record<string, unknown> = {};
