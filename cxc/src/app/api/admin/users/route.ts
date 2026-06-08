@@ -72,9 +72,14 @@ export async function GET(req: NextRequest) {
   const authError = requireAuth(req, ["admin"]);
   if (authError) return authError;
 
+  // Columnas explícitas SIN `password`: nunca enviar el hash bcrypt al cliente.
+  // (El cambio de contraseña se hace escribiendo una nueva en POST/PUT, no
+  // leyendo la actual.)
   const { data: users, error } = await supabaseServer
     .from("fg_users")
-    .select("*")
+    .select(
+      "id, name, role, active, associated_company, modulos_override, is_owner, created_at, updated_at",
+    )
     .order("created_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: "Error al cargar" }, { status: 500 });
@@ -197,11 +202,29 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  const { error } = await supabaseServer
+  const { data: updatedUser, error } = await supabaseServer
     .from("fg_users")
     .update({ active, updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .select("name")
+    .single();
 
-  if (error) return NextResponse.json({ error: "Error al actualizar" }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  if (error || !updatedUser) return NextResponse.json({ error: "Error al actualizar" }, { status: 500 });
+
+  // Al DESACTIVAR, revocar sus sesiones vivas. El middleware valida
+  // user_sessions.revoked (no fg_users.active), así que sin esto un usuario
+  // desactivado con sesión abierta seguiría entrando hasta que expire/revoque.
+  // user_sessions se relaciona por user_name (nombre único, lo enforce la API).
+  let sesionesRevocadas = 0;
+  if (active === false) {
+    const { data: revoked } = await supabaseServer
+      .from("user_sessions")
+      .update({ revoked: true })
+      .eq("user_name", updatedUser.name)
+      .eq("revoked", false)
+      .select("id");
+    sesionesRevocadas = revoked?.length ?? 0;
+  }
+
+  return NextResponse.json({ ok: true, sesionesRevocadas });
 }
