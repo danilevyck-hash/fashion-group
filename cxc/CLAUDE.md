@@ -24,7 +24,7 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 | Cliente | `cliente` | catalogo reebok (solo propio) |
 
 ## Auth
-- Passwords: bcrypt hashed (migración de plaintext completada parcialmente)
+- Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)
 - Session: httpOnly cookie `cxc_session`, base64url-encoded JSON `{role, userId, userName, sessionToken}`
 - Middleware: `src/middleware.ts` valida sesión contra `user_sessions` table
 - Session health check: `/api/auth/check` — pinged cada 2 min, warning banner antes de expirar

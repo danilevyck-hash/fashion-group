@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { requireAdmin } from "@/lib/api-auth";
+import { requireRole } from "@/lib/requireRole";
 
 export const dynamic = "force-dynamic";
+
+// Roles del módulo Catálogos (admin/secretaria gestionan; vendedor/bodega
+// consultan el catálogo interno). El catálogo PÚBLICO usa /joybees/public.
+const CATALOGO_ROLES = ["admin", "secretaria", "vendedor", "bodega"];
 
 function getSupabase() {
   return createClient(
@@ -12,6 +17,9 @@ function getSupabase() {
 }
 
 export async function GET(req: NextRequest) {
+  const auth = requireRole(req, CATALOGO_ROLES);
+  if (auth instanceof NextResponse) return auth;
+
   const supabase = getSupabase();
   const { searchParams } = new URL(req.url);
 
