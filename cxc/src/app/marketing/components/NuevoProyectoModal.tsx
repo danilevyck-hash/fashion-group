@@ -21,6 +21,7 @@ export default function NuevoProyectoModal({
 
   const handleSubmit = async (data: {
     tienda: string;
+    tiendaCodigo?: string;
     nombre: string;
     notas: string;
   }) => {
@@ -31,6 +32,7 @@ export default function NuevoProyectoModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tienda: data.tienda,
+          tiendaCodigo: data.tiendaCodigo || null,
           nombre: data.nombre || undefined,
           notas: data.notas || undefined,
         }),

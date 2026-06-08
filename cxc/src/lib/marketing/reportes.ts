@@ -65,6 +65,7 @@ interface ProyectoMin {
   id: string;
   nombre: string | null;
   tienda: string;
+  tienda_codigo: string | null;
   fecha_inicio: string;
   estado: EstadoProyecto;
 }
@@ -86,7 +87,7 @@ async function cargarProyectosVigentes(
 ): Promise<ProyectoMin[]> {
   let q = supabaseServer
     .from("mk_proyectos")
-    .select("id, nombre, tienda, fecha_inicio, estado")
+    .select("id, nombre, tienda, tienda_codigo, fecha_inicio, estado")
     .is("anulado_en", null);
   const rango = anioRange(anio);
   if (rango) q = q.gte("fecha_inicio", rango.ini).lte("fecha_inicio", rango.fin);
@@ -98,6 +99,7 @@ async function cargarProyectosVigentes(
       id: String(x.id),
       nombre: (x.nombre as string | null) ?? null,
       tienda: String(x.tienda ?? ""),
+      tienda_codigo: (x.tienda_codigo as string | null) ?? null,
       fecha_inicio: String(x.fecha_inicio ?? ""),
       estado: normalizarEstadoProyecto(x.estado),
     };
@@ -267,13 +269,19 @@ export async function reportePorTienda(
   const proyectoById = new Map(proyectos.map((p) => [p.id, p]));
   const marcaById = new Map(marcas.map((m) => [m.id, m]));
 
-  // tienda → { marcaNombre → gasto completo, total }
-  const bucket = new Map<string, { porMarca: Record<string, number>; total: number }>();
+  // Agrupa por CÓDIGO de directorio (tienda_codigo) si existe — así dos
+  // proyectos de la misma tienda con texto distinto se unen — y fallback al
+  // nombre libre. La key es código||nombre; el display es el nombre (`tienda`).
+  const bucket = new Map<
+    string,
+    { tienda: string; porMarca: Record<string, number>; total: number }
+  >();
   for (const [proyectoId, inner] of gastoPorProyMarca) {
     const proyecto = proyectoById.get(proyectoId);
     if (!proyecto) continue;
-    const tienda = proyecto.tienda;
-    const entry = bucket.get(tienda) ?? { porMarca: {}, total: 0 };
+    const key = proyecto.tienda_codigo || proyecto.tienda;
+    const entry =
+      bucket.get(key) ?? { tienda: proyecto.tienda, porMarca: {}, total: 0 };
     for (const [marcaId, monto] of inner) {
       const marca = marcaById.get(marcaId);
       if (!marca) continue;
@@ -282,11 +290,11 @@ export async function reportePorTienda(
       );
       entry.total = Number((entry.total + monto).toFixed(2));
     }
-    bucket.set(tienda, entry);
+    bucket.set(key, entry);
   }
 
-  return Array.from(bucket.entries())
-    .map(([tienda, v]) => ({ tienda, porMarca: v.porMarca, total: v.total }))
+  return Array.from(bucket.values())
+    .map((v) => ({ tienda: v.tienda, porMarca: v.porMarca, total: v.total }))
     .sort((a, b) => a.tienda.localeCompare(b.tienda, "es"));
 }
 

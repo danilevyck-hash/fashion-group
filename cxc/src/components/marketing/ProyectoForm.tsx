@@ -11,10 +11,12 @@ import type {
   MarcaPorcentajeInput,
 } from "@/lib/marketing/types";
 import { useToast } from "@/components/ToastSystem";
-import { AutocompleteInput } from "./AutocompleteInput";
+import ClienteTypeahead from "@/app/guias/components/ClienteTypeahead";
 
 export interface ProyectoFormValues {
   tienda: string;
+  // Código del directorio (D-XXX) si se eligió del typeahead; "" = sin vincular.
+  tiendaCodigo: string;
   nombre: string;
   notas: string;
   // Siempre vacío en el flow nuevo. El tipo se preserva por compatibilidad
@@ -30,10 +32,6 @@ interface ProyectoFormProps {
   onCancel?: () => void;
 }
 
-async function fetchTiendaSuggestions(_q: string): Promise<string[]> {
-  return [];
-}
-
 export function ProyectoForm({
   initial,
   onSubmit,
@@ -42,6 +40,9 @@ export function ProyectoForm({
   const { toast } = useToast();
 
   const [tienda, setTienda] = useState<string>(initial?.tienda ?? "");
+  const [tiendaCodigo, setTiendaCodigo] = useState<string>(
+    initial?.tienda_codigo ?? "",
+  );
   const [nombre, setNombre] = useState<string>(initial?.nombre ?? "");
   const [notas, setNotas] = useState<string>(initial?.notas ?? "");
   const [enviando, setEnviando] = useState(false);
@@ -54,7 +55,7 @@ export function ProyectoForm({
     if (!puedeGuardar) return;
     try {
       setEnviando(true);
-      await onSubmit({ tienda, nombre, notas, marcas: [] });
+      await onSubmit({ tienda, tiendaCodigo, nombre, notas, marcas: [] });
     } catch (err: unknown) {
       const message =
         err instanceof Error
@@ -78,14 +79,29 @@ export function ProyectoForm({
           </p>
         </div>
 
-        <AutocompleteInput
-          label="Tienda"
-          value={tienda}
-          onChange={setTienda}
-          fetchSuggestions={fetchTiendaSuggestions}
-          placeholder="Ej: Albrook Mall"
-          required
-        />
+        <div>
+          <label className="block text-sm text-gray-600 mb-1">
+            Tienda<span className="text-red-500 ml-0.5">*</span>
+          </label>
+          <ClienteTypeahead
+            value={tienda}
+            codigo={tiendaCodigo}
+            onSelect={(nombre, codigo) => {
+              setTienda(nombre);
+              setTiendaCodigo(codigo);
+            }}
+            onFreeText={(texto) => {
+              setTienda(texto);
+              setTiendaCodigo("");
+            }}
+            placeholder="Buscar tienda en el directorio…"
+            inputClassName="w-full rounded-md border border-gray-300 px-3 py-2 pr-16 text-sm focus:border-black focus:outline-none"
+          />
+          <p className="text-xs text-gray-400 mt-1">
+            Elige del directorio para vincular; si no está, se guarda como texto
+            (sin vincular).
+          </p>
+        </div>
 
         <div>
           <label

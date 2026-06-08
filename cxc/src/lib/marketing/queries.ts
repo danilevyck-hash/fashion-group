@@ -41,6 +41,7 @@ function mapProyecto(row: Record<string, unknown>): MkProyecto {
     id: String(row.id),
     nombre: (row.nombre as string | null) ?? null,
     tienda: String(row.tienda ?? ""),
+    tienda_codigo: (row.tienda_codigo as string | null) ?? null,
     fecha_inicio: String(row.fecha_inicio ?? ""),
     fecha_cierre: (row.fecha_cierre as string | null) ?? null,
     estado: normalizarEstadoProyecto(row.estado),

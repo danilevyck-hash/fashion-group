@@ -7,6 +7,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal, ConfirmModal } from "@/components/ui";
 import { useToast } from "@/components/ToastSystem";
+import ClienteTypeahead from "@/app/guias/components/ClienteTypeahead";
 import type {
   MarcaPorcentajeInput,
   MkMarca,
@@ -31,6 +32,7 @@ export default function EditarProyectoModal({
   const { toast } = useToast();
   const [nombre, setNombre] = useState(proyecto.nombre ?? "");
   const [tienda, setTienda] = useState(proyecto.tienda);
+  const [tiendaCodigo, setTiendaCodigo] = useState(proyecto.tienda_codigo ?? "");
   const [fechaInicio, setFechaInicio] = useState(proyecto.fecha_inicio);
   const [marcasSel, setMarcasSel] = useState<Set<string>>(
     new Set(proyecto.marcas.map((m) => m.marca.id)),
@@ -42,6 +44,7 @@ export default function EditarProyectoModal({
     if (!open) return;
     setNombre(proyecto.nombre ?? "");
     setTienda(proyecto.tienda);
+    setTiendaCodigo(proyecto.tienda_codigo ?? "");
     setFechaInicio(proyecto.fecha_inicio);
     setMarcasSel(new Set(proyecto.marcas.map((m) => m.marca.id)));
     setConfirmReparto(false);
@@ -91,6 +94,7 @@ export default function EditarProyectoModal({
     const body: Record<string, unknown> = {
       nombre: nombre.trim().length > 0 ? nombre.trim() : null,
       tienda: tienda.trim(),
+      tiendaCodigo: tiendaCodigo || null,
       fecha_inicio: fechaInicio,
     };
     if (cambioMarcas) {
@@ -152,17 +156,22 @@ export default function EditarProyectoModal({
         </div>
 
         <div>
-          <label htmlFor="ed-tienda" className="block text-xs text-gray-500 mb-1">
+          <label className="block text-xs text-gray-500 mb-1">
             Tienda <span className="text-red-500">*</span>
           </label>
-          <input
-            id="ed-tienda"
-            type="text"
+          <ClienteTypeahead
             value={tienda}
-            onChange={(e) => setTienda(e.target.value)}
-            disabled={guardando}
-            className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none disabled:opacity-50"
-            placeholder="Ej: Albrook"
+            codigo={tiendaCodigo}
+            onSelect={(nombre, codigo) => {
+              setTienda(nombre);
+              setTiendaCodigo(codigo);
+            }}
+            onFreeText={(texto) => {
+              setTienda(texto);
+              setTiendaCodigo("");
+            }}
+            placeholder="Buscar tienda en el directorio…"
+            inputClassName="w-full rounded-md border border-gray-300 px-3 py-2 pr-16 text-sm focus:border-black focus:outline-none"
           />
         </div>
 

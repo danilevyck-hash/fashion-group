@@ -20,6 +20,7 @@ interface ClienteTypeaheadProps {
   onBlur?: () => void;
   inputClassName?: string;
   hasError?: boolean;
+  placeholder?: string;
 }
 
 export default function ClienteTypeahead({
@@ -30,6 +31,7 @@ export default function ClienteTypeahead({
   onBlur,
   inputClassName = "",
   hasError = false,
+  placeholder = "Buscar cliente…",
 }: ClienteTypeaheadProps) {
   const [open, setOpen] = useState(false);
   const [hits, setHits] = useState<ClienteHit[]>([]);
@@ -94,7 +96,7 @@ export default function ClienteTypeahead({
           setOpen(true);
         }}
         onBlur={onBlur}
-        placeholder="Buscar cliente…"
+        placeholder={placeholder}
         className={inputClassName}
       />
 
