@@ -14,9 +14,15 @@ function getSupabase() {
 export async function GET() {
   const supabase = getSupabase();
 
+  // Columnas explícitas (no select("*")): endpoint público — blinda contra
+  // fugas si se agregan columnas internas (ej. costo) a joybees_products.
+  // Mismo criterio que reebok/public|products. Son exactamente los campos que
+  // consume la página pública (incl. stock e is_regalia para disponibilidad).
   const { data: products, error } = await supabase
     .from("joybees_products")
-    .select("*")
+    .select(
+      "id,sku,name,category,gender,price,stock,image_url,active,popular,is_regalia,badge",
+    )
     .eq("active", true)
     .order("category")
     .order("name");

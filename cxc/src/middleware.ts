@@ -11,6 +11,14 @@ const PUBLIC_PATHS = [
   "/api/auth",      // login endpoint
 ];
 
+// Extensiones de assets ESTÁTICOS reales. Antes el middleware dejaba pasar sin
+// auth cualquier pathname con un "." (`pathname.includes(".")`), lo que abría un
+// bypass: una ruta API/página con un punto en un parámetro (ej.
+// /api/catalogo/.../id.con.punto) se servía SIN validar sesión. Ahora solo se
+// saltan la auth los paths que TERMINAN en una extensión de asset conocida.
+const STATIC_ASSET_RE =
+  /\.(?:png|jpe?g|gif|svg|webp|avif|ico|bmp|css|js|mjs|map|woff2?|ttf|otf|eot|json|webmanifest|xml|txt|pdf|mp4|webm|mp3|ogg)$/i;
+
 // Paths that start with these prefixes are public
 const PUBLIC_PREFIXES = [
   "/api/cron/",     // cron jobs use CRON_SECRET
@@ -119,8 +127,10 @@ export async function middleware(req: NextRequest) {
     if (pathname.startsWith(prefix)) return NextResponse.next();
   }
 
-  // Allow static files
-  if (pathname.includes(".")) return NextResponse.next();
+  // Allow static asset files — SOLO por extensión real al final del path.
+  // (No usar pathname.includes(".") — eso dejaba pasar rutas con punto en
+  // parámetros sin autenticar.)
+  if (STATIC_ASSET_RE.test(pathname)) return NextResponse.next();
 
   const session = req.cookies.get(COOKIE_NAME)?.value;
 
