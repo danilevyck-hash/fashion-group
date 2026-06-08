@@ -57,12 +57,13 @@ export const dynamic = "force-dynamic";
 // internos de supabase-js. Sin esto, la re-consulta del log devuelve datos stale.
 export const fetchCache = "force-no-store";
 // Recuperación in-process: una corrida puede re-ejecutar varios syncs pesados en
-// serie (estadocuenta ~85-120s/empresa). 800s con Fluid Compute (ya activo) da
-// holgura; lo que no entre lo toma la siguiente pasada (10:00/14:00/18:00).
-export const maxDuration = 800;
+// serie (estadocuenta ~85-120s/empresa). 300s es el TECHO del plan (Hobby con
+// Fluid Compute; ver docs/cron-reliability-recovery.md). Lo que no entre en una
+// pasada lo toma la siguiente (10:00/14:00/18:00) — todas idempotentes.
+export const maxDuration = 300;
 // Dejar de ARRANCAR trabajo nuevo pasado este umbral (headroom antes del kill a
-// 800s). El trabajo ya iniciado termina; lo no arrancado lo toma la otra pasada.
-const RECOVERY_BUDGET_MS = 760_000;
+// 300s). El trabajo ya iniciado termina; lo no arrancado lo toma la otra pasada.
+const RECOVERY_BUDGET_MS = 270_000;
 
 // sync_type que el cron switch-sync (tipo=all) escribe a switch_sync_log.
 const DAILY_SYNC_TYPES = ["facturas", "estadocuenta", "costo"] as const;
