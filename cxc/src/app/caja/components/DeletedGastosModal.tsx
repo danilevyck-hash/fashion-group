@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { fmt, fmtDate } from "@/lib/format";
 import { CajaGasto } from "./types";
 
@@ -42,17 +43,17 @@ export default function DeletedGastosModal({
   periodOpen,
   onRestore,
 }: Props) {
+  // Lock body scroll mientras está abierto (hook compartido, ref-count).
+  useBodyScrollLock(open);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
     };
   }, [open, onClose]);
 

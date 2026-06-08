@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback, ReactNode, createContext, useContext } from "react";
 import { usePathname } from "next/navigation";
 import { useSidebarCollapsed } from "@/lib/hooks/useSidebarCollapsed";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 export { Avatar } from "./ui/Avatar";
 export type { AvatarProps } from "./ui/Avatar";
@@ -117,6 +118,11 @@ export function ModalOverlay({
   backdropClassName?: string;
   className?: string;
 }) {
+  // ModalOverlay solo se monta cuando el modal está abierto (los wrappers hacen
+  // `if (!open) return null`), así que lockeamos el body mientras esté montado.
+  // El contador de referencias del hook deja apilar (BottomSheet + ConfirmModal)
+  // sin que se pisen el lock al cerrar.
+  useBodyScrollLock(true);
   const collapsed = useSidebarCollapsed();
   const pathname = usePathname() || "";
   const items =
@@ -909,27 +915,11 @@ export function BottomSheet({
     return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  // Lock body scroll when open. En iOS, `overflow:hidden` no congela el scroll
-  // de forma fiable (el fondo sigue haciendo rubber-band detrás del backdrop).
-  // El patrón robusto es position:fixed guardando/restaurando scrollY.
-  useEffect(() => {
-    if (!open) return;
-    const scrollY = window.scrollY;
-    const body = document.body;
-    body.style.position = "fixed";
-    body.style.top = `-${scrollY}px`;
-    body.style.left = "0";
-    body.style.right = "0";
-    body.style.overflow = "hidden";
-    return () => {
-      body.style.position = "";
-      body.style.top = "";
-      body.style.left = "";
-      body.style.right = "";
-      body.style.overflow = "";
-      window.scrollTo(0, scrollY);
-    };
-  }, [open]);
+  // Lock body scroll mientras el sheet está abierto. El hook compartido usa el
+  // patrón iOS robusto (position:fixed + restaurar scrollY) y un contador de
+  // referencias, para que apilar un modal encima (BottomSheet + ConfirmModal)
+  // no deje el scroll trabado al cerrar.
+  useBodyScrollLock(open);
 
   const onTouchStart = useCallback((e: React.TouchEvent) => {
     // Only initiate drag from the handle area (first 40px) or if scrolled to top

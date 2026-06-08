@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 import { ClienteHoverCard, type HistorialState } from "./ClienteHoverCard";
 
 /**
@@ -51,12 +52,8 @@ export function ClienteSheet({
     return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  // Lock body scroll while sheet is open
-  useEffect(() => {
-    if (!open) return;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
-  }, [open]);
+  // Lock body scroll while sheet is open (hook compartido con ref-count).
+  useBodyScrollLock(open);
 
   if (!open) return null;
 

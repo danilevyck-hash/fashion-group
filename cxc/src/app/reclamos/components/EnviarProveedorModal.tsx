@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 interface EnviarProveedorModalProps {
   open: boolean;
@@ -49,13 +50,8 @@ export default function EnviarProveedorModal({
     setError(null);
   }, [open, defaultTo, defaultSubject, contactoNombre, count, empresa]);
 
-  // Bloquea el scroll del body mientras está abierto
-  useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
-  }, [open]);
+  // Bloquea el scroll del body mientras está abierto (hook compartido, ref-count).
+  useBodyScrollLock(open);
 
   // Escape para cerrar
   useEffect(() => {

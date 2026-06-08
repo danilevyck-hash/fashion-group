@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useBodyScrollLock } from "@/lib/hooks/useBodyScrollLock";
 
 /**
  * Sheet mobile para picker de ordenamiento. Reemplaza los headers
@@ -43,11 +44,8 @@ export function SortSheet({ open, onClose, sortBy, sortDir, onChange }: SortShee
     return () => document.removeEventListener("keydown", handler);
   }, [open, onClose]);
 
-  useEffect(() => {
-    if (!open) return;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
-  }, [open]);
+  // Lock body scroll mientras el sheet está abierto (hook compartido, ref-count).
+  useBodyScrollLock(open);
 
   if (!open) return null;
 
