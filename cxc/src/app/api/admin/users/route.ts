@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
 
   if (error) return NextResponse.json({ error: "Error al cargar" }, { status: 500 });
 
-  // Modules now come from role_permissions, not fg_user_modules
+  // Los módulos se derivan de role_permissions (+ modulos_override por usuario).
   const result = (users || []).map((u) => ({ ...u }));
   return NextResponse.json(result);
 }

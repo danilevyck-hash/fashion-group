@@ -81,11 +81,6 @@ export async function POST(req: NextRequest) {
         const user = matches[0];
         {
           // Módulos por rol — fuente única: role_permissions.
-          // (Antes consultábamos fg_user_modules per-user, pero el sistema migró a
-          // permisos por rol; filas residuales en fg_user_modules overrideaban
-          // role_permissions y bloqueaban módulos legítimos. /api/admin/users
-          // ya documenta esto. Si role_permissions no responde, fallback a
-          // defaults hardcoded.)
           // Prioridad de módulos del usuario:
           //   1) modulos_override (per-usuario) si está definido y no vacío
           //   2) role_permissions del rol
