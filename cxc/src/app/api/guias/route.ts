@@ -116,6 +116,7 @@ export async function POST(req: NextRequest) {
       guia_id: guia.id,
       orden: i + 1,
       cliente: item.cliente || "",
+      cliente_codigo: item.cliente_codigo || null,
       direccion: item.direccion || "",
       empresa: item.empresa || "",
       facturas: item.facturas || "",

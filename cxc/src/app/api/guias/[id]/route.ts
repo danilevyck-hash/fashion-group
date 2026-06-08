@@ -134,7 +134,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     if (items && items.length > 0) {
       const rows = items.map((item: Record<string, unknown>, i: number) => ({
         guia_id: id, orden: -(i + 1), // negative orden = new batch (temp marker)
-        cliente: item.cliente || "", direccion: item.direccion || "",
+        cliente: item.cliente || "", cliente_codigo: item.cliente_codigo || null,
+        direccion: item.direccion || "",
         empresa: item.empresa || "", facturas: item.facturas || "",
         bultos: item.bultos || 0, numero_guia_transp: item.numero_guia_transp || "",
       }));

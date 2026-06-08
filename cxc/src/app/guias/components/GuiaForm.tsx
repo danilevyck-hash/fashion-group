@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import AddNewInline from "./AddNewInline";
+import ClienteTypeahead from "./ClienteTypeahead";
 import { ScrollableTable } from "@/components/ui";
 
 interface GuiaFormProps {
@@ -43,6 +44,7 @@ interface GuiaFormProps {
   onAddDireccion: (v: string) => void;
   onAddEmpresa: (v: string) => void;
   onUpdateItem: (idx: number, field: keyof GuiaItem, value: string | number) => void;
+  onUpdateItemFields: (idx: number, partial: Partial<GuiaItem>) => void;
   onAddRow: () => void;
   onRemoveRow: (idx: number) => void;
   onSave: (opts?: { silent?: boolean }) => void;
@@ -61,7 +63,7 @@ export default function GuiaForm({
   items, transportistas, clientes, direcciones, empresas,
   validationErrors, error, saving,
   onAddCliente, onAddDireccion, onAddEmpresa,
-  onUpdateItem, onAddRow, onRemoveRow, onSave, onCancel,
+  onUpdateItem, onUpdateItemFields, onAddRow, onRemoveRow, onSave, onCancel,
   hasDraft, draftTimeAgo, onRestoreDraft, onDiscardDraft,
 }: GuiaFormProps) {
   const totalBultos = items.reduce((s, i) => s + (i.bultos || 0), 0);
@@ -347,8 +349,15 @@ export default function GuiaForm({
               <tr key={idx} className="border-b border-gray-200">
                 <td className="py-2 text-gray-300">{idx + 1}</td>
                 <td className="py-2 pr-2">
-                  <input list="clientes-list" type="text" value={item.cliente} onChange={e => onUpdateItem(idx, "cliente", e.target.value)} onBlur={() => handleBlur(`item-${idx}-cliente`)}
-                    className={inputClass(`item-${idx}-cliente`, "w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition", `item-${idx}-cliente`, item.cliente)} />
+                  <ClienteTypeahead
+                    value={item.cliente}
+                    codigo={item.cliente_codigo || ""}
+                    onSelect={(nombre, codigo) => onUpdateItemFields(idx, { cliente: nombre, cliente_codigo: codigo })}
+                    onFreeText={(texto) => onUpdateItemFields(idx, { cliente: texto, cliente_codigo: "" })}
+                    onBlur={() => handleBlur(`item-${idx}-cliente`)}
+                    hasError={fieldError(`item-${idx}-cliente`, item.cliente)}
+                    inputClassName={inputClass(`item-${idx}-cliente`, "w-full border-b border-gray-200 py-1 pr-16 text-sm outline-none focus:border-black transition", `item-${idx}-cliente`, item.cliente)}
+                  />
                   {fieldError(`item-${idx}-cliente`, item.cliente) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
                 </td>
                 <td className="py-2 pr-2">

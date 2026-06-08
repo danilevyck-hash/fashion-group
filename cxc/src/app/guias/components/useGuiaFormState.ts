@@ -186,7 +186,14 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     setItems(items.filter((_, i) => i !== idx).map((item, i) => ({ ...item, orden: i + 1 })));
   }
   function updateItem(idx: number, field: keyof GuiaItem, value: string | number) {
-    setItems(items.map((item, i) => (i === idx ? { ...item, [field]: value } : item)));
+    setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, [field]: value } : item)));
+  }
+
+  // Actualiza varios campos de una fila de forma ATÓMICA (functional update),
+  // para casos como el typeahead de cliente que setea cliente + cliente_codigo
+  // en un solo evento sin que la segunda escritura pise a la primera.
+  function updateItemFields(idx: number, partial: Partial<GuiaItem>) {
+    setItems((prev) => prev.map((item, i) => (i === idx ? { ...item, ...partial } : item)));
   }
 
   function validate(): boolean {
@@ -293,7 +300,7 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     numeroGuiaTransp, setNumeroGuiaTransp,
     items,
     saving,
-    updateItem, addRow, removeRow,
+    updateItem, updateItemFields, addRow, removeRow,
     saveGuia,
     // draft
     hasGuiaDraft, guiaDraftTimeAgo, restoreGuiaDraft, clearGuiaDraft,

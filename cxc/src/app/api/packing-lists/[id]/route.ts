@@ -21,6 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .from("packing_lists")
     .select("*")
     .eq("id", params.id)
+    .is("deleted_at", null)
     .single();
 
   if (plErr || !pl) {
@@ -59,11 +60,13 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: "Packing list no encontrado" }, { status: 404 });
   }
 
-  // Hard delete — cascade handles pl_items
+  // Soft delete: marca deleted_at. El PL y sus pl_items se conservan (red de
+  // retención 90 días); el cron purga físicamente después, con snapshot previo.
   const { error } = await supabaseServer
     .from("packing_lists")
-    .delete()
-    .eq("id", params.id);
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", params.id)
+    .is("deleted_at", null);
 
   if (error) {
     console.error(error);

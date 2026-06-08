@@ -2,6 +2,9 @@ export interface GuiaItem {
   id?: string;
   orden: number;
   cliente: string;
+  // Código del cliente en el directorio (clientes_master), formato D-XXX.
+  // "" / undefined = línea "sin vincular" (texto libre conservado en `cliente`).
+  cliente_codigo?: string;
   direccion: string;
   empresa: string;
   facturas: string;
