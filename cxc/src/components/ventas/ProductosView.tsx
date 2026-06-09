@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Download, Search, ChevronRight } from "lucide-react";
+import { SkeletonTable } from "@/components/ui";
 import { MONTHS, fmtMoney } from "@/lib/ventas/format";
 import {
   PRODUCTOS_EMPRESAS,
@@ -180,7 +181,9 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
       )}
 
       {loading && (
-        <div className="rounded-lg border border-stone-200 bg-white p-8 text-center text-sm text-stone-500">Cargando…</div>
+        <div className="rounded-lg border border-stone-200 bg-white p-3">
+          <SkeletonTable rows={6} cols={5} />
+        </div>
       )}
 
       {/* Tabla nivel 1 */}

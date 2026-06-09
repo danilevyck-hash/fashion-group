@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
+import { SkeletonTable } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Coins, FileSpreadsheet, Settings } from "lucide-react";
 import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
@@ -156,7 +157,7 @@ export function ComisionesPorEmpresaView({ year, mes }: Props) {
 
       <Card className="overflow-hidden rounded-lg border border-gray-200">
         {loading ? (
-          <div className="p-8 text-center text-sm text-gray-500">Cargando…</div>
+          <div className="p-3"><SkeletonTable rows={6} cols={5} /></div>
         ) : error ? (
           <div className="p-8 text-center text-sm">
             <p className="text-rose-600">{error}</p>

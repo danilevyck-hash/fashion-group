@@ -20,58 +20,57 @@ export default function useAdminData() {
     setLoadError(null);
 
     try {
-      // Load vendor map via API into VENDOR_MAP
-      try {
-        const vendorRes = await fetch("/api/vendors");
-        if (vendorRes.ok) {
-          const vendorRows = await vendorRes.json();
-          const vendorMapData: VendorMap = {};
-          for (const row of vendorRows) {
-            if (!vendorMapData[row.company_key]) vendorMapData[row.company_key] = {};
-            vendorMapData[row.company_key][row.client_name] = row.vendor_name;
-          }
-          Object.keys(VENDOR_MAP).forEach((k) => delete VENDOR_MAP[k]);
-          Object.assign(VENDOR_MAP, vendorMapData);
-        }
-      } catch { /* vendor map is optional */ }
+      // Todas las lecturas EN PARALELO (antes eran 5-6 awaits secuenciales que
+      // bloqueaban la navegación a /admin uno tras otro). vendors/upload son
+      // opcionales (.catch→null, nunca rompen la página). aging NO se atrapa: si
+      // la red falla, rechaza el Promise.all y caemos al snapshot offline (catch).
+      // contact_log se acota a 2000 (antes traía toda la tabla sin límite).
+      const [vendorRows, upRows, agingJson, overridesRes, pagosRes, logRes] =
+        await Promise.all([
+          fetch("/api/vendors").then((r) => (r.ok ? r.json() : null)).catch(() => null),
+          fetch("/api/upload", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+          fetch("/api/cxc/aging", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)),
+          supabase.from("cxc_client_overrides").select("*"),
+          supabase.from("switch_ultimo_pago_cliente_v2").select("*"),
+          supabase
+            .from("cxc_contact_log")
+            .select("*")
+            .order("contacted_at", { ascending: false })
+            .limit(2000),
+        ]);
 
-      // Frescura por empresa vía API server-side: /api/upload lee
-      // switch_estadocuenta.synced_at con service_role (la tabla tiene RLS y el
-      // cliente browser/anon no la lee). UploadFreshness solo usa uploaded_at.
-      const latestUploads: Record<string, CxcUpload> = {};
-      try {
-        const upRes = await fetch("/api/upload", { cache: "no-store" });
-        if (upRes.ok) {
-          const upRows = (await upRes.json()) as { company_key: string; uploaded_at: string }[];
-          for (const u of upRows) {
-            if (!latestUploads[u.company_key]) latestUploads[u.company_key] = u as CxcUpload;
-          }
+      // Vendor map (global VENDOR_MAP) — opcional.
+      if (Array.isArray(vendorRows)) {
+        const vendorMapData: VendorMap = {};
+        for (const row of vendorRows) {
+          if (!vendorMapData[row.company_key]) vendorMapData[row.company_key] = {};
+          vendorMapData[row.company_key][row.client_name] = row.vendor_name;
         }
-      } catch { /* frescura es opcional */ }
+        Object.keys(VENDOR_MAP).forEach((k) => delete VENDOR_MAP[k]);
+        Object.assign(VENDOR_MAP, vendorMapData);
+      }
+
+      // Frescura por empresa (UploadFreshness usa uploaded_at).
+      const latestUploads: Record<string, CxcUpload> = {};
+      if (Array.isArray(upRows)) {
+        for (const u of upRows as { company_key: string; uploaded_at: string }[]) {
+          if (!latestUploads[u.company_key]) latestUploads[u.company_key] = u as CxcUpload;
+        }
+      }
       setUploads(latestUploads);
 
-      // Aging vía API server-side: aplica la restricción por empresa asociada
-      // del vendedor de forma autoritativa (no se puede saltar desde el cliente).
-      let rows: CxcRow[] | null = null;
-      const agingRes = await fetch("/api/cxc/aging", { cache: "no-store" });
-      if (agingRes.ok) {
-        const agingJson = await agingRes.json();
-        rows = (agingJson.rows ?? null) as CxcRow[] | null;
-      }
-      const { data: overrides } = await supabase.from("cxc_client_overrides").select("*");
+      const rows = (agingJson?.rows ?? null) as CxcRow[] | null;
+
       const overrideMap: Record<string, { correo: string; telefono: string; celular: string; contacto: string; resultado_contacto?: string; proximo_seguimiento?: string }> = {};
-      if (overrides) {
-        for (const o of overrides) overrideMap[o.nombre_normalized] = o;
+      if (overridesRes.data) {
+        for (const o of overridesRes.data) overrideMap[o.nombre_normalized] = o;
       }
 
-      // Último pago por empresa+cliente, de la vista read-only
-      // switch_ultimo_pago_cliente_v2 (lee de switch_recibos = historial completo,
-      // ya NO de estadocuenta que solo traía recibos abiertos). Join por
-      // (empresa_key, cliente_codigo). Incluye retenciones como actividad de pago.
-      const { data: pagos } = await supabase.from("switch_ultimo_pago_cliente_v2").select("*");
+      // Último pago por empresa+cliente (vista switch_ultimo_pago_cliente_v2,
+      // lee de switch_recibos). Join por (empresa_key, cliente_codigo).
       const pagoMap = new Map<string, { fecha: string; monto: number }>();
-      if (pagos) {
-        for (const p of pagos) {
+      if (pagosRes.data) {
+        for (const p of pagosRes.data) {
           if (!p.cliente_codigo) continue;
           pagoMap.set(`${p.empresa_key}|${p.cliente_codigo}`, {
             fecha: p.ultimo_pago_fecha,
@@ -154,12 +153,9 @@ export default function useAdminData() {
       setDataTs(Date.now());
       setFromCache(false);
 
-      // Last contact per client, sourced from cxc_contact_log
+      // Último contacto por cliente (cxc_contact_log, ya leído arriba en paralelo).
       const latestLog: Record<string, { date: string; method: string }> = {};
-      const { data: logData } = await supabase
-        .from("cxc_contact_log")
-        .select("*")
-        .order("contacted_at", { ascending: false });
+      const logData = logRes.data;
       if (logData) {
         for (const l of logData) {
           if (!latestLog[l.nombre_normalized]) {
