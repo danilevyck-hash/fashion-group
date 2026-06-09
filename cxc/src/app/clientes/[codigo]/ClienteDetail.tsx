@@ -225,7 +225,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                   }`}
                   title="Saldo vencido (más de 90 días)"
                 >
-                  {cxcCritico > 0 ? "Vencido crítico" : "Vencido"} ${fmt(cxcVencido)}
+                  {cxcCritico > 0 ? "Vencido crítico" : "Vencido reciente"} ${fmt(cxcVencido)}
                 </span>
               )}
               <Link
