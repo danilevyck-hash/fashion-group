@@ -26,6 +26,7 @@ const MODULE_COLORS: Record<string, ModuleColor> = {
   marketing:  { border: "border-fuchsia-500", text: "text-fuchsia-500", hex: "#d946ef" },
   reebok:          { border: "border-red-500",     text: "text-red-500",     hex: "#ef4444" },
   "packing-lists": { border: "border-teal-500",    text: "text-teal-500",    hex: "#14b8a6" },
+  proveedores: { border: "border-purple-600",  text: "text-purple-600",  hex: "#9333ea" },
 };
 
 /** Map pathname to module key */
@@ -42,6 +43,7 @@ export function getModuleKeyFromPath(pathname: string): string | null {
   if (pathname.startsWith("/marketing"))       return "marketing";
   if (pathname.startsWith("/catalogo/reebok")) return "reebok";
   if (pathname.startsWith("/packing-lists"))   return "packing-lists";
+  if (pathname.startsWith("/proveedores"))     return "proveedores";
   return null;
 }
 

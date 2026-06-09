@@ -26,6 +26,7 @@ import {
   Settings,
   ShieldCheck,
   Coins,
+  Building2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -71,6 +72,7 @@ export const ALL_MODULES: AppModule[] = [
   { key: "caja",          label: "Caja Menuda",         subtitle: "Registrar gastos del día a día",                     href: "/caja",           icon: Wallet,           roles: ["admin", "secretaria"],                             group: "finanzas" },
   { key: "prestamos",     label: "Préstamos",           subtitle: "Adelantos y deducciones de empleados",               href: "/prestamos",      icon: HandCoins,        roles: ["admin", "contabilidad"],                           group: "finanzas" },
   { key: "comisiones",    label: "Comisiones",          subtitle: "Comisión por vendedor (venta y cobro)",              href: "/comisiones",     icon: Coins,            roles: ["admin", "secretaria"],                             group: "finanzas" },
+  { key: "proveedores",   label: "Proveedores",         subtitle: "Cuentas por pagar: saldo, aging y pagos",            href: "/proveedores",    icon: Building2,        roles: ["admin", "contabilidad"],                           group: "finanzas" },
 
   // Operación
   { key: "guias",         label: "Guías de Despacho",   subtitle: "Crear y rastrear envíos",                            href: "/guias",          icon: Truck,            roles: ["admin", "secretaria", "bodega", "vendedor"],       group: "operacion" },
