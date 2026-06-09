@@ -71,7 +71,7 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, isFa
                 <div className="tabular-nums text-amber-800 font-semibold">{client.watch === 0 ? <span className="text-gray-300">—</span> : `$${fmt(client.watch)}`}</div>
               </div>
               <div className="bg-red-50 rounded-md px-2 py-1.5 text-center">
-                <div className="text-[10px] text-red-600 font-medium">121d+</div>
+                <div className="text-[10px] text-red-600 font-medium">{AGING.overdue.range}</div>
                 <div className="tabular-nums text-red-800 font-semibold">{client.overdue === 0 ? <span className="text-gray-300">—</span> : `$${fmt(client.overdue)}`}</div>
               </div>
             </div>
