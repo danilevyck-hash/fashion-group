@@ -25,7 +25,9 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await reebokServer
     .from("reebok_orders")
-    .select("*, reebok_order_items(id, product_id, quantity, unit_price)")
+    .select(
+      "id, order_number, client_name, vendor_name, client_email, comment, total, created_at, updated_at, idempotency_key, status, origen_original, origen_short_id, reebok_order_items(id, product_id, quantity, unit_price)",
+    )
     .order("created_at", { ascending: false });
   if (error) return NextResponse.json({ error: "Error interno" }, { status: 500 });
 
@@ -75,6 +77,10 @@ export async function POST(req: NextRequest) {
     is_preorder?: boolean;
   };
   const typedItems = items as IncomingItem[];
+  // Precio por unidad debe ser positivo: un negativo metería un total artificial.
+  if (typedItems.some((i) => !(Number(i.unit_price) > 0))) {
+    return NextResponse.json({ error: "El precio de cada producto debe ser mayor a cero" }, { status: 400 });
+  }
   const categoryMap = await fetchReebokCategoryMap(typedItems.map((i) => i.product_id));
   const total = calculateReebokOrderTotal(
     typedItems.map((i) => ({
@@ -115,6 +121,6 @@ export async function POST(req: NextRequest) {
   }
 
   // Respuesta compatible con el front (espera order.id para navegar al detalle).
-  const { data: order } = await reebokServer.from("reebok_orders").select("*").eq("id", order_id).single();
+  const { data: order } = await reebokServer.from("reebok_orders").select("id, order_number").eq("id", order_id).single();
   return NextResponse.json(order ?? { id: order_id, order_number });
 }

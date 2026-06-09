@@ -18,7 +18,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (!session) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
   const { data, error } = await reebokServer
-    .from("reebok_orders").select("*, reebok_order_items(*)").eq("id", params.id).single();
+    .from("reebok_orders")
+    .select(
+      "id, order_number, client_name, vendor_name, client_email, comment, total, created_at, updated_at, idempotency_key, status, origen_original, origen_short_id, reebok_order_items(id, order_id, product_id, sku, name, image_url, quantity, unit_price, created_at)",
+    )
+    .eq("id", params.id)
+    .single();
   if (error || !data) return NextResponse.json({ error: "Error interno" }, { status: 500 });
 
   const items = (data.reebok_order_items || []) as { product_id: string; quantity: number; unit_price: number }[];

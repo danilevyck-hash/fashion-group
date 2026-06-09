@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from('inventory')
     .upsert(body, { onConflict: 'product_id,size' })
-    .select()
+    .select('id,product_id,size,quantity')
     .single()
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json(data)
@@ -35,7 +35,7 @@ export async function PUT(req: NextRequest) {
   if (auth instanceof NextResponse) return auth
   const body = await req.json()
   const { id, ...fields } = body
-  const { data, error } = await supabase.from('inventory').update(fields).eq('id', id).select().single()
+  const { data, error } = await supabase.from('inventory').update(fields).eq('id', id).select('id,product_id,size,quantity').single()
   if (error) { console.error(error); return NextResponse.json({ error: "Error interno" }, { status: 500 }); }
   return NextResponse.json(data)
 }

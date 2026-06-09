@@ -34,7 +34,9 @@ export async function POST(req: NextRequest) {
   if (body.orderId) {
     const { data: order, error } = await reebokServer
       .from("reebok_orders")
-      .select("*, reebok_order_items(*)")
+      .select(
+        "client_name, order_number, comment, created_at, reebok_order_items(product_id, sku, name, quantity, unit_price, image_url, is_preorder)",
+      )
       .eq("id", body.orderId)
       .single();
     if (error || !order) return NextResponse.json({ error: "Order not found" }, { status: 404 });

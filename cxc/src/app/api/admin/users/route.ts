@@ -117,7 +117,9 @@ export async function POST(req: NextRequest) {
   const { data: user, error } = await supabaseServer
     .from("fg_users")
     .insert({ name: name.trim(), password: hashed, role: role || "vendedor", associated_company: associated_company || null, modulos_override: overrideVal })
-    .select()
+    // Columnas explícitas SIN `password`: nunca devolver el hash bcrypt al cliente
+    // (igual que el GET). El alta no necesita leer la contraseña recién escrita.
+    .select("id, name, role, active, associated_company, modulos_override, is_owner, created_at, updated_at")
     .single();
 
   if (error) return NextResponse.json({ error: "Error al crear usuario" }, { status: 500 });
