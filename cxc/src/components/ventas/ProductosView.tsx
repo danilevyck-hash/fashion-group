@@ -34,6 +34,8 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
   const [empresa, setEmpresa] = useState(initialEmpresa);
   const [mes, setMes] = useState<number | null>(null); // null = YTD
   const [data, setData] = useState<ProductosResponse | null>(null);
+  // Venta del MISMO período del año anterior por descripción → columna Δ.
+  const [prevVenta, setPrevVenta] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -49,9 +51,22 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
     try {
       const qs = new URLSearchParams({ empresa, year: String(selectedYear) });
       if (mes) qs.set("mes", String(mes));
-      const res = await fetch(`/api/ventas/productos?${qs.toString()}`, { cache: "no-store" });
+      // Mismo período del año anterior (para Δ). Reusa el mismo endpoint/RPC.
+      const prevQs = new URLSearchParams({ empresa, year: String(selectedYear - 1) });
+      if (mes) prevQs.set("mes", String(mes));
+      const [res, prevRes] = await Promise.all([
+        fetch(`/api/ventas/productos?${qs.toString()}`, { cache: "no-store" }),
+        fetch(`/api/ventas/productos?${prevQs.toString()}`, { cache: "no-store" }),
+      ]);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = (await res.json()) as ProductosResponse;
+      // Δ es informativo: si el año anterior falla, seguimos sin la columna.
+      const prevMap: Record<string, number> = {};
+      if (prevRes.ok) {
+        const prevJson = (await prevRes.json()) as ProductosResponse;
+        for (const p of prevJson.productos) prevMap[p.descripcion] = p.venta;
+      }
+      setPrevVenta(prevMap);
       setData(json);
       setCodigos({});
       setExpanded(null);
@@ -196,12 +211,13 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
                 <th className="hidden px-3 py-2.5 text-right font-normal sm:table-cell">Códigos</th>
                 <SortableTh label="Cant" active={sort} sortKey="cantidad" onClick={toggleSort} className="hidden sm:table-cell" />
                 <SortableTh label="Venta" active={sort} sortKey="venta" onClick={toggleSort} />
+                <th className="hidden px-3 py-2.5 text-right font-normal sm:table-cell">Δ {selectedYear - 1}</th>
                 <SortableTh label="Margen %" active={sort} sortKey="margen" onClick={toggleSort} />
               </tr>
             </thead>
             <tbody>
               {visibleRows.length === 0 && (
-                <tr><td colSpan={5} className="px-3 py-8 text-center text-stone-400">Sin productos para este filtro.</td></tr>
+                <tr><td colSpan={6} className="px-3 py-8 text-center text-stone-400">Sin productos para este filtro.</td></tr>
               )}
               {visibleRows.map(p => {
                 const drillable = p.num_codigos > 1;
@@ -215,6 +231,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
                     onToggle={() => toggleExpand(p)}
                     codigos={codigos[p.descripcion]}
                     codigosLoading={codigosLoading === p.descripcion}
+                    prevVenta={prevVenta[p.descripcion]}
                   />
                 );
               })}
@@ -258,8 +275,22 @@ function SortableTh({
   );
 }
 
+// Δ vs año anterior. Productos sin venta el año previo = "Nuevo" (no +∞%).
+function DeltaCell({ curr, prev }: { curr: number; prev: number | undefined }) {
+  if (prev === undefined || prev <= 0) {
+    return <td className="hidden px-3 py-2.5 text-right font-mono text-[11px] text-teal-700 sm:table-cell">Nuevo</td>;
+  }
+  const pct = ((curr - prev) / prev) * 100;
+  const up = pct >= 0;
+  return (
+    <td className={`hidden px-3 py-2.5 text-right font-mono tabular-nums sm:table-cell ${up ? "text-emerald-700" : "text-rose-600"}`}>
+      {up ? "+" : ""}{pct.toFixed(0)}%
+    </td>
+  );
+}
+
 function ProductoRow({
-  p, drillable, isOpen, onToggle, codigos, codigosLoading,
+  p, drillable, isOpen, onToggle, codigos, codigosLoading, prevVenta,
 }: {
   p: ProductoNivel1;
   drillable: boolean;
@@ -267,6 +298,7 @@ function ProductoRow({
   onToggle: () => void;
   codigos: ProductoCodigo[] | undefined;
   codigosLoading: boolean;
+  prevVenta: number | undefined;
 }) {
   return (
     <>
@@ -287,11 +319,12 @@ function ProductoRow({
         <td className="hidden px-3 py-2.5 text-right font-mono tabular-nums text-stone-500 sm:table-cell">{p.num_codigos}</td>
         <td className="hidden px-3 py-2.5 text-right font-mono tabular-nums text-stone-600 sm:table-cell">{Math.round(p.cantidad).toLocaleString("en-US")}</td>
         <td className="px-3 py-2.5 text-right font-mono tabular-nums text-stone-900">{fmtMoney(p.venta)}</td>
+        <DeltaCell curr={p.venta} prev={prevVenta} />
         <td className="px-3 py-2.5 text-right font-mono tabular-nums text-stone-700">{fmtMargen(p.margen)}</td>
       </tr>
       {isOpen && (
         <tr className="bg-stone-50/60">
-          <td colSpan={5} className="px-3 py-0">
+          <td colSpan={6} className="px-3 py-0">
             <div className="py-2 pl-5">
               {codigosLoading && <div className="py-2 text-xs text-stone-400">Cargando códigos…</div>}
               {!codigosLoading && codigos && codigos.length > 0 && (
@@ -299,7 +332,10 @@ function ProductoRow({
                   <tbody>
                     {codigos.map(c => (
                       <tr key={c.codigo} className="border-b border-stone-100 last:border-0">
-                        <td className="py-1.5 pr-3 font-mono text-stone-500">{c.codigo}</td>
+                        <td className="py-1.5 pr-3">
+                          <span className="font-mono text-stone-500">{c.codigo}</span>
+                          {c.descripcion && <span className="ml-2 text-stone-400">{c.descripcion}</span>}
+                        </td>
                         <td className="hidden py-1.5 pr-3 text-right font-mono tabular-nums text-stone-500 sm:table-cell">{Math.round(c.cantidad).toLocaleString("en-US")}</td>
                         <td className="py-1.5 pr-3 text-right font-mono tabular-nums text-stone-800">{fmtMoney(c.venta)}</td>
                         <td className="py-1.5 text-right font-mono tabular-nums text-stone-600">{fmtMargen(c.margen)}</td>

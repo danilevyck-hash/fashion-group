@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * Syncs a state value with a URL search param.
@@ -57,7 +57,7 @@ export function useUrlState(
   const router = useRouter();
   const pathname = usePathname();
 
-  const value = useMemo(() => {
+  const urlValue = useMemo(() => {
     if (Array.isArray(defaultValue)) {
       const all = searchParams.getAll(key);
       return all.length > 0 ? all : defaultValue;
@@ -71,6 +71,27 @@ export function useUrlState(
     return raw;
   }, [searchParams, key, defaultValue]);
 
+  // Valor optimista para ESCALARES (string/number): el cambio de URL del router
+  // de Next es asíncrono, así que un tab/filtro controlado por `value` lagea un
+  // tick tras el click → se sentía como "doble click" en las pestañas. Guardamos
+  // el último valor seteado y lo mostramos al instante hasta que la URL alcanza
+  // (reconciliación). Para arrays no aplica (filtros, no tabs) → pasan directo.
+  const isArrayState = Array.isArray(defaultValue);
+  const [optimistic, setOptimistic] = useState<string | number | null>(null);
+  // Limpiamos el optimista en cuanto la URL cambie por cualquier vía: nuestro
+  // router.replace ya resolvió, o el usuario hizo back/forward. Así el override
+  // solo dura el tick entre el click y que la URL alcance, sin quedar pegado.
+  const prevUrl = useRef<unknown>(urlValue);
+  useEffect(() => {
+    if (isArrayState) return;
+    if (String(prevUrl.current) !== String(urlValue)) {
+      prevUrl.current = urlValue;
+      setOptimistic(null);
+    }
+  }, [urlValue, isArrayState]);
+
+  const value = !isArrayState && optimistic !== null ? optimistic : urlValue;
+
   const setValue = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (newValue: any) => {
@@ -83,6 +104,9 @@ export function useUrlState(
           arr.forEach((v) => params.append(key, v));
         }
       } else {
+        // Optimismo: reflejar el valor al instante (la URL alcanza en el próximo
+        // tick). Evita el lag de "doble click" en pestañas/filtros controlados.
+        setOptimistic(newValue);
         // Remove param if it matches the default (keep URL clean)
         if (newValue === defaultValue || newValue === "") {
           params.delete(key);
