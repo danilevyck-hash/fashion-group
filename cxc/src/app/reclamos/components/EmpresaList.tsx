@@ -31,6 +31,8 @@ interface Props {
   onNewReclamo: () => void;
   onLoadDetail: (id: string) => void;
   onDeleteReclamo: (id: string) => void;
+  /** Recarga los reclamos tras enviar el correo (refleja el flip a "Enviado"). */
+  onReload: () => void;
 }
 
 type BulkAction = "zip";
@@ -39,7 +41,7 @@ export default function EmpresaList({
   activeEmpresa, reclamos, contactos, search, setSearch,
   filterEstado, setFilterEstado, selectionMode, setSelectionMode,
   selectedIds, setSelectedIds, sortCol, setSortCol, sortDir, setSortDir,
-  onBack, onNewReclamo, onLoadDetail,
+  onBack, onNewReclamo, onLoadDetail, onReload,
 }: Props) {
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState<BulkAction | null>(null);
@@ -336,7 +338,7 @@ export default function EmpresaList({
         contactoNombre={c?.nombre_contacto || c?.nombre}
         count={selCount}
         onClose={() => setSendOpen(false)}
-        onSent={(msg) => { showToast(msg); cancelSelection(); }}
+        onSent={(msg) => { showToast(msg); cancelSelection(); onReload(); }}
       />
     </div>
   );
