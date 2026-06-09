@@ -1,7 +1,8 @@
 "use client";
 
-import { Suspense, useState, useEffect, useMemo } from "react";
+import { Suspense, useState, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { fmt } from "@/lib/format";
@@ -102,7 +103,8 @@ function AdminDashboardInner() {
   usePersistedScroll("cxc", !loading && clients.length > 0);
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("search") || "");
-  const [riskFilter, setRiskFilter] = useState<RiskFilter>("all");
+  // riskFilter vive en la URL (?risk=) → compartible y sobrevive refresh.
+  const [riskFilter, setRiskFilter] = useUrlState<RiskFilter>("risk", "all");
 
   // Per-user empresa restriction (e.g. Edwin only sees Vistana International)
   const [empresaRestriction, setEmpresaRestriction] = useState<string | null>(null);
@@ -110,15 +112,20 @@ function AdminDashboardInner() {
     const ef = sessionStorage.getItem("fg_empresa_filter");
     if (ef) setEmpresaRestriction(ef);
   }, []);
-  // Filtro de empresa con memoria (useLastUsed → fg_last_cxc_empresa). La
-  // restricción por usuario (abajo) sigue forzando el valor cuando existe.
-  const [companyFilter, setCompanyFilter] = useLastUsed("cxc_empresa", "all");
-  // Force empresa filter when restriction exists
-  useEffect(() => {
-    if (empresaRestriction && companyFilter !== empresaRestriction) {
-      setCompanyFilter(empresaRestriction);
-    }
-  }, [empresaRestriction, companyFilter]);
+  // Filtro de empresa: la URL (?empresa=) MANDA si está presente (compartible /
+  // sobrevive refresh); si no, cae a la memoria de useLastUsed (D3,
+  // fg_last_cxc_empresa). Al cambiarlo se escribe en AMBOS. La restricción por
+  // usuario tiene prioridad absoluta (Edwin → Vistana), incluso sobre la URL.
+  const [urlEmpresa, setUrlEmpresa] = useUrlState("empresa", "all");
+  const [lastEmpresa, setLastEmpresa] = useLastUsed("cxc_empresa", "all");
+  const empresaParamPresent = searchParams.get("empresa") !== null;
+  const companyFilter = empresaRestriction
+    ? empresaRestriction
+    : (empresaParamPresent ? urlEmpresa : lastEmpresa);
+  const setCompanyFilter = useCallback((next: string) => {
+    setUrlEmpresa(next);   // fuente compartible
+    setLastEmpresa(next);  // memoria fallback para próxima visita sin URL
+  }, [setUrlEmpresa, setLastEmpresa]);
   const [sortKey, setSortKey] = useState<SortKey>("total");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [toast, setToast] = useState<string | null>(null);
