@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabaseServer
     .from("reebok_pedidos_unificado_vw")
-    .select("*")
+    .select("origen, id_natural, cliente, total, created_at, vendor, items, fuente")
     .order("created_at", { ascending: false });
 
   if (error) {

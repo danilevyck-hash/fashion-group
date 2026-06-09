@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabaseServer
     .from("reebok_pedidos_publicos")
-    .select("*")
+    .select("id, short_id, items, total, created_at")
     .order("created_at", { ascending: false });
 
   if (error) {

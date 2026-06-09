@@ -23,9 +23,11 @@ export async function GET(req: NextRequest) {
   const supabase = getSupabase();
   const { searchParams } = new URL(req.url);
 
+  // Columnas explícitas (no select('*')): blinda contra fugas de columnas
+  // futuras (ej. costo). Mismas que el endpoint público + created_at (orden).
   let query = supabase
     .from("joybees_products")
-    .select("*")
+    .select("id,sku,name,category,gender,price,stock,image_url,active,popular,is_regalia,badge,created_at")
     .order("created_at", { ascending: false });
 
   if (searchParams.get("active") === "true") query = query.eq("active", true);
@@ -57,7 +59,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabase
     .from("joybees_products")
     .upsert(body, { onConflict: "sku" })
-    .select()
+    .select("id,sku,name,category,gender,price,stock,image_url,active,popular,is_regalia,badge,created_at")
     .single();
 
   if (error) {

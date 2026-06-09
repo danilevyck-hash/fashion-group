@@ -69,6 +69,10 @@ export async function PUT(
     if (!Number.isInteger(item.quantity) || item.quantity < 1) {
       return NextResponse.json({ error: "Cantidad inválida" }, { status: 400 });
     }
+    // Precio por unidad debe ser positivo (un negativo metería un total artificial).
+    if (!(Number(item.unit_price) > 0)) {
+      return NextResponse.json({ error: "El precio de cada producto debe ser mayor a cero" }, { status: 400 });
+    }
   }
 
   const total = calculateReebokOrderTotal(items);

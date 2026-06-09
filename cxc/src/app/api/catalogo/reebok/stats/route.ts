@@ -33,11 +33,14 @@ export async function GET(req: NextRequest) {
   const productsWithStock = new Set((inventory || []).filter((i) => i.quantity > 0).map((i) => i.product_id)).size;
   const productsNoStock = activeProducts - productsWithStock;
 
-  // Orders summary
+  // Orders summary. Tope de memoria: 5000 pedidos más recientes (muy por encima
+  // del volumen real). Evita traer la tabla entera a RAM en serverless si crece;
+  // si algún día se superan 5000 pedidos, migrar a agregación en SQL/RPC.
   const { data: orders } = await reebokServer
     .from("reebok_orders")
     .select("id, status, total, client_name, vendor_name, created_at")
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(5000);
 
   const totalOrders = orders?.length ?? 0;
 
