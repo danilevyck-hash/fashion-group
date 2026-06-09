@@ -253,9 +253,14 @@ export function ClienteHoverCard({
           </div>
         ) : ready && delta ? (
           <>
-            <div className="flex items-baseline justify-between gap-3">
-              <div className="font-mono text-2xl font-medium leading-none tabular-nums text-stone-950">
-                {fmtMoneyCompact(ready.total_12m)}
+            {/* Cada cifra rotulada con SU período (antes el 2º monto salía como
+                caption sin explicar). */}
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-wider text-stone-500">Últimos 12 meses</div>
+                <div className="mt-0.5 font-mono text-2xl font-medium leading-none tabular-nums text-stone-950">
+                  {fmtMoneyCompact(ready.total_12m)}
+                </div>
               </div>
               <div className={cn(
                 "font-mono text-sm font-medium tabular-nums",
@@ -265,12 +270,10 @@ export function ClienteHoverCard({
                 {delta.displayValue}
               </div>
             </div>
-            <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[11px] uppercase tracking-wider text-stone-500">
-              <span>en últimos 12 meses</span>
-              <span className="normal-case tracking-normal text-stone-500">
-                {ready.total_12m_prior > 0
-                  ? `vs ${fmtMoneyCompact(ready.total_12m_prior)} hace 12-24m`
-                  : "sin compras hace 12-24m"}
+            <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[11px] text-stone-500">
+              <span className="uppercase tracking-wider">12 meses anteriores</span>
+              <span className="font-mono tabular-nums">
+                {ready.total_12m_prior > 0 ? fmtMoneyCompact(ready.total_12m_prior) : "sin compras"}
               </span>
             </div>
           </>
