@@ -14,23 +14,23 @@ interface GuiaForNotify {
   modo_entrega?: string | null;
   transportista_id?: string | null;
   transportistas?: { nombre: string | null } | { nombre: string | null }[] | null;
-  guia_items?: Array<{ cliente?: string | null; deleted?: boolean }> | null;
+  guia_items?: Array<{ cliente?: string | null; empresa?: string | null; bultos?: number | null; deleted?: boolean }> | null;
 }
 
 /** Aviso Telegram al despachar una guía (interno, solo chat de Daniel). No lanza. */
 async function notifyGuiaDespachada(guia: GuiaForNotify): Promise<void> {
   const numero = `GT-${String(guia.numero).padStart(3, "0")}`;
   const transp = transportistaLabel(guia) || "—";
-  const clientes = [
-    ...new Set(
-      (guia.guia_items || [])
-        .filter((i) => !i.deleted)
-        .map((i) => (i.cliente || "").trim())
-        .filter(Boolean),
-    ),
-  ];
+  const vivos = (guia.guia_items || []).filter((i) => !i.deleted);
+  const clientes = [...new Set(vivos.map((i) => (i.cliente || "").trim()).filter(Boolean))];
   const cliente = clientes.length ? clientes.join(", ") : "—";
-  await sendTelegramAlert(`📦 Guía despachada ${numero}\nCliente: ${cliente}\nTransportista: ${transp}`);
+  // empresa y bultos viven a nivel ítem (guia_items): empresas distintas + suma de bultos.
+  const empresas = [...new Set(vivos.map((i) => (i.empresa || "").trim()).filter(Boolean))];
+  const empresa = empresas.length ? empresas.join(", ") : "—";
+  const bultos = vivos.reduce((sum, i) => sum + (Number(i.bultos) || 0), 0);
+  await sendTelegramAlert(
+    `📦 Guía despachada ${numero}\nEmpresa: ${empresa}\nCliente: ${cliente}\nTransportista: ${transp}\nBultos: ${bultos}`,
+  );
 }
 
 // ── GET ──
@@ -251,7 +251,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.estado === "Completada") {
     const { data: guia } = await supabaseServer
       .from("guia_transporte")
-      .select("numero, modo_entrega, transportista_id, transportistas(nombre), guia_items(cliente, deleted)")
+      .select("numero, modo_entrega, transportista_id, transportistas(nombre), guia_items(cliente, empresa, bultos, deleted)")
       .eq("id", params.id)
       .single();
     if (guia) await notifyGuiaDespachada(guia as GuiaForNotify);
