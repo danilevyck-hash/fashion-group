@@ -261,14 +261,14 @@ export default function OrderDetailPage() {
     const { REEBOK_LOGO_BASE64, REEBOK_LOGO_WIDTH, REEBOK_LOGO_HEIGHT } = await import("@/lib/reebok-logo");
     const doc = new jsPDF("portrait");
 
-    // Pre-fetch product images
+    // Pre-fetch product images EN PARALELO (antes: for con await por imagen →
+    // la generación del PDF se sentía colgada con N imágenes). fetchImageB64
+    // ya devuelve null ante error, así que el Promise.all no rechaza.
     const imgs: Record<number, string> = {};
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].image_url) {
-        const b = await fetchImageB64(items[i].image_url);
-        if (b) imgs[i] = b;
-      }
-    }
+    const fetched = await Promise.all(
+      items.map((it) => (it.image_url ? fetchImageB64(it.image_url) : Promise.resolve(null))),
+    );
+    fetched.forEach((b, i) => { if (b) imgs[i] = b; });
 
     doc.setFillColor(26, 26, 26);
     doc.rect(0, 0, 210, 18, "F");
