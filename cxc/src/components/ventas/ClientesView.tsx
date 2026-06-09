@@ -55,6 +55,11 @@ const EMPRESA_PILLS: { id: string; label: string }[] = [
 // huérfanos en una fila agregada.
 const SKIP_OTROS_FOR = new Set(["confecciones_boston", "american_classic"]);
 
+// "VENTAS LOCAL" es el cliente-mostrador (ventas de contado en tienda), no un
+// cliente real → se marca y se saca del ranking de clientes. (Distinto de
+// "VENTAS MAHER", que sí es cliente real.)
+const isVentasLocal = (nombre: string) => nombre.trim().toUpperCase() === "VENTAS LOCAL";
+
 interface ClientesViewProps {
   data: Clientes;
   /** Año del selector global. Para año en curso: vista rolling 12m
@@ -74,6 +79,12 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
   // año en curso → última compra (vista rolling 12m).
   const [sortBy, setSortBy] = useState<SortKey>(isClosedYear ? "ytd" : "ultima");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
+  // PERÍODO (universo) separado del ORDEN: ordenar NUNCA cambia qué clientes se
+  // ven. "12m" = universo rolling (todos los activos en 12 meses, incluidos los
+  // sin compras este año); "ytd" = estricto del año en curso (ytd>0). Antes esto
+  // estaba acoplado al sort y ordenar por "Compras YTD" borraba clientes en
+  // silencio. Para año cerrado no aplica (la RPC ya filtra el año).
+  const [vista, setVista] = useState<"12m" | "ytd">("12m");
   const [otrosOpen, setOtrosOpen] = useState(false);
   const [sheetCliente, setSheetCliente] = useState<Cliente | null>(null);
   const [sortOpen, setSortOpen] = useState(false);
@@ -144,7 +155,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
   //
   // Para años cerrados, la vista rolling 12m no aplica — la RPC clientes_anio
   // ya filtra al año específico. Forzamos is12mView=false.
-  const is12mView = !isClosedYear && sortBy === "ultima";
+  const is12mView = !isClosedYear && vista === "12m";
 
   // Etiquetas de chip "Vista": para año cerrado siempre "Año {year}";
   // para año en curso, mantiene el toggle 12m / YTD según sort.
@@ -163,16 +174,24 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
   const vistaChipTitle = isClosedYear
     ? `Vista anual: clientes con compras en ${selectedYear} y delta vs ${selectedYear - 1}.`
     : (is12mView
-        ? "Sort por última compra expande la lista al universo rolling de 12 meses (incluye clientes sin compras YTD)."
-        : "Vista estricta del año fiscal en curso: sólo clientes con compras YTD > 0.");
+        ? "Universo rolling de 12 meses (incluye clientes sin compras este año). Toca para ver solo el año en curso."
+        : "Estricto del año en curso (solo clientes con compras YTD). Toca para ver los últimos 12 meses.");
   // Color del chip: teal cuando 12m rolling (señal "expandido"), stone para
   // YTD strict o año cerrado.
   const vistaChipTone = is12mView ? "bg-teal-50 text-teal-700" : "bg-stone-100 text-stone-700";
 
-  // Universo según sort. Esto define qué huérfanos se agrupan en "Otros".
+  // Universo según el PERÍODO (no el sort). VENTAS LOCAL queda fuera (se muestra
+  // marcado aparte, fuera del ranking). Esto define qué huérfanos van a "Otros".
   const universe = useMemo(() => {
-    return is12mView ? data.rows : data.rows.filter(c => c.ytd > 0);
+    const base = data.rows.filter(c => !isVentasLocal(c.nombre));
+    return is12mView ? base : base.filter(c => c.ytd > 0);
   }, [data.rows, is12mView]);
+
+  // Fila-mostrador "VENTAS LOCAL" (si existe en el universo de datos cargado).
+  const ventasLocalRow = useMemo<Cliente | null>(
+    () => data.rows.find(c => isVentasLocal(c.nombre)) ?? null,
+    [data.rows],
+  );
 
   // Huérfanos del universo actual (cliente_id NULL en la materialized view).
   // Sólo aplica para pills B2B; Boston/Multi se manejan sin Otros row.
@@ -301,12 +320,23 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
             <p>
               <span className="font-mono text-stone-950">{filtered.length}</span> clientes activos · {vistaSubtitleText} · ordenados por {SORT_LABELS[sortBy]}
             </p>
-            <span
-              className={cn("rounded-md px-2 py-0.5 text-xs font-medium", vistaChipTone)}
-              title={vistaChipTitle}
-            >
-              Vista: {vistaChipLong}
-            </span>
+            {isClosedYear ? (
+              <span
+                className={cn("rounded-md px-2 py-0.5 text-xs font-medium", vistaChipTone)}
+                title={vistaChipTitle}
+              >
+                Vista: {vistaChipLong}
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setVista(v => (v === "12m" ? "ytd" : "12m"))}
+                className={cn("rounded-md px-2 py-0.5 text-xs font-medium transition active:scale-[0.97]", vistaChipTone)}
+                title={vistaChipTitle}
+              >
+                Vista: {vistaChipLong} ⇄
+              </button>
+            )}
           </div>
         </div>
 
@@ -317,11 +347,20 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
           <div className="text-[11px] text-stone-500">
             <span className="font-mono text-stone-950">{filtered.length}</span> clientes · {vistaSubtitleTextShort}
           </div>
-          <span
-            className={cn("mt-1.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium", vistaChipTone)}
-          >
-            {vistaChipLabel}
-          </span>
+          {isClosedYear ? (
+            <span className={cn("mt-1.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium", vistaChipTone)}>
+              {vistaChipLabel}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setVista(v => (v === "12m" ? "ytd" : "12m"))}
+              className={cn("mt-1.5 inline-flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-medium active:scale-[0.97]", vistaChipTone)}
+              title={vistaChipTitle}
+            >
+              {vistaChipLabel} ⇄
+            </button>
+          )}
         </div>
 
         <div className="-mx-1 overflow-x-auto px-1" style={{ scrollSnapType: "x proximity" }}>
@@ -395,6 +434,20 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
                   />
                 );
               })}
+              {ventasLocalRow && !search.trim() && (
+                <tr className="bg-amber-50/40">
+                  <td className="border-b border-stone-200 px-3.5 py-3 text-right">
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">Mostrador</span>
+                  </td>
+                  <td className="border-b border-stone-200 px-3.5 py-3 text-sm font-medium text-stone-700" colSpan={2}>
+                    {ventasLocalRow.nombre}
+                    <span className="ml-2 text-xs font-normal text-stone-500">ventas de contado · fuera del ranking</span>
+                  </td>
+                  <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-sm font-medium text-stone-700 tabular-nums">{fmtMoney(ventasLocalRow.ytd)}</td>
+                  <td className="border-b border-stone-200 px-3.5 py-3 text-right text-stone-400">—</td>
+                  <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-500 tabular-nums">{ventasLocalRow.ultima || "—"}</td>
+                </tr>
+              )}
               {filtered.length === 0 && (
                 <tr><td colSpan={6} className="px-3.5 py-12 text-center text-sm text-stone-500">
                   No se encontraron clientes con esos filtros.
@@ -426,6 +479,18 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
             />
           );
         })}
+        {ventasLocalRow && !search.trim() && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">Mostrador</span>
+              <span className="text-sm font-medium text-stone-700">{ventasLocalRow.nombre}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between text-xs text-stone-500">
+              <span>ventas de contado · fuera del ranking</span>
+              <span className="font-mono tabular-nums text-stone-700">{fmtMoney(ventasLocalRow.ytd)}</span>
+            </div>
+          </div>
+        )}
         {filtered.length === 0 && (
           <div className="rounded-lg border border-stone-200 bg-white px-4 py-12 text-center text-sm text-stone-500">
             No se encontraron clientes con esos filtros.
