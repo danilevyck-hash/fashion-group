@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from "rea
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { Toast, ConfirmModal, ScrollableTable } from "@/components/ui";
 import { fmtDate } from "@/lib/format";
 import {
@@ -127,7 +128,8 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
   const [dragOver, setDragOver] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [empresaFilter, setEmpresaFilter] = useState<string>("all");
+  // Filtro de empresa con memoria (useLastUsed → fg_last_packing_empresa).
+  const [empresaFilter, setEmpresaFilter] = useLastUsed("packing_empresa", "all");
   const [saveMismatchWarning, setSaveMismatchWarning] = useState<{ numeroPL: string; pdfPiezas: number; dbPiezas: number }[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);

@@ -27,6 +27,7 @@ import {
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import { usePersistedScroll } from "@/lib/hooks/usePersistedState";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
+import { useLastUsed } from "@/lib/hooks/useLastUsed";
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -109,7 +110,9 @@ function AdminDashboardInner() {
     const ef = sessionStorage.getItem("fg_empresa_filter");
     if (ef) setEmpresaRestriction(ef);
   }, []);
-  const [companyFilter, setCompanyFilter] = useState<string>("all");
+  // Filtro de empresa con memoria (useLastUsed → fg_last_cxc_empresa). La
+  // restricción por usuario (abajo) sigue forzando el valor cuando existe.
+  const [companyFilter, setCompanyFilter] = useLastUsed("cxc_empresa", "all");
   // Force empresa filter when restriction exists
   useEffect(() => {
     if (empresaRestriction && companyFilter !== empresaRestriction) {
