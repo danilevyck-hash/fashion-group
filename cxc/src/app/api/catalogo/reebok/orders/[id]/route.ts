@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const { data, error } = await reebokServer
     .from("reebok_orders")
     .select(
-      "id, order_number, client_name, vendor_name, client_email, comment, total, created_at, updated_at, idempotency_key, status, origen_original, origen_short_id, reebok_order_items(id, order_id, product_id, sku, name, image_url, quantity, unit_price, created_at)",
+      "id, order_number, client_name, vendor_name, client_email, comment, total, created_at, updated_at, idempotency_key, status, origen_original, origen_short_id, reebok_order_items(id, order_id, product_id, sku, name, image_url, quantity, unit_price, created_at, is_preorder)",
     )
     .eq("id", params.id)
     .single();
