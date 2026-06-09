@@ -1,6 +1,7 @@
 "use client";
 
 import { fmt, fmtDate } from "@/lib/format";
+import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import { CajaPeriodo } from "./types";
 
 interface Props {
@@ -42,7 +43,7 @@ export default function PrintView({ current, onBack }: Props) {
       >
         <div className="flex items-center justify-center gap-3 mb-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.jpeg" alt="FG" className="w-9 h-9 rounded" />
+          <img src={FG_LOGO_BASE64} alt="FG" className="w-9 h-9 rounded" />
           <h1 className="text-lg font-bold uppercase tracking-wide">
             Reporte de Caja Menuda
           </h1>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { requireRole } from "@/lib/requireRole";
 import { filterEmpleadosMovimientos } from "@/lib/prestamos-helpers";
+import { fmtDate } from "@/lib/format";
 import XLSX from "xlsx-js-style";
 
 function addr(r: number, c: number) { return XLSX.utils.encode_cell({ r, c }); }
@@ -167,7 +168,7 @@ export async function GET(req: NextRequest) {
       const baseStyle = { font: { sz: 10, name: "Calibri" }, fill: { fgColor: { rgb: bg } }, border: B };
       wsMovs[addr(r, 0)] = { v: emp.nombre, t: "s", s: baseStyle };
       wsMovs[addr(r, 1)] = { v: emp.empresa || "", t: "s", s: baseStyle };
-      wsMovs[addr(r, 2)] = { v: m.fecha, t: "s", s: baseStyle };
+      wsMovs[addr(r, 2)] = { v: fmtDate(m.fecha.slice(0, 10)), t: "s", s: baseStyle };
       wsMovs[addr(r, 3)] = { v: m.concepto, t: "s", s: baseStyle };
       wsMovs[addr(r, 4)] = { v: Number(m.monto), t: "n", z: '"$"#,##0.00', s: { ...baseStyle, alignment: { horizontal: "right" } } };
       wsMovs[addr(r, 5)] = { v: m.notas || "", t: "s", s: baseStyle };

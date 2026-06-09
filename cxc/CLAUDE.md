@@ -121,9 +121,7 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 - **Dashboard feed:** "Acciones pendientes" con 8 fuentes de datos ordenadas por urgencia
 - **Daily summary:** resumen matutino 1x/día con bullets accionables
 - **Draft auto-save:** formularios de reclamos, guías, cheques se guardan cada 5s en localStorage
-- **Time grouping:** cheques y guías agrupados por "Hoy/Esta semana/Vencidos"
-- **Relative time:** SmartDate muestra "hace 2 horas", "ayer" con hover para fecha completa
-- **Contextual color:** tinte rojo/ámbar ambient cuando hay datos urgentes
+- **Time grouping:** cheques y guías agrupados por "Hoy/Esta semana/Vencidos"- **Contextual color:** tinte rojo/ámbar ambient cuando hay datos urgentes
 - **Inline previews:** último contacto, días para depósito, próxima deducción visibles sin expandir
 - **Hover preview:** cards ricas en CXC al hover 500ms sobre nombre de cliente
 - **URL state:** filtros persisten en URL (?risk=vencido&empresa=fashion_wear) — deep links y back/forward funcionan
@@ -148,17 +146,13 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 - **ContextMenuWrapper** — right-click menus en desktop
 - **UndoToast** — countdown bar 5s con "Deshacer"
 - **SuggestionCard** — 💡 sugerencias proactivas inline
-- **TimeGroupHeader** — headers colapsables por período de tiempo
-- **HoverPreview** — cards ricas en hover 500ms (desktop)
-- **OverflowMenu** — "···" dropdown para acciones secundarias
+- **TimeGroupHeader** — headers colapsables por período de tiempo- **OverflowMenu** — "···" dropdown para acciones secundarias
 - **ScrollableTable** — gradient indicators para scroll horizontal
 - **SwipeableRow** — swipe-to-action en mobile
 - **PullToRefresh** — pull down para refrescar en mobile
 - **BottomSheet** — half/full screen draggable (mobile)
 - **AccordionContent** — CSS grid expand/collapse animado
 - **AnimatedNumber** — count-up con easing
-- **SmartDate** — tiempo relativo con auto-update cada 60s
-
 ## Hooks (src/lib/hooks/)
 - **useAuth** — check role, user info
 - **useBadges** — notification badge counts

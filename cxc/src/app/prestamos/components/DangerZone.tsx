@@ -79,7 +79,7 @@ export default function DangerZone({
                 {/* Clear History */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="text-sm font-medium text-red-700">Borrar Todo el Historial</div>
+                    <div className="text-sm font-medium text-red-700">Eliminar Todo el Historial</div>
                     <div className="text-xs text-red-400">Elimina todos los movimientos pero mantiene al empleado</div>
                   </div>
                   <button
@@ -88,7 +88,7 @@ export default function DangerZone({
                     className="px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
                   >
                     <WarnIcon />
-                    Borrar Historial
+                    Eliminar Historial
                   </button>
                 </div>
 

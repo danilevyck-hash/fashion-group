@@ -1,4 +1,5 @@
 import { fmtDate, fmtGuia } from "@/lib/format";
+import { FG_LOGO_BASE64 } from "@/lib/pdf-logo";
 import type { Guia } from "./types";
 
 interface PrintDocumentProps {
@@ -42,7 +43,7 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
       >
         <div className="flex items-center justify-center gap-3 mb-6">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.jpeg" alt="FG" className="w-9 h-9 rounded" />
+          <img src={FG_LOGO_BASE64} alt="FG" className="w-9 h-9 rounded" />
           <h1 className="text-lg font-bold uppercase tracking-wide">
             Guia de Transporte Interior
           </h1>

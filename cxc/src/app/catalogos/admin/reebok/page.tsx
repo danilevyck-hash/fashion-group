@@ -863,7 +863,7 @@ function PedidosTab({
                           }}
                           className="px-2.5 py-1 rounded-md border border-red-200 text-xs text-red-600 hover:bg-red-50 transition"
                         >
-                          Borrar
+                          Eliminar
                         </button>
                       </div>
                     )}
@@ -879,13 +879,13 @@ function PedidosTab({
         open={!!deleting}
         onClose={() => !deleteLoading && setDeleting(null)}
         onConfirm={handleDelete}
-        title="¿Borrar pedido?"
+        title="¿Eliminar pedido?"
         message={
           deleting
-            ? `¿Borrar el pedido de ${deleting.cliente === "Sin nombre" ? "cliente sin nombre" : deleting.cliente} por $${fmtMoney(deleting.total)}? Esta acción no se puede deshacer.`
+            ? `¿Eliminar el pedido de ${deleting.cliente === "Sin nombre" ? "cliente sin nombre" : deleting.cliente} por $${fmtMoney(deleting.total)}? Esta acción no se puede deshacer.`
             : ""
         }
-        confirmLabel="Borrar pedido"
+        confirmLabel="Eliminar pedido"
         destructive
         loading={deleteLoading}
       />

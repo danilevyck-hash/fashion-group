@@ -88,7 +88,7 @@ export function ClearHistoryConfirm({ show, movCount, clearInput, clearProgress,
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={onClose}>
       <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4" onClick={e => e.stopPropagation()}>
-        <h2 className="font-medium mb-2 text-red-700">Borrar Todo el Historial</h2>
+        <h2 className="font-medium mb-2 text-red-700">Eliminar Todo el Historial</h2>
         {clearProgress ? (
           <p className="text-sm text-amber-600 font-medium py-4">{clearProgress}</p>
         ) : (
@@ -100,7 +100,7 @@ export function ClearHistoryConfirm({ show, movCount, clearInput, clearProgress,
             <div className="flex gap-3 mt-6">
               <button onClick={onClose} className="flex-1 py-2 border border-gray-200 rounded-md text-sm hover:border-gray-400 transition">Cancelar</button>
               <button onClick={onConfirm} disabled={clearInput !== "CONFIRMAR"} className="flex-1 py-2 bg-red-600 text-white rounded-md text-sm hover:bg-red-700 transition disabled:opacity-50">
-                Borrar Todo
+                Eliminar Todo
               </button>
             </div>
           </>
