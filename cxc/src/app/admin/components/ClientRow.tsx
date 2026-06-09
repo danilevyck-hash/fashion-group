@@ -2,6 +2,7 @@
 
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt } from "@/lib/format";
+import { AGING } from "@/lib/cxc-aging";
 
 function riskInfo(total: number, current: number, watch: number, overdue: number): { border: string; tooltip: string } {
   if (total < 0) return { border: "border-l-blue-400", tooltip: "Saldo a favor: saldo negativo (nota de credito o sobrepago)" };
@@ -45,11 +46,11 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, isFa
               {client.total < 0 ? (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Saldo a favor</span>
               ) : client.overdue > 0 ? (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">Vencido crítico</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">{AGING.overdue.label}</span>
               ) : client.watch > 0 ? (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Vencido reciente</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">{AGING.watch.label}</span>
               ) : (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">Por vencer</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">{AGING.current.label}</span>
               )}
               <span className="text-sm font-semibold tabular-nums">${fmt(client.total)}</span>
               {/* Expand chevron */}
