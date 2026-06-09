@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, Suspense, Fragment, 
 import { useSearchParams } from "next/navigation";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import AppHeader from "@/components/AppHeader";
-import { SkeletonTable, EmptyState, Toast, StatusBadge, ConfirmModal, Modal, AnimatedNumber, useContextMenu, PullToRefresh, SwipeableRow } from "@/components/ui";
+import { SkeletonTable, EmptyState, Toast, StatusBadge, ConfirmModal, ConfirmDeleteModal, Modal, AnimatedNumber, useContextMenu, PullToRefresh, SwipeableRow } from "@/components/ui";
 import type { ContextMenuItem, SwipeAction } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import Drawer from "@/components/Drawer";
@@ -1413,14 +1413,12 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         message={(() => { const c = cheques.find(x => x.id === confirmDepositId); return c ? `¿Depositar cheque N° ${c.numero_cheque} por $${fmt(c.monto)}?` : ""; })()}
         confirmLabel="Si, depositar"
       />
-      <ConfirmModal
+      <ConfirmDeleteModal
         open={!!confirmDeleteId}
-        onClose={() => setConfirmDeleteId(null)}
+        onCancel={() => setConfirmDeleteId(null)}
         onConfirm={() => { deleteCheque(confirmDeleteId!); setConfirmDeleteId(null); }}
         title="Eliminar cheque"
-        message="¿Seguro que deseas eliminar este cheque? Esta acción no se puede deshacer."
-        confirmLabel="Eliminar"
-        destructive
+        description={(() => { const c = cheques.find(x => x.id === confirmDeleteId); return c ? `¿Eliminar el cheque N° ${c.numero_cheque} por $${fmt(c.monto)}? Esta acción no se puede deshacer.` : "Esta acción no se puede deshacer."; })()}
       />
       <ConfirmModal
         open={!!confirmBatch}
