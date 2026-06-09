@@ -124,24 +124,34 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
               </div>
             </section>
 
-            {/* Datos fiscales */}
-            <section className="border border-gray-200 rounded-lg p-4 mb-4">
-              <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Datos · sincronizados de Switch</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-sm">
-                <Field label="RUC" value={data.identificacion} />
-                <Field label="DV" value={data.dv} tabularNums />
-                <Field label="Contacto" value={data.contacto} />
-                <Field label="Teléfono" value={data.telefono} href={telHref(data.telefono)} />
-                <Field label="Celular" value={data.celular} href={telHref(data.celular)} />
-                <Field label="Email" value={data.email} href={mailtoHref(data.email)} />
-                <Field label="Dirección" value={data.direccion} fullWidth />
-              </div>
-              {data.synced_at && (
-                <div className="text-[11px] text-gray-400 mt-3">
-                  Última sincronización: {fmtDate(data.synced_at.slice(0, 10))}
-                </div>
-              )}
-            </section>
+            {/* Datos fiscales — solo campos con dato real; si todos vacíos, no se muestra el bloque. */}
+            {(() => {
+              const campos: { label: string; value: string | null; tabularNums?: boolean; fullWidth?: boolean; href?: string | null }[] = [
+                { label: "RUC", value: data.identificacion },
+                { label: "DV", value: data.dv, tabularNums: true },
+                { label: "Contacto", value: data.contacto },
+                { label: "Teléfono", value: data.telefono, href: telHref(data.telefono) },
+                { label: "Celular", value: data.celular, href: telHref(data.celular) },
+                { label: "Email", value: data.email, href: mailtoHref(data.email) },
+                { label: "Dirección", value: data.direccion, fullWidth: true },
+              ].filter((c) => c.value != null && String(c.value).trim() !== "");
+              if (campos.length === 0) return null;
+              return (
+                <section className="border border-gray-200 rounded-lg p-4 mb-4">
+                  <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Datos · sincronizados de Switch</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-sm">
+                    {campos.map((c) => (
+                      <Field key={c.label} label={c.label} value={c.value} tabularNums={c.tabularNums} fullWidth={c.fullWidth} href={c.href} />
+                    ))}
+                  </div>
+                  {data.synced_at && (
+                    <div className="text-[11px] text-gray-400 mt-3">
+                      Última sincronización: {fmtDate(data.synced_at.slice(0, 10))}
+                    </div>
+                  )}
+                </section>
+              );
+            })()}
 
             {/* Historial por empresa */}
             <section className="border border-gray-200 rounded-lg p-4 mb-4">
