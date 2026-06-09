@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "rea
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
-import { ConfirmModal, PullToRefresh } from "@/components/ui";
+import { ConfirmDeleteModal, PullToRefresh } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import FreshnessChip from "@/components/FreshnessChip";
 import { useUndoAction } from "@/lib/hooks/useUndoAction";
@@ -307,14 +307,17 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const alertas = pendientes.filter((r) => daysSince(r.fecha_reclamo) > 45).length;
   // ── Confirm modal — always rendered (used by list + detail views) ──
   const deleteModal = (
-    <ConfirmModal
+    <ConfirmDeleteModal
       open={!!confirmDeleteId}
-      onClose={() => setConfirmDeleteId(null)}
+      onCancel={() => setConfirmDeleteId(null)}
       onConfirm={confirmDeleteReclamo}
-      title="Eliminar reclamo"
-      message="¿Seguro que deseas eliminar este reclamo? Esta acción no se puede deshacer."
-      confirmLabel="Eliminar"
-      destructive
+      title="¿Eliminar reclamo?"
+      description={(() => {
+        const r = reclamos.find((x) => x.id === confirmDeleteId);
+        return r
+          ? `Se eliminará el reclamo ${r.nro_reclamo} de ${r.empresa} (Factura: ${r.nro_factura || "—"}). Esta acción no se puede deshacer.`
+          : "Esta acción no se puede deshacer.";
+      })()}
     />
   );
 
