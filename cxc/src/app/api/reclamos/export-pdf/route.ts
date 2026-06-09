@@ -60,7 +60,7 @@ async function buildPdf(reclamos: Record<string, unknown>[]) {
   // Subtitle with date
   doc.setTextColor(100, 100, 100);
   doc.setFontSize(8);
-  doc.text(`Exportado el ${new Date().toLocaleDateString("es-HN")}`, 108, 26, { align: "center" });
+  doc.text(`Exportado el ${new Date().toLocaleDateString("es-PA")}`, 108, 26, { align: "center" });
 
   // Table data
   let grandTotal = 0;
@@ -164,7 +164,7 @@ async function buildPdf(reclamos: Record<string, unknown>[]) {
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setTextColor(150);
-    doc.text(`Generado el ${new Date().toLocaleDateString("es-HN")}`, 15, 270);
+    doc.text(`Generado el ${new Date().toLocaleDateString("es-PA")}`, 15, 270);
     doc.text(`Página ${i} de ${pageCount}`, 200, 270, { align: "right" });
   }
 
