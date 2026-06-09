@@ -8,8 +8,9 @@ import ContactPanel from "./ContactPanel";
 import { AccordionContent, useContextMenu, BottomSheet } from "@/components/ui";
 import type { ContextMenuItem } from "@/components/ui";
 import { usePersistedState } from "@/lib/hooks/usePersistedState";
+import { AGING, type AgingKey } from "@/lib/cxc-aging";
 
-type RiskFilter = "all" | "current" | "watch" | "overdue";
+type RiskFilter = "all" | AgingKey;
 type SortKey = "name" | "current" | "watch" | "overdue" | "total";
 type SortDir = "asc" | "desc";
 
@@ -185,9 +186,9 @@ export default function ClientTable({
                 <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Estado</div>
                 <div className="grid grid-cols-2 gap-2">
                   {filterBtn("all", "Todos", roleClients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600")}
-                  {filterBtn("current", "Por vencer", countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700")}
-                  {filterBtn("watch", "Vencido reciente", countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700")}
-                  {filterBtn("overdue", "Vencido crítico", countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700")}
+                  {filterBtn("current", AGING.current.label, countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700")}
+                  {filterBtn("watch", AGING.watch.label, countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700")}
+                  {filterBtn("overdue", AGING.overdue.label, countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700")}
                 </div>
               </div>
               {roleCompanies.length > 1 && (
@@ -219,9 +220,9 @@ export default function ClientTable({
           <div className="hidden sm:flex flex-row gap-3 mb-4">
             <div className="flex gap-1.5 flex-wrap">
               {filterBtn("all", "Todos", roleClients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600 hover:bg-gray-200")}
-              {filterBtn("current", "Por vencer", countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700 hover:bg-emerald-100")}
-              {filterBtn("watch", "Vencido reciente", countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700 hover:bg-amber-100")}
-              {filterBtn("overdue", "Vencido crítico", countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700 hover:bg-red-100")}
+              {filterBtn("current", AGING.current.label, countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700 hover:bg-emerald-100")}
+              {filterBtn("watch", AGING.watch.label, countWatch, "bg-amber-500 text-white", "bg-amber-50 text-amber-700 hover:bg-amber-100")}
+              {filterBtn("overdue", AGING.overdue.label, countOverdue, "bg-red-600 text-white", "bg-red-50 text-red-700 hover:bg-red-100")}
             </div>
             {roleCompanies.length > 1 && (
               <select

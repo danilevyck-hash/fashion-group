@@ -2,8 +2,17 @@
 
 import type { ConsolidatedClient } from "@/lib/types";
 import { fmt, fmtCompact } from "@/lib/format";
+import { AGING, AGING_ORDER, type AgingKey } from "@/lib/cxc-aging";
 
-type RiskFilter = "all" | "current" | "watch" | "overdue";
+type RiskFilter = "all" | AgingKey;
+
+// Borde del estado activo por tramo (no vive en cxc-aging: ese módulo expone
+// dot/text; el color del borde del pill activo es propio de este KPI).
+const ACTIVE_BORDER: Record<AgingKey, string> = {
+  current: "border-emerald-600",
+  watch: "border-amber-500",
+  overdue: "border-red-500",
+};
 
 interface Props {
   roleClients: ConsolidatedClient[];
@@ -20,11 +29,25 @@ export default function KpiCards({ roleClients, riskFilter, onRiskFilterChange }
   const watchClients = roleClients.filter((c) => c.watch > 0).length;
   const currentClients = roleClients.filter((c) => c.overdue === 0 && c.watch === 0).length;
 
+  const valueByKey: Record<AgingKey, { value: number; count: number }> = {
+    current: { value: totalCurrent, count: currentClients },
+    watch: { value: totalWatch, count: watchClients },
+    overdue: { value: totalOverdue, count: criticalClients },
+  };
+
+  // Labels, dot y color salen de cxc-aging (fuente única). El borde activo y la
+  // tarjeta "all" (Total Pendiente) son propios de este KPI.
   const cards: { key: RiskFilter; label: string; value: number; count: number; dot: string; color: string; activeColor: string }[] = [
     { key: "all", label: "Total Pendiente", value: totalCxc, count: roleClients.length, dot: "", color: "text-gray-900", activeColor: "border-gray-800" },
-    { key: "current", label: "Por vencer", value: totalCurrent, count: currentClients, dot: "bg-emerald-500", color: "text-emerald-700", activeColor: "border-emerald-600" },
-    { key: "watch", label: "Vencido reciente", value: totalWatch, count: watchClients, dot: "bg-amber-500", color: "text-amber-700", activeColor: "border-amber-500" },
-    { key: "overdue", label: "Vencido crítico", value: totalOverdue, count: criticalClients, dot: "bg-red-500", color: "text-red-700", activeColor: "border-red-500" },
+    ...AGING_ORDER.map((k) => ({
+      key: k,
+      label: AGING[k].label,
+      value: valueByKey[k].value,
+      count: valueByKey[k].count,
+      dot: AGING[k].dot,
+      color: AGING[k].text,
+      activeColor: ACTIVE_BORDER[k],
+    })),
   ];
 
   return (
