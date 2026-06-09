@@ -45,6 +45,7 @@ import { syncArticulosDiario } from "@/lib/switch-api/sync-articulos";
 import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 import { syncMultifashionTickets } from "@/lib/switch-api/sync";
 import { syncAllProveedores } from "@/lib/switch-api/sync-proveedores";
+import { runChequesAlert } from "@/lib/cheques-alert";
 import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
 import { sendTelegramAlert } from "@/lib/telegram";
 import { recordCronHeartbeat } from "@/lib/cron-telemetry";
@@ -169,6 +170,12 @@ interface ColateralCron {
   cronName: string;
   label: string;
   recover: () => Promise<{ ok: boolean; detail: string }>;
+  // Hora UTC mínima para recuperar (idempotencia de crons que corren TARDE en el
+  // día y/o disparan una alerta única). Si la pasada de reconciliación ocurre
+  // antes de esta hora, NO se recupera (el run normal del cron aún puede correr,
+  // y recuperarlo antes duplicaría la alerta). Sin valor = recuperable siempre
+  // (caso de los Switch syncs, que corren temprano: 05:30–09:30 UTC).
+  recoverAfterHourUtc?: number;
 }
 
 const COLATERAL_CRONS: ColateralCron[] = [
@@ -254,6 +261,21 @@ const COLATERAL_CRONS: ColateralCron[] = [
       };
     },
   },
+  {
+    // Alerta de cheques por vencer (Telegram). NO toca data (query + Telegram).
+    // Su cron corre 13:00 UTC → recoverAfterHourUtc=14 para NO recuperarlo antes
+    // de su hora normal (si no, la pasada de las 10:00 mandaría la alerta y luego
+    // el run de las 13:00 la duplicaría). Idempotente: solo se re-ejecuta si NO
+    // hubo success hoy → manda la alerta perdida UNA vez (las pasadas siguientes
+    // ven el heartbeat de hoy y lo saltan).
+    cronName: "cheques-alert",
+    label: "cheques-alert",
+    recoverAfterHourUtc: 14,
+    recover: async () => {
+      const r = await runChequesAlert();
+      return { ok: r.ok, detail: r.ok ? (r.count === 0 ? "sin cheques por vencer" : `${r.count} por vencer`) : r.detail };
+    },
+  },
 ];
 
 /** Heartbeats de los colaterales que NO tienen success de hoy (= se perdieron). */
@@ -272,7 +294,14 @@ async function findMissingColaterales(dayStartIso: string): Promise<ColateralCro
       .filter((h) => h.last_success_at && h.last_success_at >= dayStartIso)
       .map((h) => h.cron_name),
   );
-  return COLATERAL_CRONS.filter((c) => !successHoy.has(c.cronName));
+  // No recuperar un colateral antes de su hora programada (recoverAfterHourUtc):
+  // su run normal aún puede correr; recuperarlo antes duplicaría su alerta.
+  const nowHourUtc = new Date().getUTCHours();
+  return COLATERAL_CRONS.filter(
+    (c) =>
+      !successHoy.has(c.cronName) &&
+      (c.recoverAfterHourUtc === undefined || nowHourUtc >= c.recoverAfterHourUtc),
+  );
 }
 
 /**
