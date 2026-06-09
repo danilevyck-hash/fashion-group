@@ -6,6 +6,7 @@ import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { EMPRESAS } from "@/lib/companies";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { Toast, SkeletonTable, EmptyState, ConfirmModal, AnimatedNumber, BottomSheet } from "@/components/ui";
 import OverflowMenu from "@/components/ui/OverflowMenu";
 import UndoToast from "@/components/UndoToast";
@@ -84,7 +85,8 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
   const [toast, setToast] = useState<string | null>(null);
 
   // Filters
-  const [filterEmpresa, setFilterEmpresa] = useState("all");
+  // Filtro de empresa con memoria (useLastUsed → fg_last_prestamos_empresa).
+  const [filterEmpresa, setFilterEmpresa] = useLastUsed("prestamos_empresa", "all");
   const [showArchived, setShowArchived] = useState(false);
   const [search, setSearch] = useState("");
   const [filterPendientes, setFilterPendientes] = useState(false);

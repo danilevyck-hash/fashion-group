@@ -10,6 +10,7 @@
 // base=$0; los sin actividad se colapsan a una línea al pie.
 
 import { useCallback, useEffect, useState } from "react";
+import { useLastUsed } from "@/lib/hooks/useLastUsed";
 import { Card } from "@/components/ui/card";
 import { SkeletonTable } from "@/components/ui";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -27,7 +28,6 @@ const MESES = [
 
 // Joystep NO comisiona — fuera del selector de ESTE tab únicamente.
 const EMPRESAS = B2B_EMPRESA_KEYS.filter((k) => k !== "joystep");
-const LAST_EMPRESA_KEY = "fg_last_comision_empresa";
 
 interface ComisionVendedor {
   vendedor: string;
@@ -52,7 +52,9 @@ interface Props {
 }
 
 export function ComisionesPorEmpresaView({ year, mes }: Props) {
-  const [empresa, setEmpresa] = useState<string>(EMPRESAS[0]);
+  // Filtro de empresa con memoria — hook centralizado useLastUsed (igual que
+  // CXC, Préstamos y Packing). Key fg_last_comision_empresa (misma de antes).
+  const [empresa, setEmpresa] = useLastUsed("comision_empresa", EMPRESAS[0]);
   const [data, setData] = useState<ComisionResp | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,18 +63,13 @@ export function ComisionesPorEmpresaView({ year, mes }: Props) {
   const [savedMsg, setSavedMsg] = useState<string | null>(null);
   const [detalleVendedor, setDetalleVendedor] = useState<string | null>(null);
 
-  // Recuerda la última empresa seleccionada (smart default).
   useEffect(() => {
     const r = sessionStorage.getItem("cxc_role") || "";
     setCanConfig(r === "admin");
-    const saved = localStorage.getItem(LAST_EMPRESA_KEY);
-    if (saved && (EMPRESAS as readonly string[]).includes(saved)) setEmpresa(saved);
   }, []);
 
-  const handleEmpresa = (k: string) => {
-    setEmpresa(k);
-    localStorage.setItem(LAST_EMPRESA_KEY, k);
-  };
+  // useLastUsed ya persiste en localStorage al setear.
+  const handleEmpresa = (k: string) => setEmpresa(k);
 
   const load = useCallback(async () => {
     setLoading(true);
