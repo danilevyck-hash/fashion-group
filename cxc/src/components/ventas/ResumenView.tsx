@@ -11,6 +11,7 @@ import {
 } from "@/lib/empresa-mapping";
 import type {
   VentasResumen, Multifashion, ProyeccionResp, ProyeccionEmpresa, ProyeccionGrupo,
+  EmpresaMonthlySales,
 } from "./types";
 import { MONTHS, QUARTERS, fmtMoney, fmtMoneyCompact, fmtPct, kpiDeltaSymbol } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
@@ -262,6 +263,16 @@ export function ResumenView({
           sub={kpiMargenSub}
         />
       </div>
+
+      {/* Mes en curso vs el mismo mes del año anterior (suma del grupo). Solo
+          para año en curso. El mes en curso puede ir parcial → se rotula. */}
+      {!isClosedYear && data.mesActual >= 1 && (
+        <MesVsMesCard
+          empresas={data.empresas}
+          mesActual={data.mesActual}
+          year={selectedYear}
+        />
+      )}
       {/* Toolbar — sync pill (left) · controls (right). El meta "Mostrando
           mes a mes vs 2025" y la nota "Ajustado al día de corte (X may)" se
           quitaron por ruido: la tabla muestra las columnas del prev year
@@ -319,21 +330,23 @@ export function ResumenView({
       <Card className="overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse" style={{ minWidth: granularity === "mensual" ? 1100 : 700 }}>
+            {/* Cabecera fija al scrollear (sticky top). La esquina Empresa
+                queda sticky en ambos ejes (left+top) sobre el resto. */}
             <thead>
               <tr className="bg-stone-100 text-left">
-                <th className="sticky left-0 z-10 min-w-[180px] bg-stone-100 px-3.5 py-3.5 text-[11px] font-medium uppercase tracking-wider text-stone-500">
+                <th className="sticky left-0 top-0 z-30 min-w-[180px] bg-stone-100 px-3.5 py-3.5 text-[11px] font-medium uppercase tracking-wider text-stone-500">
                   Empresa
                 </th>
                 {cols.map(c => (
-                  <th key={c} className="px-2.5 py-3.5 text-right text-[11px] font-medium uppercase tracking-wider text-stone-500">
+                  <th key={c} className="sticky top-0 z-20 bg-stone-100 px-2.5 py-3.5 text-right text-[11px] font-medium uppercase tracking-wider text-stone-500">
                     {c}
                   </th>
                 ))}
-                <th className="px-3.5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-stone-950">Total</th>
+                <th className="sticky top-0 z-20 bg-stone-100 px-3.5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-stone-950">Total</th>
                 {/* Columna "Proyección": sólo años en curso con data de
                     proyección disponible (no aplica a años cerrados). */}
                 {showProyeccionCol && (
-                  <th className="px-3.5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-stone-950">Proyección</th>
+                  <th className="sticky top-0 z-20 bg-stone-100 px-3.5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-stone-950">Proyección</th>
                 )}
               </tr>
             </thead>
@@ -428,6 +441,38 @@ export function ResumenView({
 
       </div>
     </div>
+  );
+}
+
+/** Tarjeta "mes en curso vs mismo mes del año anterior" (suma del grupo).
+ *  Suma ventas2026/ventas2025 de todas las empresas en el índice del mes actual.
+ *  El mes en curso puede ir parcial → se rotula "(en curso)" para no confundir. */
+function MesVsMesCard({
+  empresas, mesActual, year,
+}: { empresas: EmpresaMonthlySales[]; mesActual: number; year: number }) {
+  const idx = mesActual - 1;
+  const curr = empresas.reduce((s, e) => s + (e.ventas2026?.[idx] ?? 0), 0);
+  const prev = empresas.reduce((s, e) => s + (e.ventas2025?.[idx] ?? 0), 0);
+  const delta = prev > 0 ? (curr - prev) / prev : null;
+  const up = (delta ?? 0) >= 0;
+  const mes = MONTHS[idx] ?? "";
+  return (
+    <Card className="border-stone-200 bg-white p-4">
+      <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">
+        {mes} {year} <span className="text-stone-400">(en curso)</span> vs {mes} {year - 1}
+      </p>
+      <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="font-mono text-[26px] font-medium leading-tight tracking-tight tabular-nums text-stone-950">{fmtMoney(curr)}</span>
+        {delta !== null && (
+          <span className={cn("font-mono text-sm font-medium tabular-nums", up ? "text-emerald-700" : "text-rose-600")}>
+            {up ? "▲" : "▼"} {Math.abs(delta * 100).toFixed(0)}%
+          </span>
+        )}
+      </div>
+      <p className="mt-1.5 text-xs text-stone-500">
+        vs <span className="font-mono tabular-nums">{fmtMoney(prev)}</span> en {mes} {year - 1}
+      </p>
+    </Card>
   );
 }
 
