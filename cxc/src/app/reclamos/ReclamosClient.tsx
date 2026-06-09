@@ -302,7 +302,11 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     setEditSaving(false);
   }
 
-  const pendientes = reclamos.filter((r) => r.estado !== "Pagado");
+  // "Pendiente" = reclamo en vuelo con el proveedor = estado "Enviado" (ni Borrador
+  // ni Pagado). Antes era `!== "Pagado"`, que incluía Borradores no enviados e
+  // inflaba el total, el conteo de abiertos y las alertas. (La lista completa se
+  // sigue mostrando desde `reclamos`, así que los borradores siguen visibles/editables.)
+  const pendientes = reclamos.filter((r) => r.estado === "Enviado");
   const totalPendiente = pendientes.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
   const alertas = pendientes.filter((r) => daysSince(r.fecha_reclamo) > 45).length;
   // ── Confirm modal — always rendered (used by list + detail views) ──
@@ -371,6 +375,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
           onNewReclamo={() => { resetForm(); setFEmpresa(activeEmpresa); setView("form"); }}
           onLoadDetail={(id) => { setView("detail", id); loadDetail(id); }}
           onDeleteReclamo={(id) => requestDeleteReclamo(id)}
+          onReload={loadReclamos}
         />
         {deleteModal}
       </PullToRefresh>
