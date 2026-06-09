@@ -117,6 +117,7 @@ export function ComisionesConsolidadoView({ year, mes }: Props) {
   const hasActivity = (r: Row) => r.total !== 0 || r.sumBase !== 0 || r.sumBaseCobro !== 0;
   const activos = useMemo(() => (rows ?? []).filter(hasActivity), [rows]);
   const inactivos = useMemo(() => (rows ?? []).filter((r) => !hasActivity(r)), [rows]);
+  const [showInactivos, setShowInactivos] = useState(false);
 
   // Totales por columna (incluye "Sin asignar"; los inactivos suman 0).
   const allShown = useMemo(
@@ -221,11 +222,22 @@ export function ComisionesConsolidadoView({ year, mes }: Props) {
                 )}
                 {inactivos.length > 0 && (
                   <tr className="border-b border-gray-100 last:border-0">
-                    <td colSpan={EMPRESAS.length + 2} className="px-4 py-2 text-center text-xs italic text-gray-400">
-                      {inactivos.length} {inactivos.length === 1 ? "vendedor" : "vendedores"} sin actividad este mes
+                    <td colSpan={EMPRESAS.length + 2} className="px-4 py-1.5">
+                      <button
+                        onClick={() => setShowInactivos((v) => !v)}
+                        className="text-xs italic text-gray-400 transition hover:text-gray-600"
+                      >
+                        {showInactivos ? "▾" : "▸"} {inactivos.length} {inactivos.length === 1 ? "vendedor" : "vendedores"} sin actividad este mes
+                      </button>
                     </td>
                   </tr>
                 )}
+                {showInactivos && inactivos.map((r) => (
+                  <tr key={r.vendedor} className="border-b border-gray-100 text-gray-400 last:border-0 transition hover:bg-gray-50">
+                    <td className="whitespace-nowrap px-4 py-2.5">{r.vendedor}</td>
+                    {renderCells(r, false)}
+                  </tr>
+                ))}
               </tbody>
               <tfoot>
                 <tr className="border-t border-gray-200 bg-gray-50 font-medium text-gray-900">
