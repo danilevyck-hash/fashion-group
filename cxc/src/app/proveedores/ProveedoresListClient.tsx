@@ -29,6 +29,7 @@ export default function ProveedoresListClient() {
   const [empresa, setEmpresa] = useState<string>(""); // "" = Todas
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showSinSaldo, setShowSinSaldo] = useState(false);
 
   const fetchList = useCallback(async (emp: string, query: string) => {
     setLoading(true);
@@ -55,6 +56,43 @@ export default function ProveedoresListClient() {
   if (!authChecked) return null;
 
   const goFicha = (key: string) => router.push(`/proveedores/${encodeURIComponent(key)}`);
+
+  // Proveedores sin saldo (por pagar = $0) se colapsan bajo un toggle; los que
+  // tienen saldo (incluido "a favor" negativo) siempre se muestran.
+  const conSaldo = items.filter((it) => Math.abs(it.saldo_total) >= 0.005);
+  const sinSaldo = items.filter((it) => Math.abs(it.saldo_total) < 0.005);
+  const colsCount = empresa ? 3 : 4;
+
+  const renderRow = (it: ListItem) => (
+    <tr
+      key={it.key}
+      onClick={() => goFicha(it.key)}
+      className="border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer"
+    >
+      <td className="py-2 px-3 font-medium">{it.nombre}</td>
+      <td className="py-2 px-3 text-right tabular-nums text-gray-600">${fmt(it.comprado_ytd)}</td>
+      <SaldoCell value={it.saldo_total} />
+      {!empresa && <td className="py-2 px-3 text-right tabular-nums text-gray-400">{it.empresas_count}</td>}
+    </tr>
+  );
+
+  const renderCard = (it: ListItem) => (
+    <li
+      key={it.key}
+      onClick={() => goFicha(it.key)}
+      className="border-b border-gray-100 px-1 py-3 active:bg-gray-50 cursor-pointer"
+    >
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="font-medium truncate">{it.nombre}</span>
+        <span className={`shrink-0 text-sm font-medium tabular-nums ${it.saldo_total < 0 ? "text-blue-600" : it.saldo_total > 0 ? "text-purple-700" : "text-gray-400"}`}>
+          {it.saldo_total < 0 ? `+$${fmt(Math.abs(it.saldo_total))}` : `$${fmt(it.saldo_total)}`}
+        </span>
+      </div>
+      <div className="mt-0.5 text-xs text-gray-500 tabular-nums">
+        Comprado YTD ${fmt(it.comprado_ytd)}{!empresa && it.empresas_count > 1 ? ` · ${it.empresas_count} empresas` : ""}
+      </div>
+    </li>
+  );
 
   return (
     <div className="min-h-screen bg-white">
@@ -104,7 +142,7 @@ export default function ProveedoresListClient() {
           ) : (
             <>
               <div className="text-xs text-gray-500 mb-2 tabular-nums">
-                {items.length} {items.length === 1 ? "proveedor" : "proveedores"} · ordenados por saldo
+                {conSaldo.length} {conSaldo.length === 1 ? "proveedor con saldo" : "proveedores con saldo"} · ordenados por monto
               </div>
 
               {/* Desktop */}
@@ -120,18 +158,20 @@ export default function ProveedoresListClient() {
                       </tr>
                     </thead>
                     <tbody>
-                      {items.map((it) => (
-                        <tr
-                          key={it.key}
-                          onClick={() => goFicha(it.key)}
-                          className="border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer"
-                        >
-                          <td className="py-2 px-3 font-medium">{it.nombre}</td>
-                          <td className="py-2 px-3 text-right tabular-nums text-gray-600">${fmt(it.comprado_ytd)}</td>
-                          <SaldoCell value={it.saldo_total} />
-                          {!empresa && <td className="py-2 px-3 text-right tabular-nums text-gray-400">{it.empresas_count}</td>}
+                      {conSaldo.map(renderRow)}
+                      {sinSaldo.length > 0 && (
+                        <tr className="border-b border-gray-100">
+                          <td colSpan={colsCount} className="py-1">
+                            <button
+                              onClick={() => setShowSinSaldo((v) => !v)}
+                              className="text-[11px] text-gray-400 hover:text-gray-600 transition"
+                            >
+                              {showSinSaldo ? "▾" : "▸"} Ver {sinSaldo.length} sin saldo
+                            </button>
+                          </td>
                         </tr>
-                      ))}
+                      )}
+                      {showSinSaldo && sinSaldo.map(renderRow)}
                     </tbody>
                   </table>
                 </ScrollableTable>
@@ -139,23 +179,18 @@ export default function ProveedoresListClient() {
 
               {/* Mobile */}
               <ul className="sm:hidden border-t border-gray-100">
-                {items.map((it) => (
-                  <li
-                    key={it.key}
-                    onClick={() => goFicha(it.key)}
-                    className="border-b border-gray-100 px-1 py-3 active:bg-gray-50 cursor-pointer"
-                  >
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="font-medium truncate">{it.nombre}</span>
-                      <span className={`shrink-0 text-sm font-medium tabular-nums ${it.saldo_total < 0 ? "text-blue-600" : it.saldo_total > 0 ? "text-purple-700" : "text-gray-400"}`}>
-                        {it.saldo_total < 0 ? `+$${fmt(Math.abs(it.saldo_total))}` : `$${fmt(it.saldo_total)}`}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 text-xs text-gray-500 tabular-nums">
-                      Comprado YTD ${fmt(it.comprado_ytd)}{!empresa && it.empresas_count > 1 ? ` · ${it.empresas_count} empresas` : ""}
-                    </div>
+                {conSaldo.map(renderCard)}
+                {sinSaldo.length > 0 && (
+                  <li className="px-1 py-2">
+                    <button
+                      onClick={() => setShowSinSaldo((v) => !v)}
+                      className="text-[11px] text-gray-400 hover:text-gray-600 transition"
+                    >
+                      {showSinSaldo ? "▾" : "▸"} Ver {sinSaldo.length} sin saldo
+                    </button>
                   </li>
-                ))}
+                )}
+                {showSinSaldo && sinSaldo.map(renderCard)}
               </ul>
             </>
           )}
