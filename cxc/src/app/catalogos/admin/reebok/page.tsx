@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useState, useCallback, useRef, Suspense } from "react";
+import useSWR from "swr";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
@@ -131,6 +132,24 @@ function parseCSV(text: string): Record<string, string>[] {
   return rows;
 }
 
+// ── SWR (Fase 2b) ───────────────────────────────────────────────────────────
+// Mismas opciones que el piloto CXC (#115): dedupe 60s + revalidateOnFocus por
+// hook (keepPreviousData se hereda del SWRProvider del layout).
+const REEBOK_SWR_OPTS = { dedupingInterval: 60_000, revalidateOnFocus: true } as const;
+
+// Fetcher tolerante: en error devuelve [] (no lanza) para conservar el manejo
+// silencioso del fetch-on-mount original — listas vacías, sin UI de error.
+async function fetchList<T>(url: string): Promise<T[]> {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function ReebokAdminPage() {
@@ -150,10 +169,6 @@ function ReebokAdminInner() {
   });
 
   const [tab, setTab] = useUrlState<Tab>("tab", "productos");
-  const [products, setProducts] = useState<ReebokProduct[]>([]);
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [pedidos, setPedidos] = useState<UnifiedPedido[]>([]);
-  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = useCallback((msg: string) => {
@@ -161,44 +176,51 @@ function ReebokAdminInner() {
     setTimeout(() => setToast(null), 3000);
   }, []);
 
+  // ── 3 listas vía useSWR (receta del piloto CXC #115): caché en memoria entre
+  // navegaciones (SWRProvider), dedupe 60s + revalidateOnFocus por-hook. Clave
+  // null hasta authChecked → no se pega a /api/catalogo/reebok/* pre-auth.
+  // Fetcher tolerante (silencioso → [] en error) para conservar el
+  // comportamiento actual: sin UI de error nueva. ──
+  const { data: productsData, isLoading: productsLoading, mutate: mutateProducts } = useSWR<ReebokProduct[]>(
+    authChecked ? "reebok-products" : null,
+    () => fetchList<ReebokProduct>("/api/catalogo/reebok/products"),
+    REEBOK_SWR_OPTS,
+  );
+  const { data: inventoryData, isLoading: inventoryLoading, mutate: mutateInventory } = useSWR<InventoryItem[]>(
+    authChecked ? "reebok-inventory" : null,
+    () => fetchList<InventoryItem>("/api/catalogo/reebok/inventory"),
+    REEBOK_SWR_OPTS,
+  );
+  const { data: pedidosData, isLoading: pedidosLoading, mutate: mutatePedidos } = useSWR<UnifiedPedido[]>(
+    authChecked ? "reebok-pedidos" : null,
+    () => fetchList<UnifiedPedido>("/api/catalogo/reebok/pedidos-unificado"),
+    REEBOK_SWR_OPTS,
+  );
+
+  const products = productsData ?? [];
+  const inventory = inventoryData ?? [];
+  const pedidos = pedidosData ?? [];
+  // Solo spinner en el primer arranque (sin dato aún); al volver, la caché SWR
+  // ya tiene las listas → sin spinner.
+  const loading =
+    (productsLoading && !productsData) ||
+    (inventoryLoading && !inventoryData) ||
+    (pedidosLoading && !pedidosData);
+
   const getStock = useCallback((productId: string) => {
     return inventory
       .filter((i) => i.product_id === productId)
       .reduce((sum, i) => sum + i.quantity, 0);
   }, [inventory]);
 
+  // Refetch tras mutación → revalidación SWR (mutate). Mismas firmas que antes,
+  // así los hijos (onProductsChanged / onRefresh / onImportComplete) no cambian.
   const loadProducts = useCallback(async () => {
-    try {
-      const [pRes, iRes] = await Promise.all([
-        fetch("/api/catalogo/reebok/products"),
-        fetch("/api/catalogo/reebok/inventory"),
-      ]);
-      if (pRes.ok) {
-        const data = await pRes.json();
-        setProducts(Array.isArray(data) ? data : []);
-      }
-      if (iRes.ok) {
-        const data = await iRes.json();
-        setInventory(Array.isArray(data) ? data : []);
-      }
-    } catch { /* ignore */ }
-  }, []);
-
+    await Promise.all([mutateProducts(), mutateInventory()]);
+  }, [mutateProducts, mutateInventory]);
   const loadPedidos = useCallback(async () => {
-    try {
-      const res = await fetch("/api/catalogo/reebok/pedidos-unificado");
-      if (res.ok) {
-        const data = await res.json();
-        setPedidos(Array.isArray(data) ? data : []);
-      }
-    } catch { /* ignore */ }
-  }, []);
-
-  useEffect(() => {
-    if (!authChecked) return;
-    setLoading(true);
-    Promise.all([loadProducts(), loadPedidos()]).finally(() => setLoading(false));
-  }, [authChecked, loadProducts, loadPedidos]);
+    await mutatePedidos();
+  }, [mutatePedidos]);
 
   if (!authChecked) return null;
 
