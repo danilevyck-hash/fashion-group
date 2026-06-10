@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "react";
+import useSWR from "swr";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
@@ -24,6 +25,27 @@ import ReclamoForm from "./components/ReclamoForm";
 import ReclamoDetail from "./components/ReclamoDetail";
 import SettlementModal, { SettlementInput } from "./components/SettlementModal";
 
+// Clave de caché SWR del listado de Reclamos (Fase 3, mismo patrón que el piloto
+// CXC #115). La caché vive a nivel de la app (SWRProvider) y persiste entre
+// navegaciones → volver a Reclamos pinta al instante el dato cacheado y revalida
+// en background (cero flash), en vez del re-fetch desde cero del fetch-on-mount.
+const SWR_KEY = "reclamos-list";
+
+interface FetchError extends Error { status?: number }
+
+/** Fetcher puro del listado (misma llamada que tenía loadReclamos). */
+async function fetchReclamos(): Promise<Reclamo[]> {
+  const res = await fetch("/api/reclamos");
+  if (res.status === 401) {
+    const e: FetchError = new Error("401");
+    e.status = 401;
+    throw e;
+  }
+  if (!res.ok) throw new Error("Error al cargar reclamos");
+  const d = await res.json();
+  return Array.isArray(d) ? d : [];
+}
+
 export default function ReclamosClient({ initialData }: { initialData: ReclamosInitialData }) {
   return <Suspense><ReclamosPage initialData={initialData} /></Suspense>;
 }
@@ -35,8 +57,6 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const { authChecked, role } = useAuth({ moduleKey: "reclamos", allowedRoles: ["admin", "secretaria"] });
   const [view, _setView] = useState<RView>((searchParams.get("view") as RView) || "list");
   const [urlId] = useState(searchParams.get("id") || "");
-  const [reclamos, setReclamos] = useState<Reclamo[]>(initialData.reclamos);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Modo viaje: timestamp del snapshot mostrado + si vino del cache (offline).
   const [dataTs, setDataTs] = useState<number | null>(null);
@@ -73,6 +93,44 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [editNotas, setEditNotas] = useState(""); const [editEstado, setEditEstado] = useState("");
   const [editItems, setEditItems] = useState<RItem[]>([]); const [editSaving, setEditSaving] = useState(false);
   const [contactos, setContactos] = useState<Contacto[]>(initialData.contactos); const [toast, setToast] = useState<string | null>(null);
+
+  // Listado vía SWR (Fase 3, receta del piloto CXC #115). initialData.reclamos
+  // del SSR entra como fallbackData → primer paint instantáneo del server, luego
+  // SWR revalida en cliente. Clave condicional por auth (null hasta authChecked):
+  // no pega a /api/reclamos antes de confirmar rol. dedupingInterval 60s evita
+  // refetch redundante en re-navegaciones rápidas; onSuccess persiste el snapshot
+  // de Modo viaje (NO se toca la key de offlineCache). keepPreviousData (global,
+  // SWRProvider) mantiene en pantalla el último dato al revalidar (cero flash).
+  const { data: reclamosData, isLoading: reclamosLoading, mutate: mutateReclamos } = useSWR<Reclamo[]>(
+    authChecked ? SWR_KEY : null,
+    fetchReclamos,
+    {
+      fallbackData: initialData.reclamos,
+      dedupingInterval: 60_000,
+      revalidateOnFocus: true,
+      onSuccess: (arr) => {
+        persistentCacheSet(CACHE_KEYS.RECLAMOS, arr);
+        setDataTs(Date.now());
+        setFromCache(false);
+      },
+      onError: (err: FetchError) => {
+        // 401 mid-sesión: limpiar y volver al login (igual que el loadReclamos viejo).
+        if (err?.status === 401) { sessionStorage.clear(); router.push("/"); return; }
+        // Sin red: keepPreviousData ya mantiene el último dato; marcar que es
+        // stale para el chip de frescura (Modo viaje) y avisar.
+        const cached = persistentCacheGet<Reclamo[]>(CACHE_KEYS.RECLAMOS);
+        if (cached) setDataTs(cached.ts);
+        setFromCache(true);
+        setToast("Sin conexión. Mostrando datos guardados."); setTimeout(() => setToast(null), 3000);
+      },
+    },
+  );
+  const reclamos = reclamosData ?? [];
+  const loading = reclamosLoading; // con fallbackData hay dato → false; sin flash al revalidar
+  // loadReclamos → revalidación forzada (mutate). Mismo nombre para no tocar los
+  // call-sites (PullToRefresh, onReload, onViewSaved, y los post-escritura).
+  const loadReclamos = useCallback(async () => { await mutateReclamos(); }, [mutateReclamos]);
+
   const { pendingUndo: pendingUndoReclamo, scheduleAction: scheduleUndoReclamo, undoAction: undoActionReclamo } = useUndoAction();
   const [customMotivos, setCustomMotivos] = useState<string[]>(initialData.customMotivos);
   const [addingMotivo, setAddingMotivo] = useState<number | null>(null);
@@ -152,34 +210,6 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     return () => window.removeEventListener("popstate", onPopState);
   }, [loadDetail]);
 
-  const loadReclamos = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/reclamos");
-      if (res.status === 401) { sessionStorage.clear(); router.push("/"); return; }
-      if (res.ok) {
-        const d = await res.json();
-        const arr = Array.isArray(d) ? d : [];
-        setReclamos(arr);
-        // Snapshot persistente para lectura offline (modo viaje).
-        persistentCacheSet(CACHE_KEYS.RECLAMOS, arr);
-        setDataTs(Date.now());
-        setFromCache(false);
-      }
-    } catch {
-      // Sin red: mostrar el último snapshot guardado en vez de solo el toast.
-      const cached = persistentCacheGet<Reclamo[]>(CACHE_KEYS.RECLAMOS);
-      if (cached) {
-        setReclamos(cached.data);
-        setDataTs(cached.ts);
-        setFromCache(true);
-      }
-      setToast("Sin conexión. Mostrando datos guardados.");
-      setTimeout(() => setToast(null), 3000);
-    }
-    setLoading(false);
-  }, [router]);
-
   const loadContactos = useCallback(async () => {
     try { const res = await fetch("/api/reclamos/contactos"); if (res.ok) setContactos(await res.json()); } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
   }, []);
@@ -212,10 +242,11 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
       initialLoadListRef.current = false;
       return;
     }
-    loadReclamos();
+    // El listado lo revalida SWR solo al activarse la clave (authChecked) — sin
+    // loadReclamos() redundante aquí. contactos/motivos siguen su carga propia.
     loadContactos();
     fetchCustomMotivos().then(setCustomMotivos);
-  }, [authChecked, loadReclamos, loadContactos]);
+  }, [authChecked, loadContactos]);
 
   if (!authChecked) return null;
 
@@ -293,7 +324,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setToast(data?.error || "No se pudo guardar la nota de crédito."); setTimeout(() => setToast(null), 5000); return; }
-      await loadDetail(current.id);
+      await loadDetail(current.id); loadReclamos();
       setToast("Nota de crédito agregada"); setTimeout(() => setToast(null), 3000);
     } catch { setToast("Error de conexión. Intenta de nuevo."); setTimeout(() => setToast(null), 5000); }
   }
@@ -303,7 +334,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     try {
       const res = await fetch(`/api/reclamos/${current.id}/settlements?sid=${sid}`, { method: "DELETE" });
       if (!res.ok) { setToast("No se pudo eliminar la nota de crédito."); setTimeout(() => setToast(null), 3000); return; }
-      await loadDetail(current.id);
+      await loadDetail(current.id); loadReclamos();
       setToast("Nota de crédito eliminada"); setTimeout(() => setToast(null), 3000);
     } catch { setToast("Error de conexión. Intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
   }
