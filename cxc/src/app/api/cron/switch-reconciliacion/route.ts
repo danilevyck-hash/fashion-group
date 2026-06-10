@@ -298,15 +298,19 @@ const COLATERAL_CRONS: ColateralCron[] = [
     },
   },
   {
-    // Refresh de la materialized view clientes_empresa_12m_vw (tab Clientes de
-    // Ventas). Idempotente: REFRESH ... CONCURRENTLY recomputa la misma vista, no
-    // duplica nada. No dispara alerta y corre temprano (06:30 UTC) → sin guard de
-    // hora. Una sola RPC, ligera.
+    // Refresh de las MVs de Ventas: clientes_empresa_12m_vw (tab Clientes) +
+    // ventas_rollup_mensual_mv (rollup mensual del dashboard). Idempotente:
+    // REFRESH ... CONCURRENTLY recomputa las mismas vistas, no duplica nada. No
+    // dispara alerta y corre temprano (06:30 UTC) → sin guard de hora. Ambas RPC
+    // ligeras; falla si cualquiera falla.
     cronName: "refresh-clientes-views",
     label: "refresh-clientes-views",
     recover: async () => {
-      const { error } = await supabaseServer.rpc("refresh_clientes_empresa_12m_vw");
-      return { ok: !error, detail: error ? error.message : "vista refrescada" };
+      const { error: e1 } = await supabaseServer.rpc("refresh_clientes_empresa_12m_vw");
+      if (e1) return { ok: false, detail: `clientes_12m: ${e1.message}` };
+      const { error: e2 } = await supabaseServer.rpc("refresh_ventas_rollup_mensual_mv");
+      if (e2) return { ok: false, detail: `ventas_rollup: ${e2.message}` };
+      return { ok: true, detail: "vistas refrescadas (clientes_12m + ventas_rollup)" };
     },
   },
   {
