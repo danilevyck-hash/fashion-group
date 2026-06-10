@@ -1,22 +1,22 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Cron: REFRESH MATERIALIZED VIEW CONCURRENTLY clientes_empresa_12m_vw
-//
-// Propósito de la materialized view:
-//   Alimenta la tab Clientes del módulo Ventas — agrega por (cliente, empresa)
-//   las compras de los últimos 12 meses, YTD del año actual y año anterior.
-//   Sin refresh, las facturas nuevas no aparecen en la lista.
+// Cron: REFRESH MATERIALIZED VIEW CONCURRENTLY de las vistas de /ventas
+//   1) clientes_empresa_12m_vw  — tab Clientes (compras 12m + YTD por cliente).
+//   2) ventas_rollup_mensual_mv — rollup mensual empresa x mes (ventas + costo)
+//      que sirve el histórico de los 3 RPC del dashboard (Tier 2 perf). Los
+//      meses cerrados salen de aquí; el mes en curso lo lee el RPC en vivo, así
+//      que este refresh nocturno NO le quita frescura al mes corriente.
 //
 // CONCURRENTLY:
-//   No bloquea lecturas durante el refresh. El UNIQUE INDEX
-//   (cliente_norm, empresa) creado en migration 20260510040000 es prerequisito.
+//   No bloquea lecturas durante el refresh. Cada MV tiene su UNIQUE INDEX
+//   (clientes: (cliente_norm, empresa); rollup: (empresa_key, mes)).
 //
 // Wrapper RPC:
-//   supabase-js no expone SQL raw — el REFRESH se invoca via la función SQL
-//   refresh_clientes_empresa_12m_vw() (migration 20260510080000), que ejecuta
-//   el REFRESH con SECURITY DEFINER.
+//   supabase-js no expone SQL raw — cada REFRESH se invoca via su función SQL
+//   SECURITY DEFINER (refresh_clientes_empresa_12m_vw / refresh_ventas_rollup_mensual_mv).
 //
 // Schedule: 5:00 UTC = 12:00 AM Panamá — ventana de baja actividad, antes
 // del jornada laboral. Backup ya ocupa 6:00 UTC; este cron evita contention.
+// No llama al API de Switch (lee tablas ya sincronizadas) → single-token N/A.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
@@ -72,6 +72,35 @@ export async function GET(req: NextRequest) {
     await logCronError("refresh_clientes_views_failed", error.message);
     return NextResponse.json(
       { ok: false, error: error.message, durationMs, refreshedAt: startedAtIso },
+      { status: 500 }
+    );
+  }
+
+  // 2) Rollup mensual de /ventas. Mismo patrón: REFRESH CONCURRENTLY via RPC
+  //    SECURITY DEFINER. Si falla, persistir + 500 (no registramos heartbeat:
+  //    el cron solo está "sano" si ambas vistas refrescaron).
+  const { error: rollupError } = await supabaseServer.rpc("refresh_ventas_rollup_mensual_mv");
+
+  if (rollupError) {
+    const durationMs = Date.now() - startedAt;
+    console.error(`[cron/refresh-clientes-views] rollup failed after ${durationMs}ms:`, rollupError.message);
+    try {
+      const { error: logErr } = await supabaseServer
+        .from("cron_email_errors")
+        .insert({
+          tipo: "refresh_ventas_rollup_mv",
+          cheque_context: null,
+          error_message: rollupError.message,
+        });
+      if (logErr) {
+        console.error("[cron/refresh-clientes-views] cron_email_errors insert failed:", logErr.message);
+      }
+    } catch (logErr) {
+      console.error("[cron/refresh-clientes-views] cron_email_errors insert threw:", logErr);
+    }
+    await logCronError("refresh_ventas_rollup_mv_failed", rollupError.message);
+    return NextResponse.json(
+      { ok: false, error: rollupError.message, durationMs, refreshedAt: startedAtIso },
       { status: 500 }
     );
   }
