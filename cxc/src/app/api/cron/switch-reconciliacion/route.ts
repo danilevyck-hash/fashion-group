@@ -54,6 +54,10 @@ import type { EmpresaKey } from "@/lib/empresa-mapping";
 const CRON_NAME = "switch-reconciliacion";
 // Watchdog: alerta si algún cron lleva más de 30h sin registrar success.
 const WATCHDOG_STALE_HOURS = 30;
+// Horas UTC de las pasadas de reconciliación (espejo de vercel.json). El watchdog
+// las usa para saber si un colateral stale TODAVÍA tiene una pasada de
+// recuperación hoy → si la tiene, no alerta (se va a auto-recuperar).
+const RECONCILIACION_PASS_HOURS = [10, 14, 18];
 
 export const dynamic = "force-dynamic";
 // El App Router cachea fetch() por defecto (Data Cache) — incluye los fetch
@@ -308,6 +312,22 @@ async function findMissingColaterales(dayStartIso: string): Promise<ColateralCro
  * Watchdog de heartbeats: revisa cron_heartbeats y alerta por Telegram si algún
  * cron lleva más de WATCHDOG_STALE_HOURS sin un success. No lanza.
  */
+// ¿este cron stale TODAVÍA se va a auto-recuperar hoy? → no alertar (alerta
+// fantasma). Solo aplica a colaterales (los que la reconciliación recupera). Un
+// colateral se recupera en las pasadas cuya hora >= recoverAfterHourUtc; si aún
+// queda alguna pasada elegible hoy (ahora o más tarde), la recuperación está por
+// venir → silenciar. Si su fallo es real, el alert de failedColaterales/skipped
+// de la propia reconciliación lo reporta (mensaje preciso, no fantasma). Los
+// crons SIN recuperación (no colaterales) nunca se silencian → alerta normal.
+function autoRecoveryStillComingToday(cronName: string, nowHourUtc: number): boolean {
+  const col = COLATERAL_CRONS.find((c) => c.cronName === cronName);
+  if (!col) return false; // sin recuperación → alertar normal
+  const after = col.recoverAfterHourUtc ?? 0;
+  const eligible = RECONCILIACION_PASS_HOURS.filter((p) => p >= after);
+  if (eligible.length === 0) return false; // nunca elegible hoy → alertar
+  return Math.max(...eligible) >= nowHourUtc; // queda una pasada hoy → silenciar
+}
+
 async function checkStaleCrons(): Promise<string[]> {
   const { data, error } = await supabaseServer
     .from("cron_heartbeats")
@@ -317,11 +337,14 @@ async function checkStaleCrons(): Promise<string[]> {
     return [];
   }
   const cutoffMs = Date.now() - WATCHDOG_STALE_HOURS * 3600 * 1000;
+  const nowHourUtc = new Date().getUTCHours();
   const stale = (data || [])
     .filter((h) => {
       const t = new Date(h.last_success_at).getTime();
       return Number.isFinite(t) && t < cutoffMs;
     })
+    // Silenciar los que aún se van a auto-recuperar hoy (anti alerta-fantasma).
+    .filter((h) => !autoRecoveryStillComingToday(h.cron_name, nowHourUtc))
     .map((h) => `${h.cron_name} (último: ${h.last_success_at})`);
   if (stale.length > 0) {
     await sendTelegramAlert(
