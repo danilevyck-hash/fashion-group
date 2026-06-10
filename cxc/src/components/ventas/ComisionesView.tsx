@@ -10,9 +10,22 @@ import { useEffect, useState } from "react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { EMPRESA_KEY_TO_NAME, B2B_EMPRESA_KEYS } from "@/lib/empresa-mapping";
 import SyncStatus from "@/components/shared/SyncStatus";
-import { ComisionesConsolidadoView } from "./ComisionesConsolidadoView";
-import { ComisionesPorEmpresaView } from "./ComisionesPorEmpresaView";
 import { ComisionesCriterios } from "./ComisionesCriterios";
+import dynamic from "next/dynamic";
+
+// Vistas LAZY: solo el modo activo (Todas / Por empresa) descarga su JS, en su
+// propio chunk → fuera del bundle inicial de /comisiones. Skeleton mientras carga.
+function ViewSkeleton() {
+  return <div className="mt-4 h-72 w-full animate-pulse rounded-lg bg-stone-100" aria-hidden />;
+}
+const ComisionesConsolidadoView = dynamic(
+  () => import("./ComisionesConsolidadoView").then((m) => m.ComisionesConsolidadoView),
+  { ssr: false, loading: () => <ViewSkeleton /> },
+);
+const ComisionesPorEmpresaView = dynamic(
+  () => import("./ComisionesPorEmpresaView").then((m) => m.ComisionesPorEmpresaView),
+  { ssr: false, loading: () => <ViewSkeleton /> },
+);
 
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
