@@ -99,7 +99,7 @@ export default function AdminDashboard() {
 
 function AdminDashboardInner() {
   const { authChecked, role: userRole } = useAuth({ moduleKey: "cxc", allowedRoles: ["admin", "secretaria", "vendedor"] });
-  const { clients, uploads, contactLog, loading, loadError, loadData, setContactLog, dataTs, fromCache } = useAdminData();
+  const { clients, uploads, contactLog, loading, loadError, loadData, setContactLog, dataTs, fromCache } = useAdminData(authChecked);
   usePersistedScroll("cxc", !loading && clients.length > 0);
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("search") || "");
@@ -317,10 +317,11 @@ function AdminDashboardInner() {
 
   useEffect(() => {
     if (!authChecked) return;
-    loadData();
+    // El fetch inicial lo dispara SWR al activarse su clave (authChecked); aquí
+    // solo levantamos el ?search de la URL.
     const q = new URLSearchParams(window.location.search).get("search");
     if (q) setSearch(q);
-  }, [authChecked, loadData]);
+  }, [authChecked]);
 
   // Hook still called to maintain hook order, but SuggestionCard removed from render
   const cxcSuggestions = useMemo<SmartSuggestion[]>(() => [], []);
@@ -375,6 +376,9 @@ function AdminDashboardInner() {
           showToast("No se pudo registrar el contacto. Intenta de nuevo.");
           throw error;
         }
+        // Invalidar la caché SWR tras la escritura → el último contacto del
+        // server reemplaza al optimista al toque (mutate).
+        loadData();
       },
       onRevert: () => {
         setContactLog((prev) => {

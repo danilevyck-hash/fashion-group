@@ -14,6 +14,7 @@ import { OnlineProvider } from "@/lib/OnlineContext";
 import OfflineBanner from "@/components/OfflineBanner";
 import InstallPrompt from "@/components/InstallPrompt";
 import UpdatePrompt from "@/components/UpdatePrompt";
+import SWRProvider from "@/components/SWRProvider";
 import Sidebar, { SidebarAwareMain } from "@/components/Sidebar";
 import "./globals.css";
 
@@ -58,15 +59,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-title" content="Fashion Group" />
       </head>
       <body className={`${GeistMono.variable} ${playfair.variable} min-h-screen safe-top`}>
-        <OnlineProvider>
-          <OfflineBanner />
-          <ContextMenuProviderWrapper>
-            <Sidebar />
-            <SidebarAwareMain>{children}</SidebarAwareMain>
-          </ContextMenuProviderWrapper>
-          <InstallPrompt />
-          <UpdatePrompt />
-        </OnlineProvider>
+        <SWRProvider>
+          <OnlineProvider>
+            <OfflineBanner />
+            <ContextMenuProviderWrapper>
+              <Sidebar />
+              <SidebarAwareMain>{children}</SidebarAwareMain>
+            </ContextMenuProviderWrapper>
+            <InstallPrompt />
+            <UpdatePrompt />
+          </OnlineProvider>
+        </SWRProvider>
         {/* El SW (Serwist) lo registra UpdatePrompt vía @serwist/window
             (next.config tiene register:false) para controlar el ciclo
             waiting→controlling y ofrecer el toast "Nueva versión" (PR-4).

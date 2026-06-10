@@ -31,6 +31,15 @@ const nextConfig = {
     // sharp es un binario nativo: externalizarlo evita que webpack lo empaquete
     // (requerido para que funcione en las funciones serverless de Vercel).
     serverComponentsExternalPackages: ["sharp"],
+    // Router Cache (client-side) de rutas dinámicas: al volver a un server
+    // component (Ventas, Comisiones, el lado server de Cheques/Reclamos) dentro
+    // de 30s, Next reusa el payload RSC cacheado en el cliente en vez de re-pedir
+    // al server → navegación instantánea. Es solo caché de navegación: un reload
+    // duro o pasados los 30s trae fresco. Complementa SWR (que cachea el fetch
+    // del lado cliente); juntos cubren ambas arquitecturas. (SWR Fase 0.)
+    staleTimes: {
+      dynamic: 30,
+    },
   },
 };
 
