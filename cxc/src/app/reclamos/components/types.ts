@@ -47,6 +47,20 @@ export interface Reclamo {
   reclamo_items?: RItem[];
   reclamo_seguimiento?: Seguimiento[];
   reclamo_fotos?: Foto[];
+  reclamo_settlements?: Settlement[];
+  /** Monto reclamado congelado al marcar Pagado (para % recuperado estable). */
+  monto_reclamado_snapshot?: number | null;
+}
+
+/** Una recuperación / nota de crédito de un reclamo (settlement fraccionado). */
+export interface Settlement {
+  id: string;
+  reclamo_id: string;
+  monto: number;
+  nota_credito: string | null;
+  nota_credito_ccte_id: number | null;
+  fecha: string;
+  deleted?: boolean;
 }
 
 export type RView = "list" | "form" | "detail";

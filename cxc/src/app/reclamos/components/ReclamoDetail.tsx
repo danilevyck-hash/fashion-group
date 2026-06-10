@@ -51,6 +51,8 @@ interface Props {
   onSaveEdit: () => void;
   onUploadFoto: (file: File) => void;
   onDeleteFoto: (fotoId: string, path: string) => void;
+  onAddSettlement: (rows: { monto: number; nota_credito: string; fecha: string }[]) => void;
+  onRemoveSettlement: (sid: string) => void;
   showToast: (msg: string) => void;
 }
 
@@ -66,6 +68,7 @@ export default function ReclamoDetail({
   newMotivoText, setNewMotivoText, onBack, onBackToEmpresa, onBackToReclamos,
   onAddNota, onChangeEstado,
   onDeleteReclamo, onSaveEdit, onUploadFoto, onDeleteFoto,
+  onAddSettlement, onRemoveSettlement,
   showToast,
 }: Props) {
   const fotoRef = useRef<HTMLInputElement>(null);
@@ -109,6 +112,27 @@ export default function ReclamoDetail({
   const fotos = current.reclamo_fotos ?? [];
   const sub = calcSub(items);
   const days = daysSince(current.fecha_reclamo);
+
+  // ── Settlement (recuperación / notas de crédito) ──
+  const settlements = (current.reclamo_settlements ?? []).filter((s) => !s.deleted);
+  const recuperado = settlements.reduce((s, x) => s + (Number(x.monto) || 0), 0);
+  // Reclamado: snapshot congelado al marcar Pagado; si aún no, el vivo.
+  const reclamado = current.monto_reclamado_snapshot ?? sub * FACTOR_TOTAL;
+  const deltaRec = reclamado - recuperado;
+  const pctRec = reclamado > 0 ? (recuperado / reclamado) * 100 : 0;
+  const [ncOpen, setNcOpen] = useState(false);
+  const [ncMonto, setNcMonto] = useState("");
+  const [ncNum, setNcNum] = useState("");
+  const [ncFecha, setNcFecha] = useState(() =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "America/Panama" }).format(new Date()),
+  );
+  function submitNc() {
+    const m = Number(ncMonto);
+    if (!Number.isFinite(m) || m <= 0) { showToast("Escribe un monto recuperado mayor a 0."); return; }
+    if (!ncFecha) { showToast("Falta la fecha."); return; }
+    onAddSettlement([{ monto: m, nota_credito: ncNum.trim(), fecha: ncFecha }]);
+    setNcOpen(false); setNcMonto(""); setNcNum("");
+  }
 
   // ── Smart suggestion: escalation ──
   const reclamoSuggestions = useMemo<SmartSuggestion[]>(() => {
@@ -273,6 +297,93 @@ export default function ReclamoDetail({
         <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS (7%)</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * TASA_ITBMS)}</div></div>
         <div className="bg-gray-900 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Total</div><div className="text-xl font-semibold tabular-nums mt-1 text-white">${fmt(sub * FACTOR_TOTAL)}</div></div>
       </div>
+
+      {/* Settlement — recuperación / notas de crédito */}
+      {(current.estado === "Pagado" || settlements.length > 0) && (
+        <div className="mb-8 border border-gray-200 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs uppercase tracking-widest text-gray-400">Recuperación</div>
+            <span className="text-[11px] font-medium text-emerald-700 tabular-nums">{pctRec.toFixed(0)}% recuperado</span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 mb-3">
+            <div className="text-center">
+              <div className="text-[10px] text-gray-400 uppercase">Reclamado</div>
+              <div className="text-sm font-semibold tabular-nums mt-1">${fmt(reclamado)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-[10px] text-gray-400 uppercase">Recuperado</div>
+              <div className="text-sm font-semibold tabular-nums mt-1 text-emerald-700">${fmt(recuperado)}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-[10px] text-gray-400 uppercase">{deltaRec >= 0 ? "Pendiente" : "A favor"}</div>
+              <div className={`text-sm font-semibold tabular-nums mt-1 ${deltaRec > 0 ? "text-amber-600" : "text-gray-500"}`}>${fmt(Math.abs(deltaRec))}</div>
+            </div>
+          </div>
+
+          {/* Barra de progreso recuperado */}
+          <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden mb-4">
+            <div className="h-full bg-emerald-500 rounded-full transition-all" style={{ width: `${Math.min(100, Math.max(0, pctRec))}%` }} />
+          </div>
+
+          {/* Lista de notas de crédito */}
+          {settlements.length > 0 ? (
+            <ul className="divide-y divide-gray-100 mb-3">
+              {settlements.map((s) => (
+                <li key={s.id} className="flex items-center justify-between py-2 text-sm">
+                  <div className="min-w-0">
+                    <span className="tabular-nums font-medium">${fmt(s.monto)}</span>
+                    {s.nota_credito && <span className="text-gray-500"> · NC {s.nota_credito}</span>}
+                    <span className="text-gray-400"> · {fmtDate(s.fecha)}</span>
+                  </div>
+                  <button
+                    onClick={() => onRemoveSettlement(s.id)}
+                    className="text-[11px] text-gray-400 hover:text-red-600 transition shrink-0 ml-3"
+                  >
+                    Quitar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-gray-400 mb-3">Sin notas de crédito registradas.</p>
+          )}
+
+          {/* Agregar NC (settlement fraccionado) */}
+          {ncOpen ? (
+            <div className="rounded-md border border-gray-200 p-3">
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="text-[11px] text-gray-500">Monto recuperado *</span>
+                  <input type="number" inputMode="decimal" min="0" step="0.01" value={ncMonto}
+                    onChange={(e) => setNcMonto(e.target.value)} placeholder="0.00"
+                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm tabular-nums outline-none focus:border-black transition" />
+                </label>
+                <label className="block">
+                  <span className="text-[11px] text-gray-500">Fecha *</span>
+                  <input type="date" value={ncFecha} onChange={(e) => setNcFecha(e.target.value)}
+                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-black transition" />
+                </label>
+                <label className="col-span-2 block">
+                  <span className="text-[11px] text-gray-500">N° nota de crédito (opcional)</span>
+                  <input type="text" value={ncNum} onChange={(e) => setNcNum(e.target.value)} placeholder="Ej. 4020000422"
+                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-black transition" />
+                </label>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button onClick={() => { setNcOpen(false); setNcMonto(""); setNcNum(""); }}
+                  className="flex-1 rounded-md border border-gray-200 py-2 text-sm hover:bg-gray-50 transition">Cancelar</button>
+                <button onClick={submitNc}
+                  className="flex-1 rounded-md bg-black py-2 text-sm text-white active:scale-[0.97] transition">Guardar NC</button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setNcOpen(true)} className="text-xs font-medium text-blue-600 hover:underline">
+              + Agregar nota de crédito
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Items table */}
       {items.length > 0 && (

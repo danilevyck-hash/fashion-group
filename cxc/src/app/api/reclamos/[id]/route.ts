@@ -25,7 +25,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const { data, error } = await supabaseServer
     .from("reclamos")
-    .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_seguimiento(*)")
+    .select("*, reclamo_items(*), reclamo_fotos(*), reclamo_seguimiento(*), reclamo_settlements(*)")
     .eq("id", id)
     .eq("deleted", false)
     .single();
@@ -67,7 +67,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  for (const key of ["empresa", "proveedor", "marca", "nro_factura", "nro_orden_compra", "fecha_reclamo", "notas", "estado"]) {
+  for (const key of ["empresa", "proveedor", "marca", "nro_factura", "nro_orden_compra", "fecha_reclamo", "notas", "estado", "monto_reclamado_snapshot"]) {
     if (fields[key] !== undefined) updates[key] = fields[key];
   }
 
