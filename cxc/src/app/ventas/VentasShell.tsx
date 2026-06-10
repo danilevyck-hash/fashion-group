@@ -6,12 +6,34 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Download, TrendingUp, Contact, Package } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ResumenView } from "@/components/ventas/ResumenView";
-import { ClientesView } from "@/components/ventas/ClientesView";
-import { ProductosView } from "@/components/ventas/ProductosView";
+import dynamic from "next/dynamic";
 import { exportResumenToExcel } from "@/lib/ventas/excel";
 import { PullToRefresh } from "@/components/ui";
 import type { VentasResumen, Clientes, Multifashion } from "@/components/ventas/types";
+
+// Tabs cargados LAZY: cada vista va en su propio chunk y solo se descarga al
+// activarse su tab → fuera del bundle inicial de /ventas. Skeleton mientras
+// carga. Mismo patrón que multifashion (recharts vía next/dynamic, ssr:false).
+function TabSkeleton() {
+  return (
+    <div className="mt-5 space-y-3" aria-hidden>
+      <div className="h-8 w-48 animate-pulse rounded bg-stone-100" />
+      <div className="h-64 w-full animate-pulse rounded-lg bg-stone-100" />
+    </div>
+  );
+}
+const ResumenView = dynamic(
+  () => import("@/components/ventas/ResumenView").then((m) => m.ResumenView),
+  { ssr: false, loading: () => <TabSkeleton /> },
+);
+const ClientesView = dynamic(
+  () => import("@/components/ventas/ClientesView").then((m) => m.ClientesView),
+  { ssr: false, loading: () => <TabSkeleton /> },
+);
+const ProductosView = dynamic(
+  () => import("@/components/ventas/ProductosView").then((m) => m.ProductosView),
+  { ssr: false, loading: () => <TabSkeleton /> },
+);
 
 interface VentasShellProps {
   year: number;
