@@ -45,6 +45,8 @@ import { syncArticulosDiario } from "@/lib/switch-api/sync-articulos";
 import { syncClientesMaster } from "@/lib/switch-api/sync-clientes-master";
 import { syncMultifashionTickets } from "@/lib/switch-api/sync";
 import { syncAllProveedores } from "@/lib/switch-api/sync-proveedores";
+import { runIntegrityCheck } from "@/lib/integrity-check-run";
+import { runCleanupPackingLists } from "@/lib/cleanup-packing-lists";
 import { runChequesAlert } from "@/lib/cheques-alert";
 import { empresasConFacturas, empresasConCxc } from "@/lib/switch-api/empresas";
 import { sendTelegramAlert } from "@/lib/telegram";
@@ -274,6 +276,45 @@ const COLATERAL_CRONS: ColateralCron[] = [
     recover: async () => {
       const r = await runChequesAlert();
       return { ok: r.ok, detail: r.ok ? (r.count === 0 ? "sin cheques por vencer" : `${r.count} por vencer`) : r.detail };
+    },
+  },
+  {
+    // Checks de integridad (Telegram SOLO si hay críticos). Su cron corre 12:00
+    // UTC → recoverAfterHourUtc=13 para NO adelantarse a su run normal: sin el
+    // guard, la pasada de las 10:00 lo correría y mandaría la alerta crítica
+    // antes de tiempo, y el run de las 12:00 la duplicaría. El persist es append
+    // (igual que el botón "Correr ahora" del dashboard) → re-correr no corrompe
+    // data, solo agrega un snapshot del día. Lo recuperan las pasadas 14:00/18:00.
+    cronName: "integrity-check",
+    label: "integrity-check",
+    recoverAfterHourUtc: 13,
+    recover: async () => {
+      const r = await runIntegrityCheck();
+      return { ok: r.ok, detail: r.ok ? (r.criticalCount > 0 ? `${r.criticalCount} críticos` : "ok") : r.detail };
+    },
+  },
+  {
+    // Refresh de la materialized view clientes_empresa_12m_vw (tab Clientes de
+    // Ventas). Idempotente: REFRESH ... CONCURRENTLY recomputa la misma vista, no
+    // duplica nada. No dispara alerta y corre temprano (06:30 UTC) → sin guard de
+    // hora. Una sola RPC, ligera.
+    cronName: "refresh-clientes-views",
+    label: "refresh-clientes-views",
+    recover: async () => {
+      const { error } = await supabaseServer.rpc("refresh_clientes_empresa_12m_vw");
+      return { ok: !error, detail: error ? error.message : "vista refrescada" };
+    },
+  },
+  {
+    // Purga física de packing lists soft-deleted con retención vencida (90d),
+    // con snapshot previo a activity_logs. Idempotente: re-correr ya no encuentra
+    // candidatos (los purgados se fueron) → deleted=0, sin snapshot nuevo. No
+    // alerta y corre temprano (03:00 UTC) → sin guard de hora.
+    cronName: "cleanup-packing-lists",
+    label: "cleanup-packing-lists",
+    recover: async () => {
+      const r = await runCleanupPackingLists();
+      return { ok: r.ok, detail: r.detail };
     },
   },
 ];
