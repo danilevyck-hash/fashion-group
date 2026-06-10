@@ -26,7 +26,16 @@ export function shortError(msg: string | null | undefined, max = 200): string {
   return firstLine.length > max ? `${firstLine.slice(0, max)}…` : firstLine;
 }
 
-export async function sendTelegramAlert(text: string): Promise<boolean> {
+/**
+ * @param parseMode opcional. Por defecto el mensaje va como TEXTO PLANO (sin
+ * parse_mode) — ese es el modo seguro para alertas con contenido arbitrario.
+ * Pásalo solo cuando el texto ya viene formateado y escapado (ej. "HTML" con
+ * un bloque `<pre>` para texto monoespaciado que alinee).
+ */
+export async function sendTelegramAlert(
+  text: string,
+  parseMode?: "HTML" | "MarkdownV2",
+): Promise<boolean> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
 
@@ -45,6 +54,7 @@ export async function sendTelegramAlert(text: string): Promise<boolean> {
         chat_id: chatId,
         text,
         disable_web_page_preview: true,
+        ...(parseMode ? { parse_mode: parseMode } : {}),
       }),
     });
 

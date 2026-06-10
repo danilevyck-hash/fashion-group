@@ -22,15 +22,33 @@ async function notifyGuiaDespachada(guia: GuiaForNotify): Promise<void> {
   const numero = `GT-${String(guia.numero).padStart(3, "0")}`;
   const transp = transportistaLabel(guia) || "—";
   const vivos = (guia.guia_items || []).filter((i) => !i.deleted);
-  const clientes = [...new Set(vivos.map((i) => (i.cliente || "").trim()).filter(Boolean))];
-  const cliente = clientes.length ? clientes.join(", ") : "—";
-  // empresa y bultos viven a nivel ítem (guia_items): empresas distintas + suma de bultos.
-  const empresas = [...new Set(vivos.map((i) => (i.empresa || "").trim()).filter(Boolean))];
-  const empresa = empresas.length ? empresas.join(", ") : "—";
-  const bultos = vivos.reduce((sum, i) => sum + (Number(i.bultos) || 0), 0);
-  await sendTelegramAlert(
-    `📦 Guía despachada ${numero}\nEmpresa: ${empresa}\nCliente: ${cliente}\nTransportista: ${transp}\nBultos: ${bultos}`,
-  );
+
+  // Desglose: empresa → clientes (con bultos sumados por cliente) → total. empresa
+  // y bultos viven a nivel ítem (guia_items); un cliente puede repetir en varios
+  // ítems → se suman. Map preserva el orden de aparición (ya ordenado por `orden`).
+  const porEmpresa = new Map<string, Map<string, number>>();
+  let total = 0;
+  for (const i of vivos) {
+    const emp = (i.empresa || "").trim() || "Sin empresa";
+    const cli = (i.cliente || "").trim() || "Sin cliente";
+    const b = Number(i.bultos) || 0;
+    total += b;
+    if (!porEmpresa.has(emp)) porEmpresa.set(emp, new Map());
+    const clientes = porEmpresa.get(emp)!;
+    clientes.set(cli, (clientes.get(cli) ?? 0) + b);
+  }
+
+  // Cuerpo monoespaciado: bloque <pre> (parse_mode HTML) para que alinee en
+  // Telegram. Se escapan &<> del contenido dinámico (nombres de empresa/cliente).
+  const lineas: string[] = [`📦 ${numero} · ${transp}`];
+  for (const [emp, clientes] of porEmpresa) {
+    lineas.push("", emp);
+    for (const [cli, b] of clientes) lineas.push(`  ${cli} — ${b}`);
+  }
+  lineas.push("", `Total: ${total} bultos`);
+
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  await sendTelegramAlert(`<pre>${esc(lineas.join("\n"))}</pre>`, "HTML");
 }
 
 // ── GET ──
