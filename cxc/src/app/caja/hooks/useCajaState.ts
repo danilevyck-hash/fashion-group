@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
+import useSWR, { useSWRConfig } from "swr";
 import { CajaPeriodo, CajaGasto, CajaResponsable } from "../components/types";
 
 function normalizeStr(s: string): string {
@@ -9,28 +10,86 @@ function normalizeStr(s: string): string {
   return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
 }
 
+// ── Claves SWR del módulo Caja (caché en memoria entre navegaciones, vía
+// SWRProvider). Mismas opciones que el piloto CXC (#115): dedupe 60s +
+// revalidateOnFocus por-hook. Clave null hasta authReady → preserva el gate de
+// sesión (no se pega a /api/caja/* antes de confirmar rol). ──
+const SWR_OPTS = { dedupingInterval: 60_000, revalidateOnFocus: true } as const;
+const KEY_PERIODOS = "caja-periodos";
+const KEY_CATEGORIAS = "caja-categorias";
+const KEY_RESPONSABLES = "caja-responsables";
+const keyPeriodo = (id: string) => ["caja-periodo", id] as const;
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(url);
+  return res.json();
+}
+
+async function fetchPeriodoDetail(id: string): Promise<CajaPeriodo> {
+  const data = await fetchJson<CajaPeriodo>(`/api/caja/periodos/${id}?include_deleted=1`);
+  const gastos = data.caja_gastos || [];
+  data.total_gastado = gastos.reduce((s: number, g: CajaGasto) => s + (g.total || 0), 0);
+  return data;
+}
+
 interface UseCajaOptions {
+  /** Cuando es false, las claves SWR son null → no dispara fetch (gate de sesión). */
+  authReady?: boolean;
   onPeriodoDeleted?: (id: string) => void;
 }
 
 export function useCajaState(opts?: UseCajaOptions) {
+  const authReady = opts?.authReady ?? true;
+  const { mutate: globalMutate } = useSWRConfig();
+
   const [pendingDeleteGasto, setPendingDeleteGasto] = useState<CajaGasto | null>(null);
   const [pendingRestoreGasto, setPendingRestoreGasto] = useState<CajaGasto | null>(null);
 
-  const [periodos, setPeriodos] = useState<CajaPeriodo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [current, setCurrent] = useState<CajaPeriodo | null>(null);
+  // Errores de MUTACIÓN (escritura). Los errores de LECTURA salen de SWR y se
+  // combinan abajo en `error`.
   const [error, setError] = useState<string | null>(null);
-  const [categorias, setCategorias] = useState<string[]>([]);
   const [confirmClosePeriodo, setConfirmClosePeriodo] = useState<string | null>(null);
   const [confirmDeletePeriodoId, setConfirmDeletePeriodoId] = useState<string | null>(null);
   const [showNewPeriodoModal, setShowNewPeriodoModal] = useState(false);
   const [fondoInput, setFondoInput] = useState("200");
-  const [responsablesCatalog, setResponsablesCatalog] = useState<CajaResponsable[]>([]);
+
+  // Cuál período está abierto en la vista de detalle. Lo setea loadDetail(id) →
+  // cambia la clave SWR del detalle y dispara su fetch.
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   // Inline-edit state (still lives here because GastoTable edits in place)
   const [editingGastoId, setEditingGastoId] = useState<string | null>(null);
   const [editGasto, setEditGasto] = useState<Partial<CajaGasto>>({});
+
+  // ── Lecturas vía SWR (reemplazan loadPeriodos + el useEffect de catálogos +
+  // loadDetail). Claves null hasta authReady. ──
+  const { data: periodosData, error: periodosError, isLoading: periodosLoading, mutate: mutatePeriodos } =
+    useSWR<CajaPeriodo[]>(authReady ? KEY_PERIODOS : null, () => fetchJson<CajaPeriodo[]>("/api/caja/periodos"), SWR_OPTS);
+  const { data: categoriasData, error: categoriasError } =
+    useSWR<string[]>(authReady ? KEY_CATEGORIAS : null, () => fetchJson<string[]>("/api/caja/categorias"), SWR_OPTS);
+  const { data: responsablesData, error: responsablesError } =
+    useSWR<CajaResponsable[]>(authReady ? KEY_RESPONSABLES : null, () => fetchJson<CajaResponsable[]>("/api/caja/responsables"), SWR_OPTS);
+  const { data: detailData, mutate: mutateDetail } =
+    useSWR<CajaPeriodo>(authReady && detailId ? keyPeriodo(detailId) : null, ([, id]: readonly [string, string]) => fetchPeriodoDetail(id), SWR_OPTS);
+
+  const periodos = useMemo(() => (Array.isArray(periodosData) ? periodosData : []), [periodosData]);
+  const categorias = useMemo(() => (Array.isArray(categoriasData) ? categoriasData : []), [categoriasData]);
+  const responsablesCatalog = useMemo(() => (Array.isArray(responsablesData) ? responsablesData : []), [responsablesData]);
+  const current = detailData ?? null;
+
+  // Solo "cargando" cuando aún no hay nada que mostrar (primer arranque). Al
+  // volver al módulo, la caché SWR ya tiene los períodos → sin spinner.
+  const loading = periodosLoading && !periodosData;
+
+  // Errores de lectura → mismos mensajes que el fetch-on-mount original.
+  const loadError = periodosError
+    ? "Error al cargar períodos"
+    : categoriasError
+      ? "No se pudieron cargar las categorías. Recarga la página."
+      : responsablesError
+        ? "No se pudieron cargar los responsables. Recarga la página."
+        : null;
 
   // Merge distinct categories/responsables from loaded gastos with managed lists
   const allCategorias = useMemo(() => {
@@ -48,51 +107,23 @@ export function useCajaState(opts?: UseCajaOptions) {
     return Array.from(merged).sort((a, b) => a.localeCompare(b, "es"));
   }, [responsablesCatalog, current]);
 
-  const loadPeriodos = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/caja/periodos");
-      if (!res.ok) throw new Error();
-      setPeriodos(await res.json());
-    } catch {
-      setError("Error al cargar períodos");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const loadPeriodos = useCallback(async () => { await mutatePeriodos(); }, [mutatePeriodos]);
 
-  useEffect(() => {
-    fetch("/api/caja/categorias")
-      .then((r) => { if (!r.ok) throw new Error("categorias"); return r.json(); })
-      .then((data: string[]) => {
-        setCategorias(Array.isArray(data) ? data : []);
-      })
-      .catch(() => {
-        console.error('Failed to load categorias');
-        setError("No se pudieron cargar las categorías. Recarga la página.");
-      });
-    loadPeriodos();
-    fetch("/api/caja/responsables")
-      .then((r) => { if (!r.ok) throw new Error("responsables"); return r.json(); })
-      .then((data: CajaResponsable[]) => {
-        setResponsablesCatalog(Array.isArray(data) ? data : []);
-      })
-      .catch(() => {
-        console.error('Failed to load responsables');
-        setError("No se pudieron cargar los responsables. Recarga la página.");
-      });
-  }, [loadPeriodos]);
-
+  // loadDetail(id): fija el período de detalle (cambia la clave SWR → fetch en
+  // clave nueva) y revalida esa clave. globalMutate por-clave es estable, así no
+  // hay churn de identidad en el useEffect del page consumidor.
   const loadDetail = useCallback(async (id: string) => {
-    const res = await fetch(`/api/caja/periodos/${id}?include_deleted=1`);
-    if (res.ok) {
-      const data = await res.json();
-      const gastos = data.caja_gastos || [];
-      data.total_gastado = gastos.reduce((s: number, g: CajaGasto) => s + (g.total || 0), 0);
-      setCurrent(data);
-    }
-  }, []);
+    setDetailId(id);
+    await globalMutate(keyPeriodo(id));
+  }, [globalMutate]);
+
+  // setCurrent: conservado por estabilidad de interfaz. null → limpia el detalle;
+  // un período → siembra optimista la caché del detalle sin revalidar.
+  const setCurrent = useCallback((p: CajaPeriodo | null) => {
+    if (!p) { setDetailId(null); return; }
+    setDetailId(p.id);
+    void globalMutate(keyPeriodo(p.id), p, { revalidate: false });
+  }, [globalMutate]);
 
   function createPeriodo() {
     setFondoInput("200");
@@ -303,7 +334,9 @@ export function useCajaState(opts?: UseCajaOptions) {
   }
 
   return {
-    periodos, loading, current, setCurrent, error,
+    periodos, loading, current, setCurrent,
+    // Mutación tiene prioridad; si no, error de lectura (SWR).
+    error: error ?? loadError,
     allCategorias,
     showNewPeriodoModal, setShowNewPeriodoModal, fondoInput, setFondoInput,
     allResponsables,
