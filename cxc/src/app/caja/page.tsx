@@ -24,7 +24,7 @@ export default function CajaPage() {
     createPeriodo, confirmCreatePeriodo,
     requestClosePeriodo, doClosePeriodo,
     requestDeletePeriodo, doDeletePeriodo,
-  } = useCajaState();
+  } = useCajaState({ authReady: authChecked });
 
   if (!authChecked) return null;
 

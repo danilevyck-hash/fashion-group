@@ -57,7 +57,7 @@ export default function PeriodoDetailPage() {
     requestDeleteGasto, saveEditGasto, quickUpdateCategoria, exportExcel,
     pendingDeleteGasto, doDeleteGasto, cancelDeleteGasto,
     pendingRestoreGasto, requestRestoreGasto, doRestoreGasto, cancelRestoreGasto,
-  } = useCajaState({ onPeriodoDeleted: () => router.push("/caja") });
+  } = useCajaState({ authReady: authChecked, onPeriodoDeleted: () => router.push("/caja") });
 
   useEffect(() => {
     if (authChecked && periodoId) loadDetail(periodoId);
