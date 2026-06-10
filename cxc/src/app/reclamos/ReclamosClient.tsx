@@ -22,6 +22,7 @@ import EmpresaSelector from "./components/EmpresaSelector";
 import EmpresaList from "./components/EmpresaList";
 import ReclamoForm from "./components/ReclamoForm";
 import ReclamoDetail from "./components/ReclamoDetail";
+import SettlementModal, { SettlementInput } from "./components/SettlementModal";
 
 export default function ReclamosClient({ initialData }: { initialData: ReclamosInitialData }) {
   return <Suspense><ReclamosPage initialData={initialData} /></Suspense>;
@@ -54,6 +55,8 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [globalSearch, setGlobalSearch] = useState("");
+  const [settleOpen, setSettleOpen] = useState(false);
+  const [settling, setSettling] = useState(false);
   const [sortCol, setSortCol] = useState<"fecha" | "dias" | "total" | "estado">("fecha");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [expandedHistorial, setExpandedHistorial] = useState<Record<string, boolean>>({});
@@ -247,6 +250,10 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   }
   async function changeEstado(e: string) {
     if (!current || current.estado === e) return;
+    // Marcar Pagado no es un flip simple: captura el monto recuperado + NC(s) en
+    // un modal y el server hace insert + flip atómico. (Revertir Pagado→Enviado y
+    // las demás transiciones siguen el PATCH normal — el settlement se conserva.)
+    if (e === "Pagado" && current.estado === "Enviado") { setSettleOpen(true); return; }
     // Optimistic: update estado badge immediately
     const prevEstado = current.estado;
     setCurrent({ ...current, estado: e });
@@ -256,6 +263,49 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
       setToast(`Estado actualizado a ${e}`); setTimeout(() => setToast(null), 3000);
       loadReclamos();
     } catch { setCurrent(prev => prev ? { ...prev, estado: prevEstado } : prev); setToast("Error de conexion. Intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
+  }
+
+  // Settlement: marca Pagado capturando monto recuperado + nota(s) de crédito.
+  async function submitSettlement(rows: SettlementInput[]) {
+    if (!current) return;
+    setSettling(true);
+    try {
+      const res = await fetch(`/api/reclamos/${current.id}/settlements`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settlements: rows, markPaid: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setToast(data?.error || "No se pudo marcar como Pagado."); setTimeout(() => setToast(null), 5000); return; }
+      setSettleOpen(false);
+      await loadDetail(current.id); loadReclamos();
+      setToast("Recuperación registrada — reclamo Pagado"); setTimeout(() => setToast(null), 3000);
+    } catch { setToast("Error de conexión. Intenta de nuevo."); setTimeout(() => setToast(null), 5000); }
+    finally { setSettling(false); }
+  }
+
+  // Agregar una NC adicional a un reclamo ya Pagado (settlement fraccionado).
+  async function addSettlement(rows: SettlementInput[]) {
+    if (!current) return;
+    try {
+      const res = await fetch(`/api/reclamos/${current.id}/settlements`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settlements: rows }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setToast(data?.error || "No se pudo guardar la nota de crédito."); setTimeout(() => setToast(null), 5000); return; }
+      await loadDetail(current.id);
+      setToast("Nota de crédito agregada"); setTimeout(() => setToast(null), 3000);
+    } catch { setToast("Error de conexión. Intenta de nuevo."); setTimeout(() => setToast(null), 5000); }
+  }
+
+  async function removeSettlement(sid: string) {
+    if (!current) return;
+    try {
+      const res = await fetch(`/api/reclamos/${current.id}/settlements?sid=${sid}`, { method: "DELETE" });
+      if (!res.ok) { setToast("No se pudo eliminar la nota de crédito."); setTimeout(() => setToast(null), 3000); return; }
+      await loadDetail(current.id);
+      setToast("Nota de crédito eliminada"); setTimeout(() => setToast(null), 3000);
+    } catch { setToast("Error de conexión. Intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
   }
   function requestDeleteReclamo(id: string) {
     setShowDeleteConfirm(false);
@@ -446,7 +496,16 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         onSaveEdit={saveEdit}
         onUploadFoto={uploadFoto}
         onDeleteFoto={deleteFoto}
+        onAddSettlement={addSettlement}
+        onRemoveSettlement={removeSettlement}
         showToast={(msg: string) => { setToast(msg); setTimeout(() => setToast(null), 3000); }}
+      />
+      <SettlementModal
+        open={settleOpen}
+        reclamado={current.monto_reclamado_snapshot ?? calcSub(current.reclamo_items ?? []) * FACTOR_TOTAL}
+        submitting={settling}
+        onClose={() => setSettleOpen(false)}
+        onSubmit={submitSettlement}
       />
       {pendingUndoReclamo && <UndoToast message={pendingUndoReclamo.message} startedAt={pendingUndoReclamo.startedAt} onUndo={undoActionReclamo} />}
       {deleteModal}
