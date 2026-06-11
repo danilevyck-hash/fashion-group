@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from "rea
 import useSWR from "swr";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
-import { useDraftAutoSave } from "@/lib/hooks/useDraftAutoSave";
 import { ConfirmDeleteModal, PullToRefresh } from "@/components/ui";
 import UndoToast from "@/components/UndoToast";
 import FreshnessChip from "@/components/FreshnessChip";
@@ -136,25 +135,19 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [addingMotivo, setAddingMotivo] = useState<number | null>(null);
   const [addingEditMotivo, setAddingEditMotivo] = useState<number | null>(null); const [newMotivoText, setNewMotivoText] = useState("");
 
-  // Draft auto-save for new reclamo form
-  const reclamoDraftData = useMemo(() => ({
-    empresa: fEmpresa, factura: fFactura, fecha: fFecha, pedido: fPedido, notas: fNotas, items: fItems,
-  }), [fEmpresa, fFactura, fFecha, fPedido, fNotas, fItems]);
-  const isReclamoDraftEmpty = useCallback((d: typeof reclamoDraftData) => {
-    return !d.empresa && !d.factura && !d.pedido && !d.notas && d.items.every(i => !i.referencia && !i.descripcion && i.cantidad === 0 && i.precio_unitario === 0);
+  // Nuevo Reclamo ya NO usa borrador autosave (el flujo toma ~1 min y el borrador
+  // causaba confusión: reaparecía como "borrador de hace X días" tras guardar).
+  // Limpieza one-time: borra cualquier borrador zombi que haya quedado en
+  // localStorage, para que las secretarias que ya tenían uno no vean el banner
+  // una última vez.
+  useEffect(() => {
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("fg_draft_reclamo_")) localStorage.removeItem(k);
+      }
+    } catch { /* localStorage no disponible — ignorar */ }
   }, []);
-  const { draft: reclamoDraft, hasDraft: hasReclamoDraft, clearDraft: clearReclamoDraft, draftTimeAgo: reclamoDraftTimeAgo } = useDraftAutoSave("reclamo", reclamoDraftData, isReclamoDraftEmpty);
-
-  function restoreReclamoDraft() {
-    if (!reclamoDraft) return;
-    setFEmpresa(reclamoDraft.empresa || "");
-    setFFactura(reclamoDraft.factura || "");
-    setFFecha(reclamoDraft.fecha || new Date().toISOString().slice(0, 10));
-    setFPedido(reclamoDraft.pedido || "");
-    setFNotas(reclamoDraft.notas || "");
-    if (reclamoDraft.items?.length) setFItems(reclamoDraft.items);
-    clearReclamoDraft();
-  }
 
   function buildUrl(v: RView, id: string | null | undefined, empresa: string | null): string {
     const params = new URLSearchParams();
@@ -264,7 +257,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     try {
       const empInfo = EMPRESAS_MAP[fEmpresa];
       const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: fFactura, nro_orden_compra: fPedido, fecha_reclamo: fFecha, notas: fNotas, items }) });
-      if (res.ok) { clearReclamoDraft(); const saved = await res.json(); setSavedReclamoId(saved.id); setSavedNroReclamo(saved.nro_reclamo || ""); setFormFotos([]); loadReclamos(); }
+      if (res.ok) { const saved = await res.json(); setSavedReclamoId(saved.id); setSavedNroReclamo(saved.nro_reclamo || ""); setFormFotos([]); loadReclamos(); }
       else { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); }
     } catch { setError("Error de conexión."); }
     setSaving(false);
@@ -486,10 +479,6 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         onCancel={() => { resetForm(); setView("list"); }}
         onViewSaved={() => { const id = savedReclamoId; resetForm(); loadReclamos(); if (id) { setView("detail", id); loadDetail(id); } }}
         onResetAndCreateAnother={resetForm}
-        hasDraft={hasReclamoDraft}
-        draftTimeAgo={reclamoDraftTimeAgo}
-        onRestoreDraft={restoreReclamoDraft}
-        onDiscardDraft={clearReclamoDraft}
       />
     );
   }

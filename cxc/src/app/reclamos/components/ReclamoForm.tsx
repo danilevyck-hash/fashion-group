@@ -37,10 +37,6 @@ interface Props {
   onCancel: () => void;
   onViewSaved: () => void;
   onResetAndCreateAnother: () => void;
-  hasDraft?: boolean;
-  draftTimeAgo?: string;
-  onRestoreDraft?: () => void;
-  onDiscardDraft?: () => void;
   isEditing?: boolean;
 }
 
@@ -51,7 +47,6 @@ export default function ReclamoForm({
   uploadingFormFoto, setUploadingFormFoto, saving, error,
   customMotivos, setCustomMotivos, addingMotivo, setAddingMotivo,
   newMotivoText, setNewMotivoText, onSave, onCancel, onViewSaved, onResetAndCreateAnother,
-  hasDraft, draftTimeAgo, onRestoreDraft, onDiscardDraft,
   isEditing,
 }: Props) {
   const formFotoRef = useRef<HTMLInputElement>(null);
@@ -69,7 +64,7 @@ export default function ReclamoForm({
   const recentMotivos = customMotivos.slice(-5).reverse();
 
   // Progressive disclosure: determine which steps are revealed
-  const hasExistingData = !!isEditing || !!savedReclamoId || !!hasDraft;
+  const hasExistingData = !!isEditing || !!savedReclamoId;
   const revealAll = hasExistingData || showAll;
   const step2Visible = revealAll || !!fEmpresa;
   const step3Visible = revealAll || (step2Visible && !!fFactura.trim());
@@ -118,16 +113,6 @@ export default function ReclamoForm({
           </div>
         )}
       </div>
-
-      {hasDraft && !savedReclamoId && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-8 flex items-center justify-between gap-4">
-          <p className="text-sm text-amber-800">Tienes un borrador guardado de {draftTimeAgo}. ¿Restaurar?</p>
-          <div className="flex items-center gap-3 flex-shrink-0">
-            <button onClick={onRestoreDraft} className="bg-black text-white text-sm px-4 py-1.5 rounded-md hover:bg-gray-800 transition">Restaurar</button>
-            <button onClick={onDiscardDraft} className="text-sm text-amber-700 hover:text-amber-900 transition">Descartar</button>
-          </div>
-        </div>
-      )}
 
       {/* ── Step 1: Empresa (always visible) ── */}
       <div className="mb-10">
