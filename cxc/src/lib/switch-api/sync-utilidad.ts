@@ -79,6 +79,7 @@ function toCacheRow(empresaKey: EmpresaKey, r: UtilidadRow, cartera: Map<number,
     tipo_comprobante: r.tipoComprobante,
     vendedor: vendedorCartera, // ← dueño de cartera (fallback: vendedor de factura)
     cliente: r.cliente,
+    cliente_switch_id: r.clienteSwitchId ?? null, // id estable para utilidad_por_cliente
     subtotal_con_descuento: r.subtotalConDescuento,
     costo: r.costo,
     utilidad: r.utilidad,
