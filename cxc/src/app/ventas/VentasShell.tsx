@@ -4,7 +4,7 @@ import { useState, useTransition, useCallback } from "react";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Download, TrendingUp, Contact, Package } from "lucide-react";
+import { Download, TrendingUp, Contact, Package, Percent } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import dynamic from "next/dynamic";
 import { exportResumenToExcel } from "@/lib/ventas/excel";
@@ -32,6 +32,10 @@ const ClientesView = dynamic(
 );
 const ProductosView = dynamic(
   () => import("@/components/ventas/ProductosView").then((m) => m.ProductosView),
+  { ssr: false, loading: () => <TabSkeleton /> },
+);
+const UtilidadView = dynamic(
+  () => import("@/components/ventas/UtilidadView").then((m) => m.UtilidadView),
   { ssr: false, loading: () => <TabSkeleton /> },
 );
 
@@ -170,7 +174,7 @@ export function VentasShell({
           </Select>
           {/* Excel global = export del Resumen. En el tab Productos se oculta
               porque ese tab trae su propio export (por empresa + período). */}
-          {tab !== "productos" && (
+          {tab !== "productos" && tab !== "utilidad" && (
             <Button variant="outline" size="sm" onClick={onExportExcel} disabled={!resumen}>
               <Download className="mr-1.5 h-3.5 w-3.5" /> Excel
             </Button>
@@ -197,6 +201,12 @@ export function VentasShell({
             className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none"
           >
             <Package className="h-3.5 w-3.5" /> Productos
+          </TabsTrigger>
+          <TabsTrigger
+            value="utilidad"
+            className="gap-1.5 rounded-none border-b-2 border-transparent bg-transparent px-4 py-3 text-stone-500 data-[state=active]:border-teal-700 data-[state=active]:bg-transparent data-[state=active]:text-stone-950 data-[state=active]:shadow-none"
+          >
+            <Percent className="h-3.5 w-3.5" /> Utilidad
           </TabsTrigger>
         </TabsList>
 
@@ -230,6 +240,11 @@ export function VentasShell({
           {/* key={selectedYear} remonta al cambiar año global → resetea empresa/
               período/sort internos al universo del año cargado. */}
           <ProductosView key={selectedYear} selectedYear={selectedYear} />
+        </TabsContent>
+        <TabsContent value="utilidad" className="mt-5">
+          {/* Utilidad real por cliente (5 B2B). Self-fetch por año; key remonta
+              al cambiar año para resetear search/sort. */}
+          <UtilidadView key={selectedYear} selectedYear={selectedYear} />
         </TabsContent>
       </Tabs>
     </main>
