@@ -24,10 +24,11 @@
 // multifashion-sync (no registra heartbeat → sin señal fiable; su data igual
 // entra por american_classic en switch-sync).
 //
-// Telegram:
-//   - Re-ejecutó algo y TODO quedó OK   → mensaje informativo (qué se recuperó).
-//   - Algo sigue sin success / sin tiempo → ALERTA (qué, último error).
-//   - Todo estaba OK desde el inicio     → no envía nada (cero ruido).
+// Telegram (Opción A, jun-2026 — SOLO fallos reales):
+//   - Algo sigue sin success / sin tiempo → ALERTA (qué falló + último error;
+//     las recuperaciones van como contexto dentro de la alerta).
+//   - Ciclo 100% exitoso (con o SIN recuperaciones) → NO envía nada. Recuperar
+//     es el sistema funcionando bien, no un fallo → silencio.
 //
 // Auth: Bearer con CRON_SECRET (igual que el resto de crons).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -503,9 +504,15 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
   const failedColaterales = colateralResults.filter((c) => !c.ok);
   const recoveredColaterales = colateralResults.filter((c) => c.ok);
 
-  // 4. Telegram.
+  // 4. Telegram — SOLO si algo quedó realmente caído tras el ciclo (Opción A,
+  //    jun-2026). Recuperar NO es un fallo: un ciclo 100% exitoso —con o sin
+  //    recuperaciones— NO manda nada (cero ruido). El mensaje sale únicamente
+  //    cuando hay un fallo real: colateral irrecuperable, sync que quedó sin
+  //    success, o trabajo que no entró por tiempo (skipped). Las recuperaciones
+  //    se siguen reportando como CONTEXTO dentro de esa alerta de fallo, y en el
+  //    JSON de respuesta (reconciled[]) para auditoría.
   const hayProblemas = stillMissingPairs.length > 0 || failedColaterales.length > 0 || skipped.length > 0;
-  let telegram: "info" | "alert" | "none" = "none";
+  let telegram: "alert" | "none" = "none";
 
   if (hayProblemas) {
     telegram = "alert";
@@ -524,16 +531,6 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
     await sendTelegramAlert(
       `🚨 ALERTA sync Switch (${fecha})\n` +
         `Sin success tras reconciliación:\n${[...lineasPares, ...lineasCol, ...lineasSkip].join("\n")}${recuperadas}`,
-    );
-  } else if (recoveredPairs.length > 0 || recoveredColaterales.length > 0) {
-    telegram = "info";
-    await sendTelegramAlert(
-      `✅ Reconciliación Switch (${fecha})\n` +
-        `Recuperadas ${recoveredPairs.length + recoveredColaterales.length}: ${[
-          ...recoveredPairs.map((p) => `${p.empresa}/${p.syncType}`),
-          ...recoveredColaterales.map((c) => c.label),
-        ].join(", ")}\n` +
-        `Todo el ciclo diario quedó en success.`,
     );
   }
 
