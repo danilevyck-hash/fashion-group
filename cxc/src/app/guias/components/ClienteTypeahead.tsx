@@ -21,6 +21,10 @@ interface ClienteTypeaheadProps {
   inputClassName?: string;
   hasError?: boolean;
   placeholder?: string;
+  // OPCIONAL y aditivo: clientes más usados a mostrar arriba cuando el input
+  // está vacío (query < 2). Si no se pasa (ej. Marketing), el comportamiento es
+  // idéntico al previo: el dropdown solo aparece al teclear ≥ 2 caracteres.
+  topClientes?: ClienteHit[];
 }
 
 export default function ClienteTypeahead({
@@ -32,6 +36,7 @@ export default function ClienteTypeahead({
   inputClassName = "",
   hasError = false,
   placeholder = "Buscar cliente…",
+  topClientes,
 }: ClienteTypeaheadProps) {
   const [open, setOpen] = useState(false);
   const [hits, setHits] = useState<ClienteHit[]>([]);
@@ -114,6 +119,7 @@ export default function ClienteTypeahead({
         </span>
       )}
 
+      {/* Búsqueda (≥2 chars). Comportamiento original. */}
       {open && (query.trim().length >= 2) && (
         <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-56 overflow-y-auto text-sm">
           {loading ? (
@@ -142,6 +148,34 @@ export default function ClienteTypeahead({
           )}
         </div>
       )}
+
+      {/* Más usados (input vacío). Solo si el caller pasó topClientes. Aditivo:
+          sin el prop, este bloque nunca se renderiza. */}
+      {open &&
+        query.trim().length < 2 &&
+        topClientes &&
+        topClientes.length > 0 && (
+          <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-56 overflow-y-auto text-sm">
+            <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-gray-400">
+              Más usados
+            </div>
+            {topClientes.map((h) => (
+              <button
+                key={h.codigo}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onSelect(h.nombre, h.codigo);
+                  setOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center justify-between gap-2"
+              >
+                <span className="truncate">{h.nombre}</span>
+                <span className="text-[10px] text-gray-400 font-mono shrink-0">{h.codigo}</span>
+              </button>
+            ))}
+          </div>
+        )}
     </div>
   );
 }

@@ -58,13 +58,11 @@ export default function GuiaEditarPage() {
         transportistas={s.transportistas}
         clientes={s.clientes}
         direcciones={s.direcciones}
-        empresas={s.empresas}
         validationErrors={s.validationErrors}
         error={s.error}
         saving={s.saving}
         onAddCliente={s.addCliente}
         onAddDireccion={s.addDireccion}
-        onAddEmpresa={s.addEmpresa}
         onUpdateItem={s.updateItem}
         onUpdateItemFields={s.updateItemFields}
         onAddRow={s.addRow}

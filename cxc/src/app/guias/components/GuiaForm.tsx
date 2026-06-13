@@ -15,7 +15,23 @@ import { useEffect, useRef, useState } from "react";
 import type { GuiaItem, ModoEntrega, Transportista } from "./types";
 import AddNewInline from "./AddNewInline";
 import ClienteTypeahead from "./ClienteTypeahead";
+import EmpresaCombobox from "./EmpresaCombobox";
 import { ScrollableTable } from "@/components/ui";
+
+// Fallback offline: las 8 empresas canónicas (mismos nombres que
+// empresa-mapping.ts, que es server-only y no se puede importar acá). El orden
+// real por frecuencia llega de /api/guias/frecuencias; esto solo cubre el caso
+// sin red para que el combobox nunca quede vacío.
+const FALLBACK_EMPRESAS = [
+  "Vistana International",
+  "Fashion Wear",
+  "Fashion Shoes",
+  "Active Shoes",
+  "Active Wear",
+  "Joystep",
+  "Confecciones Boston",
+  "Multifashion",
+];
 
 interface GuiaFormProps {
   editingId: string | null;
@@ -36,13 +52,11 @@ interface GuiaFormProps {
   transportistas: Transportista[];
   clientes: string[];
   direcciones: string[];
-  empresas: string[];
   validationErrors: Set<string>;
   error: string | null;
   saving: boolean;
   onAddCliente: (v: string) => void;
   onAddDireccion: (v: string) => void;
-  onAddEmpresa: (v: string) => void;
   onUpdateItem: (idx: number, field: keyof GuiaItem, value: string | number) => void;
   onUpdateItemFields: (idx: number, partial: Partial<GuiaItem>) => void;
   onAddRow: () => void;
@@ -60,9 +74,9 @@ export default function GuiaForm({
   modoEntrega, setModoEntrega, transportistaId, setTransportistaId,
   entregadoPor, setEntregadoPor, observaciones, setObservaciones,
   numeroGuiaTransp, setNumeroGuiaTransp,
-  items, transportistas, clientes, direcciones, empresas,
+  items, transportistas, clientes, direcciones,
   validationErrors, error, saving,
-  onAddCliente, onAddDireccion, onAddEmpresa,
+  onAddCliente, onAddDireccion,
   onUpdateItem, onUpdateItemFields, onAddRow, onRemoveRow, onSave, onCancel,
   hasDraft, draftTimeAgo, onRestoreDraft, onDiscardDraft,
 }: GuiaFormProps) {
@@ -95,6 +109,24 @@ export default function GuiaForm({
     setEntregadoPor(n);
     setEntregadoPorOtro("");
   }
+
+  // "Más usados arriba": clientes (por cliente_codigo) y orden de las 8 empresas
+  // canónicas, ambos por frecuencia de uso en guías. Aditivo y best-effort.
+  const [clientesTop, setClientesTop] = useState<{ codigo: string; nombre: string }[]>([]);
+  const [empresaOptions, setEmpresaOptions] = useState<string[]>([]);
+  useEffect(() => {
+    let cancel = false;
+    fetch("/api/guias/frecuencias", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancel || !d) return;
+        if (Array.isArray(d.clientes)) setClientesTop(d.clientes);
+        if (Array.isArray(d.empresas)) setEmpresaOptions(d.empresas);
+      })
+      .catch(() => { /* offline: cae al fallback de empresas */ });
+    return () => { cancel = true; };
+  }, []);
+  const empresaOpts = empresaOptions.length > 0 ? empresaOptions : FALLBACK_EMPRESAS;
 
   // Undo delete row
   const [undoRow, setUndoRow] = useState<{ idx: number; item: GuiaItem; timer: ReturnType<typeof setTimeout> } | null>(null);
@@ -338,7 +370,7 @@ export default function GuiaForm({
               <th className="py-3 px-4 font-normal w-10 text-left">#</th>
               <th className="py-3 px-4 font-normal text-left">Cliente <span className="text-red-500">*</span><AddNewInline placeholder="Cliente" onAdd={onAddCliente} /></th>
               <th className="py-3 px-4 font-normal text-left">Dirección <span className="text-red-500">*</span><AddNewInline placeholder="Ciudad" onAdd={onAddDireccion} /></th>
-              <th className="py-3 px-4 font-normal text-left">Empresa <span className="text-red-500">*</span><AddNewInline placeholder="Empresa" onAdd={onAddEmpresa} /></th>
+              <th className="py-3 px-4 font-normal text-left">Empresa <span className="text-red-500">*</span></th>
               <th className="py-3 px-4 font-normal text-left">Factura(s) <span className="text-red-500">*</span><div className="text-[9px] text-gray-400 mt-0.5 font-normal normal-case tracking-normal">Ej: 10234, 10235</div></th>
               <th className="py-3 px-4 font-normal w-20 text-center">Bultos <span className="text-red-500">*</span></th>
               <th className="py-3 w-8"></th>
@@ -352,6 +384,7 @@ export default function GuiaForm({
                   <ClienteTypeahead
                     value={item.cliente}
                     codigo={item.cliente_codigo || ""}
+                    topClientes={clientesTop}
                     onSelect={(nombre, codigo) => onUpdateItemFields(idx, { cliente: nombre, cliente_codigo: codigo })}
                     onFreeText={(texto) => onUpdateItemFields(idx, { cliente: texto, cliente_codigo: "" })}
                     onBlur={() => handleBlur(`item-${idx}-cliente`)}
@@ -366,11 +399,14 @@ export default function GuiaForm({
                   {fieldError(`item-${idx}-direccion`, item.direccion) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
                 </td>
                 <td className="py-2 pr-2">
-                  <select value={item.empresa} onChange={e => onUpdateItem(idx, "empresa", e.target.value)} onBlur={() => handleBlur(`item-${idx}-empresa`)}
-                    className={inputClass(`item-${idx}-empresa`, "w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent focus:border-black transition appearance-none", `item-${idx}-empresa`, item.empresa)}>
-                    <option value="">Seleccionar...</option>
-                    {empresas.map(e => <option key={e} value={e}>{e}</option>)}
-                  </select>
+                  <EmpresaCombobox
+                    value={item.empresa}
+                    onChange={(v) => onUpdateItem(idx, "empresa", v)}
+                    options={empresaOpts}
+                    onBlur={() => handleBlur(`item-${idx}-empresa`)}
+                    placeholder="Empresa…"
+                    inputClassName={inputClass(`item-${idx}-empresa`, "w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent focus:border-black transition", `item-${idx}-empresa`, item.empresa)}
+                  />
                   {fieldError(`item-${idx}-empresa`, item.empresa) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
                 </td>
                 <td className="py-2 pr-2">
