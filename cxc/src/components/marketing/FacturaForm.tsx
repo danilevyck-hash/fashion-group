@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
+  EstadoPagoFactura,
   MarcaPorcentajeInput,
   MkFactura,
   MkMarca,
@@ -34,10 +35,26 @@ export interface FacturaFormValues {
   subtotal: number;
   itbms: number;
   tieneImportacion: boolean;
+  estadoPago: EstadoPagoFactura;
   marcasSeleccionadas: MarcaPorcentajeInput[];
   // El usuario confirmó que aunque haya duplicado quiere guardar igual.
   // Se loguea en activity_logs para auditoría.
   permitirDuplicado?: boolean;
+}
+
+// Orden fijo del dropdown de marca (registro de gastos): por código conocido,
+// las demás (si las hubiera) al final por nombre.
+const ORDEN_MARCAS = ["TH", "CK", "RBK", "J", "FC", "OTR"];
+
+function ordenarMarcas(marcas: MkMarca[]): MkMarca[] {
+  return [...marcas].sort((a, b) => {
+    const ia = ORDEN_MARCAS.indexOf(a.codigo);
+    const ib = ORDEN_MARCAS.indexOf(b.codigo);
+    const ra = ia === -1 ? ORDEN_MARCAS.length : ia;
+    const rb = ib === -1 ? ORDEN_MARCAS.length : ib;
+    if (ra !== rb) return ra - rb;
+    return a.nombre.localeCompare(b.nombre, "es");
+  });
 }
 
 interface FacturaFormProps {
@@ -123,6 +140,9 @@ export function FacturaForm({
   const [tieneImportacion, setTieneImportacion] = useState<boolean>(
     Boolean(initial?.tiene_importacion),
   );
+  const [estadoPago, setEstadoPago] = useState<EstadoPagoFactura>(
+    initial?.estado_pago === "pagado" ? "pagado" : "pendiente",
+  );
   const [pdfFile, setPdfFile] = useState<File | undefined>(undefined);
   const [pdfSubido, setPdfSubido] = useState(false);
   const [leyendoIA, setLeyendoIA] = useState(false);
@@ -136,22 +156,22 @@ export function FacturaForm({
   // auto-reportarse como duplicado de sí misma.
   const editandoId = initial?.id ?? null;
 
-  // ── Marcas ──
-  // Regla 50/50: cada marca asignada a la factura cubre 50% (fijo, no editable).
-  // El usuario solo elige cuáles marcas aplican; el porcentaje se persiste como 50.
-  const marcasInicialesIds: string[] = useMemo(() => {
-    if (initialMarcas && initialMarcas.length > 0) {
-      return initialMarcas.map((m) => m.marcaId);
-    }
+  // ── Marca ──
+  // Registro de gastos: cada factura lleva UNA sola marca (sin %, sin reparto).
+  // El catálogo ordenado alimenta el dropdown.
+  const marcasOrdenadas = useMemo(
+    () => ordenarMarcas(marcasCatalogo),
+    [marcasCatalogo],
+  );
+  const marcaInicial: string = useMemo(() => {
+    if (initialMarcas && initialMarcas.length > 0) return initialMarcas[0].marcaId;
     if (proyecto.marcas && proyecto.marcas.length > 0) {
-      return proyecto.marcas.map((m) => m.marca.id);
+      return proyecto.marcas[0].marca.id;
     }
-    return [];
+    return "";
   }, [initialMarcas, proyecto.marcas]);
 
-  const [marcasSel, setMarcasSel] = useState<Set<string>>(
-    () => new Set(marcasInicialesIds),
-  );
+  const [marcaSel, setMarcaSel] = useState<string>(() => marcaInicial);
 
   const subtotal = Number(subtotalStr) || 0;
   // Zona libre y ITBMS son mutuamente excluyentes (helper compartido single/bulk).
@@ -169,26 +189,13 @@ export function FacturaForm({
     [subtotal, itbmsPct, tieneImportacion],
   );
 
-  // Payload final: cada marca seleccionada con porcentaje fijo 50.
+  // Payload final: una marca con porcentaje 50 (el helper lo deriva por tipo).
   const marcasPayload: MarcaPorcentajeInput[] = useMemo(
-    () =>
-      Array.from(marcasSel).map((marcaId) => ({
-        marcaId,
-        porcentaje: 50,
-      })),
-    [marcasSel],
+    () => (marcaSel ? [{ marcaId: marcaSel, porcentaje: 50 }] : []),
+    [marcaSel],
   );
 
-  const marcasValidas = marcasPayload.length > 0;
-
-  function toggleMarca(marcaId: string) {
-    setMarcasSel((prev) => {
-      const next = new Set(prev);
-      if (next.has(marcaId)) next.delete(marcaId);
-      else next.add(marcaId);
-      return next;
-    });
-  }
+  const marcasValidas = marcaSel !== "";
 
   const pasoDatos =
     numeroFactura.trim().length > 0 &&
@@ -301,6 +308,7 @@ export function FacturaForm({
           subtotal,
           itbms,
           tieneImportacion,
+          estadoPago,
           marcasSeleccionadas: marcasPayload,
           permitirDuplicado,
         },
@@ -611,85 +619,84 @@ export function FacturaForm({
 
       <PasoInstruccion
         numero={3}
-        titulo="¿A qué marca(s) aplica esta factura?"
-        descripcion="Externas (Tommy, Calvin, Reebok): la marca cubre parte del costo. Internas (Joybees): Fashion Group absorbe todo. No se pueden mezclar."
+        titulo="Marca y estado del gasto"
+        descripcion="Elige la marca del gasto y si ya está pagado."
         completado={marcasValidas}
       >
-        <div className="space-y-2">
-          {(() => {
-            // Determinar tipo dominante en la selección actual para deshabilitar
-            // el otro tipo (regla de exclusividad).
-            const selTipos = new Set<"externa" | "interna">();
-            for (const id of marcasSel) {
-              const m = marcasCatalogo.find((x) => x.id === id);
-              if (m) selTipos.add(m.tipo ?? "externa");
-            }
-            const tipoActivo = selTipos.size === 1
-              ? Array.from(selTipos)[0]
-              : null;
-
-            return marcasCatalogo.map((m) => {
-              const checked = marcasSel.has(m.id);
-              const tipoMarca = m.tipo ?? "externa";
-              const pct = tipoMarca === "interna" ? 1 : 0.5;
-              const cobrable = total * pct;
-              const deshabilitada =
-                tipoActivo !== null && tipoActivo !== tipoMarca;
-              return (
-                <label
-                  key={m.id}
-                  title={
-                    deshabilitada
-                      ? "Joybees no se puede mezclar con otras marcas en el mismo proyecto"
-                      : tipoMarca === "interna"
-                        ? "Marca interna · Fashion Group absorbe todo"
-                        : undefined
-                  }
-                  className={`flex items-center justify-between gap-3 px-3 py-2 rounded-md border transition ${
-                    deshabilitada
-                      ? "border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed"
-                      : checked
-                        ? "border-black bg-gray-50 cursor-pointer"
-                        : "border-gray-200 hover:border-gray-300 cursor-pointer"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={deshabilitada}
-                      onChange={() => toggleMarca(m.id)}
-                      className="accent-black w-4 h-4 disabled:cursor-not-allowed"
-                    />
-                    <span className="text-sm text-gray-800">{m.nombre}</span>
-                    {tipoMarca === "interna" && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
-                        Interna
-                      </span>
-                    )}
-                  </div>
-                  {checked && total > 0 && (
-                    <span className="text-xs font-mono tabular-nums text-gray-700">
-                      {formatearMonto(cobrable)}
-                    </span>
-                  )}
-                </label>
-              );
-            });
-          })()}
-          {marcasCatalogo.length === 0 && (
-            <p className="text-xs text-gray-500">
-              No hay marcas configuradas en el catálogo.
-            </p>
-          )}
-          {marcasSel.size === 0 && (
-            <p
-              className="text-xs text-red-600 mt-1"
-              aria-live="polite"
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label
+              htmlFor="factura-marca"
+              className="block text-sm text-gray-600 mb-1"
             >
-              Selecciona al menos una marca.
-            </p>
-          )}
+              Marca<span className="text-red-500 ml-0.5">*</span>
+            </label>
+            <select
+              id="factura-marca"
+              value={marcaSel}
+              onChange={(e) => setMarcaSel(e.target.value)}
+              required
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white focus:border-black focus:outline-none"
+            >
+              <option value="">Seleccionar marca…</option>
+              {marcasOrdenadas.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.nombre}
+                </option>
+              ))}
+            </select>
+            {marcasCatalogo.length === 0 && (
+              <p className="text-xs text-gray-500 mt-1">
+                No hay marcas configuradas en el catálogo.
+              </p>
+            )}
+            {marcaSel === "" && marcasCatalogo.length > 0 && (
+              <p className="text-xs text-red-600 mt-1" aria-live="polite">
+                Selecciona una marca.
+              </p>
+            )}
+          </div>
+
+          <div>
+            <span
+              id="factura-estado-label"
+              className="block text-sm text-gray-600 mb-1"
+            >
+              Estado
+            </span>
+            <div
+              role="radiogroup"
+              aria-labelledby="factura-estado-label"
+              className="flex rounded-md border border-gray-300 overflow-hidden"
+            >
+              <button
+                type="button"
+                role="radio"
+                aria-checked={estadoPago === "pendiente"}
+                onClick={() => setEstadoPago("pendiente")}
+                className={`flex-1 px-3 py-2 text-sm transition ${
+                  estadoPago === "pendiente"
+                    ? "bg-amber-500 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                Pendiente
+              </button>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={estadoPago === "pagado"}
+                onClick={() => setEstadoPago("pagado")}
+                className={`flex-1 px-3 py-2 text-sm transition border-l border-gray-300 ${
+                  estadoPago === "pagado"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-white text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                Pagado
+              </button>
+            </div>
+          </div>
         </div>
       </PasoInstruccion>
 

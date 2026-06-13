@@ -299,6 +299,8 @@ export async function createFactura(
     ? calcularCostoTotal(subtotal, true)
     : round2(subtotal + itbms);
 
+  const estadoPago = input.estadoPago === "pagado" ? "pagado" : "pendiente";
+
   const payload = {
     proyecto_id: input.proyectoId,
     numero_factura: numero,
@@ -309,6 +311,7 @@ export async function createFactura(
     itbms,
     total,
     tiene_importacion: tieneImportacion,
+    estado_pago: estadoPago,
   };
 
   const { data, error } = await supabaseServer
@@ -348,6 +351,9 @@ export async function updateFactura(
     const c = normalizarTexto(input.concepto);
     assertNoVacio(c, "concepto");
     payload.concepto = c;
+  }
+  if (input.estadoPago !== undefined) {
+    payload.estado_pago = input.estadoPago === "pagado" ? "pagado" : "pendiente";
   }
 
   // Si cambia subtotal, itbms o tieneImportacion, recalcular total.

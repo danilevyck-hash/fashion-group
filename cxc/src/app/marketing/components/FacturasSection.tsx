@@ -9,6 +9,7 @@ import {
   FacturaForm,
 } from "@/components/marketing";
 import type {
+  EstadoPagoFactura,
   FacturaConAdjuntos,
   FacturaConAdjuntosYMarcas,
   MarcaConPorcentaje,
@@ -160,6 +161,7 @@ export default function FacturasSection({
       subtotal: number;
       itbms: number;
       tieneImportacion: boolean;
+      estadoPago: EstadoPagoFactura;
       marcasSeleccionadas: MarcaPorcentajeInput[];
       permitirDuplicado?: boolean;
     },
@@ -283,6 +285,7 @@ export default function FacturasSection({
       subtotal: number;
       itbms: number;
       tieneImportacion: boolean;
+      estadoPago: EstadoPagoFactura;
       marcasSeleccionadas: MarcaPorcentajeInput[];
     },
   ) => {
@@ -635,7 +638,7 @@ export default function FacturasSection({
             Todavía no hay facturas en este proyecto.
           </div>
           <div className="text-xs text-gray-400 mt-1">
-            Agrega la primera factura para empezar a repartir el gasto.
+            Agrega la primera factura para registrar el gasto.
           </div>
         </div>
       ) : (

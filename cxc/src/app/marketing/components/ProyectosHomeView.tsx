@@ -69,16 +69,6 @@ function colorParaMarca(codigo: string): string {
   return "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200";
 }
 
-function tooltipParaMarca(m: {
-  nombre: string;
-  tipo?: "externa" | "interna";
-}): string {
-  if (m.tipo === "interna") {
-    return `${m.nombre} · Marca interna — Fashion Group absorbe 100%`;
-  }
-  return m.nombre;
-}
-
 function inicial(s: string): string {
   return (s || "?").charAt(0).toUpperCase();
 }
@@ -200,7 +190,7 @@ export default function ProyectosHomeView({
         <div>
           <h1 className="text-xl font-semibold text-gray-900">Marketing</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            Archivo de gastos por marca, tienda y proyecto
+            Registro de gastos de mercadeo por cliente
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm w-full sm:w-auto sm:shrink-0">
@@ -403,7 +393,7 @@ export default function ProyectosHomeView({
                           {p.marcas.map((m) => (
                             <span
                               key={m.id}
-                              title={tooltipParaMarca(m)}
+                              title={m.nombre}
                               className={`inline-flex items-center justify-center w-6 h-6 rounded-md border text-[11px] font-bold ${colorParaMarca(m.codigo)}`}
                             >
                               {inicial(m.nombre)}

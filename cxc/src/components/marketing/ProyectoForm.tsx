@@ -75,13 +75,13 @@ export function ProyectoForm({
             Nuevo proyecto
           </h2>
           <p className="text-xs text-gray-500">
-            Las marcas se asignan a cada factura al subirla, no al proyecto.
+            La marca se elige en cada factura al subirla, no en el proyecto.
           </p>
         </div>
 
         <div>
           <label className="block text-sm text-gray-600 mb-1">
-            Tienda<span className="text-red-500 ml-0.5">*</span>
+            Cliente<span className="text-red-500 ml-0.5">*</span>
           </label>
           <ClienteTypeahead
             value={tienda}
@@ -94,7 +94,7 @@ export function ProyectoForm({
               setTienda(texto);
               setTiendaCodigo("");
             }}
-            placeholder="Buscar tienda en el directorio…"
+            placeholder="Busca el cliente en el directorio…"
             inputClassName="w-full rounded-md border border-gray-300 px-3 py-2 pr-16 text-sm focus:border-black focus:outline-none"
           />
           <p className="text-xs text-gray-400 mt-1">
@@ -108,14 +108,14 @@ export function ProyectoForm({
             htmlFor="proyecto-nombre"
             className="block text-sm text-gray-600 mb-1"
           >
-            Nombre
+            Descripción
           </label>
           <input
             id="proyecto-nombre"
             type="text"
             value={nombre}
             onChange={(e) => setNombre(e.target.value)}
-            placeholder="Ej: Tienda nueva — Abril 2026"
+            placeholder="Opcional — ej: Remodelación tienda Abril 2026"
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none"
           />
         </div>

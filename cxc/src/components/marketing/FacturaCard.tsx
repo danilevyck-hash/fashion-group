@@ -35,17 +35,14 @@ export function FacturaCard({
     onClick ? "hover:border-black cursor-pointer" : ""
   }`;
 
-  // Tags por marca con inicial coloreada + % y cobrable
+  // Chip por marca con inicial coloreada (sin %, sin reparto).
   function colorParaMarca(codigo: string): string {
     if (codigo === "TH") return "bg-red-50 text-red-700 border-red-200";
     if (codigo === "CK") return "bg-gray-100 text-gray-800 border-gray-300";
     if (codigo === "RBK") return "bg-blue-50 text-blue-700 border-blue-200";
+    if (codigo === "J") return "bg-emerald-50 text-emerald-700 border-emerald-200";
     return "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200";
   }
-
-  // Gasto completo por marca (sin co-op): reparte factura.total por la porción
-  // real de cada marca (porcentaje normalizado). 1 marca = total completo.
-  const sumPctMarcas = porcentajesMarcas.reduce((s, m) => s + m.porcentaje, 0) || 1;
 
   const body = (
     <div className="flex flex-col gap-2">
@@ -62,6 +59,17 @@ export function FacturaCard({
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
+          {!anulada && (
+            <span
+              className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${
+                factura.estado_pago === "pagado"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : "bg-amber-50 text-amber-800 border-amber-200"
+              }`}
+            >
+              {factura.estado_pago === "pagado" ? "Pagado" : "Pendiente"}
+            </span>
+          )}
           {factura.tiene_importacion && !anulada && (
             <span
               className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-medium"
@@ -115,7 +123,6 @@ export function FacturaCard({
       {porcentajesMarcas.length > 0 && !anulada && (
         <div className="flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-2">
           {porcentajesMarcas.map((m) => {
-            const cobrable = factura.total * (m.porcentaje / sumPctMarcas);
             const inicial = (m.marca.nombre || m.marca.codigo || "?")
               .charAt(0)
               .toUpperCase();
@@ -126,10 +133,6 @@ export function FacturaCard({
               >
                 <span className="font-semibold">[{inicial}]</span>
                 <span className="font-medium">{m.marca.nombre}</span>
-                <span className="text-gray-400">→</span>
-                <span className="font-mono tabular-nums font-semibold">
-                  {formatearMonto(cobrable)}
-                </span>
               </div>
             );
           })}

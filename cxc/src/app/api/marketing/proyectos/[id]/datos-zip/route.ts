@@ -96,6 +96,7 @@ export async function GET(
       itbms: f.itbms,
       total: f.total,
       tiene_importacion: f.tiene_importacion,
+      estado_pago: f.estado_pago,
       anulado_en: f.anulado_en,
       anulado_motivo: f.anulado_motivo,
       created_at: f.created_at,

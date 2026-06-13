@@ -45,27 +45,6 @@ function mapMarca(row: Record<string, unknown>): MkMarca {
   };
 }
 
-// Trae tipo + id para un conjunto de marca_ids, defaulting 'externa'.
-async function tiposDeMarcas(
-  marcaIds: ReadonlyArray<string>,
-): Promise<Map<string, TipoMarca>> {
-  if (marcaIds.length === 0) return new Map();
-  const { data, error } = await supabaseServer
-    .from("mk_marcas")
-    .select("*")
-    .in("id", marcaIds);
-  if (error) {
-    throw new Error(`tiposDeMarcas: ${error.message}`);
-  }
-  const out = new Map<string, TipoMarca>();
-  for (const row of (data ?? []) as Array<Record<string, unknown>>) {
-    const tipoRaw = String(row.tipo ?? "externa");
-    const tipo: TipoMarca = tipoRaw === "interna" ? "interna" : "externa";
-    out.set(String(row.id), tipo);
-  }
-  return out;
-}
-
 // Trae tipo + empresa_codigo por marca. Default empresa_pagadora_codigo se
 // deriva de aquí cuando el caller no manda override.
 async function infoDeMarcas(
@@ -89,78 +68,6 @@ async function infoDeMarcas(
     });
   }
   return out;
-}
-
-// Valida que todas las marcas sean del mismo tipo (todas externas o todas internas).
-function validarMismoTipo(
-  marcaIds: ReadonlyArray<string>,
-  tipos: Map<string, TipoMarca>,
-): TipoMarca {
-  const setTipos = new Set<TipoMarca>();
-  for (const id of marcaIds) {
-    setTipos.add(tipos.get(id) ?? "externa");
-  }
-  if (setTipos.size > 1) {
-    throw new Error(
-      "Joybees no se puede mezclar con otras marcas en el mismo proyecto.",
-    );
-  }
-  return setTipos.values().next().value ?? "externa";
-}
-
-// Valida que el proyecto de la factura no tenga facturas de otro tipo.
-// Excluye la factura actual (cuando es edición).
-async function validarTipoCoherenteConProyecto(
-  facturaId: string,
-  tipoNuevo: TipoMarca,
-): Promise<void> {
-  // Ubicar proyecto_id de la factura actual.
-  const { data: fRow, error: fErr } = await supabaseServer
-    .from("mk_facturas")
-    .select("proyecto_id")
-    .eq("id", facturaId)
-    .maybeSingle();
-  if (fErr) throw new Error(`validarTipoCoherenteConProyecto: ${fErr.message}`);
-  if (!fRow) return;
-  const proyectoId = String((fRow as { proyecto_id: string }).proyecto_id);
-
-  // Otras facturas vigentes del mismo proyecto (excluye la actual).
-  const { data: siblingsRows, error: sErr } = await supabaseServer
-    .from("mk_facturas")
-    .select("id")
-    .eq("proyecto_id", proyectoId)
-    .is("anulado_en", null)
-    .neq("id", facturaId);
-  if (sErr) throw new Error(`validarTipoCoherenteConProyecto[siblings]: ${sErr.message}`);
-  const siblingIds = ((siblingsRows ?? []) as Array<{ id: string }>).map(
-    (r) => String(r.id),
-  );
-  if (siblingIds.length === 0) return;
-
-  // Marcas ya asignadas a esas facturas vigentes.
-  const { data: fmRows, error: fmErr } = await supabaseServer
-    .from("mk_factura_marcas")
-    .select("marca_id")
-    .in("factura_id", siblingIds);
-  if (fmErr) throw new Error(`validarTipoCoherenteConProyecto[fm]: ${fmErr.message}`);
-  const otrosMarcaIds = Array.from(
-    new Set(
-      ((fmRows ?? []) as Array<{ marca_id: string }>).map((r) =>
-        String(r.marca_id),
-      ),
-    ),
-  );
-  if (otrosMarcaIds.length === 0) return;
-
-  const tipos = await tiposDeMarcas(otrosMarcaIds);
-  for (const id of otrosMarcaIds) {
-    const t = tipos.get(id) ?? "externa";
-    if (t !== tipoNuevo) {
-      throw new Error(
-        "Joybees no se puede mezclar con otras marcas en el mismo proyecto.",
-      );
-    }
-  }
 }
 
 function round2(n: number): number {
@@ -204,16 +111,14 @@ export async function getMarcasDeFactura(
 /**
  * Reemplaza todas las marcas de una factura. Aplica:
  *   1. Validación: marcaIds únicas y >= 1.
- *   2. Validación: todas las marcas deben ser del mismo tipo (externa/interna).
- *      Internas (Joybees) no se mezclan con externas.
- *   3. Validación: el tipo elegido debe ser coherente con el resto de facturas
- *      vigentes del proyecto (no se puede meter Joybees a un proyecto que ya
- *      tiene facturas externas, ni viceversa).
- *   4. Borra filas previas en mk_factura_marcas.
- *   5. Inserta nuevas con porcentaje = 50 si externa, 100 si interna.
+ *   2. Borra filas previas en mk_factura_marcas.
+ *   3. Inserta nuevas con porcentaje = 50 si externa, 100 si interna.
  *
- * Cualquier `porcentaje` en el input se ignora — el valor real se deriva del
- * tipo de marca.
+ * Registro de gastos: una factura lleva UNA marca. Se retiraron las
+ * validaciones de cobranza (mismo-tipo y coherencia de tipo por proyecto):
+ * Joybees / Otros pueden convivir con cualquier marca. La data de % y
+ * empresa_pagadora se sigue escribiendo para no romper reportes/exports.
+ * Cualquier `porcentaje` en el input se ignora — se deriva del tipo de marca.
  */
 export async function setMarcasDeFactura(
   facturaId: string,
@@ -235,12 +140,8 @@ export async function setMarcasDeFactura(
   }
   const marcaIds = Array.from(ids);
 
-  // Validación de tipos + lookup de empresa_codigo default.
+  // Lookup de tipo + empresa_codigo default por marca (sin validar mezcla).
   const info = await infoDeMarcas(marcaIds);
-  const tipos = new Map<string, TipoMarca>();
-  for (const [id, v] of info) tipos.set(id, v.tipo);
-  const tipoNuevo = validarMismoTipo(marcaIds, tipos);
-  await validarTipoCoherenteConProyecto(facturaId, tipoNuevo);
 
   // Borrar filas existentes
   const { error: delError } = await supabaseServer

@@ -98,11 +98,22 @@ export function BorradorFacturaCard({
   // alimenta borrador.duplicados. El card solo renderiza el warning.
   const duplicados = borrador.duplicados;
 
-  function toggleMarca(marcaId: string) {
-    const set = new Set(borrador.marcaIds);
-    if (set.has(marcaId)) set.delete(marcaId);
-    else set.add(marcaId);
-    onChange(borrador.cardId, { marcaIds: Array.from(set) });
+  // Registro de gastos: una sola marca por factura.
+  const marcasOrdenadas = useMemo(() => {
+    const orden = ["TH", "CK", "RBK", "J", "FC", "OTR"];
+    return [...marcasCatalogo].sort((a, b) => {
+      const ia = orden.indexOf(a.codigo);
+      const ib = orden.indexOf(b.codigo);
+      const ra = ia === -1 ? orden.length : ia;
+      const rb = ib === -1 ? orden.length : ib;
+      if (ra !== rb) return ra - rb;
+      return a.nombre.localeCompare(b.nombre, "es");
+    });
+  }, [marcasCatalogo]);
+  const marcaSel = borrador.marcaIds[0] ?? "";
+
+  function setMarca(marcaId: string) {
+    onChange(borrador.cardId, { marcaIds: marcaId ? [marcaId] : [] });
   }
 
   // ── Render ──────────────────────────────────────────────────────────────
@@ -300,80 +311,26 @@ export function BorradorFacturaCard({
         </span>
       </div>
 
-      {/* Marcas — externas 50%, internas (Joybees) 100%. No se pueden mezclar. */}
+      {/* Marca — una sola por factura (registro de gastos). */}
       <div>
-        <div className="text-xs text-gray-500 mb-1">
-          Marcas que aplican
-          <span className="text-red-500 ml-0.5">*</span>
-          <span className="text-gray-400 ml-2">
-            Externas: la marca cubre parte · Internas: FG absorbe todo
-          </span>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-          {(() => {
-            const selTipos = new Set<"externa" | "interna">();
-            for (const id of borrador.marcaIds) {
-              const m = marcasCatalogo.find((x) => x.id === id);
-              if (m) selTipos.add(m.tipo ?? "externa");
-            }
-            const tipoActivo = selTipos.size === 1
-              ? Array.from(selTipos)[0]
-              : null;
-
-            return marcasCatalogo.map((m) => {
-              const checked = borrador.marcaIds.includes(m.id);
-              const tipoMarca = m.tipo ?? "externa";
-              const pct = tipoMarca === "interna" ? 1 : 0.5;
-              const cobrable = total * pct;
-              const deshabilitada =
-                tipoActivo !== null && tipoActivo !== tipoMarca;
-              return (
-                <label
-                  key={m.id}
-                  title={
-                    deshabilitada
-                      ? "Joybees no se puede mezclar con otras marcas en el mismo proyecto"
-                      : tipoMarca === "interna"
-                        ? "Marca interna · Fashion Group absorbe todo"
-                        : undefined
-                  }
-                  className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-md border transition text-sm ${
-                    deshabilitada
-                      ? "border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed"
-                      : checked
-                        ? "border-black bg-white cursor-pointer"
-                        : "border-gray-200 bg-white hover:border-gray-300 cursor-pointer"
-                  } ${estaProcesando ? "opacity-60" : ""}`}
-                >
-                  <span className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => toggleMarca(m.id)}
-                      disabled={estaProcesando || deshabilitada}
-                      className="accent-black w-3.5 h-3.5 disabled:cursor-not-allowed"
-                    />
-                    <span className="text-gray-800">{m.nombre}</span>
-                    {tipoMarca === "interna" && (
-                      <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
-                        Interna
-                      </span>
-                    )}
-                  </span>
-                  {checked && total > 0 && (
-                    <span className="text-xs font-mono tabular-nums text-gray-700">
-                      {formatearMonto(cobrable)}
-                    </span>
-                  )}
-                </label>
-              );
-            });
-          })()}
-        </div>
+        <label className="block text-xs text-gray-500 mb-1">
+          Marca<span className="text-red-500 ml-0.5">*</span>
+        </label>
+        <select
+          value={marcaSel}
+          onChange={(e) => setMarca(e.target.value)}
+          disabled={estaProcesando}
+          className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white focus:border-black focus:outline-none disabled:bg-gray-50"
+        >
+          <option value="">Seleccionar marca…</option>
+          {marcasOrdenadas.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.nombre}
+            </option>
+          ))}
+        </select>
         {borrador.marcaIds.length === 0 && (
-          <p className="text-[11px] text-red-600 mt-1">
-            Selecciona al menos una marca.
-          </p>
+          <p className="text-[11px] text-red-600 mt-1">Selecciona una marca.</p>
         )}
       </div>
 

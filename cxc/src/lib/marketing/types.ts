@@ -22,6 +22,11 @@ export type EmpresaCodigo = (typeof EMPRESA_CODIGOS)[number];
 // escribe 'cerrado'; al reabrir, 'abierto'.
 export type EstadoProyecto = "abierto" | "cerrado";
 
+// Estado de pago a nivel FACTURA (registro de gastos). Reemplaza en la UI al
+// workflow de cobranza del proyecto (abierto/enviado/cobrado), que se conserva
+// en DB pero ya no se muestra ni se opera.
+export type EstadoPagoFactura = "pendiente" | "pagado";
+
 // Tipo de marca:
 //   'externa' — hay contraparte (Tommy, Calvin, Reebok) con quien compartir 50/50.
 //   'interna' — Fashion Group absorbe 100% del gasto (ej: Joybees).
@@ -96,6 +101,9 @@ export interface MkFactura {
   // Zona libre: si true, total = subtotal × 1.15 (ITBMS forzado a 0).
   // Si false, total = subtotal + itbms (comportamiento clásico).
   tiene_importacion: boolean;
+  // Registro de gastos: Pendiente (default) / Pagado. Independiente del estado
+  // de cobranza del proyecto (legacy, oculto en UI).
+  estado_pago: EstadoPagoFactura;
   anulado_en: string | null;
   anulado_motivo: string | null;
   created_at: string;
@@ -200,6 +208,7 @@ export interface CreateFacturaInput {
   subtotal: number;
   itbms?: number;
   tieneImportacion?: boolean;
+  estadoPago?: EstadoPagoFactura;
 }
 
 export interface UpdateFacturaInput {
@@ -210,6 +219,7 @@ export interface UpdateFacturaInput {
   subtotal?: number;
   itbms?: number;
   tieneImportacion?: boolean;
+  estadoPago?: EstadoPagoFactura;
 }
 
 export interface CreateAdjuntoInput {
