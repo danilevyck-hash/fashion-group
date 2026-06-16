@@ -171,13 +171,6 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
             <div className="font-medium uppercase mb-6">
               {isDirect ? "Recibido por — Cliente" : "Recibido Conforme — Transportista"}
             </div>
-            {!isDirect && (
-              <div className="mb-4">
-                PLACA:{" "}
-                <span className="ml-1 font-medium">{g.placa || ""}</span>
-                {!g.placa && <span className="border-b border-gray-400 inline-block w-48 ml-1">&nbsp;</span>}
-              </div>
-            )}
             <div className="mb-4">
               NOMBRE:{" "}
               <span className="ml-1 font-medium">{g.receptor_nombre || ""}</span>

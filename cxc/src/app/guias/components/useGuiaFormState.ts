@@ -143,19 +143,9 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
   const isGuiaDraftEmpty = useCallback((d: typeof guiaDraftData) => {
     return !d.transportistaId && !d.entregadoPor && !d.observaciones && d.items.every(i => !i.cliente && !i.direccion && !i.facturas && (!i.bultos || i.bultos === 0));
   }, []);
-  const { draft: guiaDraft, hasDraft: hasGuiaDraft, clearDraft: clearGuiaDraft, draftTimeAgo: guiaDraftTimeAgo } = useDraftAutoSave("guia", guiaDraftData, isGuiaDraftEmpty);
-
-  function restoreGuiaDraft() {
-    if (!guiaDraft) return;
-    if (guiaDraft.modoEntrega === "transportista" || guiaDraft.modoEntrega === "entrega_directa") {
-      setModoEntrega(guiaDraft.modoEntrega);
-    }
-    setTransportistaId(guiaDraft.transportistaId || null);
-    setEntregadoPor(guiaDraft.entregadoPor || "");
-    setObservaciones(guiaDraft.observaciones || "");
-    if (guiaDraft.items?.length) setItems(guiaDraft.items);
-    clearGuiaDraft();
-  }
+  // Auto-save del borrador: solo se conserva clearDraft para limpiar el
+  // localStorage al guardar. Ya no se ofrece restaurar (banner eliminado).
+  const { clearDraft: clearGuiaDraft } = useDraftAutoSave("guia", guiaDraftData, isGuiaDraftEmpty);
 
   // Adders de listas dinámicas (transportistas ya no se agregan desde el form
   // — son catálogo controlado por admin)
@@ -302,7 +292,7 @@ export function useGuiaFormState({ editingId = null }: Options = {}) {
     saving,
     updateItem, updateItemFields, addRow, removeRow,
     saveGuia,
-    // draft
-    hasGuiaDraft, guiaDraftTimeAgo, restoreGuiaDraft, clearGuiaDraft,
+    // draft: solo limpieza al guardar (no se restaura)
+    clearGuiaDraft,
   };
 }
