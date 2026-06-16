@@ -4,7 +4,8 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { transportistaLabel } from "@/lib/transportistaLabel";
 
-const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"];
+const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"]; // lectura (GET)
+const GUIAS_WRITE_ROLES = ["admin", "secretaria", "bodega"]; // escritura: vendedor es solo lectura
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const s = getSession(req);
-  if (!s || !GUIAS_ROLES.includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
+  if (!s || !GUIAS_WRITE_ROLES.includes(s.role)) return NextResponse.json({ error: "Sin permiso" }, { status: 403 });
   const body = await req.json();
   const { fecha, modo_entrega, transportista_id, placa, observaciones, items, monto_total, estado, firma_transportista, entregado_por, numero_guia_transp } = body;
 
