@@ -974,7 +974,7 @@ function ImportInstructions() {
           <p className="font-medium text-gray-800 mb-1">Valores validos</p>
           <ul className="space-y-0.5">
             <li>
-              <span className="font-mono text-gray-700">Genero</span>: male, female, kids, unisex
+              <span className="font-mono text-gray-700">Genero</span>: hombre/men/male, mujer/women/female/dama, ninos/kids/junior, unisex (acepta variantes en ingles o espanol, may/min)
             </li>
             <li>
               <span className="font-mono text-gray-700">Estado</span>: nuevo, oferta, proximamente (o vacio)

@@ -1,6 +1,8 @@
 // ── CSV Import Validator ─────────────────────────────────────────────────────
 // Shared validation for catalog CSV imports (Reebok & Joybees)
 
+import { normalizeGender } from "./reebok-gender";
+
 export interface CsvImportRow {
   sku: string;
   name: string;
@@ -23,7 +25,19 @@ export interface CsvValidationResult {
 const EXPECTED_HEADERS = ["SKU", "Nombre", "Precio", "Cantidad", "Genero", "Estado"];
 // Note: "Categoria" is optional — read inline below, only meaningful for active_wear imports.
 
-const VALID_GENDERS = ["male", "female", "kids", "unisex", "adults", "adults_m", "women", "junior"];
+// Joybees-specific gender values that reebok-gender.ts does NOT map to a canonical
+// group (it has its own label mapping in src/components/joybees), but are valid here.
+const EXTRA_VALID_GENDERS = new Set(["adults", "adults_m"]);
+
+// A gender is recognized if it maps to a canonical group by ROOT (via reebok-gender:
+// hombre/mujer/ninos/unisex — so MEN, hombre, women, dama, junior… all pass) or is a
+// known Joybees value. Only genuine garbage (no group) triggers a warning. This keeps
+// the validator in sync with what the catalog actually understands at display time.
+function isRecognizedGender(lowerGender: string): boolean {
+  if (EXTRA_VALID_GENDERS.has(lowerGender)) return true;
+  return normalizeGender(lowerGender) !== null;
+}
+
 const VALID_BADGES = ["nuevo", "oferta", "proximamente", ""];
 
 // Strip diacritics (e.g., "próximamente" → "proximamente") for badge normalization.
@@ -186,9 +200,9 @@ export function validateCsvImport(
       estadoLower === "oferta" ? "oferta" :
       estadoLower === "proximamente" ? "proximamente" : "";
 
-    // 9. Genero no reconocido
-    if (gender && !VALID_GENDERS.includes(gender)) {
-      warnings.push(`Fila ${lineNum} (SKU ${rawSku}): genero '${rawGender}' no reconocido. Valores validos: ${VALID_GENDERS.join(", ")}`);
+    // 9. Genero no reconocido — recognized by root (hombre/mujer/ninos/unisex) or Joybees value.
+    if (gender && !isRecognizedGender(gender)) {
+      warnings.push(`Fila ${lineNum} (SKU ${rawSku}): genero '${rawGender}' no reconocido. Valores validos: hombre/men/male, mujer/women/female/dama, ninos/kids/junior, unisex (o adults para Joybees)`);
     }
 
     // 10. Estado no reconocido
