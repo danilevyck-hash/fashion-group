@@ -7,7 +7,8 @@ import { transportistaLabel } from "@/lib/transportistaLabel";
 import { sendTelegramAlert } from "@/lib/telegram";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"];
+const GUIAS_ROLES = ["admin", "secretaria", "bodega", "vendedor"]; // lectura (GET)
+const GUIAS_WRITE_ROLES = ["admin", "secretaria", "bodega"]; // escritura: vendedor es solo lectura
 
 interface GuiaForNotify {
   numero: number;
@@ -82,7 +83,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 // ── PUT (bodega full dispatch with items/signatures) ──
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRole(req, GUIAS_ROLES);
+  const auth = requireRole(req, GUIAS_WRITE_ROLES);
   if (auth instanceof NextResponse) return auth;
   const { id } = params;
   if (!UUID_RE.test(id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
@@ -230,7 +231,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 // ── PATCH (quick dispatch from list / bodega partial update) ──
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const auth = requireRole(req, GUIAS_ROLES);
+  const auth = requireRole(req, GUIAS_WRITE_ROLES);
   if (auth instanceof NextResponse) return auth;
   if (!UUID_RE.test(params.id)) return NextResponse.json({ error: "ID inválido" }, { status: 400 });
   const body = await req.json();
