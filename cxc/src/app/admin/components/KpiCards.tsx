@@ -41,7 +41,7 @@ export default function KpiCards({ roleClients, riskFilter, onRiskFilterChange }
     { key: "all", label: "Total Pendiente", value: totalCxc, count: roleClients.length, dot: "", color: "text-gray-900", activeColor: "border-gray-800" },
     ...AGING_ORDER.map((k) => ({
       key: k,
-      label: AGING[k].label,
+      label: AGING[k].colLabel, // solo el rango (formato idéntico a las columnas de la tabla)
       value: valueByKey[k].value,
       count: valueByKey[k].count,
       dot: AGING[k].dot,

@@ -10,8 +10,7 @@ export default function AgingLegend() {
       {AGING_ORDER.map((k) => (
         <span key={k} className="inline-flex items-center gap-1.5">
           <span className={`inline-block w-2.5 h-2.5 rounded-full ${AGING[k].dot}`} />
-          <span className="font-medium text-gray-700">{AGING[k].label}</span>
-          <span className="text-gray-400 tabular-nums">{AGING[k].range}</span>
+          <span className="font-medium text-gray-700 tabular-nums">{AGING[k].colLabel}</span>
         </span>
       ))}
     </div>
