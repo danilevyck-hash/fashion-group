@@ -7,36 +7,30 @@ export const dynamic = "force-dynamic";
 const uuidRegex =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-interface RepartoEntryBody {
+interface MarcaPctBody {
   marcaId?: string;
-  empresa?: string | null;
-  cantidad?: number | string;
+  porcentaje?: number | string;
 }
 
 interface UpdateBody {
   notas?: string | null;
+  marcas?: MarcaPctBody[];
   items?: Array<{
     productoId?: string;
-    reparto?: RepartoEntryBody[];
+    cantidad?: number | string;
   }>;
 }
 
-function normalizarRepartoBody(it: {
-  reparto?: RepartoEntryBody[];
-}): Array<{ marcaId: string; empresa?: string | null; cantidad: number }> {
-  if (Array.isArray(it.reparto) && it.reparto.length > 0) {
-    return it.reparto.map((r) => ({
-      marcaId: String(r.marcaId ?? ""),
-      empresa:
-        r.empresa === undefined
-          ? undefined
-          : r.empresa === null
-            ? null
-            : String(r.empresa),
-      cantidad: Number(r.cantidad ?? 0),
-    }));
-  }
-  return [];
+function normalizarMarcasBody(
+  marcas?: MarcaPctBody[],
+): Array<{ marcaId: string; porcentaje: number }> {
+  if (!Array.isArray(marcas)) return [];
+  return marcas
+    .map((m) => ({
+      marcaId: String(m.marcaId ?? ""),
+      porcentaje: Number(m.porcentaje ?? 0),
+    }))
+    .filter((m) => m.marcaId);
 }
 
 export async function PATCH(
@@ -58,10 +52,11 @@ export async function PATCH(
     }
     const items = body.items.map((it) => ({
       productoId: String(it.productoId ?? ""),
-      reparto: normalizarRepartoBody(it),
+      cantidad: Number(it.cantidad ?? 0),
     }));
     const entrega = await updateEntrega(params.id, {
       items,
+      marcas: normalizarMarcasBody(body.marcas),
       notas: body.notas,
     });
     return NextResponse.json(entrega);

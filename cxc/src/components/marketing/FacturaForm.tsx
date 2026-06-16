@@ -1,9 +1,8 @@
 "use client";
 
-// Fase 2: las marcas se asignan A NIVEL FACTURA (no proyecto).
-// El form expone 2 modos:
-//   - "Una sola marca al 100%"
-//   - "Dividir entre varias marcas"
+// Las marcas se asignan A NIVEL FACTURA. Registro de gastos (jun 2026): una
+// factura lleva 1 o VARIAS marcas con % entre ellas (suma 100; 1 marca = 100%).
+// Se retiró el reparto 50/50 marca↔empresa pagadora.
 // Al guardar, el caller recibe marcasSeleccionadas: [{marcaId, porcentaje}] y
 // debe invocar setMarcasDeFactura(facturaId, marcas) después de crear/editar
 // la fila en mk_facturas.
@@ -54,6 +53,55 @@ function ordenarMarcas(marcas: MkMarca[]): MkMarca[] {
     const rb = ib === -1 ? ORDEN_MARCAS.length : ib;
     if (ra !== rb) return ra - rb;
     return a.nombre.localeCompare(b.nombre, "es");
+  });
+}
+
+// ── Marcas con % a nivel factura (1 marca = 100%; varias = % entre ellas) ──
+interface MarcaSelFactura {
+  marcaId: string;
+  porcentajeStr: string;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+// Reparte 100% parejo (la última absorbe el resto).
+function repartirParejo(ids: ReadonlyArray<string>): MarcaSelFactura[] {
+  const n = ids.length;
+  if (n === 0) return [];
+  const base = Math.floor((100 / n) * 100) / 100;
+  return ids.map((id, i) => ({
+    marcaId: id,
+    porcentajeStr: String(i === n - 1 ? round2(100 - base * (n - 1)) : base),
+  }));
+}
+
+// Normaliza filas {marcaId, porcentaje} a % que suman 100 (para edición de
+// facturas viejas, cuyos % podían sumar !=100 bajo la regla 50/50 anterior).
+function normalizarPorcentajes(
+  rows: ReadonlyArray<{ marcaId: string; porcentaje: number }>,
+): MarcaSelFactura[] {
+  const uniq: Array<{ marcaId: string; porcentaje: number }> = [];
+  const seen = new Set<string>();
+  for (const r of rows) {
+    if (!r.marcaId || seen.has(r.marcaId)) continue;
+    seen.add(r.marcaId);
+    uniq.push(r);
+  }
+  if (uniq.length === 0) return [];
+  if (uniq.length === 1) {
+    return [{ marcaId: uniq[0].marcaId, porcentajeStr: "100" }];
+  }
+  const sum = uniq.reduce((s, r) => s + (Number(r.porcentaje) || 0), 0) || 1;
+  let acum = 0;
+  return uniq.map((r, i) => {
+    const pct =
+      i === uniq.length - 1
+        ? round2(100 - acum)
+        : round2(((Number(r.porcentaje) || 0) / sum) * 100);
+    acum = round2(acum + pct);
+    return { marcaId: r.marcaId, porcentajeStr: String(pct) };
   });
 }
 
@@ -156,22 +204,33 @@ export function FacturaForm({
   // auto-reportarse como duplicado de sí misma.
   const editandoId = initial?.id ?? null;
 
-  // ── Marca ──
-  // Registro de gastos: cada factura lleva UNA sola marca (sin %, sin reparto).
-  // El catálogo ordenado alimenta el dropdown.
+  // ── Marcas (1 o varias con % entre ellas; suma 100) ──
   const marcasOrdenadas = useMemo(
     () => ordenarMarcas(marcasCatalogo),
     [marcasCatalogo],
   );
-  const marcaInicial: string = useMemo(() => {
-    if (initialMarcas && initialMarcas.length > 0) return initialMarcas[0].marcaId;
-    if (proyecto.marcas && proyecto.marcas.length > 0) {
-      return proyecto.marcas[0].marca.id;
+  const marcasIniciales: MarcaSelFactura[] = useMemo(() => {
+    if (initialMarcas && initialMarcas.length > 0) {
+      return normalizarPorcentajes(
+        initialMarcas.map((m) => ({
+          marcaId: m.marcaId,
+          porcentaje: m.porcentaje,
+        })),
+      );
     }
-    return "";
+    if (proyecto.marcas && proyecto.marcas.length > 0) {
+      return [{ marcaId: proyecto.marcas[0].marca.id, porcentajeStr: "100" }];
+    }
+    return [];
   }, [initialMarcas, proyecto.marcas]);
 
-  const [marcaSel, setMarcaSel] = useState<string>(() => marcaInicial);
+  const [marcasSel, setMarcasSel] = useState<MarcaSelFactura[]>(
+    () => marcasIniciales,
+  );
+  const marcaById = useMemo(
+    () => new Map(marcasCatalogo.map((m) => [m.id, m])),
+    [marcasCatalogo],
+  );
 
   const subtotal = Number(subtotalStr) || 0;
   // Zona libre y ITBMS son mutuamente excluyentes (helper compartido single/bulk).
@@ -189,13 +248,40 @@ export function FacturaForm({
     [subtotal, itbmsPct, tieneImportacion],
   );
 
-  // Payload final: una marca con porcentaje 50 (el helper lo deriva por tipo).
-  const marcasPayload: MarcaPorcentajeInput[] = useMemo(
-    () => (marcaSel ? [{ marcaId: marcaSel, porcentaje: 50 }] : []),
-    [marcaSel],
+  // Payload final: marcas con su % real (1 marca = 100%; varias = % entre ellas).
+  const sumPctMarcas = marcasSel.reduce(
+    (s, m) => s + (Number(m.porcentajeStr) || 0),
+    0,
   );
+  const marcasPayload: MarcaPorcentajeInput[] = useMemo(
+    () =>
+      marcasSel.map((m) => ({
+        marcaId: m.marcaId,
+        porcentaje: Number(m.porcentajeStr) || 0,
+      })),
+    [marcasSel],
+  );
+  const marcasValidas =
+    marcasSel.length >= 1 &&
+    marcasSel.every((m) => (Number(m.porcentajeStr) || 0) > 0) &&
+    Math.abs(sumPctMarcas - 100) < 0.01;
 
-  const marcasValidas = marcaSel !== "";
+  const multiMarca = marcasSel.length > 1;
+  const toggleMarca = (id: string) => {
+    setMarcasSel((prev) => {
+      const exists = prev.some((m) => m.marcaId === id);
+      const nextIds = exists
+        ? prev.filter((m) => m.marcaId !== id).map((m) => m.marcaId)
+        : [...prev.map((m) => m.marcaId), id];
+      return repartirParejo(nextIds);
+    });
+  };
+  const setMarcaPct = (id: string, value: string) => {
+    const clean = value.replace(/[^0-9.]/g, "");
+    setMarcasSel((prev) =>
+      prev.map((m) => (m.marcaId === id ? { ...m, porcentajeStr: clean } : m)),
+    );
+  };
 
   const pasoDatos =
     numeroFactura.trim().length > 0 &&
@@ -623,37 +709,81 @@ export function FacturaForm({
         descripcion="Elige la marca del gasto y si ya está pagado."
         completado={marcasValidas}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-3">
           <div>
-            <label
-              htmlFor="factura-marca"
-              className="block text-sm text-gray-600 mb-1"
-            >
-              Marca<span className="text-red-500 ml-0.5">*</span>
+            <label className="block text-sm text-gray-600 mb-1">
+              Marca(s)<span className="text-red-500 ml-0.5">*</span>
             </label>
-            <select
-              id="factura-marca"
-              value={marcaSel}
-              onChange={(e) => setMarcaSel(e.target.value)}
-              required
-              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm bg-white focus:border-black focus:outline-none"
-            >
-              <option value="">Seleccionar marca…</option>
-              {marcasOrdenadas.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.nombre}
-                </option>
-              ))}
-            </select>
-            {marcasCatalogo.length === 0 && (
-              <p className="text-xs text-gray-500 mt-1">
+            {marcasCatalogo.length === 0 ? (
+              <p className="text-xs text-gray-500">
                 No hay marcas configuradas en el catálogo.
               </p>
-            )}
-            {marcaSel === "" && marcasCatalogo.length > 0 && (
-              <p className="text-xs text-red-600 mt-1" aria-live="polite">
-                Selecciona una marca.
-              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {marcasOrdenadas.map((m) => {
+                    const sel = marcasSel.some((s) => s.marcaId === m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => toggleMarca(m.id)}
+                        className={`text-left rounded-md border-2 px-3 py-2 text-sm transition ${
+                          sel
+                            ? "border-black bg-gray-50 font-medium"
+                            : "border-gray-200 hover:border-gray-400"
+                        }`}
+                      >
+                        <span className="flex items-center justify-between gap-1">
+                          <span className="truncate">{m.nombre}</span>
+                          {sel && <span className="text-black text-xs">✓</span>}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {multiMarca && (
+                  <div className="mt-2 rounded-md border border-gray-200 bg-gray-50/60 p-3 space-y-2">
+                    <div className="text-[11px] uppercase tracking-wider text-gray-500">
+                      % por marca (debe sumar 100%)
+                    </div>
+                    {marcasSel.map((m) => (
+                      <div
+                        key={m.marcaId}
+                        className="flex items-center justify-between gap-3"
+                      >
+                        <span className="text-sm text-gray-700">
+                          {marcaById.get(m.marcaId)?.nombre ?? "Marca"}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={m.porcentajeStr}
+                            onChange={(e) => setMarcaPct(m.marcaId, e.target.value)}
+                            className="w-20 rounded-md border border-gray-300 px-2 py-1.5 text-sm text-right tabular-nums focus:border-black focus:outline-none"
+                          />
+                          <span className="text-sm text-gray-500">%</span>
+                        </div>
+                      </div>
+                    ))}
+                    <div
+                      className={`text-xs text-right tabular-nums ${
+                        Math.abs(sumPctMarcas - 100) < 0.01
+                          ? "text-gray-500"
+                          : "text-red-600 font-medium"
+                      }`}
+                    >
+                      Suma: {round2(sumPctMarcas)}%
+                    </div>
+                  </div>
+                )}
+                {marcasSel.length === 0 && (
+                  <p className="text-xs text-red-600 mt-1" aria-live="polite">
+                    Selecciona al menos una marca.
+                  </p>
+                )}
+              </>
             )}
           </div>
 
@@ -667,7 +797,7 @@ export function FacturaForm({
             <div
               role="radiogroup"
               aria-labelledby="factura-estado-label"
-              className="flex rounded-md border border-gray-300 overflow-hidden"
+              className="flex rounded-md border border-gray-300 overflow-hidden sm:max-w-xs"
             >
               <button
                 type="button"

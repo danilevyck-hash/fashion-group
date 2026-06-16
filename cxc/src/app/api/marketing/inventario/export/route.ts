@@ -10,6 +10,7 @@ import {
   exportarExcelGlobal,
   exportarExcelTienda,
 } from "@/lib/marketing/inventario-excel";
+import { getMarcas } from "@/lib/marketing/queries";
 import { normalizarEstadoProyecto } from "@/lib/marketing/normalizar";
 import type { MkProyecto } from "@/lib/marketing/types";
 
@@ -49,7 +50,10 @@ export async function GET(req: NextRequest) {
   const proyectoId = searchParams.get("proyecto_id");
 
   try {
-    const productos = await listProductos();
+    const [productos, marcas] = await Promise.all([
+      listProductos(),
+      getMarcas(),
+    ]);
 
     // ---- Export individual de un proyecto ----
     if (proyectoId) {
@@ -82,6 +86,7 @@ export async function GET(req: NextRequest) {
         productos,
         entregas,
         proyecto,
+        marcas,
       });
       const fname = `entrega-${fileSafe(proyecto.tienda || proyecto.nombre || proyectoId)}.xlsx`;
       return new NextResponse(Buffer.from(buffer), {
@@ -122,6 +127,7 @@ export async function GET(req: NextRequest) {
       productos,
       entregas,
       proyectos,
+      marcas,
     });
     const today = new Date().toISOString().slice(0, 10);
     const fname = `inventario-muebles-${today}.xlsx`;

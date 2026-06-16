@@ -309,17 +309,25 @@ export interface RepartoItemInput {
 
 export interface EntregaItemInput {
   productoId: string;
+  // Modelo nuevo (registro de gastos, marca por %): unidades totales del
+  // producto en la entrega. La marca/% vive a nivel entrega (`marcas`), no por
+  // item. `reparto` queda como legacy (back-compat) — la UI ya no lo emite.
+  cantidad?: number;
   reparto?: RepartoItemInput[];
 }
 
 export interface CreateEntregaInput {
   proyectoId?: string | null;
   items: EntregaItemInput[];
+  // Marcas con % entre ellas (suma 100). 1 marca = 100%. El monto total de la
+  // entrega se reparte por estos %. Sin empresa interna (se retiró el 50/50).
+  marcas?: MarcaPorcentajeInput[];
   notas?: string | null;
 }
 
 export interface UpdateEntregaInput {
   items: EntregaItemInput[];
+  marcas?: MarcaPorcentajeInput[];
   notas?: string | null;
 }
 

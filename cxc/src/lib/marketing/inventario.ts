@@ -30,6 +30,7 @@ import type {
   CreateProductoInput,
   EntregaConItems,
   EntregaItemInput,
+  MarcaPorcentajeInput,
   MkEntregaItem,
   MkEntregaMuebles,
   MkInventarioProducto,
@@ -321,6 +322,7 @@ function normalizarReparto(
 
 interface NormalizedItem {
   productoId: string;
+  cantidad?: number;
   reparto: RepartoItemInput[];
 }
 
@@ -329,17 +331,25 @@ function normalizarItems(
 ): NormalizedItem[] {
   return items
     .map((it) => {
-      // La UI siempre emite `reparto` (1 marca por entrega). El shape legacy
-      // cantidadPorMarca se retiró (ningún caller lo enviaba).
+      // Modelo nuevo: la UI emite `cantidad` (unidades totales del producto) y
+      // las marcas/% van a nivel entrega. `reparto` queda como legacy.
       const reparto = Array.isArray(it.reparto)
         ? normalizarReparto(it.reparto)
         : [];
+      const cantidad =
+        it.cantidad != null && Number.isFinite(Number(it.cantidad))
+          ? Math.trunc(Number(it.cantidad))
+          : undefined;
       return {
         productoId: String(it.productoId ?? ""),
+        cantidad,
         reparto,
       };
     })
-    .filter((it) => it.productoId && it.reparto.length > 0);
+    .filter(
+      (it) =>
+        it.productoId && ((it.cantidad ?? 0) > 0 || it.reparto.length > 0),
+    );
 }
 
 async function loadPreciosByProductoId(
@@ -391,89 +401,82 @@ async function ajustarStock(
   }
 }
 
-// Resuelve `empresa` para cada entry: si viene en input, se respeta (puede ser
-// null si la marca es interna); si no, se deriva de marca.empresa_codigo.
-// Marcas internas (Joybees) → empresa=null siempre.
-function resolverRepartoConEmpresa(
-  reparto: ReadonlyArray<RepartoItemInput>,
-  marcasInfo: Map<string, MarcaInfo>,
-): RepartoItemEntry[] {
-  const out: RepartoItemEntry[] = [];
-  for (const r of reparto) {
-    const info = marcasInfo.get(r.marcaId);
-    if (!info) continue; // marca desconocida
-    let empresa: string | null;
-    if (info.tipo === "interna") {
-      empresa = null;
-    } else if (r.empresa !== undefined) {
-      empresa = r.empresa;
-    } else {
-      empresa = info.empresa_codigo || null;
+// Normaliza las marcas con % de una entrega. SIN empresa interna (se retiró el
+// reparto 50/50 marca↔empresa). 1 marca = 100%; varias = % entre ellas.
+// Back-compat: si no vino `marcas`, deriva del reparto legacy (1 marca/100%).
+function normalizarMarcasEntrega(
+  marcas: ReadonlyArray<MarcaPorcentajeInput> | undefined,
+  items: ReadonlyArray<NormalizedItem>,
+): Array<{ marcaId: string; porcentaje: number }> {
+  const out: Array<{ marcaId: string; porcentaje: number }> = [];
+  const seen = new Set<string>();
+  for (const m of marcas ?? []) {
+    const marcaId = String(m.marcaId ?? "");
+    if (!marcaId || seen.has(marcaId)) continue;
+    const pct = Number(m.porcentaje);
+    out.push({ marcaId, porcentaje: Number.isFinite(pct) && pct > 0 ? pct : 0 });
+    seen.add(marcaId);
+  }
+  if (out.length === 0) {
+    for (const it of items) {
+      for (const r of it.reparto) {
+        const marcaId = String(r.marcaId ?? "");
+        if (marcaId && !seen.has(marcaId)) {
+          out.push({ marcaId, porcentaje: 100 });
+          seen.add(marcaId);
+        }
+      }
     }
-    out.push({
-      marca_id: r.marcaId,
-      empresa,
-      cantidad: r.cantidad,
-    });
+  }
+  // Si por algún motivo todos los % quedaron en 0, repartir parejo.
+  if (out.length > 0 && out.every((m) => m.porcentaje === 0)) {
+    const parejo = round2(100 / out.length);
+    for (const m of out) m.porcentaje = parejo;
   }
   return out;
 }
 
-// Calcula total_por_marca y total_por_empresa_interna desde items + precios.
-//   - Externa: 50% al marca_id, 50% al empresa
-//   - Interna: 100% al marca_id, empresa ignorada
-function totalesByItems(
-  items: ReadonlyArray<{
-    productoId: string;
-    reparto: ReadonlyArray<RepartoItemEntry>;
-  }>,
-  precios: Map<string, number>,
-  marcasInfo: Map<string, MarcaInfo>,
-): {
-  total: number;
-  totalPorMarca: Record<string, number>;
-  totalPorEmpresaInterna: Record<string, number>;
-} {
-  const totalPorMarca: Record<string, number> = {};
-  const totalPorEmpresaInterna: Record<string, number> = {};
-  let total = 0;
+// Unidades totales por producto (cantidad explícita o suma del reparto legacy).
+function itemsAUnidades(
+  items: ReadonlyArray<NormalizedItem>,
+): Array<{ productoId: string; cantidad: number }> {
+  const out = new Map<string, number>();
   for (const it of items) {
-    const precio = precios.get(it.productoId) ?? 0;
-    for (const r of it.reparto) {
-      const cant = Number(r.cantidad);
-      if (!Number.isFinite(cant) || cant <= 0) continue;
-      const subtotal = precio * cant;
-      total += subtotal;
-      const tipo = marcasInfo.get(r.marca_id)?.tipo ?? "externa";
-      if (tipo === "interna") {
-        totalPorMarca[r.marca_id] =
-          (totalPorMarca[r.marca_id] ?? 0) + subtotal;
-      } else {
-        const mitad = subtotal / 2;
-        totalPorMarca[r.marca_id] =
-          (totalPorMarca[r.marca_id] ?? 0) + mitad;
-        if (r.empresa) {
-          totalPorEmpresaInterna[r.empresa] =
-            (totalPorEmpresaInterna[r.empresa] ?? 0) + mitad;
-        }
-        // Si empresa es null en una marca externa, ese 50% queda sin
-        // atribución interna (Fashion Group genérico). Suma al total
-        // pero no al desglose interno — coherente con facturas legacy.
-      }
-    }
+    const cant =
+      it.cantidad != null && Number.isFinite(it.cantidad)
+        ? Math.trunc(Number(it.cantidad))
+        : it.reparto.reduce((s, r) => s + Number(r.cantidad || 0), 0);
+    if (!it.productoId || cant <= 0) continue;
+    out.set(it.productoId, (out.get(it.productoId) ?? 0) + cant);
   }
-  // Redondear
-  for (const k of Object.keys(totalPorMarca)) {
-    totalPorMarca[k] = round2(totalPorMarca[k]);
+  return Array.from(out, ([productoId, cantidad]) => ({ productoId, cantidad }));
+}
+
+// Total de la entrega + total_por_marca (100% repartido por % entre marcas).
+// total_por_empresa_interna SIEMPRE {} en entregas nuevas (sin 50/50). El
+// redondeo se absorbe en la última marca para que Σ total_por_marca == total.
+function computeTotalesEntrega(
+  itemsUnidades: ReadonlyArray<{ productoId: string; cantidad: number }>,
+  precios: Map<string, number>,
+  marcasPct: ReadonlyArray<{ marcaId: string; porcentaje: number }>,
+): { total: number; totalPorMarca: Record<string, number> } {
+  let total = 0;
+  for (const it of itemsUnidades) {
+    total += (precios.get(it.productoId) ?? 0) * it.cantidad;
   }
-  for (const k of Object.keys(totalPorEmpresaInterna)) {
-    totalPorEmpresaInterna[k] = round2(totalPorEmpresaInterna[k]);
-  }
-  return {
-    total: round2(total),
-    totalPorMarca,
-    totalPorEmpresaInterna,
-  };
+  total = round2(total);
+  const sumPct = marcasPct.reduce((s, m) => s + m.porcentaje, 0) || 1;
+  const totalPorMarca: Record<string, number> = {};
+  let acumulado = 0;
+  marcasPct.forEach((m, i) => {
+    const monto =
+      i === marcasPct.length - 1
+        ? round2(total - acumulado)
+        : round2(total * (m.porcentaje / sumPct));
+    totalPorMarca[m.marcaId] = monto;
+    acumulado = round2(acumulado + monto);
+  });
+  return { total, totalPorMarca };
 }
 
 export async function createEntrega(
@@ -499,11 +502,15 @@ export async function createEntrega(
     }
   }
 
-  // Cargar precios y tipos de marcas.
+  // Marcas con % (1 marca = 100%; varias = % entre ellas). Sin empresa interna.
+  const marcasPct = normalizarMarcasEntrega(input.marcas, items);
+  if (marcasPct.length === 0) {
+    throw new Error("La entrega debe tener al menos una marca");
+  }
+
+  // Cargar precios + validar marcas existen.
   const productoIds = Array.from(new Set(items.map((i) => i.productoId)));
-  const marcaIds = Array.from(
-    new Set(items.flatMap((i) => i.reparto.map((r) => r.marcaId))),
-  );
+  const marcaIds = marcasPct.map((m) => m.marcaId);
   const [precios, marcasInfo] = await Promise.all([
     loadPreciosByProductoId(productoIds),
     loadMarcasInfo(marcaIds),
@@ -515,31 +522,30 @@ export async function createEntrega(
     if (!marcasInfo.has(mid)) throw new Error(`Marca no existe: ${mid}`);
   }
 
-  // Resolver reparto.empresa (default desde marca.empresa_codigo, override OK).
-  const itemsResueltos = items.map((it) => ({
-    productoId: it.productoId,
-    reparto: resolverRepartoConEmpresa(it.reparto, marcasInfo),
-  }));
-
-  const { total, totalPorMarca, totalPorEmpresaInterna } = totalesByItems(
-    itemsResueltos,
+  const itemsUnidades = itemsAUnidades(items);
+  if (itemsUnidades.length === 0) {
+    throw new Error("La entrega debe tener al menos un item con cantidad");
+  }
+  const { total, totalPorMarca } = computeTotalesEntrega(
+    itemsUnidades,
     precios,
-    marcasInfo,
+    marcasPct,
   );
+  const primaryMarca = marcasPct[0].marcaId;
 
   const notas =
     input.notas !== undefined && input.notas !== null
       ? String(input.notas).trim() || null
       : null;
 
-  // 1) Insert entrega
+  // 1) Insert entrega (total_por_empresa_interna SIEMPRE {} — sin 50/50).
   const { data: entRow, error: entErr } = await supabaseServer
     .from("mk_entregas_muebles")
     .insert({
       proyecto_id: proyectoId,
       total,
       total_por_marca: totalPorMarca,
-      total_por_empresa_interna: totalPorEmpresaInterna,
+      total_por_empresa_interna: {},
       notas,
     })
     .select("*")
@@ -549,11 +555,14 @@ export async function createEntrega(
   }
   const entrega = mapEntrega(entRow as Record<string, unknown>);
 
-  // 2) Insert items con reparto resuelto
-  const itemsPayload = itemsResueltos.map((it) => ({
+  // 2) Insert items. El reparto guarda las unidades bajo la marca primaria
+  // (empresa null); el reparto de dinero por marca vive en total_por_marca.
+  const itemsPayload = itemsUnidades.map((it) => ({
     entrega_id: entrega.id,
     producto_id: it.productoId,
-    reparto: it.reparto,
+    reparto: [
+      { marca_id: primaryMarca, empresa: null, cantidad: it.cantidad },
+    ] as RepartoItemEntry[],
     precio_unitario: precios.get(it.productoId) ?? 0,
   }));
   const { data: itemRows, error: itemErr } = await supabaseServer
@@ -565,16 +574,12 @@ export async function createEntrega(
     throw new Error(`createEntrega[items]: ${itemErr.message}`);
   }
 
-  // 3) Descontar stock (suma todas las cantidades del reparto por producto)
-  const inputItemsForStock: EntregaItemInput[] = itemsResueltos.map((it) => ({
-    productoId: it.productoId,
-    reparto: it.reparto.map((r) => ({
-      marcaId: r.marca_id,
-      empresa: r.empresa,
-      cantidad: r.cantidad,
-    })),
-  }));
-  await ajustarStock(sumaUnidadesPorProducto(inputItemsForStock));
+  // 3) Descontar stock (unidades por producto).
+  const stockDelta = new Map<string, number>();
+  for (const it of itemsUnidades) {
+    stockDelta.set(it.productoId, (stockDelta.get(it.productoId) ?? 0) + it.cantidad);
+  }
+  await ajustarStock(stockDelta);
 
   return {
     ...entrega,
@@ -602,11 +607,13 @@ export async function updateEntrega(
     mapItem(r as Record<string, unknown>),
   );
 
-  // Precios + tipos de marca
+  // Marcas con % (sin empresa interna). Cargar precios + validar.
+  const marcasPct = normalizarMarcasEntrega(input.marcas, items);
+  if (marcasPct.length === 0) {
+    throw new Error("La entrega debe tener al menos una marca");
+  }
   const productoIds = Array.from(new Set(items.map((i) => i.productoId)));
-  const marcaIds = Array.from(
-    new Set(items.flatMap((i) => i.reparto.map((r) => r.marcaId))),
-  );
+  const marcaIds = marcasPct.map((m) => m.marcaId);
   const [precios, marcasInfo] = await Promise.all([
     loadPreciosByProductoId(productoIds),
     loadMarcasInfo(marcaIds),
@@ -618,28 +625,27 @@ export async function updateEntrega(
     if (!marcasInfo.has(mid)) throw new Error(`Marca no existe: ${mid}`);
   }
 
-  const itemsResueltos = items.map((it) => ({
-    productoId: it.productoId,
-    reparto: resolverRepartoConEmpresa(it.reparto, marcasInfo),
-  }));
-
-  const { total, totalPorMarca, totalPorEmpresaInterna } = totalesByItems(
-    itemsResueltos,
+  const itemsUnidades = itemsAUnidades(items);
+  if (itemsUnidades.length === 0) {
+    throw new Error("La entrega debe tener al menos un item con cantidad");
+  }
+  const { total, totalPorMarca } = computeTotalesEntrega(
+    itemsUnidades,
     precios,
-    marcasInfo,
+    marcasPct,
   );
+  const primaryMarca = marcasPct[0].marcaId;
 
-  // 1) Update entrega (total + ambos jsonb + notas si vino)
+  // 1) Update entrega (total + total_por_marca; total_por_empresa_interna se
+  // resetea a {} — al editar, la entrega pasa al modelo nuevo sin 50/50).
   const updPayload: Record<string, unknown> = {
     total,
     total_por_marca: totalPorMarca,
-    total_por_empresa_interna: totalPorEmpresaInterna,
+    total_por_empresa_interna: {},
   };
   if (input.notas !== undefined) {
     updPayload.notas =
-      input.notas === null
-        ? null
-        : String(input.notas).trim() || null;
+      input.notas === null ? null : String(input.notas).trim() || null;
   }
   const { error: updErr } = await supabaseServer
     .from("mk_entregas_muebles")
@@ -647,17 +653,19 @@ export async function updateEntrega(
     .eq("id", id);
   if (updErr) throw new Error(`updateEntrega[entrega]: ${updErr.message}`);
 
-  // 2) Reemplazar items
+  // 2) Reemplazar items (reparto = unidades bajo la marca primaria, empresa null).
   const { error: delErr } = await supabaseServer
     .from("mk_entrega_items")
     .delete()
     .eq("entrega_id", id);
   if (delErr) throw new Error(`updateEntrega[delete items]: ${delErr.message}`);
 
-  const itemsPayload = itemsResueltos.map((it) => ({
+  const itemsPayload = itemsUnidades.map((it) => ({
     entrega_id: id,
     producto_id: it.productoId,
-    reparto: it.reparto,
+    reparto: [
+      { marca_id: primaryMarca, empresa: null, cantidad: it.cantidad },
+    ] as RepartoItemEntry[],
     precio_unitario: precios.get(it.productoId) ?? 0,
   }));
   const { data: itemRows, error: insErr } = await supabaseServer
@@ -666,17 +674,12 @@ export async function updateEntrega(
     .select("*");
   if (insErr) throw new Error(`updateEntrega[insert items]: ${insErr.message}`);
 
-  // 3) Stock delta
-  const newItemsForStock: EntregaItemInput[] = itemsResueltos.map((it) => ({
-    productoId: it.productoId,
-    reparto: it.reparto.map((r) => ({
-      marcaId: r.marca_id,
-      empresa: r.empresa,
-      cantidad: r.cantidad,
-    })),
-  }));
+  // 3) Stock delta (unidades nuevas − previas, por producto).
   const sumaPrev = sumaUnidadesPorProducto(prevItems);
-  const sumaNew = sumaUnidadesPorProducto(newItemsForStock);
+  const sumaNew = new Map<string, number>();
+  for (const it of itemsUnidades) {
+    sumaNew.set(it.productoId, (sumaNew.get(it.productoId) ?? 0) + it.cantidad);
+  }
   const delta = new Map<string, number>();
   const allIds = new Set<string>([...sumaPrev.keys(), ...sumaNew.keys()]);
   for (const pid of allIds) {

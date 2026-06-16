@@ -1,17 +1,19 @@
 // ============================================================================
-// Marketing — Excel export del módulo de inventario (formato changalo)
+// Marketing — Excel export del módulo de inventario (por marca)
 // ============================================================================
-// Replica el changalo_muebles.xlsx histórico:
-//   - Hoja 1 "Resumen": 1 fila por tienda con cantidades de Paneles y montos
-//     repartidos entre Fashion Wear y Vistana, fila TOTAL al pie en amarillo.
-//   - Hojas 2..N: una hoja por tienda con detalle por producto (Cant. FW,
-//     Cant. Vistana, Precio unit, $ FW, $ Vistana, Total) + fila TOTAL.
+// Registro de gastos (jun 2026): se retiró el reparto 50/50 marca↔empresa
+// (FW/Vistana). El Excel ahora muestra:
+//   - Hoja 1 "Resumen": 1 fila por tienda con Total Paneles + monto (100%) por
+//     marca (columnas dinámicas), fila TOTAL al pie.
+//   - Hojas 2..N: una hoja por tienda con detalle por producto (Cantidad,
+//     Precio unit, Total) + fila TOTAL.
 // ============================================================================
 
 import XLSX from "xlsx-js-style";
 import type {
   EntregaConItems,
   MkInventarioProducto,
+  MkMarca,
   MkProyecto,
 } from "./types";
 import { resumirPorTienda, type FilaResumenTienda } from "./inventario-resumen";
@@ -56,7 +58,6 @@ const TOTAL_GRIS_STYLE = {
 const MONEY_FMT = '"$"#,##0.00';
 
 function sanitizeSheetName(s: string): string {
-  // Excel: max 31 chars, prohíbe \ / ? * [ ]
   const cleaned = (s || "Hoja").replace(/[\\/:*?[\]]/g, " ").trim();
   return cleaned.slice(0, 31) || "Hoja";
 }
@@ -96,8 +97,7 @@ function applyMoneyFmt(
   }
 }
 
-// Reemplaza ceros por "—" en celdas string. Mantiene los números cero como
-// "—" string para que el Excel se vea consistente con el changalo original.
+// Reemplaza ceros por "—" para consistencia visual.
 function setDashOrNumber(
   ws: XLSX.WorkSheet,
   r: number,
@@ -119,78 +119,62 @@ function setDashOrNumber(
   }
 }
 
-// ---- Hoja Resumen ----
-function hojaResumen(filas: ReadonlyArray<FilaResumenTienda>): XLSX.WorkSheet {
+// ---- Hoja Resumen (Cliente | Total Paneles | $ por marca | Total $) ----
+function hojaResumen(
+  filas: ReadonlyArray<FilaResumenTienda>,
+  marcas: ReadonlyArray<MkMarca>,
+): XLSX.WorkSheet {
   const header = [
     "Cliente",
-    "Paneles FW",
-    "Paneles Vistana",
     "Total Paneles",
-    "$ Fashion Wear",
-    "$ Vistana",
+    ...marcas.map((m) => `$ ${m.nombre}`),
     "Total $",
   ];
+  const nCols = header.length;
+  const totalCol = nCols - 1;
+  const marcaCols = marcas.map((_, i) => 2 + i);
+
   const aoa: (string | number)[][] = [header];
   for (const f of filas) {
     aoa.push([
       f.tienda,
-      f.panelesFW,
-      f.panelesVistana,
       f.totalPaneles,
-      f.montoFW,
-      f.montoVistana,
+      ...marcas.map((m) => f.montoPorMarca[m.id] ?? 0),
       f.totalMonto,
     ]);
   }
   // Fila TOTAL
-  const totalPanelesFW = filas.reduce((s, f) => s + f.panelesFW, 0);
-  const totalPanelesV = filas.reduce((s, f) => s + f.panelesVistana, 0);
-  const totalPanelesAll = filas.reduce((s, f) => s + f.totalPaneles, 0);
-  const totalMontoFW = filas.reduce((s, f) => s + f.montoFW, 0);
-  const totalMontoV = filas.reduce((s, f) => s + f.montoVistana, 0);
-  const totalMontoAll = filas.reduce((s, f) => s + f.totalMonto, 0);
-  aoa.push([
-    "TOTAL",
-    totalPanelesFW,
-    totalPanelesV,
-    totalPanelesAll,
-    totalMontoFW,
-    totalMontoV,
-    totalMontoAll,
-  ]);
+  const totalPaneles = filas.reduce((s, f) => s + f.totalPaneles, 0);
+  const totalPorMarca = marcas.map((m) =>
+    filas.reduce((s, f) => s + (f.montoPorMarca[m.id] ?? 0), 0),
+  );
+  const totalGeneral = filas.reduce((s, f) => s + f.totalMonto, 0);
+  aoa.push(["TOTAL", totalPaneles, ...totalPorMarca, totalGeneral]);
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
   ws["!cols"] = [
-    { wch: 28 }, // Cliente
-    { wch: 12 }, // Paneles FW
-    { wch: 14 }, // Paneles Vistana
-    { wch: 14 }, // Total Paneles
-    { wch: 14 }, // $ FW
-    { wch: 14 }, // $ Vistana
-    { wch: 14 }, // Total $
+    { wch: 28 },
+    { wch: 14 },
+    ...marcas.map(() => ({ wch: 16 })),
+    { wch: 14 },
   ];
-  applyStyleToRow(ws, 0, header.length, HEADER_STYLE);
+  applyStyleToRow(ws, 0, nCols, HEADER_STYLE);
 
-  // Reemplazar 0 por "—" en cantidades y dinero (filas de tiendas, no la TOTAL).
+  // Filas de tiendas: paneles (no money), montos por marca + total (money).
   for (let r = 1; r <= filas.length; r++) {
     const f = filas[r - 1];
-    setDashOrNumber(ws, r, 1, f.panelesFW, false);
-    setDashOrNumber(ws, r, 2, f.panelesVistana, false);
-    setDashOrNumber(ws, r, 3, f.totalPaneles, false);
-    setDashOrNumber(ws, r, 4, f.montoFW, true);
-    setDashOrNumber(ws, r, 5, f.montoVistana, true);
-    setDashOrNumber(ws, r, 6, f.totalMonto, true);
+    setDashOrNumber(ws, r, 1, f.totalPaneles, false);
+    marcas.forEach((m, i) => {
+      setDashOrNumber(ws, r, marcaCols[i], f.montoPorMarca[m.id] ?? 0, true);
+    });
+    setDashOrNumber(ws, r, totalCol, f.totalMonto, true);
   }
+  applyMoneyFmt(ws, 1, filas.length, [...marcaCols, totalCol]);
 
-  // Format de moneda en columnas $ (asegura formato si setDashOrNumber dejó número)
-  applyMoneyFmt(ws, 1, filas.length, [4, 5, 6]);
+  // Fila TOTAL en amarillo.
+  applyStyleToRow(ws, aoa.length - 1, nCols, TOTAL_AMARILLO_STYLE);
+  applyMoneyFmt(ws, aoa.length - 1, aoa.length - 1, [...marcaCols, totalCol]);
 
-  // Fila TOTAL en amarillo (igual que el changalo original).
-  applyStyleToRow(ws, aoa.length - 1, header.length, TOTAL_AMARILLO_STYLE);
-  // Asegurar formato moneda en celdas TOTAL $
-  applyMoneyFmt(ws, aoa.length - 1, aoa.length - 1, [4, 5, 6]);
-
-  // Freeze pane: header siempre visible.
   ws["!freeze"] = { xSplit: 0, ySplit: 1 } as unknown as Record<
     string,
     unknown
@@ -201,11 +185,8 @@ function hojaResumen(filas: ReadonlyArray<FilaResumenTienda>): XLSX.WorkSheet {
 // ---- Hoja por tienda: detalle por producto ----
 interface FilaDetalleProducto {
   productoNombre: string;
-  cantFW: number;
-  cantVistana: number;
+  cantidad: number;
   precioUnitario: number;
-  montoFW: number;
-  montoVistana: number;
   total: number;
 }
 
@@ -213,110 +194,57 @@ function hojaTiendaDetalle(
   tienda: string,
   filas: ReadonlyArray<FilaDetalleProducto>,
 ): XLSX.WorkSheet {
-  const header = [
-    "Producto",
-    "Cant. FW",
-    "Cant. Vistana",
-    "Precio unit",
-    "$ FW",
-    "$ Vistana",
-    "Total",
-  ];
+  const header = ["Producto", "Cantidad", "Precio unit", "Total"];
   const aoa: (string | number)[][] = [header];
   for (const f of filas) {
-    aoa.push([
-      f.productoNombre,
-      f.cantFW,
-      f.cantVistana,
-      f.precioUnitario,
-      f.montoFW,
-      f.montoVistana,
-      f.total,
-    ]);
+    aoa.push([f.productoNombre, f.cantidad, f.precioUnitario, f.total]);
   }
-  // Fila TOTAL
-  const totalCantFW = filas.reduce((s, f) => s + f.cantFW, 0);
-  const totalCantV = filas.reduce((s, f) => s + f.cantVistana, 0);
-  const totalMontoFW = filas.reduce((s, f) => s + f.montoFW, 0);
-  const totalMontoV = filas.reduce((s, f) => s + f.montoVistana, 0);
+  const totalCant = filas.reduce((s, f) => s + f.cantidad, 0);
   const totalTotal = filas.reduce((s, f) => s + f.total, 0);
-  aoa.push([
-    "TOTAL",
-    totalCantFW,
-    totalCantV,
-    "",
-    totalMontoFW,
-    totalMontoV,
-    totalTotal,
-  ]);
+  aoa.push(["TOTAL", totalCant, "", totalTotal]);
 
   const ws = XLSX.utils.aoa_to_sheet(aoa);
-  ws["!cols"] = [
-    { wch: 22 }, // Producto
-    { wch: 12 }, // Cant. FW
-    { wch: 14 }, // Cant. Vistana
-    { wch: 14 }, // Precio unit
-    { wch: 14 }, // $ FW
-    { wch: 14 }, // $ Vistana
-    { wch: 14 }, // Total
-  ];
+  ws["!cols"] = [{ wch: 24 }, { wch: 12 }, { wch: 14 }, { wch: 14 }];
   applyStyleToRow(ws, 0, header.length, HEADER_STYLE);
 
-  // Celdas con dash o número en cantidades; precio y montos siempre dinero.
   for (let r = 1; r <= filas.length; r++) {
     const f = filas[r - 1];
-    setDashOrNumber(ws, r, 1, f.cantFW, false);
-    setDashOrNumber(ws, r, 2, f.cantVistana, false);
-    setDashOrNumber(ws, r, 4, f.montoFW, true);
-    setDashOrNumber(ws, r, 5, f.montoVistana, true);
-    // Precio y total siempre numéricos (no dash).
-    const addrPrecio = XLSX.utils.encode_cell({ r, c: 3 });
+    const addrPrecio = XLSX.utils.encode_cell({ r, c: 2 });
     (ws as Record<string, unknown>)[addrPrecio] = {
       t: "n",
       v: f.precioUnitario,
       z: MONEY_FMT,
     };
-    const addrTotal = XLSX.utils.encode_cell({ r, c: 6 });
+    const addrTotal = XLSX.utils.encode_cell({ r, c: 3 });
     (ws as Record<string, unknown>)[addrTotal] = {
       t: "n",
       v: f.total,
       z: MONEY_FMT,
     };
   }
-  applyMoneyFmt(ws, 1, filas.length, [3, 4, 5, 6]);
+  applyMoneyFmt(ws, 1, filas.length, [2, 3]);
 
-  // Fila TOTAL gris para hojas internas (la amarilla queda solo para Resumen).
   applyStyleToRow(ws, aoa.length - 1, header.length, TOTAL_GRIS_STYLE);
-  applyMoneyFmt(ws, aoa.length - 1, aoa.length - 1, [4, 5, 6]);
+  applyMoneyFmt(ws, aoa.length - 1, aoa.length - 1, [3]);
 
-  // Freeze pane: header.
   ws["!freeze"] = { xSplit: 0, ySplit: 1 } as unknown as Record<
     string,
     unknown
   >;
 
-  // Suprime warning lint de variable sin uso (tienda solo se usa al nombrar la hoja por fuera).
   void tienda;
   return ws;
 }
 
 // ---- Construir filas de detalle a partir de una tienda y sus entregas ----
-// Categoriza producto y mapea por marca (asumimos las dos marcas FW=Tommy y
-// Vistana=Calvin como las únicas usadas en muebles, igual que el seed changalo).
 function detalleProductosDeTienda(
   entregas: ReadonlyArray<EntregaConItems>,
   productos: ReadonlyArray<MkInventarioProducto>,
 ): FilaDetalleProducto[] {
   const productoById = new Map(productos.map((p) => [p.id, p]));
-  // Acum por producto.
   const acum = new Map<
     string,
-    {
-      nombre: string;
-      cantFW: number;
-      cantVistana: number;
-      precio: number;
-    }
+    { nombre: string; cantidad: number; precio: number }
   >();
   for (const e of entregas) {
     for (const it of e.items) {
@@ -324,34 +252,27 @@ function detalleProductosDeTienda(
       if (!prod) continue;
       const existing = acum.get(it.producto_id) ?? {
         nombre: prod.nombre,
-        cantFW: 0,
-        cantVistana: 0,
+        cantidad: 0,
         precio: Number(it.precio_unitario ?? prod.precio),
       };
-      for (const r of it.reparto ?? []) {
-        const cant = Number(r.cantidad ?? 0);
-        if (!Number.isFinite(cant) || cant <= 0) continue;
-        if (r.empresa === "fashion_wear") existing.cantFW += cant;
-        else if (r.empresa === "vistana") existing.cantVistana += cant;
-        // Empresas distintas (Reebok/Joybees) no aparecen en formato changalo.
+      let unidades = 0;
+      for (const v of Object.values(it.cantidad_por_marca ?? {})) {
+        unidades += Number(v ?? 0);
       }
+      existing.cantidad += unidades;
       acum.set(it.producto_id, existing);
     }
   }
   const filas: FilaDetalleProducto[] = [];
   for (const v of acum.values()) {
-    if (v.cantFW <= 0 && v.cantVistana <= 0) continue;
+    if (v.cantidad <= 0) continue;
     filas.push({
       productoNombre: v.nombre,
-      cantFW: v.cantFW,
-      cantVistana: v.cantVistana,
+      cantidad: v.cantidad,
       precioUnitario: v.precio,
-      montoFW: Math.round(v.cantFW * v.precio * 100) / 100,
-      montoVistana: Math.round(v.cantVistana * v.precio * 100) / 100,
-      total: Math.round((v.cantFW + v.cantVistana) * v.precio * 100) / 100,
+      total: Math.round(v.cantidad * v.precio * 100) / 100,
     });
   }
-  // Orden estable por nombre de producto.
   filas.sort((a, b) => a.productoNombre.localeCompare(b.productoNombre, "es"));
   return filas;
 }
@@ -363,15 +284,23 @@ export function exportarExcelGlobal(args: {
   productos: ReadonlyArray<MkInventarioProducto>;
   entregas: ReadonlyArray<EntregaConItems>;
   proyectos: ReadonlyArray<MkProyecto>;
+  marcas: ReadonlyArray<MkMarca>;
 }): Uint8Array {
-  const { productos, entregas, proyectos } = args;
+  const { productos, entregas, proyectos, marcas } = args;
   const wb = XLSX.utils.book_new();
 
-  // Hoja Resumen.
-  const filasResumen = resumirPorTienda(entregas, proyectos, productos);
-  XLSX.utils.book_append_sheet(wb, hojaResumen(filasResumen), "Resumen");
+  const { filas: filasResumen, marcas: marcasUsadas } = resumirPorTienda(
+    entregas,
+    proyectos,
+    productos,
+    marcas,
+  );
+  XLSX.utils.book_append_sheet(
+    wb,
+    hojaResumen(filasResumen, marcasUsadas),
+    "Resumen",
+  );
 
-  // Una hoja por tienda con sus detalles.
   const usedNames = new Set<string>(["Resumen"]);
   for (const f of filasResumen) {
     if (f.entregas.length === 0) continue;
@@ -394,15 +323,23 @@ export function exportarExcelTienda(args: {
   productos: ReadonlyArray<MkInventarioProducto>;
   entregas: ReadonlyArray<EntregaConItems>;
   proyecto: MkProyecto;
+  marcas: ReadonlyArray<MkMarca>;
 }): Uint8Array {
-  const { productos, entregas, proyecto } = args;
+  const { productos, entregas, proyecto, marcas } = args;
   const wb = XLSX.utils.book_new();
-  const filasResumen = resumirPorTienda(entregas, [proyecto], productos);
+  const { filas: filasResumen, marcas: marcasUsadas } = resumirPorTienda(
+    entregas,
+    [proyecto],
+    productos,
+    marcas,
+  );
 
-  // Hoja Resumen (1 fila + TOTAL).
-  XLSX.utils.book_append_sheet(wb, hojaResumen(filasResumen), "Resumen");
+  XLSX.utils.book_append_sheet(
+    wb,
+    hojaResumen(filasResumen, marcasUsadas),
+    "Resumen",
+  );
 
-  // Hoja con detalle de la única tienda.
   const fila = filasResumen[0];
   if (fila && fila.entregas.length > 0) {
     const detalles = detalleProductosDeTienda(fila.entregas, productos);

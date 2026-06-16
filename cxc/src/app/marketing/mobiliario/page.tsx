@@ -139,35 +139,33 @@ export default function MobiliarioPage() {
     };
   }, [productos, entregas]);
 
-  // Agregado tipo changalo: 1 fila por tienda con paneles + montos por empresa.
-  // Toda entrega tiene proyecto_id (la tienda sale de proyecto.tienda).
-  const resumenPorTienda = useMemo(() => {
+  // Agregado por tienda: 1 fila por tienda con total de paneles + monto (100%)
+  // por marca. Toda entrega tiene proyecto_id (la tienda sale de proyecto.tienda).
+  const { filas: resumenFilas, marcas: resumenMarcas } = useMemo(() => {
     const proyectos: MkProyecto[] = Array.from(proyectoById.values());
-    return resumirPorTienda(entregas, proyectos, productos);
-  }, [entregas, proyectoById, productos]);
+    return resumirPorTienda(entregas, proyectos, productos, marcas);
+  }, [entregas, proyectoById, productos, marcas]);
 
   const totalResumen = useMemo(() => {
-    const t = {
-      panelesFW: 0,
-      panelesVistana: 0,
-      totalPaneles: 0,
-      montoFW: 0,
-      montoVistana: 0,
-      totalMonto: 0,
-    };
-    for (const f of resumenPorTienda) {
-      t.panelesFW += f.panelesFW;
-      t.panelesVistana += f.panelesVistana;
-      t.totalPaneles += f.totalPaneles;
-      t.montoFW += f.montoFW;
-      t.montoVistana += f.montoVistana;
-      t.totalMonto += f.totalMonto;
+    const montoPorMarca: Record<string, number> = {};
+    let totalPaneles = 0;
+    let totalMonto = 0;
+    for (const f of resumenFilas) {
+      totalPaneles += f.totalPaneles;
+      totalMonto += f.totalMonto;
+      for (const [mid, m] of Object.entries(f.montoPorMarca)) {
+        montoPorMarca[mid] = (montoPorMarca[mid] ?? 0) + m;
+      }
     }
-    t.montoFW = Math.round(t.montoFW * 100) / 100;
-    t.montoVistana = Math.round(t.montoVistana * 100) / 100;
-    t.totalMonto = Math.round(t.totalMonto * 100) / 100;
-    return t;
-  }, [resumenPorTienda]);
+    for (const k of Object.keys(montoPorMarca)) {
+      montoPorMarca[k] = Math.round(montoPorMarca[k] * 100) / 100;
+    }
+    return {
+      totalPaneles,
+      montoPorMarca,
+      totalMonto: Math.round(totalMonto * 100) / 100,
+    };
+  }, [resumenFilas]);
 
 
   // Entregado por producto (para columna "Entregado" en tabla)
@@ -452,7 +450,7 @@ export default function MobiliarioPage() {
                 Resumen por tienda
               </h2>
               <p className="text-[11px] text-gray-400 mt-0.5">
-                Paneles enviados y monto cobrado por marca, con totales
+                Total de paneles y gasto por marca, con totales
               </p>
             </div>
             <button
@@ -469,21 +467,17 @@ export default function MobiliarioPage() {
               <thead className="bg-gray-50">
                 <tr className="text-[11px] uppercase tracking-wider text-gray-500">
                   <th className="text-left font-medium px-3 py-2">Cliente</th>
-                  <th className="text-right font-medium px-3 py-2 w-24">
-                    Paneles FW
-                  </th>
-                  <th className="text-right font-medium px-3 py-2 w-28">
-                    Paneles Vistana
-                  </th>
                   <th className="text-right font-medium px-3 py-2 w-28">
                     Total Paneles
                   </th>
-                  <th className="text-right font-medium px-3 py-2 w-28">
-                    $ Fashion Wear
-                  </th>
-                  <th className="text-right font-medium px-3 py-2 w-28">
-                    $ Vistana
-                  </th>
+                  {resumenMarcas.map((m) => (
+                    <th
+                      key={m.id}
+                      className="text-right font-medium px-3 py-2 w-28"
+                    >
+                      $ {m.nombre}
+                    </th>
+                  ))}
                   <th className="text-right font-medium px-3 py-2 w-28">
                     Total $
                   </th>
@@ -493,16 +487,16 @@ export default function MobiliarioPage() {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={resumenMarcas.length + 3}
                       className="px-3 py-6 text-center text-gray-400 text-sm"
                     >
                       Cargando…
                     </td>
                   </tr>
-                ) : resumenPorTienda.length === 0 ? (
+                ) : resumenFilas.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={resumenMarcas.length + 3}
                       className="px-3 py-6 text-center text-gray-400 text-sm"
                     >
                       Aún no hay entregas registradas.
@@ -510,26 +504,12 @@ export default function MobiliarioPage() {
                   </tr>
                 ) : (
                   <>
-                    {resumenPorTienda.map((f) => (
+                    {resumenFilas.map((f) => (
                       <tr
                         key={f.tienda}
                         className="border-t border-gray-100 hover:bg-gray-50 transition-colors"
                       >
                         <td className="px-3 py-2 text-gray-900">{f.tienda}</td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums">
-                          {f.panelesFW > 0 ? (
-                            f.panelesFW
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums">
-                          {f.panelesVistana > 0 ? (
-                            f.panelesVistana
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
-                        </td>
                         <td className="px-3 py-2 text-right font-mono tabular-nums text-gray-700">
                           {f.totalPaneles > 0 ? (
                             f.totalPaneles
@@ -537,20 +517,21 @@ export default function MobiliarioPage() {
                             <span className="text-gray-300">—</span>
                           )}
                         </td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums">
-                          {f.montoFW > 0 ? (
-                            formatearMonto(f.montoFW)
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono tabular-nums">
-                          {f.montoVistana > 0 ? (
-                            formatearMonto(f.montoVistana)
-                          ) : (
-                            <span className="text-gray-300">—</span>
-                          )}
-                        </td>
+                        {resumenMarcas.map((m) => {
+                          const monto = f.montoPorMarca[m.id] ?? 0;
+                          return (
+                            <td
+                              key={m.id}
+                              className="px-3 py-2 text-right font-mono tabular-nums"
+                            >
+                              {monto > 0 ? (
+                                formatearMonto(monto)
+                              ) : (
+                                <span className="text-gray-300">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
                         <td className="px-3 py-2 text-right font-mono tabular-nums font-semibold text-gray-900">
                           {f.totalMonto > 0 ? (
                             formatearMonto(f.totalMonto)
@@ -560,38 +541,27 @@ export default function MobiliarioPage() {
                         </td>
                       </tr>
                     ))}
-                    {/* Fila TOTAL — fondo oscuro estilo changalo (la fila amarilla
-                        queda solo en el Excel descargable; en pantalla usamos
-                        oscuro para mejor contraste con el resto del módulo). */}
+                    {/* Fila TOTAL — fondo oscuro para contraste con el módulo. */}
                     <tr className="border-t border-gray-300 bg-gray-900 text-white">
                       <td className="px-3 py-2.5 font-bold uppercase text-xs tracking-wider">
                         Total
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
-                        {totalResumen.panelesFW || (
-                          <span className="opacity-50">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
-                        {totalResumen.panelesVistana || (
-                          <span className="opacity-50">—</span>
-                        )}
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
                         {totalResumen.totalPaneles || (
                           <span className="opacity-50">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
-                        {totalResumen.montoFW > 0
-                          ? formatearMonto(totalResumen.montoFW)
-                          : "—"}
-                      </td>
-                      <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
-                        {totalResumen.montoVistana > 0
-                          ? formatearMonto(totalResumen.montoVistana)
-                          : "—"}
-                      </td>
+                      {resumenMarcas.map((m) => {
+                        const monto = totalResumen.montoPorMarca[m.id] ?? 0;
+                        return (
+                          <td
+                            key={m.id}
+                            className="px-3 py-2.5 text-right font-mono tabular-nums font-bold"
+                          >
+                            {monto > 0 ? formatearMonto(monto) : "—"}
+                          </td>
+                        );
+                      })}
                       <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
                         {totalResumen.totalMonto > 0
                           ? formatearMonto(totalResumen.totalMonto)

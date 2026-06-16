@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export interface OverflowMenuItem {
   label: string;
@@ -16,9 +17,13 @@ interface Props {
   align?: "left" | "right";
 }
 
+const MENU_WIDTH = 180;
+
 /**
- * Kebab (⋯) trigger + dropdown menu. Reusable across header, table rows,
- * mobile cards, etc. Closes on outside click, ESC, or item activation.
+ * Kebab (⋯) trigger + dropdown menu. El dropdown se renderiza en un portal con
+ * posición fija calculada desde el botón — así NO lo recorta ningún contenedor
+ * padre con `overflow-hidden` (ej: la tabla de proyectos en Marketing). Si no
+ * cabe hacia abajo, se abre hacia arriba. Cierra con click afuera, ESC, item.
  */
 export default function OverflowMenu({
   items,
@@ -26,7 +31,38 @@ export default function OverflowMenu({
   align = "right",
 }: Props) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(
+    null,
+  );
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  const estHeight = items.length * 40 + 8;
+
+  const computeCoords = useCallback(() => {
+    const btn = triggerRef.current;
+    if (!btn) return;
+    const r = btn.getBoundingClientRect();
+    const openUp =
+      r.bottom + estHeight > window.innerHeight && r.top > estHeight;
+    const top = openUp ? r.top - estHeight - 4 : r.bottom + 4;
+    const left = align === "right" ? r.right - MENU_WIDTH : r.left;
+    setCoords({ top, left: Math.max(8, left) });
+  }, [align, estHeight]);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    computeCoords();
+    const onMove = () => computeCoords();
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }, [open, computeCoords]);
 
   useEffect(() => {
     if (!open) return;
@@ -34,7 +70,10 @@ export default function OverflowMenu({
       if (e.key === "Escape") setOpen(false);
     };
     const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      if (triggerRef.current?.contains(t)) return;
+      if (menuRef.current?.contains(t)) return;
+      setOpen(false);
     };
     window.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onClick);
@@ -47,9 +86,13 @@ export default function OverflowMenu({
   if (items.length === 0) return null;
 
   return (
-    <div ref={ref} className="relative inline-block">
+    <>
       <button
-        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        ref={triggerRef}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((o) => !o);
+        }}
         aria-label={ariaLabel}
         aria-haspopup="menu"
         aria-expanded={open}
@@ -61,35 +104,46 @@ export default function OverflowMenu({
           <circle cx="16" cy="2" r="2" />
         </svg>
       </button>
-      {open && (
-        <div
-          role="menu"
-          className={`absolute top-full mt-1 ${align === "right" ? "right-0" : "left-0"} bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[180px] py-1`}
-        >
-          {items.map((item, i) => (
-            <button
-              key={i}
-              role="menuitem"
-              disabled={item.disabled}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (item.disabled) return;
-                setOpen(false);
-                item.onClick();
-              }}
-              className={`w-full text-left px-3 py-2 text-sm transition ${
-                item.disabled
-                  ? "text-gray-300 cursor-not-allowed"
-                  : item.destructive
-                    ? "text-red-600 hover:bg-red-50"
-                    : "text-gray-700 hover:bg-gray-50"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+      {open &&
+        mounted &&
+        coords &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={{
+              position: "fixed",
+              top: coords.top,
+              left: coords.left,
+              width: MENU_WIDTH,
+            }}
+            className="bg-white border border-gray-200 rounded-lg shadow-lg z-[200] py-1"
+          >
+            {items.map((item, i) => (
+              <button
+                key={i}
+                role="menuitem"
+                disabled={item.disabled}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (item.disabled) return;
+                  setOpen(false);
+                  item.onClick();
+                }}
+                className={`w-full text-left px-3 py-2 text-sm transition ${
+                  item.disabled
+                    ? "text-gray-300 cursor-not-allowed"
+                    : item.destructive
+                      ? "text-red-600 hover:bg-red-50"
+                      : "text-gray-700 hover:bg-gray-50"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }

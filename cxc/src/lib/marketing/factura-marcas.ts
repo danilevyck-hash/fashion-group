@@ -112,13 +112,13 @@ export async function getMarcasDeFactura(
  * Reemplaza todas las marcas de una factura. Aplica:
  *   1. Validación: marcaIds únicas y >= 1.
  *   2. Borra filas previas en mk_factura_marcas.
- *   3. Inserta nuevas con porcentaje = 50 si externa, 100 si interna.
+ *   3. Inserta nuevas con el % REAL del input (1 marca = 100%; varias = % entre
+ *      ellas). El reporting normaliza por suma, así que un solo % = total.
  *
- * Registro de gastos: una factura lleva UNA marca. Se retiraron las
- * validaciones de cobranza (mismo-tipo y coherencia de tipo por proyecto):
- * Joybees / Otros pueden convivir con cualquier marca. La data de % y
- * empresa_pagadora se sigue escribiendo para no romper reportes/exports.
- * Cualquier `porcentaje` en el input se ignora — se deriva del tipo de marca.
+ * Registro de gastos: una factura lleva 1 o varias marcas con % entre ellas.
+ * Se retiró el reparto 50/50 marca↔empresa pagadora: empresa_pagadora_codigo
+ * se escribe NULL (la columna se conserva por compatibilidad). Joybees / Otros
+ * pueden convivir con cualquier marca.
  */
 export async function setMarcasDeFactura(
   facturaId: string,
@@ -138,10 +138,6 @@ export async function setMarcasDeFactura(
     }
     ids.add(m.marcaId);
   }
-  const marcaIds = Array.from(ids);
-
-  // Lookup de tipo + empresa_codigo default por marca (sin validar mezcla).
-  const info = await infoDeMarcas(marcaIds);
 
   // Borrar filas existentes
   const { error: delError } = await supabaseServer
@@ -152,27 +148,18 @@ export async function setMarcasDeFactura(
     throw new Error(`setMarcasDeFactura[delete]: ${delError.message}`);
   }
 
-  // Insertar nuevas — porcentaje depende del tipo de cada marca; empresa
-  // pagadora default = mk_marcas.empresa_codigo (override desde input si vino).
-  // Marca interna (Joybees): empresa_pagadora_codigo = NULL (no aplica).
+  // Insertar nuevas con el % real del input (clamp al CHECK: 0 < pct <= 100).
+  // Si el input no trae % válido, repartir parejo entre las marcas.
+  const parejo = round2(100 / marcas.length);
   const payload = marcas.map((m) => {
-    const meta = info.get(m.marcaId);
-    const tipo = meta?.tipo ?? "externa";
-    let empresa: string | null;
-    if (tipo === "interna") {
-      empresa = null;
-    } else if (m.empresaPagadoraCodigo !== undefined) {
-      empresa = m.empresaPagadoraCodigo === null
-        ? null
-        : String(m.empresaPagadoraCodigo) || null;
-    } else {
-      empresa = meta?.empresa_codigo || null;
-    }
+    const pct = Number(m.porcentaje);
+    const porcentaje =
+      Number.isFinite(pct) && pct > 0 ? Math.min(100, round2(pct)) : parejo;
     return {
       factura_id: facturaId,
       marca_id: m.marcaId,
-      porcentaje: porcentajeParaTipo(tipo),
-      empresa_pagadora_codigo: empresa,
+      porcentaje,
+      empresa_pagadora_codigo: null,
     };
   });
   const { error: insError } = await supabaseServer

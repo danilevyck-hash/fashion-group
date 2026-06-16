@@ -2,30 +2,27 @@
 
 // Form modal para crear/editar una entrega de muebles.
 //
-// Flow nuevo (mayo 2026):
-//   1) Selector de marca (Tommy / Calvin / Reebok / Joybees según corresponda).
-//      La empresa interna pagadora se deriva de marca.empresa_codigo y NO se
-//      expone en UI — el backend la resuelve por default al guardar.
+// Registro de gastos (jun 2026): se retiró el reparto 50/50 marca↔empresa
+// interna (FW/Vistana). Ahora cada entrega lleva 1 o varias MARCAS con % entre
+// ellas (suma 100; 1 marca = 100%) y el total del kit se reparte por esos %.
+//
+// Flow:
+//   1) Nombre de la entrega (opcional) + marca(s) con %.
 //   2) Input destacado "Cantidad de paneles" (driver del kit).
 //   3) Bloque "Accesorios": tablas, conjunto, norte, barra. Al escribir paneles
 //      se autorrellenan según la curva sugerida (3/3/1/3). Editables a mano.
-//      Si el usuario edita uno y luego cambia paneles, se ofrece un link
-//      "Recalcular según curva" en vez de pisar el valor manual.
-//   4) Resumen en vivo: total $, reparto Marca / Empresa interna o "100%
-//      absorbe" si la marca es interna (Joybees).
+//   4) Resumen en vivo: total $ + desglose por marca (al 100%, por %).
 // ============================================================================
 
 import { useEffect, useMemo, useState } from "react";
 import type {
   EntregaConItems,
-  EntregaItemInput,
   MarcaConPorcentaje,
   MkInventarioProducto,
   MkMarca,
 } from "@/lib/marketing/types";
 import { useToast } from "@/components/ToastSystem";
 import { formatearMonto } from "@/lib/marketing/normalizar";
-import { getEmpresaStyle } from "@/lib/marketing/empresa-styles";
 
 interface Props {
   open: boolean;
@@ -72,6 +69,28 @@ function trunc(n: number): number {
   return Math.max(0, Math.trunc(n));
 }
 
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+interface MarcaSel {
+  marcaId: string;
+  porcentajeStr: string;
+}
+
+// Reparte 100% en partes parejas entre las marcas (la última absorbe el resto).
+function repartirParejo(ids: ReadonlyArray<string>): MarcaSel[] {
+  const n = ids.length;
+  if (n === 0) return [];
+  const base = Math.floor((100 / n) * 100) / 100;
+  return ids.map((id, i) => ({
+    marcaId: id,
+    porcentajeStr: String(
+      i === n - 1 ? round2(100 - base * (n - 1)) : base,
+    ),
+  }));
+}
+
 export default function EntregaForm({
   open,
   proyectoId,
@@ -86,8 +105,7 @@ export default function EntregaForm({
 
   // ---- Marcas elegibles ----
   // Si el form se abre desde un proyecto, las opciones son las marcas del
-  // proyecto. Si es standalone (sin proyecto: marcasProyecto vacío), cargamos
-  // todas las marcas activas del catálogo.
+  // proyecto. Si es standalone (sin proyecto), cargamos todas las activas.
   const [catalogoMarcas, setCatalogoMarcas] = useState<MkMarca[]>([]);
   useEffect(() => {
     if (!open) return;
@@ -115,10 +133,15 @@ export default function EntregaForm({
     return catalogoMarcas;
   }, [marcasProyecto, catalogoMarcas]);
 
+  const marcaById = useMemo(
+    () => new Map(marcasOpciones.map((m) => [m.id, m])),
+    [marcasOpciones],
+  );
+
   // ---- Estado del form ----
-  const [marcaIdSel, setMarcaIdSel] = useState<string>("");
+  const [nombre, setNombre] = useState<string>("");
+  const [marcasSel, setMarcasSel] = useState<MarcaSel[]>([]);
   const [panelesStr, setPanelesStr] = useState<string>("");
-  // Cantidades por categoría (string para input controlado).
   const [accesorios, setAccesorios] = useState<Record<Categoria, string>>({
     paneles: "",
     tablas: "",
@@ -127,8 +150,6 @@ export default function EntregaForm({
     barra: "",
     otros: "",
   });
-  // Tracking: ¿el usuario tocó manualmente el accesorio? (evita pisar al
-  // recalcular paneles).
   const [tocadoManual, setTocadoManual] = useState<Record<Categoria, boolean>>({
     paneles: false,
     tablas: false,
@@ -137,7 +158,6 @@ export default function EntregaForm({
     barra: false,
     otros: false,
   });
-  // Cantidades libres para productos en categoría "otros" (uno por producto).
   const [otrosCant, setOtrosCant] = useState<Record<string, string>>({});
   const [guardando, setGuardando] = useState(false);
 
@@ -145,13 +165,9 @@ export default function EntregaForm({
   useEffect(() => {
     if (!open) return;
     if (initial) {
-      // Reconstruir desde la entrega existente. Asumimos una sola marca en el
-      // reparto (caso normal) — tomamos el marca_id del primer entry con
-      // cantidad>0.
       const productoNombreById = new Map(
         productos.map((p) => [p.id, p.nombre]),
       );
-      let marcaId = "";
       const cantsByCat: Record<Categoria, number> = {
         paneles: 0,
         tablas: 0,
@@ -162,11 +178,10 @@ export default function EntregaForm({
       };
       const otros: Record<string, string> = {};
       for (const it of initial.items ?? []) {
-        const nombre = productoNombreById.get(it.producto_id) ?? "";
-        const cat = categorizarProducto(nombre);
+        const nombreProd = productoNombreById.get(it.producto_id) ?? "";
+        const cat = categorizarProducto(nombreProd);
         let totalItem = 0;
         for (const r of it.reparto ?? []) {
-          if (!marcaId) marcaId = r.marca_id;
           totalItem += Number(r.cantidad ?? 0);
         }
         if (cat === "otros") {
@@ -175,7 +190,33 @@ export default function EntregaForm({
           cantsByCat[cat] += totalItem;
         }
       }
-      setMarcaIdSel(marcaId);
+      // Reconstruir marcas con % desde las proporciones de total_por_marca,
+      // normalizadas a 100. (En entregas viejas 50/50 ambas marcas eran
+      // externas con el mismo factor, así que la proporción de total_por_marca
+      // ya refleja el % real entre marcas.)
+      const montos = Object.entries(initial.total_por_marca ?? {}).map(
+        ([marcaId, v]) => ({ marcaId, monto: Number(v) || 0 }),
+      );
+      let marcasIni: MarcaSel[];
+      if (montos.length === 0) {
+        marcasIni = [];
+      } else if (montos.length === 1) {
+        marcasIni = [{ marcaId: montos[0].marcaId, porcentajeStr: "100" }];
+      } else {
+        const sum = montos.reduce((s, m) => s + m.monto, 0) || 1;
+        let acum = 0;
+        marcasIni = montos.map((m, i) => {
+          const pct =
+            i === montos.length - 1
+              ? round2(100 - acum)
+              : round2((m.monto / sum) * 100);
+          acum = round2(acum + pct);
+          return { marcaId: m.marcaId, porcentajeStr: String(pct) };
+        });
+      }
+
+      setNombre(initial.notas ?? "");
+      setMarcasSel(marcasIni);
       setPanelesStr(cantsByCat.paneles > 0 ? String(cantsByCat.paneles) : "");
       setAccesorios({
         paneles: cantsByCat.paneles > 0 ? String(cantsByCat.paneles) : "",
@@ -185,8 +226,6 @@ export default function EntregaForm({
         barra: cantsByCat.barra > 0 ? String(cantsByCat.barra) : "",
         otros: "",
       });
-      // En edit, asumimos que cualquier valor que difiera de la curva pudo
-      // ser editado a mano — marcamos todo como tocado para no pisar.
       setTocadoManual({
         paneles: false,
         tablas: true,
@@ -197,8 +236,8 @@ export default function EntregaForm({
       });
       setOtrosCant(otros);
     } else {
-      // Reset al abrir en modo crear.
-      setMarcaIdSel("");
+      setNombre("");
+      setMarcasSel([]);
       setPanelesStr("");
       setAccesorios({
         paneles: "",
@@ -221,8 +260,6 @@ export default function EntregaForm({
   }, [open, initial, productos]);
 
   // ---- Auto-fill al cambiar paneles ----
-  // Solo rellenamos accesorios que NO fueron tocados manualmente.
-  // Sincroniza accesorios.paneles con panelesStr.
   useEffect(() => {
     const n = trunc(Number(panelesStr));
     setAccesorios((prev) => {
@@ -255,21 +292,8 @@ export default function EntregaForm({
     return out;
   }, [productos]);
 
-  // Tomamos el primer producto de cada categoría (el seed tiene un único
-  // producto por categoría — Paneles, Tablas, Conjunto soporte, etc).
   const productoDe = (c: Categoria): MkInventarioProducto | null =>
     productosByCat[c][0] ?? null;
-
-  // Marca seleccionada
-  const marcaSel = useMemo(
-    () => marcasOpciones.find((m) => m.id === marcaIdSel) ?? null,
-    [marcasOpciones, marcaIdSel],
-  );
-  const esInterna = marcaSel?.tipo === "interna";
-  const empresaCodigo = marcaSel?.empresa_codigo ?? "";
-  const empresaStyle = !esInterna && empresaCodigo
-    ? getEmpresaStyle(empresaCodigo)
-    : null;
 
   // ---- Cálculo en vivo ----
   const filasParaResumen = useMemo(() => {
@@ -292,17 +316,27 @@ export default function EntregaForm({
     for (const f of filasParaResumen) {
       t += Number(f.producto.precio) * f.cant;
     }
-    return Math.round(t * 100) / 100;
+    return round2(t);
   }, [filasParaResumen]);
 
-  const repartoMarca = useMemo(() => {
-    if (esInterna) return totalEntrega;
-    return Math.round(totalEntrega * 50) / 100;
-  }, [totalEntrega, esInterna]);
-  const repartoEmpresa = useMemo(() => {
-    if (esInterna) return 0;
-    return Math.round(totalEntrega * 50) / 100;
-  }, [totalEntrega, esInterna]);
+  // Desglose por marca (por %). La última marca absorbe el redondeo.
+  const sumPctSel = useMemo(
+    () => marcasSel.reduce((s, m) => s + (Number(m.porcentajeStr) || 0), 0),
+    [marcasSel],
+  );
+  const desgloseMarcas = useMemo(() => {
+    const sum = sumPctSel || 1;
+    let acum = 0;
+    return marcasSel.map((m, i) => {
+      const pct = Number(m.porcentajeStr) || 0;
+      const monto =
+        i === marcasSel.length - 1
+          ? round2(totalEntrega - acum)
+          : round2(totalEntrega * (pct / sum));
+      acum = round2(acum + monto);
+      return { marcaId: m.marcaId, monto };
+    });
+  }, [marcasSel, totalEntrega, sumPctSel]);
 
   // ---- Handlers ----
   const setAccesorio = (cat: Categoria, value: string) => {
@@ -314,8 +348,7 @@ export default function EntregaForm({
   };
 
   const setPaneles = (value: string) => {
-    const clean = value.replace(/[^0-9]/g, "");
-    setPanelesStr(clean);
+    setPanelesStr(value.replace(/[^0-9]/g, ""));
   };
 
   const recalcularCurva = () => {
@@ -339,33 +372,49 @@ export default function EntregaForm({
     });
   };
 
-  // ¿Algún accesorio editado a mano difiere de la curva? Si sí, ofrecemos
-  // el link "Recalcular según curva".
   const hayManualEditado = useMemo(() => {
     return (["tablas", "conjunto", "norte", "barra"] as Categoria[]).some(
       (c) => tocadoManual[c],
     );
   }, [tocadoManual]);
 
-  // Sugerido por accesorio (gris debajo del input cuando difiere del valor real).
   const sugeridoDe = (cat: Categoria): number => {
     const n = trunc(Number(panelesStr));
     if (n <= 0) return 0;
     return n * (CURVA[cat] ?? 0);
   };
 
+  // Marca toggle: agrega/quita y reparte el % parejo entre las seleccionadas.
+  const toggleMarca = (id: string) => {
+    setMarcasSel((prev) => {
+      const exists = prev.some((m) => m.marcaId === id);
+      const nextIds = exists
+        ? prev.filter((m) => m.marcaId !== id).map((m) => m.marcaId)
+        : [...prev.map((m) => m.marcaId), id];
+      return repartirParejo(nextIds);
+    });
+  };
+
+  const setMarcaPct = (id: string, value: string) => {
+    const clean = value.replace(/[^0-9.]/g, "");
+    setMarcasSel((prev) =>
+      prev.map((m) => (m.marcaId === id ? { ...m, porcentajeStr: clean } : m)),
+    );
+  };
+
   // ---- Validación ----
   const tieneAlMenosUno = filasParaResumen.length > 0;
   const panelesOk = trunc(Number(panelesStr)) >= 1;
-  const marcaOk = !!marcaIdSel;
-  const puedeGuardar = panelesOk && marcaOk && tieneAlMenosUno && !guardando;
+  const marcasOk =
+    marcasSel.length >= 1 &&
+    marcasSel.every((m) => (Number(m.porcentajeStr) || 0) > 0) &&
+    Math.abs(sumPctSel - 100) < 0.01;
+  const puedeGuardar = panelesOk && marcasOk && tieneAlMenosUno && !guardando;
 
   // Warnings de stock por producto (no bloqueantes).
   const warningsStock = useMemo(() => {
     const out: Array<{ nombre: string; pedido: number; disponible: number }> = [];
     for (const f of filasParaResumen) {
-      // Si está en initial, sumamos lo que esa entrega ya tomaba para no contar
-      // doble (lectura informativa, el backend recalcula stock al guardar).
       let previa = 0;
       if (initial) {
         for (const it of initial.items ?? []) {
@@ -390,10 +439,13 @@ export default function EntregaForm({
     if (!puedeGuardar) return;
     setGuardando(true);
     try {
-      const items: EntregaItemInput[] = filasParaResumen.map((f) => ({
+      const items = filasParaResumen.map((f) => ({
         productoId: f.producto.id,
-        // No mandamos `empresa` — el backend la deriva de marca.empresa_codigo.
-        reparto: [{ marcaId: marcaIdSel, cantidad: f.cant }],
+        cantidad: f.cant,
+      }));
+      const marcas = marcasSel.map((m) => ({
+        marcaId: m.marcaId,
+        porcentaje: Number(m.porcentajeStr) || 0,
       }));
 
       const url = initial
@@ -401,13 +453,8 @@ export default function EntregaForm({
         : "/api/marketing/inventario/entregas";
       const method = initial ? "PATCH" : "POST";
       const body = initial
-        ? { items }
-        : {
-            // Toda entrega nueva va atada a su proyecto (se retiró el flujo de
-            // entregas huérfanas/bandeja).
-            proyectoId,
-            items,
-          };
+        ? { items, marcas, notas: nombre.trim() || null }
+        : { proyectoId, items, marcas, notas: nombre.trim() || null };
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -452,6 +499,8 @@ export default function EntregaForm({
 
   if (!open) return null;
 
+  const multiMarca = marcasSel.length > 1;
+
   // ---- Render ----
   return (
     <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center">
@@ -493,19 +542,42 @@ export default function EntregaForm({
             </div>
           ) : (
             <>
-              {/* Paso 1: Marca */}
+              {/* Nombre de la entrega */}
+              <section className="space-y-2">
+                <label
+                  htmlFor="entrega-nombre"
+                  className="block text-sm font-medium text-stone-800"
+                >
+                  Nombre de la entrega{" "}
+                  <span className="text-stone-400 font-normal">(opcional)</span>
+                </label>
+                <input
+                  id="entrega-nombre"
+                  type="text"
+                  value={nombre}
+                  onChange={(e) => setNombre(e.target.value)}
+                  disabled={guardando}
+                  maxLength={120}
+                  placeholder="Ej: Reposición vitrina, kit local nuevo…"
+                  className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm focus:border-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900 disabled:bg-stone-50"
+                />
+              </section>
+
+              {/* Paso 1: Marca(s) con % */}
               <section className="space-y-2">
                 <label className="block text-sm font-medium text-stone-800">
-                  ¿A qué marca pertenece esta entrega?
+                  ¿A qué marca(s) pertenece esta entrega?
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {marcasOpciones.map((m) => {
-                    const seleccionada = marcaIdSel === m.id;
+                    const seleccionada = marcasSel.some(
+                      (s) => s.marcaId === m.id,
+                    );
                     return (
                       <button
                         key={m.id}
                         type="button"
-                        onClick={() => setMarcaIdSel(m.id)}
+                        onClick={() => toggleMarca(m.id)}
                         disabled={guardando}
                         className={`text-left rounded-lg border-2 px-4 py-3 transition ${
                           seleccionada
@@ -513,18 +585,59 @@ export default function EntregaForm({
                             : "border-stone-200 bg-white hover:border-stone-400"
                         } disabled:opacity-50`}
                       >
-                        <div className="text-sm font-medium text-stone-900">
-                          {m.nombre}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-medium text-stone-900">
+                            {m.nombre}
+                          </span>
+                          {seleccionada && (
+                            <span className="text-stone-900 text-xs">✓</span>
+                          )}
                         </div>
-                        {m.tipo === "interna" && (
-                          <div className="text-[11px] text-emerald-700 mt-0.5">
-                            Marca interna · absorbe 100%
-                          </div>
-                        )}
                       </button>
                     );
                   })}
                 </div>
+
+                {/* % por marca cuando hay más de una */}
+                {multiMarca && (
+                  <div className="rounded-md border border-stone-200 bg-stone-50/50 p-3 space-y-2">
+                    <div className="text-[11px] uppercase tracking-wider text-stone-500">
+                      Porcentaje por marca (debe sumar 100%)
+                    </div>
+                    {marcasSel.map((m) => (
+                      <div
+                        key={m.marcaId}
+                        className="flex items-center justify-between gap-3"
+                      >
+                        <span className="text-sm text-stone-700">
+                          {marcaById.get(m.marcaId)?.nombre ?? "Marca"}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={m.porcentajeStr}
+                            onChange={(e) =>
+                              setMarcaPct(m.marcaId, e.target.value)
+                            }
+                            disabled={guardando}
+                            className="w-20 rounded-md border border-stone-300 px-2 py-1.5 text-sm text-right font-mono tabular-nums focus:border-stone-900 focus:outline-none disabled:bg-stone-50"
+                          />
+                          <span className="text-sm text-stone-500">%</span>
+                        </div>
+                      </div>
+                    ))}
+                    <div
+                      className={`text-xs text-right tabular-nums ${
+                        Math.abs(sumPctSel - 100) < 0.01
+                          ? "text-stone-500"
+                          : "text-red-600 font-medium"
+                      }`}
+                    >
+                      Suma: {round2(sumPctSel)}%
+                    </div>
+                  </div>
+                )}
               </section>
 
               {/* Paso 2: Paneles destacado */}
@@ -672,33 +785,16 @@ export default function EntregaForm({
                     {formatearMonto(totalEntrega)}
                   </span>
                 </div>
-                {marcaSel && totalEntrega > 0 && (
-                  <div className="text-xs text-stone-600 pt-1 border-t border-stone-200">
-                    {esInterna ? (
-                      <div className="flex justify-between">
-                        <span>{marcaSel.nombre} absorbe 100%</span>
+                {marcasSel.length > 0 && totalEntrega > 0 && (
+                  <div className="text-xs text-stone-600 pt-1 border-t border-stone-200 space-y-0.5">
+                    {desgloseMarcas.map((d) => (
+                      <div key={d.marcaId} className="flex justify-between">
+                        <span>{marcaById.get(d.marcaId)?.nombre ?? "Marca"}</span>
                         <span className="font-mono tabular-nums">
-                          {formatearMonto(totalEntrega)}
+                          {formatearMonto(d.monto)}
                         </span>
                       </div>
-                    ) : (
-                      <>
-                        <div className="flex justify-between">
-                          <span>{marcaSel.nombre} paga</span>
-                          <span className="font-mono tabular-nums">
-                            {formatearMonto(repartoMarca)}
-                          </span>
-                        </div>
-                        {empresaStyle && (
-                          <div className="flex justify-between">
-                            <span>{empresaStyle.nombre} paga</span>
-                            <span className="font-mono tabular-nums">
-                              {formatearMonto(repartoEmpresa)}
-                            </span>
-                          </div>
-                        )}
-                      </>
-                    )}
+                    ))}
                   </div>
                 )}
               </section>
@@ -733,8 +829,8 @@ export default function EntregaForm({
                 disabled={!puedeGuardar}
                 className="rounded-md bg-stone-900 text-white px-4 py-2 text-sm font-medium active:scale-[0.97] transition disabled:opacity-50"
                 title={
-                  !marcaOk
-                    ? "Selecciona una marca"
+                  !marcasOk
+                    ? "Selecciona marca(s) y que el % sume 100"
                     : !panelesOk
                       ? "Indica al menos 1 panel"
                       : !tieneAlMenosUno
