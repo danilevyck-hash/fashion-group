@@ -49,7 +49,19 @@ Fuente única de navegación + permisos de UI. Agrupados:
 
 ## Base de datos
 - **Tablas grandes:** cxc_rows (~50K), switch_facturas (historia 2022+, fuente única de ventas), ventas_raw (~100K, congelada — solo la lee costo)
-- **Soft delete:** `deleted` boolean en: reclamos, cheques, guias, prestamos, caja, directorio
+- **Soft delete (`deleted` boolean), por módulo:**
+  - Caja: `caja_gastos` (+ `deleted_by`, `deleted_at`), `caja_periodos`
+  - Préstamos: `prestamos_empleados`, `prestamos_movimientos`
+  - Reclamos: `reclamos`, `reclamo_items`, `reclamo_settlements`
+  - Cheques: `cheques`
+  - Guías: `guia_transporte`, `guia_items`
+  - Directorio: `directorio_clientes`, `clientes_master`
+  - Nota: `packing_lists` usa `deleted_at` (timestamp), NO la columna `deleted` — patrón distinto.
+- **Vistas / Materialized views:** Convención de nombres: sufijo `_mv` = materialized view, `_vw` = view. (No verificado contra catálogo pg — vía REST no se distingue MV de view; confirmar con acceso a catálogo si se necesita certeza.)
+  - `ventas_rollup_mensual_mv` (única `_mv`), `clientes_agregado_12m_vw`, `clientes_empresa_12m_vw`, `reebok_pedidos_unificado_vw`, `switch_costo_unificado_vw`, `switch_ventas_netas_vw`, `switch_ventas_unificado_vw`, `_multifashion_sf_vw`
+- **Flags de negocio:**
+  - `is_wholesale`: en `ventas_raw`, `switch_facturas` y `_multifashion_sf_vw` (segrega retail/wholesale en Multifashion)
+  - `is_preorder`: en `reebok_order_items` (preventa Reebok)
 - **Tablas UX audit (abril 2026):**
   - `cxc_favorites` — favoritos ⭐ por usuario (antes localStorage)
   - `reclamo_custom_motivos` — motivos personalizados de reclamos (antes localStorage)
