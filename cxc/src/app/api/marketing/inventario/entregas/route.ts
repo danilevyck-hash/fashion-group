@@ -9,39 +9,32 @@ import {
 
 export const dynamic = "force-dynamic";
 
-interface RepartoEntryBody {
+interface MarcaPctBody {
   marcaId?: string;
-  empresa?: string | null;
-  cantidad?: number | string;
+  porcentaje?: number | string;
 }
 
 interface CreateEntregaBody {
   proyectoId?: string | null;
   notas?: string | null;
+  // Marcas con % entre ellas (1 marca = 100%). Sin empresa interna.
+  marcas?: MarcaPctBody[];
   items?: Array<{
     productoId?: string;
-    reparto?: RepartoEntryBody[];
+    cantidad?: number | string;
   }>;
 }
 
-// Normaliza el `reparto[]` del body. La empresa se deja undefined (default
-// desde marca.empresa_codigo lo resuelve el backend).
-function normalizarRepartoBody(it: {
-  reparto?: RepartoEntryBody[];
-}): Array<{ marcaId: string; empresa?: string | null; cantidad: number }> {
-  if (Array.isArray(it.reparto) && it.reparto.length > 0) {
-    return it.reparto.map((r) => ({
-      marcaId: String(r.marcaId ?? ""),
-      empresa:
-        r.empresa === undefined
-          ? undefined
-          : r.empresa === null
-            ? null
-            : String(r.empresa),
-      cantidad: Number(r.cantidad ?? 0),
-    }));
-  }
-  return [];
+function normalizarMarcasBody(
+  marcas?: MarcaPctBody[],
+): Array<{ marcaId: string; porcentaje: number }> {
+  if (!Array.isArray(marcas)) return [];
+  return marcas
+    .map((m) => ({
+      marcaId: String(m.marcaId ?? ""),
+      porcentaje: Number(m.porcentaje ?? 0),
+    }))
+    .filter((m) => m.marcaId);
 }
 
 export async function GET(req: NextRequest) {
@@ -79,11 +72,12 @@ export async function POST(req: NextRequest) {
     }
     const items = body.items.map((it) => ({
       productoId: String(it.productoId ?? ""),
-      reparto: normalizarRepartoBody(it),
+      cantidad: Number(it.cantidad ?? 0),
     }));
     const entrega = await createEntrega({
       proyectoId: body.proyectoId ?? null,
       items,
+      marcas: normalizarMarcasBody(body.marcas),
       notas: body.notas ?? null,
     });
     return NextResponse.json(entrega);

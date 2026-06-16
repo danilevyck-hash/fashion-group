@@ -135,9 +135,7 @@ export default function EntregasSection({
                 className="rounded-lg border border-gray-200 bg-white overflow-hidden"
               >
                 {/* Fila principal: clickeable para expandir.
-                    Una pill por marca con el monto cobrable a esa marca.
-                    El reparto interno 50/50 vive en DB y en el Excel exportado;
-                    aquí solo mostramos lo que la marca paga. */}
+                    Una pill por marca con el monto (100%) atribuido a esa marca. */}
                 <button
                   type="button"
                   onClick={() =>
@@ -149,8 +147,8 @@ export default function EntregasSection({
                     Entrega
                   </span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-gray-900">
-                      Entrega de muebles
+                    <div className="text-sm font-medium text-gray-900 truncate">
+                      {e.notas?.trim() || "Entrega de muebles"}
                     </div>
                     <div className="flex flex-wrap items-center gap-1 mt-1">
                       {Object.entries(e.total_por_marca ?? {}).length === 0 ? (
@@ -210,19 +208,12 @@ export default function EntregasSection({
                 {/* Detalle expandido */}
                 {expandida && (
                   <div className="border-t border-gray-100 px-3 py-3 bg-gray-50/40 space-y-3">
-                    {/* Cards por marca */}
+                    {/* Cards por marca (monto al 100%) */}
                     {Object.entries(e.total_por_marca ?? {}).length > 0 && (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {Object.entries(e.total_por_marca ?? {}).map(
                           ([marcaId, monto]) => {
                             const marca = marcaById.get(marcaId);
-                            // Sumar unidades de esta marca
-                            let unidades = 0;
-                            for (const it of e.items) {
-                              unidades += Number(
-                                it.cantidad_por_marca?.[marcaId] ?? 0,
-                              );
-                            }
                             return (
                               <div
                                 key={marcaId}
@@ -233,9 +224,6 @@ export default function EntregasSection({
                                 </div>
                                 <div className="text-sm font-mono tabular-nums text-gray-900 font-semibold">
                                   {formatearMonto(Number(monto ?? 0))}
-                                </div>
-                                <div className="text-[11px] text-gray-400">
-                                  {unidades} unidades
                                 </div>
                               </div>
                             );
@@ -255,16 +243,9 @@ export default function EntregasSection({
                             <th className="text-right font-medium px-2 py-1.5">
                               Precio
                             </th>
-                            {Object.keys(e.total_por_marca ?? {}).map(
-                              (marcaId) => (
-                                <th
-                                  key={marcaId}
-                                  className="text-center font-medium px-2 py-1.5"
-                                >
-                                  {marcaById.get(marcaId)?.nombre ?? "Marca"}
-                                </th>
-                              ),
-                            )}
+                            <th className="text-right font-medium px-2 py-1.5">
+                              Cantidad
+                            </th>
                             <th className="text-right font-medium px-2 py-1.5">
                               Total línea
                             </th>
@@ -292,20 +273,9 @@ export default function EntregasSection({
                                 <td className="px-2 py-1.5 text-right tabular-nums text-gray-600">
                                   {formatearMonto(it.precio_unitario)}
                                 </td>
-                                {Object.keys(e.total_por_marca ?? {}).map(
-                                  (marcaId) => (
-                                    <td
-                                      key={marcaId}
-                                      className="px-2 py-1.5 text-center tabular-nums text-gray-700"
-                                    >
-                                      {Number(
-                                        it.cantidad_por_marca?.[marcaId] ?? 0,
-                                      ) || (
-                                        <span className="text-gray-300">—</span>
-                                      )}
-                                    </td>
-                                  ),
-                                )}
+                                <td className="px-2 py-1.5 text-right tabular-nums text-gray-700">
+                                  {unidadesTotales}
+                                </td>
                                 <td className="px-2 py-1.5 text-right font-mono tabular-nums text-gray-900">
                                   {formatearMonto(totalLinea)}
                                 </td>
