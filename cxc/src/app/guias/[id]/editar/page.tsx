@@ -69,10 +69,6 @@ export default function GuiaEditarPage() {
         onRemoveRow={s.removeRow}
         onSave={s.saveGuia}
         onCancel={() => router.push("/guias")}
-        hasDraft={s.hasGuiaDraft}
-        draftTimeAgo={s.guiaDraftTimeAgo}
-        onRestoreDraft={s.restoreGuiaDraft}
-        onDiscardDraft={s.clearGuiaDraft}
       />
       <Toast message={s.toast} />
     </div>
