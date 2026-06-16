@@ -136,6 +136,7 @@ export function useGuiasState() {
     const payload: Record<string, unknown> = {
       estado: "Completada",
       tipo_despacho: tipoDespacho,
+      placa: bPlaca, // placa obligatoria siempre, sin importar tipo de despacho
       receptor_nombre: bReceptor,
       cedula: bCedula,
       firma_base64: firma1,
@@ -143,7 +144,6 @@ export function useGuiasState() {
     };
 
     if (tipoDespacho === "externo") {
-      payload.placa = bPlaca;
       payload.numero_guia_transp = bNumeroGuiaTransp;
     } else {
       payload.nombre_chofer = bChofer;

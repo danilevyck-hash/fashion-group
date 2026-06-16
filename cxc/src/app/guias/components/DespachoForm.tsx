@@ -52,8 +52,9 @@ export default function DespachoForm({
   }, [isDirty, bSaving]);
 
   function handleConfirmar() {
+    // La placa es obligatoria SIEMPRE, sin importar el tipo de despacho.
+    if (!bPlaca.trim()) return showToast("Ingresa la placa del vehiculo");
     if (tipoDespacho === "externo") {
-      if (!bPlaca.trim()) return showToast("Ingresa la placa del vehiculo");
       if (!bNumeroGuiaTransp.trim()) return showToast("Falta el N° de guía del transportista");
       if (!bReceptor.trim()) return showToast("Ingresa el nombre del transportista/receptor");
       if (!bCedula.trim()) return showToast("Ingresa la cedula del receptor");
@@ -121,6 +122,11 @@ export default function DespachoForm({
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          <div>
+            <label className="text-xs uppercase tracking-wider text-gray-400 mb-1 block">Placa del vehiculo *</label>
+            <input type="text" value={bPlaca} onChange={(e) => setBPlaca(e.target.value)}
+              className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
+          </div>
           <div>
             <label className="text-xs uppercase tracking-wider text-gray-400 mb-1 block">Chofer *</label>
             <input type="text" value={bChofer} onChange={(e) => setBChofer(e.target.value)} placeholder="Nombre del chofer"
