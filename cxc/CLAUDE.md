@@ -16,12 +16,24 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 | Rol | DB value | Acceso |
 |-----|----------|--------|
 | Admin | `admin` | Todo |
-| Secretaria | `secretaria` | upload, guias, caja, reclamos, cheques, directorio, KPIs dashboard |
-| Bodega | `bodega` | guias (despacho), directorio, búsqueda global (guías+directorio). Auto-redirect a Guías desde home (único módulo) |
-| Director | `director` | Todo (lectura), ventas, CXC |
-| Contabilidad | `contabilidad` | prestamos, ventas, búsqueda global (ventas+prestamos) |
-| Vendedor | `vendedor` | reebok, CXC, directorio, búsqueda global (CXC+directorio) |
-| Cliente | `cliente` | catalogo reebok (solo propio) |
+| Secretaria | `secretaria` | upload, guias, caja, reclamos, cheques, directorio, marketing, comisiones, packing-lists, catálogos, KPIs dashboard |
+| Bodega | `bodega` | guias (despacho), packing-lists, catálogos, búsqueda global (guías+directorio). Auto-redirect a Guías desde home (único módulo). Nota: directorio aparece solo en la búsqueda global, NO como módulo navegable |
+| Contabilidad | `contabilidad` | prestamos, proveedores, ventas, búsqueda global (ventas+prestamos). En API directorio solo lectura (GET), no edición |
+| Vendedor | `vendedor` | catálogos (reebok), CXC, directorio, guías (solo lectura), búsqueda global (CXC+directorio) |
+
+> Roles reales del sistema = los 5 de arriba (`src/lib/modules.ts` → `SYSTEM_ROLES`). No existen roles `director` ni `cliente` (el catálogo Reebok es público, sin login).
+
+## Módulos (src/lib/modules.ts)
+Fuente única de navegación + permisos de UI. Agrupados:
+- **Ventas:** CXC (`/admin`), Ventas, Multifashion, Clientes/Directorio (`/clientes`), Marketing
+- **Finanzas:** Cheques, Caja, Préstamos, Comisiones, Proveedores
+- **Operación:** Guías, Packing Lists, Reclamos
+- **Productos:** Catálogos (Reebok, Joybees)
+- **Sistema:** Usuarios, Data Health
+
+## Guías — máquina de estados
+- Estado en `guia_transporte.estado` (TEXT, **sin CHECK constraint** — valores válidos por convención de código).
+- Flujo: **Pendiente Bodega** (default al crear) → **Completada** (al despachar; exige receptor, cédula, placa, ≥1 bulto y firmas; queda **bloqueada** para edición) → **Rechazada** (solo desde Completada, con `motivo_rechazo`).
 
 ## Auth
 - Passwords: bcrypt hashed (migración de plaintext completada — todos los usuarios en bcrypt; el login exige bcrypt y rechaza cualquier password no-hasheada)
@@ -29,7 +41,7 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 - Middleware: `src/middleware.ts` valida sesión contra `user_sessions` table
 - Session health check: `/api/auth/check` — pinged cada 2 min, warning banner antes de expirar
 - API auth: `src/lib/requireRole.ts` — admin siempre pasa, verifica rol contra array
-- Rate limiting: 5 intentos/min/IP en login (in-memory)
+- Rate limiting: login en Supabase (tabla `login_attempts` + RPC `register_login_failure`/`clear_login_attempts`), por IP — 5 fallos en ventana de 15 min → lockout 15 min (`src/lib/login-rate-limit.ts`, fail-open). Reemplazó el Map en-memoria (inefectivo en serverless)
 - Login case-insensitive: contraseñas no distinguen mayúsculas/minúsculas (autocapitalizar iPhone)
 - Input login: autoCapitalize=none, autoCorrect=off
 - User indicator: nombre + rol visible en header desktop y drawer mobile
@@ -57,19 +69,34 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 - `pedidos@fashiongr.com` — guias notify
 
 ## Crons (vercel.json)
-| Cron | Schedule | Descripción |
-|------|----------|-------------|
-| /api/cron/cheques | 13:00 UTC diario | Marca vencidos + emails individuales |
-| /api/cron/cheques-alert | 13:00 UTC diario | Email resumen agregado |
-| /api/cron/weekly-report | 14:00 UTC lunes | Resumen semanal a daniel@ |
-| /api/cron/monthly-report | 14:00 UTC día 1 | Resumen mensual a daniel@ |
-| /api/cron/backup | 06:00 UTC diario | Backup |
+18 crons configurados (todos 1×/día por restricción del plan Hobby, ver nota):
+
+| Cron | Schedule (UTC) |
+|------|----------------|
+| /api/cron/cleanup-packing-lists | 03:00 |
+| /api/cron/multifashion-sync | 05:00 |
+| /api/cron/switch-sync (vistana, active_wear) | 05:30 |
+| /api/cron/switch-sync (fashion_shoes, fashion_wear) | 05:35 |
+| /api/cron/switch-sync (active_shoes, joystep) | 05:40 |
+| /api/cron/switch-sync (american_classic, confecciones_boston) | 06:30 |
+| /api/cron/backup | 06:00 |
+| /api/cron/refresh-clientes-views | 06:30 |
+| /api/cron/sync-clientes-master | 07:00 |
+| /api/cron/sync-utilidad | 08:00 |
+| /api/cron/sync-recibos | 08:30 |
+| /api/cron/switch-articulos | 09:00 |
+| /api/cron/sync-proveedores | 09:30 |
+| /api/cron/integrity-check | 12:00 |
+| /api/cron/cheques-alert | 13:00 |
+| /api/cron/switch-reconciliacion | 10:00, 14:00, 18:00 (3 entradas) |
+
+> **Plan Vercel Hobby:** los crons solo corren 1×/día (las 3 entradas de `switch-reconciliacion` son expresiones distintas, no sub-diario) y las funciones tienen tope `maxDuration` 300s.
 
 ## PWA (iOS)
 - `viewport-fit: cover` + `env(safe-area-inset-top/bottom)` para notch/Dynamic Island
 - `apple-mobile-web-app-status-bar-style: black`
 - Standalone mode, start_url: `/home`
-- Sin service worker (desregistrado en layout)
+- Service worker ACTIVO (Serwist) — Modo Viaje / lectura cacheada offline; registrado vía `UpdatePrompt` (@serwist/window, `next.config` con `register:false`); toast "Nueva versión · Recargar" sin auto-reload (`src/app/sw.ts`, `src/components/UpdatePrompt.tsx`)
 - Roles con 1 solo módulo auto-redirigen desde home (ej: Bodega → Guías)
 - Sin bottom tab bar — navegación por módulos del home + drawer del header
 
@@ -185,7 +212,8 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 
 
 ### API & Cache
-- All 58 API routes now have `export const dynamic = 'force-dynamic'` (no more stale cache on Vercel)
+- 165 rutas API (`route.ts`); 150 tienen `export const dynamic = 'force-dynamic'` (evita cache stale en Vercel)
+- `SWRProvider` (caché de navegación stale-while-revalidate, #115/#117) — fetchers comparten caché entre vistas, dedupe y revalidación en foco
 
 ### Hooks
 - Hooks fixed in cheques and caja (moved before conditional returns per React rules)
@@ -228,7 +256,7 @@ Vistana International, Fashion Wear, Fashion Shoes, Active Shoes, Active Wear, J
 - Chevron icons on expandable rows
 
 ### Infrastructure (April 10-11)
-- All 58 API routes have `export const dynamic = 'force-dynamic'`
+- 165 rutas API; 150 con `export const dynamic = 'force-dynamic'`
 - Sentry monitoring added
 - Backup cron exists
 - 20 tests (vitest)
