@@ -5,16 +5,17 @@
 export type AgingKey = "current" | "watch" | "overdue";
 
 export interface AgingMeta {
-  label: string;   // término canónico en español
-  range: string;   // rango compacto de días
-  dot: string;     // clase de fondo para el swatch/punto de color
-  text: string;    // clase de texto del color del tramo
+  label: string;    // término canónico en español
+  range: string;    // rango compacto de días (texto descriptivo: 0-90d / 91-120d / +120d)
+  colLabel: string; // rango en el MISMO formato que las columnas de la tabla (0-90d / 91-120d / 121d+)
+  dot: string;      // clase de fondo para el swatch/punto de color
+  text: string;     // clase de texto del color del tramo
 }
 
 export const AGING: Record<AgingKey, AgingMeta> = {
-  current: { label: "Por vencer", range: "0-90d", dot: "bg-emerald-500", text: "text-emerald-700" },
-  watch: { label: "Vencido reciente", range: "91-120d", dot: "bg-amber-500", text: "text-amber-700" },
-  overdue: { label: "Vencido crítico", range: "+120d", dot: "bg-red-500", text: "text-red-700" },
+  current: { label: "Por vencer", range: "0-90d", colLabel: "0-90d", dot: "bg-emerald-500", text: "text-emerald-700" },
+  watch: { label: "Vencido reciente", range: "91-120d", colLabel: "91-120d", dot: "bg-amber-500", text: "text-amber-700" },
+  overdue: { label: "Vencido crítico", range: "+120d", colLabel: "121d+", dot: "bg-red-500", text: "text-red-700" },
 };
 
 export const AGING_ORDER: AgingKey[] = ["current", "watch", "overdue"];
