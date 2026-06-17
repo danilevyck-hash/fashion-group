@@ -46,6 +46,9 @@ interface ResumenViewMobileProps {
   setViewMode: (m: ViewMode) => void;
   granularity: Granularity;
   setGranularity: (g: Granularity) => void;
+  /** Etiqueta del cliente de mayoreo de Multifashion (american_classic). null si
+   *  no hay mayoreo en el período → la nota "incluye mayoreo" no se muestra. */
+  multiMayoreoLabel?: string | null;
 }
 
 export function ResumenViewMobile({
@@ -56,6 +59,7 @@ export function ResumenViewMobile({
   setViewMode,
   granularity,
   setGranularity,
+  multiMayoreoLabel,
 }: ResumenViewMobileProps) {
   const prevYear = selectedYear - 1;
 
@@ -80,6 +84,7 @@ export function ResumenViewMobile({
         viewMode={viewMode}
         granularity={granularity}
         isClosedYear={isClosedYear}
+        multiMayoreoLabel={multiMayoreoLabel}
       />
     </div>
   );
@@ -234,11 +239,13 @@ function MobileHeatmap({
   viewMode,
   granularity,
   isClosedYear,
+  multiMayoreoLabel,
 }: {
   data: VentasResumen;
   viewMode: ViewMode;
   granularity: Granularity;
   isClosedYear: boolean;
+  multiMayoreoLabel?: string | null;
 }) {
   const cols = granularity === "mensual" ? MONTHS : QUARTERS;
 
@@ -340,9 +347,16 @@ function MobileHeatmap({
               <tr key={r.id} className="border-b border-stone-100 last:border-b-0">
                 <th
                   scope="row"
-                  className="sticky left-0 z-10 min-w-[120px] max-w-[140px] truncate border-r border-stone-200 bg-white px-3 py-3 text-left text-xs font-medium text-stone-900"
+                  className="sticky left-0 z-10 min-w-[120px] max-w-[140px] border-r border-stone-200 bg-white px-3 py-3 text-left text-xs font-medium text-stone-900"
                 >
-                  {r.nombre}
+                  <span className="block truncate">{r.nombre}</span>
+                  {r.id === "multi" && multiMayoreoLabel && (
+                    /* Nota VISIBLE (paridad con desktop): la fila es american_classic
+                       COMPLETA (tienda + mayoreo), no solo el retail del mostrador. */
+                    <span className="mt-0.5 block whitespace-normal text-[9.5px] font-normal leading-tight text-stone-500">
+                      incluye mayoreo · {multiMayoreoLabel}
+                    </span>
+                  )}
                 </th>
                 {r.cells.map((c, ci) => (
                   <MobileCell
