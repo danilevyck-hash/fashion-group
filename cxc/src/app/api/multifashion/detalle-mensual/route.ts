@@ -40,15 +40,42 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "mes inválido (1..12)" }, { status: 400 });
   }
 
+  // Rango del mes para el desacople retail/mayoreo. El RPC de detalle ya da el
+  // retail (totales.ventas, is_wholesale=false). El mayoreo lo sumamos aparte de
+  // la MISMA vista (_multifashion_sf_vw, is_wholesale=true) por mes calendario —
+  // mismo bucket que usa la fila Multifashion del grupo, así el titular "tienda
+  // completa" cuadra al centavo con Ventas. NO toca vistas ni cálculos base.
+  const mesNext = mes === 12 ? `${year + 1}-01-01` : `${year}-${String(mes + 1).padStart(2, "0")}-01`;
+  const mesInicio = `${year}-${String(mes).padStart(2, "0")}-01`;
+
   // Detalle mensual + ventas por hora (hora pico) en paralelo. La hora pico es
   // aditiva: si su RPC falla, el detalle igual responde (la sección de horas
   // simplemente no se renderiza) — no bloquea el resto del subtab.
-  // Detalle + hora pico + margen mensual tienda completa, en paralelo. Tanto
-  // horas como margen son aditivos: si su RPC falla, el detalle igual responde.
-  const [detalleRes, horasRes, margenRes] = await Promise.all([
+  // Detalle + hora pico + margen mensual tienda completa + mayoreo del mes +
+  // cliente(s) de mayoreo, en paralelo. Todo lo extra es aditivo: si falla, el
+  // detalle igual responde (el titular cae a retail puro y la nota no se muestra).
+  const [detalleRes, horasRes, margenRes, mayoreoRes, mayoreoClienteRes] = await Promise.all([
     supabaseServer.rpc("multifashion_detalle_mensual_v2", { p_year: year, p_mes: mes }),
     supabaseServer.rpc("multifashion_horas_pico_v1", { p_year: year, p_mes: mes }),
     supabaseServer.rpc("multifashion_margen_tienda_mensual", { p_year: year, p_mes: mes }),
+    // Mayoreo del mes: misma vista, is_wholesale=true. subtotal ya trae el signo
+    // de NC (la vista lo resuelve). Mayoreo de Multifashion es escaso (≤ unas
+    // pocas filas/mes), no requiere paginación.
+    supabaseServer
+      .from("_multifashion_sf_vw")
+      .select("subtotal")
+      .eq("anio", year)
+      .eq("mes", mes)
+      .eq("is_wholesale", true),
+    // Nombre del/los cliente(s) de mayoreo para la nota (solo etiqueta). El monto
+    // sale de la vista; el nombre de la tabla base (la vista no expone cliente).
+    supabaseServer
+      .from("switch_facturas")
+      .select("cliente_nombre")
+      .eq("empresa_key", "american_classic")
+      .eq("is_wholesale", true)
+      .gte("fecha", mesInicio)
+      .lt("fecha", mesNext),
   ]);
 
   if (detalleRes.error) {
@@ -74,9 +101,47 @@ export async function GET(req: NextRequest) {
     console.error("[multifashion/detalle-mensual] margen rpc error", margenRes.error);
   }
 
+  // Mayoreo del mes (tienda completa = retail + mayoreo). retail = totales.ventas
+  // (lo deja el RPC, is_wholesale=false). El titular VENTAS MES usará ventas_total;
+  // los comparativos (MoM/YoY), ticket promedio y proyección siguen sobre ventas
+  // (retail) → sus % NO se mueven.
+  if (mayoreoRes.error) {
+    console.error("[multifashion/detalle-mensual] mayoreo query error", mayoreoRes.error);
+  }
+  const mayoreoMes = mayoreoRes.error
+    ? 0
+    : ((mayoreoRes.data ?? []) as Array<{ subtotal: number | null }>)
+        .reduce((s, r) => s + Number(r.subtotal ?? 0), 0);
+  const retailVentas = Number(totales.ventas ?? 0);
+
+  // Etiqueta del cliente de mayoreo (solo para la nota). 1 cliente → su nombre;
+  // >1 → "N clientes mayoreo". Casing tal cual la DB (consistente con la nota del
+  // grupo en Ventas).
+  if (mayoreoClienteRes.error) {
+    console.error("[multifashion/detalle-mensual] mayoreo cliente query error", mayoreoClienteRes.error);
+  }
+  const clientesMayoreo = mayoreoClienteRes.error
+    ? []
+    : [...new Set(
+        ((mayoreoClienteRes.data ?? []) as Array<{ cliente_nombre: string | null }>)
+          .map(r => (r.cliente_nombre ?? "").trim())
+          .filter(Boolean),
+      )];
+  const mayoreoCliente = clientesMayoreo.length === 1
+    ? clientesMayoreo[0]
+    : clientesMayoreo.length > 1
+      ? `${clientesMayoreo.length} clientes mayoreo`
+      : null;
+
   return NextResponse.json({
     ...detalle,
-    totales: { ...totales, margen: margenMes },
+    totales: {
+      ...totales,
+      margen: margenMes,
+      mayoreo: mayoreoMes,
+      ventas_total: retailVentas + mayoreoMes,
+    },
+    mayoreo_cliente: mayoreoCliente,
     ...(horas as Record<string, unknown>),
   });
 }

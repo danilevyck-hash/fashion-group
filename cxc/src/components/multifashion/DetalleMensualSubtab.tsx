@@ -7,7 +7,7 @@
 // (no solo el mes en curso). Year y mes vienen como props desde el shell de
 // Multifashion (selector único de período); este sub-tab solo los consume.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Card } from "@/components/ui/card";
 import { Award, AlertTriangle, Info } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -48,7 +48,13 @@ interface HoraRow {
 }
 
 interface Totales {
+  /** Retail mostrador (is_wholesale=false). Base de TODOS los comparativos
+   *  (MoM/YoY), ticket promedio y proyección — NO cambia con el titular. */
   ventas: number;
+  /** Mayoreo del mes (is_wholesale=true). Solo alimenta el titular + la nota. */
+  mayoreo?: number;
+  /** Tienda completa = ventas (retail) + mayoreo. Titular de VENTAS MES. */
+  ventas_total?: number;
   /** null cuando la fuente es switch_facturas (sin costo). */
   utilidad: number | null;
   n_tickets: number;
@@ -85,6 +91,8 @@ interface DetalleMensualResp {
   /** Hora con mayor venta neta del mes (0-23, Panamá). null si sin ventas. */
   hora_pico?: number | null;
   hora_pico_ventas?: number | null;
+  /** Cliente(s) de mayoreo del mes, para la nota del titular. null si no hay. */
+  mayoreo_cliente?: string | null;
 }
 
 interface DetalleMensualSubtabProps {
@@ -272,8 +280,21 @@ export function DetalleMensualSubtab({ year, mes }: DetalleMensualSubtabProps) {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <MiniKpi
           label="VENTAS MES"
-          value={fmtMoney(totales.ventas)}
-          sub={`${totales.n_tickets.toLocaleString()} tickets`}
+          value={fmtMoney(totales.ventas_total ?? totales.ventas)}
+          sub={
+            <>
+              {totales.n_tickets.toLocaleString()} tickets retail
+              {(totales.mayoreo ?? 0) > 0 && (
+                /* Titular = tienda completa (retail + mayoreo). La nota desglosa
+                   el mayoreo del mes (dinámico). Los tickets siguen siendo retail:
+                   la factura de mayoreo no es un ticket de mostrador. */
+                <span className="mt-0.5 block text-stone-400">
+                  incluye {fmtMoney(totales.mayoreo ?? 0)} en mayoreo
+                  {data.mayoreo_cliente ? ` (${data.mayoreo_cliente})` : ""}
+                </span>
+              )}
+            </>
+          }
         />
         <DeltaKpi
           label="VS MES ANTERIOR"
@@ -456,7 +477,7 @@ function MiniKpi({
 }: {
   label: string;
   value: string;
-  sub?: string;
+  sub?: ReactNode;
   valueClassName?: string;
 }) {
   return (
