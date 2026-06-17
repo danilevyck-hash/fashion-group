@@ -239,6 +239,13 @@ export function ResumenView({
         setViewMode={onToggleMode}
         granularity={granularity}
         setGranularity={setGranularity}
+        multiMayoreoLabel={
+          multi && multi.wholesale.ytdVentas > 0
+            ? multi.wholesale.totalClientes > 1
+              ? `${multi.wholesale.totalClientes} clientes wholesale`
+              : (multi.wholesale.topClienteName ?? "—")
+            : null
+        }
       />
 
       <div className="hidden md:block space-y-5">
@@ -1064,35 +1071,42 @@ function MultifashionNameWithBreakdown({
     ? `${wholesale.totalClientes} clientes wholesale`
     : (wholesale.topClienteName ?? "—");
   return (
-    <TooltipProvider delayDuration={120}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            type="button"
-            className="inline-flex cursor-help items-center gap-1.5 text-left outline-none focus-visible:underline"
-          >
-            <span className="underline decoration-dotted decoration-stone-300 underline-offset-4">
-              {nombre}
-            </span>
-            <Info className="h-3 w-3 text-stone-400" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="right" align="start" sideOffset={4} collisionPadding={12} className="min-w-[240px] border-0 bg-stone-950 p-3 text-white shadow-lg">
-          <div className="text-[11px] font-medium text-white">{nombre}</div>
-          <div className="mt-1.5 flex justify-between gap-6 text-[11px]">
-            <span className="text-stone-300">Retail</span>
-            <span className="font-mono text-white tabular-nums">{fmtMoney(retailYtd)}</span>
-          </div>
-          <div className="mt-1 flex justify-between gap-6 text-[11px]">
-            <span className="text-stone-300">Mayoreo</span>
-            <span className="font-mono text-white tabular-nums">{fmtMoney(wholesale.ytdVentas)}</span>
-          </div>
-          <div className="mt-1.5 border-t border-white/10 pt-1.5 text-[10.5px] text-stone-400">
-            {clienteLabel}
-          </div>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <div className="flex flex-col gap-0.5">
+      <TooltipProvider delayDuration={120}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex cursor-help items-center gap-1.5 text-left outline-none focus-visible:underline"
+            >
+              <span className="underline decoration-dotted decoration-stone-300 underline-offset-4">
+                {nombre}
+              </span>
+              <Info className="h-3 w-3 text-stone-400" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="right" align="start" sideOffset={4} collisionPadding={12} className="min-w-[240px] border-0 bg-stone-950 p-3 text-white shadow-lg">
+            <div className="text-[11px] font-medium text-white">{nombre}</div>
+            <div className="mt-1.5 flex justify-between gap-6 text-[11px]">
+              <span className="text-stone-300">Retail</span>
+              <span className="font-mono text-white tabular-nums">{fmtMoney(retailYtd)}</span>
+            </div>
+            <div className="mt-1 flex justify-between gap-6 text-[11px]">
+              <span className="text-stone-300">Mayoreo</span>
+              <span className="font-mono text-white tabular-nums">{fmtMoney(wholesale.ytdVentas)}</span>
+            </div>
+            <div className="mt-1.5 border-t border-white/10 pt-1.5 text-[10.5px] text-stone-400">
+              {clienteLabel}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      {/* Nota VISIBLE (no solo tooltip): deja claro que esta fila es american_classic
+          COMPLETA (tienda + mayoreo), no solo el retail del mostrador. */}
+      <span className="block max-w-[170px] whitespace-normal text-[10px] font-normal leading-tight text-stone-500">
+        incluye mayoreo · {clienteLabel}
+      </span>
+    </div>
   );
 }
 
