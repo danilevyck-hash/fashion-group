@@ -1,8 +1,8 @@
 "use client";
 
-// Gráficos del subtab "Detalle mensual" (ventas día por día + ventas por hora).
-// Aislados en su propio archivo para cargarse vía next/dynamic(ssr:false) desde
-// DetalleMensualSubtab → recharts sale del bundle inicial de /multifashion.
+// Gráficos del mes (ventas día por día + ventas por hora). Aislados en su propio
+// archivo para cargarse vía next/dynamic(ssr:false) desde MultifashionResumenView
+// → recharts sale del bundle inicial de /multifashion.
 
 import {
   Bar, XAxis, YAxis, Tooltip as RTooltip,
