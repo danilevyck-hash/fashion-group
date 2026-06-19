@@ -5,6 +5,7 @@
 // y dropdown de marca. Marcas se derivan de mk_factura_marcas.
 
 import { useCallback, useEffect, useState } from "react";
+import { saveAs } from "file-saver";
 import type { MkMarca } from "@/lib/marketing/types";
 import { formatearFecha, formatearMonto } from "@/lib/marketing/normalizar";
 import { useToast } from "@/components/ToastSystem";
@@ -97,6 +98,46 @@ export default function ProyectosHomeView({
   >(null);
   const [anularMotivo, setAnularMotivo] = useState("");
   const [anulando, setAnulando] = useState(false);
+  const [exportando, setExportando] = useState(false);
+
+  // Exporta los gastos visibles (respeta búsqueda + marca; sin filtro baja todo)
+  // a un ZIP: carpeta por cliente → proyecto → fotos + gasto, con Excel resumen.
+  const exportarZip = useCallback(async () => {
+    if (exportando) return;
+    setExportando(true);
+    try {
+      const res = await fetch("/api/marketing/export-zip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          busqueda: busquedaDebounced || undefined,
+          marca_id: marcaIdFiltro || null,
+        }),
+      });
+      if (!res.ok) {
+        const msg =
+          res.status === 404
+            ? "No hay gastos para exportar con el filtro actual."
+            : "No se pudo generar el ZIP. Intenta de nuevo en unos segundos.";
+        toast(msg, "error");
+        return;
+      }
+      const blob = await res.blob();
+      const fecha = new Date().toISOString().slice(0, 10);
+      saveAs(blob, `Gastos-Marketing-${fecha}.zip`);
+      const omit = Number(res.headers.get("X-Fotos-Omitidas") || 0);
+      toast(
+        omit > 0
+          ? `ZIP listo — revisa tus descargas (${omit} foto(s) no se pudieron incluir).`
+          : "ZIP listo — revisa tu carpeta de descargas.",
+        "success",
+      );
+    } catch {
+      toast("No se pudo generar el ZIP. Verifica tu conexión.", "error");
+    } finally {
+      setExportando(false);
+    }
+  }, [exportando, busquedaDebounced, marcaIdFiltro, toast]);
 
   // Debounce de búsqueda
   useEffect(() => {
@@ -216,6 +257,15 @@ export default function ProyectosHomeView({
             className="text-[11px] text-gray-400 hover:text-gray-700 transition"
           >
             Anulados
+          </button>
+          <span className="text-gray-300">·</span>
+          <button
+            type="button"
+            onClick={exportarZip}
+            disabled={exportando}
+            className="text-gray-600 hover:text-black transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {exportando ? "Generando ZIP…" : "Exportar"}
           </button>
           <button
             type="button"
