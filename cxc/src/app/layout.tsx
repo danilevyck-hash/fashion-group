@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { GeistMono } from "geist/font/mono";
 import { Playfair_Display } from "next/font/google";
 
@@ -67,7 +68,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <SidebarAwareMain>{children}</SidebarAwareMain>
             </ContextMenuProviderWrapper>
             <InstallPrompt />
-            <UpdatePrompt />
+            {/* Suspense: UpdatePrompt usa useSearchParams() (detecta navegación
+                para aplicar el SW nuevo). El boundary contiene el bailout a CSR a
+                este componente (que renderiza null), sin degradar el SSR del resto. */}
+            <Suspense fallback={null}>
+              <UpdatePrompt />
+            </Suspense>
           </OnlineProvider>
         </SWRProvider>
         {/* El SW (Serwist) lo registra UpdatePrompt vía @serwist/window
