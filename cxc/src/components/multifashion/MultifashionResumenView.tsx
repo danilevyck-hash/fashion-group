@@ -52,6 +52,9 @@ interface DiaRow {
   utilidad: number | null;
   n_tickets: number;
   ventas_mes_anterior: number;
+  /** Ventas del MISMO día del MISMO mes del AÑO ANTERIOR (comparación YoY del
+   *  gráfico). null si el año anterior no tiene datos (ej. antes de may 2024). */
+  ventas_anio_anterior?: number | null;
 }
 
 interface HeatmapDow {
@@ -104,6 +107,10 @@ interface DetalleMensualResp {
   totales: Totales;
   mes_anterior: ComparativoBlock;
   yoy: ComparativoBlock;
+  /** Año de la serie de comparación del gráfico (año actual − 1). */
+  anio_anterior?: number;
+  /** Si el mismo mes del año anterior tiene ventas (para dibujar la línea). */
+  anio_anterior_tiene_data?: boolean;
   mejor_dia: { fecha: string; ventas: number } | null;
   peor_dia: { fecha: string; ventas: number } | null;
   heatmap_dia_semana: HeatmapDow[];
@@ -478,13 +485,16 @@ function ChartMesAnioMount({
   data: DetalleMensualResp | null;
 }) {
   if (!data) return null;
-  const { totales, mes_anterior, dias, mes_label, is_mes_actual } = data;
+  const { totales, dias, mes_label, is_mes_actual } = data;
   const hasData = totales.n_tickets > 0;
-  const showPrevLine = mes_anterior.tiene_data && mes_anterior.ventas >= 100;
+  // Comparación del gráfico = MISMO mes del AÑO ANTERIOR (estacionalidad retail),
+  // no el mes previo. Solo se dibuja si el año anterior tiene datos.
+  const showPrevLine = data.anio_anterior_tiene_data === true;
+  const anioAnterior = data.anio_anterior ?? year - 1;
   const chartData = dias.map((d) => ({
     dia: d.dia,
     ventas: Math.max(0, d.ventas),
-    ventas_mes_anterior: showPrevLine ? Math.max(0, d.ventas_mes_anterior) : 0,
+    ventas_anio_anterior: showPrevLine ? Math.max(0, d.ventas_anio_anterior ?? 0) : 0,
   }));
 
   return (
@@ -514,12 +524,14 @@ function ChartMesAnioMount({
               <p className="mt-2 px-1 text-[10.5px] text-stone-500">
                 <span className="mr-1 inline-block h-2 w-2 rounded-sm bg-teal-700" />
                 {mes_label} {year}
-                {showPrevLine && (
+                {showPrevLine ? (
                   <>
                     {" · "}
                     <span className="mr-1 inline-block h-[2px] w-2 bg-stone-400" />
-                    Mes anterior
+                    Mismo mes {anioAnterior}
                   </>
+                ) : (
+                  <span className="text-stone-400"> · sin datos de {anioAnterior} para comparar</span>
                 )}
               </p>
             </>

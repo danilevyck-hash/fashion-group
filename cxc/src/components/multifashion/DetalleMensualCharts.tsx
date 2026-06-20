@@ -11,7 +11,7 @@ import {
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
 import { cn } from "@/lib/utils";
 
-type DiaPoint = { dia: number; ventas: number; ventas_mes_anterior: number };
+type DiaPoint = { dia: number; ventas: number; ventas_anio_anterior: number };
 type HoraPoint = { hora: number; label: string; ventas: number; n_tickets: number };
 
 // Hora pico 0-23 → rango legible ("4–5 pm", cruce de meridiano "11 pm–12 am").
@@ -85,7 +85,7 @@ export function VentasDiariasChart({
           {showPrevLine && (
             <Line
               type="monotone"
-              dataKey="ventas_mes_anterior"
+              dataKey="ventas_anio_anterior"
               stroke="#a8a29e"
               strokeWidth={1.5}
               strokeDasharray="3 3"
@@ -179,9 +179,9 @@ function ChartTooltip({
   if (!Number.isFinite(day)) return null;
 
   const ventasItem = payload.find(p => matchesKey(p, "ventas"));
-  const prevItem   = payload.find(p => matchesKey(p, "ventas_mes_anterior"));
+  const prevItem   = payload.find(p => matchesKey(p, "ventas_anio_anterior"));
   const ventas = readDataKey(ventasItem, "ventas");
-  const prev   = readDataKey(prevItem,   "ventas_mes_anterior");
+  const prev   = readDataKey(prevItem,   "ventas_anio_anterior");
   const isFuture = isMesActual && day > diaActual;
 
   const rows: { label: string; value: string; tone?: string }[] = [];
@@ -194,7 +194,7 @@ function ChartTooltip({
     }
   }
   if (showPrevLine && prev > 0) {
-    rows.push({ label: "Mes anterior", value: fmtMoney(prev), tone: "text-stone-600" });
+    rows.push({ label: `Mismo mes ${year - 1}`, value: fmtMoney(prev), tone: "text-stone-600" });
   }
   if (rows.length === 0) {
     rows.push({ label: "Pendiente", value: "—", tone: "text-stone-400" });
