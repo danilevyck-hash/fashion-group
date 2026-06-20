@@ -370,20 +370,59 @@ export function ConfirmTypeNameModal({
 }
 
 // ── ESTÉTICA 7d: Foto Lightbox ──
-export function FotoLightbox({ src, onClose }: { src: string | null; onClose: () => void }) {
+export function FotoLightbox({
+  src,
+  onClose,
+  onPrev,
+  onNext,
+}: {
+  src: string | null;
+  onClose: () => void;
+  // Opcionales: si se pasan, habilitan navegación con flechas ‹ › y teclas ← →.
+  // Sin ellos, el lightbox se comporta igual que antes (una sola foto).
+  onPrev?: () => void;
+  onNext?: () => void;
+}) {
   useEffect(() => {
     if (!src) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowLeft") onPrev?.();
+      else if (e.key === "ArrowRight") onNext?.();
+    };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [src, onClose]);
+  }, [src, onClose, onPrev, onNext]);
 
   if (!src) return null;
+
+  const flecha =
+    "absolute z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-3xl leading-none text-white transition hover:bg-white/30";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" />
+      {onPrev && (
+        <button
+          type="button"
+          aria-label="Foto anterior"
+          onClick={(e) => { e.stopPropagation(); onPrev(); }}
+          className={`${flecha} left-2 sm:left-4`}
+        >
+          ‹
+        </button>
+      )}
       <img src={src} alt="" className="relative max-w-3xl max-h-[90vh] w-auto h-auto object-contain rounded-lg shadow-2xl" onClick={(e) => e.stopPropagation()} />
+      {onNext && (
+        <button
+          type="button"
+          aria-label="Foto siguiente"
+          onClick={(e) => { e.stopPropagation(); onNext(); }}
+          className={`${flecha} right-2 sm:right-4`}
+        >
+          ›
+        </button>
+      )}
     </div>
   );
 }
