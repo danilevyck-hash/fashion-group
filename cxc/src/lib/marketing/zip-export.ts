@@ -3,15 +3,17 @@
 //
 //   resumen_gastos.xlsx                          (hoja Gastos + hoja Fotos,
 //                                                 con hyperlinks a cada PDF/foto)
-//   <Cliente>/<Proyecto>/
+//   <Cliente>/
 //       fotos/<archivo>.jpg                      (foto_proyecto, comprimidas)
 //       <fecha · concepto>/factura.pdf           (pdf_factura del gasto)
-//   Sin cliente/<tienda · proyecto>/ …           (proyectos sin tienda_codigo)
+//   Sin cliente/ …                               (proyectos sin tienda_codigo)
 //
-// Patrón basado en src/lib/reclamos/zip-bulk.ts (jszip nodebuffer + sharp +
-// concurrencia). Respeta el filtro de pantalla (busqueda + marca); incluye
-// anulados marcados. Los links del Excel son signed URLs de larga duración
-// (1 año) — las carpetas del ZIP son el respaldo permanente.
+// El contenido cuelga DIRECTO de la carpeta del cliente — sin nivel de carpeta
+// por proyecto. Los gastos y proyectos ANULADOS se excluyen por completo (no se
+// descargan ni aparecen en el Excel). Patrón basado en src/lib/reclamos/
+// zip-bulk.ts (jszip nodebuffer + sharp + concurrencia). Respeta el filtro de
+// pantalla (busqueda + marca). Los links del Excel son signed URLs de larga
+// duración (1 año) — las carpetas del ZIP son el respaldo permanente.
 // ============================================================================
 
 import JSZip from "jszip";
@@ -280,7 +282,9 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     return true;
   };
 
-  // Proyectos seleccionados: pasan filtro y tienen ≥1 factura o ≥1 foto.
+  // Proyectos/gastos ANULADOS se excluyen por completo del ZIP y del Excel.
+  // Un gasto se excluye si está anulado él mismo o si su proyecto está en
+  // papelera (anulado_en). Un proyecto anulado no aporta fotos ni gastos.
   const fotosPorProyecto = new Map<string, MkAdjunto[]>();
   for (const a of adjuntos) {
     if (a.tipo === "foto_proyecto" && a.proyecto_id) {
@@ -289,8 +293,11 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
       fotosPorProyecto.set(a.proyecto_id, arr);
     }
   }
+  const facturasActivas = facturas.filter(
+    (f) => !f.anulado_en && !proyectoById.get(f.proyecto_id)?.anulado_en,
+  );
   const facturasPorProyecto = new Map<string, MkFactura[]>();
-  for (const f of facturas) {
+  for (const f of facturasActivas) {
     const arr = facturasPorProyecto.get(f.proyecto_id) ?? [];
     arr.push(f);
     facturasPorProyecto.set(f.proyecto_id, arr);
@@ -304,8 +311,11 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     }
   }
 
+  // Proyectos seleccionados: NO anulados, pasan filtro y tienen ≥1 gasto
+  // activo o ≥1 foto.
   const proyectosSel = proyectos.filter(
     (p) =>
+      !p.anulado_en &&
       proyectoPasa(p.id) &&
       ((facturasPorProyecto.get(p.id)?.length ?? 0) > 0 ||
         (fotosPorProyecto.get(p.id)?.length ?? 0) > 0),
@@ -314,7 +324,7 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     throw new Error("SIN_RESULTADOS");
   }
   const proyectoIdsSel = new Set(proyectosSel.map((p) => p.id));
-  const facturasSel = facturas
+  const facturasSel = facturasActivas
     .filter((f) => proyectoIdsSel.has(f.proyecto_id))
     .sort((a, b) => (a.fecha_factura < b.fecha_factura ? -1 : 1));
 
@@ -328,19 +338,11 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   }
   const urlFirmada = await firmarLote(pathsAFirmar);
 
-  // 6. Nombres de carpeta.
+  // 6. Nombre de carpeta de cliente. El contenido cuelga DIRECTO aquí — sin
+  //    nivel de carpeta por proyecto.
   const clienteFolder = (p: MkProyecto): string => {
     const nombre = p.tienda_codigo ? clienteNombrePorCodigo.get(p.tienda_codigo) : null;
     return nombre ? sanitizeName(nombre, "Cliente") : "Sin cliente";
-  };
-  const proyectoFolder = (p: MkProyecto): string => {
-    const base = p.nombre?.trim() || p.tienda?.trim() || "Proyecto";
-    if (!p.tienda_codigo) {
-      const t = p.tienda?.trim();
-      const label = t && base !== t ? `${t} · ${base}` : base;
-      return sanitizeName(label, "Proyecto");
-    }
-    return sanitizeName(base, "Proyecto");
   };
 
   // 7. Armar el ZIP.
@@ -350,20 +352,30 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   let pdfsIncluidos = 0;
   let pdfsOmitidos = 0;
 
-  // Carpetas por proyecto + dedupe de subcarpetas de gasto dentro de cada uno.
-  const rutaProyecto = new Map<string, string>();
-  const usadosPorProyecto = new Map<string, Set<string>>();
+  // Carpeta destino por proyecto = SOLO la del cliente (sin nivel de proyecto).
+  // El dedupe de subcarpetas de gasto y de nombres de foto es POR CLIENTE,
+  // porque varios proyectos del mismo cliente comparten su carpeta.
+  const rutaCliente = new Map<string, string>();
+  const usadosGastoPorCliente = new Map<string, Set<string>>();
+  const usadosFotoPorCliente = new Map<string, Set<string>>();
+  const getSet = (map: Map<string, Set<string>>, key: string): Set<string> => {
+    let s = map.get(key);
+    if (!s) {
+      s = new Set<string>();
+      map.set(key, s);
+    }
+    return s;
+  };
   for (const p of proyectosSel) {
-    rutaProyecto.set(p.id, `${clienteFolder(p)}/${proyectoFolder(p)}`);
-    usadosPorProyecto.set(p.id, new Set<string>());
+    rutaCliente.set(p.id, clienteFolder(p));
   }
 
   // 7a. PDFs de cada gasto.
   await mapLimit(facturasSel, CONCURRENCY, async (f) => {
     const pdfs = pdfsPorFactura.get(f.id) ?? [];
     if (pdfs.length === 0) return;
-    const baseDir = rutaProyecto.get(f.proyecto_id)!;
-    const usados = usadosPorProyecto.get(f.proyecto_id)!;
+    const baseDir = rutaCliente.get(f.proyecto_id)!;
+    const usados = getSet(usadosGastoPorCliente, baseDir);
     const sub = unico(
       sanitizeName(`${f.fecha_factura} · ${truncar(f.concepto, 50)}`, f.numero_factura || "gasto"),
       usados,
@@ -381,10 +393,12 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     }
   });
 
-  // 7b. Fotos de cada proyecto (comprimidas).
+  // 7b. Fotos de cada proyecto (comprimidas). Cuelgan de <Cliente>/fotos/ —
+  // dedupe de nombre por cliente para no pisar fotos de otro proyecto.
   for (const p of proyectosSel) {
     const fotos = fotosPorProyecto.get(p.id) ?? [];
-    const baseDir = rutaProyecto.get(p.id)!;
+    const baseDir = rutaCliente.get(p.id)!;
+    const usadosFoto = getSet(usadosFotoPorCliente, baseDir);
     await mapLimit(fotos, CONCURRENCY, async (foto, i) => {
       const raw = await descargar(foto.url);
       const out = raw ? await comprimirFoto(raw) : null;
@@ -393,7 +407,8 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
         return;
       }
       const original = sanitizeName(foto.nombre_original?.replace(/\.[^.]+$/, ""), `foto_${i + 1}`);
-      zip.file(`${baseDir}/fotos/${original}.jpg`, out);
+      const nombreUnico = unico(original, usadosFoto);
+      zip.file(`${baseDir}/fotos/${nombreUnico}.jpg`, out);
       fotosIncluidas++;
     });
   }
@@ -401,17 +416,16 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   // 8. Excel resumen_gastos.xlsx (hoja Gastos + hoja Fotos, con hyperlinks).
   const wb = XLSX.utils.book_new();
 
-  // Hoja Gastos: 1 fila por gasto.
+  // Hoja Gastos: 1 fila por gasto (solo activos). Columnas reducidas a Total.
   const headGastos = [
     "Cliente", "Proyecto", "Fecha", "Concepto", "Proveedor", "N° Factura",
-    "Subtotal", "ITBMS", "Total", "Estado pago", "Anulado", "Factura PDF",
+    "Total", "Factura PDF",
   ];
   const filasGastos: (string | number)[][] = facturasSel.map((f) => {
     const p = proyectoById.get(f.proyecto_id);
     const nombreCliente = p?.tienda_codigo
       ? clienteNombrePorCodigo.get(p.tienda_codigo) ?? "Sin cliente"
       : "Sin cliente";
-    const anulado = !!(f.anulado_en || p?.anulado_en);
     return [
       nombreCliente,
       p?.nombre?.trim() || p?.tienda || "—",
@@ -419,38 +433,30 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
       f.concepto || "",
       f.proveedor || "",
       f.numero_factura || "",
-      Number(f.subtotal ?? 0),
-      Number(f.itbms ?? 0),
       Number(f.total ?? 0),
-      f.estado_pago === "pagado" ? "Pagado" : "Pendiente",
-      anulado ? "ANULADO" : "",
       "", // link (se setea abajo)
     ];
   });
-  const placeholderTot = [
-    "", "", "", "", "", "TOTALES", 0, 0, 0, "", "", "",
-  ];
+  const placeholderTot = ["", "", "", "", "", "TOTALES", 0, ""];
   const aoaGastos = [headGastos, ...filasGastos, placeholderTot];
   const wsG = XLSX.utils.aoa_to_sheet(aoaGastos);
   const totalesRow = aoaGastos.length - 1;
   const lastDataRow = filasGastos.length + 1; // 1-indexed
-  // Fórmulas SUM en Subtotal(6), ITBMS(7), Total(8).
+  // Fórmula SUM en Total (col 6).
   if (filasGastos.length > 0) {
-    for (const c of [6, 7, 8]) {
-      const letter = XLSX.utils.encode_col(c);
-      const addr = XLSX.utils.encode_cell({ r: totalesRow, c });
-      (wsG as Record<string, unknown>)[addr] = {
-        t: "n",
-        f: `SUM(${letter}2:${letter}${lastDataRow})`,
-      };
-    }
+    const letter = XLSX.utils.encode_col(6);
+    const addr = XLSX.utils.encode_cell({ r: totalesRow, c: 6 });
+    (wsG as Record<string, unknown>)[addr] = {
+      t: "n",
+      f: `SUM(${letter}2:${letter}${lastDataRow})`,
+    };
   }
-  // Hyperlinks de la columna "Factura PDF" (col 11).
+  // Hyperlinks de la columna "Factura PDF" (col 7).
   facturasSel.forEach((f, i) => {
     const pdfs = pdfsPorFactura.get(f.id) ?? [];
     const path = pdfs[0]?.url;
     const signed = path ? urlFirmada.get(path) : undefined;
-    const addr = XLSX.utils.encode_cell({ r: i + 1, c: 11 });
+    const addr = XLSX.utils.encode_cell({ r: i + 1, c: 7 });
     if (signed) {
       (wsG as Record<string, unknown>)[addr] = {
         t: "s",
@@ -463,10 +469,10 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   });
   wsG["!cols"] = [
     { wch: 24 }, { wch: 26 }, { wch: 12 }, { wch: 34 }, { wch: 22 }, { wch: 14 },
-    { wch: 14 }, { wch: 12 }, { wch: 14 }, { wch: 13 }, { wch: 11 }, { wch: 16 },
+    { wch: 14 }, { wch: 16 },
   ];
   wsG["!freeze"] = { xSplit: 0, ySplit: 1 } as unknown as Record<string, unknown>;
-  estilarHoja(wsG, { montoCols: [6, 7, 8], linkCols: [11], totalesRow });
+  estilarHoja(wsG, { montoCols: [6], linkCols: [7], totalesRow });
   XLSX.utils.book_append_sheet(wb, wsG, "Gastos");
 
   // Hoja Fotos: 1 fila por foto (link a cada una).
