@@ -27,6 +27,7 @@ const PUBLIC_PREFIXES = [
   "/api/catalogo/reebok/public",    // public catalog endpoint (no auth)
   "/catalogo-publico/",             // public catalog page (no auth)
   "/marketing/galeria/",            // galería pública de fotos por cliente (token HMAC)
+  "/api/marketing/facturas-pdf/",   // PDF combinado de facturas por cliente (token HMAC)
   "/pedido-reebok/",                // public order view page (no auth)
   "/api/catalogo/reebok/pedido-publico", // public order API (no auth)
   "/api/catalogo/joybees/public",       // Joybees public catalog (no auth)
