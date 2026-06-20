@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
   // Detalle + hora pico + margen mensual tienda completa + mayoreo del mes +
   // cliente(s) de mayoreo, en paralelo. Todo lo extra es aditivo: si falla, el
   // detalle igual responde (el titular cae a retail puro y la nota no se muestra).
-  const [detalleRes, horasRes, margenRes, mayoreoRes, mayoreoClienteRes] = await Promise.all([
+  const [detalleRes, horasRes, margenRes, mayoreoRes, mayoreoClienteRes, prevYearRes] = await Promise.all([
     supabaseServer.rpc("multifashion_detalle_mensual_v2", { p_year: year, p_mes: mes }),
     supabaseServer.rpc("multifashion_horas_pico_v1", { p_year: year, p_mes: mes }),
     supabaseServer.rpc("multifashion_margen_tienda_mensual", { p_year: year, p_mes: mes }),
@@ -76,6 +76,11 @@ export async function GET(req: NextRequest) {
       .eq("is_wholesale", true)
       .gte("fecha", mesInicio)
       .lt("fecha", mesNext),
+    // Comparación YoY día-por-día del gráfico (modo Mes): MISMO mes del AÑO
+    // ANTERIOR. Reusa el MISMO RPC con year-1 → metodología idéntica (retail,
+    // _multifashion_sf_vw, misma fuente y bucket de día). Aditivo: si falla o no
+    // hay datos (año anterior < may 2024), la línea simplemente no se dibuja.
+    supabaseServer.rpc("multifashion_detalle_mensual_v2", { p_year: year - 1, p_mes: mes }),
   ]);
 
   if (detalleRes.error) {
@@ -133,8 +138,32 @@ export async function GET(req: NextRequest) {
       ? `${clientesMayoreo.length} clientes mayoreo`
       : null;
 
+  // Serie de comparación YoY día-por-día (mismo mes, año anterior). Mapea por día
+  // del mes y la inyecta como `ventas_anio_anterior` en cada día del mes actual.
+  // Si el año anterior no tiene datos (ej. cae antes de may 2024), queda en null y
+  // el gráfico no dibuja la línea (sin error).
+  if (prevYearRes.error) {
+    console.error("[multifashion/detalle-mensual] año anterior rpc error", prevYearRes.error);
+  }
+  const prevYear = prevYearRes.error ? null : (prevYearRes.data as Record<string, unknown> | null);
+  const prevYearTotales = (prevYear?.totales ?? {}) as { ventas?: number | null };
+  const anioAnteriorTieneData = Number(prevYearTotales.ventas ?? 0) > 0;
+  const ventasPorDiaAA = new Map<number, number>();
+  for (const d of (prevYear?.dias ?? []) as Array<{ dia: number; ventas: number | null }>) {
+    ventasPorDiaAA.set(Number(d.dia), Number(d.ventas ?? 0));
+  }
+  const diasConYoY = ((detalle?.dias ?? []) as Array<Record<string, unknown>>).map((d) => ({
+    ...d,
+    ventas_anio_anterior: anioAnteriorTieneData
+      ? (ventasPorDiaAA.get(Number(d.dia)) ?? 0)
+      : null,
+  }));
+
   return NextResponse.json({
     ...detalle,
+    dias: diasConYoY,
+    anio_anterior: year - 1,
+    anio_anterior_tiene_data: anioAnteriorTieneData,
     totales: {
       ...totales,
       margen: margenMes,
