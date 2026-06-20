@@ -179,8 +179,8 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
       .from("mk_entregas_muebles")
       .select("proyecto_id, total, notas, created_at, total_por_marca")
       .not("proyecto_id", "is", null),
-    // Catálogo de marcas (id → nombre completo) para la columna Marca.
-    supabaseServer.from("mk_marcas").select("id, nombre"),
+    // Catálogo de marcas (id → nombre completo + sigla) para las columnas Marca/Marcas.
+    supabaseServer.from("mk_marcas").select("id, nombre, codigo"),
   ]);
   if (facturasRes.error) throw new Error(`facturas: ${facturasRes.error.message}`);
   if (proyectosRes.error) throw new Error(`proyectos: ${proyectosRes.error.message}`);
@@ -196,11 +196,9 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   const proyectoById = new Map(proyectos.map((p) => [p.id, p]));
 
   // Marca: catálogo id→nombre completo y lista de marca_id por factura.
-  const marcaNombreById = new Map(
-    ((marcasRes.data ?? []) as Array<{ id: string; nombre: string }>).map(
-      (m) => [String(m.id), String(m.nombre)],
-    ),
-  );
+  const marcaCat = (marcasRes.data ?? []) as Array<{ id: string; nombre: string; codigo: string }>;
+  const marcaNombreById = new Map(marcaCat.map((m) => [String(m.id), String(m.nombre)]));
+  const marcaCodigoById = new Map(marcaCat.map((m) => [String(m.id), String(m.codigo)]));
   const marcasByFactura = new Map<string, string[]>();
   for (const r of (fmRes.data ?? []) as Array<{ factura_id: string; marca_id: string }>) {
     const arr = marcasByFactura.get(String(r.factura_id)) ?? [];
@@ -446,16 +444,35 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     numero: string; total: number; signed?: string;
   }
   interface FotoXlsx { archivo: string; signed?: string }
-  interface ClienteBucket { gastos: GastoXlsx[]; fotos: FotoXlsx[] }
+  interface ClienteBucket { gastos: GastoXlsx[]; fotos: FotoXlsx[]; marcaIds: Set<string> }
   const buckets = new Map<string, ClienteBucket>();
   const bucket = (nombre: string): ClienteBucket => {
     let b = buckets.get(nombre);
-    if (!b) { b = { gastos: [], fotos: [] }; buckets.set(nombre, b); }
+    if (!b) { b = { gastos: [], fotos: [], marcaIds: new Set() }; buckets.set(nombre, b); }
     return b;
+  };
+  // Siglas (codigo) de las marcas que toca un cliente, en orden canónico.
+  const MARCA_ORDEN = ["TH", "CK", "RBK", "FC", "J", "OTR"];
+  const siglasCliente = (ids: Set<string>): string => {
+    const cods = Array.from(
+      new Set(
+        Array.from(ids)
+          .map((id) => marcaCodigoById.get(id))
+          .filter((c): c is string => !!c),
+      ),
+    );
+    cods.sort((a, b) => {
+      const ia = MARCA_ORDEN.indexOf(a);
+      const ib = MARCA_ORDEN.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+    });
+    return cods.length ? cods.join(", ") : "—";
   };
   for (const f of facturasSel) {
     const pdfPath = (pdfsPorFactura.get(f.id) ?? [])[0]?.url;
-    bucket(clienteFolder(proyectoById.get(f.proyecto_id)!)).gastos.push({
+    const b = bucket(clienteFolder(proyectoById.get(f.proyecto_id)!));
+    for (const mid of marcasByFactura.get(f.id) ?? []) b.marcaIds.add(mid);
+    b.gastos.push({
       fecha: f.fecha_factura || "",
       concepto: f.concepto || "",
       proveedor: f.proveedor || "",
@@ -466,7 +483,11 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     });
   }
   for (const e of entregasSel) {
-    bucket(clienteFolder(proyectoById.get(e.proyecto_id)!)).gastos.push({
+    const b = bucket(clienteFolder(proyectoById.get(e.proyecto_id)!));
+    for (const [mid, v] of Object.entries(e.total_por_marca ?? {})) {
+      if (Number(v) > 0) b.marcaIds.add(mid);
+    }
+    b.gastos.push({
       fecha: (e.created_at || "").slice(0, 10),
       concepto: e.notas?.trim() || "Entrega de muebles",
       proveedor: "Mobiliario",
@@ -519,24 +540,27 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   };
 
   // ── Hoja "Resumen" (vista de pájaro) ──
-  const headRes = ["Cliente", "# Gastos", "# Fotos", "Total"];
+  // Columna "Marcas" = siglas de las marcas que toca cada cliente (facturas +
+  // muebles), igual que los chips de la pantalla.
+  const headRes = ["Cliente", "Marcas", "# Gastos", "# Fotos", "Total"];
   const filasRes = clientes.map((nombre) => {
     const b = buckets.get(nombre)!;
-    return [nombre, b.gastos.length, b.fotos.length, totalDe(b)] as (string | number)[];
+    return [nombre, siglasCliente(b.marcaIds), b.gastos.length, b.fotos.length, totalDe(b)] as (string | number)[];
   });
-  const granGastos = filasRes.reduce((s, r) => s + Number(r[1]), 0);
-  const granFotos = filasRes.reduce((s, r) => s + Number(r[2]), 0);
-  const granTotal = filasRes.reduce((s, r) => s + Number(r[3]), 0);
-  const aoaRes = [headRes, ...filasRes, ["TOTAL", granGastos, granFotos, granTotal]];
+  const granGastos = filasRes.reduce((s, r) => s + Number(r[2]), 0);
+  const granFotos = filasRes.reduce((s, r) => s + Number(r[3]), 0);
+  const granTotal = filasRes.reduce((s, r) => s + Number(r[4]), 0);
+  const aoaRes = [headRes, ...filasRes, ["TOTAL", "", granGastos, granFotos, granTotal]];
   const wsR = XLSX.utils.aoa_to_sheet(aoaRes);
-  wsR["!cols"] = [{ wch: 32 }, { wch: 10 }, { wch: 10 }, { wch: 16 }];
+  wsR["!cols"] = [{ wch: 32 }, { wch: 18 }, { wch: 10 }, { wch: 10 }, { wch: 16 }];
   wsR["!freeze"] = { xSplit: 0, ySplit: 1 } as unknown as Record<string, unknown>;
   const totalRowR = aoaRes.length - 1;
+  const esTextoCol = (c: number): boolean => c === 0 || c === 1; // Cliente, Marcas
   for (let c = 0; c < headRes.length; c++) {
     styleCell(wsR, 0, c, {
       font: { ...fontBase, bold: true },
       fill: headFill,
-      alignment: { horizontal: c === 0 ? "left" : "right" },
+      alignment: { horizontal: esTextoCol(c) ? "left" : "right" },
       border: ruleBottom,
     });
   }
@@ -545,11 +569,11 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     for (let c = 0; c < headRes.length; c++) {
       styleCell(wsR, r, c, {
         font: { ...fontBase, bold: esTotal },
-        alignment: { horizontal: c === 0 ? "left" : "right" },
+        alignment: { horizontal: esTextoCol(c) ? "left" : "right" },
         ...(esTotal ? { border: ruleTop } : {}),
       });
     }
-    fmtCell(wsR, r, 3, money);
+    fmtCell(wsR, r, 4, money);
   }
   XLSX.utils.book_append_sheet(wb, wsR, "Resumen");
 
