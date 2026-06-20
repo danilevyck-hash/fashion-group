@@ -10,7 +10,10 @@
 //
 // El contenido cuelga DIRECTO de la carpeta del cliente — sin nivel de carpeta
 // por proyecto. Los gastos y proyectos ANULADOS se excluyen por completo (no se
-// descargan ni aparecen en el Excel). Patrón basado en src/lib/reclamos/
+// descargan ni aparecen en el Excel). La hoja Gastos incluye facturas
+// (mk_facturas) Y gastos de muebles (mk_entregas_muebles, Proveedor "Mobiliario")
+// para que el TOTAL cuadre con el "Gastado" de la pantalla. Patrón basado en
+// src/lib/reclamos/
 // zip-bulk.ts (jszip nodebuffer + sharp + concurrencia). Respeta el filtro de
 // pantalla (busqueda + marca). Los links del Excel son signed URLs de larga
 // duración (1 año) — las carpetas del ZIP son el respaldo permanente.
@@ -32,6 +35,15 @@ const LINK_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 año
 export interface ExportFiltro {
   busqueda?: string;
   marcaId?: string | null;
+}
+
+// Gasto de muebles (submódulo Mobiliario) — entra al Excel como fila más para
+// que el TOTAL cuadre con el "Gastado" de la pantalla (Σ facturas + Σ muebles).
+interface EntregaExport {
+  proyecto_id: string;
+  total: number;
+  notas: string | null;
+  created_at: string;
 }
 
 export interface ExportResult {
@@ -198,7 +210,7 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   const marcaId = filtro.marcaId || null;
 
   // 1. Carga base (volumen chico: ~70 facturas / 18 proyectos / 122 adjuntos).
-  const [facturasRes, proyectosRes, adjuntosRes, fmRes] = await Promise.all([
+  const [facturasRes, proyectosRes, adjuntosRes, fmRes, entregasRes] = await Promise.all([
     supabaseServer.from("mk_facturas").select("*"),
     supabaseServer.from("mk_proyectos").select("*"),
     supabaseServer
@@ -208,15 +220,23 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     marcaId
       ? supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id")
       : Promise.resolve({ data: [] as Array<{ factura_id: string; marca_id: string }>, error: null }),
+    // Gastos de muebles asignados a un proyecto (proyecto_id no nulo = no
+    // pendientes). mk_entregas_muebles NO tiene columna de anulado.
+    supabaseServer
+      .from("mk_entregas_muebles")
+      .select("proyecto_id, total, notas, created_at")
+      .not("proyecto_id", "is", null),
   ]);
   if (facturasRes.error) throw new Error(`facturas: ${facturasRes.error.message}`);
   if (proyectosRes.error) throw new Error(`proyectos: ${proyectosRes.error.message}`);
   if (adjuntosRes.error) throw new Error(`adjuntos: ${adjuntosRes.error.message}`);
   if (fmRes.error) throw new Error(`factura_marcas: ${fmRes.error.message}`);
+  if (entregasRes.error) throw new Error(`entregas: ${entregasRes.error.message}`);
 
   const facturas = (facturasRes.data ?? []) as MkFactura[];
   const proyectos = (proyectosRes.data ?? []) as MkProyecto[];
   const adjuntos = (adjuntosRes.data ?? []) as MkAdjunto[];
+  const entregas = (entregasRes.data ?? []) as EntregaExport[];
   const proyectoById = new Map(proyectos.map((p) => [p.id, p]));
 
   // 2. Nombres de cliente (clientes_master por tienda_codigo).
@@ -302,6 +322,16 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     arr.push(f);
     facturasPorProyecto.set(f.proyecto_id, arr);
   }
+  // Entregas de muebles activas (proyecto no en papelera).
+  const entregasActivas = entregas.filter(
+    (e) => !proyectoById.get(e.proyecto_id)?.anulado_en,
+  );
+  const entregasPorProyecto = new Map<string, EntregaExport[]>();
+  for (const e of entregasActivas) {
+    const arr = entregasPorProyecto.get(e.proyecto_id) ?? [];
+    arr.push(e);
+    entregasPorProyecto.set(e.proyecto_id, arr);
+  }
   const pdfsPorFactura = new Map<string, MkAdjunto[]>();
   for (const a of adjuntos) {
     if (a.tipo === "pdf_factura" && a.factura_id) {
@@ -312,13 +342,14 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   }
 
   // Proyectos seleccionados: NO anulados, pasan filtro y tienen ≥1 gasto
-  // activo o ≥1 foto.
+  // activo (factura o mueble) o ≥1 foto.
   const proyectosSel = proyectos.filter(
     (p) =>
       !p.anulado_en &&
       proyectoPasa(p.id) &&
       ((facturasPorProyecto.get(p.id)?.length ?? 0) > 0 ||
-        (fotosPorProyecto.get(p.id)?.length ?? 0) > 0),
+        (fotosPorProyecto.get(p.id)?.length ?? 0) > 0 ||
+        (entregasPorProyecto.get(p.id)?.length ?? 0) > 0),
   );
   if (proyectosSel.length === 0) {
     throw new Error("SIN_RESULTADOS");
@@ -327,6 +358,9 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   const facturasSel = facturasActivas
     .filter((f) => proyectoIdsSel.has(f.proyecto_id))
     .sort((a, b) => (a.fecha_factura < b.fecha_factura ? -1 : 1));
+  const entregasSel = entregasActivas
+    .filter((e) => proyectoIdsSel.has(e.proyecto_id))
+    .sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
 
   // 5. Firmar en lote todos los paths (PDFs de gastos + fotos de proyectos).
   const pathsAFirmar: string[] = [];
@@ -416,18 +450,21 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   // 8. Excel resumen_gastos.xlsx (hoja Gastos + hoja Fotos, con hyperlinks).
   const wb = XLSX.utils.book_new();
 
-  // Hoja Gastos: 1 fila por gasto (solo activos). Columnas reducidas a Total.
+  // Hoja Gastos: 1 fila por gasto activo. Facturas (mk_facturas) + entregas de
+  // muebles (mk_entregas_muebles, Proveedor "Mobiliario") en la misma hoja, para
+  // que el TOTAL cuadre con el "Gastado" de la pantalla (Σ facturas + Σ muebles).
   const headGastos = [
     "Cliente", "Proyecto", "Fecha", "Concepto", "Proveedor", "N° Factura",
     "Total", "Factura PDF",
   ];
-  const filasGastos: (string | number)[][] = facturasSel.map((f) => {
-    const p = proyectoById.get(f.proyecto_id);
-    const nombreCliente = p?.tienda_codigo
+  const clienteDe = (p: MkProyecto | undefined): string =>
+    p?.tienda_codigo
       ? clienteNombrePorCodigo.get(p.tienda_codigo) ?? "Sin cliente"
       : "Sin cliente";
+  const filasFacturas: (string | number)[][] = facturasSel.map((f) => {
+    const p = proyectoById.get(f.proyecto_id);
     return [
-      nombreCliente,
+      clienteDe(p),
       p?.nombre?.trim() || p?.tienda || "—",
       f.fecha_factura || "",
       f.concepto || "",
@@ -437,12 +474,27 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
       "", // link (se setea abajo)
     ];
   });
+  // Muebles: sin N° de factura ni PDF; fecha = created_at, concepto = notas.
+  const filasMuebles: (string | number)[][] = entregasSel.map((e) => {
+    const p = proyectoById.get(e.proyecto_id);
+    return [
+      clienteDe(p),
+      p?.nombre?.trim() || p?.tienda || "—",
+      (e.created_at || "").slice(0, 10),
+      e.notas?.trim() || "Entrega de muebles",
+      "Mobiliario",
+      "",
+      Number(e.total ?? 0),
+      "—",
+    ];
+  });
+  const filasGastos = [...filasFacturas, ...filasMuebles];
   const placeholderTot = ["", "", "", "", "", "TOTALES", 0, ""];
   const aoaGastos = [headGastos, ...filasGastos, placeholderTot];
   const wsG = XLSX.utils.aoa_to_sheet(aoaGastos);
   const totalesRow = aoaGastos.length - 1;
   const lastDataRow = filasGastos.length + 1; // 1-indexed
-  // Fórmula SUM en Total (col 6).
+  // Fórmula SUM en Total (col 6) — cubre facturas + muebles.
   if (filasGastos.length > 0) {
     const letter = XLSX.utils.encode_col(6);
     const addr = XLSX.utils.encode_cell({ r: totalesRow, c: 6 });
@@ -451,7 +503,7 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
       f: `SUM(${letter}2:${letter}${lastDataRow})`,
     };
   }
-  // Hyperlinks de la columna "Factura PDF" (col 7).
+  // Hyperlinks de la columna "Factura PDF" (col 7) — solo filas de factura.
   facturasSel.forEach((f, i) => {
     const pdfs = pdfsPorFactura.get(f.id) ?? [];
     const path = pdfs[0]?.url;
@@ -524,7 +576,7 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
 
   return {
     buffer,
-    gastos: facturasSel.length,
+    gastos: facturasSel.length + entregasSel.length,
     proyectos: proyectosSel.length,
     fotosIncluidas,
     fotosOmitidas,
