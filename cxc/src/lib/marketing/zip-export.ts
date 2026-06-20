@@ -44,6 +44,7 @@ interface EntregaExport {
   total: number;
   notas: string | null;
   created_at: string;
+  total_por_marca: Record<string, number> | null;
 }
 
 export interface ExportResult {
@@ -156,53 +157,6 @@ async function firmarLote(paths: ReadonlyArray<string>): Promise<Map<string, str
   return map;
 }
 
-const moneyFmt = "$#,##0.00";
-const borderThin = { style: "thin", color: { rgb: "BFBFBF" } };
-const borders = { top: borderThin, bottom: borderThin, left: borderThin, right: borderThin };
-const linkFont = { name: "Arial", sz: 10, color: { rgb: "0563C1" }, underline: true };
-
-function estilarHoja(
-  ws: XLSX.WorkSheet,
-  opts: { montoCols: number[]; linkCols: number[]; totalesRow?: number },
-): void {
-  const range = XLSX.utils.decode_range(ws["!ref"] ?? "A1");
-  for (let r = range.s.r; r <= range.e.r; r++) {
-    for (let c = range.s.c; c <= range.e.c; c++) {
-      const addr = XLSX.utils.encode_cell({ r, c });
-      const cell = (ws as Record<string, unknown>)[addr] as
-        | { v?: unknown; s?: unknown; z?: string; l?: unknown }
-        | undefined;
-      if (!cell) continue;
-      const esHeader = r === 0;
-      const esTotales = opts.totalesRow !== undefined && r === opts.totalesRow;
-      const esMonto = opts.montoCols.includes(c);
-      const esLink = opts.linkCols.includes(c) && !esHeader && !!cell.l;
-      cell.s = {
-        font: esLink
-          ? linkFont
-          : {
-              name: "Arial",
-              sz: esHeader ? 11 : 10,
-              bold: esHeader || esTotales,
-              color: esHeader ? { rgb: "FFFFFF" } : { rgb: "000000" },
-            },
-        alignment: {
-          vertical: "center",
-          horizontal: esMonto && !esHeader ? "right" : "left",
-          wrapText: true,
-        },
-        border: borders,
-        ...(esHeader
-          ? { fill: { patternType: "solid", fgColor: { rgb: "1F1F1F" } } }
-          : esTotales
-            ? { fill: { patternType: "solid", fgColor: { rgb: "EFEFEF" } } }
-            : {}),
-      };
-      if (esMonto && !esHeader) cell.z = moneyFmt;
-    }
-  }
-}
-
 // ── Construcción principal ───────────────────────────────────────────────────
 
 export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportResult> {
@@ -210,34 +164,49 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   const marcaId = filtro.marcaId || null;
 
   // 1. Carga base (volumen chico: ~70 facturas / 18 proyectos / 122 adjuntos).
-  const [facturasRes, proyectosRes, adjuntosRes, fmRes, entregasRes] = await Promise.all([
+  const [facturasRes, proyectosRes, adjuntosRes, fmRes, entregasRes, marcasRes] = await Promise.all([
     supabaseServer.from("mk_facturas").select("*"),
     supabaseServer.from("mk_proyectos").select("*"),
     supabaseServer
       .from("mk_adjuntos")
       .select("*")
       .in("tipo", ["pdf_factura", "foto_proyecto"]),
-    marcaId
-      ? supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id")
-      : Promise.resolve({ data: [] as Array<{ factura_id: string; marca_id: string }>, error: null }),
+    // Marca por factura (SIEMPRE — alimenta la columna Marca y el filtro por marca).
+    supabaseServer.from("mk_factura_marcas").select("factura_id, marca_id"),
     // Gastos de muebles asignados a un proyecto (proyecto_id no nulo = no
     // pendientes). mk_entregas_muebles NO tiene columna de anulado.
     supabaseServer
       .from("mk_entregas_muebles")
-      .select("proyecto_id, total, notas, created_at")
+      .select("proyecto_id, total, notas, created_at, total_por_marca")
       .not("proyecto_id", "is", null),
+    // Catálogo de marcas (id → nombre completo) para la columna Marca.
+    supabaseServer.from("mk_marcas").select("id, nombre"),
   ]);
   if (facturasRes.error) throw new Error(`facturas: ${facturasRes.error.message}`);
   if (proyectosRes.error) throw new Error(`proyectos: ${proyectosRes.error.message}`);
   if (adjuntosRes.error) throw new Error(`adjuntos: ${adjuntosRes.error.message}`);
   if (fmRes.error) throw new Error(`factura_marcas: ${fmRes.error.message}`);
   if (entregasRes.error) throw new Error(`entregas: ${entregasRes.error.message}`);
+  if (marcasRes.error) throw new Error(`marcas: ${marcasRes.error.message}`);
 
   const facturas = (facturasRes.data ?? []) as MkFactura[];
   const proyectos = (proyectosRes.data ?? []) as MkProyecto[];
   const adjuntos = (adjuntosRes.data ?? []) as MkAdjunto[];
   const entregas = (entregasRes.data ?? []) as EntregaExport[];
   const proyectoById = new Map(proyectos.map((p) => [p.id, p]));
+
+  // Marca: catálogo id→nombre completo y lista de marca_id por factura.
+  const marcaNombreById = new Map(
+    ((marcasRes.data ?? []) as Array<{ id: string; nombre: string }>).map(
+      (m) => [String(m.id), String(m.nombre)],
+    ),
+  );
+  const marcasByFactura = new Map<string, string[]>();
+  for (const r of (fmRes.data ?? []) as Array<{ factura_id: string; marca_id: string }>) {
+    const arr = marcasByFactura.get(String(r.factura_id)) ?? [];
+    arr.push(String(r.marca_id));
+    marcasByFactura.set(String(r.factura_id), arr);
+  }
 
   // 2. Nombres de cliente (clientes_master por tienda_codigo).
   const codigos = Array.from(
@@ -447,123 +416,228 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     });
   }
 
-  // 8. Excel resumen_gastos.xlsx (hoja Gastos + hoja Fotos, con hyperlinks).
+  // 8. Excel resumen_gastos.xlsx — hoja "Resumen" (1 fila por cliente) + 1
+  //    pestaña por cliente (sección Gastos + sección Fotos). Minimalista. NO
+  //    unifica tablas: facturas y muebles son filas distintas que solo conviven.
   const wb = XLSX.utils.book_new();
 
-  // Hoja Gastos: 1 fila por gasto activo. Facturas (mk_facturas) + entregas de
-  // muebles (mk_entregas_muebles, Proveedor "Mobiliario") en la misma hoja, para
-  // que el TOTAL cuadre con el "Gastado" de la pantalla (Σ facturas + Σ muebles).
-  const headGastos = [
-    "Cliente", "Proyecto", "Fecha", "Concepto", "Proveedor", "N° Factura",
-    "Total", "Factura PDF",
-  ];
-  const clienteDe = (p: MkProyecto | undefined): string =>
-    p?.tienda_codigo
-      ? clienteNombrePorCodigo.get(p.tienda_codigo) ?? "Sin cliente"
-      : "Sin cliente";
-  const filasFacturas: (string | number)[][] = facturasSel.map((f) => {
-    const p = proyectoById.get(f.proyecto_id);
-    return [
-      clienteDe(p),
-      p?.nombre?.trim() || p?.tienda || "—",
-      f.fecha_factura || "",
-      f.concepto || "",
-      f.proveedor || "",
-      f.numero_factura || "",
-      Number(f.total ?? 0),
-      "", // link (se setea abajo)
-    ];
-  });
-  // Muebles: sin N° de factura ni PDF; fecha = created_at, concepto = notas.
-  const filasMuebles: (string | number)[][] = entregasSel.map((e) => {
-    const p = proyectoById.get(e.proyecto_id);
-    return [
-      clienteDe(p),
-      p?.nombre?.trim() || p?.tienda || "—",
-      (e.created_at || "").slice(0, 10),
-      e.notas?.trim() || "Entrega de muebles",
-      "Mobiliario",
-      "",
-      Number(e.total ?? 0),
-      "—",
-    ];
-  });
-  const filasGastos = [...filasFacturas, ...filasMuebles];
-  const placeholderTot = ["", "", "", "", "", "TOTALES", 0, ""];
-  const aoaGastos = [headGastos, ...filasGastos, placeholderTot];
-  const wsG = XLSX.utils.aoa_to_sheet(aoaGastos);
-  const totalesRow = aoaGastos.length - 1;
-  const lastDataRow = filasGastos.length + 1; // 1-indexed
-  // Fórmula SUM en Total (col 6) — cubre facturas + muebles.
-  if (filasGastos.length > 0) {
-    const letter = XLSX.utils.encode_col(6);
-    const addr = XLSX.utils.encode_cell({ r: totalesRow, c: 6 });
-    (wsG as Record<string, unknown>)[addr] = {
-      t: "n",
-      f: `SUM(${letter}2:${letter}${lastDataRow})`,
-    };
-  }
-  // Hyperlinks de la columna "Factura PDF" (col 7) — solo filas de factura.
-  facturasSel.forEach((f, i) => {
-    const pdfs = pdfsPorFactura.get(f.id) ?? [];
-    const path = pdfs[0]?.url;
-    const signed = path ? urlFirmada.get(path) : undefined;
-    const addr = XLSX.utils.encode_cell({ r: i + 1, c: 7 });
-    if (signed) {
-      (wsG as Record<string, unknown>)[addr] = {
-        t: "s",
-        v: "Ver factura",
-        l: { Target: signed, Tooltip: "Abrir PDF de la factura" },
-      };
-    } else {
-      (wsG as Record<string, unknown>)[addr] = { t: "s", v: "—" };
-    }
-  });
-  wsG["!cols"] = [
-    { wch: 24 }, { wch: 26 }, { wch: 12 }, { wch: 34 }, { wch: 22 }, { wch: 14 },
-    { wch: 14 }, { wch: 16 },
-  ];
-  wsG["!freeze"] = { xSplit: 0, ySplit: 1 } as unknown as Record<string, unknown>;
-  estilarHoja(wsG, { montoCols: [6], linkCols: [7], totalesRow });
-  XLSX.utils.book_append_sheet(wb, wsG, "Gastos");
+  // Marca de una factura: nombres completos (1 tras la corrección; " / " si
+  // hubiera varias). Marca de un mueble: desde total_por_marca con su %.
+  const marcaFactura = (fid: string): string => {
+    const nombres = (marcasByFactura.get(fid) ?? [])
+      .map((mid) => marcaNombreById.get(mid))
+      .filter((n): n is string => !!n);
+    return nombres.length ? nombres.join(" / ") : "—";
+  };
+  const marcaMueble = (tpm: Record<string, number> | null): string => {
+    const ent = Object.entries(tpm ?? {}).filter(([, v]) => Number(v) > 0);
+    if (ent.length === 0) return "—";
+    const suma = ent.reduce((s, [, v]) => s + Number(v), 0) || 1;
+    return ent
+      .sort((a, b) => Number(b[1]) - Number(a[1]))
+      .map(([mid, v]) => `${marcaNombreById.get(mid) ?? "—"} ${Math.round((Number(v) / suma) * 100)}%`)
+      .join(" / ");
+  };
 
-  // Hoja Fotos: 1 fila por foto (link a cada una).
-  const headFotos = ["Cliente", "Proyecto", "Archivo", "Foto"];
-  const filasFotos: (string | number)[][] = [];
-  const linksFotos: (string | undefined)[] = [];
-  for (const p of proyectosSel) {
-    const nombreCliente = p.tienda_codigo
-      ? clienteNombrePorCodigo.get(p.tienda_codigo) ?? "Sin cliente"
-      : "Sin cliente";
-    const fotos = fotosPorProyecto.get(p.id) ?? [];
-    fotos.forEach((foto, i) => {
-      filasFotos.push([
-        nombreCliente,
-        p.nombre?.trim() || p.tienda || "—",
-        foto.nombre_original || `foto_${i + 1}`,
-        "",
-      ]);
-      linksFotos.push(foto.url ? urlFirmada.get(foto.url) : undefined);
+  // Agrupar gastos (facturas + muebles) y fotos por CLIENTE (misma clave que la
+  // carpeta del ZIP → pestañas alineadas con las carpetas).
+  interface GastoXlsx {
+    fecha: string; concepto: string; proveedor: string; marca: string;
+    numero: string; total: number; signed?: string;
+  }
+  interface FotoXlsx { archivo: string; signed?: string }
+  interface ClienteBucket { gastos: GastoXlsx[]; fotos: FotoXlsx[] }
+  const buckets = new Map<string, ClienteBucket>();
+  const bucket = (nombre: string): ClienteBucket => {
+    let b = buckets.get(nombre);
+    if (!b) { b = { gastos: [], fotos: [] }; buckets.set(nombre, b); }
+    return b;
+  };
+  for (const f of facturasSel) {
+    const pdfPath = (pdfsPorFactura.get(f.id) ?? [])[0]?.url;
+    bucket(clienteFolder(proyectoById.get(f.proyecto_id)!)).gastos.push({
+      fecha: f.fecha_factura || "",
+      concepto: f.concepto || "",
+      proveedor: f.proveedor || "",
+      marca: marcaFactura(f.id),
+      numero: f.numero_factura || "",
+      total: Number(f.total ?? 0),
+      signed: pdfPath ? urlFirmada.get(pdfPath) : undefined,
     });
   }
-  const aoaFotos = [headFotos, ...filasFotos];
-  const wsF = XLSX.utils.aoa_to_sheet(aoaFotos);
-  linksFotos.forEach((signed, i) => {
-    const addr = XLSX.utils.encode_cell({ r: i + 1, c: 3 });
-    if (signed) {
-      (wsF as Record<string, unknown>)[addr] = {
-        t: "s",
-        v: "Ver foto",
-        l: { Target: signed, Tooltip: "Abrir foto" },
-      };
-    } else {
-      (wsF as Record<string, unknown>)[addr] = { t: "s", v: "—" };
+  for (const e of entregasSel) {
+    bucket(clienteFolder(proyectoById.get(e.proyecto_id)!)).gastos.push({
+      fecha: (e.created_at || "").slice(0, 10),
+      concepto: e.notas?.trim() || "Entrega de muebles",
+      proveedor: "Mobiliario",
+      marca: marcaMueble(e.total_por_marca),
+      numero: "",
+      total: Number(e.total ?? 0),
+    });
+  }
+  for (const p of proyectosSel) {
+    const b = bucket(clienteFolder(p));
+    for (const foto of fotosPorProyecto.get(p.id) ?? []) {
+      b.fotos.push({
+        archivo: foto.nombre_original || "foto",
+        signed: foto.url ? urlFirmada.get(foto.url) : undefined,
+      });
     }
+  }
+
+  const totalDe = (b: ClienteBucket): number =>
+    b.gastos.reduce((s, g) => s + g.total, 0);
+  // Orden: por total desc; "Sin cliente" al final.
+  const clientes = Array.from(buckets.keys()).sort((a, b) => {
+    if (a === "Sin cliente") return 1;
+    if (b === "Sin cliente") return -1;
+    return totalDe(buckets.get(b)!) - totalDe(buckets.get(a)!);
   });
-  wsF["!cols"] = [{ wch: 24 }, { wch: 26 }, { wch: 32 }, { wch: 14 }];
-  wsF["!freeze"] = { xSplit: 0, ySplit: 1 } as unknown as Record<string, unknown>;
-  estilarHoja(wsF, { montoCols: [], linkCols: [3] });
-  XLSX.utils.book_append_sheet(wb, wsF, "Fotos");
+
+  // ── Estilos minimalistas (gris suave en headers, links azules, sin grid pesado) ──
+  const money = "$#,##0.00";
+  const fontBase = { name: "Arial", sz: 10, color: { rgb: "111111" } };
+  const headFill = { patternType: "solid", fgColor: { rgb: "F2F2F2" } };
+  const sectionFill = { patternType: "solid", fgColor: { rgb: "E6E6E6" } };
+  const ruleBottom = { bottom: { style: "thin", color: { rgb: "D9D9D9" } } };
+  const ruleTop = { top: { style: "thin", color: { rgb: "BFBFBF" } } };
+  const linkFontX = { name: "Arial", sz: 10, color: { rgb: "1155CC" }, underline: true };
+  const setCell = (ws: XLSX.WorkSheet, r: number, c: number, patch: Record<string, unknown>): void => {
+    const addr = XLSX.utils.encode_cell({ r, c });
+    const cur = (ws as Record<string, unknown>)[addr] as Record<string, unknown> | undefined;
+    (ws as Record<string, unknown>)[addr] = { ...(cur ?? {}), ...patch };
+  };
+  const styleCell = (ws: XLSX.WorkSheet, r: number, c: number, s: Record<string, unknown>): void => {
+    const addr = XLSX.utils.encode_cell({ r, c });
+    const cell = (ws as Record<string, unknown>)[addr] as { s?: unknown } | undefined;
+    if (cell) cell.s = s;
+  };
+  const fmtCell = (ws: XLSX.WorkSheet, r: number, c: number, z: string): void => {
+    const addr = XLSX.utils.encode_cell({ r, c });
+    const cell = (ws as Record<string, unknown>)[addr] as { z?: string } | undefined;
+    if (cell) cell.z = z;
+  };
+
+  // ── Hoja "Resumen" (vista de pájaro) ──
+  const headRes = ["Cliente", "# Gastos", "# Fotos", "Total"];
+  const filasRes = clientes.map((nombre) => {
+    const b = buckets.get(nombre)!;
+    return [nombre, b.gastos.length, b.fotos.length, totalDe(b)] as (string | number)[];
+  });
+  const granGastos = filasRes.reduce((s, r) => s + Number(r[1]), 0);
+  const granFotos = filasRes.reduce((s, r) => s + Number(r[2]), 0);
+  const granTotal = filasRes.reduce((s, r) => s + Number(r[3]), 0);
+  const aoaRes = [headRes, ...filasRes, ["TOTAL", granGastos, granFotos, granTotal]];
+  const wsR = XLSX.utils.aoa_to_sheet(aoaRes);
+  wsR["!cols"] = [{ wch: 32 }, { wch: 10 }, { wch: 10 }, { wch: 16 }];
+  wsR["!freeze"] = { xSplit: 0, ySplit: 1 } as unknown as Record<string, unknown>;
+  const totalRowR = aoaRes.length - 1;
+  for (let c = 0; c < headRes.length; c++) {
+    styleCell(wsR, 0, c, {
+      font: { ...fontBase, bold: true },
+      fill: headFill,
+      alignment: { horizontal: c === 0 ? "left" : "right" },
+      border: ruleBottom,
+    });
+  }
+  for (let r = 1; r < aoaRes.length; r++) {
+    const esTotal = r === totalRowR;
+    for (let c = 0; c < headRes.length; c++) {
+      styleCell(wsR, r, c, {
+        font: { ...fontBase, bold: esTotal },
+        alignment: { horizontal: c === 0 ? "left" : "right" },
+        ...(esTotal ? { border: ruleTop } : {}),
+      });
+    }
+    fmtCell(wsR, r, 3, money);
+  }
+  XLSX.utils.book_append_sheet(wb, wsR, "Resumen");
+
+  // ── Una pestaña por cliente ──
+  const tabsUsados = new Set<string>(["resumen"]);
+  const tabName = (nombre: string): string => {
+    const base = (nombre.replace(/[[\]:*?/\\]/g, " ").replace(/\s+/g, " ").trim() || "Cliente").slice(0, 31).trim();
+    let cand = base;
+    let n = 2;
+    while (tabsUsados.has(cand.toLowerCase())) {
+      const suf = ` (${n++})`;
+      cand = `${base.slice(0, 31 - suf.length).trim()}${suf}`;
+    }
+    tabsUsados.add(cand.toLowerCase());
+    return cand;
+  };
+  const headG = ["Fecha", "Concepto", "Proveedor", "Marca", "N° Factura", "Total", "Factura"];
+  for (const nombre of clientes) {
+    const b = buckets.get(nombre)!;
+    const aoa: (string | number)[][] = [["GASTOS"], headG];
+    const gastoStart = aoa.length; // índice 0-based de la 1ª fila de gasto
+    for (const g of b.gastos) {
+      aoa.push([g.fecha, g.concepto, g.proveedor, g.marca, g.numero, g.total, g.signed ? "Ver factura" : "—"]);
+    }
+    const gastoEnd = gastoStart + b.gastos.length - 1;
+    aoa.push(["", "", "", "", "Subtotal", totalDe(b), ""]);
+    const subtotalRow = aoa.length - 1;
+    aoa.push([""]);
+    const fotosTitle = aoa.length;
+    aoa.push(["FOTOS"], ["Archivo", "Foto"]);
+    const fotoHeader = aoa.length - 1;
+    const fotoStart = aoa.length;
+    for (const f of b.fotos) {
+      aoa.push([f.archivo, f.signed ? "Ver foto" : "—"]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws["!cols"] = [{ wch: 12 }, { wch: 42 }, { wch: 22 }, { wch: 24 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+
+    // Links de gasto (col 6) + SUM del subtotal (col 5).
+    b.gastos.forEach((g, i) => {
+      if (g.signed) {
+        setCell(ws, gastoStart + i, 6, { t: "s", v: "Ver factura", l: { Target: g.signed, Tooltip: "Abrir PDF de la factura" } });
+      }
+    });
+    if (b.gastos.length > 0) {
+      const L = XLSX.utils.encode_col(5);
+      setCell(ws, subtotalRow, 5, { t: "n", f: `SUM(${L}${gastoStart + 1}:${L}${gastoEnd + 1})` });
+    }
+    // Links de foto (col 1).
+    b.fotos.forEach((f, i) => {
+      if (f.signed) {
+        setCell(ws, fotoStart + i, 1, { t: "s", v: "Ver foto", l: { Target: f.signed, Tooltip: "Abrir foto" } });
+      }
+    });
+
+    // Estilos.
+    styleCell(ws, 0, 0, { font: { ...fontBase, bold: true, sz: 11 }, fill: sectionFill });
+    styleCell(ws, fotosTitle, 0, { font: { ...fontBase, bold: true, sz: 11 }, fill: sectionFill });
+    for (let c = 0; c < headG.length; c++) {
+      styleCell(ws, 1, c, { font: { ...fontBase, bold: true }, fill: headFill, alignment: { horizontal: c === 5 ? "right" : "left" }, border: ruleBottom });
+    }
+    for (let i = 0; i < b.gastos.length; i++) {
+      const r = gastoStart + i;
+      for (let c = 0; c < headG.length; c++) {
+        const esLink = c === 6 && !!b.gastos[i].signed;
+        styleCell(ws, r, c, {
+          font: esLink ? linkFontX : fontBase,
+          alignment: { horizontal: c === 5 ? "right" : "left", wrapText: c === 1 },
+        });
+      }
+      fmtCell(ws, r, 5, money);
+    }
+    styleCell(ws, subtotalRow, 4, { font: { ...fontBase, bold: true }, alignment: { horizontal: "right" } });
+    styleCell(ws, subtotalRow, 5, { font: { ...fontBase, bold: true }, alignment: { horizontal: "right" }, border: ruleTop });
+    fmtCell(ws, subtotalRow, 5, money);
+    for (let c = 0; c < 2; c++) {
+      styleCell(ws, fotoHeader, c, { font: { ...fontBase, bold: true }, fill: headFill, border: ruleBottom });
+    }
+    for (let i = 0; i < b.fotos.length; i++) {
+      const r = fotoStart + i;
+      styleCell(ws, r, 0, { font: fontBase, alignment: { horizontal: "left", wrapText: true } });
+      styleCell(ws, r, 1, { font: b.fotos[i].signed ? linkFontX : fontBase });
+    }
+
+    ws["!freeze"] = { xSplit: 0, ySplit: 2 } as unknown as Record<string, unknown>;
+    XLSX.utils.book_append_sheet(wb, ws, tabName(nombre));
+  }
 
   const xlsxBuf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
   zip.file("resumen_gastos.xlsx", xlsxBuf);
