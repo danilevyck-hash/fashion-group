@@ -25,12 +25,15 @@ import XLSX from "xlsx-js-style";
 import { supabaseServer } from "@/lib/supabase-server";
 import type { MkAdjunto, MkFactura, MkProyecto } from "./types";
 import { esPathStorage } from "./storage";
+import { signGalleryToken } from "./gallery-token";
 
 const BUCKET = "marketing";
 const MAX_DIM = 1600; // px — lado mayor de la foto tras redimensionar
 const JPEG_QUALITY = 70;
 const CONCURRENCY = 4; // descargas/compresiones simultáneas
 const LINK_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 año
+// Base para los links de galería del Excel (la galería re-firma fotos al abrir).
+const GALERIA_BASE = process.env.NEXT_PUBLIC_SITE_URL || "https://www.fashiongr.com";
 
 export interface ExportFiltro {
   busqueda?: string;
@@ -514,6 +517,13 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     if (b === "Sin cliente") return -1;
     return totalDe(buckets.get(b)!) - totalDe(buckets.get(a)!);
   });
+  // Código D-XXX por nombre de cliente (todos sus proyectos comparten código).
+  // Null = "Sin cliente" → sin galería (links de foto individuales).
+  const codigoDeCliente = new Map<string, string | null>();
+  for (const p of proyectosSel) {
+    const n = clienteFolder(p);
+    if (!codigoDeCliente.has(n)) codigoDeCliente.set(n, p.tienda_codigo ?? null);
+  }
 
   // ── Estilos minimalistas (gris suave en headers, links azules, sin grid pesado) ──
   const money = "$#,##0.00";
@@ -593,6 +603,11 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   const headG = ["Fecha", "Concepto", "Proveedor", "Marca", "N° Factura", "Total", "Factura"];
   for (const nombre of clientes) {
     const b = buckets.get(nombre)!;
+    const codigo = codigoDeCliente.get(nombre) ?? null;
+    // Galería = 1 link por cliente (requiere código). "Sin cliente" / sin código
+    // → links individuales por foto (no hay galería sin código de cliente).
+    const usarGaleria = !!codigo && b.fotos.length > 0;
+
     const aoa: (string | number)[][] = [["GASTOS"], headG];
     const gastoStart = aoa.length; // índice 0-based de la 1ª fila de gasto
     for (const g of b.gastos) {
@@ -603,11 +618,21 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     const subtotalRow = aoa.length - 1;
     aoa.push([""]);
     const fotosTitle = aoa.length;
-    aoa.push(["FOTOS"], ["Archivo", "Foto"]);
-    const fotoHeader = aoa.length - 1;
-    const fotoStart = aoa.length;
-    for (const f of b.fotos) {
-      aoa.push([f.archivo, f.signed ? "Ver foto" : "—"]);
+    aoa.push(["FOTOS"]);
+    let galeriaRow = -1;
+    let fotoHeader = -1;
+    let fotoStart = -1;
+    if (usarGaleria) {
+      galeriaRow = aoa.length;
+      aoa.push([`Ver todas las fotos (${b.fotos.length})`]);
+    } else {
+      aoa.push(["Archivo", "Foto"]);
+      fotoHeader = aoa.length - 1;
+      fotoStart = aoa.length;
+      for (const f of b.fotos) {
+        aoa.push([f.archivo, f.signed ? "Ver foto" : "—"]);
+      }
+      if (b.fotos.length === 0) aoa.push(["(sin fotos)", ""]);
     }
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -623,14 +648,8 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
       const L = XLSX.utils.encode_col(5);
       setCell(ws, subtotalRow, 5, { t: "n", f: `SUM(${L}${gastoStart + 1}:${L}${gastoEnd + 1})` });
     }
-    // Links de foto (col 1).
-    b.fotos.forEach((f, i) => {
-      if (f.signed) {
-        setCell(ws, fotoStart + i, 1, { t: "s", v: "Ver foto", l: { Target: f.signed, Tooltip: "Abrir foto" } });
-      }
-    });
 
-    // Estilos.
+    // Estilos comunes.
     styleCell(ws, 0, 0, { font: { ...fontBase, bold: true, sz: 11 }, fill: sectionFill });
     styleCell(ws, fotosTitle, 0, { font: { ...fontBase, bold: true, sz: 11 }, fill: sectionFill });
     for (let c = 0; c < headG.length; c++) {
@@ -650,13 +669,26 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     styleCell(ws, subtotalRow, 4, { font: { ...fontBase, bold: true }, alignment: { horizontal: "right" } });
     styleCell(ws, subtotalRow, 5, { font: { ...fontBase, bold: true }, alignment: { horizontal: "right" }, border: ruleTop });
     fmtCell(ws, subtotalRow, 5, money);
-    for (let c = 0; c < 2; c++) {
-      styleCell(ws, fotoHeader, c, { font: { ...fontBase, bold: true }, fill: headFill, border: ruleBottom });
-    }
-    for (let i = 0; i < b.fotos.length; i++) {
-      const r = fotoStart + i;
-      styleCell(ws, r, 0, { font: fontBase, alignment: { horizontal: "left", wrapText: true } });
-      styleCell(ws, r, 1, { font: b.fotos[i].signed ? linkFontX : fontBase });
+
+    // Sección de fotos: galería (1 link) o links individuales.
+    if (usarGaleria) {
+      const url = `${GALERIA_BASE}/marketing/galeria/${encodeURIComponent(codigo!)}?t=${signGalleryToken(codigo!)}`;
+      setCell(ws, galeriaRow, 0, { t: "s", v: `Ver todas las fotos (${b.fotos.length})`, l: { Target: url, Tooltip: "Abrir galería del cliente" } });
+      styleCell(ws, galeriaRow, 0, { font: linkFontX });
+    } else {
+      b.fotos.forEach((f, i) => {
+        if (f.signed) {
+          setCell(ws, fotoStart + i, 1, { t: "s", v: "Ver foto", l: { Target: f.signed, Tooltip: "Abrir foto" } });
+        }
+      });
+      for (let c = 0; c < 2; c++) {
+        styleCell(ws, fotoHeader, c, { font: { ...fontBase, bold: true }, fill: headFill, border: ruleBottom });
+      }
+      for (let i = 0; i < b.fotos.length; i++) {
+        const r = fotoStart + i;
+        styleCell(ws, r, 0, { font: fontBase, alignment: { horizontal: "left", wrapText: true } });
+        styleCell(ws, r, 1, { font: b.fotos[i].signed ? linkFontX : fontBase });
+      }
     }
 
     ws["!freeze"] = { xSplit: 0, ySplit: 2 } as unknown as Record<string, unknown>;
