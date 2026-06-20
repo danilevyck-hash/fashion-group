@@ -15,7 +15,7 @@ export default function GaleriaView({
   nombre: string;
   fotos: Foto[];
 }) {
-  const [lightbox, setLightbox] = useState<string | null>(null);
+  const [idx, setIdx] = useState<number | null>(null);
   const [conError, setConError] = useState<Set<number>>(new Set());
 
   return (
@@ -64,7 +64,7 @@ export default function GaleriaView({
                     alt={f.nombre}
                     loading="lazy"
                     className="h-full w-full cursor-zoom-in object-cover"
-                    onClick={() => setLightbox(f.url)}
+                    onClick={() => setIdx(i)}
                     onError={() =>
                       setConError((prev) => {
                         const next = new Set(prev);
@@ -80,7 +80,20 @@ export default function GaleriaView({
         </div>
       )}
 
-      <FotoLightbox src={lightbox} onClose={() => setLightbox(null)} />
+      <FotoLightbox
+        src={idx !== null ? fotos[idx]?.url ?? null : null}
+        onClose={() => setIdx(null)}
+        onPrev={
+          fotos.length > 1
+            ? () => setIdx((p) => (p === null ? p : (p - 1 + fotos.length) % fotos.length))
+            : undefined
+        }
+        onNext={
+          fotos.length > 1
+            ? () => setIdx((p) => (p === null ? p : (p + 1) % fotos.length))
+            : undefined
+        }
+      />
     </main>
   );
 }
