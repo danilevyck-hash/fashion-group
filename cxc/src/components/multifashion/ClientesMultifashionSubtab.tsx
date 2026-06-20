@@ -2,22 +2,25 @@
 
 // Sub-tab "Clientes" de Multifashion — layout tabla compacta.
 //
-// Período: respeta el SELECTOR ÚNICO de mes del shell (selectedYear + mes),
-// igual que Detalle mensual y Vendedoras. El rango es el mes seleccionado
-// (1er a último día). (Antes tenía pills de período propios — retirados para
-// unificar el selector en todo el módulo.)
+// Período: filtro PROPIO del tab (Mes · 3m · 6m · 12m), persistido en URL
+// (?mfCliRango). El mes/año del shell ancla el FIN del rango; los rangos
+// móviles cuentan N meses hacia atrás desde ese mes (cruzan año solos).
 //
 // Dos secciones:
 //   1. Wholesale: clientes con is_wholesale=true.
-//   2. Retail recurrentes: top 50 clientes retail con ≥ 2 tickets y
-//      SUM(subtotal) > 0 en el rango.
+//   2. Clientes identificados (retail): ranking por monto, nombre real.
+//      Identidad normalizada en el RPC (TRIM + colapsa espacios) para no partir
+//      un cliente por variantes; VENTAS MAHER excluido (revendedor). El bucket
+//      "Anónimos (mostrador)" suma CONTADO / CONSUMIDOR FINAL aparte.
 //
+// La columna "#" es la POSICIÓN en el ranking por monto (no un id de cliente).
 // Click en una row expande sparkline mensual (un cliente expandido a la vez).
 
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Package, Users, ChevronDown } from "lucide-react";
+import { Package, Users, ChevronDown, Store } from "lucide-react";
 import { fmtMoney, fmtMoneyCompact } from "@/lib/ventas/format";
+import { useUrlState } from "@/lib/hooks/useUrlState";
 import { cn } from "@/lib/utils";
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -55,8 +58,24 @@ interface RetailResp {
   total_clientes: number;
   total_ventas: number;
   total_tickets: number;
+  // Cobertura identificados vs anónimos (mostrador), independiente del top N.
+  clientes_identificados: number;
+  ventas_identificadas: number;
+  tickets_identificados: number;
+  ventas_anonimas: number;
+  tickets_anonimos: number;
+  pct_identificado: number;
   clientes: ClienteRow[];
 }
+
+type RangoCli = "mes" | "3m" | "6m" | "12m";
+
+const RANGO_OPCIONES: { value: RangoCli; label: string }[] = [
+  { value: "mes", label: "Mes" },
+  { value: "3m", label: "3 meses" },
+  { value: "6m", label: "6 meses" },
+  { value: "12m", label: "12 meses" },
+];
 
 interface ClientesMultifashionSubtabProps {
   selectedYear: number;
@@ -82,15 +101,25 @@ const MES_NOMBRES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-// Rango = el MES seleccionado (1er a último día). Clientes respeta el selector
-// único de mes del shell de Multifashion (igual que Detalle y Vendedoras).
-function monthRange(selectedYear: number, mes: number): { fecha_inicio: string; fecha_fin: string } {
-  const lastDay = new Date(selectedYear, mes, 0).getDate();
+// Rango del tab Clientes. El FIN siempre es el último día del mes seleccionado
+// en el shell; el INICIO depende del filtro propio: "mes" = ese mes; "3m/6m/12m"
+// = primer día N-1 meses atrás (cruza año automáticamente vía Date).
+function computeRange(
+  rango: RangoCli, selectedYear: number, mes: number,
+): { fecha_inicio: string; fecha_fin: string } {
   const mm = String(mes).padStart(2, "0");
-  return {
-    fecha_inicio: `${selectedYear}-${mm}-01`,
-    fecha_fin: `${selectedYear}-${mm}-${String(lastDay).padStart(2, "0")}`,
-  };
+  const lastDay = new Date(selectedYear, mes, 0).getDate();
+  const fecha_fin = `${selectedYear}-${mm}-${String(lastDay).padStart(2, "0")}`;
+
+  if (rango === "mes") {
+    return { fecha_inicio: `${selectedYear}-${mm}-01`, fecha_fin };
+  }
+
+  const nMonths = rango === "3m" ? 3 : rango === "6m" ? 6 : 12;
+  const start = new Date(selectedYear, mes - 1 - (nMonths - 1), 1);
+  const sy = start.getFullYear();
+  const sm = String(start.getMonth() + 1).padStart(2, "0");
+  return { fecha_inicio: `${sy}-${sm}-01`, fecha_fin };
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────
@@ -103,8 +132,16 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  const range = useMemo(() => monthRange(selectedYear, mes), [selectedYear, mes]);
-  const periodoStr = useMemo(() => `${MES_NOMBRES[mes - 1]} ${selectedYear}`, [selectedYear, mes]);
+  // Filtro de período PROPIO del tab (persistido en URL ?mfCliRango). Es un
+  // filtro del mismo nivel → history "replace" (no cicla en back/forward).
+  const [rango, setRango] = useUrlState<RangoCli>("mfCliRango", "mes");
+
+  const range = useMemo(() => computeRange(rango, selectedYear, mes), [rango, selectedYear, mes]);
+  const periodoStr = useMemo(() => {
+    if (rango === "mes") return `${MES_NOMBRES[mes - 1]} ${selectedYear}`;
+    const n = rango === "3m" ? 3 : rango === "6m" ? 6 : 12;
+    return `Últimos ${n} meses · hasta ${MES_NOMBRES[mes - 1].toLowerCase()} ${selectedYear}`;
+  }, [rango, selectedYear, mes]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -180,11 +217,29 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
         </Card>
       ) : (
         <div className="space-y-8">
-          {/* Rótulo de período (ítem 6): el alcance es el MES seleccionado,
-              para que no parezca contradecir el Mayoreo YTD del Overview. */}
-          <div>
-            <h3 className="font-display text-base font-semibold text-stone-950">Clientes · {periodoStr}</h3>
-            <p className="mt-0.5 text-[11px] text-stone-400">Período: el mes seleccionado (no acumulado anual).</p>
+          {/* Encabezado + filtro de período propio del tab. */}
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 className="font-display text-base font-semibold text-stone-950">Clientes · {periodoStr}</h3>
+              <p className="mt-0.5 text-[11px] text-stone-400">Mejores clientes por monto. Mostrador anónimo aparte.</p>
+            </div>
+            <div className="inline-flex items-center gap-0.5 rounded-md border border-stone-200 bg-stone-50 p-0.5">
+              {RANGO_OPCIONES.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setRango(opt.value)}
+                  className={cn(
+                    "rounded px-2.5 py-1 text-[11px] font-medium transition",
+                    rango === opt.value
+                      ? "bg-white text-stone-900 shadow-sm"
+                      : "text-stone-500 hover:text-stone-800",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Sección 1: Wholesale */}
@@ -204,12 +259,12 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
             emptyText={`No hay clientes wholesale en ${periodoStr}.`}
           />
 
-          {/* Sección 2: Retail recurrentes */}
+          {/* Sección 2: Clientes identificados (retail por monto) */}
           <ClientesSection
             prefix="rt"
-            title="Retail recurrentes"
+            title="Clientes identificados"
             subtitle={retail
-              ? `Top ${retail.limit} · ≥ 2 visitas en ${periodoStr} · ${fmtMoney(retail.total_ventas)} · ${retail.total_tickets.toLocaleString()} tickets`
+              ? `${retail.pct_identificado ?? 0}% de las ventas · top ${retail.limit} por monto · ${retail.clientes_identificados ?? retail.total_clientes} con nombre`
               : "—"}
             icon={<Users className="h-4 w-4" />}
             iconTone="teal"
@@ -218,8 +273,25 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
             spansYears={spansYears}
             expandedId={expandedId}
             onToggleRow={toggleRow}
-            emptyText={`No hay clientes retail recurrentes (con ≥ 2 visitas) en ${periodoStr}.`}
+            emptyText={`No hay clientes retail con nombre en ${periodoStr}.`}
           />
+
+          {/* Bucket anónimo (mostrador): CONTADO / CONSUMIDOR FINAL, sin nombre. */}
+          {retail && (retail.ventas_anonimas > 0 || retail.tickets_anonimos > 0) && (
+            <Card className="flex items-center gap-3 p-3.5">
+              <div className="flex h-7 w-7 items-center justify-center rounded-md border border-stone-200 bg-stone-50 text-stone-500">
+                <Store className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-stone-900">Anónimos (mostrador)</p>
+                <p className="text-[11px] text-stone-500">Ventas de CONTADO / CONSUMIDOR FINAL, sin cliente identificado.</p>
+              </div>
+              <div className="text-right">
+                <p className="font-mono text-sm tabular-nums text-stone-950">{fmtMoney(retail.ventas_anonimas)}</p>
+                <p className="font-mono text-[11px] tabular-nums text-stone-500">{retail.tickets_anonimos.toLocaleString()} tickets</p>
+              </div>
+            </Card>
+          )}
         </div>
       )}
     </div>
@@ -267,7 +339,7 @@ function ClientesSection({
       ) : (
         <Card className="overflow-hidden p-0">
           <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem] items-center gap-3 border-b border-stone-200 bg-stone-50 px-3.5 py-2 text-[10.5px] font-medium uppercase tracking-[0.04em] text-stone-500">
-            <span className="text-right">#</span>
+            <span className="text-right" title="Posición en el ranking por monto">#</span>
             <span>Cliente</span>
             <span className="text-right">Total</span>
             <span className="text-right">Tickets</span>

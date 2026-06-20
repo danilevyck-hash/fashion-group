@@ -136,7 +136,7 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
             <SelectContent>
               {navMonths.map(m => (
                 <SelectItem key={m} value={String(m)} className="text-xs">
-                  {MES_FULL_OVERVIEW[m - 1]} {selectedYear}
+                  {MES_FULL_OVERVIEW[m - 1]}
                 </SelectItem>
               ))}
             </SelectContent>
