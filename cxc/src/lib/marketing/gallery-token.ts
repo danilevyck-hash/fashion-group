@@ -21,26 +21,47 @@ function requireSecret(): string {
   return s;
 }
 
-function firmar(codigo: string, secret: string): string {
+// scope = "galeria" (fotos) | "facturas" (PDF combinado). Namespaces separados
+// para que un token de una vista no sirva para la otra.
+function firmar(scope: string, codigo: string, secret: string): string {
   return crypto
     .createHmac("sha256", secret)
-    .update(`galeria:${codigo}`)
+    .update(`${scope}:${codigo}`)
     .digest("base64url");
 }
 
+function verificar(
+  scope: string,
+  codigo: string,
+  token: string | undefined | null,
+): boolean {
+  const secret = process.env.SESSION_SECRET;
+  if (!secret || !token) return false; // fail-closed
+  const expected = firmar(scope, codigo, secret);
+  const a = Buffer.from(token);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 export function signGalleryToken(clienteCodigo: string): string {
-  return firmar(clienteCodigo, requireSecret());
+  return firmar("galeria", clienteCodigo, requireSecret());
 }
 
 export function verifyGalleryToken(
   clienteCodigo: string,
   token: string | undefined | null,
 ): boolean {
-  const secret = process.env.SESSION_SECRET;
-  if (!secret || !token) return false; // fail-closed
-  const expected = firmar(clienteCodigo, secret);
-  const a = Buffer.from(token);
-  const b = Buffer.from(expected);
-  if (a.length !== b.length) return false;
-  return crypto.timingSafeEqual(a, b);
+  return verificar("galeria", clienteCodigo, token);
+}
+
+export function signFacturasToken(clienteCodigo: string): string {
+  return firmar("facturas", clienteCodigo, requireSecret());
+}
+
+export function verifyFacturasToken(
+  clienteCodigo: string,
+  token: string | undefined | null,
+): boolean {
+  return verificar("facturas", clienteCodigo, token);
 }

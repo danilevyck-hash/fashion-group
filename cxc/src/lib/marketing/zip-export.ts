@@ -25,7 +25,7 @@ import XLSX from "xlsx-js-style";
 import { supabaseServer } from "@/lib/supabase-server";
 import type { MkAdjunto, MkFactura, MkProyecto } from "./types";
 import { esPathStorage } from "./storage";
-import { signGalleryToken } from "./gallery-token";
+import { signGalleryToken, signFacturasToken } from "./gallery-token";
 
 const BUCKET = "marketing";
 const MAX_DIM = 1600; // px — lado mayor de la foto tras redimensionar
@@ -608,7 +608,18 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     // → links individuales por foto (no hay galería sin código de cliente).
     const usarGaleria = !!codigo && b.fotos.length > 0;
 
-    const aoa: (string | number)[][] = [["GASTOS"], headG];
+    // Fila "Ver todas las facturas (N)" arriba de la tabla (solo si el cliente
+    // tiene código y ≥1 factura con PDF). Abre el PDF combinado del cliente.
+    const nFacturasPdf = b.gastos.filter((g) => g.signed).length;
+    const verFacturas = !!codigo && nFacturasPdf > 0;
+    const aoa: (string | number)[][] = [["GASTOS"]];
+    let verFacturasRow = -1;
+    if (verFacturas) {
+      verFacturasRow = aoa.length;
+      aoa.push([`Ver todas las facturas (${nFacturasPdf})`]);
+    }
+    const headerRow = aoa.length;
+    aoa.push(headG);
     const gastoStart = aoa.length; // índice 0-based de la 1ª fila de gasto
     for (const g of b.gastos) {
       aoa.push([g.fecha, g.concepto, g.proveedor, g.marca, g.numero, g.total, g.signed ? "Ver factura" : "—"]);
@@ -653,7 +664,7 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     styleCell(ws, 0, 0, { font: { ...fontBase, bold: true, sz: 11 }, fill: sectionFill });
     styleCell(ws, fotosTitle, 0, { font: { ...fontBase, bold: true, sz: 11 }, fill: sectionFill });
     for (let c = 0; c < headG.length; c++) {
-      styleCell(ws, 1, c, { font: { ...fontBase, bold: true }, fill: headFill, alignment: { horizontal: c === 5 ? "right" : "left" }, border: ruleBottom });
+      styleCell(ws, headerRow, c, { font: { ...fontBase, bold: true }, fill: headFill, alignment: { horizontal: c === 5 ? "right" : "left" }, border: ruleBottom });
     }
     for (let i = 0; i < b.gastos.length; i++) {
       const r = gastoStart + i;
@@ -669,6 +680,13 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     styleCell(ws, subtotalRow, 4, { font: { ...fontBase, bold: true }, alignment: { horizontal: "right" } });
     styleCell(ws, subtotalRow, 5, { font: { ...fontBase, bold: true }, alignment: { horizontal: "right" }, border: ruleTop });
     fmtCell(ws, subtotalRow, 5, money);
+
+    // Link "Ver todas las facturas (N)" → PDF combinado del cliente.
+    if (verFacturas) {
+      const url = `${GALERIA_BASE}/api/marketing/facturas-pdf/${encodeURIComponent(codigo!)}?t=${signFacturasToken(codigo!)}`;
+      setCell(ws, verFacturasRow, 0, { t: "s", v: `Ver todas las facturas (${nFacturasPdf})`, l: { Target: url, Tooltip: "Abrir PDF combinado de las facturas" } });
+      styleCell(ws, verFacturasRow, 0, { font: linkFontX });
+    }
 
     // Sección de fotos: galería (1 link) o links individuales.
     if (usarGaleria) {
@@ -691,7 +709,7 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
       }
     }
 
-    ws["!freeze"] = { xSplit: 0, ySplit: 2 } as unknown as Record<string, unknown>;
+    ws["!freeze"] = { xSplit: 0, ySplit: headerRow + 1 } as unknown as Record<string, unknown>;
     XLSX.utils.book_append_sheet(wb, ws, tabName(nombre));
   }
 
