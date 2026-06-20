@@ -7,9 +7,9 @@ export const maxDuration = 60; // descargar fotos/PDFs + comprimir + zip
 
 // POST /api/marketing/export-zip
 //   body: { busqueda?: string, marca_id?: string | null }
-// Respeta el filtro de pantalla (busqueda + marca). Incluye anulados (marcados
-// ANULADO en el Excel). Devuelve un ZIP con carpeta por cliente → proyecto →
-// fotos + subcarpeta por gasto con su factura.pdf, más resumen_gastos.xlsx.
+// Respeta el filtro de pantalla (busqueda + marca). Excluye gastos/proyectos
+// anulados. Devuelve un ZIP con carpeta por cliente (sin nivel de proyecto):
+// fotos/ + subcarpeta por gasto con su factura.pdf, más resumen_gastos.xlsx.
 export async function POST(req: NextRequest) {
   const auth = requireRole(req, ["admin", "secretaria"]);
   if (auth instanceof NextResponse) return auth;
