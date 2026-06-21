@@ -208,7 +208,7 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
             <span className="font-mono tabular-nums text-stone-700">{resp.tickets_total.toLocaleString()}</span> tickets
           </p>
         )}
-        <p className="mt-1 text-[11px] text-stone-400">Ventas retail mostrador. Mayoreo se reporta en Overview.</p>
+        <p className="mt-1 text-[11px] text-stone-400">Ventas atribuidas a cada vendedor (incluye mayoreo si lo hubo).</p>
       </div>
 
       {/* Tabla única */}
