@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
   // Detalle + hora pico + margen mensual tienda completa + mayoreo del mes +
   // cliente(s) de mayoreo, en paralelo. Todo lo extra es aditivo: si falla, el
   // detalle igual responde (el titular cae a retail puro y la nota no se muestra).
-  const [detalleRes, horasRes, margenRes, mayoreoRes, mayoreoClienteRes, prevYearRes] = await Promise.all([
+  const [detalleRes, horasRes, margenRes, mayoreoRes, mayoreoClienteRes, prevYearRes, retailProyRes] = await Promise.all([
     supabaseServer.rpc("multifashion_detalle_mensual_v2", { p_year: year, p_mes: mes }),
     supabaseServer.rpc("multifashion_horas_pico_v1", { p_year: year, p_mes: mes }),
     supabaseServer.rpc("multifashion_margen_tienda_mensual", { p_year: year, p_mes: mes }),
@@ -85,6 +85,9 @@ export async function GET(req: NextRequest) {
     // _multifashion_sf_vw, misma fuente y bucket de día). Aditivo: si falla o no
     // hay datos (año anterior < may 2024), la línea simplemente no se dibuja.
     supabaseServer.rpc("multifashion_detalle_mensual_v2", { p_year: year - 1, p_mes: mes }),
+    // Proyección de cierre MÉTODO-B (pico fuera + run-rate plano + mayoreo). Reemplaza
+    // la proyección lineal del titular (que se inflaba con días pico de feriado).
+    supabaseServer.rpc("proyeccion_mensual_retail_v1", { p_anio: year, p_mes: mes }),
   ]);
 
   if (detalleRes.error) {
@@ -163,14 +166,27 @@ export async function GET(req: NextRequest) {
       : null,
   }));
 
-  // Proyección de cierre a TIENDA-COMPLETA: proyección RETAIL lineal (del RPC) +
-  // mayoreo REAL del mes a la fecha (NO se extrapola el mayoreo grumoso/esporádico).
-  // Solo aplica al mes en curso (cuando hay proyección); en meses cerrados queda null.
-  const proyRetail = totales.proyeccion_cierre;
+  // Proyección de cierre MÉTODO-B (validado backtest 8.6% vs 9.8% lineal): día pico
+  // (>4× mediana, ≥10 días) entra al acumulado real pero NO se extrapola; el resto se
+  // proyecta al run-rate plano normal; + mayoreo real (ya incluido en proyeccion_total).
+  // Gate de mes en curso = el RPC lineal del detalle solo devuelve proyección para el
+  // mes actual; en meses cerrados queda null y la respetamos.
+  const esMesEnCurso = totales.proyeccion_cierre != null;
+  const retailProy = retailProyRes.error
+    ? []
+    : ((retailProyRes.data ?? []) as Array<{
+        empresa_key: string;
+        proyeccion_total: number | null;
+        suficiente_data: boolean;
+      }>);
+  const acProy = retailProy.find((r) => r.empresa_key === "american_classic");
   const proyeccionTienda =
-    proyRetail != null && Number.isFinite(Number(proyRetail))
-      ? Number(proyRetail) + mayoreoMes
+    esMesEnCurso && acProy?.suficiente_data && acProy.proyeccion_total != null
+      ? Number(acProy.proyeccion_total)
       : null;
+  if (retailProyRes.error) {
+    console.error("[multifashion/detalle-mensual] proyeccion_mensual_retail_v1", retailProyRes.error.message);
+  }
 
   return NextResponse.json({
     ...detalle,

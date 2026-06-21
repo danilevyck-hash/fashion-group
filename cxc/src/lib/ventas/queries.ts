@@ -24,6 +24,7 @@ import type {
   EmpresaMonthlySales,
   MonthlySeries,
   ProyeccionResp,
+  ProyeccionMensualEmpresa,
 } from "@/components/ventas/types";
 
 interface DashboardSummaryRow {
@@ -66,7 +67,10 @@ function buildEmpresa(key: string): Empresa {
  * construye el shape VentasResumen mapeando empresa key → ventas_id.
  */
 export async function fetchVentasResumen({ year }: { year: number }): Promise<VentasResumen> {
-  const [curRes, prevRes, metaRes, proyRes, syncedRes] = await Promise.all([
+  const nowD = new Date();
+  const isCurrentYear = year === nowD.getFullYear();
+  const curMonth = nowD.getMonth() + 1;
+  const [curRes, prevRes, metaRes, proyRes, syncedRes, retailMensualRes, mayoristaMensualRes] = await Promise.all([
     supabaseServer.rpc("ventas_dashboard_summary", { p_anio: year }),
     // Prev year usa same-period day-by-day: el mes que está en curso en
     // el calendario actual se recorta al mismo offset de días en el año
@@ -86,6 +90,15 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     // para mostrar frescura real (no la fecha de hoy). Graceful: si falla,
     // el subtitle cae a fecha_corte (lógica vieja) vía null.
     supabaseServer.from("switch_facturas").select("synced_at").order("synced_at", { ascending: false }).limit(1),
+    // Proyección de cierre MENSUAL por régimen (solo año en curso). Retail = método-b
+    // (pico fuera + run-rate plano + mayoreo); mayorista = run-rate plano + nota volátil.
+    // Aditivo: si falla, la columna mensual simplemente no se muestra.
+    isCurrentYear
+      ? supabaseServer.rpc("proyeccion_mensual_retail_v1", { p_anio: year, p_mes: curMonth })
+      : Promise.resolve({ data: null, error: null }),
+    isCurrentYear
+      ? supabaseServer.rpc("proyeccion_mensual_mayorista_v1", { p_anio: year, p_mes: curMonth })
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   if (curRes.error)  throw new Error(`ventas_dashboard_summary(${year}): ${curRes.error.message}`);
@@ -222,6 +235,26 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
   const syncedRow = (syncedRes.data as Array<{ synced_at: string }> | null) ?? [];
   const dataActualizadaAt = syncedRow[0]?.synced_at ?? null;
 
+  // Proyección de cierre MENSUAL por empresa (clave = ventas id, igual que el anual).
+  // Solo año en curso. Retail (proyeccion_total = método-b + mayoreo) + mayorista
+  // (proyeccion = run-rate plano). Aditivo: si falla, el mapa queda vacío.
+  let proyeccionMensual: Record<string, ProyeccionMensualEmpresa> | null = null;
+  if (isCurrentYear) {
+    proyeccionMensual = {};
+    if (retailMensualRes.error) console.error("[ventas/proyeccion_mensual_retail]", retailMensualRes.error.message);
+    if (mayoristaMensualRes.error) console.error("[ventas/proyeccion_mensual_mayorista]", mayoristaMensualRes.error.message);
+    const retailRows = (retailMensualRes.data ?? []) as Array<{ empresa_key: string; proyeccion_total: number | null; acumulado: number; suficiente_data: boolean; nota: string | null }>;
+    const mayoristaRows = (mayoristaMensualRes.data ?? []) as Array<{ empresa_key: string; proyeccion: number | null; acumulado: number; suficiente_data: boolean; volatil: boolean; nota: string | null }>;
+    for (const r of retailRows) {
+      const id = EMPRESA_KEY_TO_VENTAS_ID[r.empresa_key] ?? r.empresa_key;
+      proyeccionMensual[id] = { regimen: "retail", proyeccion: r.proyeccion_total, acumulado: r.acumulado, suficiente_data: r.suficiente_data, volatil: false, nota: r.nota };
+    }
+    for (const r of mayoristaRows) {
+      const id = EMPRESA_KEY_TO_VENTAS_ID[r.empresa_key] ?? r.empresa_key;
+      proyeccionMensual[id] = { regimen: "mayorista", proyeccion: r.proyeccion, acumulado: r.acumulado, suficiente_data: r.suficiente_data, volatil: !!r.volatil, nota: r.nota };
+    }
+  }
+
   return {
     year,
     mesActual,
@@ -241,6 +274,8 @@ export async function fetchVentasResumen({ year }: { year: number }): Promise<Ve
     dia_corte_anio_anterior: prevPayload.dia_corte_anio_anterior,
     data_actualizada_at:     dataActualizadaAt,
     proyeccion,
+    proyeccionMensual,
+    mesProyeccion: isCurrentYear ? curMonth : null,
   };
 }
 
