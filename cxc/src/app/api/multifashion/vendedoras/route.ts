@@ -21,7 +21,7 @@ import type { VendedorasPeriodo } from "@/components/ventas/types";
 
 export const dynamic = "force-dynamic";
 
-type Periodo = "mes" | "trimestre" | "ytd";
+type Periodo = "mes" | "trimestre" | "ytd" | "ultimos";
 
 function parseIntParam(v: string | null): number | null {
   if (v == null || v === "") return null;
@@ -38,8 +38,8 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const year = parseIntParam(sp.get("year")) ?? new Date().getFullYear();
   const periodoRaw = (sp.get("periodo") ?? "mes") as Periodo;
-  if (periodoRaw !== "mes" && periodoRaw !== "trimestre" && periodoRaw !== "ytd") {
-    return NextResponse.json({ error: "periodo inválido (mes|trimestre|ytd)" }, { status: 400 });
+  if (periodoRaw !== "mes" && periodoRaw !== "trimestre" && periodoRaw !== "ytd" && periodoRaw !== "ultimos") {
+    return NextResponse.json({ error: "periodo inválido (mes|trimestre|ytd|ultimos)" }, { status: 400 });
   }
   if (!Number.isFinite(year) || year < 2000 || year > 2100) {
     return NextResponse.json({ error: "year inválido" }, { status: 400 });
@@ -53,6 +53,28 @@ export async function GET(req: NextRequest) {
   }
   if (periodoRaw === "trimestre" && (trimestre == null || trimestre < 1 || trimestre > 4)) {
     return NextResponse.json({ error: "trimestre requerido (1..4) cuando periodo=trimestre" }, { status: 400 });
+  }
+
+  // periodo=ultimos → ventana rolling de N meses (3/6/12) terminando en `mes`,
+  // vía multifashion_vendedoras_range (Δ vs misma ventana del año anterior, sin bono).
+  if (periodoRaw === "ultimos") {
+    const n = parseIntParam(sp.get("n"));
+    if (n !== 3 && n !== 6 && n !== 12) {
+      return NextResponse.json({ error: "n requerido (3|6|12) cuando periodo=ultimos" }, { status: 400 });
+    }
+    if (mes == null || mes < 1 || mes > 12) {
+      return NextResponse.json({ error: "mes (fin de ventana) requerido (1..12)" }, { status: 400 });
+    }
+    const { data, error } = await supabaseServer.rpc("multifashion_vendedoras_range", {
+      p_year: year,
+      p_fin_mes: mes,
+      p_n_meses: n,
+    });
+    if (error) {
+      console.error("[multifashion/vendedoras] range rpc error", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+    return NextResponse.json(data as VendedorasPeriodo);
   }
 
   const { data, error } = await supabaseServer.rpc("multifashion_vendedoras_v3", {
