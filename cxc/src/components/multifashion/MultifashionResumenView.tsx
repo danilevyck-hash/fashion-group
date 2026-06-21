@@ -390,7 +390,21 @@ export function MultifashionResumenView({
         {panoramaOpen && (
           <div className="border-t border-stone-200 p-4">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <MiniKpi label={`VENTAS RETAIL ${ytdSuffix}`} value={fmtMoney(overview.retail.ytdVentas)} sub={retailYtdSub} />
+              <MiniKpi
+                label={`VENTAS ${ytdSuffix}`}
+                value={fmtMoney(overview.total.ytdVentas)}
+                sub={
+                  <>
+                    {retailYtdSub}
+                    {overview.wholesale.ytdVentas > 0 && (
+                      <span className="block text-stone-500">
+                        incluye {fmtMoney(overview.wholesale.ytdVentas)} en mayoreo
+                        {overview.wholesale.topClienteName ? ` · ${overview.wholesale.topClienteName}` : ""}
+                      </span>
+                    )}
+                  </>
+                }
+              />
               {overview.proyeccionCierre.tiene_proyeccion ? (
                 <MiniKpi
                   label={`PROYECCIÓN CIERRE ${year}`}
