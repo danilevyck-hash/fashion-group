@@ -15,6 +15,7 @@ import type {
   EmpresaMonthlySales,
   ProyeccionResp,
   ProyeccionEmpresa,
+  ProyeccionMensualEmpresa,
 } from "./types";
 import { MONTHS, QUARTERS, formatCompactCurrency } from "@/lib/ventas/format";
 import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
@@ -298,6 +299,8 @@ function MobileHeatmap({
   );
 
   const showProy = !isClosedYear && !!data.proyeccion;
+  const showMensual = !isClosedYear && !!data.proyeccionMensual;
+  const mesProyLabel = data.mesProyeccion ? MONTHS[data.mesProyeccion - 1] : "";
 
   return (
     <div className="relative overflow-x-auto rounded-xl border border-stone-200 bg-white">
@@ -334,6 +337,14 @@ function MobileHeatmap({
                 className="px-2.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-stone-950"
               >
                 Proyección
+              </th>
+            )}
+            {showMensual && (
+              <th
+                scope="col"
+                className="px-2.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-stone-950"
+              >
+                Cierre {mesProyLabel} (proy.)
               </th>
             )}
           </tr>
@@ -374,6 +385,7 @@ function MobileHeatmap({
                   margenPctPrev={r.margenPctPrev}
                 />
                 {showProy && <MobileProyCell proyeccion={proy} />}
+                {showMensual && <MobileMensualCell pm={data.proyeccionMensual![r.id]} />}
               </tr>
             );
           })}
@@ -403,6 +415,7 @@ function MobileHeatmap({
             {showProy && (
               <MobileProyGrupoCell proyeccion={data.proyeccion!} />
             )}
+            {showMensual && <MobileMensualGrupoCell pm={data.proyeccionMensual!} />}
           </tr>
         </tbody>
       </table>
@@ -476,6 +489,35 @@ function MobileTotalCell({
         <span className="w-full text-right text-[11px] font-semibold">{display}</span>
         <DeltaPct delta={delta} mode={mode} />
       </span>
+    </td>
+  );
+}
+
+/** Celda mobile de proyección de cierre del MES (método-b retail / run-rate mayorista).
+ *  Paridad con la columna desktop. */
+function MobileMensualCell({ pm }: { pm: ProyeccionMensualEmpresa | undefined }) {
+  if (!pm || pm.proyeccion == null) {
+    return (
+      <td className="border-l border-stone-200 px-2.5 py-3 text-right text-[9.5px] text-stone-400">
+        datos insuf.
+      </td>
+    );
+  }
+  return (
+    <td className="border-l border-stone-200 px-2.5 py-3 text-right">
+      <span className="block font-mono text-[11px] font-semibold tabular-nums text-stone-900">{formatCompactCurrency(pm.proyeccion)}</span>
+      {pm.volatil && <span className="mt-0.5 block text-[9px] text-amber-600">volátil</span>}
+    </td>
+  );
+}
+
+/** Total grupo mobile de la proyección mensual: suma las empresas con dato suficiente. */
+function MobileMensualGrupoCell({ pm }: { pm: Record<string, ProyeccionMensualEmpresa> }) {
+  const vals = Object.values(pm);
+  const total = vals.reduce((s, e) => s + (e.suficiente_data && e.proyeccion != null ? e.proyeccion : 0), 0);
+  return (
+    <td className="border-l border-stone-700 px-2.5 py-3 text-right font-mono text-[11px] font-semibold tabular-nums text-white">
+      {formatCompactCurrency(total)}
     </td>
   );
 }
