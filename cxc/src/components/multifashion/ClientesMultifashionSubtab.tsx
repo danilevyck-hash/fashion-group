@@ -264,7 +264,7 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
             prefix="rt"
             title="Clientes identificados"
             subtitle={retail
-              ? `${retail.pct_identificado ?? 0}% de las ventas · top ${retail.limit} por monto · ${retail.clientes_identificados ?? retail.total_clientes} con nombre`
+              ? `${retail.pct_identificado ?? 0}% de las ventas retail · top ${retail.limit} por monto · ${retail.clientes_identificados ?? retail.total_clientes} con nombre`
               : "—"}
             icon={<Users className="h-4 w-4" />}
             iconTone="teal"
