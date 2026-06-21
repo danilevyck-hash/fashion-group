@@ -163,6 +163,15 @@ export async function GET(req: NextRequest) {
       : null,
   }));
 
+  // Proyección de cierre a TIENDA-COMPLETA: proyección RETAIL lineal (del RPC) +
+  // mayoreo REAL del mes a la fecha (NO se extrapola el mayoreo grumoso/esporádico).
+  // Solo aplica al mes en curso (cuando hay proyección); en meses cerrados queda null.
+  const proyRetail = totales.proyeccion_cierre;
+  const proyeccionTienda =
+    proyRetail != null && Number.isFinite(Number(proyRetail))
+      ? Number(proyRetail) + mayoreoMes
+      : null;
+
   return NextResponse.json({
     ...detalle,
     dias: diasConYoY,
@@ -173,6 +182,7 @@ export async function GET(req: NextRequest) {
       margen: margenMes,
       mayoreo: mayoreoMes,
       ventas_total: retailVentas + mayoreoMes,
+      proyeccion_cierre: proyeccionTienda,
     },
     mayoreo_cliente: mayoreoCliente,
     ...(horas as Record<string, unknown>),
