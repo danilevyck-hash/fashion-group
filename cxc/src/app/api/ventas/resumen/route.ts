@@ -3,6 +3,10 @@ import { requireRole } from "@/lib/requireRole";
 import { fetchVentasResumen } from "@/lib/ventas/queries";
 
 export const dynamic = "force-dynamic";
+// El resumen del año cruza el empalme switch_facturas/ventas_raw (blend pesado);
+// el año 2025 tarda ~4-5s. Sin maxDuration explícito, un cold-start tras un deploy
+// lo empuja sobre el timeout default → 500 transitorio. 60s da headroom.
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "contabilidad"]);

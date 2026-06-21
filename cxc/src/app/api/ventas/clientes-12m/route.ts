@@ -5,6 +5,9 @@ import { requireRole } from "@/lib/requireRole";
 import { fetchClientes } from "@/lib/ventas/queries";
 
 export const dynamic = "force-dynamic";
+// Mismo load anual de Ventas (cruza el empalme switch_facturas/ventas_raw).
+// maxDuration explícito para sobrevivir cold-starts tras un deploy (evita 500).
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   const auth = requireRole(req, ["admin", "contabilidad"]);

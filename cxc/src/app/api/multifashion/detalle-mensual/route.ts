@@ -17,6 +17,10 @@ import { requireRole } from "@/lib/requireRole";
 import { supabaseServer } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
+// Hace 2 llamados al RPC mensual (año actual + año anterior para la comparación
+// YoY del gráfico) → más pesado. maxDuration explícito para no caer en timeout
+// en cold-starts tras un deploy.
+export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
   // Multifashion es módulo admin-only por ahora (los demás roles se definen
