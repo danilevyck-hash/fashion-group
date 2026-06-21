@@ -329,9 +329,6 @@ export function MultifashionResumenView({
         </div>
         <div>
           <h2 className="font-display text-xl font-semibold leading-tight text-stone-950">{overview.tienda}</h2>
-          <p className="mt-0.5 text-xs text-stone-500">
-            American Classics · {overview.ubicacion} · Gerente {overview.manager}
-          </p>
           <div className="mt-1.5">
             <SyncStatus
               tabla="facturas"
@@ -360,6 +357,75 @@ export function MultifashionResumenView({
       {data && (
         <>
           <Titular data={data} year={year} />
+          {/* PANORAMA DEL AÑO — colapsable, debajo del titular y antes del gráfico. */}
+          <div className="overflow-hidden rounded-lg border border-stone-200">
+            <button
+              type="button"
+              onClick={() => setPanoramaOpen((o) => !o)}
+              aria-expanded={panoramaOpen}
+              className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-stone-50"
+            >
+              <span className="font-display text-sm font-semibold text-stone-950">
+                Panorama del año {year}
+              </span>
+              <span className="flex items-center gap-2 text-[11px] text-stone-500">
+                {panoramaOpen ? "Ocultar" : "Ver"}
+                <ChevronDown className={cn("h-4 w-4 transition-transform", panoramaOpen && "rotate-180")} />
+              </span>
+            </button>
+            {panoramaOpen && (
+              <div className="border-t border-stone-200 p-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                  <MiniKpi
+                    label={`VENTAS ${ytdSuffix}`}
+                    value={fmtMoney(overview.total.ytdVentas)}
+                    sub={
+                      <>
+                        {retailYtdSub}
+                        {overview.wholesale.ytdVentas > 0 && (
+                          <span className="block text-stone-500">
+                            incluye {fmtMoney(overview.wholesale.ytdVentas)} en mayoreo
+                            {overview.wholesale.topClienteName ? ` · ${overview.wholesale.topClienteName}` : ""}
+                          </span>
+                        )}
+                      </>
+                    }
+                  />
+                  {overview.proyeccionCierre.tiene_proyeccion ? (
+                    <MiniKpi
+                      label={`PROYECCIÓN CIERRE ${year}`}
+                      value={fmtMoney(proyTienda)}
+                      sub={
+                        <>
+                          <span className={deltaToneCierre(deltaCierreTienda)}>
+                            {deltaStrCierre(deltaCierreTienda)}{" "}
+                            <span className="text-stone-500">vs cierre {prevYear}</span>
+                          </span>
+                          {mayActualYear > 0 && (
+                            <span className="block text-stone-500">incluye {fmtMoney(mayActualYear)} en mayoreo a la fecha</span>
+                          )}
+                        </>
+                      }
+                    />
+                  ) : (
+                    <MiniKpi
+                      label={`CIERRE ${year}`}
+                      value={fmtMoney(cierreActualTienda)}
+                      sub={
+                        <>
+                          acumulado del año
+                          {mayActualYear > 0 && (
+                            <span className="block text-stone-500">incluye {fmtMoney(mayActualYear)} en mayoreo</span>
+                          )}
+                        </>
+                      }
+                    />
+                  )}
+                  <MiniKpi label="MARGEN BRUTO · TIENDA" value={fmtMargen(overview.total.margen)} sub={margenSub} />
+                </div>
+              </div>
+            )}
+          </div>
           <ChartMesAnioMount
             chartView={chartView}
             setChartView={setChartView}
@@ -378,77 +444,6 @@ export function MultifashionResumenView({
           <BandCards data={data} />
         </>
       )}
-
-      {/* 5. PANORAMA DEL AÑO — colapsable (colapsado por defecto). Solo 3 cards;
-          el gráfico acumulado vive en el toggle "Año" del gráfico principal. */}
-      <div className="overflow-hidden rounded-lg border border-stone-200">
-        <button
-          type="button"
-          onClick={() => setPanoramaOpen((o) => !o)}
-          aria-expanded={panoramaOpen}
-          className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-stone-50"
-        >
-          <span className="font-display text-sm font-semibold text-stone-950">
-            Panorama del año {year}
-          </span>
-          <span className="flex items-center gap-2 text-[11px] text-stone-500">
-            {panoramaOpen ? "Ocultar" : "Ver"}
-            <ChevronDown className={cn("h-4 w-4 transition-transform", panoramaOpen && "rotate-180")} />
-          </span>
-        </button>
-        {panoramaOpen && (
-          <div className="border-t border-stone-200 p-4">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <MiniKpi
-                label={`VENTAS ${ytdSuffix}`}
-                value={fmtMoney(overview.total.ytdVentas)}
-                sub={
-                  <>
-                    {retailYtdSub}
-                    {overview.wholesale.ytdVentas > 0 && (
-                      <span className="block text-stone-500">
-                        incluye {fmtMoney(overview.wholesale.ytdVentas)} en mayoreo
-                        {overview.wholesale.topClienteName ? ` · ${overview.wholesale.topClienteName}` : ""}
-                      </span>
-                    )}
-                  </>
-                }
-              />
-              {overview.proyeccionCierre.tiene_proyeccion ? (
-                <MiniKpi
-                  label={`PROYECCIÓN CIERRE ${year}`}
-                  value={fmtMoney(proyTienda)}
-                  sub={
-                    <>
-                      <span className={deltaToneCierre(deltaCierreTienda)}>
-                        {deltaStrCierre(deltaCierreTienda)}{" "}
-                        <span className="text-stone-500">vs cierre {prevYear}</span>
-                      </span>
-                      {mayActualYear > 0 && (
-                        <span className="block text-stone-500">incluye {fmtMoney(mayActualYear)} en mayoreo a la fecha</span>
-                      )}
-                    </>
-                  }
-                />
-              ) : (
-                <MiniKpi
-                  label={`CIERRE ${year}`}
-                  value={fmtMoney(cierreActualTienda)}
-                  sub={
-                    <>
-                      acumulado del año
-                      {mayActualYear > 0 && (
-                        <span className="block text-stone-500">incluye {fmtMoney(mayActualYear)} en mayoreo</span>
-                      )}
-                    </>
-                  }
-                />
-              )}
-              <MiniKpi label="MARGEN BRUTO · TIENDA" value={fmtMargen(overview.total.margen)} sub={margenSub} />
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -596,7 +591,7 @@ function BandCards({ data }: { data: DetalleMensualResp }) {
     <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
       <BestWorstDayCard mejor={mejor_dia} peor={peor_dia} />
       <BestDowCard heatmap={heatmap_dia_semana} />
-      <HoraPicoCard hora={data.hora_pico ?? null} ventas={data.hora_pico_ventas ?? null} />
+      <HoraPicoCard hora={data.hora_pico ?? null} ventas={data.hora_pico_ventas ?? null} horas={data.horas ?? []} />
     </div>
   );
 }
@@ -789,46 +784,109 @@ function BestWorstDayCard({
   );
 }
 
-// Mejor día de la semana (max promedio). Reemplaza la fila de 7 columnas.
+// Mini gráfico de barras (CSS, sin recharts) para las cards de patrones. Usa los
+// mismos datos que ya alimentan la card (heatmap día-semana / ventas por hora).
+function MiniBars({
+  data, highlightIdx, tone, showLabels = false,
+}: {
+  data: { label: string; value: number; full?: string }[];
+  highlightIdx: number;
+  tone: "teal" | "violet";
+  showLabels?: boolean;
+}) {
+  const max = Math.max(...data.map((d) => d.value), 1);
+  const on = tone === "violet" ? "bg-violet-600" : "bg-teal-700";
+  const off = tone === "violet" ? "bg-violet-200" : "bg-teal-200";
+  return (
+    <div>
+      <div className="flex h-12 items-end gap-px">
+        {data.map((d, i) => (
+          <div key={i} className="flex h-full flex-1 items-end" title={`${d.full ?? d.label}: ${fmtMoney(d.value)}`}>
+            <div
+              className={cn("w-full rounded-sm", i === highlightIdx ? on : off)}
+              style={{ height: `${d.value > 0 ? Math.max(3, (d.value / max) * 100) : 0}%` }}
+            />
+          </div>
+        ))}
+      </div>
+      {showLabels && (
+        <div className="mt-1 flex gap-px">
+          {data.map((d, i) => (
+            <span key={i} className="flex-1 text-center text-[8.5px] uppercase text-stone-400">{d.label.slice(0, 1)}</span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Mejor día de la semana (max promedio) + mini gráfico de barras lun→dom.
 function BestDowCard({ heatmap }: { heatmap: HeatmapDow[] }) {
   const best = heatmap.reduce<HeatmapDow | null>(
     (acc, h) => (h.ventas_promedio > (acc?.ventas_promedio ?? -1) ? h : acc),
     null,
   );
+  // Reordenar lun→dom (dow 1..6, luego 0) para el mini gráfico.
+  const bars = [1, 2, 3, 4, 5, 6, 0]
+    .map((dow) => heatmap.find((h) => h.dow === dow))
+    .filter((h): h is HeatmapDow => !!h)
+    .map((h) => ({ label: h.dow_label, value: h.ventas_promedio, full: `${h.dow_label} (promedio)` }));
+  const highlightIdx = best ? bars.findIndex((b) => b.label === best.dow_label) : -1;
+  const hayData = bars.some((b) => b.value > 0);
   return (
-    <Card className="flex items-center gap-3 p-4">
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-teal-100 bg-teal-50 text-teal-700">
-        <CalendarDays className="h-5 w-5" strokeWidth={1.75} />
+    <Card className="p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-teal-100 bg-teal-50 text-teal-700">
+          <CalendarDays className="h-5 w-5" strokeWidth={1.75} />
+        </div>
+        <div className="flex-1">
+          <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Mejor día de semana</p>
+          <p className="mt-0.5 font-display text-base font-semibold text-stone-950">{hayData ? best!.dow_label : "—"}</p>
+          <p className="mt-0.5 font-mono text-[11px] tabular-nums text-stone-500">
+            {hayData ? `${fmtMoneyCompact(best!.ventas_promedio)} promedio` : "sin data"}
+          </p>
+        </div>
       </div>
-      <div className="flex-1">
-        <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Mejor día de semana</p>
-        <p className="mt-0.5 font-display text-base font-semibold text-stone-950">
-          {best && best.ventas_promedio > 0 ? best.dow_label : "—"}
-        </p>
-        <p className="mt-0.5 font-mono text-[11px] tabular-nums text-stone-500">
-          {best && best.ventas_promedio > 0 ? `${fmtMoneyCompact(best.ventas_promedio)} promedio` : "sin data"}
-        </p>
-      </div>
+      {hayData && (
+        <div className="mt-3">
+          <MiniBars data={bars} highlightIdx={highlightIdx} tone="teal" showLabels />
+        </div>
+      )}
     </Card>
   );
 }
 
-// Hora pico del mes (hora Panamá).
-function HoraPicoCard({ hora, ventas }: { hora: number | null; ventas: number | null }) {
+// Hora pico del mes (hora Panamá) + mini gráfico de barras por hora del día.
+function HoraPicoCard({
+  hora, ventas, horas,
+}: {
+  hora: number | null;
+  ventas: number | null;
+  horas: HoraRow[];
+}) {
+  const bars = horas.map((h) => ({ label: String(h.hora), value: h.ventas, full: horaPicoLabel(h.hora) }));
+  const highlightIdx = hora != null ? bars.findIndex((b) => Number(b.label) === hora) : -1;
   return (
-    <Card className="flex items-center gap-3 p-4">
-      <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-violet-100 bg-violet-50 text-violet-700">
-        <Clock className="h-5 w-5" strokeWidth={1.75} />
+    <Card className="p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-violet-100 bg-violet-50 text-violet-700">
+          <Clock className="h-5 w-5" strokeWidth={1.75} />
+        </div>
+        <div className="flex-1">
+          <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Hora pico</p>
+          <p className="mt-0.5 font-display text-base font-semibold text-stone-950">
+            {hora != null ? horaPicoLabel(hora) : "—"}
+          </p>
+          <p className="mt-0.5 font-mono text-[11px] tabular-nums text-stone-500">
+            {ventas != null ? `${fmtMoneyCompact(ventas)} en la hora` : "sin data"}
+          </p>
+        </div>
       </div>
-      <div className="flex-1">
-        <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Hora pico</p>
-        <p className="mt-0.5 font-display text-base font-semibold text-stone-950">
-          {hora != null ? horaPicoLabel(hora) : "—"}
-        </p>
-        <p className="mt-0.5 font-mono text-[11px] tabular-nums text-stone-500">
-          {ventas != null ? `${fmtMoneyCompact(ventas)} en la hora` : "sin data"}
-        </p>
-      </div>
+      {bars.length > 0 && (
+        <div className="mt-3">
+          <MiniBars data={bars} highlightIdx={highlightIdx} tone="violet" />
+        </div>
+      )}
     </Card>
   );
 }
