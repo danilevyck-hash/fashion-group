@@ -43,7 +43,7 @@ const TONE_LIGHT: Record<DeltaTone, string> = {
 
 type SortKey = "tickets" | "ventas" | "delta_ventas" | "comision";
 type SortDir = "asc" | "desc";
-type ChipKey = "en_curso" | "mes_anterior" | "ytd";
+type ChipKey = "en_curso" | "mes_anterior" | "ytd" | "ultimos_3" | "ultimos_6" | "ultimos_12";
 
 // Badge info por vendedora, derivado del RPC de bonos (sin fórmulas nuevas).
 interface BonoBadge { winner: boolean; gerenteBono: number }
@@ -68,11 +68,17 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
 
   const [chip, setChip] = useState<ChipKey>("en_curso");
 
+  // Ventana rolling (botones "Últimos N meses"): periodo='ultimos', N meses
+  // terminando en el mes en curso. Δ vs misma ventana del año anterior; sin bono.
+  const rangoN = chip === "ultimos_3" ? 3 : chip === "ultimos_6" ? 6 : chip === "ultimos_12" ? 12 : null;
+  const esRango = rangoN != null;
+
   // Parámetros del ranking según el chip.
-  const rpcPeriodo: VendedorasPeriodoTipo = chip === "ytd" ? "ytd" : "mes";
+  const rpcPeriodo: VendedorasPeriodoTipo | "ultimos" =
+    esRango ? "ultimos" : chip === "ytd" ? "ytd" : "mes";
   const rpcMes = chip === "en_curso" ? enCursoMes : mesAnteriorMes;
   // Mes cuyo bono se evalúa: en_curso → mes en curso (será pendiente);
-  // mes_anterior / ytd → último mes cerrado.
+  // mes_anterior / ytd → último mes cerrado. (No aplica a ventanas rolling.)
   const bonoMes = chip === "en_curso" ? enCursoMes : mesAnteriorMes;
 
   const [resp, setResp] = useState<VendedorasPeriodo | null>(null);
@@ -93,6 +99,7 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
     setError(null);
     const params = new URLSearchParams({ year: String(year), periodo: rpcPeriodo });
     if (rpcPeriodo === "mes") params.set("mes", String(rpcMes));
+    if (rpcPeriodo === "ultimos") { params.set("n", String(rangoN)); params.set("mes", String(enCursoMes)); }
     fetch(`/api/multifashion/vendedoras?${params.toString()}`, { cache: "no-store", signal: ctrl.signal })
       .then(async r => {
         if (!r.ok) {
@@ -109,11 +116,12 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
       })
       .finally(() => setLoading(false));
     return () => ctrl.abort();
-  }, [year, rpcPeriodo, rpcMes, reloadKey]);
+  }, [year, rpcPeriodo, rpcMes, rangoN, enCursoMes, reloadKey]);
 
-  // Badges de bono por nombre (solo cuando el mes es evaluable).
+  // Badges de bono por nombre (solo cuando el mes es evaluable; nunca en rangos).
   const bonoBadges = useMemo(() => {
     const map = new Map<string, BonoBadge>();
+    if (esRango) return map;
     if (bonos && !bonos.sin_data && bonos.es_elegible) {
       const gerenteBono = bonos.gerente.bono;
       for (const v of bonos.vendedoras) {
@@ -121,7 +129,7 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
       }
     }
     return map;
-  }, [bonos]);
+  }, [bonos, esRango]);
 
   const sortedVendedoras = useMemo(() => {
     if (!resp) return [];
@@ -153,6 +161,9 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
     en_curso: `${MES_FULL[enCursoMes - 1]} ${year} (en curso)`,
     mes_anterior: `${MES_FULL[mesAnteriorMes - 1]} ${year}`,
     ytd: `YTD ${year}`,
+    ultimos_3: "Últimos 3 meses",
+    ultimos_6: "Últimos 6 meses",
+    ultimos_12: "Últimos 12 meses",
   };
 
   return (
@@ -164,10 +175,13 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
         </div>
       )}
 
-      {/* Banner del bono gerente (una línea). Eleva la data para los badges. */}
-      <BonosSection selectedYear={year} mes={bonoMes} onData={onBonosData} />
+      {/* Banner del bono gerente (una línea). Eleva la data para los badges.
+          No aplica a ventanas rolling (el bono es por mes). */}
+      {!esRango && (
+        <BonosSection selectedYear={year} mes={bonoMes} onData={onBonosData} />
+      )}
 
-      {/* Chips de período: en curso (default) · mes cerrado anterior · YTD */}
+      {/* Chips de período: mes en curso · mes cerrado · YTD · ventanas rolling. */}
       <div className="flex flex-wrap items-center gap-2">
         <ChipPill active={chip === "en_curso"} onClick={() => setChip("en_curso")}>
           {`${MES_FULL[enCursoMes - 1]} (en curso)`}
@@ -178,6 +192,10 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
         <ChipPill active={chip === "ytd"} onClick={() => setChip("ytd")}>
           {`YTD ${year}`}
         </ChipPill>
+        <span className="mx-1 h-4 w-px bg-stone-200" aria-hidden />
+        <ChipPill active={chip === "ultimos_3"} onClick={() => setChip("ultimos_3")}>Últimos 3 meses</ChipPill>
+        <ChipPill active={chip === "ultimos_6"} onClick={() => setChip("ultimos_6")}>Últimos 6 meses</ChipPill>
+        <ChipPill active={chip === "ultimos_12"} onClick={() => setChip("ultimos_12")}>Últimos 12 meses</ChipPill>
       </div>
 
       {/* Subtitle */}
