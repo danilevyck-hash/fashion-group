@@ -361,6 +361,11 @@ export function MultifashionResumenView({
             prevYear={prevYear}
             data={data}
           />
+          <ComparativoInteranualCard
+            meses={overview.retail.meses}
+            year={year}
+            diaActual={data.dia_actual}
+          />
           <BandCards data={data} />
         </>
       )}
@@ -453,6 +458,94 @@ function Titular({ data, year }: { data: DetalleMensualResp; year: number }) {
           ) : null}
         </div>
       </Card>
+  );
+}
+
+// 3b. Comparativo interanual mes a mes (RETAIL, mismo corte) — debajo del gráfico.
+// El monto del año anterior se DERIVA del vs2025 full-precision (ventas/(1+vs2025)),
+// que cuadra al centavo con switch_facturas; NO usa la serie blend (ventas_raw) para
+// no mezclar fuentes. El mes en curso se compara al mismo día (parcial), consistente
+// con el % mostrado. Es retail por la decisión híbrida (mayoreo no entra a comparativos).
+function ComparativoInteranualCard({
+  meses, year, diaActual,
+}: {
+  meses: RetailMonthly[];
+  year: number;
+  diaActual: number;
+}) {
+  const prevYear = year - 1;
+  const filas = meses
+    .map((m, i) => {
+      const pct = m.vs2025;
+      const vPrev = pct != null ? m.ventas / (1 + pct) : null;
+      return {
+        label: MESES_SHORT[i],
+        parcial: !!m.es_periodo_parcial,
+        v: m.ventas,
+        vPrev,
+        pct,
+        abs: vPrev != null ? m.ventas - vPrev : null,
+        tieneData: m.ventas > 0 || m.tickets > 0,
+      };
+    })
+    .filter((f) => f.tieneData);
+
+  if (filas.length === 0) return null;
+
+  // YTD a mismo corte: solo meses con comparación del año anterior disponible.
+  const comp = filas.filter((f) => f.vPrev != null);
+  const tot = comp.reduce((s, f) => s + f.v, 0);
+  const totPrev = comp.reduce((s, f) => s + (f.vPrev ?? 0), 0);
+  const totPct = totPrev > 0 ? (tot - totPrev) / totPrev : null;
+
+  const GRID = "grid grid-cols-[2.8rem_minmax(0,1fr)_minmax(0,1fr)_6rem] items-center gap-2 px-4";
+  const deltaTone = (n: number | null) =>
+    n == null ? "text-stone-400" : n >= 0 ? "text-emerald-600" : "text-rose-600";
+  const fmtPct = (p: number | null) => (p == null ? "—" : `${p >= 0 ? "+" : ""}${(p * 100).toFixed(1)}%`);
+  const fmtAbs = (n: number | null) => (n == null ? "" : `${n >= 0 ? "+" : "−"}${fmtMoney(Math.abs(n))}`);
+
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="border-b border-stone-100 px-4 py-3">
+        <h4 className="font-display text-sm font-semibold text-stone-950">Mes a mes vs {prevYear}</h4>
+        <p className="mt-0.5 text-[11px] text-stone-400">
+          Retail (sin mayoreo) · mismo corte. El mes en curso se compara al día {diaActual}.
+        </p>
+      </div>
+      <div className={cn(GRID, "border-b border-stone-200 bg-stone-50 py-2 text-[10.5px] font-medium uppercase tracking-[0.04em] text-stone-500")}>
+        <span>Mes</span>
+        <span className="text-right">{year}</span>
+        <span className="text-right">{prevYear}</span>
+        <span className="text-right">Δ</span>
+      </div>
+      {filas.map((f) => (
+        <div key={f.label} className={cn(GRID, "border-t border-stone-100 py-2 text-sm")}>
+          <span className="capitalize text-stone-700">
+            {f.label}
+            {f.parcial ? <span className="ml-1 text-[9px] text-stone-400">d{diaActual}</span> : null}
+          </span>
+          <span className="text-right font-mono tabular-nums text-stone-950">{fmtMoney(f.v)}</span>
+          <span className="text-right font-mono tabular-nums text-stone-500">
+            {f.vPrev != null ? fmtMoney(f.vPrev) : "—"}
+          </span>
+          <span className="text-right font-mono tabular-nums leading-tight">
+            <span className={cn("font-medium", deltaTone(f.pct))}>{fmtPct(f.pct)}</span>
+            {f.abs != null && (
+              <span className={cn("block text-[10px]", deltaTone(f.abs))}>{fmtAbs(f.abs)}</span>
+            )}
+          </span>
+        </div>
+      ))}
+      <div className={cn(GRID, "border-t border-stone-300 bg-stone-50 py-2 text-sm font-semibold")}>
+        <span className="text-stone-700">YTD</span>
+        <span className="text-right font-mono tabular-nums text-stone-950">{fmtMoney(tot)}</span>
+        <span className="text-right font-mono tabular-nums text-stone-600">{fmtMoney(totPrev)}</span>
+        <span className="text-right font-mono tabular-nums leading-tight">
+          <span className={cn("font-medium", deltaTone(totPct))}>{fmtPct(totPct)}</span>
+          <span className={cn("block text-[10px]", deltaTone(tot - totPrev))}>{fmtAbs(tot - totPrev)}</span>
+        </span>
+      </div>
+    </Card>
   );
 }
 
