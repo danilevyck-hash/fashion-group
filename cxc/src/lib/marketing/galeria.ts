@@ -2,6 +2,13 @@ import { supabaseServer } from "@/lib/supabase-server";
 import { firmarAdjuntos } from "./storage";
 import type { MkAdjunto } from "./types";
 
+// TTL de las URLs firmadas de las fotos de la galería. La galería re-firma en
+// cada carga, pero el default de storage.ts (1 hora) hacía que las fotos
+// vencieran ("exp claim timestamp check failed") si la página quedaba abierta o
+// cacheada un rato. 1 año = en la práctica no expira (el acceso lo controla el
+// token HMAC del cliente, no la duración del link).
+const GALERIA_LINK_TTL_SECONDS = 60 * 60 * 24 * 365;
+
 /**
  * Datos de la galería pública de un cliente.
  *
@@ -46,7 +53,10 @@ export async function getGaleriaCliente(
     .eq("tipo", "foto_proyecto")
     .order("created_at", { ascending: false });
 
-  const firmadas = await firmarAdjuntos((adjs ?? []) as MkAdjunto[]);
+  const firmadas = await firmarAdjuntos(
+    (adjs ?? []) as MkAdjunto[],
+    GALERIA_LINK_TTL_SECONDS,
+  );
   const fotos: GaleriaFoto[] = firmadas
     .filter((a) => !!a.url)
     .map((a) => ({ url: a.url, nombre: a.nombre_original ?? "Foto" }));

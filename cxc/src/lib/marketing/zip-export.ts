@@ -4,12 +4,13 @@
 //   resumen_gastos.xlsx                          (hoja Gastos + hoja Fotos,
 //                                                 con hyperlinks a cada PDF/foto)
 //   <Cliente>/
+//       facturas/<fecha · concepto>.pdf          (pdf_factura del gasto)
 //       fotos/<archivo>.jpg                      (foto_proyecto, comprimidas)
-//       <fecha · concepto>/factura.pdf           (pdf_factura del gasto)
 //   Sin cliente/ …                               (proyectos sin tienda_codigo)
 //
-// El contenido cuelga DIRECTO de la carpeta del cliente — sin nivel de carpeta
-// por proyecto. Los gastos y proyectos ANULADOS se excluyen por completo (no se
+// Por cliente hay SOLO dos carpetas: facturas/ (todos los PDFs juntos) y fotos/
+// — sin carpeta por factura ni por proyecto. Los gastos y proyectos ANULADOS se
+// excluyen por completo (no se
 // descargan ni aparecen en el Excel). La hoja Gastos incluye facturas
 // (mk_facturas) Y gastos de muebles (mk_entregas_muebles, Proveedor "Mobiliario")
 // para que el TOTAL cuadre con el "Gastado" de la pantalla. Patrón basado en
@@ -357,8 +358,8 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
   let pdfsOmitidos = 0;
 
   // Carpeta destino por proyecto = SOLO la del cliente (sin nivel de proyecto).
-  // El dedupe de subcarpetas de gasto y de nombres de foto es POR CLIENTE,
-  // porque varios proyectos del mismo cliente comparten su carpeta.
+  // El dedupe de nombres de archivo de factura y de nombres de foto es POR
+  // CLIENTE, porque varios proyectos del mismo cliente comparten su carpeta.
   const rutaCliente = new Map<string, string>();
   const usadosGastoPorCliente = new Map<string, Set<string>>();
   const usadosFotoPorCliente = new Map<string, Set<string>>();
@@ -374,15 +375,17 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
     rutaCliente.set(p.id, clienteFolder(p));
   }
 
-  // 7a. PDFs de cada gasto.
+  // 7a. PDFs de cada gasto → TODOS juntos en <Cliente>/facturas/, sin carpeta
+  // por factura. El nombre de archivo lleva "fecha · concepto" para distinguirlos
+  // y se deduplica por cliente (sufijo (2), (3)… si chocan).
   await mapLimit(facturasSel, CONCURRENCY, async (f) => {
     const pdfs = pdfsPorFactura.get(f.id) ?? [];
     if (pdfs.length === 0) return;
     const baseDir = rutaCliente.get(f.proyecto_id)!;
     const usados = getSet(usadosGastoPorCliente, baseDir);
-    const sub = unico(
-      sanitizeName(`${f.fecha_factura} · ${truncar(f.concepto, 50)}`, f.numero_factura || "gasto"),
-      usados,
+    const nombreBase = sanitizeName(
+      `${f.fecha_factura} · ${truncar(f.concepto, 50)}`,
+      f.numero_factura || "factura",
     );
     let idx = 0;
     for (const pdf of pdfs) {
@@ -391,8 +394,10 @@ export async function buildMarketingZip(filtro: ExportFiltro): Promise<ExportRes
         pdfsOmitidos++;
         continue;
       }
-      const nombre = pdfs.length > 1 ? `factura-${++idx}.pdf` : "factura.pdf";
-      zip.file(`${baseDir}/${sub}/${nombre}`, buf);
+      // Varios PDFs en la misma factura → sufijo numérico antes del dedupe.
+      const etiqueta = pdfs.length > 1 ? `${nombreBase} (${++idx})` : nombreBase;
+      const nombreUnico = unico(etiqueta, usados);
+      zip.file(`${baseDir}/facturas/${nombreUnico}.pdf`, buf);
       pdfsIncluidos++;
     }
   });
