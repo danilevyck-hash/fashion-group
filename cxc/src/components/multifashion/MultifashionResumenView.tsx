@@ -304,6 +304,15 @@ export function MultifashionResumenView({
   const serieAct = overview.serieActual;
   const seriePrev = overview.seriePrevio;
   const cierreActual = serieAct.dias.length ? serieAct.dias[serieAct.dias.length - 1].acumulado : 0;
+  // Proyección/cierre del Panorama a TIENDA-COMPLETA: + mayoreo REAL del año a la
+  // fecha (sin extrapolar lo grumoso). El delta se recalcula vs cierre del año previo
+  // también tienda-completa (cierre_prev retail + mayoreo total del año previo, ya cerrado).
+  const mayActualYear = overview.wholesale.ytdVentas;
+  const mayPrevYear = overview.mayoreoPrevYearTotal ?? 0;
+  const proyTienda = (overview.proyeccionCierre.proyeccion ?? 0) + mayActualYear;
+  const cierrePrevTienda = overview.proyeccionCierre.cierre_prev + mayPrevYear;
+  const deltaCierreTienda = cierrePrevTienda > 0 ? (proyTienda - cierrePrevTienda) / cierrePrevTienda : null;
+  const cierreActualTienda = cierreActual + mayActualYear;
   const cumChart = useMemo(() => buildCumulativeChart(serieAct, seriePrev), [serieAct, seriePrev]);
   const mesMapAct = useMemo(() => new Map<number, MultifashionSerieMes>(serieAct.meses.map((m) => [m.mes, m])), [serieAct]);
   const mesMapPrev = useMemo(() => new Map<number, MultifashionSerieMes>(seriePrev.meses.map((m) => [m.mes, m])), [seriePrev]);
@@ -408,16 +417,32 @@ export function MultifashionResumenView({
               {overview.proyeccionCierre.tiene_proyeccion ? (
                 <MiniKpi
                   label={`PROYECCIÓN CIERRE ${year}`}
-                  value={fmtMoney(overview.proyeccionCierre.proyeccion ?? 0)}
+                  value={fmtMoney(proyTienda)}
                   sub={
-                    <span className={deltaToneCierre(overview.proyeccionCierre.delta_pct)}>
-                      {deltaStrCierre(overview.proyeccionCierre.delta_pct)}{" "}
-                      <span className="text-stone-500">vs cierre {prevYear}</span>
-                    </span>
+                    <>
+                      <span className={deltaToneCierre(deltaCierreTienda)}>
+                        {deltaStrCierre(deltaCierreTienda)}{" "}
+                        <span className="text-stone-500">vs cierre {prevYear}</span>
+                      </span>
+                      {mayActualYear > 0 && (
+                        <span className="block text-stone-500">incluye {fmtMoney(mayActualYear)} en mayoreo a la fecha</span>
+                      )}
+                    </>
                   }
                 />
               ) : (
-                <MiniKpi label={`CIERRE ${year}`} value={fmtMoney(cierreActual)} sub="acumulado del año" />
+                <MiniKpi
+                  label={`CIERRE ${year}`}
+                  value={fmtMoney(cierreActualTienda)}
+                  sub={
+                    <>
+                      acumulado del año
+                      {mayActualYear > 0 && (
+                        <span className="block text-stone-500">incluye {fmtMoney(mayActualYear)} en mayoreo</span>
+                      )}
+                    </>
+                  }
+                />
               )}
               <MiniKpi label="MARGEN BRUTO · TIENDA" value={fmtMargen(overview.total.margen)} sub={margenSub} />
             </div>
