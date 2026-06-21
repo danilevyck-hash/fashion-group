@@ -438,8 +438,8 @@ function Titular({ data, year }: { data: DetalleMensualResp; year: number }) {
             )}
           </div>
           <div className="flex gap-6">
-            <ComparativoStat label="vs mes anterior" delta={deltaMoM} comp={mes_anterior} />
-            <ComparativoStat label={`vs ${MESES_SHORT[data.mes - 1]} ${year - 1}`} delta={deltaYoy} comp={yoy} />
+            <ComparativoStat label={`vs mes anterior${is_mes_actual ? ` (al día ${data.dia_actual})` : ""}`} delta={deltaMoM} comp={mes_anterior} />
+            <ComparativoStat label={`vs ${MESES_SHORT[data.mes - 1]} ${year - 1}${is_mes_actual ? ` (al día ${data.dia_actual})` : ""}`} delta={deltaYoy} comp={yoy} />
           </div>
         </div>
         {/* Línea inferior: tickets retail · ticket promedio · proyección/margen */}
