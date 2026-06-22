@@ -3,7 +3,7 @@
 //
 // POST  body { settlements: [{ monto, nota_credito?, fecha }], markPaid?: boolean }
 //   - Inserta las filas de settlement.
-//   - Si markPaid: marca el reclamo como Pagado (solo desde "Enviado") y congela
+//   - Si markPaid: marca el reclamo como Pagado (solo desde "Creado") y congela
 //     el snapshot del reclamado. Atómico-best-effort: si el flip falla, borra los
 //     settlements recién insertados (compensación) → reintento seguro.
 // DELETE ?sid=<id>  → soft-delete de un settlement.
@@ -81,10 +81,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       if (ids.length) await supabaseServer.from("reclamo_settlements").delete().in("id", ids);
     };
 
-    if (!rec || rec.estado !== "Enviado") {
+    if (!rec || rec.estado !== "Creado") {
       await compensar();
       return NextResponse.json(
-        { error: `Solo se puede marcar Pagado desde "Enviado" (estado actual: ${rec?.estado ?? "?"}).` },
+        { error: `Solo se puede marcar Pagado desde "Creado" (estado actual: ${rec?.estado ?? "?"}).` },
         { status: 400 },
       );
     }

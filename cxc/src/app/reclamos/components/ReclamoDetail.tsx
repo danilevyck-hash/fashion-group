@@ -28,8 +28,6 @@ interface Props {
   setEditFecha: (v: string) => void;
   editNotas: string;
   setEditNotas: (v: string) => void;
-  editEstado: string;
-  setEditEstado: (v: string) => void;
   editItems: RItem[];
   setEditItems: React.Dispatch<React.SetStateAction<RItem[]>>;
   editSaving: boolean;
@@ -61,7 +59,7 @@ const SUPA_URL = typeof window !== "undefined" ? (process.env.NEXT_PUBLIC_SUPABA
 export default function ReclamoDetail({
   current, role, nota, setNota, editMode, setEditMode,
   editEmpresa, setEditEmpresa, editFactura, setEditFactura, editPedido, setEditPedido,
-  editFecha, setEditFecha, editNotas, setEditNotas, editEstado, setEditEstado,
+  editFecha, setEditFecha, editNotas, setEditNotas,
   editItems, setEditItems, editSaving,
   showDeleteConfirm, setShowDeleteConfirm, toast,
   customMotivos, setCustomMotivos, addingEditMotivo, setAddingEditMotivo,
@@ -136,10 +134,10 @@ export default function ReclamoDetail({
 
   // ── Smart suggestion: escalation ──
   const reclamoSuggestions = useMemo<SmartSuggestion[]>(() => {
-    if (days <= 45 || current.estado !== "Enviado") return [];
+    if (days <= 45 || current.estado !== "Creado") return [];
     return [{
       id: `reclamo-escalate-${current.id}`,
-      message: `Este reclamo lleva ${days} días enviado. Si el proveedor ya lo acreditó, márcalo como Pagado.`,
+      message: `Este reclamo lleva ${days} días abierto. Si el proveedor ya lo acreditó, márcalo como Pagado.`,
       actionLabel: "Marcar como Pagado",
       onAction: () => onChangeEstado("Pagado"),
     }];
@@ -153,7 +151,6 @@ export default function ReclamoDetail({
     setEditPedido(current.nro_orden_compra || "");
     setEditFecha(current.fecha_reclamo || "");
     setEditNotas(current.notas || "");
-    setEditEstado(current.estado || "");
     setEditItems((current.reclamo_items || []).map((i) => ({ ...i })));
     setEditMode(true);
   }
@@ -187,61 +184,90 @@ export default function ReclamoDetail({
         )}
       </div>
 
-      <div className="flex items-start justify-between mb-4">
-        <div>
+      <div className="flex items-start justify-between mb-4 gap-4">
+        <div className="flex-1 min-w-0">
           <h1 className="text-xl font-light tracking-tight flex items-center gap-2">
             {current.nro_reclamo}
             <FotoBadge count={fotos.length} />
           </h1>
-          <p className="text-sm text-gray-400 mt-1">{current.empresa} — {current.marca} — {current.proveedor}</p>
-          <p className="text-sm text-gray-400">Factura: {current.nro_factura}{current.nro_orden_compra ? ` | PO: ${current.nro_orden_compra}` : ""}</p>
-          <p className="text-sm text-gray-400">{fmtDate(current.fecha_reclamo)} — {days} días</p>
+          {editMode ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3 mt-3 max-w-2xl">
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa</span>
+                <select value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent">
+                  {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
+                </select>
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Factura</span>
+                <input type="text" value={editFactura} onChange={(e) => setEditFactura(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Pedido</span>
+                <input type="text" value={editPedido} onChange={(e) => setEditPedido(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha</span>
+                <input type="date" value={editFecha} onChange={(e) => setEditFecha(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
+              </label>
+              <label className="flex flex-col gap-1 sm:col-span-2">
+                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Notas</span>
+                <textarea value={editNotas} onChange={(e) => setEditNotas(e.target.value)} rows={1} className="border-b border-gray-200 py-1.5 text-sm outline-none resize-none" />
+              </label>
+            </div>
+          ) : (
+            <>
+              <p className="text-sm text-gray-400 mt-1">{current.empresa} — {current.marca} — {current.proveedor}</p>
+              <p className="text-sm text-gray-400">Factura: {current.nro_factura}{current.nro_orden_compra ? ` | PO: ${current.nro_orden_compra}` : ""}</p>
+              <p className="text-sm text-gray-400">{fmtDate(current.fecha_reclamo)} — {days} días</p>
+            </>
+          )}
         </div>
         <StatusBadge estado={current.estado} />
       </div>
 
       {reclamoSuggestion && <SuggestionCard suggestion={reclamoSuggestion} onDismiss={dismissReclamo} />}
 
-      {/* Action bar */}
-      <div className="flex items-center gap-2 mb-6 flex-wrap overflow-x-auto pb-1">
-        <button onClick={startEdit} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 active:bg-gray-100 transition-all flex items-center gap-1">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
-          Editar
-        </button>
-        <button onClick={downloadZip} disabled={zipBusy} title="Descargar el ZIP de este reclamo (Excel + fotos comprimidas) para adjuntarlo a un correo" className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1 disabled:opacity-40">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-          {zipBusy ? "Generando ZIP…" : "Descargar ZIP"}
-        </button>
-        {(role === "admin" || role === "secretaria") && (
-          <button onClick={() => setShowDeleteConfirm(true)} className="text-xs text-red-300 hover:text-red-600 transition ml-auto">Eliminar Reclamo</button>
-        )}
-      </div>
-
-      {/* Acción de estado — flujo lineal Borrador → Enviado → Pagado (un clic) */}
-      {current.estado === "Borrador" && (
-        <div className="mb-6">
-          <button onClick={() => onChangeEstado("Enviado")} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
-            Marcar como enviado
+      {/* Action bar — en edición se vuelve Guardar / Cancelar (edición in-place) */}
+      {editMode ? (
+        <div className="flex items-center gap-4 mb-6 flex-wrap">
+          <button onClick={onSaveEdit} disabled={editSaving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50">
+            {editSaving ? "Guardando…" : "Guardar"}
           </button>
+          <button onClick={() => setEditMode(false)} disabled={editSaving} className="text-sm text-gray-400 hover:text-black transition disabled:opacity-50">Cancelar</button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 mb-6 flex-wrap overflow-x-auto pb-1">
+          <button onClick={startEdit} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 active:bg-gray-100 transition-all flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
+            Editar
+          </button>
+          <button onClick={downloadZip} disabled={zipBusy} title="Descargar el ZIP de este reclamo (Excel + fotos comprimidas) para adjuntarlo a un correo" className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 transition flex items-center gap-1 disabled:opacity-40">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+            {zipBusy ? "Generando ZIP…" : "Descargar ZIP"}
+          </button>
+          {(role === "admin" || role === "secretaria") && (
+            <button onClick={() => setShowDeleteConfirm(true)} className="text-xs text-red-300 hover:text-red-600 transition ml-auto">Eliminar Reclamo</button>
+          )}
         </div>
       )}
-      {current.estado === "Enviado" && (
-        <div className="flex items-center gap-3 mb-6 flex-wrap">
+
+      {/* Acción de estado — pipeline de 2 estados: Creado → Pagado (vía settlement) */}
+      {!editMode && current.estado === "Creado" && (
+        <div className="mb-6">
           <button onClick={() => onChangeEstado("Pagado")} className="bg-black text-white px-5 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all flex items-center gap-2">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
             Marcar como Pagado
           </button>
-          <button onClick={() => onChangeEstado("Borrador")} className="text-xs text-gray-400 hover:text-gray-700 transition" title="Corrección: regresar a Borrador">← Volver a Borrador</button>
         </div>
       )}
-      {current.estado === "Pagado" && (
+      {!editMode && current.estado === "Pagado" && (
         <div className="flex items-center gap-3 mb-6 flex-wrap">
           <span className="inline-flex items-center gap-2 bg-green-50 text-green-700 border border-green-200 px-4 py-2.5 rounded-md text-sm font-medium">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
             Ciclo completado — Pagado
           </span>
-          <button onClick={() => onChangeEstado("Enviado")} className="text-xs text-gray-400 hover:text-gray-700 transition" title="Corrección: regresar a Enviado">← Volver a Enviado</button>
+          <button onClick={() => onChangeEstado("Creado")} className="text-xs text-gray-400 hover:text-gray-700 transition" title="Corrección: regresar a Creado">← Volver a Creado</button>
         </div>
       )}
 
@@ -250,7 +276,7 @@ export default function ReclamoDetail({
         {ESTADOS.map((e, i, arr) => {
           const isCurrent = current.estado === e;
           const isPast = (() => {
-            const order = ["Borrador", "Enviado", "Pagado"];
+            const order = ["Creado", "Pagado"];
             return order.indexOf(e) < order.indexOf(current.estado);
           })();
           return (
@@ -272,8 +298,7 @@ export default function ReclamoDetail({
                 <button onClick={() => setShowEstadoHelp(false)} className="text-gray-300 hover:text-black text-sm leading-none">x</button>
               </div>
               <div className="space-y-1.5 text-[11px] text-gray-500">
-                <div><span className="font-medium text-gray-700">Borrador</span> — Reclamo creado en la oficina</div>
-                <div><span className="font-medium text-gray-700">Enviado</span> — Enviado al encargado/proveedor</div>
+                <div><span className="font-medium text-gray-700">Creado</span> — Reclamo abierto con el proveedor</div>
                 <div><span className="font-medium text-gray-700">Pagado</span> — El proveedor acreditó el reclamo (nota de crédito aplicada)</div>
               </div>
             </div>
@@ -385,42 +410,93 @@ export default function ReclamoDetail({
         </div>
       )}
 
-      {/* Items table */}
-      {items.length > 0 && (
+      {/* Items table — UNA sola tabla: editable in-place cuando editMode, read-only si no */}
+      {(editMode || items.length > 0) && (
         <div className="mb-8">
           <div className="text-xs uppercase tracking-widest text-gray-400 mb-3">Ítems</div>
-          <ScrollableTable minWidth={700}>
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white z-10">
-                <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
-                  <th className="text-left pb-2 font-medium">Código</th>
-                  <th className="text-left pb-2 font-medium">Descripción</th>
-                  <th className="text-left pb-2 font-medium">Talla</th>
-                  <th className="text-right pb-2 font-medium">Cant.</th>
-                  <th className="text-right pb-2 font-medium">Precio</th>
-                  <th className="text-right pb-2 font-medium">Subtotal</th>
-                  <th className="text-left pb-2 font-medium">Motivo</th>
-                  <th className="text-left pb-2 font-medium">Factura</th>
-                  <th className="text-left pb-2 font-medium">PO</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item, i) => (
-                  <tr key={i} className="border-b border-gray-200">
-                    <td className="py-2">{item.referencia}</td>
-                    <td className="py-2 text-gray-500">{item.descripcion}</td>
-                    <td className="py-2 text-gray-500">{item.talla}</td>
-                    <td className="py-2 text-right tabular-nums">{Number(item.cantidad) || 0}</td>
-                    <td className="py-2 text-right tabular-nums">${fmt(item.precio_unitario)}</td>
-                    <td className="py-2 text-right tabular-nums font-medium">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>
-                    <td className="py-2 text-gray-500 text-xs">{item.motivo}</td>
-                    <td className="py-2 text-gray-500 text-xs">{item.nro_factura}</td>
-                    <td className="py-2 text-gray-500 text-xs">{item.nro_orden_compra}</td>
+          {editMode ? (
+            <>
+              <ScrollableTable minWidth={700} className="mb-4">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white z-10">
+                    <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
+                      <th className="pb-2 font-medium text-left">Código</th>
+                      <th className="pb-2 font-medium text-left">Descripción</th>
+                      <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla</th>
+                      <th className="pb-2 font-medium text-center" style={{ minWidth: 60 }}>Cant.</th>
+                      <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio U.</th>
+                      <th className="pb-2 font-medium text-left">Motivo</th>
+                      <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Subtotal</th>
+                      <th className="pb-2 w-6"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {editItems.map((item, idx) => (
+                      <tr key={idx} className="border-b border-gray-200">
+                        <td className="py-2 pr-1"><input type="text" value={item.referencia} onChange={(e) => updateEditItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" /></td>
+                        <td className="py-2 pr-1"><input type="text" value={item.descripcion} onChange={(e) => updateEditItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" /></td>
+                        <td className="py-2 pr-1"><input type="text" value={item.talla} onChange={(e) => updateEditItem(idx, "talla", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" style={{ minWidth: 50 }} /></td>
+                        <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateEditItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-center" /></td>
+                        <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateEditItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
+                        <td className="py-2 pr-1">
+                          {addingEditMotivo === idx ? (
+                            <div className="flex items-center gap-1">
+                              <input type="text" value={newMotivoText} onChange={(e) => setNewMotivoText(e.target.value)} placeholder="Nuevo motivo..." className="w-full border-b border-gray-200 py-1 text-sm outline-none" autoFocus
+                                onKeyDown={(e) => { if (e.key === "Enter" && newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateEditItem(idx, "motivo", newMotivoText.trim()); setNewMotivoText(""); setAddingEditMotivo(null); } }} />
+                              <button onClick={() => { if (newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateEditItem(idx, "motivo", newMotivoText.trim()); } setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-400 hover:text-black py-2 px-3">OK</button>
+                              <button onClick={() => { setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-300 hover:text-black py-2 px-3">x</button>
+                            </div>
+                          ) : (
+                            <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingEditMotivo(idx); setNewMotivoText(""); } else updateEditItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent">
+                              <option value="">--</option>
+                              {MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}
+                              <option value="__add__">+ Agregar motivo</option>
+                            </select>
+                          )}
+                        </td>
+                        <td className="py-2 text-right tabular-nums text-gray-500 text-xs">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>
+                        <td className="py-2 text-center">{editItems.length > 1 && <button onClick={() => setEditItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm">×</button>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </ScrollableTable>
+              <button onClick={() => setEditItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition">+ Agregar fila</button>
+            </>
+          ) : (
+            <ScrollableTable minWidth={700}>
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-white z-10">
+                  <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
+                    <th className="text-left pb-2 font-medium">Código</th>
+                    <th className="text-left pb-2 font-medium">Descripción</th>
+                    <th className="text-left pb-2 font-medium">Talla</th>
+                    <th className="text-right pb-2 font-medium">Cant.</th>
+                    <th className="text-right pb-2 font-medium">Precio</th>
+                    <th className="text-right pb-2 font-medium">Subtotal</th>
+                    <th className="text-left pb-2 font-medium">Motivo</th>
+                    <th className="text-left pb-2 font-medium">Factura</th>
+                    <th className="text-left pb-2 font-medium">PO</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </ScrollableTable>
+                </thead>
+                <tbody>
+                  {items.map((item, i) => (
+                    <tr key={i} className="border-b border-gray-200">
+                      <td className="py-2">{item.referencia}</td>
+                      <td className="py-2 text-gray-500">{item.descripcion}</td>
+                      <td className="py-2 text-gray-500">{item.talla}</td>
+                      <td className="py-2 text-right tabular-nums">{Number(item.cantidad) || 0}</td>
+                      <td className="py-2 text-right tabular-nums">${fmt(item.precio_unitario)}</td>
+                      <td className="py-2 text-right tabular-nums font-medium">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>
+                      <td className="py-2 text-gray-500 text-xs">{item.motivo}</td>
+                      <td className="py-2 text-gray-500 text-xs">{item.nro_factura}</td>
+                      <td className="py-2 text-gray-500 text-xs">{item.nro_orden_compra}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </ScrollableTable>
+          )}
         </div>
       )}
 
@@ -498,95 +574,6 @@ export default function ReclamoDetail({
 
       <FotoLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
 
-      {/* Edit mode panel */}
-      {editMode && (
-        <div className="border-t border-gray-200 pt-6">
-          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Editando Reclamo</div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-12 gap-y-5 mb-6">
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa</label>
-              <select value={editEmpresa} onChange={(e) => setEditEmpresa(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent">
-                {EMPRESAS.map((e) => <option key={e} value={e}>{e}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Factura</label>
-              <input type="text" value={editFactura} onChange={(e) => setEditFactura(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha</label>
-              <input type="date" value={editFecha} onChange={(e) => setEditFecha(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Pedido</label>
-              <input type="text" value={editPedido} onChange={(e) => setEditPedido(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none" />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Estado</label>
-              <select value={editEstado} onChange={(e) => setEditEstado(e.target.value)} className="border-b border-gray-200 py-1.5 text-sm outline-none bg-transparent">
-                {ESTADOS.map((e) => <option key={e} value={e}>{e}</option>)}
-              </select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Notas</label>
-              <textarea value={editNotas} onChange={(e) => setEditNotas(e.target.value)} rows={1} className="border-b border-gray-200 py-1.5 text-sm outline-none resize-none" />
-            </div>
-          </div>
-          <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Ítems</div>
-          <ScrollableTable minWidth={700} className="mb-4">
-            <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-white z-10">
-                <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
-                  <th className="pb-2 font-medium text-left">Código</th>
-                  <th className="pb-2 font-medium text-left">Descripción</th>
-                  <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla</th>
-                  <th className="pb-2 font-medium text-center" style={{ minWidth: 60 }}>Cant.</th>
-                  <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio U.</th>
-                  <th className="pb-2 font-medium text-left">Motivo</th>
-                  <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Subtotal</th>
-                  <th className="pb-2 w-6"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {editItems.map((item, idx) => (
-                  <tr key={idx} className="border-b border-gray-200">
-                    <td className="py-2 pr-1"><input type="text" value={item.referencia} onChange={(e) => updateEditItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" /></td>
-                    <td className="py-2 pr-1"><input type="text" value={item.descripcion} onChange={(e) => updateEditItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" /></td>
-                    <td className="py-2 pr-1"><input type="text" value={item.talla} onChange={(e) => updateEditItem(idx, "talla", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" style={{ minWidth: 50 }} /></td>
-                    <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateEditItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-center" /></td>
-                    <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateEditItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
-                    <td className="py-2 pr-1">
-                      {addingEditMotivo === idx ? (
-                        <div className="flex items-center gap-1">
-                          <input type="text" value={newMotivoText} onChange={(e) => setNewMotivoText(e.target.value)} placeholder="Nuevo motivo..." className="w-full border-b border-gray-200 py-1 text-sm outline-none" autoFocus
-                            onKeyDown={(e) => { if (e.key === "Enter" && newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateEditItem(idx, "motivo", newMotivoText.trim()); setNewMotivoText(""); setAddingEditMotivo(null); } }} />
-                          <button onClick={() => { if (newMotivoText.trim()) { saveCustomMotivo(newMotivoText.trim()); setCustomMotivos(loadCustomMotivos()); updateEditItem(idx, "motivo", newMotivoText.trim()); } setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-400 hover:text-black py-2 px-3">OK</button>
-                          <button onClick={() => { setNewMotivoText(""); setAddingEditMotivo(null); }} className="text-xs text-gray-300 hover:text-black py-2 px-3">x</button>
-                        </div>
-                      ) : (
-                        <select value={item.motivo} onChange={(e) => { if (e.target.value === "__add__") { setAddingEditMotivo(idx); setNewMotivoText(""); } else updateEditItem(idx, "motivo", e.target.value); }} className="w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent">
-                          <option value="">--</option>
-                          {MOTIVOS.map((m) => <option key={m} value={m}>{m}</option>)}
-                          <option value="__add__">+ Agregar motivo</option>
-                        </select>
-                      )}
-                    </td>
-                    <td className="py-2 text-right tabular-nums text-gray-500 text-xs">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>
-                    <td className="py-2 text-center">{editItems.length > 1 && <button onClick={() => setEditItems((p) => p.filter((_, i) => i !== idx))} className="text-gray-300 hover:text-black text-sm">×</button>}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </ScrollableTable>
-          <button onClick={() => setEditItems((p) => [...p, emptyItem()])} className="text-sm text-gray-400 hover:text-black transition mb-6">+ Agregar fila</button>
-          <div className="flex items-center gap-6">
-            <button onClick={onSaveEdit} disabled={editSaving} className="bg-black text-white px-6 py-2.5 rounded-md text-sm font-medium hover:bg-gray-800 active:scale-[0.97] transition-all disabled:opacity-50">
-              {editSaving ? "Guardando..." : "Guardar Cambios"}
-            </button>
-            <button onClick={() => setEditMode(false)} className="text-sm text-gray-400 hover:text-black transition">Cancelar</button>
-          </div>
-        </div>
-      )}
 
       <Toast message={toast} />
       </div>

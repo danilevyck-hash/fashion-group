@@ -206,19 +206,8 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       );
     }
 
-    // Cablear estado ↔ envío: al mandarse el correo, los reclamos en "Borrador"
-    // pasan a "Enviado" automáticamente (antes el estado se marcaba a mano, sin
-    // relación con el envío real). Solo promueve Borrador→Enviado (respeta el
-    // pipeline: los "Enviado" quedan igual; los "Pagado" no entran a la selección).
-    // Best-effort: el correo ya salió, un fallo acá solo se loguea.
-    const borradorIds = reclamos.filter((r) => r.estado === "Borrador").map((r) => r.id);
-    if (borradorIds.length > 0) {
-      const { error: estadoError } = await supabaseServer
-        .from("reclamos")
-        .update({ estado: "Enviado", updated_at: new Date().toISOString() })
-        .in("id", borradorIds);
-      if (estadoError) console.error("send-zip estado flip error:", estadoError.message);
-    }
+    // Pipeline de 2 estados: enviar el ZIP por correo NO cambia el estado. El
+    // reclamo se queda en "Creado"; solo el settlement (Pagado) lo avanza.
 
     return NextResponse.json({
       ok: true,
