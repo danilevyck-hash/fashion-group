@@ -10,7 +10,7 @@ import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useToast } from "@/components/ToastSystem";
-import { ConfirmDeleteModal } from "@/components/ui";
+import { ConfirmDeleteModal, ConfirmModal } from "@/components/ui";
 import { formatearMonto } from "@/lib/marketing/normalizar";
 import { resumirPorTienda } from "@/lib/marketing/inventario-resumen";
 import EntregaForm from "@/components/marketing/EntregaForm";
@@ -28,6 +28,15 @@ interface ProductoEditState {
   nombre: string;
   precio: string;
   stockTotal: string;
+  precioOriginal: number | null; // precio al abrir (para detectar cambio)
+}
+
+// Impacto de cambiar el precio (preview del endpoint impacto-precio).
+interface ImpactoPrecio {
+  entregasAfectadas: number;
+  totalAntes: number;
+  totalDespues: number;
+  delta: number;
 }
 
 export default function MobiliarioPage() {
@@ -51,6 +60,9 @@ export default function MobiliarioPage() {
 
   const [editProd, setEditProd] = useState<ProductoEditState | null>(null);
   const [savingProd, setSavingProd] = useState(false);
+  // Confirmación de precio vivo: impacto a mostrar antes de aplicar el cambio.
+  const [confirmPrecio, setConfirmPrecio] = useState<ImpactoPrecio | null>(null);
+  const [checkingPrecio, setCheckingPrecio] = useState(false);
   const [deleteProd, setDeleteProd] = useState<MkInventarioProducto | null>(
     null,
   );
@@ -185,7 +197,13 @@ export default function MobiliarioPage() {
 
   // Handlers
   const abrirNuevoProducto = () => {
-    setEditProd({ id: null, nombre: "", precio: "0", stockTotal: "0" });
+    setEditProd({
+      id: null,
+      nombre: "",
+      precio: "0",
+      stockTotal: "0",
+      precioOriginal: null,
+    });
   };
   const abrirEditarProducto = (p: MkInventarioProducto) => {
     setEditProd({
@@ -193,10 +211,13 @@ export default function MobiliarioPage() {
       nombre: p.nombre,
       precio: String(p.precio),
       stockTotal: String(p.stock_total),
+      precioOriginal: Number(p.precio),
     });
   };
 
-  const guardarProducto = async () => {
+  // Escribe el producto (POST/PATCH). El PATCH propaga el precio vivo a las
+  // entregas; la confirmación previa (si aplica) ya la maneja guardarProducto.
+  const aplicarGuardarProducto = async () => {
     if (!editProd) return;
     setSavingProd(true);
     try {
@@ -218,7 +239,19 @@ export default function MobiliarioPage() {
         const err = await res.json().catch(() => null);
         throw new Error(err?.error ?? "No se pudo guardar");
       }
-      toast(editProd.id ? "Producto actualizado" : "Producto creado", "success");
+      const data = (await res.json().catch(() => null)) as {
+        impacto?: ImpactoPrecio | null;
+      } | null;
+      const n = data?.impacto?.entregasAfectadas ?? 0;
+      toast(
+        !editProd.id
+          ? "Producto creado"
+          : n > 0
+            ? `Precio actualizado · ${n} ${n === 1 ? "entrega recalculada" : "entregas recalculadas"}`
+            : "Producto actualizado",
+        "success",
+      );
+      setConfirmPrecio(null);
       setEditProd(null);
       cargar();
     } catch (err) {
@@ -226,6 +259,37 @@ export default function MobiliarioPage() {
     } finally {
       setSavingProd(false);
     }
+  };
+
+  const guardarProducto = async () => {
+    if (!editProd) return;
+    // Si es edición y el precio cambió, consultar el impacto antes de aplicar
+    // y pedir confirmación si hay entregas afectadas (precio vivo).
+    const cambioPrecio =
+      editProd.id !== null &&
+      editProd.precioOriginal !== null &&
+      Math.abs(Number(editProd.precio) - editProd.precioOriginal) > 0.005;
+    if (cambioPrecio) {
+      setCheckingPrecio(true);
+      try {
+        const res = await fetch(
+          `/api/marketing/inventario/productos/${editProd.id}/impacto-precio?precio=${Number(editProd.precio)}`,
+          { cache: "no-store" },
+        );
+        if (res.ok) {
+          const imp = (await res.json()) as ImpactoPrecio;
+          if (imp.entregasAfectadas > 0) {
+            setConfirmPrecio(imp);
+            return; // espera confirmación → aplicarGuardarProducto
+          }
+        }
+      } catch {
+        /* si el preview falla, seguimos al guardado normal */
+      } finally {
+        setCheckingPrecio(false);
+      }
+    }
+    await aplicarGuardarProducto();
   };
 
   const ejecutarBorrarProducto = async () => {
@@ -644,10 +708,14 @@ export default function MobiliarioPage() {
               <button
                 type="button"
                 onClick={guardarProducto}
-                disabled={savingProd || !editProd.nombre.trim()}
+                disabled={savingProd || checkingPrecio || !editProd.nombre.trim()}
                 className="rounded-md bg-black text-white px-4 py-2 text-sm font-medium active:scale-[0.97] transition disabled:opacity-50"
               >
-                {savingProd ? "Guardando…" : "Guardar"}
+                {checkingPrecio
+                  ? "Revisando…"
+                  : savingProd
+                    ? "Guardando…"
+                    : "Guardar"}
               </button>
             </div>
           </div>
@@ -661,6 +729,27 @@ export default function MobiliarioPage() {
         onConfirm={ejecutarBorrarProducto}
         onCancel={() => setDeleteProd(null)}
         loading={deleting}
+      />
+
+      {/* Confirmación de precio vivo: el cambio recalcula entregas existentes. */}
+      <ConfirmModal
+        open={confirmPrecio !== null}
+        title="Actualizar precio y entregas"
+        message={
+          confirmPrecio
+            ? `Este precio se usa en ${confirmPrecio.entregasAfectadas} ${
+                confirmPrecio.entregasAfectadas === 1 ? "entrega" : "entregas"
+              }. Al cambiarlo, el total de muebles pasa de ${formatearMonto(
+                confirmPrecio.totalAntes,
+              )} a ${formatearMonto(confirmPrecio.totalDespues)} (${
+                confirmPrecio.delta >= 0 ? "+" : "−"
+              }${formatearMonto(Math.abs(confirmPrecio.delta))}). ¿Aplicar a todas?`
+            : ""
+        }
+        confirmLabel="Sí, aplicar a todas"
+        loading={savingProd}
+        onConfirm={aplicarGuardarProducto}
+        onClose={() => setConfirmPrecio(null)}
       />
 
       {/* Modal editar entrega — usa marcas asignadas al proyecto */}

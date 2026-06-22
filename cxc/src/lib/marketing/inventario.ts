@@ -212,6 +212,155 @@ export async function updateProducto(
   return mapProducto(data as Record<string, unknown>);
 }
 
+// ----------------------------------------------------------------------------
+// Precio vivo: al cambiar el precio de un producto, las entregas que lo usan
+// se recalculan (total + total_por_marca) con el precio nuevo. Reusa la MISMA
+// lógica de montos que create/update para cuadrar. Sirve de preview (aplicar
+// = false, no escribe) o de aplicación (aplicar = true).
+// ----------------------------------------------------------------------------
+export interface ImpactoPrecio {
+  entregasAfectadas: number;
+  totalAntes: number;
+  totalDespues: number;
+  delta: number;
+}
+
+// Precio actual de un producto (para detectar si el PATCH realmente lo cambió).
+export async function getProductoPrecio(id: string): Promise<number | null> {
+  const { data, error } = await supabaseServer
+    .from("mk_inventario_productos")
+    .select("precio")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`getProductoPrecio: ${error.message}`);
+  return data ? Number((data as { precio: number }).precio ?? 0) : null;
+}
+
+// Deriva el % por marca de una entrega desde su total_por_marca (proporciones).
+// El split por marca es independiente del precio, así que re-aplicarlo al total
+// nuevo preserva el reparto exacto.
+function marcasPctDeEntrega(
+  totalPorMarca: Record<string, number>,
+): Array<{ marcaId: string; porcentaje: number }> {
+  const entries = Object.entries(totalPorMarca ?? {});
+  if (entries.length === 0) return [];
+  const suma = entries.reduce((s, [, v]) => s + Number(v || 0), 0);
+  if (suma <= 0) {
+    const parejo = round2(100 / entries.length);
+    return entries.map(([marcaId]) => ({ marcaId, porcentaje: parejo }));
+  }
+  return entries.map(([marcaId, v]) => ({
+    marcaId,
+    porcentaje: (Number(v || 0) / suma) * 100,
+  }));
+}
+
+export async function recalcularEntregasPorPrecio(
+  productoId: string,
+  nuevoPrecio: number,
+  aplicar: boolean,
+): Promise<ImpactoPrecio> {
+  if (!productoId) throw new Error("productoId requerido");
+  const precio = round2(Number(nuevoPrecio));
+  if (!Number.isFinite(precio) || precio < 0) throw new Error("Precio inválido");
+
+  // 1) Entregas que contienen el producto.
+  const { data: itemRows, error: itemErr } = await supabaseServer
+    .from("mk_entrega_items")
+    .select("entrega_id")
+    .eq("producto_id", productoId);
+  if (itemErr) throw new Error(`recalcularPrecio[items]: ${itemErr.message}`);
+  const entregaIds = Array.from(
+    new Set(
+      (itemRows ?? []).map((r) =>
+        String((r as { entrega_id: string }).entrega_id),
+      ),
+    ),
+  );
+  if (entregaIds.length === 0) {
+    return { entregasAfectadas: 0, totalAntes: 0, totalDespues: 0, delta: 0 };
+  }
+
+  // 2) Cargar esas entregas con TODOS sus items.
+  const { data: entRows, error: entErr } = await supabaseServer
+    .from("mk_entregas_muebles")
+    .select("*, mk_entrega_items(*)")
+    .in("id", entregaIds);
+  if (entErr) throw new Error(`recalcularPrecio[entregas]: ${entErr.message}`);
+  const entregas = (entRows ?? []) as Array<Record<string, unknown>>;
+
+  // 3) Precios actuales de todos los productos; override el cambiado.
+  const allProductoIds = new Set<string>();
+  for (const e of entregas) {
+    for (const it of (e.mk_entrega_items as Array<Record<string, unknown>>) ??
+      []) {
+      allProductoIds.add(String(it.producto_id));
+    }
+  }
+  const precios = await loadPreciosByProductoId(Array.from(allProductoIds));
+  precios.set(productoId, precio);
+
+  // 4) Recalcular cada entrega (misma lógica de montos que create/update).
+  let totalAntes = 0;
+  let totalDespues = 0;
+  const updates: Array<{
+    id: string;
+    total: number;
+    totalPorMarca: Record<string, number>;
+  }> = [];
+  for (const e of entregas) {
+    const oldTotal = Number(e.total ?? 0);
+    const items = (
+      (e.mk_entrega_items as Array<Record<string, unknown>>) ?? []
+    ).map((r) => mapItem(r));
+    const itemsUnidades = items.map((it) => ({
+      productoId: it.producto_id,
+      cantidad: Object.values(it.cantidad_por_marca ?? {}).reduce(
+        (s, v) => s + Number(v || 0),
+        0,
+      ),
+    }));
+    const marcasPct = marcasPctDeEntrega(
+      (e.total_por_marca as Record<string, number>) ?? {},
+    );
+    const { total, totalPorMarca } = computeTotalesEntrega(
+      itemsUnidades,
+      precios,
+      marcasPct,
+    );
+    totalAntes = round2(totalAntes + oldTotal);
+    totalDespues = round2(totalDespues + total);
+    updates.push({ id: String(e.id), total, totalPorMarca });
+  }
+
+  if (aplicar) {
+    // Sincronizar el precio congelado de los items del producto cambiado.
+    const { error: upItemErr } = await supabaseServer
+      .from("mk_entrega_items")
+      .update({ precio_unitario: precio })
+      .eq("producto_id", productoId);
+    if (upItemErr) {
+      throw new Error(`recalcularPrecio[upd items]: ${upItemErr.message}`);
+    }
+    for (const u of updates) {
+      const { error } = await supabaseServer
+        .from("mk_entregas_muebles")
+        .update({ total: u.total, total_por_marca: u.totalPorMarca })
+        .eq("id", u.id);
+      if (error) {
+        throw new Error(`recalcularPrecio[upd ${u.id}]: ${error.message}`);
+      }
+    }
+  }
+
+  return {
+    entregasAfectadas: entregas.length,
+    totalAntes: round2(totalAntes),
+    totalDespues: round2(totalDespues),
+    delta: round2(totalDespues - totalAntes),
+  };
+}
+
 export async function deleteProducto(id: string): Promise<void> {
   if (!id) throw new Error("id requerido");
   const { data: usos, error: usosErr } = await supabaseServer
