@@ -3,12 +3,13 @@
 import { useRef, useState, useMemo } from "react";
 import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
-import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox, ScrollableTable } from "@/components/ui";
+import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox, ScrollableTable, PdfLightbox } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
-import { ESTADOS, EMPRESAS, EC, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, loadCustomMotivos, saveCustomMotivo, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, estadoLabel } from "./constants";
+import { ESTADOS, EMPRESAS, EC, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, estadoLabel } from "./constants";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
 import FotoBadge from "./FotoBadge";
+import FacturaPdfUploader, { type FacturaIAData } from "./FacturaPdfUploader";
 
 interface Props {
   current: Reclamo;
@@ -28,6 +29,8 @@ interface Props {
   setEditFecha: (v: string) => void;
   editNotas: string;
   setEditNotas: (v: string) => void;
+  editFacturaPdfPath: string | null;
+  setEditFacturaPdfPath: (v: string | null) => void;
   editItems: RItem[];
   setEditItems: React.Dispatch<React.SetStateAction<RItem[]>>;
   editSaving: boolean;
@@ -60,6 +63,7 @@ export default function ReclamoDetail({
   current, role, nota, setNota, editMode, setEditMode,
   editEmpresa, setEditEmpresa, editFactura, setEditFactura, editPedido, setEditPedido,
   editFecha, setEditFecha, editNotas, setEditNotas,
+  editFacturaPdfPath, setEditFacturaPdfPath,
   editItems, setEditItems, editSaving,
   showDeleteConfirm, setShowDeleteConfirm, toast,
   customMotivos, setCustomMotivos, addingEditMotivo, setAddingEditMotivo,
@@ -75,6 +79,16 @@ export default function ReclamoDetail({
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [showEstadoHelp, setShowEstadoHelp] = useState(false);
   const [zipBusy, setZipBusy] = useState(false);
+  const [facturaLightbox, setFacturaLightbox] = useState<string | null>(null);
+
+  // La IA rellena la cabecera en edición (campos editables); NO toca los ítems.
+  function aplicarIA(data: FacturaIAData) {
+    const emp = empresaDesdeIA(data.proveedor, data.marca);
+    if (emp) setEditEmpresa(emp);
+    if (data.nro_factura) setEditFactura(data.nro_factura);
+    if (data.fecha_factura) setEditFecha(data.fecha_factura);
+    if (data.nro_orden_compra) setEditPedido(data.nro_orden_compra);
+  }
 
   async function downloadZip() {
     if (zipBusy) return;
@@ -151,6 +165,7 @@ export default function ReclamoDetail({
     setEditPedido(current.nro_orden_compra || "");
     setEditFecha(current.fecha_reclamo || "");
     setEditNotas(current.notas || "");
+    setEditFacturaPdfPath(current.factura_pdf_path ?? null);
     setEditItems((current.reclamo_items || []).map((i) => ({ ...i })));
     setEditMode(true);
   }
@@ -214,12 +229,30 @@ export default function ReclamoDetail({
                 <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Notas</span>
                 <textarea value={editNotas} onChange={(e) => setEditNotas(e.target.value)} rows={1} className="border-b border-gray-200 py-1.5 text-sm outline-none resize-none" />
               </label>
+              <div className="sm:col-span-2 flex flex-col gap-1">
+                <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Factura (PDF) — autocompletar</span>
+                <FacturaPdfUploader
+                  pdfUrl={current.factura_pdf_url}
+                  onUploaded={setEditFacturaPdfPath}
+                  onExtracted={aplicarIA}
+                />
+              </div>
             </div>
           ) : (
             <>
               <p className="text-sm text-gray-400 mt-1">{current.empresa} — {current.marca} — {current.proveedor}</p>
               <p className="text-sm text-gray-400">Factura: {current.nro_factura}{current.nro_orden_compra ? ` | PO: ${current.nro_orden_compra}` : ""}</p>
               <p className="text-sm text-gray-400">{fmtDate(current.fecha_reclamo)} — {days} días</p>
+              {current.factura_pdf_url && (
+                <button
+                  type="button"
+                  onClick={() => setFacturaLightbox(current.factura_pdf_url ?? null)}
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-gray-700 hover:text-black border border-gray-200 rounded px-2.5 py-1.5 active:scale-[0.97] transition"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /></svg>
+                  Ver factura
+                </button>
+              )}
             </>
           )}
         </div>
@@ -573,6 +606,7 @@ export default function ReclamoDetail({
       />
 
       <FotoLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      <PdfLightbox src={facturaLightbox} titulo="Factura" onClose={() => setFacturaLightbox(null)} />
 
 
       <Toast message={toast} />

@@ -18,6 +18,34 @@ export const EMPRESAS_MAP: Record<string, { proveedor: string; marca: string }> 
 
 export const EMPRESAS = Object.keys(EMPRESAS_MAP);
 
+/** Mapea proveedor/marca extraídos por IA a la "empresa" del reclamo (que
+ *  determina proveedor+marca al guardar). Match por marca+proveedor; si la marca
+ *  es ambigua (Tommy→FW/FS, Reebok→AS/AW) gana el primer match — el usuario
+ *  puede corregir. Devuelve null si no hay match. */
+export function empresaDesdeIA(
+  proveedor: string | null | undefined,
+  marca: string | null | undefined,
+): string | null {
+  const m = (marca || "").toLowerCase().trim();
+  const p = (proveedor || "").toLowerCase().trim();
+  if (!m && !p) return null;
+  // 1) match por marca + proveedor.
+  for (const [empresa, info] of Object.entries(EMPRESAS_MAP)) {
+    const im = info.marca.toLowerCase();
+    const ip = info.proveedor.toLowerCase();
+    if (m && im === m && p && ip === p) return empresa;
+  }
+  // 2) match por marca sola.
+  for (const [empresa, info] of Object.entries(EMPRESAS_MAP)) {
+    if (m && info.marca.toLowerCase() === m) return empresa;
+  }
+  // 3) match por proveedor solo.
+  for (const [empresa, info] of Object.entries(EMPRESAS_MAP)) {
+    if (p && info.proveedor.toLowerCase() === p) return empresa;
+  }
+  return null;
+}
+
 export const DEFAULT_MOTIVOS = [
   "Mercancía defectuosa",
   "Talla incorrecta",

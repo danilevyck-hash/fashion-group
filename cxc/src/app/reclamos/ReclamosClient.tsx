@@ -83,6 +83,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [fEmpresa, setFEmpresa] = useState(""); const [fFecha, setFFecha] = useState(new Date().toISOString().slice(0, 10));
   const [fFactura, setFFactura] = useState(""); const [fPedido, setFPedido] = useState(""); const [fNotas, setFNotas] = useState("");
   const [fItems, setFItems] = useState<RItem[]>([emptyItem()]);
+  const [fFacturaPdfPath, setFFacturaPdfPath] = useState<string | null>(null);
   const [savedReclamoId, setSavedReclamoId] = useState<string | null>(null); const [savedNroReclamo, setSavedNroReclamo] = useState("");
   const [formFotos, setFormFotos] = useState<Foto[]>([]); const [uploadingFormFoto, setUploadingFormFoto] = useState(false);
   // Detail state
@@ -90,6 +91,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [editEmpresa, setEditEmpresa] = useState(""); const [editFactura, setEditFactura] = useState("");
   const [editPedido, setEditPedido] = useState(""); const [editFecha, setEditFecha] = useState("");
   const [editNotas, setEditNotas] = useState("");
+  const [editFacturaPdfPath, setEditFacturaPdfPath] = useState<string | null>(null);
   const [editItems, setEditItems] = useState<RItem[]>([]); const [editSaving, setEditSaving] = useState(false);
   const [contactos, setContactos] = useState<Contacto[]>(initialData.contactos); const [toast, setToast] = useState<string | null>(null);
 
@@ -245,7 +247,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
 
   function resetForm() {
     setFEmpresa(""); setFFecha(new Date().toISOString().slice(0, 10)); setFFactura("");
-    setFPedido(""); setFNotas(""); setFItems([emptyItem()]); setError(null);
+    setFPedido(""); setFNotas(""); setFItems([emptyItem()]); setFFacturaPdfPath(null); setError(null);
     setSavedReclamoId(null); setSavedNroReclamo(""); setFormFotos([]);
   }
 
@@ -256,7 +258,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     setSaving(true); setError(null);
     try {
       const empInfo = EMPRESAS_MAP[fEmpresa];
-      const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: fFactura, nro_orden_compra: fPedido, fecha_reclamo: fFecha, notas: fNotas, items }) });
+      const res = await fetch("/api/reclamos", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: fEmpresa, proveedor: empInfo?.proveedor || "", marca: empInfo?.marca || "", nro_factura: fFactura, nro_orden_compra: fPedido, fecha_reclamo: fFecha, notas: fNotas, items, factura_pdf_path: fFacturaPdfPath }) });
       if (res.ok) { const saved = await res.json(); setSavedReclamoId(saved.id); setSavedNroReclamo(saved.nro_reclamo || ""); setFormFotos([]); loadReclamos(); }
       else { const err = await res.json().catch(() => null); setError(err?.error || "Error al guardar."); }
     } catch { setError("Error de conexión."); }
@@ -369,7 +371,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     setEditSaving(true);
     try {
       // El estado NO se edita desde el form (solo botón de transición / settlement).
-      const patchRes = await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: editEmpresa, proveedor: EMPRESAS_MAP[editEmpresa]?.proveedor || current.proveedor, marca: EMPRESAS_MAP[editEmpresa]?.marca || current.marca, nro_factura: editFactura, nro_orden_compra: editPedido, fecha_reclamo: editFecha, notas: editNotas }) });
+      const patchRes = await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: editEmpresa, proveedor: EMPRESAS_MAP[editEmpresa]?.proveedor || current.proveedor, marca: EMPRESAS_MAP[editEmpresa]?.marca || current.marca, nro_factura: editFactura, nro_orden_compra: editPedido, fecha_reclamo: editFecha, notas: editNotas, factura_pdf_path: editFacturaPdfPath }) });
       if (!patchRes.ok) {
         // No tocar los ítems ni cerrar el form si el header falló: mostrar el error real.
         const err = await patchRes.json().catch(() => null);
@@ -477,6 +479,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         fPedido={fPedido} setFPedido={setFPedido}
         fNotas={fNotas} setFNotas={setFNotas}
         fItems={fItems} setFItems={setFItems}
+        facturaPdfPath={fFacturaPdfPath} setFacturaPdfPath={setFFacturaPdfPath}
         savedReclamoId={savedReclamoId}
         savedNroReclamo={savedNroReclamo}
         formFotos={formFotos} setFormFotos={setFormFotos}
@@ -510,6 +513,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         editPedido={editPedido} setEditPedido={setEditPedido}
         editFecha={editFecha} setEditFecha={setEditFecha}
         editNotas={editNotas} setEditNotas={setEditNotas}
+        editFacturaPdfPath={editFacturaPdfPath} setEditFacturaPdfPath={setEditFacturaPdfPath}
         editItems={editItems} setEditItems={setEditItems}
         editSaving={editSaving}
         showDeleteConfirm={showDeleteConfirm} setShowDeleteConfirm={setShowDeleteConfirm}
