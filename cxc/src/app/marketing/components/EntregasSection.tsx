@@ -12,6 +12,7 @@ import type {
   EntregaConItems,
   MarcaConPorcentaje,
   MkInventarioProducto,
+  MkMarca,
   ProyectoConMarcas,
 } from "@/lib/marketing/types";
 
@@ -27,12 +28,16 @@ function colorParaMarca(codigo: string): string {
 interface Props {
   proyecto: ProyectoConMarcas;
   marcasParaEntrega: MarcaConPorcentaje[];
+  // Catálogo completo de marcas — para resolver el tag de marca de CUALQUIER
+  // entrega, aunque su marca no esté entre las asignadas al proyecto.
+  marcasCatalogo: MkMarca[];
   onChange?: () => void;
 }
 
 export default function EntregasSection({
   proyecto,
   marcasParaEntrega,
+  marcasCatalogo,
   onChange,
 }: Props) {
   const { toast } = useToast();
@@ -73,7 +78,12 @@ export default function EntregasSection({
   }, [cargar]);
 
   const productoById = new Map(productos.map((p) => [p.id, p]));
-  const marcaById = new Map(marcasParaEntrega.map((m) => [m.marca.id, m.marca]));
+  // Resolver marca desde el catálogo completo (+ las del proyecto como respaldo),
+  // para que el tag SIEMPRE aparezca aunque la marca de la entrega no esté
+  // asignada al proyecto.
+  const marcaById = new Map<string, MkMarca>();
+  for (const m of marcasParaEntrega) marcaById.set(m.marca.id, m.marca);
+  for (const m of marcasCatalogo) marcaById.set(m.id, m);
 
   const proyectoNombre = proyecto.nombre || proyecto.tienda;
 

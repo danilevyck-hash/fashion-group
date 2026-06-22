@@ -395,6 +395,7 @@ export default function ProyectoOverlay({
               <EntregasSection
                 proyecto={proyecto}
                 marcasParaEntrega={proyecto.marcas}
+                marcasCatalogo={marcasCatalogo}
                 onChange={() => {
                   cargar();
                   onChange();

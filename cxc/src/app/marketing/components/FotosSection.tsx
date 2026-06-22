@@ -114,6 +114,28 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
 
   const hayFotos = fotos.length > 0;
 
+  // Navegación del lightbox con flechas ‹ › y teclas ← → (igual que la galería
+  // pública). Solo se navega entre fotos visualizables (no HEIC ni con error).
+  const esHeic = (f: MkAdjunto): boolean => {
+    const urlLower = (f.url ?? "").toLowerCase();
+    const nombreLower = (f.nombre_original ?? "").toLowerCase();
+    return (
+      nombreLower.endsWith(".heic") ||
+      urlLower.includes(".heic") ||
+      urlLower.startsWith("data:image/heic")
+    );
+  };
+  const urlsNavegables = fotos
+    .filter((f) => !esHeic(f) && !fotosConError.has(f.id))
+    .map((f) => f.url);
+  const idxLightbox = lightbox ? urlsNavegables.indexOf(lightbox) : -1;
+  const irAFoto = (delta: number) => {
+    if (idxLightbox < 0 || urlsNavegables.length === 0) return;
+    const n =
+      (idxLightbox + delta + urlsNavegables.length) % urlsNavegables.length;
+    setLightbox(urlsNavegables[n]);
+  };
+
   return (
     <section className="space-y-3">
       <div>
@@ -142,12 +164,7 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
           <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
             {fotos.map((f) => {
               const conError = fotosConError.has(f.id);
-              const urlLower = (f.url ?? "").toLowerCase();
-              const nombreLower = (f.nombre_original ?? "").toLowerCase();
-              const esHeic =
-                nombreLower.endsWith(".heic") ||
-                urlLower.includes(".heic") ||
-                urlLower.startsWith("data:image/heic");
+              const esHeicFoto = esHeic(f);
               // Fotos legacy pueden venir como data URL (data:image/...).
               // El <img> las renderiza nativamente; solo cae al fallback si
               // el onError se dispara (data corrupta).
@@ -156,7 +173,7 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
                 key={f.id}
                 className="relative aspect-square rounded-md border border-gray-200 overflow-hidden bg-gray-50 group"
               >
-                {conError || esHeic ? (
+                {conError || esHeicFoto ? (
                   <a
                     href={f.url}
                     target="_blank"
@@ -170,7 +187,7 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
                       <polyline points="21 15 16 10 5 21" />
                     </svg>
                     <span className="mt-1 truncate max-w-full">
-                      {esHeic ? "HEIC" : "Ver"}
+                      {esHeicFoto ? "HEIC" : "Ver"}
                     </span>
                     <span className="truncate max-w-full text-gray-400">
                       {(f.nombre_original ?? "").slice(0, 18)}
@@ -250,7 +267,12 @@ export default function FotosSection({ proyectoId, readonly = false }: FotosSect
         />
       )}
 
-      <FotoLightbox src={lightbox} onClose={() => setLightbox(null)} />
+      <FotoLightbox
+        src={lightbox}
+        onClose={() => setLightbox(null)}
+        onPrev={urlsNavegables.length > 1 ? () => irAFoto(-1) : undefined}
+        onNext={urlsNavegables.length > 1 ? () => irAFoto(1) : undefined}
+      />
     </section>
   );
 }

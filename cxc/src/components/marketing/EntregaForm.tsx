@@ -104,12 +104,12 @@ export default function EntregaForm({
   const { toast } = useToast();
 
   // ---- Marcas elegibles ----
-  // Si el form se abre desde un proyecto, las opciones son las marcas del
-  // proyecto. Si es standalone (sin proyecto), cargamos todas las activas.
+  // Mostramos SIEMPRE el catálogo completo de marcas (igual que el selector de
+  // facturas). Antes se restringía a las marcas asignadas al proyecto, lo que
+  // dejaba el selector con una sola marca si el proyecto tenía una sola asignada.
   const [catalogoMarcas, setCatalogoMarcas] = useState<MkMarca[]>([]);
   useEffect(() => {
     if (!open) return;
-    if (marcasProyecto.length > 0) return;
     let cancelado = false;
     (async () => {
       try {
@@ -124,14 +124,14 @@ export default function EntregaForm({
     return () => {
       cancelado = true;
     };
-  }, [open, marcasProyecto.length]);
+  }, [open]);
 
   const marcasOpciones: MkMarca[] = useMemo(() => {
-    if (marcasProyecto.length > 0) {
-      return marcasProyecto.map((m) => m.marca);
-    }
-    return catalogoMarcas;
-  }, [marcasProyecto, catalogoMarcas]);
+    // El catálogo completo es la fuente. marcasProyecto solo sirve de respaldo
+    // mientras el catálogo termina de cargar (evita un parpadeo vacío).
+    if (catalogoMarcas.length > 0) return catalogoMarcas;
+    return marcasProyecto.map((m) => m.marca);
+  }, [catalogoMarcas, marcasProyecto]);
 
   const marcaById = useMemo(
     () => new Map(marcasOpciones.map((m) => [m.id, m])),
@@ -537,7 +537,7 @@ export default function EntregaForm({
             </div>
           ) : marcasOpciones.length === 0 ? (
             <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              No hay marcas disponibles. Asigna marcas al proyecto antes de
+              No hay marcas en el catálogo. Crea marcas en Marketing antes de
               registrar la entrega.
             </div>
           ) : (
