@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/requireRole";
-import { deleteProducto, updateProducto } from "@/lib/marketing/inventario";
+import {
+  deleteProducto,
+  getProductoPrecio,
+  recalcularEntregasPorPrecio,
+  updateProducto,
+} from "@/lib/marketing/inventario";
 
 export const dynamic = "force-dynamic";
 
@@ -22,13 +27,33 @@ export async function PATCH(
       precio?: number;
       stockTotal?: number;
     };
+    // Precio anterior (para saber si el cambio debe propagarse a las entregas).
+    const precioAntes =
+      body.precio !== undefined ? await getProductoPrecio(params.id) : null;
+
     const updated = await updateProducto(params.id, {
       nombre: body.nombre,
       precio: body.precio !== undefined ? Number(body.precio) : undefined,
       stockTotal:
         body.stockTotal !== undefined ? Number(body.stockTotal) : undefined,
     });
-    return NextResponse.json(updated);
+
+    // Precio vivo: si el precio cambió de verdad, recalcular el total y el
+    // total_por_marca de TODAS las entregas que usan este producto.
+    let impacto = null;
+    if (
+      body.precio !== undefined &&
+      precioAntes !== null &&
+      Math.abs(Number(body.precio) - precioAntes) > 0.005
+    ) {
+      impacto = await recalcularEntregasPorPrecio(
+        params.id,
+        Number(body.precio),
+        true,
+      );
+    }
+
+    return NextResponse.json({ ...updated, impacto });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Error";
     console.error("inventario/productos/[id] PATCH:", msg);
