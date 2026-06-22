@@ -22,8 +22,9 @@ import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 import SyncStatus from "@/components/shared/SyncStatus";
 import { SWITCH_FACTURAS_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
+import { ResumenAnual, type AnualData } from "./ResumenAnual";
 
-type Granularity = "mensual" | "trimestral";
+type Granularity = "mensual" | "trimestral" | "anual";
 type ViewMode = "ventas" | "utilidad" | "margen";
 
 const MARGEN_VENTAS_MIN = 100;
@@ -47,6 +48,9 @@ interface ResumenViewMobileProps {
   setViewMode: (m: ViewMode) => void;
   granularity: Granularity;
   setGranularity: (g: Granularity) => void;
+  /** Datos del modo Anual (compartidos con el desktop; fetch perezoso en ResumenView). */
+  anualData: AnualData | null;
+  anualError: string | null;
   /** Etiqueta del cliente de mayoreo de Multifashion (american_classic). null si
    *  no hay mayoreo en el período → la nota "incluye mayoreo" no se muestra. */
   multiMayoreoLabel?: string | null;
@@ -60,6 +64,8 @@ export function ResumenViewMobile({
   setViewMode,
   granularity,
   setGranularity,
+  anualData,
+  anualError,
   multiMayoreoLabel,
 }: ResumenViewMobileProps) {
   const prevYear = selectedYear - 1;
@@ -80,13 +86,17 @@ export function ResumenViewMobile({
         granularity={granularity}
         setGranularity={setGranularity}
       />
-      <MobileHeatmap
-        data={data}
-        viewMode={viewMode}
-        granularity={granularity}
-        isClosedYear={isClosedYear}
-        multiMayoreoLabel={multiMayoreoLabel}
-      />
+      {granularity === "anual" ? (
+        <ResumenAnual data={anualData} error={anualError} viewMode={viewMode} />
+      ) : (
+        <MobileHeatmap
+          data={data}
+          viewMode={viewMode}
+          granularity={granularity}
+          isClosedYear={isClosedYear}
+          multiMayoreoLabel={multiMayoreoLabel}
+        />
+      )}
     </div>
   );
 }
@@ -181,6 +191,7 @@ function MobileToggles({
         options={[
           { value: "mensual", label: "Mensual" },
           { value: "trimestral", label: "Trimestral" },
+          { value: "anual", label: "Anual" },
         ]}
         active={granularity}
         onChange={setGranularity}
