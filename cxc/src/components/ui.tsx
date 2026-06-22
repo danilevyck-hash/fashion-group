@@ -507,15 +507,15 @@ export function Badge({ children, color = "gray" }: { children: ReactNode; color
 // ── ESTÉTICA 9: Status Badge (unified estado → color mapping) ──
 const STATUS_COLORS: Record<string, string> = {
   // Yellow: pending/draft
-  pendiente: "yellow", borrador: "yellow", "Borrador": "yellow", "pendiente_aprobacion": "yellow",
-  // Green: active/open
-  activo: "green", abierto: "green", "Enviado": "blue",
+  pendiente: "yellow", borrador: "yellow", "pendiente_aprobacion": "yellow",
+  // Gray: reclamo creado (abierto) · Green: active/open
+  "Creado": "gray", activo: "green", abierto: "green",
   // Green: completed/resolved/deposited — cerrado is gray (inactive)
-  depositado: "green", aprobado: "green", "Aplicado": "green", "Pagado": "green", cerrado: "gray", "Aplicada": "green", "Entregado": "green", despachada: "green",
+  depositado: "green", aprobado: "green", "Pagado": "green", cerrado: "gray", "Entregado": "green", despachada: "green",
   // Red: rejected/expired/bounced
   rechazado: "red", "Rechazado": "red", rechazada: "red", "Rechazada": "red", vencido: "red", rebotado: "red", archivado: "red",
-  // Purple: in review / confirmed
-  "Confirmado": "purple", "En revisión": "purple",
+  // Purple: in review
+  "En revisión": "purple",
   // Orange: in progress
   "Preparando": "orange", "En camino": "orange", "Pendiente Bodega": "orange",
 };

@@ -89,7 +89,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [nota, setNota] = useState(""); const [editMode, setEditMode] = useState(false);
   const [editEmpresa, setEditEmpresa] = useState(""); const [editFactura, setEditFactura] = useState("");
   const [editPedido, setEditPedido] = useState(""); const [editFecha, setEditFecha] = useState("");
-  const [editNotas, setEditNotas] = useState(""); const [editEstado, setEditEstado] = useState("");
+  const [editNotas, setEditNotas] = useState("");
   const [editItems, setEditItems] = useState<RItem[]>([]); const [editSaving, setEditSaving] = useState(false);
   const [contactos, setContactos] = useState<Contacto[]>(initialData.contactos); const [toast, setToast] = useState<string | null>(null);
 
@@ -181,7 +181,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   // vez. Así popstate (Back/Forward) y los refresh inline no pushean de más.
   const loadDetail = useCallback(async (id: string) => {
     try {
-      const res = await fetch(`/api/reclamos/${id}`);
+      const res = await fetch(`/api/reclamos/${id}`, { cache: "no-store" });
       if (res.ok) { const d = await res.json(); if (d?.id) { setCurrent(d); _setView("detail"); } }
     } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -275,9 +275,9 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   async function changeEstado(e: string) {
     if (!current || current.estado === e) return;
     // Marcar Pagado no es un flip simple: captura el monto recuperado + NC(s) en
-    // un modal y el server hace insert + flip atómico. (Revertir Pagado→Enviado y
-    // las demás transiciones siguen el PATCH normal — el settlement se conserva.)
-    if (e === "Pagado" && current.estado === "Enviado") { setSettleOpen(true); return; }
+    // un modal y el server hace insert + flip atómico. (Revertir Pagado→Creado
+    // sigue el PATCH normal — el settlement se conserva.)
+    if (e === "Pagado" && current.estado === "Creado") { setSettleOpen(true); return; }
     // Optimistic: update estado badge immediately
     const prevEstado = current.estado;
     setCurrent({ ...current, estado: e });
@@ -368,19 +368,30 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
     if (!current) return;
     setEditSaving(true);
     try {
-      await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: editEmpresa, proveedor: EMPRESAS_MAP[editEmpresa]?.proveedor || current.proveedor, marca: EMPRESAS_MAP[editEmpresa]?.marca || current.marca, nro_factura: editFactura, nro_orden_compra: editPedido, fecha_reclamo: editFecha, notas: editNotas, estado: editEstado }) });
-      await fetch(`/api/reclamos/${current.id}/items`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: editItems }) });
+      // El estado NO se edita desde el form (solo botón de transición / settlement).
+      const patchRes = await fetch(`/api/reclamos/${current.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ empresa: editEmpresa, proveedor: EMPRESAS_MAP[editEmpresa]?.proveedor || current.proveedor, marca: EMPRESAS_MAP[editEmpresa]?.marca || current.marca, nro_factura: editFactura, nro_orden_compra: editPedido, fecha_reclamo: editFecha, notas: editNotas }) });
+      if (!patchRes.ok) {
+        // No tocar los ítems ni cerrar el form si el header falló: mostrar el error real.
+        const err = await patchRes.json().catch(() => null);
+        setToast(err?.error || "No se pudo guardar el reclamo."); setTimeout(() => setToast(null), 5000);
+        setEditSaving(false); return;
+      }
+      const itemsRes = await fetch(`/api/reclamos/${current.id}/items`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: editItems }) });
+      if (!itemsRes.ok) {
+        const err = await itemsRes.json().catch(() => null);
+        setToast(err?.error || "Se guardaron los datos pero no los ítems. Revisa e intenta de nuevo."); setTimeout(() => setToast(null), 5000);
+        await loadDetail(current.id); loadReclamos();
+        setEditSaving(false); return;
+      }
       setEditMode(false); await loadDetail(current.id); loadReclamos();
       setToast("Cambios guardados"); setTimeout(() => setToast(null), 3000);
     } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
     setEditSaving(false);
   }
 
-  // "Pendiente" = reclamo en vuelo con el proveedor = estado "Enviado" (ni Borrador
-  // ni Pagado). Antes era `!== "Pagado"`, que incluía Borradores no enviados e
-  // inflaba el total, el conteo de abiertos y las alertas. (La lista completa se
-  // sigue mostrando desde `reclamos`, así que los borradores siguen visibles/editables.)
-  const pendientes = reclamos.filter((r) => r.estado === "Enviado");
+  // "Pendiente" = reclamo abierto (aún no Pagado) = estado "Creado". Pipeline de
+  // 2 estados: Creado (abierto) → Pagado (resuelto vía settlement).
+  const pendientes = reclamos.filter((r) => r.estado === "Creado");
   const totalPendiente = pendientes.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
   const alertas = pendientes.filter((r) => daysSince(r.fecha_reclamo) > 45).length;
   // ── Confirm modal — always rendered (used by list + detail views) ──
@@ -499,7 +510,6 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         editPedido={editPedido} setEditPedido={setEditPedido}
         editFecha={editFecha} setEditFecha={setEditFecha}
         editNotas={editNotas} setEditNotas={setEditNotas}
-        editEstado={editEstado} setEditEstado={setEditEstado}
         editItems={editItems} setEditItems={setEditItems}
         editSaving={editSaving}
         showDeleteConfirm={showDeleteConfirm} setShowDeleteConfirm={setShowDeleteConfirm}

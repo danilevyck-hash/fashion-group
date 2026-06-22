@@ -31,7 +31,7 @@ interface Props {
   onNewReclamo: () => void;
   onLoadDetail: (id: string) => void;
   onDeleteReclamo: (id: string) => void;
-  /** Recarga los reclamos tras enviar el correo (refleja el flip a "Enviado"). */
+  /** Recarga los reclamos tras enviar el correo (el envío no cambia el estado). */
   onReload: () => void;
 }
 
@@ -71,7 +71,7 @@ export default function EmpresaList({
     return 0;
   });
 
-  const allSelectableIds = sortedRecs.filter((r) => r.estado !== "Pagado").map((r) => r.id);
+  const allSelectableIds = sortedRecs.filter((r) => r.estado === "Creado").map((r) => r.id);
   const allSelected = allSelectableIds.length > 0 && allSelectableIds.every((id) => selectedIds.includes(id));
 
   function toggleSelect(id: string) {
@@ -217,7 +217,7 @@ export default function EmpresaList({
           {sortedRecs.map((r) => {
             const days = daysSince(r.fecha_reclamo);
             const total = calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL;
-            const isOpen = r.estado !== "Pagado";
+            const isOpen = r.estado === "Creado";
             return (
               <div
                 key={r.id}
@@ -253,7 +253,7 @@ export default function EmpresaList({
       )}
 
       {sortedRecs.length === 0 ? (() => {
-        const openCount = allEmpresaRecs.filter(r => r.estado !== "Pagado").length;
+        const openCount = allEmpresaRecs.filter(r => r.estado === "Creado").length;
         if (allEmpresaRecs.length > 0 && openCount === 0 && filterEstado === "all" && !search) {
           return (
             <div className="flex flex-col items-center py-16 text-center">
@@ -297,7 +297,7 @@ export default function EmpresaList({
             {sortedRecs.map((r) => {
               const days = daysSince(r.fecha_reclamo);
               const total = calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL;
-              const isOpen = r.estado !== "Pagado";
+              const isOpen = r.estado === "Creado";
               return (
                 <tr key={r.id}
                   onClick={() => selectionMode ? (isOpen && toggleSelect(r.id)) : onLoadDetail(r.id)}

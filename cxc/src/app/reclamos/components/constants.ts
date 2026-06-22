@@ -29,7 +29,7 @@ export const DEFAULT_MOTIVOS = [
 
 export const TALLAS = ["XS", "S", "M", "L", "XL", "XXL", "OS", "Otros"];
 
-export const ESTADOS = ["Borrador", "Enviado", "Pagado"];
+export const ESTADOS = ["Creado", "Pagado"];
 
 /** Display-friendly names for estados (use in buttons/labels) */
 export const ESTADO_DISPLAY: Record<string, string> = {};
@@ -40,8 +40,7 @@ export function estadoLabel(estado: string): string {
 }
 
 export const EC: Record<string, string> = {
-  "Borrador": "bg-gray-100 text-gray-600",
-  "Enviado": "bg-blue-50 text-blue-700",
+  "Creado": "bg-gray-100 text-gray-600",
   "Pagado": "bg-green-50 text-green-700",
 };
 
