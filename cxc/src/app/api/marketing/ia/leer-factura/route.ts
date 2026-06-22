@@ -6,6 +6,11 @@ import { supabaseServer } from "@/lib/supabase-server";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+// Modelo de lectura de facturas. El ID anterior (claude-sonnet-4-20250514) fue
+// retirado por la API y devolvía 404 not_found_error → TODA factura fallaba con
+// "No se pudo leer la factura con IA". Sonnet 4.6 lee el PDF (texto + visual).
+const MODEL = "claude-sonnet-4-6";
+
 interface Body {
   path?: string;
 }
@@ -104,7 +109,7 @@ export async function POST(req: NextRequest) {
 
     const client = new Anthropic({ apiKey });
     const msg = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: MODEL,
       max_tokens: 1024,
       messages: [
         {
