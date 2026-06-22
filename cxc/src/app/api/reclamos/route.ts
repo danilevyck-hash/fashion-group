@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const denied = requireAdmin(req); if (denied) return denied;
   const body = await req.json();
-  const { empresa, proveedor, marca, nro_factura, nro_orden_compra, fecha_reclamo, notas, items } = body;
+  const { empresa, proveedor, marca, nro_factura, nro_orden_compra, fecha_reclamo, notas, items, factura_pdf_path } = body;
 
   if (!empresa || !nro_factura || !fecha_reclamo) {
     return NextResponse.json({ error: "Campos requeridos faltantes" }, { status: 400 });
@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
       fecha_reclamo,
       estado: "Creado",
       notas: notas || "",
+      factura_pdf_path: factura_pdf_path || null,
     })
     .select()
     .single();

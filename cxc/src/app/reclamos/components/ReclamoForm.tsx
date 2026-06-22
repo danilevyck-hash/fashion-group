@@ -4,7 +4,8 @@ import { useRef, useState } from "react";
 import { fmt } from "@/lib/format";
 import { RItem, Foto } from "./types";
 import { AccordionContent, ConfirmDeleteModal, FotoLightbox } from "@/components/ui";
-import { EMPRESAS, EMPRESAS_MAP, TALLAS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "./constants";
+import { EMPRESAS, EMPRESAS_MAP, TALLAS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "./constants";
+import FacturaPdfUploader, { type FacturaIAData } from "./FacturaPdfUploader";
 
 interface Props {
   fEmpresa: string;
@@ -19,6 +20,8 @@ interface Props {
   setFNotas: (v: string) => void;
   fItems: RItem[];
   setFItems: React.Dispatch<React.SetStateAction<RItem[]>>;
+  facturaPdfPath: string | null;
+  setFacturaPdfPath: (v: string | null) => void;
   savedReclamoId: string | null;
   savedNroReclamo: string;
   formFotos: Foto[];
@@ -43,6 +46,7 @@ interface Props {
 export default function ReclamoForm({
   fEmpresa, setFEmpresa, fFecha, setFFecha, fFactura, setFFactura,
   fPedido, setFPedido, fNotas, setFNotas, fItems, setFItems,
+  facturaPdfPath, setFacturaPdfPath,
   savedReclamoId, savedNroReclamo, formFotos, setFormFotos,
   uploadingFormFoto, setUploadingFormFoto, saving, error,
   customMotivos, setCustomMotivos, addingMotivo, setAddingMotivo,
@@ -83,6 +87,15 @@ export default function ReclamoForm({
     }));
   }
 
+  // La IA rellena la cabecera (campos editables); NO toca los ítems.
+  function aplicarIA(data: FacturaIAData) {
+    const emp = empresaDesdeIA(data.proveedor, data.marca);
+    if (emp) setFEmpresa(emp);
+    if (data.nro_factura) setFFactura(data.nro_factura);
+    if (data.fecha_factura) setFFecha(data.fecha_factura);
+    if (data.nro_orden_compra) setFPedido(data.nro_orden_compra);
+  }
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
       {/* Breadcrumbs */}
@@ -112,6 +125,15 @@ export default function ReclamoForm({
             </button>
           </div>
         )}
+      </div>
+
+      {/* ── Factura PDF + autocompletado por IA (opcional, no bloquea) ── */}
+      <div className="mb-10">
+        <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Factura (PDF) — autocompletar</div>
+        <div className="max-w-xl">
+          <FacturaPdfUploader onUploaded={setFacturaPdfPath} onExtracted={aplicarIA} />
+          <p className="text-[11px] text-gray-400 mt-2">Sube el PDF y la IA rellena proveedor, marca, factura, fecha y pedido. Revisa y corrige. Los ítems a reclamar se siguen agregando a mano.</p>
+        </div>
       </div>
 
       {/* ── Step 1: Empresa (always visible) ── */}

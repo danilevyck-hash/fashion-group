@@ -4,11 +4,12 @@ import { requireAdmin } from "@/lib/api-auth";
 import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
+import { firmarFacturaPathSafe } from "@/lib/reclamos/factura-storage";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Máquina de estados del pipeline lineal (Borrador → Enviado → Pagado, con
-// correcciones hacia atrás). Validación de transición — fuente de verdad server.
+// Máquina de estados del pipeline (Creado → Pagado, con corrección hacia atrás).
+// Validación de transición — fuente de verdad server.
 const VALID_TRANSITIONS: Record<string, string[]> = {
   "Creado": ["Pagado"],
   "Pagado": ["Creado"],
@@ -34,6 +35,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (data?.reclamo_seguimiento) {
     data.reclamo_seguimiento.sort((a: { created_at: string }, b: { created_at: string }) =>
       b.created_at.localeCompare(a.created_at));
+  }
+
+  // Firma el PDF de factura (signed URL TTL 1h) para "Ver factura". Nunca público.
+  if (data?.factura_pdf_path) {
+    data.factura_pdf_url = await firmarFacturaPathSafe(data.factura_pdf_path);
   }
 
   return NextResponse.json(data);
@@ -66,7 +72,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
-  for (const key of ["empresa", "proveedor", "marca", "nro_factura", "nro_orden_compra", "fecha_reclamo", "notas", "estado", "monto_reclamado_snapshot"]) {
+  for (const key of ["empresa", "proveedor", "marca", "nro_factura", "nro_orden_compra", "fecha_reclamo", "notas", "estado", "monto_reclamado_snapshot", "factura_pdf_path"]) {
     if (fields[key] !== undefined) updates[key] = fields[key];
   }
 
