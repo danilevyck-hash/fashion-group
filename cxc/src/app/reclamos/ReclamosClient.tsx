@@ -71,8 +71,10 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState(""); const [filterEstado, setFilterEstado] = useState("all");
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  // Borrado unificado (single + bulk): lista de ids pendientes de confirmar.
+  // null = modal cerrado. UN solo modal en todo el flujo (lista y detalle).
+  const [pendingDelete, setPendingDelete] = useState<string[] | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
   const [settleOpen, setSettleOpen] = useState(false);
   const [settling, setSettling] = useState(false);
@@ -181,12 +183,27 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   // loadDetail SOLO trae datos y muestra el detalle localmente (sin navegar).
   // La entrada de historial la crea el caller (setView/changeEmpresa) una sola
   // vez. Así popstate (Back/Forward) y los refresh inline no pushean de más.
-  const loadDetail = useCallback(async (id: string) => {
+  const loadDetail = useCallback(async (id: string): Promise<Reclamo | null> => {
     try {
       const res = await fetch(`/api/reclamos/${id}`, { cache: "no-store" });
-      if (res.ok) { const d = await res.json(); if (d?.id) { setCurrent(d); _setView("detail"); } }
+      if (res.ok) { const d = await res.json(); if (d?.id) { setCurrent(d); _setView("detail"); return d as Reclamo; } }
     } catch { setToast("Sin conexión. Verifica tu internet e intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
+    return null;
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Entra a modo edición poblando los campos desde el reclamo dado. Compartido
+  // por el botón "Editar" del detalle y la acción "Editar" de cada fila de la
+  // lista (que primero carga el detalle y luego entra a edición con ese dato).
+  const enterEdit = useCallback((r: Reclamo) => {
+    setEditEmpresa(r.empresa);
+    setEditFactura(r.nro_factura || "");
+    setEditPedido(r.nro_orden_compra || "");
+    setEditFecha(r.fecha_reclamo || "");
+    setEditNotas(r.notas || "");
+    setEditFacturaPdfPath(r.factura_pdf_path ?? null);
+    setEditItems((r.reclamo_items || []).map((i) => ({ ...i })));
+    setEditMode(true);
   }, []);
 
   useEffect(() => {
@@ -198,7 +215,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
       const emp = params.get("empresa");
       setActiveEmpresa(emp ? decodeURIComponent(emp) : null);
       _setView(v);
-      if (v === "detail" && id) loadDetail(id);
+      if (v === "detail" && id) { setEditMode(false); loadDetail(id); }
       else if (v === "list") setCurrent(null);
     }
     window.addEventListener("popstate", onPopState);
@@ -335,20 +352,35 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
       setToast("Nota de crédito eliminada"); setTimeout(() => setToast(null), 3000);
     } catch { setToast("Error de conexión. Intenta de nuevo."); setTimeout(() => setToast(null), 3000); }
   }
-  function requestDeleteReclamo(id: string) {
-    setShowDeleteConfirm(false);
-    setConfirmDeleteId(id);
-  }
+  // Single (desde detalle o fila) y bulk (desde la barra de selección) abren el
+  // MISMO modal de confirmación, vía la lista de ids pendientes.
+  function requestDeleteReclamo(id: string) { setPendingDelete([id]); }
+  function requestDeleteSelected(ids: string[]) { if (ids.length > 0) setPendingDelete([...ids]); }
 
-  async function confirmDeleteReclamo() {
-    if (!confirmDeleteId) return;
-    const id = confirmDeleteId;
-    setConfirmDeleteId(null);
-    try {
-      const res = await fetch(`/api/reclamos/${id}`, { method: "DELETE" });
-      if (!res.ok) { setToast("No se pudo eliminar el reclamo."); setTimeout(() => setToast(null), 3000); return; }
-      setCurrent(null); setView("list"); loadReclamos();
-    } catch { setToast("Error de conexion."); setTimeout(() => setToast(null), 3000); }
+  async function confirmDelete() {
+    if (!pendingDelete || pendingDelete.length === 0) return;
+    const ids = pendingDelete;
+    setDeleting(true);
+    // Soft-delete (deleted:true) por cada id — el endpoint DELETE es admin-only.
+    const results = await Promise.allSettled(
+      ids.map((id) => fetch(`/api/reclamos/${id}`, { method: "DELETE" })),
+    );
+    const failed = results.filter(
+      (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok),
+    ).length;
+    setDeleting(false);
+    setPendingDelete(null);
+    setSelectionMode(false); setSelectedIds([]);
+    // Si el reclamo abierto fue borrado, vuelve a la lista.
+    if (current && ids.includes(current.id)) { setCurrent(null); setView("list"); }
+    if (failed === ids.length) {
+      setToast("No se pudo eliminar. Intenta de nuevo."); setTimeout(() => setToast(null), 3000);
+    } else if (failed > 0) {
+      setToast(`Se eliminaron ${ids.length - failed} de ${ids.length}. Reintenta los demás.`); setTimeout(() => setToast(null), 4000);
+    } else {
+      setToast(ids.length > 1 ? `${ids.length} reclamos eliminados` : "Reclamo eliminado"); setTimeout(() => setToast(null), 3000);
+    }
+    loadReclamos();
   }
 
   async function uploadFoto(file: File) {
@@ -405,19 +437,20 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   const pendientes = reclamos.filter((r) => r.estado === "Creado");
   const totalPendiente = pendientes.reduce((s, r) => s + calcSub(r.reclamo_items ?? []) * FACTOR_TOTAL, 0);
   const alertas = pendientes.filter((r) => daysSince(r.fecha_reclamo) > 45).length;
-  // ── Confirm modal — always rendered (used by list + detail views) ──
+  // ── Confirm modal — UN solo modal, usado por lista (single + bulk) y detalle ──
+  const pendingCount = pendingDelete?.length ?? 0;
   const deleteModal = (
     <ConfirmDeleteModal
-      open={!!confirmDeleteId}
-      onCancel={() => setConfirmDeleteId(null)}
-      onConfirm={confirmDeleteReclamo}
-      title="¿Eliminar reclamo?"
-      description={(() => {
-        const r = reclamos.find((x) => x.id === confirmDeleteId);
-        return r
-          ? `Se eliminará el reclamo ${r.nro_reclamo} de ${r.empresa} (Factura: ${r.nro_factura || "—"}). Esta acción no se puede deshacer.`
-          : "Esta acción no se puede deshacer.";
-      })()}
+      open={pendingCount > 0}
+      loading={deleting}
+      onCancel={() => setPendingDelete(null)}
+      onConfirm={confirmDelete}
+      title={pendingCount > 1 ? "Eliminar reclamos" : "Eliminar reclamo"}
+      description={
+        pendingCount > 1
+          ? `¿Seguro que quieres eliminar los ${pendingCount} reclamos seleccionados? Esta acción no se puede deshacer.`
+          : "¿Seguro que quieres eliminar este reclamo? Esta acción no se puede deshacer."
+      }
     />
   );
 
@@ -440,7 +473,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
             alertas={alertas}
             onNewReclamo={() => { resetForm(); setView("form"); }}
             onSelectEmpresa={(empresa) => { changeEmpresa(empresa); setSearch(""); setFilterEstado("all"); }}
-            onLoadDetail={(id, empresa) => { changeEmpresa(empresa, { view: "detail", id }); loadDetail(id); }}
+            onLoadDetail={(id, empresa) => { setEditMode(false); changeEmpresa(empresa, { view: "detail", id }); loadDetail(id); }}
             freshness={<FreshnessChip ts={dataTs} fromCache={fromCache} />}
           />
           {deleteModal}
@@ -469,8 +502,10 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
           setSortDir={setSortDir}
           onBack={() => changeEmpresa(null)}
           onNewReclamo={() => { resetForm(); setFEmpresa(activeEmpresa); setView("form"); }}
-          onLoadDetail={(id) => { setView("detail", id); loadDetail(id); }}
+          onLoadDetail={(id) => { setEditMode(false); setView("detail", id); loadDetail(id); }}
+          onEditReclamo={(id) => { setView("detail", id); loadDetail(id).then((r) => { if (r) enterEdit(r); }); }}
           onDeleteReclamo={(id) => requestDeleteReclamo(id)}
+          onDeleteSelected={requestDeleteSelected}
           onReload={loadReclamos}
         />
         {deleteModal}
@@ -500,7 +535,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         newMotivoText={newMotivoText} setNewMotivoText={setNewMotivoText}
         onSave={saveReclamo}
         onCancel={() => { resetForm(); setView("list"); }}
-        onViewSaved={() => { const id = savedReclamoId; resetForm(); loadReclamos(); if (id) { setView("detail", id); loadDetail(id); } }}
+        onViewSaved={() => { const id = savedReclamoId; resetForm(); setEditMode(false); loadReclamos(); if (id) { setView("detail", id); loadDetail(id); } }}
         onResetAndCreateAnother={resetForm}
       />
     );
@@ -525,7 +560,7 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
         editFacturaPdfPath={editFacturaPdfPath} setEditFacturaPdfPath={setEditFacturaPdfPath}
         editItems={editItems} setEditItems={setEditItems}
         editSaving={editSaving}
-        showDeleteConfirm={showDeleteConfirm} setShowDeleteConfirm={setShowDeleteConfirm}
+        onStartEdit={() => enterEdit(current)}
         toast={toast}
         customMotivos={customMotivos} setCustomMotivos={setCustomMotivos}
         addingEditMotivo={addingEditMotivo} setAddingEditMotivo={setAddingEditMotivo}

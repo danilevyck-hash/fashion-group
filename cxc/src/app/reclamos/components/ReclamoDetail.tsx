@@ -5,7 +5,7 @@ import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox, ScrollableTable, PdfLightbox } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
-import { ESTADOS, EMPRESAS, EC, GENEROS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, estadoLabel } from "./constants";
+import { EMPRESAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, estadoLabel } from "./constants";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
 import FotoBadge from "./FotoBadge";
@@ -34,8 +34,8 @@ interface Props {
   editItems: RItem[];
   setEditItems: React.Dispatch<React.SetStateAction<RItem[]>>;
   editSaving: boolean;
-  showDeleteConfirm: boolean;
-  setShowDeleteConfirm: (v: boolean) => void;
+  /** Entra a modo edición poblando los campos (lo maneja el contenedor). */
+  onStartEdit: () => void;
   toast: string | null;
   customMotivos: string[];
   setCustomMotivos: React.Dispatch<React.SetStateAction<string[]>>;
@@ -65,7 +65,7 @@ export default function ReclamoDetail({
   editFecha, setEditFecha, editNotas, setEditNotas,
   editFacturaPdfPath, setEditFacturaPdfPath,
   editItems, setEditItems, editSaving,
-  showDeleteConfirm, setShowDeleteConfirm, toast,
+  onStartEdit, toast,
   customMotivos, setCustomMotivos, addingEditMotivo, setAddingEditMotivo,
   newMotivoText, setNewMotivoText, onBack, onBackToEmpresa, onBackToReclamos,
   onAddNota, onChangeEstado,
@@ -77,7 +77,6 @@ export default function ReclamoDetail({
   const MOTIVOS = [...DEFAULT_MOTIVOS, ...customMotivos];
   const [deleteFotoTarget, setDeleteFotoTarget] = useState<{ id: string; path: string } | null>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
-  const [showEstadoHelp, setShowEstadoHelp] = useState(false);
   const [zipBusy, setZipBusy] = useState(false);
   const [facturaLightbox, setFacturaLightbox] = useState<string | null>(null);
 
@@ -123,6 +122,10 @@ export default function ReclamoDetail({
   const seg = current.reclamo_seguimiento ?? [];
   const fotos = current.reclamo_fotos ?? [];
   const sub = calcSub(items);
+  // Totales: en modo edición se recalculan EN VIVO desde editItems mientras el
+  // usuario cambia cantidades/precios; en modo ver, desde los ítems guardados.
+  // La lógica fiscal (importación 10% / ITBMS / FACTOR_TOTAL) no cambia, solo la fuente.
+  const totalsSub = editMode ? calcSub(editItems) : sub;
   const days = daysSince(current.fecha_reclamo);
 
   // ── Settlement (recuperación / notas de crédito) ──
@@ -158,17 +161,6 @@ export default function ReclamoDetail({
   }, [current.id, current.estado, days, onChangeEstado]);
 
   const { suggestion: reclamoSuggestion, dismiss: dismissReclamo } = useSmartSuggestions(reclamoSuggestions);
-
-  function startEdit() {
-    setEditEmpresa(current.empresa);
-    setEditFactura(current.nro_factura || "");
-    setEditPedido(current.nro_orden_compra || "");
-    setEditFecha(current.fecha_reclamo || "");
-    setEditNotas(current.notas || "");
-    setEditFacturaPdfPath(current.factura_pdf_path ?? null);
-    setEditItems((current.reclamo_items || []).map((i) => ({ ...i })));
-    setEditMode(true);
-  }
 
   function updateEditItem(idx: number, field: string, val: string | number) {
     setEditItems((prev) => prev.map((item, i) => {
@@ -256,10 +248,16 @@ export default function ReclamoDetail({
             </>
           )}
         </div>
-        <StatusBadge estado={current.estado} />
+        {/* UN solo indicador de estado: el pill (solo en modo ver). En edición,
+            un rótulo mínimo sin acciones — el estado no se edita aquí. */}
+        {editMode ? (
+          <span className="text-xs text-gray-400 whitespace-nowrap shrink-0">Editando · {estadoLabel(current.estado)}</span>
+        ) : (
+          <StatusBadge estado={current.estado} />
+        )}
       </div>
 
-      {reclamoSuggestion && <SuggestionCard suggestion={reclamoSuggestion} onDismiss={dismissReclamo} />}
+      {!editMode && reclamoSuggestion && <SuggestionCard suggestion={reclamoSuggestion} onDismiss={dismissReclamo} />}
 
       {/* Action bar — en edición se vuelve Guardar / Cancelar (edición in-place) */}
       {editMode ? (
@@ -271,7 +269,7 @@ export default function ReclamoDetail({
         </div>
       ) : (
         <div className="flex items-center gap-2 mb-6 flex-wrap overflow-x-auto pb-1">
-          <button onClick={startEdit} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 active:bg-gray-100 transition-all flex items-center gap-1">
+          <button onClick={onStartEdit} className="text-xs border border-gray-200 px-3 py-2.5 sm:py-1.5 rounded-full text-gray-500 hover:text-black hover:border-gray-400 active:bg-gray-100 transition-all flex items-center gap-1">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /></svg>
             Editar
           </button>
@@ -279,8 +277,11 @@ export default function ReclamoDetail({
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
             {zipBusy ? "Generando ZIP…" : "Descargar ZIP"}
           </button>
-          {(role === "admin" || role === "secretaria") && (
-            <button onClick={() => setShowDeleteConfirm(true)} className="text-xs text-red-300 hover:text-red-600 transition ml-auto">Eliminar Reclamo</button>
+          {role === "admin" && (
+            <button onClick={() => onDeleteReclamo(current.id)} className="text-xs text-red-400 hover:text-red-600 transition ml-auto flex items-center gap-1">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
+              Eliminar
+            </button>
           )}
         </div>
       )}
@@ -304,56 +305,30 @@ export default function ReclamoDetail({
         </div>
       )}
 
-      {/* Estado progress indicator */}
-      <div className="flex items-center gap-1 mb-2 flex-wrap gap-y-2">
-        {ESTADOS.map((e, i, arr) => {
-          const isCurrent = current.estado === e;
-          const isPast = (() => {
-            const order = ["Creado", "Pagado"];
-            return order.indexOf(e) < order.indexOf(current.estado);
-          })();
-          return (
-            <div key={e} className="flex items-center gap-1">
-              <span className={`text-xs px-3 py-1.5 rounded-md ${isCurrent ? `${EC[e] || "bg-gray-100 text-gray-500"} ring-1 ring-current font-medium` : isPast ? "bg-gray-100 text-gray-500" : "bg-gray-50 text-gray-300"}`}>
-                {isPast ? "\u2713 " : ""}{estadoLabel(e)}
-              </span>
-              {i < arr.length - 1 && <span className={`text-xs ${isPast ? "text-gray-400" : "text-gray-200"}`}>→</span>}
-            </div>
-          );
-        })}
-        {/* Info icon — estado help */}
-        <div className="relative">
-          <button onClick={() => setShowEstadoHelp(!showEstadoHelp)} className="w-7 h-7 sm:w-6 sm:h-6 rounded-full border border-gray-200 text-gray-400 hover:text-gray-600 hover:border-gray-400 flex items-center justify-center text-xs transition ml-1" title="Significado de cada estado">?</button>
-          {showEstadoHelp && (
-            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 z-20" style={{ minWidth: 280 }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-gray-600">Estados del reclamo</span>
-                <button onClick={() => setShowEstadoHelp(false)} className="text-gray-300 hover:text-black text-sm leading-none">x</button>
-              </div>
-              <div className="space-y-1.5 text-[11px] text-gray-500">
-                <div><span className="font-medium text-gray-700">Creado</span> — Reclamo abierto con el proveedor</div>
-                <div><span className="font-medium text-gray-700">Pagado</span> — El proveedor acreditó el reclamo (nota de crédito aplicada)</div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      <p className="text-[11px] text-gray-400 mt-1">
-        Último cambio: {(() => {
-          const latestSeg = seg.length > 0 ? seg[0]?.created_at : null;
-          const raw = current.updated_at || latestSeg || current.created_at;
-          const d = raw ? new Date(raw) : null;
-          if (!d) return "—";
-          return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-        })()}
-      </p>
+      {/* El stepper "Creado -> Pagado ?" se elimino: el pill de estado (arriba) es
+          el UNICO indicador de estado. Aqui solo queda la metadata de ultimo cambio. */}
+      {!editMode && (
+        <p className="text-[11px] text-gray-400 mb-2">
+          Último cambio: {(() => {
+            const latestSeg = seg.length > 0 ? seg[0]?.created_at : null;
+            const raw = current.updated_at || latestSeg || current.created_at;
+            const d = raw ? new Date(raw) : null;
+            if (!d) return "\u2014";
+            return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+          })()}
+        </p>
+      )}
 
-      {/* Totals */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8 mt-6">
-        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Subtotal</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub)}</div></div>
-        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Imp. importación (10%)</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * TASA_IMPORTACION)}</div></div>
-        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS (7%)</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(sub * TASA_ITBMS)}</div></div>
-        <div className="bg-gray-900 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Total</div><div className="text-xl font-semibold tabular-nums mt-1 text-white">${fmt(sub * FACTOR_TOTAL)}</div></div>
+      {/* Totals — en edición se recalculan en vivo desde los ítems editados */}
+      <div className="flex items-center justify-between mb-2 mt-6">
+        <div className="text-xs uppercase tracking-widest text-gray-400">Totales</div>
+        {editMode && <span className="text-[11px] text-gray-400">Actualizando en vivo</span>}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-8">
+        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Subtotal</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(totalsSub)}</div></div>
+        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Imp. importación (10%)</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(totalsSub * TASA_IMPORTACION)}</div></div>
+        <div className="border border-gray-200 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">ITBMS (7%)</div><div className="text-sm font-semibold tabular-nums mt-1">${fmt(totalsSub * TASA_ITBMS)}</div></div>
+        <div className="bg-gray-900 rounded-lg p-3 text-center"><div className="text-[10px] text-gray-400 uppercase">Total</div><div className="text-xl font-semibold tabular-nums mt-1 text-white">${fmt(totalsSub * FACTOR_TOTAL)}</div></div>
       </div>
 
       {/* Settlement — recuperación / notas de crédito */}
@@ -598,14 +573,8 @@ export default function ReclamoDetail({
         ))}
       </div>
 
-      <ConfirmDeleteModal
-        open={showDeleteConfirm}
-        title={`¿Eliminar reclamo ${current.nro_reclamo}?`}
-        description={`Se eliminará el reclamo de ${current.empresa} (Factura: ${current.nro_factura}) con ${items.length} ítems y todas sus notas de seguimiento. Esta acción no se puede deshacer.`}
-        onConfirm={() => onDeleteReclamo(current.id)}
-        onCancel={() => setShowDeleteConfirm(false)}
-      />
-
+      {/* El borrado del reclamo usa el ÚNICO modal del contenedor (ReclamosClient),
+          abierto vía onDeleteReclamo. Aquí solo queda el de la foto. */}
       <ConfirmDeleteModal
         open={!!deleteFotoTarget}
         title="¿Eliminar esta foto?"
