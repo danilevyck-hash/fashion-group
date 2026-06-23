@@ -22,7 +22,7 @@ export default function CatalogHeader({ variant }: CatalogHeaderProps) {
               <h1 className="text-lg font-black uppercase tracking-[0.15em] text-[#1A2656] leading-none">
                 REEBOK
               </h1>
-              <p className="text-[9px] text-[#1A2656]/40 uppercase tracking-[0.25em] leading-none mt-0.5">
+              <p className="text-xs text-[#1A2656]/40 uppercase tracking-[0.25em] leading-none mt-0.5">
                 Catalogo Panama
               </p>
             </div>
@@ -31,7 +31,7 @@ export default function CatalogHeader({ variant }: CatalogHeaderProps) {
         {variant === "public" ? (
           <div className="flex items-center gap-1.5">
             <div className="w-1 h-4 bg-[#E4002B] rounded-full" />
-            <span className="text-[9px] font-medium uppercase tracking-wider text-[#1A2656]/30">
+            <span className="text-xs font-medium uppercase tracking-wide text-[#1A2656]/30">
               Fashion Group
             </span>
           </div>

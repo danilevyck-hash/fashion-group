@@ -206,7 +206,7 @@ export function ProductosView({ selectedYear }: { selectedYear: number }) {
         <div className="overflow-x-auto rounded-lg border border-stone-200">
           <table className="w-full min-w-[560px] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-stone-200 text-left text-[11px] uppercase tracking-[0.04em] text-stone-400">
+              <tr className="border-b border-stone-200 text-left text-xs uppercase tracking-[0.04em] text-stone-400">
                 <th className="px-3 py-2.5 font-normal">Descripción</th>
                 <th className="hidden px-3 py-2.5 text-right font-normal sm:table-cell">Códigos</th>
                 <SortableTh label="Cant" active={sort} sortKey="cantidad" onClick={toggleSort} className="hidden sm:table-cell" />
@@ -269,7 +269,7 @@ function SortableTh({
         className={`inline-flex items-center gap-0.5 hover:text-stone-700 ${isActive ? "text-stone-900" : ""}`}
       >
         {label}
-        <span className="w-2 text-[9px]">{isActive ? (active.dir === "desc" ? "▼" : "▲") : ""}</span>
+        <span className="w-2 text-xs">{isActive ? (active.dir === "desc" ? "▼" : "▲") : ""}</span>
       </button>
     </th>
   );
@@ -278,7 +278,7 @@ function SortableTh({
 // Δ vs año anterior. Productos sin venta el año previo = "Nuevo" (no +∞%).
 function DeltaCell({ curr, prev }: { curr: number; prev: number | undefined }) {
   if (prev === undefined || prev <= 0) {
-    return <td className="hidden px-3 py-2.5 text-right font-mono text-[11px] text-teal-700 sm:table-cell">Nuevo</td>;
+    return <td className="hidden px-3 py-2.5 text-right font-mono text-xs text-teal-700 sm:table-cell">Nuevo</td>;
   }
   const pct = ((curr - prev) / prev) * 100;
   const up = pct >= 0;

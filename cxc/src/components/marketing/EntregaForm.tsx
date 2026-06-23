@@ -601,7 +601,7 @@ export default function EntregaForm({
                 {/* % por marca cuando hay más de una */}
                 {multiMarca && (
                   <div className="rounded-md border border-stone-200 bg-stone-50/50 p-3 space-y-2">
-                    <div className="text-[11px] uppercase tracking-wider text-stone-500">
+                    <div className="text-xs uppercase tracking-wide text-stone-500">
                       Porcentaje por marca (debe sumar 100%)
                     </div>
                     {marcasSel.map((m) => (
@@ -712,12 +712,12 @@ export default function EntregaForm({
                             placeholder="0"
                           />
                           {muestraSugerido && (
-                            <div className="text-[11px] text-stone-400 mt-0.5">
+                            <div className="text-xs text-stone-400 mt-0.5">
                               Sugerido: {sugerido}
                             </div>
                           )}
                           {prod && (
-                            <div className="text-[11px] text-stone-400 mt-0.5">
+                            <div className="text-xs text-stone-400 mt-0.5">
                               Stock disponible: {prod.stock_total}
                             </div>
                           )}
@@ -751,7 +751,7 @@ export default function EntregaForm({
                           className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm font-mono tabular-nums focus:border-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900 disabled:bg-stone-50"
                           placeholder="0"
                         />
-                        <div className="text-[11px] text-stone-400 mt-0.5">
+                        <div className="text-xs text-stone-400 mt-0.5">
                           Stock disponible: {p.stock_total}
                         </div>
                       </div>
@@ -776,7 +776,7 @@ export default function EntregaForm({
 
               {/* Resumen */}
               <section className="rounded-md border border-stone-200 bg-stone-50/50 p-3 space-y-1">
-                <div className="text-[11px] uppercase tracking-wider text-stone-500">
+                <div className="text-xs uppercase tracking-wide text-stone-500">
                   Resumen
                 </div>
                 <div className="flex justify-between text-sm">

@@ -276,11 +276,11 @@ function PublicJoybeesCatalog() {
           {sections.map(s => (
             <div key={s.section}>
               <div className="flex items-center gap-3 mb-4">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-[#404041]">
+                <h2 className="text-xs font-bold uppercase tracking-wide text-[#404041]">
                   {s.label}
                 </h2>
                 <div className="flex-1 h-px bg-[#404041]/10" />
-                <span className="text-[11px] text-[#404041]/25 tabular-nums">{s.items.length}</span>
+                <span className="text-xs text-[#404041]/25 tabular-nums">{s.items.length}</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                 {s.items.map(g => (

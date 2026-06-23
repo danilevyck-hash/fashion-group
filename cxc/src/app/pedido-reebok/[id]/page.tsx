@@ -166,7 +166,7 @@ export default function PedidoReebokPage() {
             );
 
             const sectionHeader = (label: string, color: string) => (
-              <div className={`px-4 py-2 ${color} text-white text-[10px] font-bold uppercase tracking-wider`}>
+              <div className={`px-4 py-2 ${color} text-white text-xs font-bold uppercase tracking-wide`}>
                 {label}
               </div>
             );

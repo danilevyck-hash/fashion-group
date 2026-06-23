@@ -100,7 +100,7 @@ export default function JoybeesProductCard({
         >
           {isRegalia && (
             <div className="absolute top-2 left-2 z-[5]">
-              <span className="inline-block bg-[#FFE443] text-[#404041] text-[9px] font-bold uppercase tracking-wider px-2 py-[3px] rounded-md">
+              <span className="inline-block bg-[#FFE443] text-[#404041] text-xs font-bold uppercase tracking-wide px-2 py-[3px] rounded-md">
                 Regalia
               </span>
             </div>
@@ -108,7 +108,7 @@ export default function JoybeesProductCard({
 
           {product.popular && !isRegalia && (
             <div className="absolute top-2 left-2 z-[5]">
-              <span className="inline-block bg-[#404041] text-white text-[9px] font-bold uppercase tracking-wider px-2 py-[3px] rounded-md">
+              <span className="inline-block bg-[#404041] text-white text-xs font-bold uppercase tracking-wide px-2 py-[3px] rounded-md">
                 Popular
               </span>
             </div>
@@ -155,15 +155,15 @@ export default function JoybeesProductCard({
           </h3>
 
           <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-[10px] text-[#404041]/40 bg-[#FFE443]/20 px-1.5 py-0.5 rounded font-medium">
+            <span className="text-xs text-[#404041]/40 bg-[#FFE443]/20 px-1.5 py-0.5 rounded font-medium">
               {CATEGORY_LABELS[product.category] || product.category}
             </span>
-            <span className="text-[10px] text-[#404041]/40">
+            <span className="text-xs text-[#404041]/40">
               {GENDER_LABELS[product.gender] || product.gender}
             </span>
           </div>
 
-          <div className="text-[10px] text-[#404041]/35 mt-1 font-mono">{product.sku}</div>
+          <div className="text-xs text-[#404041]/35 mt-1 font-mono">{product.sku}</div>
 
           {/* Price / Regalia */}
           <div className="mt-2">
@@ -177,12 +177,12 @@ export default function JoybeesProductCard({
                   <span className="text-xl font-bold tabular-nums text-[#404041]">
                     ${product.price.toFixed(2)}
                   </span>
-                  <span className="text-[10px] text-[#404041]/40">/unidad</span>
+                  <span className="text-xs text-[#404041]/40">/unidad</span>
                 </div>
                 <div className="flex items-baseline gap-1.5 mt-0.5">
-                  <span className="text-[11px] text-[#404041]/50 font-medium">Bulto de {BULTO_SIZE}</span>
-                  <span className="text-[11px] text-[#404041]/30">&middot;</span>
-                  <span className="text-[11px] text-[#404041]/50 font-semibold tabular-nums">${bultoTotal.toFixed(2)}/bulto</span>
+                  <span className="text-xs text-[#404041]/50 font-medium">Bulto de {BULTO_SIZE}</span>
+                  <span className="text-xs text-[#404041]/30">&middot;</span>
+                  <span className="text-xs text-[#404041]/50 font-semibold tabular-nums">${bultoTotal.toFixed(2)}/bulto</span>
                 </div>
               </>
             )}
@@ -224,7 +224,7 @@ export default function JoybeesProductCard({
                 </button>
                 <div className="text-center min-w-[48px] py-1">
                   <span className="text-base font-bold text-[#404041] tabular-nums">{qty}</span>
-                  <span className="text-[10px] text-[#404041]/60 ml-1">{qty === 1 ? "bulto" : "bultos"}</span>
+                  <span className="text-xs text-[#404041]/60 ml-1">{qty === 1 ? "bulto" : "bultos"}</span>
                 </div>
                 <button
                   onClick={() => setQty(qty + 1)}

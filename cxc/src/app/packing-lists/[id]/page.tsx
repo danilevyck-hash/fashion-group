@@ -633,7 +633,7 @@ function GroupRows({
                     <span
                       key={bultoId}
                       title={`B${n} (${label})`}
-                      className="inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600"
+                      className="inline-block px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600"
                     >
                       (B{n}: {pcs})
                     </span>

@@ -42,7 +42,7 @@ export default function PeriodoDetailFooter({
               >
                 Aprobar reposicion
               </button>
-              <p className="text-[10px] text-gray-400 mt-1 text-right">Reponer = devolver el dinero gastado al fondo de caja</p>
+              <p className="text-xs text-gray-400 mt-1 text-right">Reponer = devolver el dinero gastado al fondo de caja</p>
             </div>
           ) : (
             <span className="text-sm text-green-600 font-medium">

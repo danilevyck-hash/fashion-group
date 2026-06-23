@@ -254,7 +254,7 @@ export default function ProyectosHomeView({
           <button
             type="button"
             onClick={onOpenAnulados}
-            className="text-[11px] text-gray-400 hover:text-gray-700 transition"
+            className="text-xs text-gray-400 hover:text-gray-700 transition"
           >
             Anulados
           </button>
@@ -328,7 +328,7 @@ export default function ProyectosHomeView({
         <div className="rounded-[10px] border border-[#e5e5e5] overflow-hidden bg-white">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
-              <tr className="text-[11px] uppercase tracking-wider text-gray-500">
+              <tr className="text-xs uppercase tracking-wide text-gray-500">
                 <th className="text-left font-medium px-[18px] py-2.5">Proyecto</th>
                 <th className="text-left font-medium px-[18px] py-2.5 w-[120px] hidden md:table-cell">
                   Marcas
@@ -444,7 +444,7 @@ export default function ProyectosHomeView({
                             <span
                               key={m.id}
                               title={m.nombre}
-                              className={`inline-flex items-center justify-center w-6 h-6 rounded-md border text-[11px] font-bold ${colorParaMarca(m.codigo)}`}
+                              className={`inline-flex items-center justify-center w-6 h-6 rounded-md border text-xs font-bold ${colorParaMarca(m.codigo)}`}
                             >
                               {inicial(m.nombre)}
                             </span>

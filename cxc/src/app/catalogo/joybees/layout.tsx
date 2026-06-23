@@ -18,7 +18,7 @@ export default function JoybeesLayout({ children }: { children: React.ReactNode 
             </a>
             <div className="flex items-center gap-2 flex-shrink-0">
               <span className="text-lg">🐝</span>
-              <span className="font-black text-[#404041] uppercase tracking-wider text-sm">Joybees</span>
+              <span className="font-black text-[#404041] uppercase tracking-wide text-sm">Joybees</span>
             </div>
             <div className="flex-1" />
           </div>

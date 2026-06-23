@@ -94,7 +94,7 @@ export default function JoybeesGroupedCard({
         >
           {isRegalia && (
             <div className="absolute top-2 left-2 z-[5]">
-              <span className="inline-block bg-[#FFE443] text-[#404041] text-[9px] font-bold uppercase tracking-wider px-2 py-[3px] rounded-md">
+              <span className="inline-block bg-[#FFE443] text-[#404041] text-xs font-bold uppercase tracking-wide px-2 py-[3px] rounded-md">
                 Regalia
               </span>
             </div>
@@ -102,7 +102,7 @@ export default function JoybeesGroupedCard({
 
           {group.popular && !isRegalia && (
             <div className="absolute top-2 left-2 z-[5]">
-              <span className="inline-block bg-[#404041] text-white text-[9px] font-bold uppercase tracking-wider px-2 py-[3px] rounded-md">
+              <span className="inline-block bg-[#404041] text-white text-xs font-bold uppercase tracking-wide px-2 py-[3px] rounded-md">
                 Popular
               </span>
             </div>
@@ -149,24 +149,24 @@ export default function JoybeesGroupedCard({
           </h3>
 
           <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-[10px] text-[#404041]/40 bg-[#FFE443]/20 px-1.5 py-0.5 rounded font-medium">
+            <span className="text-xs text-[#404041]/40 bg-[#FFE443]/20 px-1.5 py-0.5 rounded font-medium">
               {CATEGORY_LABELS[group.category] || group.category}
             </span>
             {isSingleVariant && (
-              <span className="text-[10px] text-[#404041]/40">
+              <span className="text-xs text-[#404041]/40">
                 {group.variants[0].genderLabel}
               </span>
             )}
           </div>
 
-          <div className="text-[10px] text-[#404041]/35 mt-1 font-mono">{group.baseSku}</div>
+          <div className="text-xs text-[#404041]/35 mt-1 font-mono">{group.baseSku}</div>
 
           {/* Gender badges for multi-variant */}
           {!isSingleVariant && (
             <div className="flex items-center gap-1 mt-1.5 flex-wrap">
-              <span className="text-[10px] text-[#404041]/40">Disponible en:</span>
+              <span className="text-xs text-[#404041]/40">Disponible en:</span>
               {group.variants.map(v => (
-                <span key={v.product.id} className="text-[10px] font-semibold text-[#404041]/70 bg-[#404041]/5 px-1.5 py-0.5 rounded">
+                <span key={v.product.id} className="text-xs font-semibold text-[#404041]/70 bg-[#404041]/5 px-1.5 py-0.5 rounded">
                   {v.genderLabel}
                 </span>
               ))}
@@ -185,13 +185,13 @@ export default function JoybeesGroupedCard({
                   <span className="text-xl font-bold tabular-nums text-[#404041]">
                     ${group.price.toFixed(2)}
                   </span>
-                  <span className="text-[10px] text-[#404041]/40">/unidad</span>
+                  <span className="text-xs text-[#404041]/40">/unidad</span>
                 </div>
                 <div className="flex items-baseline justify-between gap-1.5 mt-0.5">
                   <div className="flex items-baseline gap-1.5">
-                    <span className="text-[11px] text-[#404041]/50 font-medium">Bulto de {BULTO_SIZE}</span>
-                    <span className="text-[11px] text-[#404041]/30">&middot;</span>
-                    <span className="text-[11px] text-[#404041]/50 font-semibold tabular-nums">${bultoTotal.toFixed(2)}/bulto</span>
+                    <span className="text-xs text-[#404041]/50 font-medium">Bulto de {BULTO_SIZE}</span>
+                    <span className="text-xs text-[#404041]/30">&middot;</span>
+                    <span className="text-xs text-[#404041]/50 font-semibold tabular-nums">${bultoTotal.toFixed(2)}/bulto</span>
                   </div>
                   {showBultos && <BultosBadge stock={groupStock} bultoSize={BULTO_SIZE} />}
                 </div>
@@ -224,7 +224,7 @@ export default function JoybeesGroupedCard({
                 return inOrder ? (
                   <div key={v.product.id}>
                     {!isSingleVariant && (
-                      <div className="text-[10px] text-[#404041]/50 font-medium mb-0.5">{v.genderLabel}</div>
+                      <div className="text-xs text-[#404041]/50 font-medium mb-0.5">{v.genderLabel}</div>
                     )}
                     <div className="flex items-center justify-between bg-[#FFE443]/20 rounded-lg px-1 border border-[#FFE443]/40">
                       <button
@@ -247,7 +247,7 @@ export default function JoybeesGroupedCard({
                       </button>
                       <div className="text-center min-w-[48px] py-1">
                         <span className="text-base font-bold text-[#404041] tabular-nums">{qty}</span>
-                        <span className="text-[10px] text-[#404041]/60 ml-1">{qty === 1 ? "bulto" : "bultos"}</span>
+                        <span className="text-xs text-[#404041]/60 ml-1">{qty === 1 ? "bulto" : "bultos"}</span>
                       </div>
                       <button
                         onClick={() => setQty(v.product.id, v.product, qty + 1)}

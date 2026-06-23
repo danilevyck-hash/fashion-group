@@ -20,7 +20,7 @@ export default function AdminError({
       <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 max-w-lg w-full">
         <p className="text-sm text-red-700 font-mono break-all">{error.message}</p>
         {error.stack && (
-          <pre className="text-[10px] text-red-500 mt-2 overflow-auto max-h-40 whitespace-pre-wrap">{error.stack}</pre>
+          <pre className="text-xs text-red-500 mt-2 overflow-auto max-h-40 whitespace-pre-wrap">{error.stack}</pre>
         )}
       </div>
       <button

@@ -399,7 +399,7 @@ export default function GuiasList({
                                   <ScrollableTable minWidth={600} className="mt-4">
                                     <table className="w-full text-xs">
                                       <thead className="sticky top-0 bg-white z-10">
-                                        <tr className="text-[10px] uppercase tracking-wider text-gray-400 border-b border-gray-200">
+                                        <tr className="text-xs uppercase tracking-wide text-gray-400 border-b border-gray-200">
                                           <th className="text-left py-2 px-2 font-normal">#</th>
                                           <th className="text-left py-2 px-2 font-normal">Cliente</th>
                                           <th className="text-left py-2 px-2 font-normal">Direccion</th>
@@ -431,7 +431,7 @@ export default function GuiasList({
                                   {/* Motivo de rechazo */}
                                   {expandedGuia.estado === "Rechazada" && expandedGuia.motivo_rechazo && (
                                     <div className="mt-3 rounded-md bg-red-50 border border-red-100 px-3 py-2">
-                                      <p className="text-[10px] font-medium uppercase tracking-wide text-red-500">Motivo de rechazo</p>
+                                      <p className="text-xs font-medium uppercase tracking-wide text-red-500">Motivo de rechazo</p>
                                       <p className="text-xs text-red-700 mt-0.5">{expandedGuia.motivo_rechazo}</p>
                                     </div>
                                   )}
@@ -475,7 +475,7 @@ export default function GuiasList({
                                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                                         {expandedGuia.firma_base64 && (
                                           <div>
-                                            <span className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1">
+                                            <span className="text-xs uppercase tracking-wide text-gray-400 block mb-1">
                                               {expandedGuia.tipo_despacho === "directo" ? "Firma del chofer" : "Firma del transportista"}
                                             </span>
                                             <img src={expandedGuia.firma_base64} alt="Firma" className="h-12 border border-gray-200 rounded p-1 bg-white" />
@@ -483,7 +483,7 @@ export default function GuiasList({
                                         )}
                                         {expandedGuia.firma_entregador_base64 && (
                                           <div>
-                                            <span className="text-[10px] uppercase tracking-wider text-gray-400 block mb-1">
+                                            <span className="text-xs uppercase tracking-wide text-gray-400 block mb-1">
                                               {expandedGuia.tipo_despacho === "directo" ? "Firma del cliente" : "Firma del entregador"}
                                             </span>
                                             <img src={expandedGuia.firma_entregador_base64} alt="Firma" className="h-12 border border-gray-200 rounded p-1 bg-white" />
@@ -576,7 +576,7 @@ export default function GuiasList({
 
                     {/* Totals */}
                     <div className="flex items-center justify-between px-4 py-3 text-sm border-t border-gray-200 mt-2">
-                      <span className="text-gray-400 text-xs uppercase tracking-wider">
+                      <span className="text-gray-400 text-xs uppercase tracking-wide">
                         {filtered.length} guía{filtered.length !== 1 ? "s" : ""}
                       </span>
                       <span className="tabular-nums font-medium">{totalBultos} bultos</span>

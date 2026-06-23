@@ -100,7 +100,7 @@ export function UtilidadView({ selectedYear }: { selectedYear: number }) {
         </p>
       )}
 
-      <p className="mb-3 text-[11px] text-stone-400">
+      <p className="mb-3 text-xs text-stone-400">
         Costo real por documento (5 empresas B2B). {negativos > 0 && (
           <span className="text-rose-600">{negativos} cliente{negativos === 1 ? "" : "s"} con utilidad negativa (devoluciones netas).</span>
         )}
@@ -122,7 +122,7 @@ export function UtilidadView({ selectedYear }: { selectedYear: number }) {
         <div className="overflow-x-auto rounded-lg border border-stone-200">
           <table className="w-full min-w-[640px] border-collapse text-sm">
             <thead>
-              <tr className="border-b border-stone-200 text-left text-[11px] uppercase tracking-[0.04em] text-stone-400">
+              <tr className="border-b border-stone-200 text-left text-xs uppercase tracking-[0.04em] text-stone-400">
                 <th className="px-3 py-2.5 font-normal">Cliente</th>
                 <th className="hidden px-3 py-2.5 font-normal sm:table-cell">Empresa</th>
                 <SortableTh label="Ventas" active={sort} sortKey="ventas" onClick={toggleSort} />
@@ -171,7 +171,7 @@ function SortableTh({
         className={`inline-flex items-center gap-0.5 hover:text-stone-700 ${isActive ? "text-stone-900" : ""}`}
       >
         {label}
-        <span className="w-2 text-[9px]">{isActive ? (active.dir === "desc" ? "▼" : "▲") : ""}</span>
+        <span className="w-2 text-xs">{isActive ? (active.dir === "desc" ? "▼" : "▲") : ""}</span>
       </button>
     </th>
   );
@@ -187,7 +187,7 @@ function UtilidadRow({ r }: { r: UtilidadClienteRow }) {
       <td className="px-3 py-2.5">
         <span className="text-stone-800">{r.cliente}</span>
         {neg && (
-          <span className="ml-2 rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-600" title="Devoluciones netas: las notas de crédito superan las ventas del período">
+          <span className="ml-2 rounded bg-rose-50 px-1.5 py-0.5 text-xs font-medium text-rose-600" title="Devoluciones netas: las notas de crédito superan las ventas del período">
             dev. neta
           </span>
         )}

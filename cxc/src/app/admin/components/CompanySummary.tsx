@@ -49,7 +49,7 @@ export default function CompanySummary({
   return (
     <div className="mb-6 border border-gray-200 rounded-lg px-4 sm:px-5 py-4">
       <div className="mb-3">
-        <div className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">
+        <div className="text-xs font-medium text-gray-500 uppercase tracking-wide">
           <span className="sm:hidden">Resumen por empresa</span>
           <span className="hidden sm:inline">CXC por Empresa</span>
         </div>
@@ -65,10 +65,10 @@ export default function CompanySummary({
               key={co.key}
               className="flex-shrink-0 w-[140px] snap-start bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100"
             >
-              <div className="text-[11px] font-medium text-gray-600 truncate mb-1.5">{co.name}</div>
+              <div className="text-xs font-medium text-gray-600 truncate mb-1.5">{co.name}</div>
               <div className="text-sm font-semibold tabular-nums">${fmt(val)}</div>
               {overdue > 0 && (
-                <div className="text-[10px] text-red-500 tabular-nums mt-0.5">
+                <div className="text-xs text-red-500 tabular-nums mt-0.5">
                   Vencido crítico: ${fmt(overdue)}
                 </div>
               )}
@@ -90,7 +90,7 @@ export default function CompanySummary({
                 <div className="h-full rounded-md transition-all" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #1e3a5f, #3b82f6)" }} />
               </div>
               <div className="w-28 text-xs text-right tabular-nums font-medium">${fmt(val)}</div>
-              <div className="w-10 text-[10px] text-right text-gray-400 tabular-nums">{sharePct}%</div>
+              <div className="w-10 text-xs text-right text-gray-400 tabular-nums">{sharePct}%</div>
             </div>
           );
         })}

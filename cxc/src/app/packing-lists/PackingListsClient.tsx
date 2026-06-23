@@ -72,7 +72,7 @@ function EditableDistBadge({
 
   if (editing && !disabled) {
     return (
-      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] bg-white border border-indigo-400">
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-white border border-indigo-400">
         <span className="font-mono text-gray-500">{bultoId}:</span>
         <input
           type="number"
@@ -88,7 +88,7 @@ function EditableDistBadge({
             if (e.key === "Enter") (e.target as HTMLInputElement).blur();
             if (e.key === "Escape") { setValue(String(pcs)); setEditing(false); }
           }}
-          className="w-12 text-[11px] px-1 py-0 outline-none tabular-nums"
+          className="w-12 text-xs px-1 py-0 outline-none tabular-nums"
         />
       </span>
     );
@@ -97,7 +97,7 @@ function EditableDistBadge({
     <span
       onClick={() => { if (!disabled) setEditing(true); }}
       title={disabled ? undefined : "Click para editar"}
-      className={`inline-block px-1.5 py-0.5 rounded text-[11px] bg-gray-100 text-gray-600 tabular-nums ${disabled ? "" : "cursor-pointer hover:bg-indigo-50 hover:text-indigo-700"}`}
+      className={`inline-block px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600 tabular-nums ${disabled ? "" : "cursor-pointer hover:bg-indigo-50 hover:text-indigo-700"}`}
     >
       ({bultoId}: {pcs})
     </span>
@@ -870,13 +870,13 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
                       <span className="text-xs text-gray-500">{item.parsed.totalPiezas.toLocaleString()} pzas</span>
                       <span className="text-xs text-gray-500">{item.index.length} estilos</span>
                       {!hasErrors && item.parsed.totalBultos > 0 && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">OK</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">OK</span>
                       )}
                       {hasErrors && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">{item.errors.length} error{item.errors.length !== 1 ? "es" : ""}</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">{item.errors.length} error{item.errors.length !== 1 ? "es" : ""}</span>
                       )}
                       {item.existsInDB && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Ya existe - se actualizara</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">Ya existe - se actualizara</span>
                       )}
                     </div>
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-gray-400 transition-transform flex-shrink-0 ${isOpen ? "rotate-180" : ""}`}>
@@ -901,19 +901,19 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
                                     Bulto <span className="font-mono font-bold">{e.bultoId}</span>: PDF dice {e.pdfTotal} piezas, parser calculó {e.parserTotal} (dif: {e.diff})
                                   </p>
                                   {fallbackErr && (
-                                    <p className="text-[11px] text-red-500 mt-1">IA: {fallbackErr}</p>
+                                    <p className="text-xs text-red-500 mt-1">IA: {fallbackErr}</p>
                                   )}
                                   <div className="flex gap-2 mt-2">
                                     <button
                                       onClick={() => handleApplyPdfTotal(item.parsed.numeroPL, e.bultoId)}
-                                      className="text-[11px] px-2.5 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 transition"
+                                      className="text-xs px-2.5 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 transition"
                                     >
                                       Usar total del PDF ({e.pdfTotal})
                                     </button>
                                     <button
                                       onClick={() => handleClaudeFallback(item.parsed.numeroPL, e.bultoId)}
                                       disabled={isLoading}
-                                      className="text-[11px] px-2.5 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition disabled:opacity-50"
+                                      className="text-xs px-2.5 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition disabled:opacity-50"
                                     >
                                       {isLoading ? "Consultando IA..." : "Resolver con IA"}
                                     </button>
@@ -922,7 +922,7 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
                               );
                             })}
                           </div>
-                          <p className="text-[11px] text-red-500 mt-2">
+                          <p className="text-xs text-red-500 mt-2">
                             &quot;Usar total del PDF&quot;: confía en el total del PDF y colapsa a 1 item. &quot;Resolver con IA&quot;: manda el texto del bulto a Claude y reconstruye el desglose por estilo.
                           </p>
                         </div>
@@ -1200,7 +1200,7 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
                               />
                             </td>
                             <td colSpan={colSpan} className="px-3 py-2 font-medium text-gray-700 text-sm">
-                              <span className="inline-block w-4 text-gray-400 text-[10px] mr-2">{isCollapsed ? "▶" : "▼"}</span>
+                              <span className="inline-block w-4 text-gray-400 text-xs mr-2">{isCollapsed ? "▶" : "▼"}</span>
                               {group.label}
                               <span className="text-gray-500 font-normal"> · {group.pls.length} PL{group.pls.length !== 1 ? "s" : ""} · {group.totalPiezas.toLocaleString()} piezas</span>
                             </td>
@@ -1221,7 +1221,7 @@ export default function PackingListsClient({ initialData }: { initialData: Packi
                         </td>
                         <td className="px-3 py-2.5 font-medium">{pl.numero_pl || "—"}</td>
                         <td className="px-3 py-2.5 text-gray-600">
-                          <span className="inline-block px-2 py-0.5 rounded-full text-[11px] bg-teal-50 text-teal-700 border border-teal-100">
+                          <span className="inline-block px-2 py-0.5 rounded-full text-xs bg-teal-50 text-teal-700 border border-teal-100">
                             {displayEmpresa(pl.empresa)}
                           </span>
                         </td>

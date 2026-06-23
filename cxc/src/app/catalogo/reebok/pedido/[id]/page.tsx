@@ -458,12 +458,12 @@ export default function OrderDetailPage() {
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="border-b border-gray-200">
-                <th className="py-2 text-left text-[10px] uppercase text-gray-400 font-normal w-12"></th>
-                <th className="py-2 text-left text-[10px] uppercase text-gray-400 font-normal">Producto</th>
-                <th className="py-2 text-center text-[10px] uppercase text-gray-400 font-normal w-16">Bultos</th>
-                <th className="py-2 text-center text-[10px] uppercase text-gray-400 font-normal w-14">Pzas</th>
-                <th className="py-2 text-right text-[10px] uppercase text-gray-400 font-normal w-16">Precio</th>
-                <th className="py-2 text-right text-[10px] uppercase text-gray-400 font-normal w-20">Subtotal</th>
+                <th className="py-2 text-left text-xs uppercase text-gray-400 font-normal w-12"></th>
+                <th className="py-2 text-left text-xs uppercase text-gray-400 font-normal">Producto</th>
+                <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-16">Bultos</th>
+                <th className="py-2 text-center text-xs uppercase text-gray-400 font-normal w-14">Pzas</th>
+                <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-16">Precio</th>
+                <th className="py-2 text-right text-xs uppercase text-gray-400 font-normal w-20">Subtotal</th>
                 {canEdit && <th className="w-8"></th>}
               </tr>
             </thead>
@@ -477,7 +477,7 @@ export default function OrderDetailPage() {
                   </td>
                   <td className="py-2">
                     <div className="text-sm">{item.name}</div>
-                    <div className="text-[10px] text-gray-400 font-mono">{item.sku}</div>
+                    <div className="text-xs text-gray-400 font-mono">{item.sku}</div>
                   </td>
                   <td className="py-2 text-center">
                     {canEdit ? (
@@ -535,7 +535,7 @@ export default function OrderDetailPage() {
             </div>
             <span className="text-emerald-600 text-xs block mt-0.5">Enviado por email a Fashion Group</span>
             {(editedAt || order.updated_at) && (
-              <span className={`text-[11px] block mt-1 ${editedAt ? "text-amber-600 font-medium" : "text-emerald-600/70"}`}>
+              <span className={`text-xs block mt-1 ${editedAt ? "text-amber-600 font-medium" : "text-emerald-600/70"}`}>
                 {editedAt
                   ? `Editado despues de confirmar: ${fmtDateTime(editedAt)} — no se reenvio correo`
                   : `Ultima edicion interna: ${fmtDateTime(order.updated_at!)}`}
@@ -545,7 +545,7 @@ export default function OrderDetailPage() {
 
           {/* Share section — subtle, optional */}
           <div className="pt-3 border-t border-gray-100">
-            <p className="text-[11px] uppercase tracking-wider text-gray-400 mb-2">Compartir pedido</p>
+            <p className="text-xs uppercase tracking-wide text-gray-400 mb-2">Compartir pedido</p>
             <div className="flex flex-col gap-2">
               <button onClick={downloadPDF} className="text-xs text-gray-500 hover:text-black transition text-left flex items-center gap-2">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>

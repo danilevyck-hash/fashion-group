@@ -227,7 +227,7 @@ export default function ProyectoOverlay({
                 {proyecto.nombre || proyecto.tienda}
               </span>
               {proyecto.anulado_en && (
-                <span className="text-[10px] px-2 py-0.5 rounded bg-red-50 text-red-700 font-medium shrink-0">
+                <span className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 font-medium shrink-0">
                   Anulado
                 </span>
               )}
@@ -275,7 +275,7 @@ export default function ProyectoOverlay({
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0">
                 {proyecto.anulado_en && (
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-red-50 text-red-700 font-medium">
+                  <span className="text-xs px-2 py-0.5 rounded bg-red-50 text-red-700 font-medium">
                     Anulado
                   </span>
                 )}
@@ -283,7 +283,7 @@ export default function ProyectoOverlay({
                   <button
                     type="button"
                     onClick={() => setEditando(true)}
-                    className="text-[11px] px-2 py-1 rounded border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
+                    className="text-xs px-2 py-1 rounded border border-gray-200 text-gray-700 hover:bg-gray-50 transition"
                   >
                     Editar
                   </button>
@@ -291,7 +291,7 @@ export default function ProyectoOverlay({
                     <button
                       type="button"
                       onClick={() => setEliminando(true)}
-                      className="text-[11px] px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition"
+                      className="text-xs px-2 py-1 rounded border border-red-200 text-red-600 hover:bg-red-50 transition"
                     >
                       Eliminar
                     </button>
@@ -315,7 +315,7 @@ export default function ProyectoOverlay({
               } gap-3 mt-4 pt-3 border-t border-gray-100`}
             >
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-gray-400">
+                <div className="text-xs uppercase tracking-wide text-gray-400">
                   Facturas
                 </div>
                 <div className="text-sm font-semibold tabular-nums text-gray-900">
@@ -323,7 +323,7 @@ export default function ProyectoOverlay({
                 </div>
               </div>
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-gray-400">
+                <div className="text-xs uppercase tracking-wide text-gray-400">
                   Subtotal
                 </div>
                 <div className="text-sm font-semibold font-mono tabular-nums text-gray-900">
@@ -333,7 +333,7 @@ export default function ProyectoOverlay({
               {totales.tieneAlgunaZonaLibre && (
                 <div>
                   <div
-                    className="text-[10px] uppercase tracking-wider text-amber-700"
+                    className="text-xs uppercase tracking-wide text-amber-700"
                     title="Sumatoria del 15% de importación de las facturas marcadas como zona libre"
                   >
                     Importación {PORCENTAJE_IMPORTACION_ZONA_LIBRE}%
@@ -344,7 +344,7 @@ export default function ProyectoOverlay({
                 </div>
               )}
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-gray-400">
+                <div className="text-xs uppercase tracking-wide text-gray-400">
                   Costo total
                 </div>
                 <div className="text-sm font-semibold font-mono tabular-nums text-gray-900">

@@ -211,7 +211,7 @@ export function EmpresaMesAnioPanel({
         {/* Header: eyebrow + nombre (izq) · toggle métrica + X (der). */}
         <header className="flex items-start justify-between gap-4 border-b border-stone-100 px-6 pb-5 pt-[max(1.25rem,env(safe-area-inset-top))] sm:px-9 sm:pt-7">
           <div className="min-w-0">
-            <p className="text-[11px] font-medium uppercase tracking-widest text-stone-400">Histórico mes × año</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-stone-400">Histórico mes × año</p>
             <h2 className="mt-0.5 truncate text-[22px] font-medium leading-tight tracking-tight text-stone-950">{nombre}</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -304,15 +304,15 @@ function MatrizHorizontal({
         </colgroup>
         <thead>
           <tr>
-            <th className="sticky left-0 bg-white pb-3 pl-1 pr-2 text-left text-[11px] font-medium uppercase tracking-wider text-stone-400">
+            <th className="sticky left-0 bg-white pb-3 pl-1 pr-2 text-left text-xs font-medium uppercase tracking-wide text-stone-400">
               Año
             </th>
             {MONTHS.map((m) => (
-              <th key={m} className="pb-3 pl-1 pr-1.5 text-right text-[11px] font-medium uppercase tracking-wide text-stone-400">
+              <th key={m} className="pb-3 pl-1 pr-1.5 text-right text-xs font-medium uppercase tracking-wide text-stone-400">
                 {m}
               </th>
             ))}
-            <th className="border-l border-stone-200 pb-3 pl-2 pr-1 text-right text-[11px] font-semibold uppercase tracking-wide text-stone-600">
+            <th className="border-l border-stone-200 pb-3 pl-2 pr-1 text-right text-xs font-semibold uppercase tracking-wide text-stone-600">
               Total
             </th>
           </tr>
@@ -389,12 +389,12 @@ function MatrizCell({
     >
       <div>{renderMetric(v, mode)}</div>
       {fmt && (
-        <div className={cn("mt-0.5 text-[10px] font-normal leading-none", deltaTone[fmt.tone] ?? "text-stone-400")}>
+        <div className={cn("mt-0.5 text-xs font-normal leading-none", deltaTone[fmt.tone] ?? "text-stone-400")}>
           {fmt.arrow ? `${fmt.arrow} ` : ""}{fmt.displayValue}
         </div>
       )}
       {deltaOverride && (
-        <div className="mt-0.5 text-[9px] font-normal uppercase tracking-wide text-stone-400">{deltaOverride.label}</div>
+        <div className="mt-0.5 text-xs font-normal uppercase tracking-wide text-stone-400">{deltaOverride.label}</div>
       )}
     </td>
   );

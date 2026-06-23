@@ -31,10 +31,10 @@ export default function SummaryCards({ prestado, pagado, saldo, pct, quincenaEst
 
         {/* Chip de quincena */}
         {quincenaEstado === "deducida" && (
-          <span className="shrink-0 text-[11px] px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-medium">✓ Deducida esta quincena</span>
+          <span className="shrink-0 text-xs px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-medium">✓ Deducida esta quincena</span>
         )}
         {quincenaEstado === "pendiente" && (
-          <span className="shrink-0 text-[11px] px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-medium">⚠ Deducción pendiente</span>
+          <span className="shrink-0 text-xs px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-medium">⚠ Deducción pendiente</span>
         )}
       </div>
 

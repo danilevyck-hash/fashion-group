@@ -31,7 +31,7 @@ function StatusPill({ estado }: { estado: string }) {
   if (estado === "abierto") {
     return (
       <span
-        className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-full"
+        className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full"
         style={{
           background: "var(--caja-success-soft)",
           color: "var(--caja-success-onSoft)",
@@ -48,7 +48,7 @@ function StatusPill({ estado }: { estado: string }) {
   }
   return (
     <span
-      className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full"
+      className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full"
       style={{
         background: "var(--caja-stone-100)",
         color: "var(--caja-stone-600)",
@@ -189,7 +189,7 @@ export default function PeriodoList({
                     </div>
                   </div>
                   <p
-                    className="caja-mono text-[11px] mb-3"
+                    className="caja-mono text-xs mb-3"
                     style={{ color: "var(--caja-fg-muted)" }}
                   >
                     {fmtDate(p.fecha_apertura)}

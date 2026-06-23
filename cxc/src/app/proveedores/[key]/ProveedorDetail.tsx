@@ -92,7 +92,7 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
             <section className="border border-gray-200 rounded-lg p-4 mb-4">
               <div className="flex flex-wrap items-end justify-between gap-3 mb-4">
                 <div>
-                  <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Por pagar · grupo</div>
+                  <div className="text-xs uppercase tracking-[0.05em] text-gray-400">Por pagar · grupo</div>
                   <div className={`text-2xl font-semibold tabular-nums mt-1 ${data.total_grupo.por_pagar < 0 ? "text-blue-600" : "text-purple-700"}`}>
                     {data.total_grupo.por_pagar < 0
                       ? `Saldo a favor $${fmt(Math.abs(data.total_grupo.por_pagar))}`
@@ -106,7 +106,7 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
               </div>
 
               {/* Aging bucketizado (viene de Switch). Buckets vacíos en gris. */}
-              <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2">Antigüedad del saldo</div>
+              <div className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-2">Antigüedad del saldo</div>
               <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
                 {data.total_grupo.aging.map((b, i) => {
                   const v = b.saldo;
@@ -114,7 +114,7 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
                     v === 0 ? "text-gray-300" : i >= 4 ? "text-red-700" : i >= 2 ? "text-amber-700" : "text-gray-800";
                   return (
                     <div key={b.title} className="text-center">
-                      <div className="text-[10px] text-gray-400">{b.title}</div>
+                      <div className="text-xs text-gray-400">{b.title}</div>
                       <div className={`text-xs tabular-nums mt-0.5 ${tone}`}>
                         {v < 0 ? `-$${fmt(Math.abs(v))}` : v === 0 ? "—" : `$${fmt(v)}`}
                       </div>
@@ -138,14 +138,14 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
               if (campos.length === 0) return null;
               return (
                 <section className="border border-gray-200 rounded-lg p-4 mb-4">
-                  <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Datos · sincronizados de Switch</h2>
+                  <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Datos · sincronizados de Switch</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-sm">
                     {campos.map((c) => (
                       <Field key={c.label} label={c.label} value={c.value} tabularNums={c.tabularNums} fullWidth={c.fullWidth} href={c.href} />
                     ))}
                   </div>
                   {data.synced_at && (
-                    <div className="text-[11px] text-gray-400 mt-3">
+                    <div className="text-xs text-gray-400 mt-3">
                       Última sincronización: {fmtDate(data.synced_at.slice(0, 10))}
                     </div>
                   )}
@@ -155,10 +155,10 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
 
             {/* Historial por empresa */}
             <section className="border border-gray-200 rounded-lg p-4 mb-4">
-              <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Por empresa · YTD {new Date().getFullYear()}</h2>
+              <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Por empresa · YTD {new Date().getFullYear()}</h2>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-[11px] uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
+                  <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
                     <th className="py-2 font-normal">Empresa</th>
                     <th className="py-2 font-normal text-right">Comprado YTD</th>
                     <th className="py-2 font-normal text-right">Pagado YTD</th>
@@ -195,7 +195,7 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
             {data.reclamos.length > 0 && (
               <section className="border border-gray-200 rounded-lg p-4 mb-4">
                 <div className="flex items-center justify-between mb-2">
-                  <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Reclamos vinculados</h2>
+                  <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400">Reclamos vinculados</h2>
                   <Link href="/reclamos" className="text-xs text-blue-600 hover:underline">Ver en Reclamos →</Link>
                 </div>
                 <ul className="divide-y divide-gray-100">
@@ -209,8 +209,8 @@ export default function ProveedorDetail({ fichaKey }: { fichaKey: string }) {
                         </span>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
-                        {r.estado && <span className="rounded-full border border-gray-200 px-2 py-0.5 text-[11px] text-gray-600">{r.estado}</span>}
-                        {r.fecha_reclamo && <span className="text-[11px] tabular-nums text-gray-400">{fmtDate(r.fecha_reclamo.slice(0, 10))}</span>}
+                        {r.estado && <span className="rounded-full border border-gray-200 px-2 py-0.5 text-xs text-gray-600">{r.estado}</span>}
+                        {r.fecha_reclamo && <span className="text-xs tabular-nums text-gray-400">{fmtDate(r.fecha_reclamo.slice(0, 10))}</span>}
                       </div>
                     </li>
                   ))}
@@ -239,7 +239,7 @@ function PorPagarCell({ value, className = "py-2" }: { value: number; className?
 function Field({ label, value, tabularNums, fullWidth, href }: { label: string; value: string | null | undefined; tabularNums?: boolean; fullWidth?: boolean; href?: string | null }) {
   return (
     <div className={fullWidth ? "sm:col-span-2" : undefined}>
-      <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400">{label}</div>
+      <div className="text-xs uppercase tracking-[0.05em] text-gray-400">{label}</div>
       <div className={`text-sm mt-0.5 ${tabularNums ? "tabular-nums" : ""} ${value ? "text-gray-900" : "text-gray-400"}`}>
         {value && href ? <a href={href} className="text-blue-600 hover:underline">{value}</a> : (value || "—")}
       </div>

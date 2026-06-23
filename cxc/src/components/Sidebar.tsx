@@ -91,7 +91,7 @@ function CollapsedFlyout({
       style={{ top, left: 64 }}
     >
       <div className="min-w-[12rem] max-h-[70vh] overflow-y-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg">
-        <p className="px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider text-gray-400">
+        <p className="px-3 py-1.5 text-xs font-medium uppercase tracking-wide text-gray-400">
           {group.label}
         </p>
         {children.map((m) => {
@@ -365,7 +365,7 @@ export default function Sidebar() {
             <>
               <div className="flex-1 min-w-0">
                 <div className="text-xs font-medium text-gray-800 truncate">{userName}</div>
-                <div className="text-[10px] text-gray-400">{ROLE_LABELS[userRole] || userRole}</div>
+                <div className="text-xs text-gray-400">{ROLE_LABELS[userRole] || userRole}</div>
               </div>
               <button
                 onClick={handleLogout}

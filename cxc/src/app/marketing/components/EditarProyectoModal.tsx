@@ -99,7 +99,7 @@ export default function EditarProyectoModal({
             placeholder="Busca el cliente en el directorio…"
             inputClassName="w-full rounded-md border border-gray-300 px-3 py-2 pr-16 text-sm focus:border-black focus:outline-none"
           />
-          <p className="text-[11px] text-gray-400 mt-1">
+          <p className="text-xs text-gray-400 mt-1">
             Elige del directorio para vincular; si no está, se guarda como texto.
           </p>
         </div>
@@ -117,7 +117,7 @@ export default function EditarProyectoModal({
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-black focus:outline-none disabled:opacity-50"
             placeholder="Opcional — ej: Remodelación tienda Abril 2026"
           />
-          <p className="text-[11px] text-gray-400 mt-1">
+          <p className="text-xs text-gray-400 mt-1">
             Opcional. Si lo dejas vacío, se genera automático.
           </p>
         </div>

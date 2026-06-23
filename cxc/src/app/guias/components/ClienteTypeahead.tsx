@@ -108,7 +108,7 @@ export default function ClienteTypeahead({
       {/* Indicador de vínculo */}
       {value.trim() && (
         <span
-          className={`absolute right-1 top-1/2 -translate-y-1/2 text-[9px] px-1 rounded pointer-events-none ${
+          className={`absolute right-1 top-1/2 -translate-y-1/2 text-xs px-1 rounded pointer-events-none ${
             codigo
               ? "text-emerald-700 bg-emerald-50"
               : "text-gray-400"
@@ -142,7 +142,7 @@ export default function ClienteTypeahead({
                 className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center justify-between gap-2"
               >
                 <span className="truncate">{h.nombre}</span>
-                <span className="text-[10px] text-gray-400 font-mono shrink-0">{h.codigo}</span>
+                <span className="text-xs text-gray-400 font-mono shrink-0">{h.codigo}</span>
               </button>
             ))
           )}
@@ -156,7 +156,7 @@ export default function ClienteTypeahead({
         topClientes &&
         topClientes.length > 0 && (
           <div className="absolute z-30 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-56 overflow-y-auto text-sm">
-            <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-gray-400">
+            <div className="px-3 pt-2 pb-1 text-xs uppercase tracking-wide text-gray-400">
               Más usados
             </div>
             {topClientes.map((h) => (
@@ -171,7 +171,7 @@ export default function ClienteTypeahead({
                 className="w-full text-left px-3 py-2 hover:bg-gray-50 flex items-center justify-between gap-2"
               >
                 <span className="truncate">{h.nombre}</span>
-                <span className="text-[10px] text-gray-400 font-mono shrink-0">{h.codigo}</span>
+                <span className="text-xs text-gray-400 font-mono shrink-0">{h.codigo}</span>
               </button>
             ))}
           </div>

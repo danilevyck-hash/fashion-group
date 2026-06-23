@@ -273,7 +273,7 @@ export default function GastoTable({
                   <CategoryDot categoria={g.categoria || "Varios"} />
                 </div>
                 <p
-                  className="text-[11px] caja-mono"
+                  className="text-xs caja-mono"
                   style={{ color: "var(--caja-fg-subtle)" }}
                 >
                   {fmtDate(g.fecha)}
@@ -461,7 +461,7 @@ export default function GastoTable({
                           {g.proveedor || "—"}
                           {g.nro_factura && (
                             <div
-                              className="caja-mono text-[11px] mt-0.5"
+                              className="caja-mono text-xs mt-0.5"
                               style={{ color: "var(--caja-fg-subtle)" }}
                             >
                               #{g.nro_factura}

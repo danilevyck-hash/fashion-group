@@ -356,7 +356,7 @@ export default function GuiaForm({
               <th className="py-3 px-4 font-normal text-left">Cliente <span className="text-red-500">*</span><AddNewInline placeholder="Cliente" onAdd={onAddCliente} /></th>
               <th className="py-3 px-4 font-normal text-left">Dirección <span className="text-red-500">*</span><AddNewInline placeholder="Ciudad" onAdd={onAddDireccion} /></th>
               <th className="py-3 px-4 font-normal text-left">Empresa <span className="text-red-500">*</span></th>
-              <th className="py-3 px-4 font-normal text-left">Factura(s) <span className="text-red-500">*</span><div className="text-[9px] text-gray-400 mt-0.5 font-normal normal-case tracking-normal">Ej: 10234, 10235</div></th>
+              <th className="py-3 px-4 font-normal text-left">Factura(s) <span className="text-red-500">*</span><div className="text-xs text-gray-400 mt-0.5 font-normal normal-case tracking-normal">Ej: 10234, 10235</div></th>
               <th className="py-3 px-4 font-normal w-20 text-center">Bultos <span className="text-red-500">*</span></th>
               <th className="py-3 w-8"></th>
             </tr>
@@ -398,8 +398,8 @@ export default function GuiaForm({
                   <input type="text" value={item.facturas} onChange={e => onUpdateItem(idx, "facturas", e.target.value)} onBlur={() => handleBlur(`item-${idx}-facturas`)}
                     className={inputClass(`item-${idx}-facturas`, "w-full border-b border-gray-200 py-1 text-sm outline-none focus:border-black transition", `item-${idx}-facturas`, item.facturas)} />
                   {fieldError(`item-${idx}-facturas`, item.facturas) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
-                  {validationErrors.has(`item-${idx}-facturas-separator`) && <p className="text-[9px] text-red-500 mt-0.5">Separar con coma y espacio (ej: FA-001, FA-002)</p>}
-                  {validationErrors.has(`item-${idx}-facturas-format`) && !validationErrors.has(`item-${idx}-facturas-separator`) && <p className="text-[9px] text-red-500 mt-0.5">Mín. 4 dígitos por factura</p>}
+                  {validationErrors.has(`item-${idx}-facturas-separator`) && <p className="text-xs text-red-500 mt-0.5">Separar con coma y espacio (ej: FA-001, FA-002)</p>}
+                  {validationErrors.has(`item-${idx}-facturas-format`) && !validationErrors.has(`item-${idx}-facturas-separator`) && <p className="text-xs text-red-500 mt-0.5">Mín. 4 dígitos por factura</p>}
                 </td>
                 <td className="py-2 pr-2">
                   <input type="number" min={0} value={item.bultos || ""} placeholder="0" onChange={e => onUpdateItem(idx, "bultos", parseInt(e.target.value) || 0)} onBlur={() => handleBlur(`item-${idx}-bultos`)}

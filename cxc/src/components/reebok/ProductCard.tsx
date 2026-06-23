@@ -58,14 +58,14 @@ export default function ProductCard({ product, stock = 0, qty, onQtyChange, disa
         <div className="aspect-square bg-[#F5F0E8] relative overflow-hidden cursor-pointer" onClick={() => { if (product.image_url) setShowLightbox(true); }}>
           {product.badge === "nuevo" && (
             <div className="absolute top-2.5 left-0 z-[5]">
-              <span className="inline-block bg-[#1A2656] text-white text-[9px] font-bold uppercase tracking-[0.15em] pl-2.5 pr-2 py-[3px]">
+              <span className="inline-block bg-[#1A2656] text-white text-xs font-bold uppercase tracking-[0.15em] pl-2.5 pr-2 py-[3px]">
                 Nuevo
               </span>
             </div>
           )}
           {product.badge === "oferta" && (
             <div className="absolute top-2.5 left-0 z-[5]">
-              <span className="inline-block bg-[#E4002B] text-white text-[9px] font-bold uppercase tracking-[0.15em] pl-2.5 pr-2 py-[3px]">
+              <span className="inline-block bg-[#E4002B] text-white text-xs font-bold uppercase tracking-[0.15em] pl-2.5 pr-2 py-[3px]">
                 Oferta
               </span>
             </div>
@@ -108,15 +108,15 @@ export default function ProductCard({ product, stock = 0, qty, onQtyChange, disa
         <div className="p-3">
           <h3 className="text-sm font-medium text-gray-900 line-clamp-2 leading-tight">{product.name}</h3>
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-            {false && product.sku && <span className="text-[10px] text-gray-400 font-mono">{product.sku}</span>}
-            {product.sub_category && <span className="text-[10px] text-gray-500 capitalize">{product.sub_category}</span>}
-            {product.color && <><span className="text-[10px] text-gray-300">·</span><span className="text-[10px] text-gray-400">{product.color}</span></>}
+            {false && product.sku && <span className="text-xs text-gray-400 font-mono">{product.sku}</span>}
+            {product.sub_category && <span className="text-xs text-gray-500 capitalize">{product.sub_category}</span>}
+            {product.color && <><span className="text-xs text-gray-300">·</span><span className="text-xs text-gray-400">{product.color}</span></>}
           </div>
           <div className="flex items-center gap-2 mt-1.5">
             <p className="text-base font-semibold text-black">
               {product.price ? `$${product.price.toFixed(0)}` : "Consultar"}
             </p>
-            {product.badge === "oferta" && <span className="text-[10px] font-bold text-[#E4002B] bg-red-50 px-2 py-0.5 uppercase tracking-wider">OFERTA</span>}
+            {product.badge === "oferta" && <span className="text-xs font-bold text-[#E4002B] bg-red-50 px-2 py-0.5 uppercase tracking-wide">OFERTA</span>}
           </div>
 
           {inOrder ? (
@@ -133,7 +133,7 @@ export default function ProductCard({ product, stock = 0, qty, onQtyChange, disa
                 </button>
                 <button onClick={openQtyInput} className="text-center min-w-[48px] py-1">
                   <span className="text-base font-semibold text-green-700 tabular-nums">{qty}</span>
-                  <span className="text-[10px] text-green-600 ml-1">bultos</span>
+                  <span className="text-xs text-green-600 ml-1">bultos</span>
                 </button>
                 <button onClick={() => setQty(qty + 1)}
                   className="w-12 h-12 flex items-center justify-center text-green-700 text-lg font-medium hover:bg-green-100 rounded transition">+</button>

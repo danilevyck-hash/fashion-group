@@ -404,11 +404,11 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
         {/* Resumen: 2 chips + acción de quincena masiva (confirmación con resumen) */}
         <div className="flex flex-wrap items-center gap-2 mb-5">
           <div className="rounded-lg border border-gray-200 bg-gray-50 px-3.5 py-2">
-            <div className="text-[11px] text-gray-400 uppercase tracking-wide">Saldo pendiente total</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo pendiente total</div>
             <div className={`text-lg font-semibold tabular-nums ${totalSaldo > 0 ? "text-red-600" : "text-gray-400"}`}>$<AnimatedNumber value={totalSaldo} formatter={(n: number) => fmt(n)} /></div>
           </div>
           <div className={`rounded-lg border px-3.5 py-2 ${deduccionesCompletas ? "border-green-200 bg-green-50" : "border-amber-200 bg-amber-50"}`}>
-            <div className="text-[11px] text-gray-400 uppercase tracking-wide">Quincena · {quincena.label}</div>
+            <div className="text-xs text-gray-400 uppercase tracking-wide">Quincena · {quincena.label}</div>
             <div className={`text-lg font-semibold tabular-nums ${deduccionesCompletas ? "text-green-600" : "text-amber-600"}`}>{deduccionesAplicadas} / {deduccionesTotal}</div>
           </div>
           {quincenaPendientesN > 0 && (
@@ -549,9 +549,9 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-medium truncate">{emp.nombre}</span>
-                      {pendientes > 0 && <span className="shrink-0 text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-medium">{pendientes} pend.</span>}
-                      {saldado && <span className="shrink-0 text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md font-medium">Saldado</span>}
-                      {!emp.activo && <span className="shrink-0 text-[10px] bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span>}
+                      {pendientes > 0 && <span className="shrink-0 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md font-medium">{pendientes} pend.</span>}
+                      {saldado && <span className="shrink-0 text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md font-medium">Saldado</span>}
+                      {!emp.activo && <span className="shrink-0 text-xs bg-gray-200 text-gray-500 px-1.5 py-0.5 rounded-md">Archivado</span>}
                     </div>
                     <div className="text-xs text-gray-500 truncate">{emp.empresa || "Sin empresa"}</div>
                   </div>
@@ -561,21 +561,21 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
                     <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                       <div className={`h-full ${progressColor(pct)} rounded-full`} style={{ width: `${Math.min(pct, 100)}%` }} />
                     </div>
-                    <span className="text-[11px] text-gray-400 tabular-nums w-8 text-right">{pct.toFixed(0)}%</span>
+                    <span className="text-xs text-gray-400 tabular-nums w-8 text-right">{pct.toFixed(0)}%</span>
                   </div>
 
                   {/* 3 · Chip quincena */}
                   <div className="shrink-0 text-center sm:w-24">
                     {emp.deduccion_quincenal <= 0 ? null
-                      : deducida ? <span className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md">✓ Deducida</span>
-                      : pendienteDed ? <span className="text-[10px] bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md">⚠ Pendiente</span>
+                      : deducida ? <span className="text-xs bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded-md">✓ Deducida</span>
+                      : pendienteDed ? <span className="text-xs bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded-md">⚠ Pendiente</span>
                       : null}
                   </div>
 
                   {/* 4 · SALDO héroe */}
                   <div className="shrink-0 text-right min-w-[72px]">
                     <div className={`text-base sm:text-lg font-semibold tabular-nums ${saldo > 0 ? "text-gray-900" : saldo < 0 ? "text-blue-600" : "text-gray-400"}`}>${fmt(Math.abs(saldo))}</div>
-                    {saldo < 0 && <div className="text-[10px] text-blue-500 -mt-0.5">a favor</div>}
+                    {saldo < 0 && <div className="text-xs text-blue-500 -mt-0.5">a favor</div>}
                   </div>
 
                   {/* Acciones */}
@@ -614,7 +614,7 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
               <div>
                 <label className="text-xs text-gray-400 uppercase">Deducción Quincenal ($)</label>
                 <input type="number" step="0.01" min="0" value={fDeduccion} onChange={e => setFDeduccion(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" placeholder="0.00" />
-                <p className="text-[10px] text-gray-400 mt-1">Monto que se deduce cada quincena del salario del colaborador</p>
+                <p className="text-xs text-gray-400 mt-1">Monto que se deduce cada quincena del salario del colaborador</p>
               </div>
               <div>
                 <label className="text-xs text-gray-400 uppercase">Notas</label>
@@ -734,15 +734,15 @@ export default function PrestamosClient({ initialData }: { initialData: Prestamo
             {/* Summary cards */}
             <div className="grid grid-cols-3 gap-2 mb-5">
               <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
-                <div className="text-[10px] text-gray-400 uppercase tracking-wide">Prestado</div>
+                <div className="text-xs text-gray-400 uppercase tracking-wide">Prestado</div>
                 <div className="text-sm font-semibold tabular-nums mt-0.5">${fmt(sheetCalc.prestado)}</div>
               </div>
               <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
-                <div className="text-[10px] text-gray-400 uppercase tracking-wide">Pagado</div>
+                <div className="text-xs text-gray-400 uppercase tracking-wide">Pagado</div>
                 <div className="text-sm font-semibold tabular-nums mt-0.5 text-green-600">${fmt(sheetCalc.pagado)}</div>
               </div>
               <div className="bg-gray-50 rounded-lg p-2.5 border border-gray-200">
-                <div className="text-[10px] text-gray-400 uppercase tracking-wide">Saldo</div>
+                <div className="text-xs text-gray-400 uppercase tracking-wide">Saldo</div>
                 <div className="text-sm font-semibold tabular-nums mt-0.5 text-red-600">${fmt(sheetCalc.saldo)}</div>
               </div>
             </div>

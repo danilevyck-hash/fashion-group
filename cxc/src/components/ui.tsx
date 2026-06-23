@@ -501,7 +501,7 @@ const BADGE_COLORS: Record<string, string> = {
 
 export function Badge({ children, color = "gray" }: { children: ReactNode; color?: keyof typeof BADGE_COLORS | string }) {
   const cls = BADGE_COLORS[color] || BADGE_COLORS.gray;
-  return <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium inline-flex items-center ${cls}`}>{children}</span>;
+  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium inline-flex items-center ${cls}`}>{children}</span>;
 }
 
 // ── ESTÉTICA 9: Status Badge (unified estado → color mapping) ──
@@ -888,7 +888,7 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
               >
                 {item.icon && <span className="w-4 h-4 shrink-0 flex items-center justify-center text-gray-400 group-hover/item:text-gray-600">{item.icon}</span>}
                 <span className="flex-1">{item.label}</span>
-                {item.shortcut && <span className="text-[11px] text-gray-300 ml-3 font-mono">{item.shortcut}</span>}
+                {item.shortcut && <span className="text-xs text-gray-300 ml-3 font-mono">{item.shortcut}</span>}
               </button>
               {item.dividerAfter && <div className="border-t border-gray-100 my-1" />}
             </div>
@@ -904,7 +904,7 @@ export function ContextMenuProvider({ children }: { children: ReactNode }) {
             >
               {item.icon && <span className="w-4 h-4 shrink-0 flex items-center justify-center">{item.icon}</span>}
               <span className="flex-1">{item.label}</span>
-              {item.shortcut && <span className="text-[11px] text-red-300 ml-3 font-mono">{item.shortcut}</span>}
+              {item.shortcut && <span className="text-xs text-red-300 ml-3 font-mono">{item.shortcut}</span>}
             </button>
           ))}
         </div>
@@ -1227,7 +1227,7 @@ export function SwipeableRow({
         >
           <div className="flex flex-col items-center gap-0.5 px-3">
             {rightAction.icon}
-            <span className="text-[11px] font-medium whitespace-nowrap">{rightAction.label}</span>
+            <span className="text-xs font-medium whitespace-nowrap">{rightAction.label}</span>
           </div>
         </div>
       )}
@@ -1244,7 +1244,7 @@ export function SwipeableRow({
         >
           <div className="flex flex-col items-center gap-0.5 px-3">
             {leftAction.icon}
-            <span className="text-[11px] font-medium whitespace-nowrap">{leftAction.label}</span>
+            <span className="text-xs font-medium whitespace-nowrap">{leftAction.label}</span>
           </div>
         </div>
       )}

@@ -166,7 +166,7 @@ export function ComisionesDetalleModal({ empresa, empresaNombre, year, mes, vend
                     </tfoot>
                   </table>
                 </div>
-                <p className="mt-1 text-[11px] text-gray-400">El API de Switch no expone el número de recibo.</p>
+                <p className="mt-1 text-xs text-gray-400">El API de Switch no expone el número de recibo.</p>
               </section>
 
               {/* CIERRE */}

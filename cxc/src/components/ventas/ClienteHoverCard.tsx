@@ -257,7 +257,7 @@ export function ClienteHoverCard({
                 caption sin explicar). */}
             <div className="flex items-end justify-between gap-3">
               <div>
-                <div className="text-[10px] uppercase tracking-wider text-stone-500">Últimos 12 meses</div>
+                <div className="text-xs uppercase tracking-wide text-stone-500">Últimos 12 meses</div>
                 <div className="mt-0.5 font-mono text-2xl font-medium leading-none tabular-nums text-stone-950">
                   {fmtMoneyCompact(ready.total_12m)}
                 </div>
@@ -270,15 +270,15 @@ export function ClienteHoverCard({
                 {delta.displayValue}
               </div>
             </div>
-            <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[11px] text-stone-500">
-              <span className="uppercase tracking-wider">12 meses anteriores</span>
+            <div className="mt-1.5 flex items-baseline justify-between gap-3 text-xs text-stone-500">
+              <span className="uppercase tracking-wide">12 meses anteriores</span>
               <span className="font-mono tabular-nums">
                 {ready.total_12m_prior > 0 ? fmtMoneyCompact(ready.total_12m_prior) : "sin compras"}
               </span>
             </div>
           </>
         ) : (
-          <p className="text-[11px] text-red-600">
+          <p className="text-xs text-red-600">
             {historial.status === "error" ? historial.message : "Sin datos"}
           </p>
         )}
@@ -307,7 +307,7 @@ export function ClienteHoverCard({
 function UltimasFacturas({ state }: { state: FacturasState }) {
   return (
     <div className="space-y-1.5 border-t border-stone-100 pt-3">
-      <div className="text-[11px] uppercase tracking-wider text-stone-500">Últimas facturas</div>
+      <div className="text-xs uppercase tracking-wide text-stone-500">Últimas facturas</div>
       {state.status === "loading" ? (
         <div className="space-y-1.5">
           <div className="h-3.5 w-full animate-pulse rounded bg-stone-100" />
@@ -315,9 +315,9 @@ function UltimasFacturas({ state }: { state: FacturasState }) {
           <div className="h-3.5 w-4/6 animate-pulse rounded bg-stone-100" />
         </div>
       ) : state.status === "error" ? (
-        <p className="text-[11px] text-stone-400">No se pudieron cargar.</p>
+        <p className="text-xs text-stone-400">No se pudieron cargar.</p>
       ) : state.data.length === 0 ? (
-        <p className="text-[11px] text-stone-400">Sin facturas registradas.</p>
+        <p className="text-xs text-stone-400">Sin facturas registradas.</p>
       ) : (
         <ul className="space-y-1">
           {state.data.map((f, i) => (
@@ -350,7 +350,7 @@ function CxcChip({ state }: { state: CxcState }) {
 
   if (saldo_total <= 0) {
     return (
-      <div className="inline-flex items-center rounded bg-stone-100 px-2 py-0.5 text-[11px] font-medium text-stone-600">
+      <div className="inline-flex items-center rounded bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-600">
         Sin saldo pendiente
       </div>
     );
@@ -368,7 +368,7 @@ function CxcChip({ state }: { state: CxcState }) {
 
   return (
     <div className={cn(
-      "inline-flex flex-wrap items-center gap-x-1.5 rounded px-2 py-1 text-[11px] font-medium leading-tight",
+      "inline-flex flex-wrap items-center gap-x-1.5 rounded px-2 py-1 text-xs font-medium leading-tight",
       cls
     )}>
       <span>{label}</span>
@@ -402,7 +402,7 @@ function DetailRow({
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <span className="text-[11px] uppercase tracking-wider text-stone-500">{label}</span>
+      <span className="text-xs uppercase tracking-wide text-stone-500">{label}</span>
       {loading ? (
         <div className="h-3.5 w-32 animate-pulse rounded bg-stone-100" />
       ) : (

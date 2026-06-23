@@ -93,21 +93,21 @@ export default function CatalogProductCard({
           {/* Badge */}
           {product.badge === "oferta" && (
             <div className="absolute top-2 left-2 z-[5]">
-              <span className="inline-block bg-[#E4002B] text-white text-[9px] font-bold uppercase tracking-wider px-2 py-[3px] rounded-md">
+              <span className="inline-block bg-[#E4002B] text-white text-xs font-bold uppercase tracking-wide px-2 py-[3px] rounded-md">
                 Oferta
               </span>
             </div>
           )}
           {product.badge === "nuevo" && (
             <div className="absolute top-2 left-2 z-[5]">
-              <span className="inline-block bg-[#1A2656] text-white text-[9px] font-bold uppercase tracking-wider px-2 py-[3px] rounded-md">
+              <span className="inline-block bg-[#1A2656] text-white text-xs font-bold uppercase tracking-wide px-2 py-[3px] rounded-md">
                 Nuevo
               </span>
             </div>
           )}
           {product.badge === "proximamente" && (
             <div className="absolute top-2 left-2 z-[5]">
-              <span className="inline-block bg-amber-500 text-white text-[9px] font-bold uppercase tracking-wider px-2 py-[3px] rounded-md">
+              <span className="inline-block bg-amber-500 text-white text-xs font-bold uppercase tracking-wide px-2 py-[3px] rounded-md">
                 Próximamente
               </span>
             </div>
@@ -166,14 +166,14 @@ export default function CatalogProductCard({
                 className="w-3 h-3 rounded-full border border-black/10 shrink-0"
                 style={{ backgroundColor: getColorDot(product.color) }}
               />
-              <span className="text-[11px] text-[#1A2656]/40">{product.color}</span>
+              <span className="text-xs text-[#1A2656]/40">{product.color}</span>
             </div>
           )}
 
           {/* SKU / código */}
           {product.sku && (
             <div className="flex flex-wrap gap-1 mt-2">
-              <span className="text-[10px] bg-[#F5F0E8] text-[#1A2656]/50 px-1.5 py-0.5 rounded font-medium tabular-nums">
+              <span className="text-xs bg-[#F5F0E8] text-[#1A2656]/50 px-1.5 py-0.5 rounded font-medium tabular-nums">
                 {product.sku}
               </span>
             </div>
@@ -185,9 +185,9 @@ export default function CatalogProductCard({
               <span className={`text-xl font-bold tabular-nums ${product.badge === "oferta" ? "text-[#E4002B]" : "text-[#1A2656]"}`}>
                 {product.price ? `$${product.price.toFixed(2)}` : "Consultar"}
               </span>
-              {product.price && <span className="text-[10px] text-[#1A2656]/40">/unidad</span>}
+              {product.price && <span className="text-xs text-[#1A2656]/40">/unidad</span>}
               {product.badge === "oferta" && (
-                <span className="text-[10px] font-bold text-[#E4002B] bg-red-50 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                <span className="text-xs font-bold text-[#E4002B] bg-red-50 px-1.5 py-0.5 rounded uppercase tracking-wide">
                   Oferta
                 </span>
               )}
@@ -195,9 +195,9 @@ export default function CatalogProductCard({
             {product.price != null && (
               <div className="flex items-baseline justify-between gap-1.5 mt-0.5">
                 <div className="flex items-baseline gap-1.5">
-                  <span className="text-[11px] text-[#1A2656]/50 font-medium">Bulto de {bultoSize}</span>
-                  <span className="text-[11px] text-[#1A2656]/30">&middot;</span>
-                  <span className="text-[11px] text-[#1A2656]/50 font-semibold tabular-nums">${bultoTotal.toFixed(2)}/bulto</span>
+                  <span className="text-xs text-[#1A2656]/50 font-medium">Bulto de {bultoSize}</span>
+                  <span className="text-xs text-[#1A2656]/30">&middot;</span>
+                  <span className="text-xs text-[#1A2656]/50 font-semibold tabular-nums">${bultoTotal.toFixed(2)}/bulto</span>
                 </div>
                 {showBultos && <BultosBadge stock={product._stock} bultoSize={bultoSize} />}
               </div>
@@ -228,7 +228,7 @@ export default function CatalogProductCard({
                 </button>
                 <button onClick={showBultos ? openQtyInput : undefined} className="text-center min-w-[48px] py-1">
                   <span className="text-base font-bold text-emerald-700 tabular-nums">{qty}</span>
-                  <span className="text-[10px] text-emerald-600 ml-1">{qty === 1 ? "bulto" : "bultos"}</span>
+                  <span className="text-xs text-emerald-600 ml-1">{qty === 1 ? "bulto" : "bultos"}</span>
                 </button>
                 <button
                   onClick={() => setQty(qty + 1)}

@@ -17,7 +17,7 @@ export default function JoybeesHeader({ variant }: JoybeesHeaderProps) {
               <h1 className="text-lg font-black uppercase tracking-[0.12em] text-[#404041] leading-none">
                 JOYBEES
               </h1>
-              <p className="text-[9px] text-[#404041]/40 uppercase tracking-[0.25em] leading-none mt-0.5">
+              <p className="text-xs text-[#404041]/40 uppercase tracking-[0.25em] leading-none mt-0.5">
                 Catalogo Panama
               </p>
             </div>
@@ -26,7 +26,7 @@ export default function JoybeesHeader({ variant }: JoybeesHeaderProps) {
         {variant === "public" ? (
           <div className="flex items-center gap-1.5">
             <div className="w-1 h-4 bg-[#FFE443] rounded-full" />
-            <span className="text-[9px] font-medium uppercase tracking-wider text-[#404041]/30">
+            <span className="text-xs font-medium uppercase tracking-wide text-[#404041]/30">
               Fashion Group
             </span>
           </div>

@@ -350,7 +350,7 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
         <div className="rounded-[10px] border border-[#e5e5e5] overflow-hidden bg-white">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
-              <tr className="text-[11px] uppercase tracking-wider text-gray-500">
+              <tr className="text-xs uppercase tracking-wide text-gray-500">
                 <th className="px-[18px] py-2.5 w-10">
                   <input
                     type="checkbox"
@@ -397,7 +397,7 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
                     <td className="px-[18px] py-3 align-middle">
                       <div className="flex items-center gap-2 min-w-0">
                         <span
-                          className={`inline-flex items-center rounded-full border text-[10px] px-1.5 py-0.5 font-medium uppercase tracking-wider shrink-0 ${TIPO_BADGE[item.tipo]}`}
+                          className={`inline-flex items-center rounded-full border text-xs px-1.5 py-0.5 font-medium uppercase tracking-wide shrink-0 ${TIPO_BADGE[item.tipo]}`}
                         >
                           {TIPO_LABEL[item.tipo]}
                         </span>
@@ -406,7 +406,7 @@ export function AnuladosLista({ esAdmin }: AnuladosListaProps) {
                         </span>
                       </div>
                       {/* En mobile, motivo y fecha colapsan aquí debajo */}
-                      <div className="md:hidden text-[11px] text-gray-500 mt-1 truncate">
+                      <div className="md:hidden text-xs text-gray-500 mt-1 truncate">
                         Anulado {fmtDate(item.anulado_en.slice(0, 10))}
                         {item.anulado_motivo
                           ? ` · ${item.anulado_motivo}`

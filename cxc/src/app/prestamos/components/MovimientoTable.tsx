@@ -71,7 +71,7 @@ export default function MovimientoTable({ sortedMovs, saldoByMov, isAdmin, canEd
           >
             {t.label}
             {t.count > 0 && (
-              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${filtro === t.key ? "text-gray-600 bg-gray-100" : "text-gray-400 bg-gray-200"}`}>{t.count}</span>
+              <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${filtro === t.key ? "text-gray-600 bg-gray-100" : "text-gray-400 bg-gray-200"}`}>{t.count}</span>
             )}
           </button>
         ))}

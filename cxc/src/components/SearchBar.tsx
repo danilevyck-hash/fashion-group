@@ -386,7 +386,7 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
           )}
           {!loading && items.length > 0 && Object.entries(grouped).map(([mod, gItems]) => (
             <div key={mod} className="mb-4">
-              <div className="text-[10px] uppercase text-gray-400 font-medium mb-1">{mod}</div>
+              <div className="text-xs uppercase text-gray-400 font-medium mb-1">{mod}</div>
               {gItems.map((item, i) => (
                 <button key={i} onClick={() => { router.push(item.href); onClose?.(); }}
                   className="w-full flex items-center gap-3 py-2.5 text-left hover:bg-gray-50 rounded-md px-2 transition">
@@ -413,7 +413,7 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
         <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
         </svg>
-        <span className="text-[10px] text-gray-300 hidden sm:inline border border-gray-200 rounded px-1">⌘K</span>
+        <span className="text-xs text-gray-300 hidden sm:inline border border-gray-200 rounded px-1">⌘K</span>
       </button>
     );
   }
@@ -477,7 +477,7 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
                 let idx = quickAction ? 1 : 0;
                 return Object.entries(grouped).map(([module, moduleItems]) => (
                   <div key={module}>
-                    <div className={`px-3 py-1.5 text-[10px] uppercase tracking-wider font-medium ${darkMode ? "text-gray-500 bg-gray-900" : "text-gray-400 bg-gray-50"}`}>
+                    <div className={`px-3 py-1.5 text-xs uppercase tracking-wide font-medium ${darkMode ? "text-gray-500 bg-gray-900" : "text-gray-400 bg-gray-50"}`}>
                       {module}
                     </div>
                     {moduleItems.map((item) => {
@@ -512,7 +512,7 @@ export default function SearchBar({ darkMode, compact, fullScreen, onClose }: { 
                 if (suggestions.length === 0) return null;
                 return (
                   <div className="mt-3">
-                    <p className="text-[10px] text-gray-400 mb-2">Tal vez buscas en:</p>
+                    <p className="text-xs text-gray-400 mb-2">Tal vez buscas en:</p>
                     <div className="flex flex-wrap justify-center gap-1.5">
                       {suggestions.map(s => (
                         <button key={s.href} onClick={() => navigate({ module: s.label, label: s.label, sub: "", href: s.href, icon: "" })} className="text-xs px-2.5 py-1 rounded-full border border-gray-200 text-gray-500 hover:border-gray-400 hover:text-black transition">

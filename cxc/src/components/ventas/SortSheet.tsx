@@ -97,7 +97,7 @@ export function SortSheet({ open, onClose, sortBy, sortDir, onChange }: SortShee
           </div>
 
           <div className="mt-4">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-stone-500">
+            <div className="text-xs font-medium uppercase tracking-wide text-stone-500">
               Dirección
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">

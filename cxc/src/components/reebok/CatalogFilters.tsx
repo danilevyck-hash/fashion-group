@@ -68,7 +68,7 @@ export default function CatalogFilters({
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide -mx-4 px-4">
         {/* Gender chips */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[10px] font-semibold text-[#1A2656]/40 uppercase tracking-wider mr-0.5">Genero</span>
+          <span className="text-xs font-semibold text-[#1A2656]/40 uppercase tracking-wide mr-0.5">Genero</span>
           {genderOptions.map(opt => (
             <button
               key={opt.value}
@@ -88,7 +88,7 @@ export default function CatalogFilters({
 
         {/* Category chips */}
         <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-[10px] font-semibold text-[#1A2656]/40 uppercase tracking-wider mr-0.5">Cat.</span>
+          <span className="text-xs font-semibold text-[#1A2656]/40 uppercase tracking-wide mr-0.5">Cat.</span>
           {categoryOptions.map(opt => (
             <button
               key={opt.value}

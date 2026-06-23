@@ -153,7 +153,7 @@ export default function EntregasSection({
                   }
                   className="w-full text-left px-3 py-3 flex items-center gap-3 hover:bg-gray-50 transition"
                 >
-                  <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-semibold shrink-0">
+                  <span className="text-xs uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200 font-semibold shrink-0">
                     Entrega
                   </span>
                   <div className="flex-1 min-w-0">
@@ -178,7 +178,7 @@ export default function EntregasSection({
                             return (
                               <span
                                 key={marcaId}
-                                className={`inline-flex items-center gap-1.5 border rounded-md px-1.5 py-0.5 text-[11px] ${colorParaMarca(marca.codigo)}`}
+                                className={`inline-flex items-center gap-1.5 border rounded-md px-1.5 py-0.5 text-xs ${colorParaMarca(marca.codigo)}`}
                               >
                                 <span className="font-semibold">
                                   [{inicial}]
@@ -229,7 +229,7 @@ export default function EntregasSection({
                                 key={marcaId}
                                 className="rounded-md border border-gray-200 bg-white p-2"
                               >
-                                <div className="text-[11px] text-gray-500">
+                                <div className="text-xs text-gray-500">
                                   {marca?.nombre ?? "Marca"}
                                 </div>
                                 <div className="text-sm font-mono tabular-nums text-gray-900 font-semibold">
@@ -246,7 +246,7 @@ export default function EntregasSection({
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs">
                         <thead>
-                          <tr className="text-[10px] uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                          <tr className="text-xs uppercase tracking-wide text-gray-500 border-b border-gray-200">
                             <th className="text-left font-medium px-2 py-1.5">
                               Producto
                             </th>

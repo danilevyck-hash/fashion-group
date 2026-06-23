@@ -77,7 +77,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
             <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
               <div className="text-right">
                 <div className="text-sm text-gray-700 font-medium leading-tight">{userName.split(" ")[0]}</div>
-                <div className="text-[10px] text-gray-400 leading-tight">{ROLE_LABELS[userRole] || userRole}</div>
+                <div className="text-xs text-gray-400 leading-tight">{ROLE_LABELS[userRole] || userRole}</div>
               </div>
               <button onClick={handleLogout} title="Cerrar sesión" className="text-gray-300 hover:text-gray-600 transition p-1">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -105,7 +105,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
           ];
           const lastIndex = segments.length - 1;
           return (
-            <div className="hidden sm:flex flex-wrap px-6 py-1 text-[11px] text-gray-400 items-center gap-1">
+            <div className="hidden sm:flex flex-wrap px-6 py-1 text-xs text-gray-400 items-center gap-1">
               {segments.map((seg, i) => {
                 const isLast = i === lastIndex;
                 return (
@@ -147,7 +147,7 @@ export default function AppHeader({ module, breadcrumbs, hideBreadcrumbBar }: Ap
                 <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 text-xs font-medium">{userName[0]}</div>
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-gray-800 truncate">{userName}</div>
-                  <div className="text-[10px] text-gray-400">{ROLE_LABELS[userRole] || userRole}</div>
+                  <div className="text-xs text-gray-400">{ROLE_LABELS[userRole] || userRole}</div>
                 </div>
                 <button onClick={() => { handleLogout(); setDrawerOpen(false); }} className="text-xs text-gray-400 hover:text-red-600 transition">Salir</button>
               </div>

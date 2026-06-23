@@ -111,7 +111,7 @@ export default function NotificationCenter() {
                   <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${TYPE_DOT[n.type]}`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-700 leading-snug">{n.message}</p>
-                    <p className="text-[11px] text-gray-400 mt-0.5">{formatRelativeTime(n.timestamp)}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{formatRelativeTime(n.timestamp)}</p>
                   </div>
                 </div>
               ))

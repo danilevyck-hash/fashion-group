@@ -47,7 +47,7 @@ export default function GaleriaView({
                     href={f.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex h-full w-full flex-col items-center justify-center p-2 text-center text-[10px] text-gray-500 hover:bg-gray-100"
+                    className="flex h-full w-full flex-col items-center justify-center p-2 text-center text-xs text-gray-500 hover:bg-gray-100"
                     title={f.nombre}
                   >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
