@@ -23,6 +23,7 @@ import EmpresaList from "./components/EmpresaList";
 import ReclamoForm from "./components/ReclamoForm";
 import ReclamoDetail from "./components/ReclamoDetail";
 import SettlementModal, { SettlementInput } from "./components/SettlementModal";
+import { validateReclamoFull } from "@/lib/reclamos/validate";
 
 // Clave de caché SWR del listado de Reclamos (Fase 3, mismo patrón que el piloto
 // CXC #115). La caché vive a nivel de la app (SWRProvider) y persiste entre
@@ -269,11 +270,13 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
   }
 
   async function saveReclamo() {
-    if (!fEmpresa || !fFecha || !fFactura) { setError("Completa empresa, factura y fecha."); return; }
-    const items = fItems.filter((i) => i.referencia || i.cantidad > 0);
-    if (!items.length) { setError("Agrega al menos un ítem."); return; }
-    // Género obligatorio por ítem (dropdown fijo, sin default silencioso).
-    if (items.some((i) => !i.genero)) { setError("Selecciona el género (Men/Women/Kids/Accessories) en cada ítem."); return; }
+    // Obligatoriedad completa (cabecera + cada ítem). Solo notas/PDF/fotos opcionales.
+    const vErr = validateReclamoFull(
+      { empresa: fEmpresa, nro_factura: fFactura, fecha_reclamo: fFecha, nro_orden_compra: fPedido },
+      fItems,
+    );
+    if (vErr) { setError(vErr); return; }
+    const items = fItems;
     setSaving(true); setError(null);
     try {
       const empInfo = EMPRESAS_MAP[fEmpresa];
@@ -402,13 +405,13 @@ function ReclamosPage({ initialData }: { initialData: ReclamosInitialData }) {
 
   async function saveEdit() {
     if (!current) return;
-    // Género obligatorio en edición: al guardar un reclamo, cada ítem debe tener
-    // género (incluye históricos NULL si se editan — "solo lo que se edita").
-    if (editItems.some((i) => !i.genero)) {
-      setToast("Selecciona el género (Men/Women/Kids/Accessories) en cada ítem.");
-      setTimeout(() => setToast(null), 5000);
-      return;
-    }
+    // Obligatoriedad completa al editar (cabecera + cada ítem + >=1 ítem). Bloquea
+    // dejar un reclamo incompleto. Solo notas/PDF/fotos opcionales.
+    const vErr = validateReclamoFull(
+      { empresa: editEmpresa, nro_factura: editFactura, fecha_reclamo: editFecha, nro_orden_compra: editPedido },
+      editItems,
+    );
+    if (vErr) { setToast(vErr); setTimeout(() => setToast(null), 5000); return; }
     setEditSaving(true);
     try {
       // El estado NO se edita desde el form (solo botón de transición / settlement).

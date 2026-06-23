@@ -5,6 +5,7 @@ import { logActivity } from "@/lib/log-activity";
 import { getSession } from "@/lib/require-auth";
 import { requireRole } from "@/lib/requireRole";
 import { firmarFacturaPathSafe } from "@/lib/reclamos/factura-storage";
+import { validateReclamoHeader } from "@/lib/reclamos/validate";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -58,6 +59,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     await supabaseServer.from("reclamo_seguimiento").insert({
       reclamo_id: id, nota: seguimiento_nota, autor: autor || "",
     });
+  }
+
+  // Obligatoriedad de cabecera al EDITAR: solo si el PATCH trae campos de cabecera
+  // (no aplica a PATCH de solo-estado ni de solo-seguimiento). Evita dejar un
+  // reclamo incompleto editando.
+  const editaCabecera = ["empresa", "nro_factura", "fecha_reclamo", "nro_orden_compra"].some(
+    (k) => fields[k] !== undefined,
+  );
+  if (editaCabecera) {
+    const vErr = validateReclamoHeader({
+      empresa: fields.empresa,
+      nro_factura: fields.nro_factura,
+      fecha_reclamo: fields.fecha_reclamo,
+      nro_orden_compra: fields.nro_orden_compra,
+    });
+    if (vErr) return NextResponse.json({ error: vErr }, { status: 400 });
   }
 
   // Validate estado transition

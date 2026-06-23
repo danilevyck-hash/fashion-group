@@ -2,6 +2,8 @@ import JSZip from "jszip";
 import sharp from "sharp";
 import { supabaseServer } from "@/lib/supabase-server";
 import { buildBulkReclamosExcel, type ReclamoFull } from "./excel-bulk";
+import { FACTURA_BUCKET } from "./factura-storage";
+import { reclamoFolder, fotoPath } from "./zip-paths";
 
 const BUCKET = "reclamo-fotos";
 const MAX_DIM = 1600; // px — lado mayor tras redimensionar
@@ -18,15 +20,8 @@ export interface ZipResult {
   buffer: Buffer;
   fotosIncluidas: number;
   fotosOmitidas: number;
-}
-
-/** Limpia un texto para usarlo como nombre de carpeta/archivo dentro del ZIP. */
-function sanitizeSegment(s: string | undefined, fallback: string): string {
-  const clean = (s || "")
-    .trim()
-    .replace(/[^A-Za-z0-9._-]+/g, "_")
-    .replace(/^_+|_+$/g, "");
-  return clean || fallback;
+  pdfsIncluidos: number;
+  pdfsOmitidos: number;
 }
 
 /**
@@ -50,12 +45,27 @@ async function compressPhoto(storagePath: string): Promise<Buffer | null> {
 }
 
 /**
- * Arma un ZIP "todo en uno":
- *   Resumen.xlsx                         (resumen + hoja por reclamo, incluye # Fotos)
- *   fotos/{nro_factura}/{nro_reclamo}_N.jpg   (comprimidas)
+ * Descarga el PDF de factura del bucket privado `reclamo-facturas` (service role).
+ * Devuelve null si no hay path o falla la descarga (se omite, no rompe el ZIP).
+ */
+async function downloadFactura(path: string): Promise<Buffer | null> {
+  try {
+    const { data, error } = await supabaseServer.storage.from(FACTURA_BUCKET).download(path);
+    if (error || !data) return null;
+    return Buffer.from(await data.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Arma un ZIP "todo en uno", UNA carpeta por RECLAMO:
+ *   Resumen.xlsx                              (resumen + hoja por reclamo, con links)
+ *   {nro_reclamo}/factura.pdf                 (PDF de la factura, si existe)
+ *   {nro_reclamo}/fotos/foto_N.jpg            (fotos comprimidas)
  *
- * El nombre de archivo se prefija con el N° de reclamo para evitar choques
- * si dos reclamos comparten número de factura.
+ * Los hyperlinks del Excel apuntan a estas rutas relativas → abren los archivos
+ * del propio ZIP (no expiran). Single reclamo y bulk comparten este código.
  */
 export async function buildReclamosZip(
   reclamos: ReclamoFull[],
@@ -64,11 +74,33 @@ export async function buildReclamosZip(
 ): Promise<ZipResult> {
   const zip = new JSZip();
 
-  // 1) Excel resumen (reusa la generación existente)
-  const xlsx = await buildBulkReclamosExcel(reclamos, empresa, contacto);
+  // 1) Excel resumen (links relativos a los archivos del ZIP)
+  const xlsx = await buildBulkReclamosExcel(reclamos, empresa, contacto, { relative: true });
   zip.file("Resumen.xlsx", xlsx);
 
-  // 2) Lista plana de fotos a procesar (con su reclamo y un índice 1-based)
+  let fotosIncluidas = 0;
+  let fotosOmitidas = 0;
+  let pdfsIncluidos = 0;
+  let pdfsOmitidos = 0;
+
+  // 2) Factura PDF por reclamo (bucket privado) → {nro_reclamo}/factura.pdf
+  for (let i = 0; i < reclamos.length; i += PHOTO_CONCURRENCY) {
+    const batch = reclamos.slice(i, i + PHOTO_CONCURRENCY);
+    const results = await Promise.all(
+      batch.map(async (rec) => ({
+        rec,
+        buf: rec.factura_pdf_path ? await downloadFactura(rec.factura_pdf_path) : null,
+      })),
+    );
+    for (const { rec, buf } of results) {
+      if (!rec.factura_pdf_path) continue; // sin factura → no aplica (no cuenta como omitida)
+      if (!buf) { pdfsOmitidos++; continue; }
+      zip.file(`${reclamoFolder(rec.nro_reclamo)}/factura.pdf`, buf);
+      pdfsIncluidos++;
+    }
+  }
+
+  // 3) Lista plana de fotos (con su reclamo y un índice 1-based por reclamo)
   const tasks: { rec: ReclamoFull; storagePath: string; idx: number }[] = [];
   for (const rec of reclamos) {
     const fotos = rec.reclamo_fotos || [];
@@ -77,10 +109,7 @@ export async function buildReclamosZip(
     });
   }
 
-  let fotosIncluidas = 0;
-  let fotosOmitidas = 0;
-
-  // 3) Procesa en lotes con concurrencia limitada
+  // 4) Procesa fotos en lotes con concurrencia limitada → {nro_reclamo}/fotos/foto_N.jpg
   for (let i = 0; i < tasks.length; i += PHOTO_CONCURRENCY) {
     const batch = tasks.slice(i, i + PHOTO_CONCURRENCY);
     const results = await Promise.all(
@@ -91,9 +120,7 @@ export async function buildReclamosZip(
         fotosOmitidas++;
         continue;
       }
-      const facturaDir = sanitizeSegment(t.rec.nro_factura, "sin-factura");
-      const recName = sanitizeSegment(t.rec.nro_reclamo, "reclamo");
-      zip.file(`fotos/${facturaDir}/${recName}_${t.idx}.jpg`, buf);
+      zip.file(fotoPath(t.rec.nro_reclamo, t.idx), buf);
       fotosIncluidas++;
     }
   }
@@ -104,5 +131,5 @@ export async function buildReclamosZip(
     compressionOptions: { level: 6 },
   })) as Buffer;
 
-  return { buffer, fotosIncluidas, fotosOmitidas };
+  return { buffer, fotosIncluidas, fotosOmitidas, pdfsIncluidos, pdfsOmitidos };
 }

@@ -168,8 +168,9 @@ export default function ReclamoForm({
               {fieldError("fecha", fFecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Pedido</label>
-              <input type="text" value={fPedido} onChange={(e) => setFPedido(e.target.value)} placeholder="Ej. PO-2026-001" className="border-b border-gray-200 py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none" />
+              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Pedido *</label>
+              <input type="text" value={fPedido} onChange={(e) => setFPedido(e.target.value)} onBlur={() => handleBlur("pedido")} placeholder="Ej. PO-2026-001" className={`border-b ${fieldError("pedido", fPedido) ? "border-red-400" : "border-gray-200"} py-3 sm:py-1.5 text-base sm:text-sm text-black outline-none`} />
+              {fieldError("pedido", fPedido) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
           </div>
         </div>
@@ -205,13 +206,13 @@ export default function ReclamoForm({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 text-[10px] uppercase tracking-[0.05em] text-gray-400">
-                <th className="pb-2 font-medium text-left">Código</th>
-                <th className="pb-2 font-medium text-left">Descripción</th>
-                <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla</th>
+                <th className="pb-2 font-medium text-left">Código *</th>
+                <th className="pb-2 font-medium text-left">Descripción *</th>
+                <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla *</th>
                 <th className="pb-2 font-medium text-left" style={{ minWidth: 90 }}>Género *</th>
-                <th className="pb-2 font-medium text-center" style={{ minWidth: 60 }}>Cant.</th>
-                <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio U.</th>
-                <th className="pb-2 font-medium text-left">Motivo</th>
+                <th className="pb-2 font-medium text-center" style={{ minWidth: 60 }}>Cant. *</th>
+                <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio U. *</th>
+                <th className="pb-2 font-medium text-left">Motivo *</th>
                 <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Subtotal</th>
                 <th className="pb-2 w-6"></th>
               </tr>
@@ -277,16 +278,16 @@ export default function ReclamoForm({
                 )}
               </div>
               <label className="block">
-                <span className="text-[10px] uppercase tracking-wider text-gray-400">Código</span>
+                <span className="text-[10px] uppercase tracking-wider text-gray-400">Código *</span>
                 <input type="text" value={item.referencia} onChange={(e) => updateItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
               </label>
               <label className="block">
-                <span className="text-[10px] uppercase tracking-wider text-gray-400">Descripción</span>
+                <span className="text-[10px] uppercase tracking-wider text-gray-400">Descripción *</span>
                 <input type="text" value={item.descripcion} onChange={(e) => updateItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Talla</span>
+                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Talla *</span>
                   {(!TALLAS.includes(item.talla) && item.talla !== "") ? (
                     <div className="flex items-center gap-1">
                       <input type="text" value={item.talla} onChange={(e) => updateItem(idx, "talla", e.target.value)} placeholder="Talla" className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
@@ -300,7 +301,7 @@ export default function ReclamoForm({
                   )}
                 </label>
                 <label className="block">
-                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Cantidad</span>
+                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Cantidad *</span>
                   <input type="number" inputMode="numeric" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
                 </label>
               </div>
@@ -313,7 +314,7 @@ export default function ReclamoForm({
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
-                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Precio U.</span>
+                  <span className="text-[10px] uppercase tracking-wider text-gray-400">Precio U. *</span>
                   <input type="number" inputMode="decimal" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
                 </label>
                 <div className="block">
@@ -322,7 +323,7 @@ export default function ReclamoForm({
                 </div>
               </div>
               <label className="block">
-                <span className="text-[10px] uppercase tracking-wider text-gray-400">Motivo</span>
+                <span className="text-[10px] uppercase tracking-wider text-gray-400">Motivo *</span>
                 {addingMotivo === idx ? (
                   <div className="flex items-center gap-1">
                     <input type="text" value={newMotivoText} onChange={(e) => setNewMotivoText(e.target.value)} placeholder="Nuevo motivo..." className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" autoFocus />

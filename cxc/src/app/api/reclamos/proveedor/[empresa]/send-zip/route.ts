@@ -94,8 +94,8 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       .limit(1);
     const contacto = contactos?.[0] || null;
 
-    // Arma el ZIP (Excel resumen + fotos comprimidas)
-    const { buffer, fotosIncluidas, fotosOmitidas } = await buildReclamosZip(reclamos, empresa, contacto);
+    // Arma el ZIP (Excel resumen + carpeta por reclamo con factura PDF + fotos)
+    const { buffer, fotosIncluidas, fotosOmitidas, pdfsIncluidos, pdfsOmitidos } = await buildReclamosZip(reclamos, empresa, contacto);
     const safeName = empresa.replace(/[^A-Za-z0-9_-]+/g, "_");
     const filename = `Reclamos_${safeName}_${new Date().toISOString().slice(0, 10)}.zip`;
     const sizeMB = buffer.length / (1024 * 1024);
@@ -217,6 +217,8 @@ export async function POST(req: NextRequest, { params }: { params: { empresa: st
       sizeMB: Number(sizeMB.toFixed(1)),
       fotosIncluidas,
       fotosOmitidas,
+      pdfsIncluidos,
+      pdfsOmitidos,
     });
   } catch (err) {
     console.error("send-zip error:", err);
