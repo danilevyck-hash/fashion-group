@@ -5,7 +5,7 @@ import AppHeader from "@/components/AppHeader";
 import { fmt, fmtDate } from "@/lib/format";
 import { Toast, StatusBadge, ConfirmDeleteModal, FotoLightbox, ScrollableTable, PdfLightbox } from "@/components/ui";
 import { Reclamo, RItem, Contacto } from "./types";
-import { ESTADOS, EMPRESAS, EC, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, estadoLabel } from "./constants";
+import { ESTADOS, EMPRESAS, EC, GENEROS, DEFAULT_MOTIVOS, emptyItem, daysSince, calcSub, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL, estadoLabel } from "./constants";
 import { useSmartSuggestions, type SmartSuggestion } from "@/lib/hooks/useSmartSuggestions";
 import SuggestionCard from "@/components/SuggestionCard";
 import FotoBadge from "./FotoBadge";
@@ -456,6 +456,7 @@ export default function ReclamoDetail({
                       <th className="pb-2 font-medium text-left">Código</th>
                       <th className="pb-2 font-medium text-left">Descripción</th>
                       <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla</th>
+                      <th className="pb-2 font-medium text-left" style={{ minWidth: 90 }}>Género *</th>
                       <th className="pb-2 font-medium text-center" style={{ minWidth: 60 }}>Cant.</th>
                       <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio U.</th>
                       <th className="pb-2 font-medium text-left">Motivo</th>
@@ -469,6 +470,12 @@ export default function ReclamoDetail({
                         <td className="py-2 pr-1"><input type="text" value={item.referencia} onChange={(e) => updateEditItem(idx, "referencia", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" /></td>
                         <td className="py-2 pr-1"><input type="text" value={item.descripcion} onChange={(e) => updateEditItem(idx, "descripcion", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" /></td>
                         <td className="py-2 pr-1"><input type="text" value={item.talla} onChange={(e) => updateEditItem(idx, "talla", e.target.value)} className="w-full border-b border-gray-200 py-1 text-sm outline-none" style={{ minWidth: 50 }} /></td>
+                        <td className="py-2 pr-1">
+                          <select value={item.genero || ""} onChange={(e) => updateEditItem(idx, "genero", e.target.value)} className={`w-full border-b border-gray-200 py-1 text-sm outline-none bg-transparent ${item.genero ? "text-black" : "text-gray-400"}`} style={{ minWidth: 80 }}>
+                            <option value="">Género…</option>
+                            {GENEROS.map((g) => <option key={g} value={g}>{g}</option>)}
+                          </select>
+                        </td>
                         <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateEditItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-center" /></td>
                         <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateEditItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
                         <td className="py-2 pr-1">
@@ -504,6 +511,7 @@ export default function ReclamoDetail({
                     <th className="text-left pb-2 font-medium">Código</th>
                     <th className="text-left pb-2 font-medium">Descripción</th>
                     <th className="text-left pb-2 font-medium">Talla</th>
+                    <th className="text-left pb-2 font-medium">Género</th>
                     <th className="text-right pb-2 font-medium">Cant.</th>
                     <th className="text-right pb-2 font-medium">Precio</th>
                     <th className="text-right pb-2 font-medium">Subtotal</th>
@@ -518,6 +526,7 @@ export default function ReclamoDetail({
                       <td className="py-2">{item.referencia}</td>
                       <td className="py-2 text-gray-500">{item.descripcion}</td>
                       <td className="py-2 text-gray-500">{item.talla}</td>
+                      <td className="py-2 text-gray-500 text-xs">{item.genero || "—"}</td>
                       <td className="py-2 text-right tabular-nums">{Number(item.cantidad) || 0}</td>
                       <td className="py-2 text-right tabular-nums">${fmt(item.precio_unitario)}</td>
                       <td className="py-2 text-right tabular-nums font-medium">${fmt((Number(item.cantidad) || 0) * (Number(item.precio_unitario) || 0))}</td>

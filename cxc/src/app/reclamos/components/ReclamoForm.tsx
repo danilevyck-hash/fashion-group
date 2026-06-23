@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { fmt } from "@/lib/format";
 import { RItem, Foto } from "./types";
 import { AccordionContent, ConfirmDeleteModal, FotoLightbox } from "@/components/ui";
-import { EMPRESAS, EMPRESAS_MAP, TALLAS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "./constants";
+import { EMPRESAS, EMPRESAS_MAP, TALLAS, GENEROS, DEFAULT_MOTIVOS, emptyItem, loadCustomMotivos, saveCustomMotivo, empresaDesdeIA, TASA_IMPORTACION, TASA_ITBMS, FACTOR_TOTAL } from "./constants";
 import FacturaPdfUploader, { type FacturaIAData } from "./FacturaPdfUploader";
 
 interface Props {
@@ -208,6 +208,7 @@ export default function ReclamoForm({
                 <th className="pb-2 font-medium text-left">Código</th>
                 <th className="pb-2 font-medium text-left">Descripción</th>
                 <th className="pb-2 font-medium text-left" style={{ minWidth: 70 }}>Talla</th>
+                <th className="pb-2 font-medium text-left" style={{ minWidth: 90 }}>Género *</th>
                 <th className="pb-2 font-medium text-center" style={{ minWidth: 60 }}>Cant.</th>
                 <th className="pb-2 font-medium text-right" style={{ minWidth: 80 }}>Precio U.</th>
                 <th className="pb-2 font-medium text-left">Motivo</th>
@@ -232,6 +233,12 @@ export default function ReclamoForm({
                         {TALLAS.map((t) => <option key={t} value={t}>{t}</option>)}
                       </select>
                     )}
+                  </td>
+                  <td className="py-2 pr-1">
+                    <select value={item.genero} onChange={(e) => updateItem(idx, "genero", e.target.value)} className={`w-full border-b py-1 text-sm outline-none bg-transparent ${item.genero ? "border-gray-200 text-black" : "border-gray-200 text-gray-400"}`} style={{ minWidth: 80 }}>
+                      <option value="">Género…</option>
+                      {GENEROS.map((g) => <option key={g} value={g}>{g}</option>)}
+                    </select>
                   </td>
                   <td className="py-2 pr-1"><input type="number" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-center" /></td>
                   <td className="py-2 pr-1"><input type="number" step="0.01" min={0} value={item.precio_unitario} onChange={(e) => updateItem(idx, "precio_unitario", parseFloat(e.target.value) || 0)} className="w-full border-b border-gray-200 py-1 text-sm outline-none text-right" /></td>
@@ -297,6 +304,13 @@ export default function ReclamoForm({
                   <input type="number" inputMode="numeric" min={0} value={item.cantidad} onChange={(e) => updateItem(idx, "cantidad", parseInt(e.target.value) || 0)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black" />
                 </label>
               </div>
+              <label className="block">
+                <span className="text-[10px] uppercase tracking-wider text-gray-400">Género *</span>
+                <select value={item.genero} onChange={(e) => updateItem(idx, "genero", e.target.value)} className={`w-full border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black ${item.genero ? "text-black" : "text-gray-400"}`}>
+                  <option value="">Género…</option>
+                  {GENEROS.map((g) => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-[10px] uppercase tracking-wider text-gray-400">Precio U.</span>

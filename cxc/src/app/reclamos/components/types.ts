@@ -6,6 +6,9 @@ export interface RItem {
   precio_unitario: number;
   subtotal: number;
   motivo: string;
+  /** Men/Women/Kids/Accessories. "" = aún sin elegir (form nuevo); null en
+   *  ítems históricos previos al campo. Obligatorio al crear/editar. */
+  genero: string;
   nro_factura: string;
   nro_orden_compra: string;
 }

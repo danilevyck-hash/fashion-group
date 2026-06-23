@@ -57,6 +57,9 @@ export const DEFAULT_MOTIVOS = [
 
 export const TALLAS = ["XS", "S", "M", "L", "XL", "XXL", "OS", "Otros"];
 
+/** Género del ítem reclamado — dropdown FIJO (sin opción libre). Obligatorio. */
+export const GENEROS = ["Men", "Women", "Kids", "Accessories"] as const;
+
 export const ESTADOS = ["Creado", "Pagado"];
 
 /** Display-friendly names for estados (use in buttons/labels) */
@@ -110,7 +113,7 @@ export async function saveCustomMotivo(m: string) {
 }
 
 export function emptyItem(): RItem {
-  return { referencia: "", descripcion: "", talla: "", cantidad: 1, precio_unitario: 0, subtotal: 0, motivo: "", nro_factura: "", nro_orden_compra: "" };
+  return { referencia: "", descripcion: "", talla: "", cantidad: 1, precio_unitario: 0, subtotal: 0, motivo: "", genero: "", nro_factura: "", nro_orden_compra: "" };
 }
 
 export function daysSince(d: string) {

@@ -21,6 +21,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       referencia: String(item.referencia || ""),
       descripcion: String(item.descripcion || ""),
       talla: String(item.talla || ""),
+      genero: item.genero ? String(item.genero) : null,
       cantidad: Number(item.cantidad) || 1,
       precio_unitario: Number(item.precio_unitario) || 0,
       subtotal: (Number(item.cantidad) || 1) * (Number(item.precio_unitario) || 0),
