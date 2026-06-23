@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppHeader from "@/components/AppHeader";
@@ -67,8 +67,16 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
     }
   }, [pageSize]);
 
-  // Debounced search
+  // Debounced search. El SSR ya entregó la página 1 (initialClientes): saltamos
+  // el fetch del primer render cuando no hay filtros, en vez de re-pedir la misma
+  // página. Cualquier cambio posterior de q/provincia (incl. el prefill de
+  // ?search=) sí dispara el fetch.
+  const skipInitial = useRef(true);
   useEffect(() => {
+    if (skipInitial.current) {
+      skipInitial.current = false;
+      if (!q && !provincia) return; // usa initialClientes del SSR
+    }
     const handle = setTimeout(() => {
       fetchPage(1, q, provincia);
     }, q || provincia ? 250 : 0);

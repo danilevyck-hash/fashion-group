@@ -45,87 +45,57 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
   const { codigo: rawCodigo } = await params;
   const codigo = decodeURIComponent(rawCodigo);
 
-  const { data: cliente } = await supabaseServer
-    .from("clientes_master")
-    .select("*")
-    .eq("codigo", codigo)
-    .eq("deleted", false)
-    .maybeSingle();
-  if (!cliente) notFound();
-
   const yearStart = new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10);
 
-  // Puente por ID: pares (empresa_key, cliente_switch_id) del cliente. El id es
-  // por-empresa → matcheamos el par exacto, no solo el cliente_switch_id.
-  const { data: pares } = await supabaseServer
-    .from("switch_clientes")
-    .select("empresa_key, cliente_switch_id")
-    .eq("codigo", cliente.codigo);
-  const cids = [...new Set((pares ?? [])
-    .map(p => (p as { cliente_switch_id: number | null }).cliente_switch_id)
-    .filter((x): x is number => typeof x === "number"))];
-  const pairSet = new Set((pares ?? []).map(p => {
-    const x = p as { empresa_key: string; cliente_switch_id: number | null };
-    return `${x.empresa_key}|${x.cliente_switch_id}`;
-  }));
-
-  // Ventas YTD (switch_facturas año en curso, acotado) · última factura (switch_
-  // facturas ordenada desc) · CXC · Cobrado. Dos queries switch separadas para NO
-  // topar el límite de 1000 filas en clientes grandes. CXC/Cobrado ya eran switch
-  // → idénticas; solo ventas/última dejan ventas_raw.
-  const [ventasRes, ultimaRes, cxcRes, cobradoRes] = await Promise.all([
-    cids.length > 0
-      ? supabaseServer
-          .from("switch_facturas")
-          .select("empresa_key, cliente_switch_id, fecha, tipo_comprobante, total")
-          .in("cliente_switch_id", cids)
-          .gte("fecha", yearStart)
-      : Promise.resolve({ data: [] as unknown[] }),
-    cids.length > 0
-      ? supabaseServer
-          .from("switch_facturas")
-          .select("empresa_key, cliente_switch_id, fecha")
-          .in("cliente_switch_id", cids)
-          .in("tipo_comprobante", ["Factura", "Tiquete", "Transacción"])
-          .order("fecha", { ascending: false })
-      : Promise.resolve({ data: [] as unknown[] }),
+  // Todo lo que solo depende del `codigo` de la URL corre EN PARALELO (antes:
+  // cliente → switch_clientes → Promise.all → guia_items en serie). ventas YTD +
+  // última factura vienen de un RPC con SUM server-side: mata el corte silencioso
+  // de 1000 filas que truncaba el YTD de clientes grandes Y baja el payload
+  // (≤6 filas en vez de traer miles).
+  const [cliente, ventasRpc, cxcRes, cobradoRes, guiaItemRows] = await Promise.all([
+    supabaseServer
+      .from("clientes_master")
+      .select("*")
+      .eq("codigo", codigo)
+      .eq("deleted", false)
+      .maybeSingle()
+      .then((r) => r.data),
+    supabaseServer.rpc("cliente_ficha_ventas", { p_codigo: codigo }),
     supabaseServer
       .from("switch_estadocuenta_aging")
       .select("company_key, total, d91_120, d121_180, d181_270, d271_365, mas_365")
-      .eq("codigo", cliente.codigo),
+      .eq("codigo", codigo),
     supabaseServer
       .from("switch_recibos")
       .select("empresa_key, total")
-      .eq("cliente_codigo", cliente.codigo)
+      .eq("cliente_codigo", codigo)
       .eq("es_retencion", false)
       .gte("fecha", yearStart),
+    supabaseServer
+      .from("guia_items")
+      .select("guia_id")
+      .eq("cliente_codigo", codigo)
+      .eq("deleted", false),
   ]);
+  if (!cliente) notFound();
 
-  // Ventas YTD (base CON ITBMS = total, igual que antes → solo cambia por frescura),
-  // neto firmado por tipo, re-filtrada a hora-Panamá del año en curso.
-  const POS = new Set(["Factura", "Tiquete", "Transacción", "Nota de Débito"]);
-  const panamaYmd = (iso: string) => new Date(Date.parse(iso) - 5 * 3600 * 1000).toISOString().slice(0, 10);
-  const ventasMap = new Map<string, number>();
-  for (const r of (ventasRes.data ?? []) as {
-    empresa_key: string; cliente_switch_id: number; fecha: string;
-    tipo_comprobante: string; total: number | string;
-  }[]) {
-    if (!pairSet.has(`${r.empresa_key}|${r.cliente_switch_id}`)) continue;
-    if (!r.fecha || panamaYmd(r.fecha) < yearStart) continue;
-    const base = Number(r.total ?? 0);
-    const signed = POS.has(r.tipo_comprobante) ? base : (r.tipo_comprobante === "Nota de Crédito" ? -base : 0);
-    ventasMap.set(r.empresa_key, (ventasMap.get(r.empresa_key) ?? 0) + signed);
+  // ventas YTD (firmada, base con ITBMS, hora-Panamá) + última factura por empresa,
+  // ya agregadas server-side. Si el RPC aún no está aplicado (ventana de deploy),
+  // degrada a vacío en vez de romper la ficha.
+  if (ventasRpc.error) {
+    console.error("[clientes/ficha] cliente_ficha_ventas:", ventasRpc.error.message);
   }
-
-  // Última factura: lista ordenada desc → primera fila (pairSet) por empresa = más
-  // reciente; primera global = la del grupo.
+  const ventasMap = new Map<string, number>();
   const ultimaFacturaMap = new Map<string, string>();
   let ultimaGlobal: string | null = null;
-  for (const r of (ultimaRes.data ?? []) as { empresa_key: string; cliente_switch_id: number; fecha: string }[]) {
-    if (!r.fecha || !pairSet.has(`${r.empresa_key}|${r.cliente_switch_id}`)) continue;
-    const ymd = panamaYmd(r.fecha);
-    if (!ultimaFacturaMap.has(r.empresa_key)) ultimaFacturaMap.set(r.empresa_key, ymd);
-    if (!ultimaGlobal || ymd > ultimaGlobal) ultimaGlobal = ymd;
+  for (const r of (ventasRpc.data ?? []) as {
+    empresa_key: string; ventas_ytd: number | string; ultima_factura: string | null;
+  }[]) {
+    ventasMap.set(r.empresa_key, Math.round(Number(r.ventas_ytd ?? 0) * 100) / 100);
+    if (r.ultima_factura) {
+      ultimaFacturaMap.set(r.empresa_key, r.ultima_factura);
+      if (!ultimaGlobal || r.ultima_factura > ultimaGlobal) ultimaGlobal = r.ultima_factura;
+    }
   }
 
   // Aging del grupo: "vencido reciente" = d91_120 (ámbar); "crítico" = +120d
@@ -164,16 +134,11 @@ export default async function ClienteDetailPage({ params }: { params: Promise<{ 
     ultima_factura: ultimaGlobal,
   };
 
-  // Últimas guías del cliente (por cliente_codigo D-XXX, vínculo de Guías V2).
-  // Dedupe por guía (un cliente puede tener varias líneas en la misma guía) y
-  // tomamos las 3 más recientes. Link al detalle por URL: /guias/[id]/imprimir.
-  const { data: guiaItemRows } = await supabaseServer
-    .from("guia_items")
-    .select("guia_id")
-    .eq("cliente_codigo", cliente.codigo)
-    .eq("deleted", false);
+  // Últimas guías del cliente (guia_items ya traído en paralelo arriba). Dedupe
+  // por guía (un cliente puede tener varias líneas en la misma guía) y tomamos
+  // las 3 más recientes. Link al detalle por URL: /guias/[id]/imprimir.
   const guiaIds = [...new Set(
-    (guiaItemRows ?? [])
+    (guiaItemRows.data ?? [])
       .map(r => (r as { guia_id: string | null }).guia_id)
       .filter((x): x is string => !!x),
   )];
