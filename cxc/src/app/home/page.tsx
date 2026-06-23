@@ -148,7 +148,7 @@ export default function HomePage() {
                 {/* Encabezado del grupo */}
                 <div className="flex items-center gap-2.5 mb-2 px-1">
                   <GroupIcon size={16} strokeWidth={1.5} className={darkMode ? "text-gray-400" : "text-gray-500"} />
-                  <h2 className={`text-xs font-semibold uppercase tracking-wider ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
+                  <h2 className={`text-xs font-semibold uppercase tracking-wide ${darkMode ? "text-gray-400" : "text-gray-500"}`}>
                     {g.label}
                   </h2>
                 </div>

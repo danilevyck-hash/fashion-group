@@ -218,23 +218,23 @@ export default function UsuariosPage() {
                         <div className="text-sm font-medium text-stone-900 leading-tight truncate">{u.name}</div>
                         <div className="text-xs text-stone-500 mt-0.5 capitalize">{u.role}</div>
                         {u.associated_company && (
-                          <div className="text-[11px] text-stone-400 mt-1 truncate" title={u.associated_company}>
+                          <div className="text-xs text-stone-400 mt-1 truncate" title={u.associated_company}>
                             {u.associated_company}
                           </div>
                         )}
                         {hasOverride && (
-                          <div className="text-[11px] text-teal-700 mt-1">Permisos personalizados</div>
+                          <div className="text-xs text-teal-700 mt-1">Permisos personalizados</div>
                         )}
                       </div>
                     </div>
 
                     <div className="flex items-center justify-between mt-3 pt-3 border-t border-stone-100">
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 text-[11px] text-stone-600">
+                        <div className="flex items-center gap-1.5 text-xs text-stone-600">
                           <span className={`w-1.5 h-1.5 rounded-full ${u.active ? "bg-emerald-500" : "bg-stone-300"}`} />
                           {u.active ? "Activo" : "Inactivo"}
                         </div>
-                        <div className="text-[11px] text-stone-400 mt-0.5" title={lastSeen ? new Date(lastSeen).toLocaleString("es-PA") : undefined}>
+                        <div className="text-xs text-stone-400 mt-0.5" title={lastSeen ? new Date(lastSeen).toLocaleString("es-PA") : undefined}>
                           {lastSeen ? `Última sesión ${relativeTime(lastSeen)}` : "Nunca ha entrado"}
                         </div>
                       </div>
@@ -291,7 +291,7 @@ export default function UsuariosPage() {
 
               <div className="px-6 py-5 space-y-4">
                 <div>
-                  <label className="text-[11px] font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">Nombre</label>
+                  <label className="text-xs font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">Nombre</label>
                   <input
                     value={uName}
                     onChange={e => setUName(e.target.value)}
@@ -302,7 +302,7 @@ export default function UsuariosPage() {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">
+                  <label className="text-xs font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">
                     {editUserId ? "Nueva contraseña" : "Contraseña"}
                   </label>
                   <div className="relative">
@@ -329,7 +329,7 @@ export default function UsuariosPage() {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">Rol</label>
+                  <label className="text-xs font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">Rol</label>
                   <select
                     value={uRole}
                     onChange={e => setURole(e.target.value)}
@@ -349,7 +349,7 @@ export default function UsuariosPage() {
                 </div>
 
                 <div>
-                  <label className="text-[11px] font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">
+                  <label className="text-xs font-medium text-stone-700 uppercase tracking-[0.08em] block mb-1.5">
                     Empresa <span className="font-normal text-stone-400 normal-case">(opcional)</span>
                   </label>
                   <input
@@ -358,13 +358,13 @@ export default function UsuariosPage() {
                     placeholder="vistana, fashion_wear, etc."
                     className="w-full bg-white border border-stone-200 rounded-md px-3 py-3 text-sm placeholder:text-stone-400 focus:outline-none focus:border-teal-700 transition"
                   />
-                  <p className="text-[11px] text-stone-400 mt-1">Para vendedores: restringe el CXC a esa empresa. Vacío = todas.</p>
+                  <p className="text-xs text-stone-400 mt-1">Para vendedores: restringe el CXC a esa empresa. Vacío = todas.</p>
                 </div>
 
                 {/* Override de módulos per-usuario */}
                 <div className="pt-1">
                   <label className="flex items-center justify-between gap-3 cursor-pointer">
-                    <span className="text-[11px] font-medium text-stone-700 uppercase tracking-[0.08em]">Permisos personalizados</span>
+                    <span className="text-xs font-medium text-stone-700 uppercase tracking-[0.08em]">Permisos personalizados</span>
                     <input
                       type="checkbox"
                       checked={customPerms}
@@ -372,7 +372,7 @@ export default function UsuariosPage() {
                       className="accent-teal-700 w-4 h-4"
                     />
                   </label>
-                  <p className="text-[11px] text-stone-400 mt-1">
+                  <p className="text-xs text-stone-400 mt-1">
                     {customPerms
                       ? "Este usuario verá solo los módulos marcados (ignora los del rol)."
                       : "Apagado: usa los módulos por defecto de su rol."}
@@ -447,7 +447,7 @@ export default function UsuariosPage() {
                   aria-expanded={sessionsOpen}
                 >
                   <div className="flex items-center gap-3">
-                    <h2 className="text-[11px] font-medium uppercase tracking-[0.12em] text-stone-500">Sesiones activas</h2>
+                    <h2 className="text-xs font-medium uppercase tracking-[0.12em] text-stone-500">Sesiones activas</h2>
                     <span className="text-xs text-stone-400">{active.length} {active.length === 1 ? "sesión" : "sesiones"}</span>
                   </div>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`text-stone-400 transition-transform ${sessionsOpen ? "rotate-180" : ""}`}>
@@ -482,14 +482,14 @@ export default function UsuariosPage() {
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="text-sm font-medium text-stone-900 truncate">{s.user_name}</span>
-                                  <span className="text-[11px] text-stone-400 capitalize">{s.user_role}</span>
+                                  <span className="text-xs text-stone-400 capitalize">{s.user_role}</span>
                                 </div>
-                                <div className="text-[11px] text-stone-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                                <div className="text-xs text-stone-500 mt-0.5 flex items-center gap-2 flex-wrap">
                                   <span title={new Date(s.last_seen).toLocaleString("es-PA")}>{relativeTime(s.last_seen)}</span>
                                   {s.ip_address && (
                                     <>
                                       <span className="text-stone-300">·</span>
-                                      <span className="font-mono text-[10px]">{s.ip_address}</span>
+                                      <span className="font-mono text-xs">{s.ip_address}</span>
                                     </>
                                   )}
                                 </div>
@@ -500,7 +500,7 @@ export default function UsuariosPage() {
                                     onClick={() => revokeAllSessions(s.user_name)}
                                     disabled={revokingSession === s.user_name}
                                     title={`Revocar todas las sesiones de ${s.user_name}`}
-                                    className="text-[11px] text-stone-500 hover:text-red-600 px-2 py-1 transition disabled:opacity-50"
+                                    className="text-xs text-stone-500 hover:text-red-600 px-2 py-1 transition disabled:opacity-50"
                                   >
                                     Revocar todas ({userTotal})
                                   </button>

@@ -391,13 +391,13 @@ export default function MobiliarioPage() {
         {/* Tabla productos */}
         <section className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs uppercase tracking-wider text-gray-500 font-medium">
+            <h2 className="text-xs uppercase tracking-wide text-gray-500 font-medium">
               Productos
             </h2>
             <button
               type="button"
               onClick={abrirNuevoProducto}
-              className="text-[11px] text-gray-500 hover:text-black underline"
+              className="text-xs text-gray-500 hover:text-black underline"
             >
               + Agregar producto
             </button>
@@ -405,7 +405,7 @@ export default function MobiliarioPage() {
           <div className="rounded-[10px] border border-gray-200 overflow-hidden bg-white">
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
-                <tr className="text-[11px] uppercase tracking-wider text-gray-500">
+                <tr className="text-xs uppercase tracking-wide text-gray-500">
                   <th className="text-left font-medium px-3 py-2">Producto</th>
                   <th className="text-right font-medium px-3 py-2 w-24">Precio</th>
                   <th className="text-right font-medium px-3 py-2 w-24">Comprado</th>
@@ -510,10 +510,10 @@ export default function MobiliarioPage() {
         <section className="space-y-1.5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xs uppercase tracking-wider text-gray-500 font-medium">
+              <h2 className="text-xs uppercase tracking-wide text-gray-500 font-medium">
                 Resumen por tienda
               </h2>
-              <p className="text-[11px] text-gray-400 mt-0.5">
+              <p className="text-xs text-gray-400 mt-0.5">
                 Total de paneles y gasto por marca, con totales
               </p>
             </div>
@@ -521,7 +521,7 @@ export default function MobiliarioPage() {
               type="button"
               onClick={() => descargarExcel()}
               disabled={downloading === "global"}
-              className="text-[11px] text-gray-500 hover:text-black underline disabled:opacity-60"
+              className="text-xs text-gray-500 hover:text-black underline disabled:opacity-60"
             >
               {downloading === "global" ? "Generando…" : "Descargar Excel"}
             </button>
@@ -529,7 +529,7 @@ export default function MobiliarioPage() {
           <div className="rounded-[10px] border border-gray-200 overflow-hidden bg-white">
             <table className="w-full text-sm border-collapse">
               <thead className="bg-gray-50">
-                <tr className="text-[11px] uppercase tracking-wider text-gray-500">
+                <tr className="text-xs uppercase tracking-wide text-gray-500">
                   <th className="text-left font-medium px-3 py-2">Cliente</th>
                   <th className="text-right font-medium px-3 py-2 w-28">
                     Total Paneles
@@ -607,7 +607,7 @@ export default function MobiliarioPage() {
                     ))}
                     {/* Fila TOTAL — fondo oscuro para contraste con el módulo. */}
                     <tr className="border-t border-gray-300 bg-gray-900 text-white">
-                      <td className="px-3 py-2.5 font-bold uppercase text-xs tracking-wider">
+                      <td className="px-3 py-2.5 font-bold uppercase text-xs tracking-wide">
                         Total
                       </td>
                       <td className="px-3 py-2.5 text-right font-mono tabular-nums font-bold">
@@ -792,7 +792,7 @@ function MetricCard({
 }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-3">
-      <div className="text-[10px] uppercase tracking-wider text-gray-500">
+      <div className="text-xs uppercase tracking-wide text-gray-500">
         {label}
       </div>
       <div

@@ -44,13 +44,13 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, isFa
             <div className="flex items-center gap-2 flex-shrink-0 ml-2">
               {/* Status badge */}
               {client.total < 0 ? (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Saldo a favor</span>
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">Saldo a favor</span>
               ) : client.overdue > 0 ? (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">{AGING.overdue.label}</span>
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 font-medium">{AGING.overdue.label}</span>
               ) : client.watch > 0 ? (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">{AGING.watch.label}</span>
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium">{AGING.watch.label}</span>
               ) : (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">{AGING.current.label}</span>
+                <span className="text-xs px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium">{AGING.current.label}</span>
               )}
               <span className="text-sm font-semibold tabular-nums">${fmt(client.total)}</span>
               {/* Expand chevron */}
@@ -63,15 +63,15 @@ export default function ClientRow({ client, isExpanded, onToggle, userRole, isFa
           {isExpanded && (
             <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
               <div className="bg-emerald-50 rounded-md px-2 py-1.5 text-center">
-                <div className="text-[10px] text-emerald-600 font-medium">0-90d</div>
+                <div className="text-xs text-emerald-600 font-medium">0-90d</div>
                 <div className="tabular-nums text-emerald-800 font-semibold">{client.current === 0 ? <span className="text-gray-300">—</span> : `$${fmt(client.current)}`}</div>
               </div>
               <div className="bg-amber-50 rounded-md px-2 py-1.5 text-center">
-                <div className="text-[10px] text-amber-600 font-medium">91-120d</div>
+                <div className="text-xs text-amber-600 font-medium">91-120d</div>
                 <div className="tabular-nums text-amber-800 font-semibold">{client.watch === 0 ? <span className="text-gray-300">—</span> : `$${fmt(client.watch)}`}</div>
               </div>
               <div className="bg-red-50 rounded-md px-2 py-1.5 text-center">
-                <div className="text-[10px] text-red-600 font-medium">{AGING.overdue.range}</div>
+                <div className="text-xs text-red-600 font-medium">{AGING.overdue.range}</div>
                 <div className="tabular-nums text-red-800 font-semibold">{client.overdue === 0 ? <span className="text-gray-300">—</span> : `$${fmt(client.overdue)}`}</div>
               </div>
             </div>

@@ -132,7 +132,7 @@ export default function InstallPrompt() {
             )}
 
             {/* Priming — siempre presente */}
-            <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
+            <p className="text-xs text-gray-400 mt-2 leading-relaxed">
               Antes de viajar, abre <span className="font-medium">Cuentas por Cobrar</span>,{" "}
               <span className="font-medium">Cheques</span>, <span className="font-medium">Reclamos</span> y{" "}
               <span className="font-medium">Marketing</span> con señal — así quedan disponibles sin conexión.

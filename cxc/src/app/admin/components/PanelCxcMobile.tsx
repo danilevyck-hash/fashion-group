@@ -130,7 +130,7 @@ export default function PanelCxcMobile({
           disabled={!!empresaRestriction}
         />
 
-        <p className="text-[11px] text-stone-500">
+        <p className="text-xs text-stone-500">
           {sortedMobile.length} {sortedMobile.length === 1 ? "cliente" : "clientes"} · ordenados por total
         </p>
 
@@ -166,7 +166,7 @@ export default function PanelCxcMobile({
           </ul>
         )}
 
-        <p className="pt-4 text-center text-[10.5px] leading-relaxed text-stone-400">
+        <p className="pt-4 text-center text-xs leading-relaxed text-stone-400">
           Política: 0-90d por vencer · 91-120d vencido reciente · +120d vencido crítico
         </p>
       </div>
@@ -260,7 +260,7 @@ function MenuItem({ label, onClick }: { label: string; onClick: () => void }) {
 function MobileHero({ total, clientCount }: { total: number; clientCount: number }) {
   return (
     <section className="rounded-xl bg-stone-900 px-5 py-4 text-white shadow-sm">
-      <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-400">
+      <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
         Total pendiente
       </p>
       <p className="mt-1 font-mono text-[36px] font-medium leading-none tracking-tight tabular-nums">
@@ -337,13 +337,13 @@ function MobileAgingChips({
               isActive ? `${theme.borderActive} ${theme.bgActive}` : "border-stone-200 bg-white",
             ].join(" ")}
           >
-            <p className={`text-[10px] font-semibold uppercase tracking-wider ${theme.text}`}>
+            <p className={`text-xs font-semibold uppercase tracking-wide ${theme.text}`}>
               {theme.label}
             </p>
             <p className={`mt-0.5 font-mono text-sm font-medium tabular-nums ${isActive ? theme.text : "text-stone-900"}`}>
               {formatCompactCurrency(value)}
             </p>
-            <p className="mt-0.5 text-[10px] text-stone-500 tabular-nums">
+            <p className="mt-0.5 text-xs text-stone-500 tabular-nums">
               {count} {count === 1 ? "cliente" : "clientes"}
             </p>
           </button>
@@ -509,10 +509,10 @@ function BucketChip({
         isZero ? "border-stone-200 bg-stone-50" : `${theme.border} ${theme.bgActive}`,
       ].join(" ")}
     >
-      <p className={`font-mono text-[11px] font-medium tabular-nums ${isZero ? "text-stone-300" : theme.text}`}>
+      <p className={`font-mono text-xs font-medium tabular-nums ${isZero ? "text-stone-300" : theme.text}`}>
         {isZero ? "—" : formatCompactCurrency(value)}
       </p>
-      <p className={`text-[9px] uppercase tracking-wider ${isZero ? "text-stone-300" : theme.text}`}>
+      <p className={`text-xs uppercase tracking-wide ${isZero ? "text-stone-300" : theme.text}`}>
         {theme.label}
       </p>
     </div>
@@ -561,7 +561,7 @@ function MobileClientExpanded({
   return (
     <div className="border-t border-stone-100 bg-stone-50 px-3 py-3">
       <div className="mb-2 flex items-baseline justify-between gap-2">
-        <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">
+        <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
           Desglose por empresa ({rows.length})
         </p>
         <span className={`shrink-0 font-mono text-xs font-semibold tabular-nums ${client.total < 0 ? "text-stone-500" : "text-stone-900"}`}>
@@ -582,7 +582,7 @@ function MobileClientExpanded({
               <EmpresaBucketMini variant="watch" value={row.watch} />
               <EmpresaBucketMini variant="overdue" value={row.overdue} />
             </div>
-            <p className={`mt-1.5 text-[10.5px] ${row.ultimoPagoFecha ? "text-stone-500" : "text-stone-400"}`}>
+            <p className={`mt-1.5 text-xs ${row.ultimoPagoFecha ? "text-stone-500" : "text-stone-400"}`}>
               {ultimoPagoLabel(row.ultimoPagoFecha, row.ultimoPagoMonto)}
             </p>
           </li>
@@ -591,7 +591,7 @@ function MobileClientExpanded({
       {codigo && (
         <Link
           href={`/clientes/${encodeURIComponent(codigo)}`}
-          className="mt-3 inline-flex items-center gap-1 text-[11px] font-medium text-blue-600 active:opacity-70"
+          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-blue-600 active:opacity-70"
         >
           Ver facturas pendientes
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -614,7 +614,7 @@ function EmpresaBucketMini({
   const isZero = value === 0;
   return (
     <span
-      className={`flex-1 rounded px-1.5 py-0.5 text-center font-mono text-[10px] tabular-nums ${theme.bgActive} ${theme.text}`}
+      className={`flex-1 rounded px-1.5 py-0.5 text-center font-mono text-xs tabular-nums ${theme.bgActive} ${theme.text}`}
       style={isZero ? { opacity: 0.4 } : undefined}
     >
       {isZero ? "—" : formatCompactCurrency(value)}

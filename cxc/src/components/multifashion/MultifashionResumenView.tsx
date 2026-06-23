@@ -368,7 +368,7 @@ export function MultifashionResumenView({
               <span className="font-display text-sm font-semibold text-stone-950">
                 Panorama del año {year}
               </span>
-              <span className="flex items-center gap-2 text-[11px] text-stone-500">
+              <span className="flex items-center gap-2 text-xs text-stone-500">
                 {panoramaOpen ? "Ocultar" : "Ver"}
                 <ChevronDown className={cn("h-4 w-4 transition-transform", panoramaOpen && "rotate-180")} />
               </span>
@@ -463,14 +463,14 @@ function Titular({ data, year }: { data: DetalleMensualResp; year: number }) {
       <Card className="p-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-[200px]">
-            <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">
+            <p className="text-xs font-medium uppercase tracking-wide text-stone-500">
               Ventas del mes · {headerTitle}
             </p>
             <p className="mt-1 font-mono text-3xl font-semibold leading-tight tabular-nums text-stone-950">
               {fmtMoney(totales.ventas_total ?? totales.ventas)}
             </p>
             {(totales.mayoreo ?? 0) > 0 && (
-              <p className="mt-1 text-[11px] text-stone-500">
+              <p className="mt-1 text-xs text-stone-500">
                 incluye {fmtMoney(totales.mayoreo ?? 0)} en mayoreo
                 {data.mayoreo_cliente ? ` · ${data.mayoreo_cliente}` : ""}
               </p>
@@ -482,7 +482,7 @@ function Titular({ data, year }: { data: DetalleMensualResp; year: number }) {
           </div>
         </div>
         {/* Línea inferior: tickets retail · ticket promedio · proyección/margen */}
-        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-stone-100 pt-3 font-mono text-[11px] tabular-nums text-stone-600">
+        <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-stone-100 pt-3 font-mono text-xs tabular-nums text-stone-600">
           <span>{totales.n_tickets.toLocaleString()} tickets retail</span>
           <span>ticket promedio ${totales.ticket_promedio.toFixed(2)}</span>
           {is_mes_actual && totales.proyeccion_cierre != null ? (
@@ -542,11 +542,11 @@ function ComparativoInteranualCard({
     <Card className="overflow-hidden p-0">
       <div className="border-b border-stone-100 px-4 py-3">
         <h4 className="font-display text-sm font-semibold text-stone-950">Mes a mes vs {prevYear}</h4>
-        <p className="mt-0.5 text-[11px] text-stone-400">
+        <p className="mt-0.5 text-xs text-stone-400">
           Retail (sin mayoreo) · mismo corte. El mes en curso se compara al día {diaActual}.
         </p>
       </div>
-      <div className={cn(GRID, "border-b border-stone-200 bg-stone-50 py-2 text-[10.5px] font-medium uppercase tracking-[0.04em] text-stone-500")}>
+      <div className={cn(GRID, "border-b border-stone-200 bg-stone-50 py-2 text-xs font-medium uppercase tracking-[0.04em] text-stone-500")}>
         <span>Mes</span>
         <span className="text-right">{year}</span>
         <span className="text-right">{prevYear}</span>
@@ -556,7 +556,7 @@ function ComparativoInteranualCard({
         <div key={f.label} className={cn(GRID, "border-t border-stone-100 py-2 text-sm")}>
           <span className="capitalize text-stone-700">
             {f.label}
-            {f.parcial ? <span className="ml-1 text-[9px] text-stone-400">d{diaActual}</span> : null}
+            {f.parcial ? <span className="ml-1 text-xs text-stone-400">d{diaActual}</span> : null}
           </span>
           <span className="text-right font-mono tabular-nums text-stone-950">{fmtMoney(f.v)}</span>
           <span className="text-right font-mono tabular-nums text-stone-500">
@@ -565,7 +565,7 @@ function ComparativoInteranualCard({
           <span className="text-right font-mono tabular-nums leading-tight">
             <span className={cn("font-medium", deltaTone(f.pct))}>{fmtPct(f.pct)}</span>
             {f.abs != null && (
-              <span className={cn("block text-[10px]", deltaTone(f.abs))}>{fmtAbs(f.abs)}</span>
+              <span className={cn("block text-xs", deltaTone(f.abs))}>{fmtAbs(f.abs)}</span>
             )}
           </span>
         </div>
@@ -576,7 +576,7 @@ function ComparativoInteranualCard({
         <span className="text-right font-mono tabular-nums text-stone-600">{fmtMoney(totPrev)}</span>
         <span className="text-right font-mono tabular-nums leading-tight">
           <span className={cn("font-medium", deltaTone(totPct))}>{fmtPct(totPct)}</span>
-          <span className={cn("block text-[10px]", deltaTone(tot - totPrev))}>{fmtAbs(tot - totPrev)}</span>
+          <span className={cn("block text-xs", deltaTone(tot - totPrev))}>{fmtAbs(tot - totPrev)}</span>
         </span>
       </div>
     </Card>
@@ -648,7 +648,7 @@ function ChartMesAnioMount({
                 mesLabel={mes_label}
                 year={year}
               />
-              <p className="mt-2 px-1 text-[10.5px] text-stone-500">
+              <p className="mt-2 px-1 text-xs text-stone-500">
                 <span className="mr-1 inline-block h-2 w-2 rounded-sm bg-teal-700" />
                 {mes_label} {year}
                 {showPrevLine ? (
@@ -666,7 +666,7 @@ function ChartMesAnioMount({
             <div className="flex min-h-[200px] flex-col items-center justify-center gap-2 text-center">
               <Info className="h-6 w-6 text-stone-400" strokeWidth={1.5} />
               <p className="text-sm text-stone-500">No hay datos para este período</p>
-              <p className="text-[11px] text-stone-400">{mes_label} {year} no registra ventas retail.</p>
+              <p className="text-xs text-stone-400">{mes_label} {year} no registra ventas retail.</p>
             </div>
           )}
         </Card>
@@ -703,7 +703,7 @@ function SegmentedToggle<T extends string>({
             aria-selected={active}
             onClick={() => onChange(o.value)}
             className={cn(
-              "rounded px-3 py-1 text-[11px] font-medium transition",
+              "rounded px-3 py-1 text-xs font-medium transition",
               active ? "bg-white text-stone-950 shadow-sm" : "text-stone-500 hover:text-stone-700",
             )}
           >
@@ -735,9 +735,9 @@ function ComparativoStat({
       : `$${Math.round(comp.ventas).toLocaleString()}`;
   return (
     <div className="text-right">
-      <p className="text-[10px] font-medium uppercase tracking-wider text-stone-500">{label}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-stone-500">{label}</p>
       <p className={cn("mt-0.5 font-mono text-base font-semibold tabular-nums", tone)}>{pct}</p>
-      <p className="font-mono text-[11px] tabular-nums text-stone-500">{monto}</p>
+      <p className="font-mono text-xs tabular-nums text-stone-500">{monto}</p>
     </div>
   );
 }
@@ -751,7 +751,7 @@ function BestWorstDayCard({
 }) {
   return (
     <Card className="p-4">
-      <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Mejor / peor día</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Mejor / peor día</p>
       <div className="mt-2 space-y-2">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-700">
@@ -761,7 +761,7 @@ function BestWorstDayCard({
             <p className="font-mono text-base font-medium tabular-nums text-stone-950">
               {mejor ? fmtMoney(mejor.ventas) : "—"}
             </p>
-            <p className="text-[11px] text-stone-500">
+            <p className="text-xs text-stone-500">
               mejor{mejor ? ` · ${formatFechaShort(mejor.fecha)}` : ""}
             </p>
           </div>
@@ -774,7 +774,7 @@ function BestWorstDayCard({
             <p className="font-mono text-base font-medium tabular-nums text-stone-950">
               {peor ? fmtMoney(peor.ventas) : "—"}
             </p>
-            <p className="text-[11px] text-stone-500">
+            <p className="text-xs text-stone-500">
               peor{peor ? ` · ${formatFechaShort(peor.fecha)}` : ""}
             </p>
           </div>
@@ -840,9 +840,9 @@ function BestDowCard({ heatmap }: { heatmap: HeatmapDow[] }) {
           <CalendarDays className="h-5 w-5" strokeWidth={1.75} />
         </div>
         <div className="flex-1">
-          <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Mejor día de semana</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Mejor día de semana</p>
           <p className="mt-0.5 font-display text-base font-semibold text-stone-950">{hayData ? best!.dow_label : "—"}</p>
-          <p className="mt-0.5 font-mono text-[11px] tabular-nums text-stone-500">
+          <p className="mt-0.5 font-mono text-xs tabular-nums text-stone-500">
             {hayData ? `${fmtMoneyCompact(best!.ventas_promedio)} promedio` : "sin data"}
           </p>
         </div>
@@ -873,11 +873,11 @@ function HoraPicoCard({
           <Clock className="h-5 w-5" strokeWidth={1.75} />
         </div>
         <div className="flex-1">
-          <p className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Hora pico</p>
+          <p className="text-xs font-medium uppercase tracking-wide text-stone-500">Hora pico</p>
           <p className="mt-0.5 font-display text-base font-semibold text-stone-950">
             {hora != null ? horaPicoLabel(hora) : "—"}
           </p>
-          <p className="mt-0.5 font-mono text-[11px] tabular-nums text-stone-500">
+          <p className="mt-0.5 font-mono text-xs tabular-nums text-stone-500">
             {ventas != null ? `${fmtMoneyCompact(ventas)} en la hora` : "sin data"}
           </p>
         </div>
@@ -901,12 +901,12 @@ function MiniKpi({
 }) {
   return (
     <Card className="p-3.5">
-      <p className="text-[10px] font-medium uppercase tracking-widest text-stone-500">{label}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-stone-500">{label}</p>
       <p className={cn(
         "mt-1.5 font-mono text-[22px] font-medium leading-tight tabular-nums text-stone-950",
         valueClassName,
       )}>{value}</p>
-      {sub && <p className="mt-1 text-[11px] text-stone-500">{sub}</p>}
+      {sub && <p className="mt-1 text-xs text-stone-500">{sub}</p>}
     </Card>
   );
 }

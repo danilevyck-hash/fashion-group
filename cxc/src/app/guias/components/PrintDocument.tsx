@@ -193,7 +193,7 @@ export default function PrintDocument({ guia: g }: PrintDocumentProps) {
           </div>
         </div>
 
-        <div className="print-footer mt-8 pt-4 border-t border-gray-200 text-[9px] text-gray-400 text-center leading-relaxed">
+        <div className="print-footer mt-8 pt-4 border-t border-gray-200 text-xs text-gray-400 text-center leading-relaxed">
           La firma del transportista constituye aceptacion expresa de la mercancia detallada en este
           documento, en la cantidad y condicion indicadas. Cualquier faltante o dano no reportado al
           momento de la recepcion sera responsabilidad exclusiva del transportista.

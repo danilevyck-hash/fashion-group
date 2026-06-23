@@ -141,21 +141,21 @@ export function BorradorFacturaCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">
+            <span className="text-xs uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 font-semibold">
               Sin guardar
             </span>
             {borrador.estado.tipo === "ocr-pendiente" && (
-              <span className="text-[10px] text-gray-500 inline-flex items-center gap-1">
+              <span className="text-xs text-gray-500 inline-flex items-center gap-1">
                 <Spinner /> Leyendo PDF con IA…
               </span>
             )}
             {borrador.estado.tipo === "ocr-error" && (
-              <span className="text-[10px] text-amber-700">
+              <span className="text-xs text-amber-700">
                 ⚠ No pudimos leer el PDF — llena los campos a mano
               </span>
             )}
             {borrador.estado.tipo === "guardando" && (
-              <span className="text-[10px] text-gray-500 inline-flex items-center gap-1">
+              <span className="text-xs text-gray-500 inline-flex items-center gap-1">
                 <Spinner /> Guardando…
               </span>
             )}
@@ -278,7 +278,7 @@ export function BorradorFacturaCard({
             <option value="7">7%</option>
           </select>
           {tieneImportacion && (
-            <div className="text-[11px] text-gray-500 mt-1">
+            <div className="text-xs text-gray-500 mt-1">
               ITBMS no aplica en zona libre
             </div>
           )}
@@ -330,7 +330,7 @@ export function BorradorFacturaCard({
           ))}
         </select>
         {borrador.marcaIds.length === 0 && (
-          <p className="text-[11px] text-red-600 mt-1">Selecciona una marca.</p>
+          <p className="text-xs text-red-600 mt-1">Selecciona una marca.</p>
         )}
       </div>
 

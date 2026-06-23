@@ -152,7 +152,7 @@ function HoraTooltip({ active, payload }: {
     <div className="rounded-md border border-stone-200 bg-white px-3 py-2 text-xs shadow-sm">
       <p className="font-medium text-stone-950">{horaPicoLabel(row.hora)}</p>
       <p className="mt-0.5 font-mono tabular-nums text-stone-700">{fmtMoney(row.ventas)}</p>
-      <p className="text-[10px] text-stone-500">
+      <p className="text-xs text-stone-500">
         {row.n_tickets} {row.n_tickets === 1 ? "ticket" : "tickets"}
       </p>
     </div>
@@ -201,7 +201,7 @@ function ChartTooltip({
   }
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-[11px] shadow-sm">
+    <div className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs shadow-sm">
       <div className="mb-1 font-medium text-stone-700">Día {day}</div>
       {rows.map((r, i) => (
         <div key={i} className="flex items-center justify-between gap-4">

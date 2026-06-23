@@ -615,11 +615,11 @@ function Productos() {
           {groups.map(g => (
             <div key={g.label}>
               <div className="flex items-center gap-3 mb-4">
-                <h2 className="text-xs font-bold uppercase tracking-wider text-[#1A2656]">
+                <h2 className="text-xs font-bold uppercase tracking-wide text-[#1A2656]">
                   {g.label}
                 </h2>
                 <div className="flex-1 h-px bg-[#1A2656]/10" />
-                <span className="text-[11px] text-[#1A2656]/25 tabular-nums">{g.items.length}</span>
+                <span className="text-xs text-[#1A2656]/25 tabular-nums">{g.items.length}</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4">
                 {g.items.map(p => (
@@ -673,9 +673,9 @@ function Productos() {
           <div className="flex items-center gap-2 text-sm">
             {!draftId && (
               <div className="flex items-center gap-1.5 mr-2">
-                <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[10px] flex items-center justify-center font-medium">&#10003;</span>
-                <span className="w-5 h-5 rounded-full bg-[#1A2656] text-white text-[10px] flex items-center justify-center font-bold">2</span>
-                <span className="text-[10px] text-[#1A2656]/30 font-medium">Paso 2 de 2</span>
+                <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-xs flex items-center justify-center font-medium">&#10003;</span>
+                <span className="w-5 h-5 rounded-full bg-[#1A2656] text-white text-xs flex items-center justify-center font-bold">2</span>
+                <span className="text-xs text-[#1A2656]/30 font-medium">Paso 2 de 2</span>
               </div>
             )}
             <span className="w-2 h-2 rounded-full bg-emerald-500" />

@@ -334,7 +334,7 @@ export default function PeriodoDetailHeader({
               />
             </div>
             <div
-              className="flex justify-between mt-2 text-[11px] caja-mono"
+              className="flex justify-between mt-2 text-xs caja-mono"
               style={{ color: "var(--caja-fg-muted)" }}
             >
               <span>$0.00</span>

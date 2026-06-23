@@ -649,7 +649,7 @@ export function FacturaForm({
               </dl>
             )}
             {tieneImportacion && subtotal === 0 && (
-              <div className="mt-1 text-[11px] text-gray-500">
+              <div className="mt-1 text-xs text-gray-500">
                 El {PORCENTAJE_IMPORTACION_ZONA_LIBRE}% se calcula al ingresar el subtotal.
               </div>
             )}
@@ -744,7 +744,7 @@ export function FacturaForm({
                 </div>
                 {multiMarca && (
                   <div className="mt-2 rounded-md border border-gray-200 bg-gray-50/60 p-3 space-y-2">
-                    <div className="text-[11px] uppercase tracking-wider text-gray-500">
+                    <div className="text-xs uppercase tracking-wide text-gray-500">
                       % por marca (debe sumar 100%)
                     </div>
                     {marcasSel.map((m) => (

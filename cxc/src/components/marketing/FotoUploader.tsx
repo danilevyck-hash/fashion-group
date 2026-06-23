@@ -272,13 +272,13 @@ export function FotoUploader({
               )}
               {it.status === "error" && (
                 <div className="absolute inset-0 bg-red-600/70 flex flex-col items-center justify-center p-1 gap-1">
-                  <div className="text-[10px] text-white text-center leading-tight">
+                  <div className="text-xs text-white text-center leading-tight">
                     Error
                   </div>
                   <button
                     type="button"
                     onClick={() => reintentar(it.id)}
-                    className="text-[10px] text-white underline"
+                    className="text-xs text-white underline"
                   >
                     Reintentar
                   </button>

@@ -126,7 +126,7 @@ export default function ProductoDetalle() {
               <button
                 onClick={handleAdd}
                 disabled={!selectedSize}
-                className="w-full bg-reebok-red text-white py-3 rounded font-bold text-sm uppercase tracking-wider hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full bg-reebok-red text-white py-3 rounded font-bold text-sm uppercase tracking-wide hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {added ? 'Agregado al pedido!' : 'Agregar al pedido'}
               </button>

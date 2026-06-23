@@ -73,7 +73,7 @@ export default function KeyboardShortcutsHelp({ open, onClose }: Props) {
         <div className="px-5 py-4 max-h-[70vh] overflow-y-auto space-y-5">
           {SHORTCUT_GROUPS.map((group) => (
             <div key={group.title}>
-              <h3 className="text-[11px] uppercase tracking-wider font-medium text-gray-400 mb-2.5">
+              <h3 className="text-xs uppercase tracking-wide font-medium text-gray-400 mb-2.5">
                 {group.title}
               </h3>
               <div className="space-y-1.5">
@@ -86,13 +86,13 @@ export default function KeyboardShortcutsHelp({ open, onClose }: Props) {
                     <div className="flex items-center gap-1">
                       {shortcut.keys.map((k, i) => (
                         <span key={i} className="flex items-center gap-1">
-                          {i > 0 && <span className="text-[10px] text-gray-300 mx-0.5">/</span>}
+                          {i > 0 && <span className="text-xs text-gray-300 mx-0.5">/</span>}
                           {k.includes(" ") ? (
                             // Multi-key chord like "G H"
                             k.split(" ").map((part, pi) => (
                               <span key={pi} className="flex items-center gap-0.5">
                                 {pi > 0 && (
-                                  <span className="text-[10px] text-gray-300 mx-0.5">luego</span>
+                                  <span className="text-xs text-gray-300 mx-0.5">luego</span>
                                 )}
                                 <kbd className="inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-200 rounded-md shadow-[0_1px_0_0_rgba(0,0,0,0.05)]">
                                   {part}
@@ -116,7 +116,7 @@ export default function KeyboardShortcutsHelp({ open, onClose }: Props) {
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50">
-          <p className="text-[11px] text-gray-400 text-center">
+          <p className="text-xs text-gray-400 text-center">
             Los atajos se desactivan cuando un campo de texto tiene foco
           </p>
         </div>

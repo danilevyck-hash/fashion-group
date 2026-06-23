@@ -38,7 +38,7 @@ export default function ContactPanel({
         <div>
           <button
             onClick={() => setDesgloseOpen(!desgloseOpen)}
-            className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5 hover:text-gray-700 transition"
+            className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5 hover:text-gray-700 transition"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
             <svg width="10" height="10" viewBox="0 0 10 10" className={`transition-transform ${desgloseOpen ? "rotate-90" : ""}`} fill="currentColor"><path d="M3 1l5 4-5 4V1z"/></svg>
@@ -48,7 +48,7 @@ export default function ContactPanel({
             <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-[10px] text-gray-400 uppercase tracking-wider">
+                <tr className="text-xs text-gray-400 uppercase tracking-wide">
                   {roleCompanies.length > 1 && <th className="text-left py-1.5 font-medium">Empresa</th>}
                   <th className="text-right py-1.5 font-medium text-emerald-600" title="0-30 + 31-60 + 61-90 días">Por vencer</th>
                   <th className="text-right py-1.5 font-medium text-amber-600" title="91-120 días">Vencido reciente</th>

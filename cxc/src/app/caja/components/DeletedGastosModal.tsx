@@ -96,7 +96,7 @@ export default function DeletedGastosModal({
             <div className="overflow-x-auto">
               <table className="w-full text-xs min-w-[720px]">
                 <thead>
-                  <tr className="border-b border-gray-200 text-[11px] uppercase tracking-[0.05em] text-gray-400">
+                  <tr className="border-b border-gray-200 text-xs uppercase tracking-[0.05em] text-gray-400">
                     <th className="text-left py-2 px-3 font-normal">Fecha</th>
                     <th className="text-left py-2 px-3 font-normal">Descripción</th>
                     <th className="text-left py-2 px-3 font-normal">Responsable</th>

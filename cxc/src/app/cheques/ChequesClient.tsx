@@ -720,26 +720,26 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-8">
             {/* Total a cobrar */}
             <div className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg border border-gray-200 px-3 py-2">
-              <span className="text-[11px] uppercase tracking-wider text-gray-500">Total a cobrar</span>
+              <span className="text-xs uppercase tracking-wide text-gray-500">Total a cobrar</span>
               <span className="flex items-baseline gap-1.5">
                 <span className="font-mono text-sm font-semibold tabular-nums">$<AnimatedNumber value={totalPendiente} formatter={(n: number) => fmt(n)} /></span>
-                <span className="text-[11px] text-gray-400 tabular-nums">{pendientes.length} chq</span>
+                <span className="text-xs text-gray-400 tabular-nums">{pendientes.length} chq</span>
               </span>
             </div>
             {/* Vencen esta semana */}
             <div className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2 ${vencenSemanaKPI.length > 0 ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-200"}`}>
-              <span className="text-[11px] uppercase tracking-wider text-gray-500">Vencen esta semana</span>
+              <span className="text-xs uppercase tracking-wide text-gray-500">Vencen esta semana</span>
               <span className="flex items-baseline gap-1.5">
                 <span className={`font-mono text-sm font-semibold tabular-nums ${vencenSemanaKPI.length > 0 ? "text-amber-600" : ""}`}>{vencenSemanaKPI.length}</span>
-                <span className="text-[11px] text-gray-400 tabular-nums">${fmt(vencenSemanaMonto)}</span>
+                <span className="text-xs text-gray-400 tabular-nums">${fmt(vencenSemanaMonto)}</span>
               </span>
             </div>
             {/* Depositados */}
             <div className="flex items-center justify-between gap-2 bg-gray-50 rounded-lg border border-gray-200 px-3 py-2">
-              <span className="text-[11px] uppercase tracking-wider text-gray-500">Depositados</span>
+              <span className="text-xs uppercase tracking-wide text-gray-500">Depositados</span>
               <span className="flex items-baseline gap-1.5">
                 <span className="font-mono text-sm font-semibold tabular-nums text-green-600">{depositados.length}</span>
-                <span className="text-[11px] text-gray-400 tabular-nums">${fmt(depositadosMonto)}</span>
+                <span className="text-xs text-gray-400 tabular-nums">${fmt(depositadosMonto)}</span>
               </span>
             </div>
           </div>
@@ -772,7 +772,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
           )}
           <div className="grid grid-cols-1 gap-y-4 overflow-visible">
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Cliente <span className="text-red-500">*</span></label>
+              <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Cliente <span className="text-red-500">*</span></label>
               <div className="relative">
                 <input type="text" value={fCliente} onChange={(e) => { setFCliente(e.target.value); setShowSuggestions(true); }} onFocus={() => setShowSuggestions(true)} onBlur={() => { setTimeout(() => setShowSuggestions(false), 200); handleChequeBlur("cliente"); }} className={`w-full border-b ${chequeFieldError("cliente", fCliente) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`} />
                 {showSuggestions && fCliente.length >= 2 && (() => {
@@ -789,7 +789,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
               {chequeFieldError("cliente", fCliente) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Empresa <span className="text-red-500">*</span></label>
+              <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Empresa <span className="text-red-500">*</span></label>
               <SearchableSelect
                 value={fEmpresa}
                 onChange={setFEmpresa}
@@ -802,22 +802,22 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
               {chequeFieldError("empresa", fEmpresa) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">N° Cheque <span className="text-red-500">*</span></label>
+              <label className="text-xs uppercase tracking-[0.05em] text-gray-400">N° Cheque <span className="text-red-500">*</span></label>
               <input type="text" value={fNumero} onChange={(e) => setFNumero(e.target.value)} onBlur={() => handleChequeBlur("numero")} className={`border-b ${chequeFieldError("numero", fNumero) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`} />
               {chequeFieldError("numero", fNumero) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Monto <span className="text-red-500">*</span></label>
+              <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Monto <span className="text-red-500">*</span></label>
               <input type="number" step="0.01" value={fMonto} onChange={(e) => setFMonto(e.target.value)} onBlur={() => handleChequeBlur("monto")} className={`border-b ${chequeFieldError("monto", fMonto) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`} />
               {chequeFieldError("monto", fMonto) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Fecha Depósito <span className="text-red-500">*</span></label>
+              <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Fecha Depósito <span className="text-red-500">*</span></label>
               <input type="date" value={fFecha} onChange={(e) => setFFecha(e.target.value)} onBlur={() => handleChequeBlur("fecha")} className={`border-b ${chequeFieldError("fecha", fFecha) ? "border-red-400" : "border-gray-200"} py-2 text-sm outline-none bg-transparent focus:border-black transition`} />
               {chequeFieldError("fecha", fFecha) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1 relative">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Vendedor <span className="text-red-500">*</span></label>
+              <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Vendedor <span className="text-red-500">*</span></label>
               {!showAddVendedor ? (
                 <SearchableSelect
                   value={fVendedor}
@@ -887,7 +887,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
               {chequeFieldError("vendedor", fVendedor) && <p className="text-red-500 text-xs mt-0.5">Campo obligatorio</p>}
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Notas</label>
+              <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Notas</label>
               <textarea value={fNotas} onChange={(e) => setFNotas(e.target.value)} rows={2} className="border-b border-gray-200 py-2 text-sm outline-none bg-transparent focus:border-black transition resize-none" />
             </div>
           </div>
@@ -937,8 +937,8 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
       {rebotandoId && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50" onClick={() => { setRebotandoId(null); setMotivoRebote(""); }}>
           <div className="bg-white rounded-lg p-6 w-full max-w-md border border-gray-200" onClick={(e) => e.stopPropagation()}>
-            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-4">Marcar como Rebotado</div>
-            <label className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Motivo (opcional)</label>
+            <div className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-4">Marcar como Rebotado</div>
+            <label className="text-xs uppercase tracking-[0.05em] text-gray-400">Motivo (opcional)</label>
             <textarea
               value={motivoRebote}
               onChange={(e) => setMotivoRebote(e.target.value)}
@@ -1005,7 +1005,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
 
             {/* Desktop grid */}
             <div className="hidden sm:block">
-              <div className="grid grid-cols-7 text-center text-xs text-gray-500 uppercase tracking-wider mb-1">
+              <div className="grid grid-cols-7 text-center text-xs text-gray-500 uppercase tracking-wide mb-1">
                 {["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"].map(d => <div key={d} className="py-1">{d}</div>)}
               </div>
               <div className="grid grid-cols-7 border-t border-l border-gray-200">
@@ -1016,7 +1016,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                   const dayCheques = byDay[day] || [];
                   return (
                     <div key={day} className={`border-r border-b border-gray-200 min-h-[80px] p-1 ${isToday ? "bg-blue-50/60" : ""}`}>
-                      <div className={`text-[11px] mb-0.5 ${isToday ? "font-bold text-blue-600" : "text-gray-400"}`}>{day}</div>
+                      <div className={`text-xs mb-0.5 ${isToday ? "font-bold text-blue-600" : "text-gray-400"}`}>{day}</div>
                       <div className="space-y-0.5">
                         {dayCheques.slice(0, 3).map(c => {
                           const ve = visualEstado(c);
@@ -1024,20 +1024,20 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                           <div key={c.id} className="relative">
                             <button onClick={() => setCalPopover(calPopover === c.id ? null : c.id)}
                               title={`N° ${c.numero_cheque} · $${fmt(c.monto)} · ${c.cliente}`}
-                              className={`w-full flex items-center gap-1 text-left text-[10px] px-1.5 py-0.5 rounded ${pillColor(ve)}`}>
+                              className={`w-full flex items-center gap-1 text-left text-xs px-1.5 py-0.5 rounded ${pillColor(ve)}`}>
                               <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ve === "depositado" ? "bg-gray-400" : ve === "pendiente" ? "bg-emerald-500" : "bg-red-500"}`} />
                               <span className="truncate">{c.cliente.length > 12 ? c.cliente.slice(0, 12) + "…" : c.cliente} ${fmt(c.monto)}</span>
                             </button>
                             {calPopover === c.id && (
                               <div className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg p-3 w-56" onClick={e => e.stopPropagation()}>
                                 <div className="text-xs font-medium mb-1">{c.cliente}</div>
-                                <div className="text-[11px] text-gray-500 mb-0.5">N° {c.numero_cheque}</div>
+                                <div className="text-xs text-gray-500 mb-0.5">N° {c.numero_cheque}</div>
                                 <div className="text-sm font-semibold mb-2">${fmt(c.monto)}</div>
                                 <StatusBadge estado={ve} />
                                 {(ve === "pendiente" || ve === "vencido") && (
                                   <div className="flex gap-2 mt-2 pt-2 border-t border-gray-200">
-                                    <button onClick={() => { setConfirmDepositId(c.id); setCalPopover(null); }} className="text-[11px] text-emerald-600 hover:underline">Confirmar depósito</button>
-                                    <button onClick={() => { setRebotandoId(c.id); setCalPopover(null); }} title="Cheque devuelto por el banco" className="text-[11px] text-red-500 hover:underline">Rebotado</button>
+                                    <button onClick={() => { setConfirmDepositId(c.id); setCalPopover(null); }} className="text-xs text-emerald-600 hover:underline">Confirmar depósito</button>
+                                    <button onClick={() => { setRebotandoId(c.id); setCalPopover(null); }} title="Cheque devuelto por el banco" className="text-xs text-red-500 hover:underline">Rebotado</button>
                                   </div>
                                 )}
                               </div>
@@ -1046,7 +1046,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                           );
                         })}
                         {dayCheques.length > 3 && (
-                          <button onClick={() => { setCalPopover(null); setDayChequesModal(dateStr); }} className="text-[9px] text-gray-500 hover:text-black px-1 w-full text-left transition">
+                          <button onClick={() => { setCalPopover(null); setDayChequesModal(dateStr); }} className="text-xs text-gray-500 hover:text-black px-1 w-full text-left transition">
                             +{dayCheques.length - 3} más
                           </button>
                         )}
@@ -1072,12 +1072,12 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                         <div key={c.id}>
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${pillColor(ve)}`}>{ve}</span>
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${pillColor(ve)}`}>{ve}</span>
                               <span className="text-sm truncate">{c.cliente}</span>
                             </div>
                             <span className="text-sm font-medium tabular-nums ml-2">${fmt(c.monto)}</span>
                           </div>
-                          <div className="text-[11px] text-gray-400 mt-0.5 ml-1">N° {c.numero_cheque} · {getCompanyDisplay(c.empresa)}</div>
+                          <div className="text-xs text-gray-400 mt-0.5 ml-1">N° {c.numero_cheque} · {getCompanyDisplay(c.empresa)}</div>
                           {(ve === "pendiente" || ve === "vencido") && (
                             <div className="flex gap-3 mt-1 ml-1">
                               <button onClick={() => setConfirmDepositId(c.id)} className="text-xs text-emerald-600 hover:underline py-1">Confirmar depósito</button>
@@ -1096,7 +1096,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
         );
       })()}
       {viewMode === "calendario" && !loading && (
-        <div className="flex items-center gap-4 text-[11px] text-gray-500 mt-3 px-1">
+        <div className="flex items-center gap-4 text-xs text-gray-500 mt-3 px-1">
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500" /> Pendiente</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500" /> Vencido / Rebotado</span>
           <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-gray-300" /> Depositado</span>
@@ -1206,14 +1206,14 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                   <div className="ml-auto text-right">
                     <div className="text-xs text-gray-400">{fmtDate(c.fecha_deposito)}</div>
                     {ve === "depositado" && c.fecha_depositado && c.fecha_depositado !== c.fecha_deposito && (
-                      <div className={`text-[10px] ${c.fecha_depositado > c.fecha_deposito ? "text-amber-600" : "text-gray-500"}`}>Depositado: {fmtDate(c.fecha_depositado)}</div>
+                      <div className={`text-xs ${c.fecha_depositado > c.fecha_deposito ? "text-amber-600" : "text-gray-500"}`}>Depositado: {fmtDate(c.fecha_depositado)}</div>
                     )}
                   </div>
                 </div>
                 {/* Row 3: Secondary info */}
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[11px] text-gray-400">N° {c.numero_cheque}</span>
-                  <span className="text-[11px] text-gray-400">· {getCompanyDisplay(c.empresa)}</span>
+                  <span className="text-xs text-gray-400">N° {c.numero_cheque}</span>
+                  <span className="text-xs text-gray-400">· {getCompanyDisplay(c.empresa)}</span>
                 </div>
                 {/* State-valid actions with inline guide */}
                 {ve === "depositado" && (
@@ -1222,12 +1222,12 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12h18M3 12l6-6M3 12l6 6" /></svg>
                       Marcar como rebotado
                     </button>
-                    <span className="text-[10px] text-gray-300">Si el banco lo devolvió</span>
+                    <span className="text-xs text-gray-300">Si el banco lo devolvió</span>
                   </div>
                 )}
                 {isRebotado && (
                   <div className="mt-2 pt-2 border-t border-red-100 bg-red-50/40 -mx-4 px-4 pb-1 rounded-b-lg">
-                    <div className="text-[10px] text-red-400 mb-1">Este cheque rebotó{c.motivo_rebote ? ` — ${c.motivo_rebote}` : ""}</div>
+                    <div className="text-xs text-red-400 mb-1">Este cheque rebotó{c.motivo_rebote ? ` — ${c.motivo_rebote}` : ""}</div>
                     <button onClick={(e) => { e.stopPropagation(); redepositar(c.id); }} className="text-xs bg-emerald-600 text-white px-4 py-1.5 rounded-md font-medium min-h-[44px] flex items-center gap-1.5 hover:bg-emerald-700 transition">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
                       Re-depositar cheque
@@ -1329,7 +1329,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                     <tr className="bg-gray-50/90 border-b border-gray-200">
                       <td colSpan={filter !== "depositado" ? 8 : 7} className="px-4 py-2">
                         <span className={`text-sm font-semibold ${g.color}`}>{"▸ "}{g.label}</span>
-                        <span className="text-[11px] text-gray-400 tabular-nums ml-2">({g.items.length})</span>
+                        <span className="text-xs text-gray-400 tabular-nums ml-2">({g.items.length})</span>
                       </td>
                     </tr>
                     {g.items.map(_rr)}
@@ -1373,14 +1373,14 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
                           <span className="text-sm font-medium truncate">{c.cliente}</span>
                           <span className="text-sm font-semibold tabular-nums flex-shrink-0">${fmt(c.monto)}</span>
                         </div>
-                        <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-500">
+                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
                           <StatusBadge estado={ve} />
                           <span>N° {c.numero_cheque}</span>
                           <span>·</span>
                           <span className="truncate">{getCompanyDisplay(c.empresa)}</span>
                         </div>
                         {ve === "depositado" && c.fecha_depositado && c.fecha_depositado !== c.fecha_deposito && (
-                          <div className={`text-[10px] mt-1 ${c.fecha_depositado > c.fecha_deposito ? "text-amber-600" : "text-gray-500"}`}>Depositado: {fmtDate(c.fecha_depositado)}</div>
+                          <div className={`text-xs mt-1 ${c.fecha_depositado > c.fecha_deposito ? "text-amber-600" : "text-gray-500"}`}>Depositado: {fmtDate(c.fecha_depositado)}</div>
                         )}
                       </button>
                       {(isPending || isRebotado) && (
@@ -1435,7 +1435,7 @@ function ChequesPage({ initialData }: { initialData: ChequesInitialData }) {
           const ve = visualEstado(detailCheque);
           const Row = ({ label, value }: { label: string; value: ReactNode }) => (
             <div className="flex items-baseline justify-between gap-3 py-1.5 border-b border-gray-100 last:border-0">
-              <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">{label}</span>
+              <span className="text-xs uppercase tracking-[0.05em] text-gray-400">{label}</span>
               <span className="text-sm text-gray-900 text-right">{value}</span>
             </div>
           );

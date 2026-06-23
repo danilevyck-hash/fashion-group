@@ -273,7 +273,7 @@ function ProductosTab({ products }: { products: JoybeesProduct[] }) {
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-semibold text-gray-900 truncate">{product.name}</p>
                     {badgeLabel && (
-                      <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                      <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
                         product.badge === "oferta"
                           ? "bg-orange-50 text-orange-600"
                           : "bg-blue-50 text-blue-600"
@@ -282,7 +282,7 @@ function ProductosTab({ products }: { products: JoybeesProduct[] }) {
                       </span>
                     )}
                     {product.stock === 0 && (
-                      <span className="text-[10px] font-medium bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">Sin stock</span>
+                      <span className="text-xs font-medium bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">Sin stock</span>
                     )}
                   </div>
                   <p className="text-xs text-gray-400 mt-0.5">
@@ -572,17 +572,17 @@ function ImportSection({
                       <td className="px-3 py-1.5 text-right tabular-nums">{row.quantity}</td>
                       <td className="px-3 py-1.5">
                         {row.badge ? (
-                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                          <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
                             row.badge === "oferta" ? "bg-orange-50 text-orange-600" : "bg-blue-50 text-blue-600"
                           }`}>
                             {row.badge === "oferta" ? "Oferta" : "Nuevo"}
                           </span>
                         ) : (
-                          <span className="text-[10px] text-gray-400">—</span>
+                          <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
                       <td className="px-3 py-1.5">
-                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
                           exists ? "bg-blue-50 text-blue-600" : "bg-green-50 text-green-600"
                         }`}>
                           {exists ? "Actualizar" : "Nuevo"}
@@ -752,7 +752,7 @@ function BatchPhotosSection({
                   className="w-full aspect-square object-cover"
                   unoptimized
                 />
-                <div className={`absolute bottom-0 left-0 right-0 px-1.5 py-1 text-[10px] font-mono truncate ${match.matched ? "bg-green-500/90 text-white" : "bg-red-500/90 text-white"}`}>
+                <div className={`absolute bottom-0 left-0 right-0 px-1.5 py-1 text-xs font-mono truncate ${match.matched ? "bg-green-500/90 text-white" : "bg-red-500/90 text-white"}`}>
                   {match.sku}
                 </div>
               </div>

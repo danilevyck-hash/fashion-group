@@ -96,7 +96,7 @@ function AnualCell({ cur, prev, mode, dark = false, showDelta = true }: {
     <td className={cn("border-b px-2.5 py-3.5 text-right align-top", dark ? "border-stone-800" : "border-stone-200")}>
       <div className={cn("font-mono text-sm tabular-nums", dark ? "text-white" : "text-stone-950")}>{val}</div>
       {d && (d.arrow !== null || d.displayValue !== "—") && (
-        <div className={cn("font-mono text-[11px] tabular-nums", dark ? toneClassDark[d.tone] : toneClass[d.tone])}>
+        <div className={cn("font-mono text-xs tabular-nums", dark ? toneClassDark[d.tone] : toneClass[d.tone])}>
           {d.arrow ? `${d.arrow} ` : ""}{d.displayValue}
         </div>
       )}
@@ -124,20 +124,20 @@ export function ResumenAnual({ data, error, viewMode }: {
           <table className="w-full border-collapse" style={{ minWidth: 640 }}>
             <thead>
               <tr className="bg-stone-100 text-left">
-                <th className="sticky left-0 top-0 z-30 min-w-[160px] bg-stone-100 px-3.5 py-3.5 text-[11px] font-medium uppercase tracking-wider text-stone-500">
+                <th className="sticky left-0 top-0 z-30 min-w-[160px] bg-stone-100 px-3.5 py-3.5 text-xs font-medium uppercase tracking-wide text-stone-500">
                   Empresa
                 </th>
                 {years.map((y) => (
-                  <th key={y} className="sticky top-0 z-20 bg-stone-100 px-2.5 py-3.5 text-right text-[11px] font-medium uppercase tracking-wider text-stone-500">
+                  <th key={y} className="sticky top-0 z-20 bg-stone-100 px-2.5 py-3.5 text-right text-xs font-medium uppercase tracking-wide text-stone-500">
                     <div className="text-stone-700">{y}</div>
                     {parcial && parcial.year === y ? (
-                      <div className="text-[10px] font-normal normal-case tracking-normal text-stone-400">parcial ({parcial.label})</div>
+                      <div className="text-xs font-normal normal-case tracking-normal text-stone-400">parcial ({parcial.label})</div>
                     ) : y === currentYear ? (
-                      <div className="text-[10px] font-normal normal-case tracking-normal text-stone-400">al día</div>
+                      <div className="text-xs font-normal normal-case tracking-normal text-stone-400">al día</div>
                     ) : null}
                   </th>
                 ))}
-                <th className="sticky top-0 z-20 bg-stone-100 px-3.5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-stone-950">Total</th>
+                <th className="sticky top-0 z-20 bg-stone-100 px-3.5 py-3.5 text-right text-xs font-semibold uppercase tracking-wide text-stone-950">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -154,7 +154,7 @@ export function ResumenAnual({ data, error, viewMode }: {
                 </tr>
               ))}
               <tr className="bg-stone-950 text-white">
-                <td className="sticky left-0 z-10 bg-stone-950 px-3.5 py-3.5 text-xs font-medium uppercase tracking-widest">Total Grupo</td>
+                <td className="sticky left-0 z-10 bg-stone-950 px-3.5 py-3.5 text-xs font-medium uppercase tracking-wide">Total Grupo</td>
                 {years.map((y) => {
                   const c = totalGrupo.byYear[y] ?? emptyCell;
                   return <AnualCell key={y} cur={c} prev={c.prev} mode={viewMode} dark />;
@@ -171,7 +171,7 @@ export function ResumenAnual({ data, error, viewMode }: {
         )}
       </Card>
 
-      <div className="flex flex-wrap items-center gap-4 text-[11px] text-stone-500">
+      <div className="flex flex-wrap items-center gap-4 text-xs text-stone-500">
         <span className="inline-flex items-center gap-1.5">
           <span className="text-emerald-700">▲</span>
           {viewMode === "margen" ? "Δ interanual mayor a +0.5 pts" : "Δ interanual mayor a +5%"}

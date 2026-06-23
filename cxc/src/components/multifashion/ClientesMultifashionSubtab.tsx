@@ -213,7 +213,7 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h3 className="font-display text-base font-semibold text-stone-950">Clientes · {periodoStr}</h3>
-              <p className="mt-0.5 text-[11px] text-stone-400">Mejores clientes por monto. Mostrador anónimo aparte.</p>
+              <p className="mt-0.5 text-xs text-stone-400">Mejores clientes por monto. Mostrador anónimo aparte.</p>
             </div>
             <div className="inline-flex items-center gap-0.5 rounded-md border border-stone-200 bg-stone-50 p-0.5">
               {RANGO_OPCIONES.map(opt => (
@@ -222,7 +222,7 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
                   type="button"
                   onClick={() => setRango(opt.value)}
                   className={cn(
-                    "rounded px-2.5 py-1 text-[11px] font-medium transition",
+                    "rounded px-2.5 py-1 text-xs font-medium transition",
                     rango === opt.value
                       ? "bg-white text-stone-900 shadow-sm"
                       : "text-stone-500 hover:text-stone-800",
@@ -276,11 +276,11 @@ export function ClientesMultifashionSubtab({ selectedYear, mes }: ClientesMultif
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-stone-900">Anónimos (mostrador)</p>
-                <p className="text-[11px] text-stone-500">Ventas de CONTADO / CONSUMIDOR FINAL, sin cliente identificado.</p>
+                <p className="text-xs text-stone-500">Ventas de CONTADO / CONSUMIDOR FINAL, sin cliente identificado.</p>
               </div>
               <div className="text-right">
                 <p className="font-mono text-sm tabular-nums text-stone-950">{fmtMoney(retail.ventas_anonimas)}</p>
-                <p className="font-mono text-[11px] tabular-nums text-stone-500">{retail.tickets_anonimos.toLocaleString()} tickets</p>
+                <p className="font-mono text-xs tabular-nums text-stone-500">{retail.tickets_anonimos.toLocaleString()} tickets</p>
               </div>
             </Card>
           )}
@@ -320,7 +320,7 @@ function ClientesSection({
         </div>
         <div>
           <h3 className="font-display text-sm font-semibold text-stone-950">{title}</h3>
-          <p className="text-[11px] text-stone-500">{subtitle}</p>
+          <p className="text-xs text-stone-500">{subtitle}</p>
         </div>
       </div>
 
@@ -330,7 +330,7 @@ function ClientesSection({
         </Card>
       ) : (
         <Card className="overflow-hidden p-0">
-          <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem] items-center gap-3 border-b border-stone-200 bg-stone-50 px-3.5 py-2 text-[10.5px] font-medium uppercase tracking-[0.04em] text-stone-500">
+          <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_7rem_4rem_5rem_6rem_1.25rem] items-center gap-3 border-b border-stone-200 bg-stone-50 px-3.5 py-2 text-xs font-medium uppercase tracking-[0.04em] text-stone-500">
             <span className="text-right" title="Posición en el ranking por monto">#</span>
             <span>Cliente</span>
             <span className="text-right">Total</span>
@@ -389,7 +389,7 @@ function ClienteRowItem({
           isExpanded && "bg-stone-50/80",
         )}
       >
-        <span className="text-right font-mono text-[11px] text-stone-500 tabular-nums">{rank}</span>
+        <span className="text-right font-mono text-xs text-stone-500 tabular-nums">{rank}</span>
         <span className="truncate font-medium text-stone-900">{cliente.nombre}</span>
         <span className="text-right font-mono text-stone-950 tabular-nums">{fmtMoney(cliente.total_ytd)}</span>
         <span className="text-right font-mono text-stone-700 tabular-nums">{cliente.tickets_ytd.toLocaleString()}</span>
@@ -449,9 +449,9 @@ function ClienteSparkline({
                   />
                 )}
               </div>
-              <p className="text-[9.5px] font-medium uppercase text-stone-500 whitespace-nowrap">{labelFor(m)}</p>
+              <p className="text-xs font-medium uppercase text-stone-500 whitespace-nowrap">{labelFor(m)}</p>
               <p className={cn(
-                "font-mono text-[10px] tabular-nums",
+                "font-mono text-xs tabular-nums",
                 hasData ? "text-stone-700" : "text-stone-300",
               )}>
                 {hasData ? fmtMoneyCompact(m.ventas) : "—"}
@@ -460,7 +460,7 @@ function ClienteSparkline({
           );
         })}
       </div>
-      <p className="mt-2 text-[10.5px] text-stone-500">
+      <p className="mt-2 text-xs text-stone-500">
         Histórico mensual del rango. Escala compartida entre wholesale y retail.
       </p>
     </div>

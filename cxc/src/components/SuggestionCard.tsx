@@ -12,7 +12,7 @@ export default function SuggestionCard({ suggestion, onDismiss }: Props) {
     <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 mb-4 flex items-start gap-3">
       <span className="text-base flex-shrink-0 mt-0.5">💡</span>
       <div className="flex-1 min-w-0">
-        <p className="text-xs uppercase tracking-widest text-gray-400 mb-1">Sugerencia</p>
+        <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Sugerencia</p>
         <p className="text-sm text-gray-700">{suggestion.message}</p>
         {suggestion.actionLabel && suggestion.onAction && (
           <button

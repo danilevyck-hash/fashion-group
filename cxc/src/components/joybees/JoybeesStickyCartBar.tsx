@@ -62,7 +62,7 @@ export default function JoybeesStickyCartBar({
         <div className="overflow-y-auto" style={{ maxHeight: "260px" }}>
           <div className="px-4 pt-3 pb-1">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-[#404041]/50 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-[#404041]/50 uppercase tracking-wide">
                 Tu pedido
               </span>
               <button
@@ -80,7 +80,7 @@ export default function JoybeesStickyCartBar({
                 <div key={item.product_id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
                   <div className="flex-1 min-w-0 mr-3">
                     <span className="text-sm text-[#404041] truncate block font-medium">{item.name}</span>
-                    <span className="text-[10px] text-[#404041]/40">x{item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * BULTO_SIZE} pzas)</span>
+                    <span className="text-xs text-[#404041]/40">x{item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * BULTO_SIZE} pzas)</span>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <div className="flex items-center gap-0.5">
@@ -133,7 +133,7 @@ export default function JoybeesStickyCartBar({
               <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
               <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
             </svg>
-            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#FFE443] text-[#404041] text-[9px] font-bold flex items-center justify-center">
+            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#FFE443] text-[#404041] text-xs font-bold flex items-center justify-center">
               {cartCount > 9 ? "9+" : cartCount}
             </span>
           </div>

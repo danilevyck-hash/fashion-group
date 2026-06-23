@@ -84,7 +84,7 @@ export default function NewOrderModal({ onClose, onSelected }: Props) {
         <div className="flex items-center gap-2 mb-3">
           <span className="w-6 h-6 rounded-full bg-black text-white text-xs flex items-center justify-center font-medium">1</span>
           <span className="w-6 h-6 rounded-full bg-gray-200 text-gray-400 text-xs flex items-center justify-center font-medium">2</span>
-          <span className="text-[11px] text-gray-400 ml-1">Paso 1 de 2: Selecciona cliente</span>
+          <span className="text-xs text-gray-400 ml-1">Paso 1 de 2: Selecciona cliente</span>
         </div>
         <h2 className="text-base font-medium mb-1">Nuevo Pedido</h2>
         <p className="text-xs text-gray-400 mb-4">Nombre del cliente para este pedido</p>

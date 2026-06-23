@@ -114,7 +114,7 @@ function Field({
       {children}
       {hint && (
         <div
-          className="text-[11px] mt-0.5 leading-snug"
+          className="text-xs mt-0.5 leading-snug"
           style={{ color: "var(--caja-fg-muted)" }}
         >
           {hint}
@@ -618,7 +618,7 @@ export default function GastoForm({
             />
             {gSubtotal && subtotalNum <= 0 && (
               <p
-                className="text-[11px] mt-1"
+                className="text-xs mt-1"
                 style={{ color: "var(--caja-danger-onSoft)" }}
               >
                 El monto debe ser mayor a $0
@@ -644,7 +644,7 @@ export default function GastoForm({
               <option value="7">7%</option>
             </SelectInput>
             <div
-              className="text-[11px] mt-1.5 leading-snug"
+              className="text-xs mt-1.5 leading-snug"
               style={{ color: "var(--caja-fg-muted)" }}
             >
               Calculado al {gItbmsPct}% del subtotal:{" "}

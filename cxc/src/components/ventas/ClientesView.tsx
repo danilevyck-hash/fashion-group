@@ -344,18 +344,18 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
             línea 2 con 6px de separación. Evita que el chip quede pegado
             al texto y dé sensación de amontonamiento. */}
         <div className="md:hidden">
-          <div className="text-[11px] text-stone-500">
+          <div className="text-xs text-stone-500">
             <span className="font-mono text-stone-950">{filtered.length}</span> clientes · {vistaSubtitleTextShort}
           </div>
           {isClosedYear ? (
-            <span className={cn("mt-1.5 inline-flex rounded px-1.5 py-0.5 text-[10px] font-medium", vistaChipTone)}>
+            <span className={cn("mt-1.5 inline-flex rounded px-1.5 py-0.5 text-xs font-medium", vistaChipTone)}>
               {vistaChipLabel}
             </span>
           ) : (
             <button
               type="button"
               onClick={() => setVista(v => (v === "12m" ? "ytd" : "12m"))}
-              className={cn("mt-1.5 inline-flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-medium active:scale-[0.97]", vistaChipTone)}
+              className={cn("mt-1.5 inline-flex items-center gap-1 rounded px-1.5 py-1 text-xs font-medium active:scale-[0.97]", vistaChipTone)}
               title={vistaChipTitle}
             >
               {vistaChipLabel} ⇄
@@ -437,7 +437,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
               {ventasLocalRow && !search.trim() && (
                 <tr className="bg-amber-50/40">
                   <td className="border-b border-stone-200 px-3.5 py-3 text-right">
-                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">Mostrador</span>
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">Mostrador</span>
                   </td>
                   <td className="border-b border-stone-200 px-3.5 py-3 text-sm font-medium text-stone-700" colSpan={2}>
                     {ventasLocalRow.nombre}
@@ -482,7 +482,7 @@ export function ClientesView({ data: initialData, selectedYear, isClosedYear }: 
         {ventasLocalRow && !search.trim() && (
           <div className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2.5">
             <div className="flex items-center gap-2">
-              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800">Mostrador</span>
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">Mostrador</span>
               <span className="text-sm font-medium text-stone-700">{ventasLocalRow.nombre}</span>
             </div>
             <div className="mt-1 flex items-center justify-between text-xs text-stone-500">
@@ -597,7 +597,7 @@ function ClienteRow({
             />
           </HoverCardContent>
         </HoverCard>
-        <div className="font-mono text-[11px] leading-tight text-stone-500">{c.id}</div>
+        <div className="font-mono text-xs leading-tight text-stone-500">{c.id}</div>
       </td>
       <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-xs text-stone-700">
         {isMultiEmpresa ? (
@@ -618,12 +618,12 @@ function ClienteRow({
                 collisionPadding={8}
                 className="min-w-[240px] border-0 bg-stone-950 p-3 text-white shadow-lg"
               >
-                <div className="text-[10px] font-medium uppercase tracking-wider text-stone-400">
+                <div className="text-xs font-medium uppercase tracking-wide text-stone-400">
                   Desglose por empresa
                 </div>
                 <div className="mt-2 space-y-1">
                   {(c.empresas_breakdown ?? []).map(b => (
-                    <div key={b.empresaKey} className="flex justify-between gap-4 text-[11px]">
+                    <div key={b.empresaKey} className="flex justify-between gap-4 text-xs">
                       <span className="text-stone-300">{b.empresaNombre}</span>
                       <span className="font-mono text-white tabular-nums">{fmtMoney(b.monto)}</span>
                     </div>
@@ -663,7 +663,7 @@ function OtrosRow({ c, onClick }: { c: Cliente; onClick: () => void }) {
       <td className="border-b border-stone-200 px-3.5 py-3 text-right font-mono text-xs text-stone-400 tabular-nums">—</td>
       <td className="border-b border-stone-200 px-3.5 py-3 text-sm text-stone-950">
         <div className="font-medium leading-tight">{c.nombre}</div>
-        <div className="font-mono text-[11px] leading-tight text-stone-500">click para ver detalle</div>
+        <div className="font-mono text-xs leading-tight text-stone-500">click para ver detalle</div>
       </td>
       <td className="whitespace-nowrap border-b border-stone-200 px-3.5 py-3 text-xs text-stone-700">
         {c.empresa}
@@ -715,7 +715,7 @@ function ClienteCard({
             {c.nombre}
           </Link>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-[11px] text-stone-500">
+        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-stone-500">
           <span className="font-mono">{c.id}</span>
           {showEmpresa && c.empresa && (
             <>
@@ -733,7 +733,7 @@ function ClienteCard({
             {fmt.arrow && <span className="mr-0.5">{fmt.arrow}</span>}
             {fmt.displayValue}
           </div>
-          <div className="ml-auto truncate text-[11px] text-stone-500">
+          <div className="ml-auto truncate text-xs text-stone-500">
             {c.ultima || "—"}
           </div>
         </div>
@@ -754,7 +754,7 @@ function OtrosCard({ c, onTap }: { c: Cliente; onTap: () => void }) {
       className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3.5 active:bg-stone-100"
     >
       <div className="text-[15px] font-medium leading-tight text-stone-950">{c.nombre}</div>
-      <div className="mt-1 text-[11px] text-stone-500">Ver detalle de huérfanos sin master</div>
+      <div className="mt-1 text-xs text-stone-500">Ver detalle de huérfanos sin master</div>
       <div className="mt-3 flex items-baseline gap-3">
         <div className="font-mono text-base font-medium tabular-nums text-stone-950">
           {fmtMoneyCompact(c.ytd)}
@@ -763,7 +763,7 @@ function OtrosCard({ c, onTap }: { c: Cliente; onTap: () => void }) {
           {fmt.arrow && <span className="mr-0.5">{fmt.arrow}</span>}
           {fmt.displayValue}
         </div>
-        <div className="ml-auto text-[11px] text-stone-500">{c.ultima || "—"}</div>
+        <div className="ml-auto text-xs text-stone-500">{c.ultima || "—"}</div>
       </div>
     </div>
   );
@@ -780,14 +780,14 @@ function SortHeader({
     <th
       onClick={() => onClick(col)}
       className={cn(
-        "cursor-pointer select-none whitespace-nowrap border-b border-stone-200 bg-stone-100 px-3.5 py-2.5 text-[11px] font-medium uppercase tracking-wider transition",
+        "cursor-pointer select-none whitespace-nowrap border-b border-stone-200 bg-stone-100 px-3.5 py-2.5 text-xs font-medium uppercase tracking-wide transition",
         align === "right" ? "text-right" : "text-left",
         active ? "text-stone-950" : "text-stone-500 hover:text-stone-700"
       )}
     >
       <span className="inline-flex items-center gap-1">
         {children}
-        <span className={cn("text-[9px]", active ? "opacity-100" : "opacity-35")}>
+        <span className={cn("text-xs", active ? "opacity-100" : "opacity-35")}>
           {active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
         </span>
       </span>

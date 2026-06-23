@@ -166,7 +166,7 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
               <ScrollableTable>
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-[11px] uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
+                    <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
                       <th className="py-2 px-3">Código</th>
                       <th className="py-2 px-3">Nombre</th>
                       <th className="py-2 px-3">Teléfono</th>
@@ -213,7 +213,7 @@ export default function ClientesListClient({ initialClientes, initialTotal, prov
                   >
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="font-medium truncate">{c.nombre}</span>
-                      <span className="shrink-0 text-[11px] tabular-nums text-gray-400">{c.codigo}</span>
+                      <span className="shrink-0 text-xs tabular-nums text-gray-400">{c.codigo}</span>
                     </div>
                     <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
                       {tHref ? (

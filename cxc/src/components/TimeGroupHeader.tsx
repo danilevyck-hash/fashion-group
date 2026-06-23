@@ -41,7 +41,7 @@ export default function TimeGroupHeader({
         <span className={`text-sm font-semibold ${color}`}>
           {label}
         </span>
-        <span className="text-[11px] text-gray-400 tabular-nums">
+        <span className="text-xs text-gray-400 tabular-nums">
           ({count} {count === 1 ? "guía" : "guías"})
         </span>
       </button>

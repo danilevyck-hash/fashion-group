@@ -197,13 +197,13 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
       <div className={cn(loading && "opacity-60 transition-opacity")}>
         <h3 className="font-display text-base font-semibold text-stone-950">Vendedoras · {chipLabel[chip]}</h3>
         {resp && (
-          <p className="mt-0.5 text-[11px] text-stone-500">
+          <p className="mt-0.5 text-xs text-stone-500">
             <span className="font-mono tabular-nums text-stone-700">{resp.total_vendedoras_periodo}</span> vendedoras ·{" "}
             <span className="font-mono tabular-nums text-stone-700">{fmtMoney(resp.ventas_total)}</span> ventas ·{" "}
             <span className="font-mono tabular-nums text-stone-700">{resp.tickets_total.toLocaleString()}</span> tickets
           </p>
         )}
-        <p className="mt-1 text-[11px] text-stone-400">Ventas atribuidas a cada vendedor (incluye mayoreo si lo hubo).</p>
+        <p className="mt-1 text-xs text-stone-400">Ventas atribuidas a cada vendedor (incluye mayoreo si lo hubo).</p>
       </div>
 
       {/* Tabla única */}
@@ -217,11 +217,11 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
               <table className="w-full border-collapse" style={{ minWidth: 760 }}>
                 <thead>
                   <tr className="bg-stone-100">
-                    <th className="w-10 border-b border-stone-200 px-3.5 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider text-stone-500">#</th>
-                    <th className="border-b border-stone-200 px-3.5 py-2.5 text-left text-[11px] font-medium uppercase tracking-wider text-stone-500">Vendedora</th>
+                    <th className="w-10 border-b border-stone-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-stone-500">#</th>
+                    <th className="border-b border-stone-200 px-3.5 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-stone-500">Vendedora</th>
                     <SortHeader col="tickets"      sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Tickets</SortHeader>
                     <SortHeader col="ventas"       sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Ventas</SortHeader>
-                    <th className="border-b border-stone-200 px-3.5 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider text-stone-500">Ticket prom.</th>
+                    <th className="border-b border-stone-200 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-stone-500">Ticket prom.</th>
                     <SortHeader col="delta_ventas" sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Δ vs año pasado</SortHeader>
                     <SortHeader col="comision"     sortBy={sortBy} sortDir={sortDir} onClick={onSort}>Comisión</SortHeader>
                   </tr>
@@ -255,15 +255,15 @@ function BonoBadges({ v, badge }: { v: VendedoraDetalle; badge?: BonoBadge }) {
   return (
     <>
       {v.manager && (
-        <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-[10px] font-medium text-teal-700">Gerente</span>
+        <span className="rounded-md bg-teal-50 px-1.5 py-0.5 text-xs font-medium text-teal-700">Gerente</span>
       )}
       {badge?.winner && (
-        <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800">
+        <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-100 px-1.5 py-0.5 text-xs font-semibold text-amber-800">
           <Award className="h-3 w-3" /> Bono $50
         </span>
       )}
       {v.manager && badge && badge.gerenteBono > 0 && (
-        <span className="inline-flex items-center gap-0.5 rounded-md bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800">
+        <span className="inline-flex items-center gap-0.5 rounded-md bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">
           <Award className="h-3 w-3" /> Bono ${badge.gerenteBono}
         </span>
       )}
@@ -316,7 +316,7 @@ function VendedoraCard({ v, rank, badge }: { v: VendedoraDetalle; rank: number; 
           <span className="ml-1 text-stone-400">vs año pasado</span>
         </span>
       </div>
-      <div className="mt-1 text-[11px] text-stone-500">
+      <div className="mt-1 text-xs text-stone-500">
         <span className="font-mono tabular-nums">{v.tickets.toLocaleString()}</span> tickets ·{" "}
         <span className="font-mono tabular-nums">${v.ticket_promedio.toFixed(2)}</span> tkt prom ·{" "}
         <span className="font-mono tabular-nums">${v.comision.toFixed(2)}</span> comisión
@@ -368,13 +368,13 @@ function SortHeader({
     <th
       onClick={() => onClick(col)}
       className={cn(
-        "cursor-pointer select-none whitespace-nowrap border-b border-stone-200 bg-stone-100 px-3.5 py-2.5 text-right text-[11px] font-medium uppercase tracking-wider transition",
+        "cursor-pointer select-none whitespace-nowrap border-b border-stone-200 bg-stone-100 px-3.5 py-2.5 text-right text-xs font-medium uppercase tracking-wide transition",
         active ? "text-stone-950" : "text-stone-500 hover:text-stone-700"
       )}
     >
       <span className="inline-flex items-center gap-1">
         {children}
-        <span className={cn("text-[9px]", active ? "opacity-100" : "opacity-35")}>
+        <span className={cn("text-xs", active ? "opacity-100" : "opacity-35")}>
           {active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
         </span>
       </span>

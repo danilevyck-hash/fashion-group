@@ -108,7 +108,7 @@ export default function ProveedoresListClient() {
 
           {/* Total por pagar (grupo o empresa filtrada) */}
           <div className="border border-gray-200 rounded-lg p-4 mb-4">
-            <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400">
+            <div className="text-xs uppercase tracking-[0.05em] text-gray-400">
               {empresa ? `Por pagar · ${getCompanyDisplay(empresa)}` : "Por pagar · grupo"}
             </div>
             <div className={`text-2xl font-semibold tabular-nums mt-1 ${grupoSaldo < 0 ? "text-blue-600" : "text-purple-700"}`}>
@@ -150,7 +150,7 @@ export default function ProveedoresListClient() {
                 <ScrollableTable>
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-left text-[11px] uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
+                      <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
                         <th className="py-2 px-3">Proveedor</th>
                         <th className="py-2 px-3 text-right">Comprado YTD</th>
                         <th className="py-2 px-3 text-right">Por pagar</th>
@@ -164,7 +164,7 @@ export default function ProveedoresListClient() {
                           <td colSpan={colsCount} className="py-1">
                             <button
                               onClick={() => setShowSinSaldo((v) => !v)}
-                              className="text-[11px] text-gray-400 hover:text-gray-600 transition"
+                              className="text-xs text-gray-400 hover:text-gray-600 transition"
                             >
                               {showSinSaldo ? "▾" : "▸"} Ver {sinSaldo.length} sin saldo
                             </button>
@@ -184,7 +184,7 @@ export default function ProveedoresListClient() {
                   <li className="px-1 py-2">
                     <button
                       onClick={() => setShowSinSaldo((v) => !v)}
-                      className="text-[11px] text-gray-400 hover:text-gray-600 transition"
+                      className="text-xs text-gray-400 hover:text-gray-600 transition"
                     >
                       {showSinSaldo ? "▾" : "▸"} Ver {sinSaldo.length} sin saldo
                     </button>

@@ -66,7 +66,7 @@ export default function SignatureCanvas({ label, canvasRef, initialImage, onChan
 
   return (
     <div>
-      <label className="text-xs uppercase tracking-wider text-gray-400 mb-2 block">
+      <label className="text-xs uppercase tracking-wide text-gray-400 mb-2 block">
         {label}
       </label>
       <canvas

@@ -80,7 +80,7 @@ export default function StickyCartBar({
         <div className="overflow-y-auto" style={{ maxHeight: "260px" }}>
           <div className="px-4 pt-3 pb-1">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-[#1A2656]/50 uppercase tracking-wider">
+              <span className="text-xs font-semibold text-[#1A2656]/50 uppercase tracking-wide">
                 Tu pedido
               </span>
               <button
@@ -103,7 +103,7 @@ export default function StickyCartBar({
                   <div key={item.product_id} className="flex items-center justify-between py-2.5 border-b border-gray-50 last:border-0">
                     <div className="flex-1 min-w-0 mr-3">
                       <span className="text-sm text-[#1A2656] truncate block font-medium">{item.name}</span>
-                      <span className="text-[10px] text-[#1A2656]/40">x{item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * bs} pzas)</span>
+                      <span className="text-xs text-[#1A2656]/40">x{item.quantity} bulto{item.quantity !== 1 ? "s" : ""} ({item.quantity * bs} pzas)</span>
                     </div>
                     <div className="flex items-center gap-3 shrink-0">
                       <div className="flex items-center gap-0.5">
@@ -133,12 +133,12 @@ export default function StickyCartBar({
               return (
                 <>
                   {hasPreorders && regular.length > 0 && (
-                    <div className="px-1 pt-1 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-[#1A2656]/40">Pedido</div>
+                    <div className="px-1 pt-1 pb-0.5 text-xs font-bold uppercase tracking-wide text-[#1A2656]/40">Pedido</div>
                   )}
                   {regular.map(renderItem)}
                   {hasPreorders && (
                     <>
-                      <div className="px-1 pt-3 pb-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-600">Pre-orden</div>
+                      <div className="px-1 pt-3 pb-0.5 text-xs font-bold uppercase tracking-wide text-amber-600">Pre-orden</div>
                       {preorders.map(renderItem)}
                     </>
                   )}
@@ -166,7 +166,7 @@ export default function StickyCartBar({
       {/* Client name input (public variant) */}
       {variant === "public" && onClientNameChange && (
         <div className="px-3 pt-2 pb-1 bg-white border-t border-gray-100">
-          <label className="block text-[10px] font-semibold uppercase tracking-wider text-[#1A2656]/50 mb-1">
+          <label className="block text-xs font-semibold uppercase tracking-wide text-[#1A2656]/50 mb-1">
             Tu nombre
           </label>
           <input
@@ -193,7 +193,7 @@ export default function StickyCartBar({
               <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
               <path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" />
             </svg>
-            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#E4002B] text-white text-[9px] font-bold flex items-center justify-center">
+            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#E4002B] text-white text-xs font-bold flex items-center justify-center">
               {cartCount > 9 ? "9+" : cartCount}
             </span>
           </div>

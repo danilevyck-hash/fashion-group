@@ -61,7 +61,7 @@ export function FacturaCard({
         <div className="flex items-center gap-1.5 shrink-0">
           {!anulada && (
             <span
-              className={`text-[10px] px-1.5 py-0.5 rounded border font-medium ${
+              className={`text-xs px-1.5 py-0.5 rounded border font-medium ${
                 factura.estado_pago === "pagado"
                   ? "bg-green-50 text-green-700 border-green-200"
                   : "bg-gray-100 text-gray-600 border-gray-300"
@@ -72,19 +72,19 @@ export function FacturaCard({
           )}
           {factura.tiene_importacion && !anulada && (
             <span
-              className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-medium"
+              className="text-xs px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 font-medium"
               title={`Compra en zona libre · ${PORCENTAJE_IMPORTACION_ZONA_LIBRE}% de importación incluido en el total`}
             >
               Zona libre
             </span>
           )}
           {tienePdf && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-900 text-white font-semibold tracking-wide">
+            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-900 text-white font-semibold tracking-wide">
               PDF
             </span>
           )}
           {anulada && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-50 text-red-700 font-medium">
+            <span className="text-xs px-1.5 py-0.5 rounded bg-red-50 text-red-700 font-medium">
               Anulada
             </span>
           )}
@@ -129,7 +129,7 @@ export function FacturaCard({
             return (
               <div
                 key={m.marca.id}
-                className={`inline-flex items-center gap-1.5 border rounded-md px-1.5 py-0.5 text-[11px] ${colorParaMarca(m.marca.codigo)}`}
+                className={`inline-flex items-center gap-1.5 border rounded-md px-1.5 py-0.5 text-xs ${colorParaMarca(m.marca.codigo)}`}
               >
                 <span className="font-semibold">[{inicial}]</span>
                 <span className="font-medium">{m.marca.nombre}</span>

@@ -55,7 +55,7 @@ export default function FreshnessChip({ ts, fromCache = false, financial = false
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium tabular-nums ${tone} ${className}`}
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums ${tone} ${className}`}
       title={new Date(ts).toLocaleString("es-PA")}
     >
       {(stale || !online) && (

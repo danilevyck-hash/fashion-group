@@ -100,22 +100,22 @@ export default function DespachoForm({
       {tipoDespacho === "externo" ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div>
-            <label className="text-xs uppercase tracking-wider text-gray-400 mb-1 block">Placa del vehiculo *</label>
+            <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Placa del vehiculo *</label>
             <input type="text" value={bPlaca} onChange={(e) => setBPlaca(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-gray-400 mb-1 block">N° guía del transportista *</label>
+            <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">N° guía del transportista *</label>
             <input type="text" value={bNumeroGuiaTransp} onChange={(e) => setBNumeroGuiaTransp(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-gray-400 mb-1 block">Nombre del receptor *</label>
+            <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Nombre del receptor *</label>
             <input type="text" value={bReceptor} onChange={(e) => setBReceptor(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-gray-400 mb-1 block">Cedula del receptor *</label>
+            <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Cedula del receptor *</label>
             <input type="text" value={bCedula} onChange={(e) => setBCedula(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
           </div>
@@ -123,22 +123,22 @@ export default function DespachoForm({
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
           <div>
-            <label className="text-xs uppercase tracking-wider text-gray-400 mb-1 block">Placa del vehiculo *</label>
+            <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Placa del vehiculo *</label>
             <input type="text" value={bPlaca} onChange={(e) => setBPlaca(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-gray-400 mb-1 block">Chofer *</label>
+            <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Chofer *</label>
             <input type="text" value={bChofer} onChange={(e) => setBChofer(e.target.value)} placeholder="Nombre del chofer"
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-gray-400 mb-1 block">Cliente receptor *</label>
+            <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Cliente receptor *</label>
             <input type="text" value={bReceptor} onChange={(e) => setBReceptor(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
           </div>
           <div>
-            <label className="text-xs uppercase tracking-wider text-gray-400 mb-1 block">Cedula del cliente *</label>
+            <label className="text-xs uppercase tracking-wide text-gray-400 mb-1 block">Cedula del cliente *</label>
             <input type="text" value={bCedula} onChange={(e) => setBCedula(e.target.value)}
               className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-black transition" />
           </div>

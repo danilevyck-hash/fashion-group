@@ -198,9 +198,9 @@ export default function DataHealthPage() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
             {(["critical", "warning", "info", "ok"] as const).map(sev => (
               <div key={sev} className="border border-gray-200 rounded-lg px-4 py-3">
-                <div className="text-[11px] uppercase tracking-wider text-gray-500 font-medium">{SEVERITY_BADGE[sev].label}</div>
+                <div className="text-xs uppercase tracking-wide text-gray-500 font-medium">{SEVERITY_BADGE[sev].label}</div>
                 <div className={`text-2xl font-semibold tabular-nums mt-1 ${SEVERITY_BADGE[sev].text}`}>{summary[sev]}</div>
-                <div className="text-[11px] text-gray-400 mt-1 leading-snug">{SEVERITY_MEANING[sev]}</div>
+                <div className="text-xs text-gray-400 mt-1 leading-snug">{SEVERITY_MEANING[sev]}</div>
               </div>
             ))}
           </div>
@@ -220,7 +220,7 @@ export default function DataHealthPage() {
           ) : (
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-[11px] text-gray-500 uppercase tracking-wider bg-gray-50 border-b border-gray-200">
+                <tr className="text-xs text-gray-500 uppercase tracking-wide bg-gray-50 border-b border-gray-200">
                   <th className="text-left px-4 py-2 font-medium">Check</th>
                   <th className="text-left px-4 py-2 font-medium">Tabla</th>
                   <th className="text-center px-4 py-2 font-medium">Severity</th>
@@ -240,7 +240,7 @@ export default function DataHealthPage() {
                       <td className="px-4 py-2.5 font-mono text-xs">{r.check_name}</td>
                       <td className="px-4 py-2.5 font-mono text-xs text-gray-500">{r.table_name}</td>
                       <td className="px-4 py-2.5 text-center">
-                        <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${badge.bg} ${badge.text}`}>
+                        <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${badge.bg} ${badge.text}`}>
                           {badge.label}
                         </span>
                       </td>
@@ -264,7 +264,7 @@ export default function DataHealthPage() {
           <div className="border border-gray-200 rounded-lg overflow-hidden">
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
               <h2 className="text-sm font-semibold text-gray-700">Historial 30 días</h2>
-              <p className="text-[11px] text-gray-400 mt-0.5">Cada celda = peor severity del día. Gris = sin corrida.</p>
+              <p className="text-xs text-gray-400 mt-0.5">Cada celda = peor severity del día. Gris = sin corrida.</p>
             </div>
             <div className="px-4 py-4 overflow-x-auto">
               <table className="text-xs">
@@ -272,7 +272,7 @@ export default function DataHealthPage() {
                   <tr>
                     <th className="text-left pr-3 font-medium text-gray-500"></th>
                     {days30.map(d => (
-                      <th key={d} className="px-0.5 font-normal text-[9px] text-gray-400" title={d}>
+                      <th key={d} className="px-0.5 font-normal text-xs text-gray-400" title={d}>
                         {new Date(d + "T12:00:00").getDate()}
                       </th>
                     ))}
@@ -281,7 +281,7 @@ export default function DataHealthPage() {
                 <tbody>
                   {data.latest.map(r => (
                     <tr key={r.check_name}>
-                      <td className="pr-3 py-1 font-mono text-[11px] text-gray-600 whitespace-nowrap">{r.check_name}</td>
+                      <td className="pr-3 py-1 font-mono text-xs text-gray-600 whitespace-nowrap">{r.check_name}</td>
                       {days30.map(d => {
                         const sev = data.history[r.check_name]?.[d];
                         const dotClass = sev ? SEVERITY_DOT[sev] : SEVERITY_DOT.missing;
@@ -296,7 +296,7 @@ export default function DataHealthPage() {
                   ))}
                 </tbody>
               </table>
-              <div className="flex items-center gap-3 mt-3 text-[11px] text-gray-500">
+              <div className="flex items-center gap-3 mt-3 text-xs text-gray-500">
                 {(["ok", "info", "warning", "critical"] as const).map(s => (
                   <div key={s} className="flex items-center gap-1.5">
                     <div className={`w-3 h-3 rounded-sm ${SEVERITY_DOT[s]}`} />
@@ -322,7 +322,7 @@ export default function DataHealthPage() {
               <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200">
                 <div>
                   <div className="font-mono text-sm font-semibold">{selectedCheck.check_name}</div>
-                  <div className="text-[11px] text-gray-500 mt-0.5">{selectedCheck.table_name} · {fmtAbsolute(selectedCheck.checked_at)}</div>
+                  <div className="text-xs text-gray-500 mt-0.5">{selectedCheck.table_name} · {fmtAbsolute(selectedCheck.checked_at)}</div>
                 </div>
                 <button
                   onClick={() => setSelectedCheck(null)}
@@ -334,7 +334,7 @@ export default function DataHealthPage() {
               </div>
               <div className="px-5 py-4 overflow-auto flex-1">
                 <div className="flex items-center gap-3 mb-4">
-                  <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold ${SEVERITY_BADGE[selectedCheck.severity].bg} ${SEVERITY_BADGE[selectedCheck.severity].text}`}>
+                  <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${SEVERITY_BADGE[selectedCheck.severity].bg} ${SEVERITY_BADGE[selectedCheck.severity].text}`}>
                     {SEVERITY_BADGE[selectedCheck.severity].label}
                   </span>
                   <span className="text-sm text-gray-600">
@@ -360,7 +360,7 @@ export default function DataHealthPage() {
                   </div>
                 )}
 
-                <p className="text-[11px] uppercase tracking-wider text-gray-400 mb-1.5">Detalles técnicos</p>
+                <p className="text-xs uppercase tracking-wide text-gray-400 mb-1.5">Detalles técnicos</p>
                 <div className="text-xs font-mono bg-gray-50 border border-gray-200 rounded p-3 whitespace-pre-wrap break-all text-gray-700">
                   {selectedCheck.details ? JSON.stringify(selectedCheck.details, null, 2) : "El check corrió sin observaciones (sin detalles)."}
                 </div>

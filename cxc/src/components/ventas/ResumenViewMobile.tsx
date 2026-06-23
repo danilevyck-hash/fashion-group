@@ -154,12 +154,12 @@ function KpiTile({
     : sub.sign > 0 ? "text-emerald-700" : sub.sign < 0 ? "text-rose-700" : "text-stone-500";
   return (
     <div className="rounded-xl border border-stone-200 bg-white p-2.5">
-      <p className="text-[9.5px] font-medium uppercase tracking-wider text-stone-500">{label}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-stone-500">{label}</p>
       <p className="mt-1 font-mono text-[17px] font-medium leading-tight tracking-tight tabular-nums text-stone-950">
         {value}
       </p>
       {sub && (
-        <p className={cn("mt-0.5 text-[10px] font-medium leading-tight", subTone)}>
+        <p className={cn("mt-0.5 text-xs font-medium leading-tight", subTone)}>
           {sub.text}
         </p>
       )}
@@ -328,7 +328,7 @@ function MobileHeatmap({
           <tr className="border-b border-stone-200 bg-stone-50">
             <th
               scope="col"
-              className="sticky left-0 z-10 min-w-[120px] border-r border-stone-200 bg-stone-50 px-3 py-2.5 text-left text-[10px] font-medium uppercase tracking-wider text-stone-500"
+              className="sticky left-0 z-10 min-w-[120px] border-r border-stone-200 bg-stone-50 px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-stone-500"
             >
               Empresa
             </th>
@@ -337,7 +337,7 @@ function MobileHeatmap({
                 key={c}
                 scope="col"
                 className={cn(
-                  "px-2 py-2.5 text-right text-[10px] font-medium uppercase tracking-wider text-stone-500",
+                  "px-2 py-2.5 text-right text-xs font-medium uppercase tracking-wide text-stone-500",
                   ci === currentColIdx && "bg-[rgba(15,118,110,0.06)] text-teal-800"
                 )}
               >
@@ -346,14 +346,14 @@ function MobileHeatmap({
             ))}
             <th
               scope="col"
-              className="px-2.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-stone-950"
+              className="px-2.5 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-stone-950"
             >
               Total
             </th>
             {showProy && (
               <th
                 scope="col"
-                className="px-2.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-stone-950"
+                className="px-2.5 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-stone-950"
               >
                 Proyección
               </th>
@@ -361,7 +361,7 @@ function MobileHeatmap({
             {showMensual && (
               <th
                 scope="col"
-                className="px-2.5 py-2.5 text-right text-[10px] font-semibold uppercase tracking-wider text-stone-950"
+                className="px-2.5 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-stone-950"
               >
                 Cierre {mesProyLabel} (proy.)
               </th>
@@ -390,7 +390,7 @@ function MobileHeatmap({
                       {r.id === "multi" && multiMayoreoLabel && (
                         /* Nota VISIBLE (paridad con desktop): la fila es american_classic
                            COMPLETA (tienda + mayoreo), no solo el retail del mostrador. */
-                        <span className="mt-0.5 block whitespace-normal text-[9.5px] font-normal leading-tight text-stone-500">
+                        <span className="mt-0.5 block whitespace-normal text-xs font-normal leading-tight text-stone-500">
                           incluye mayoreo · {multiMayoreoLabel}
                         </span>
                       )}
@@ -422,7 +422,7 @@ function MobileHeatmap({
           <tr className="bg-stone-900 text-white">
             <th
               scope="row"
-              className="sticky left-0 z-10 min-w-[120px] border-r border-stone-700 bg-stone-900 px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-wider"
+              className="sticky left-0 z-10 min-w-[120px] border-r border-stone-700 bg-stone-900 px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide"
             >
               Total grupo
             </th>
@@ -468,7 +468,7 @@ function MobileCell({
 
   if (cur == null) {
     return (
-      <td className={cn("px-2 py-3 text-right font-mono text-[11px] tabular-nums text-stone-300", bgCls)}>
+      <td className={cn("px-2 py-3 text-right font-mono text-xs tabular-nums text-stone-300", bgCls)}>
         —
       </td>
     );
@@ -481,7 +481,7 @@ function MobileCell({
   return (
     <td className={cn("px-2 py-3 text-right font-mono tabular-nums", bgCls)}>
       <span className="flex flex-col items-end gap-1 leading-tight">
-        <span className="w-full text-right text-[11px] text-stone-600">{renderCell(cur, mode)}</span>
+        <span className="w-full text-right text-xs text-stone-600">{renderCell(cur, mode)}</span>
         <DeltaPct delta={delta} mode={mode} />
       </span>
     </td>
@@ -516,7 +516,7 @@ function MobileTotalCell({
   return (
     <td className="border-l border-stone-200 px-2.5 py-3 text-right font-mono tabular-nums text-stone-950">
       <span className="flex flex-col items-end gap-1 leading-tight">
-        <span className="w-full text-right text-[11px] font-semibold">{display}</span>
+        <span className="w-full text-right text-xs font-semibold">{display}</span>
         <DeltaPct delta={delta} mode={mode} />
       </span>
     </td>
@@ -528,15 +528,15 @@ function MobileTotalCell({
 function MobileMensualCell({ pm }: { pm: ProyeccionMensualEmpresa | undefined }) {
   if (!pm || pm.proyeccion == null) {
     return (
-      <td className="border-l border-stone-200 px-2.5 py-3 text-right text-[9.5px] text-stone-400">
+      <td className="border-l border-stone-200 px-2.5 py-3 text-right text-xs text-stone-400">
         datos insuf.
       </td>
     );
   }
   return (
     <td className="border-l border-stone-200 px-2.5 py-3 text-right">
-      <span className="block font-mono text-[11px] font-semibold tabular-nums text-stone-900">{formatCompactCurrency(pm.proyeccion)}</span>
-      {pm.volatil && <span className="mt-0.5 block text-[9px] text-amber-600">volátil</span>}
+      <span className="block font-mono text-xs font-semibold tabular-nums text-stone-900">{formatCompactCurrency(pm.proyeccion)}</span>
+      {pm.volatil && <span className="mt-0.5 block text-xs text-amber-600">volátil</span>}
     </td>
   );
 }
@@ -546,7 +546,7 @@ function MobileMensualGrupoCell({ pm }: { pm: Record<string, ProyeccionMensualEm
   const vals = Object.values(pm);
   const total = vals.reduce((s, e) => s + (e.suficiente_data && e.proyeccion != null ? e.proyeccion : 0), 0);
   return (
-    <td className="border-l border-stone-700 px-2.5 py-3 text-right font-mono text-[11px] font-semibold tabular-nums text-white">
+    <td className="border-l border-stone-700 px-2.5 py-3 text-right font-mono text-xs font-semibold tabular-nums text-white">
       {formatCompactCurrency(total)}
     </td>
   );
@@ -555,13 +555,13 @@ function MobileMensualGrupoCell({ pm }: { pm: Record<string, ProyeccionMensualEm
 function MobileProyCell({ proyeccion }: { proyeccion: ProyeccionEmpresa | null }) {
   if (!proyeccion) {
     return (
-      <td className="border-l border-stone-200 px-2.5 py-3 text-right font-mono text-[11px] tabular-nums text-stone-300">
+      <td className="border-l border-stone-200 px-2.5 py-3 text-right font-mono text-xs tabular-nums text-stone-300">
         —
       </td>
     );
   }
   return (
-    <td className="border-l border-stone-200 px-2.5 py-3 text-right font-mono text-[11px] font-semibold tabular-nums text-teal-700">
+    <td className="border-l border-stone-200 px-2.5 py-3 text-right font-mono text-xs font-semibold tabular-nums text-teal-700">
       {formatCompactCurrency(proyeccion.proyeccion_cierre)}
     </td>
   );
@@ -581,13 +581,13 @@ function MobileTotalGrupoCell({
   const bgCls = highlighted ? "bg-[rgba(15,118,110,0.12)]" : "";
 
   if (cur == null) {
-    return <td className={cn("px-2 py-3 text-right font-mono text-[11px] tabular-nums text-stone-500", bgCls)}>—</td>;
+    return <td className={cn("px-2 py-3 text-right font-mono text-xs tabular-nums text-stone-500", bgCls)}>—</td>;
   }
 
   return (
     <td className={cn("px-2 py-3 text-right font-mono tabular-nums", bgCls)}>
       <span className="flex flex-col items-end gap-1 leading-tight">
-        <span className="w-full text-right text-[11px] font-medium text-white">{renderCell(cur, mode)}</span>
+        <span className="w-full text-right text-xs font-medium text-white">{renderCell(cur, mode)}</span>
         <DeltaPct delta={delta} mode={mode} dark />
       </span>
     </td>
@@ -628,7 +628,7 @@ function MobileTotalGrupoYtdCell({
   return (
     <td className="border-l border-stone-700 px-2.5 py-3 text-right font-mono tabular-nums text-white">
       <span className="flex flex-col items-end gap-1 leading-tight">
-        <span className="w-full text-right text-[11px] font-semibold">{display}</span>
+        <span className="w-full text-right text-xs font-semibold">{display}</span>
         <DeltaPct delta={d} mode={mode} dark />
       </span>
     </td>
@@ -637,7 +637,7 @@ function MobileTotalGrupoYtdCell({
 
 function MobileProyGrupoCell({ proyeccion }: { proyeccion: ProyeccionResp }) {
   return (
-    <td className="border-l border-stone-700 px-2.5 py-3 text-right font-mono text-[11px] font-semibold tabular-nums text-teal-200">
+    <td className="border-l border-stone-700 px-2.5 py-3 text-right font-mono text-xs font-semibold tabular-nums text-teal-200">
       {formatCompactCurrency(proyeccion.totales_grupo.proyeccion_cierre)}
     </td>
   );
@@ -672,7 +672,7 @@ function DeltaPct({
   // (9px, sin negrita): el color aparece solo donde importa, sin que toda la
   // grilla vibre.
   return (
-    <span className={cn("block w-full text-right text-[8px] font-normal leading-tight", tone)}>
+    <span className={cn("block w-full text-right text-xs font-normal leading-tight", tone)}>
       {fmt.arrow ?? ""}{fmt.displayValue}
     </span>
   );

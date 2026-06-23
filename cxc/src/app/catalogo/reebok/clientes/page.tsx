@@ -98,10 +98,10 @@ export default function ClientesPage() {
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-white z-10">
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-4 py-3 text-[11px] uppercase text-gray-400 font-normal">Nombre</th>
-                <th className="text-left px-4 py-3 text-[11px] uppercase text-gray-400 font-normal">Empresa</th>
-                <th className="text-left px-4 py-3 text-[11px] uppercase text-gray-400 font-normal">Correo</th>
-                <th className="text-left px-4 py-3 text-[11px] uppercase text-gray-400 font-normal">WhatsApp</th>
+                <th className="text-left px-4 py-3 text-xs uppercase text-gray-400 font-normal">Nombre</th>
+                <th className="text-left px-4 py-3 text-xs uppercase text-gray-400 font-normal">Empresa</th>
+                <th className="text-left px-4 py-3 text-xs uppercase text-gray-400 font-normal">Correo</th>
+                <th className="text-left px-4 py-3 text-xs uppercase text-gray-400 font-normal">WhatsApp</th>
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -134,19 +134,19 @@ export default function ClientesPage() {
             <h2 className="font-medium mb-4">{editingId ? "Editar Cliente" : "Nuevo Cliente"}</h2>
             <div className="space-y-3">
               <div>
-                <label className="text-[11px] text-gray-400 uppercase block mb-1">Nombre *</label>
+                <label className="text-xs text-gray-400 uppercase block mb-1">Nombre *</label>
                 <input value={fNombre} onChange={e => setFNombre(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[11px] text-gray-400 uppercase block mb-1">Empresa</label>
+                <label className="text-xs text-gray-400 uppercase block mb-1">Empresa</label>
                 <input value={fEmpresa} onChange={e => setFEmpresa(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[11px] text-gray-400 uppercase block mb-1">Correo</label>
+                <label className="text-xs text-gray-400 uppercase block mb-1">Correo</label>
                 <input type="email" value={fCorreo} onChange={e => setFCorreo(e.target.value)} className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
               </div>
               <div>
-                <label className="text-[11px] text-gray-400 uppercase block mb-1">WhatsApp</label>
+                <label className="text-xs text-gray-400 uppercase block mb-1">WhatsApp</label>
                 <input value={fWhatsapp} onChange={e => setFWhatsapp(e.target.value)} placeholder="+507 6000-0000" className="w-full border-b border-gray-200 py-2 text-sm outline-none focus:border-black transition" />
               </div>
             </div>

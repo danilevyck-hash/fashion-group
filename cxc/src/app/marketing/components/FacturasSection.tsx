@@ -661,7 +661,7 @@ export default function FacturasSection({
                         e.stopPropagation();
                         handleAbrirEdicion(f);
                       }}
-                      className="text-[11px] text-gray-600 hover:text-black bg-white/80 backdrop-blur px-2 py-1 rounded"
+                      className="text-xs text-gray-600 hover:text-black bg-white/80 backdrop-blur px-2 py-1 rounded"
                     >
                       Editar
                     </button>
@@ -672,7 +672,7 @@ export default function FacturasSection({
                         setAnulando(f);
                         setAnulandoMotivo("");
                       }}
-                      className="text-[11px] text-red-600 hover:text-red-800 bg-white/80 backdrop-blur px-2 py-1 rounded"
+                      className="text-xs text-red-600 hover:text-red-800 bg-white/80 backdrop-blur px-2 py-1 rounded"
                     >
                       Anular
                     </button>
@@ -683,7 +683,7 @@ export default function FacturasSection({
                           e.stopPropagation();
                           setEliminando(f);
                         }}
-                        className="text-[11px] text-red-700 hover:text-red-900 bg-white/80 backdrop-blur px-2 py-1 rounded font-medium"
+                        className="text-xs text-red-700 hover:text-red-900 bg-white/80 backdrop-blur px-2 py-1 rounded font-medium"
                         title="Eliminar definitivamente (irreversible)"
                       >
                         Eliminar

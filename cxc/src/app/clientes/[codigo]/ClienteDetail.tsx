@@ -154,7 +154,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
 
         {/* Datos fiscales (read-only) */}
         <section className="border border-gray-200 rounded-lg p-4 mb-4">
-          <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Datos fiscales · sincronizados de Switch</h2>
+          <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Datos fiscales · sincronizados de Switch</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-6 text-sm">
             <Field label="RUC"          value={cliente.identificacion} />
             <Field label="DV"           value={cliente.dv}              tabularNums />
@@ -162,7 +162,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
             <Field label="Provincia"    value={cliente.provincia}      />
           </div>
           {cliente.last_synced_at && (
-            <div className="text-[11px] text-gray-400 mt-3">
+            <div className="text-xs text-gray-400 mt-3">
               {/* last_synced_at es timestamptz; fmtDate espera fecha (YYYY-MM-DD). */}
               Última sincronización: {fmtDate(cliente.last_synced_at.slice(0, 10))}
             </div>
@@ -171,7 +171,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
 
         {/* Contacto (editable) */}
         <section className="border border-gray-200 rounded-lg p-4 mb-4">
-          <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-3">Contacto · editable en fashiongr</h2>
+          <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-3">Contacto · editable en fashiongr</h2>
           {editing ? (
             <div className="space-y-3">
               <FormRow label="Teléfono" value={form.telefono} onChange={(v) => setForm({ ...form, telefono: v })} />
@@ -212,13 +212,13 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
         {/* Historial por empresa */}
         <section className="border border-gray-200 rounded-lg p-4 mb-4">
           <div className="flex items-center justify-between gap-3 mb-3">
-            <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400">
+            <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400">
               Historial · YTD {new Date().getFullYear()}
             </h2>
             <div className="flex items-center gap-2">
               {cxcVencido > 0 && (
                 <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium tabular-nums ${
+                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium tabular-nums ${
                     cxcCritico > 0
                       ? "bg-red-50 text-red-700 border border-red-200"
                       : "bg-amber-50 text-amber-700 border border-amber-200"
@@ -238,7 +238,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
           </div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-[11px] uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
+              <tr className="text-left text-xs uppercase tracking-[0.05em] text-gray-400 border-b border-gray-200">
                 <th className="py-2 font-normal">Empresa</th>
                 <th className="py-2 font-normal text-right">Ventas YTD</th>
                 <th className="py-2 font-normal text-right">Cobrado YTD</th>
@@ -265,7 +265,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
                   <td colSpan={5} className="py-1">
                     <button
                       onClick={() => setShowInactivas(v => !v)}
-                      className="text-[11px] text-gray-400 hover:text-gray-600 transition"
+                      className="text-xs text-gray-400 hover:text-gray-600 transition"
                     >
                       {showInactivas ? "▾" : "▸"} {empresasInactivas.length}{" "}
                       {empresasInactivas.length === 1 ? "empresa sin actividad" : "empresas sin actividad"}
@@ -299,7 +299,7 @@ export default function ClienteDetail({ initialData }: { initialData: ClienteDet
         {/* Últimas guías del cliente (vínculo por cliente_codigo). Tappable al detalle. */}
         {initialData.ultimas_guias && initialData.ultimas_guias.length > 0 && (
           <section className="border border-gray-200 rounded-lg p-4 mb-4">
-            <h2 className="text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-2">Últimas guías</h2>
+            <h2 className="text-xs uppercase tracking-[0.05em] text-gray-400 mb-2">Últimas guías</h2>
             <ul className="divide-y divide-gray-100">
               {initialData.ultimas_guias.map(g => (
                 <li key={g.id}>
@@ -341,7 +341,7 @@ function CxcCell({ value, className = "py-2" }: { value: number; className?: str
 function Field({ label, value, tabularNums, fullWidth, href }: { label: string; value: string | null | undefined; tabularNums?: boolean; fullWidth?: boolean; href?: string | null }) {
   return (
     <div className={fullWidth ? "sm:col-span-2" : undefined}>
-      <div className="text-[11px] uppercase tracking-[0.05em] text-gray-400">{label}</div>
+      <div className="text-xs uppercase tracking-[0.05em] text-gray-400">{label}</div>
       <div className={`text-sm mt-0.5 ${tabularNums ? "tabular-nums" : ""} ${value ? "text-gray-900" : "text-gray-400"}`}>
         {value && href ? (
           <a href={href} className="text-blue-600 hover:underline">{value}</a>
@@ -354,7 +354,7 @@ function Field({ label, value, tabularNums, fullWidth, href }: { label: string; 
 function FormRow({ label, value, onChange, type, multiline }: { label: string; value: string; onChange: (v: string) => void; type?: string; multiline?: boolean }) {
   return (
     <div>
-      <label className="block text-[11px] uppercase tracking-[0.05em] text-gray-400 mb-1">{label}</label>
+      <label className="block text-xs uppercase tracking-[0.05em] text-gray-400 mb-1">{label}</label>
       {multiline ? (
         <textarea
           value={value}

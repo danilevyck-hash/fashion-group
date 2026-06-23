@@ -244,7 +244,7 @@ function ReebokAdminInner() {
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 rounded-xl bg-[#1A2656] flex items-center justify-center">
-            <span className="text-white font-extrabold text-[10px] tracking-tight">RBK</span>
+            <span className="text-white font-extrabold text-xs tracking-tight">RBK</span>
           </div>
           <div>
             <h1 className="text-xl font-bold text-gray-900">REEBOK</h1>
@@ -566,10 +566,10 @@ function ProductosTab({
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-semibold text-gray-900 truncate">{product.name}</p>
                       {isInactive && (
-                        <span className="text-[10px] font-medium bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">Inactivo</span>
+                        <span className="text-xs font-medium bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded">Inactivo</span>
                       )}
                       {!isInactive && badgeLabel && (
-                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
                           product.badge === "oferta"
                             ? "bg-orange-50 text-orange-600"
                             : "bg-blue-50 text-blue-600"
@@ -578,7 +578,7 @@ function ProductosTab({
                         </span>
                       )}
                       {!isInactive && stock === 0 && (
-                        <span className="text-[10px] font-medium bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">Sin stock</span>
+                        <span className="text-xs font-medium bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded">Sin stock</span>
                       )}
                     </div>
                     <p className="text-xs text-gray-400 mt-0.5">
@@ -632,7 +632,7 @@ function ProductosTab({
                   </div>
                 </div>
                 {error && (
-                  <p className="text-[11px] text-red-600 mt-1.5 ml-15">{error}</p>
+                  <p className="text-xs text-red-600 mt-1.5 ml-15">{error}</p>
                 )}
               </div>
             );
@@ -650,13 +650,13 @@ type OrigenFilter = "todos" | "link" | "mio";
 function OrigenBadge({ origen }: { origen: "mio" | "link" }) {
   if (origen === "link") {
     return (
-      <span className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
+      <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700">
         Del link
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+    <span className="inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
       Mío
     </span>
   );
@@ -968,7 +968,7 @@ function ImportInstructions() {
       <div className="space-y-3 text-xs text-gray-600">
         <div>
           <p className="font-medium text-gray-800 mb-1">Columnas del archivo</p>
-          <p className="font-mono text-[11px] text-gray-700">SKU, Nombre, Precio, Cantidad, Genero, Estado, Categoria</p>
+          <p className="font-mono text-xs text-gray-700">SKU, Nombre, Precio, Cantidad, Genero, Estado, Categoria</p>
         </div>
         <div>
           <p className="font-medium text-gray-800 mb-1">Valores validos</p>
@@ -1272,17 +1272,17 @@ function ImportSection({
                       <td className="px-3 py-1.5 text-right tabular-nums">{row.quantity}</td>
                       <td className="px-3 py-1.5">
                         {row.badge ? (
-                          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                          <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
                             row.badge === "oferta" ? "bg-orange-50 text-orange-600" : "bg-blue-50 text-blue-600"
                           }`}>
                             {row.badge === "oferta" ? "Oferta" : "Nuevo"}
                           </span>
                         ) : (
-                          <span className="text-[10px] text-gray-400">—</span>
+                          <span className="text-xs text-gray-400">—</span>
                         )}
                       </td>
                       <td className="px-3 py-1.5">
-                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                        <span className={`text-xs font-medium px-1.5 py-0.5 rounded ${
                           exists ? "bg-blue-50 text-blue-600" : "bg-green-50 text-green-600"
                         }`}>
                           {exists ? "Actualizar" : "Nuevo"}
@@ -1328,10 +1328,10 @@ function ImportSection({
               <p className="text-xs font-semibold text-amber-900">
                 {importResult.unclassifiedNew.length} producto{importResult.unclassifiedNew.length !== 1 ? "s" : ""} nuevo{importResult.unclassifiedNew.length !== 1 ? "s" : ""} entr{importResult.unclassifiedNew.length !== 1 ? "aron" : "ó"} como Ropa por defecto
               </p>
-              <p className="text-[11px] text-amber-800 mt-1">
+              <p className="text-xs text-amber-800 mt-1">
                 Clasificalos en el tab Productos o corrige la columna Categoria del archivo y vuelve a subir.
               </p>
-              <p className="text-[11px] font-mono text-amber-900 mt-2 break-all">
+              <p className="text-xs font-mono text-amber-900 mt-2 break-all">
                 {importResult.unclassifiedNew.join(", ")}
               </p>
             </div>
@@ -1471,7 +1471,7 @@ function BatchPhotosSection({ showToast }: { showToast: (msg: string) => void })
             {matchResult.matched.map((match, i) => (
               <div key={i} className="relative rounded-lg overflow-hidden border-2 border-green-300">
                 <Image src={match.preview} alt={match.sku} width={100} height={100} className="w-full aspect-square object-cover" unoptimized />
-                <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 text-[10px] font-mono truncate bg-green-500/90 text-white">
+                <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 text-xs font-mono truncate bg-green-500/90 text-white">
                   {match.sku}
                 </div>
               </div>
@@ -1483,7 +1483,7 @@ function BatchPhotosSection({ showToast }: { showToast: (msg: string) => void })
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>
-                <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 text-[10px] font-mono truncate bg-red-500/90 text-white">
+                <div className="absolute bottom-0 left-0 right-0 px-1.5 py-1 text-xs font-mono truncate bg-red-500/90 text-white">
                   {item.name}
                 </div>
               </div>

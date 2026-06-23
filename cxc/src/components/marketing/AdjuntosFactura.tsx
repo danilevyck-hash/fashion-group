@@ -62,7 +62,7 @@ export default function AdjuntosFactura({ adjuntos }: { adjuntos: MkAdjunto[] })
                     href={a.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="w-full h-full flex flex-col items-center justify-center text-center p-2 text-[10px] text-gray-500 hover:bg-gray-100"
+                    className="w-full h-full flex flex-col items-center justify-center text-center p-2 text-xs text-gray-500 hover:bg-gray-100"
                     title={a.nombre_original ?? ""}
                   >
                     {IconoImg}
@@ -98,7 +98,7 @@ export default function AdjuntosFactura({ adjuntos }: { adjuntos: MkAdjunto[] })
             key={a.id}
             className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-white px-2.5 py-2"
           >
-            <span className="text-[11px] text-gray-600 truncate flex items-center gap-1.5 min-w-0">
+            <span className="text-xs text-gray-600 truncate flex items-center gap-1.5 min-w-0">
               <span className="text-gray-400 shrink-0">{IconoPdf}</span>
               <span className="truncate">{nombre}</span>
             </span>
@@ -106,7 +106,7 @@ export default function AdjuntosFactura({ adjuntos }: { adjuntos: MkAdjunto[] })
               <button
                 type="button"
                 onClick={() => setPdfLightbox({ url: a.url, nombre })}
-                className="text-[11px] font-medium text-gray-700 hover:text-black border border-gray-200 rounded px-2 py-1 active:scale-[0.97] transition"
+                className="text-xs font-medium text-gray-700 hover:text-black border border-gray-200 rounded px-2 py-1 active:scale-[0.97] transition"
               >
                 Ver PDF
               </button>
@@ -114,7 +114,7 @@ export default function AdjuntosFactura({ adjuntos }: { adjuntos: MkAdjunto[] })
                 href={a.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[11px] text-gray-500 hover:text-black"
+                className="text-xs text-gray-500 hover:text-black"
               >
                 Abrir ↗
               </a>

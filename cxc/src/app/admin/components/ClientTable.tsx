@@ -110,7 +110,7 @@ export default function ClientTable({
       title={riskTooltips[key] || ""}
       className={`px-3 min-h-[44px] rounded-lg text-xs font-medium transition flex flex-col items-center justify-center ${riskFilter === key ? activeClasses : inactiveClasses}`}>
       <span>{label} <span className="opacity-60 ml-0.5">{count}</span></span>
-      {riskSubtitles[key] && <span className={`text-[10px] font-normal mt-0.5 ${riskFilter === key ? "opacity-70" : "opacity-50"}`}>{riskSubtitles[key]}</span>}
+      {riskSubtitles[key] && <span className={`text-xs font-normal mt-0.5 ${riskFilter === key ? "opacity-70" : "opacity-50"}`}>{riskSubtitles[key]}</span>}
     </button>
   );
 
@@ -183,7 +183,7 @@ export default function ClientTable({
             <div className="px-4 pb-6 space-y-5">
               <div className="text-base font-semibold text-gray-900 pb-2 border-b border-gray-100">Filtros</div>
               <div>
-                <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Estado</div>
+                <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Estado</div>
                 <div className="grid grid-cols-2 gap-2">
                   {filterBtn("all", "Todos", roleClients.length, "bg-gray-900 text-white", "bg-gray-100 text-gray-600")}
                   {filterBtn("current", AGING.current.label, countCurrent, "bg-emerald-600 text-white", "bg-emerald-50 text-emerald-700")}
@@ -193,9 +193,9 @@ export default function ClientTable({
               </div>
               {roleCompanies.length > 1 && (
                 <div>
-                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                  <div className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
                     Empresa
-                    <span className="ml-2 normal-case tracking-normal text-[10px] font-normal text-gray-400">Según permisos de tu rol</span>
+                    <span className="ml-2 normal-case tracking-normal text-xs font-normal text-gray-400">Según permisos de tu rol</span>
                   </div>
                   <select
                     value={companyFilter}
@@ -282,7 +282,7 @@ export default function ClientTable({
       <div className="border border-gray-200 rounded-lg overflow-hidden">
         {/* Sticky sortable header */}
         {/* Desktop header — hidden on mobile since mobile uses card layout */}
-        <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-[11px] font-medium text-gray-500 uppercase tracking-wider select-none">
+        <div className="hidden sm:grid grid-cols-12 gap-2 px-4 py-2.5 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-500 uppercase tracking-wide select-none">
           <div className="col-span-4 cursor-pointer hover:text-gray-900 transition" onClick={() => toggleSort("name")}>
             Cliente{sortArrow("name")}
           </div>
@@ -316,7 +316,7 @@ export default function ClientTable({
       {/* Saldo a favor (crédito): fuera de la lista de cobro principal */}
       {negativos.length > 0 && (
         <div className="mt-6">
-          <h3 className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-2">
+          <h3 className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2">
             Saldo a favor <span className="text-gray-400 font-normal normal-case">({negativos.length})</span>
           </h3>
           <div className="border border-blue-100 rounded-lg overflow-hidden">

@@ -118,7 +118,7 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
       {subtab === "resumen" && (
       <div className="mb-4">
         <div className="flex items-center justify-end gap-2">
-        <span className="text-[10.5px] font-medium uppercase tracking-widest text-stone-500">Mes</span>
+        <span className="text-xs font-medium uppercase tracking-wide text-stone-500">Mes</span>
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -153,7 +153,7 @@ export function MultifashionView({ data, selectedYear, isClosedYear }: Multifash
         </div>
         </div>
         {showMesCerradoHint && (
-          <p className="mt-1 text-right text-[10.5px] text-stone-400">
+          <p className="mt-1 text-right text-xs text-stone-400">
             último mes cerrado · {MES_FULL_OVERVIEW[currentCalMonth - 1].toLowerCase()} en curso
           </p>
         )}

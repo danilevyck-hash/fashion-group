@@ -161,14 +161,14 @@ function SortHeader({
     <th
       onClick={() => onClick(col)}
       className={cn(
-        "cursor-pointer select-none whitespace-nowrap border-b border-stone-200 bg-stone-100 px-3 py-2.5 text-[11px] font-medium uppercase tracking-wider transition",
+        "cursor-pointer select-none whitespace-nowrap border-b border-stone-200 bg-stone-100 px-3 py-2.5 text-xs font-medium uppercase tracking-wide transition",
         align === "right" ? "text-right" : "text-left",
         active ? "text-stone-950" : "text-stone-500 hover:text-stone-700"
       )}
     >
       <span className="inline-flex items-center gap-1">
         {children}
-        <span className={cn("text-[9px]", active ? "opacity-100" : "opacity-35")}>
+        <span className={cn("text-xs", active ? "opacity-100" : "opacity-35")}>
           {active ? (sortDir === "asc" ? "↑" : "↓") : "↕"}
         </span>
       </span>
