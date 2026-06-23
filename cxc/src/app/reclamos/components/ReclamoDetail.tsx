@@ -219,7 +219,18 @@ export default function ReclamoDetail({
               </label>
               <label className="flex flex-col gap-1 sm:col-span-2">
                 <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Notas</span>
-                <textarea value={editNotas} onChange={(e) => setEditNotas(e.target.value)} rows={1} className="border-b border-gray-200 py-1.5 text-sm outline-none resize-none" />
+                <textarea
+                  value={editNotas}
+                  onChange={(e) => {
+                    setEditNotas(e.target.value);
+                    // Auto-grow: ajusta el alto al contenido (con tope por maxHeight + scroll).
+                    e.target.style.height = "auto";
+                    e.target.style.height = `${e.target.scrollHeight}px`;
+                  }}
+                  rows={3}
+                  className="rounded-md border border-gray-200 px-3 py-2 text-sm outline-none focus:border-black transition resize-y overflow-auto"
+                  style={{ minHeight: "4.5rem", maxHeight: "12rem" }}
+                />
               </label>
               <div className="sm:col-span-2 flex flex-col gap-1">
                 <span className="text-[11px] uppercase tracking-[0.05em] text-gray-400">Factura (PDF) — autocompletar</span>
@@ -556,7 +567,7 @@ export default function ReclamoDetail({
         )}
       </div>
 
-      {current.notas && <p className="text-sm text-gray-400 mb-6">Notas: {current.notas}</p>}
+      {!editMode && current.notas && <p className="text-sm text-gray-400 mb-6">Notas: {current.notas}</p>}
 
       {/* Seguimiento */}
       <div className="mb-8">
