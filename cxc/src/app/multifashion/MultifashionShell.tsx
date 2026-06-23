@@ -9,11 +9,21 @@
 // Gate admin-only vía useAuth (mismo patrón que /admin). Permisos de los demás
 // roles se definen después.
 
-import { useState, useTransition, useCallback } from "react";
+import { useState } from "react";
+import useSWR from "swr";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MultifashionView } from "@/components/multifashion/MultifashionView";
 import type { Multifashion } from "@/components/ventas/types";
+
+// Fetcher puro del overview por año. Misma llamada que tenía el onYearChange
+// (cache:"no-store"); SWR la cachea por año → volver a un año ya visto pinta al
+// instante y revalida en background, en vez del refetch desde cero anterior.
+async function fetchOverview(year: number): Promise<Multifashion> {
+  const res = await fetch(`/api/multifashion/overview?year=${year}`, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return (await res.json()) as Multifashion;
+}
 
 interface MultifashionShellProps {
   year: number;
@@ -31,32 +41,26 @@ export function MultifashionShell({
   // no parpadear data a un rol sin acceso (useAuth redirige si no pasa).
   const { authChecked } = useAuth({ moduleKey: "multifashion", allowedRoles: ["admin"] });
 
+  // El año es estado de UI local (no data de SWR): cambia la KEY del overview.
   const [selectedYear, setSelectedYear] = useState(initialYear);
-  const [multi, setMulti] = useState<Multifashion | null>(initialMulti);
-  const [, startTransition] = useTransition();
-  const [loading, setLoading] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Cambio de año: refetch SOLO del overview de Multifashion. Los sub-tabs
-  // (Detalle mensual / Vendedoras / Clientes) hacen su propio refetch al
-  // recibir el nuevo selectedYear como prop vía MultifashionView.
-  const onYearChange = useCallback(async (year: number) => {
-    if (year === selectedYear) return;
-    setSelectedYear(year);
-    setLoading(true);
-    setFetchError(null);
-    try {
-      const res = await fetch(`/api/multifashion/overview?year=${year}`, { cache: "no-store" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = (await res.json()) as Multifashion;
-      startTransition(() => setMulti(data));
-    } catch (err) {
-      console.error("[multifashion] year change refetch failed", err);
-      setFetchError(err instanceof Error ? err.message : "error inesperado");
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedYear]);
+  // Overview por año vía SWR (clave null hasta authChecked → respeta el gate
+  // admin-only). fallbackData = el SSR SOLO para el año inicial; los demás años
+  // se piden bajo demanda. Cambiar el selector solo cambia la key (sin fetch
+  // manual): SWR sirve caché si ya se vio ese año y revalida en background.
+  const { data: multi, error, isLoading } = useSWR<Multifashion>(
+    authChecked ? ["multifashion-overview", selectedYear] : null,
+    () => fetchOverview(selectedYear),
+    {
+      dedupingInterval: 5 * 60_000,
+      revalidateOnFocus: false,
+      fallbackData: selectedYear === initialYear ? (initialMulti ?? undefined) : undefined,
+    },
+  );
+
+  // Deshabilita el selector mientras carga un año sin dato en caché.
+  const loading = isLoading && !multi;
+  const fetchError = error && !multi ? (error instanceof Error ? error.message : "error inesperado") : null;
 
   if (!authChecked) return null;
 
@@ -74,7 +78,7 @@ export function MultifashionShell({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Select value={String(selectedYear)} onValueChange={v => onYearChange(parseInt(v, 10))}>
+          <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(parseInt(v, 10))}>
             <SelectTrigger className="h-9 w-auto min-w-[88px] gap-1.5 text-xs font-mono tabular-nums" disabled={loading}>
               <SelectValue />
             </SelectTrigger>

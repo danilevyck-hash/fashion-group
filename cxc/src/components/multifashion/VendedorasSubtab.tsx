@@ -15,7 +15,8 @@
 // Server-side: RPC multifashion_vendedoras (ranking por período) +
 // multifashion_bonos_v3 (bono del mes, vía BonosSection). Sin fórmulas nuevas.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
+import useSWR from "swr";
 import { Card } from "@/components/ui/card";
 import { Users, Award } from "lucide-react";
 import type {
@@ -81,42 +82,36 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
   // mes_anterior / ytd → último mes cerrado. (No aplica a ventanas rolling.)
   const bonoMes = chip === "en_curso" ? enCursoMes : mesAnteriorMes;
 
-  const [resp, setResp] = useState<VendedorasPeriodo | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-
   const [bonos, setBonos] = useState<BonosMultifashion | null>(null);
   const onBonosData = useCallback((r: BonosMultifashion | null) => setBonos(r), []);
 
   const [sortBy, setSortBy] = useState<SortKey>("ventas");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
 
-  // Fetch del ranking
-  useEffect(() => {
-    const ctrl = new AbortController();
-    setLoading(true);
-    setError(null);
-    const params = new URLSearchParams({ year: String(year), periodo: rpcPeriodo });
-    if (rpcPeriodo === "mes") params.set("mes", String(rpcMes));
-    if (rpcPeriodo === "ultimos") { params.set("n", String(rangoN)); params.set("mes", String(enCursoMes)); }
-    fetch(`/api/multifashion/vendedoras?${params.toString()}`, { cache: "no-store", signal: ctrl.signal })
-      .then(async r => {
-        if (!r.ok) {
-          const body = await r.json().catch(() => ({}));
-          throw new Error(body?.error ?? `HTTP ${r.status}`);
-        }
-        return r.json() as Promise<VendedorasPeriodo>;
-      })
-      .then(json => setResp(json))
-      .catch(err => {
-        if (err?.name === "AbortError") return;
-        console.error("[multifashion/vendedoras] fetch failed", err);
-        setError(err instanceof Error ? err.message : "error inesperado");
-      })
-      .finally(() => setLoading(false));
-    return () => ctrl.abort();
-  }, [year, rpcPeriodo, rpcMes, rangoN, enCursoMes, reloadKey]);
+  // Querystring del ranking — MISMOS params que antes: year + periodo; mes solo
+  // en "mes"; n+mes(en curso) en "ultimos". El querystring ES la clave SWR →
+  // cada combinación (año/chip/mes) cachea por separado; volver a un chip ya
+  // visto pinta al instante y revalida en background. SWR maneja cancelación.
+  const params = new URLSearchParams({ year: String(year), periodo: rpcPeriodo });
+  if (rpcPeriodo === "mes") params.set("mes", String(rpcMes));
+  if (rpcPeriodo === "ultimos") { params.set("n", String(rangoN)); params.set("mes", String(enCursoMes)); }
+  const vendedorasUrl = `/api/multifashion/vendedoras?${params.toString()}`;
+
+  const { data: resp, error, isLoading, mutate } = useSWR<VendedorasPeriodo>(
+    vendedorasUrl,
+    async (url: string) => {
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body?.error ?? `HTTP ${r.status}`);
+      }
+      return r.json() as Promise<VendedorasPeriodo>;
+    },
+    { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
+  );
+
+  const loading = isLoading && !resp;
+  const errorMsg = error ? (error instanceof Error ? error.message : "error inesperado") : null;
 
   // Badges de bono por nombre (solo cuando el mes es evaluable; nunca en rangos).
   const bonoBadges = useMemo(() => {
@@ -168,10 +163,10 @@ export function VendedorasSubtab({ data, selectedYear }: VendedorasSubtabProps) 
 
   return (
     <div className="space-y-4">
-      {error && (
+      {errorMsg && (
         <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
-          No se pudo cargar el ranking: {error}
-          <button onClick={() => setReloadKey(k => k + 1)} className="ml-2 font-medium underline underline-offset-2 hover:text-orange-700">Reintentar</button>
+          No se pudo cargar el ranking: {errorMsg}
+          <button onClick={() => mutate()} className="ml-2 font-medium underline underline-offset-2 hover:text-orange-700">Reintentar</button>
         </div>
       )}
 

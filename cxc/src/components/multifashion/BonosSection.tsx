@@ -14,7 +14,8 @@
 // Server-side: RPC multifashion_bonos_v3 (migration 20260604180000). Misma
 // fuente que Overview (_multifashion_sf_vw / switch_facturas), tienda completa.
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import useSWR from "swr";
 import { Card } from "@/components/ui/card";
 import { Info } from "lucide-react";
 import type { BonosMultifashion } from "@/components/ventas/types";
@@ -46,42 +47,39 @@ interface BonosSectionProps {
 }
 
 export function BonosSection({ selectedYear, mes, onData }: BonosSectionProps) {
-  const [resp, setResp] = useState<BonosMultifashion | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+  // Bono por año+mes vía SWR (el querystring es la clave → cachea por combinación
+  // y revalida en background). Eleva la respuesta al padre vía onData en un
+  // useEffect (no en el fetcher) para que los badges de la tabla se sincronicen
+  // tanto con caché como con dato fresco.
+  const bonosUrl = `/api/multifashion/bonos?${new URLSearchParams({ year: String(selectedYear), mes: String(mes) }).toString()}`;
 
+  const { data: resp, error, isLoading, mutate } = useSWR<BonosMultifashion>(
+    bonosUrl,
+    async (url: string) => {
+      const r = await fetch(url, { cache: "no-store" });
+      if (!r.ok) {
+        const body = await r.json().catch(() => ({}));
+        throw new Error(body?.error ?? `HTTP ${r.status}`);
+      }
+      return r.json() as Promise<BonosMultifashion>;
+    },
+    { dedupingInterval: 5 * 60_000, revalidateOnFocus: false },
+  );
+
+  const loading = isLoading && !resp;
+
+  // Mantiene el contrato original con el padre: eleva la respuesta (o null en
+  // error) para que VendedorasSubtab arme los badges de bono de la tabla única.
   useEffect(() => {
-    const ctrl = new AbortController();
-    setLoading(true);
-    setError(null);
-    const params = new URLSearchParams({ year: String(selectedYear), mes: String(mes) });
-    fetch(`/api/multifashion/bonos?${params.toString()}`, { cache: "no-store", signal: ctrl.signal })
-      .then(async r => {
-        if (!r.ok) {
-          const body = await r.json().catch(() => ({}));
-          throw new Error(body?.error ?? `HTTP ${r.status}`);
-        }
-        return r.json() as Promise<BonosMultifashion>;
-      })
-      .then(json => { setResp(json); onData(json); })
-      .catch(err => {
-        if (err?.name === "AbortError") return;
-        console.error("[multifashion/bonos] fetch failed", err);
-        setError(err instanceof Error ? err.message : "error inesperado");
-        onData(null);
-      })
-      .finally(() => setLoading(false));
-    return () => ctrl.abort();
-    // onData se omite a propósito (identidad estable vía useCallback en el padre).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedYear, mes, reloadKey]);
+    onData(error ? null : (resp ?? null));
+  }, [resp, error, onData]);
 
   if (error) {
+    const errorMsg = error instanceof Error ? error.message : "error inesperado";
     return (
       <div className="rounded-md border border-orange-200 bg-orange-50 px-3 py-2 text-xs text-orange-900">
-        No se pudieron cargar los bonos: {error}
-        <button onClick={() => setReloadKey(k => k + 1)} className="ml-2 font-medium underline underline-offset-2 hover:text-orange-700">Reintentar</button>
+        No se pudieron cargar los bonos: {errorMsg}
+        <button onClick={() => mutate()} className="ml-2 font-medium underline underline-offset-2 hover:text-orange-700">Reintentar</button>
       </div>
     );
   }

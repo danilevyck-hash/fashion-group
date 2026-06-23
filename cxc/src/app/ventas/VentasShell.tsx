@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition, useCallback } from "react";
+import { useState, useCallback } from "react";
+import useSWR from "swr";
 import { useUrlState } from "@/lib/hooks/useUrlState";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,39 @@ const UtilidadView = dynamic(
   { ssr: false, loading: () => <TabSkeleton /> },
 );
 
+// Bundle del tab Resumen: las 3 lecturas que dependen del año seleccionado.
+interface VentasBundle {
+  resumen: VentasResumen;
+  clientes: Clientes;
+  multi: Multifashion;
+}
+
+// Fetcher puro keyed por año: refetch EN PARALELO de resumen + clientes + multi.
+// resumen + clientes son los tabs visibles; multi (overview Multifashion) ya no
+// tiene tab propio aquí, pero ResumenView lo usa para el tooltip de desglose
+// retail/mayoreo de la fila Multifashion del heatmap, así que se sigue
+// refetcheando con el año. Rechaza si algún endpoint falla → SWR marca error.
+async function fetchVentasBundle(year: number): Promise<VentasBundle> {
+  const [resumenRes, clientesRes, multiRes] = await Promise.all([
+    fetch(`/api/ventas/resumen?year=${year}`, { cache: "no-store" }),
+    fetch(`/api/ventas/clientes-12m?year=${year}`, { cache: "no-store" }),
+    fetch(`/api/multifashion/overview?year=${year}`, { cache: "no-store" }),
+  ]);
+
+  const errors: string[] = [];
+  if (!resumenRes.ok) errors.push(`resumen: HTTP ${resumenRes.status}`);
+  if (!clientesRes.ok) errors.push(`clientes: HTTP ${clientesRes.status}`);
+  if (!multiRes.ok) errors.push(`multifashion: HTTP ${multiRes.status}`);
+  if (errors.length) throw new Error(errors.join(" · "));
+
+  const [resumen, clientes, multi] = await Promise.all([
+    resumenRes.json() as Promise<VentasResumen>,
+    clientesRes.json() as Promise<Clientes>,
+    multiRes.json() as Promise<Multifashion>,
+  ]);
+  return { resumen, clientes, multi };
+}
+
 interface VentasShellProps {
   year: number;
   availableYears: number[];
@@ -56,66 +90,48 @@ export function VentasShell({
 }: VentasShellProps) {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(initialYear);
-  const [resumen, setResumen] = useState<VentasResumen | null>(initialResumen);
-  const [clientes, setClientes] = useState<Clientes | null>(initialClientes);
-  const [multi, setMulti] = useState<Multifashion | null>(initialMulti);
-  const [, startTransition] = useTransition();
-  const [loading, setLoading] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
   // Tab activo en la URL (?tab=resumen|clientes) para que refresh, back/forward
   // y compartir-link mantengan dónde estaba el usuario. Multifashion se separó
   // a su propio módulo (/multifashion); Ventas queda con Resumen + Clientes.
   const [tab, setTab] = useUrlState("tab", "resumen");
 
-  const loadData = useCallback(async (year: number) => {
-    setLoading(true);
-    setFetchError(null);
-    try {
-      // Refetch en paralelo. resumen + clientes son los tabs visibles; multi
-      // (overview Multifashion) ya no tiene tab propio aquí, pero ResumenView
-      // lo usa para el tooltip de desglose retail/mayoreo de la fila
-      // Multifashion del heatmap, así que se sigue refetcheando con el año.
-      const [resumenRes, clientesRes, multiRes] = await Promise.all([
-        fetch(`/api/ventas/resumen?year=${year}`, { cache: "no-store" }),
-        fetch(`/api/ventas/clientes-12m?year=${year}`, { cache: "no-store" }),
-        fetch(`/api/multifashion/overview?year=${year}`, { cache: "no-store" }),
-      ]);
+  // Bundle del Resumen cacheado por SWR, keyed por el año → cada año cachea por
+  // separado y volver a un año ya visto pinta al instante (sin re-fetch). El
+  // fallbackData del SSR solo aplica al año inicial (no servir el initial de un
+  // año distinto). dedupe 5min + sin revalidar al volver a la pestaña (módulo
+  // pesado). La caché vive a nivel app (SWRProvider).
+  const { data, error, isLoading, mutate } = useSWR<VentasBundle>(
+    ["ventas-bundle", selectedYear],
+    () => fetchVentasBundle(selectedYear),
+    {
+      dedupingInterval: 5 * 60_000,
+      revalidateOnFocus: false,
+      fallbackData:
+        selectedYear === initialYear && initialResumen && initialClientes && initialMulti
+          ? { resumen: initialResumen, clientes: initialClientes, multi: initialMulti }
+          : undefined,
+    },
+  );
 
-      const errors: string[] = [];
-      if (!resumenRes.ok) errors.push(`resumen: HTTP ${resumenRes.status}`);
-      if (!clientesRes.ok) errors.push(`clientes: HTTP ${clientesRes.status}`);
-      if (!multiRes.ok) errors.push(`multifashion: HTTP ${multiRes.status}`);
-      if (errors.length) throw new Error(errors.join(" · "));
+  const resumen = data?.resumen ?? null;
+  const clientes = data?.clientes ?? null;
+  const multi = data?.multi ?? null;
+  // "Cargando" solo cuando aún no hay nada que mostrar (deshabilita el selector).
+  const loading = isLoading && !data;
+  // Error solo si no hay dato utilizable; con caché/SSR se muestra eso (stale).
+  const fetchError = error && !data ? (error instanceof Error ? error.message : "error inesperado") : null;
 
-      const [resumenData, clientesData, multiData] = await Promise.all([
-        resumenRes.json() as Promise<VentasResumen>,
-        clientesRes.json() as Promise<Clientes>,
-        multiRes.json() as Promise<Multifashion>,
-      ]);
-
-      startTransition(() => {
-        setResumen(resumenData);
-        setClientes(clientesData);
-        setMulti(multiData);
-      });
-    } catch (err) {
-      console.error("[ventas] year change refetch failed", err);
-      setFetchError(err instanceof Error ? err.message : "error inesperado");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const onYearChange = useCallback(async (year: number) => {
+  const onYearChange = useCallback((year: number) => {
     if (year === selectedYear) return;
+    // Cambiar el año cambia la key del useSWR → SWR dispara el fetch del año
+    // nuevo (o sirve su caché). No se llama a ningún loader manual.
     setSelectedYear(year);
-    await loadData(year);
-  }, [selectedYear, loadData]);
+  }, [selectedYear]);
 
-  // Pull-to-refresh (mobile): recarga el año actual sin cambiarlo.
+  // Pull-to-refresh (mobile): revalida el año actual sin cambiarlo.
   const onRefresh = useCallback(async () => {
-    await loadData(selectedYear);
-  }, [selectedYear, loadData]);
+    await mutate();
+  }, [mutate]);
 
   const onExportExcel = async () => {
     if (!resumen) return;
