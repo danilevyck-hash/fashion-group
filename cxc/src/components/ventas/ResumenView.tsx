@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { Card } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Info } from "lucide-react";
+import { ChevronRight, Info } from "lucide-react";
 import SyncStatus from "@/components/shared/SyncStatus";
 import {
   SWITCH_FACTURAS_EMPRESA_KEYS,
@@ -18,7 +18,7 @@ import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 import { ResumenViewMobile } from "./ResumenViewMobile";
 import { ResumenAnual, useResumenAnual } from "./ResumenAnual";
-import { ResumenMesAnio, useResumenMesAnio } from "./ResumenMesAnio";
+import { MesAnioMatrix, useResumenMesAnio } from "./ResumenMesAnio";
 
 // Mapeo ventas_id (short) → empresa key snake_case usado por la RPC de
 // proyección. Inline para evitar importar server-only de empresa-mapping.
@@ -39,7 +39,7 @@ function findProyeccionForEmpresa(p: ProyeccionResp, ventasId: string): Proyecci
 }
 
 
-type Granularity = "mensual" | "trimestral" | "anual" | "mes-anio";
+type Granularity = "mensual" | "trimestral" | "anual";
 type ViewMode = "ventas" | "utilidad" | "margen";
 
 // Una celda de la matriz carga las 4 fuentes siempre: ventas y utilidad
@@ -138,15 +138,22 @@ export function ResumenView({
 }: ResumenViewProps) {
   const [granularity, setGranularity] = useState<Granularity>("mensual");
   const [viewMode, setViewMode] = useState<ViewMode>("ventas");
+  // Fila de empresa expandida → despliega su histórico mes × año en línea.
+  // Una sola a la vez (al abrir otra se cierra la anterior). Compartido entre la
+  // tabla desktop y la mobile (ambas montadas; el id de empresa es el mismo).
+  const [expandedEmpresaId, setExpandedEmpresaId] = useState<string | null>(null);
   const [, startTransition] = useTransition();
   // Modo Anual: matriz empresas × años (mismo MV agregado por año). Fetch perezoso
   // compartido entre la vista desktop y la mobile (una sola llamada).
   const isAnual = granularity === "anual";
-  const isMesAnio = granularity === "mes-anio";
   const { data: anualData, error: anualError } = useResumenAnual(isAnual);
-  // Modo Mes × año: matriz 12 meses × años de UNA empresa (mismo MV agregado por
-  // empresa/mes/año). Fetch perezoso compartido desktop/mobile.
-  const { data: mesAnioData, error: mesAnioError } = useResumenMesAnio(isMesAnio);
+  // Histórico mes × año de UNA empresa (mismo MV agregado por empresa/mes/año).
+  // Carga perezosa: el endpoint solo se pide al expandir la PRIMERA fila; la
+  // respuesta trae todas las empresas → expandir otra fila no refetchea (caché
+  // SWR). Cambiar el toggle de métrica no recarga (se deriva en cliente).
+  const { data: mesAnioData, error: mesAnioError } = useResumenMesAnio(expandedEmpresaId !== null);
+  const toggleEmpresa = (id: string) =>
+    setExpandedEmpresaId((prev) => (prev === id ? null : id));
   const k = data.kpis;
   const prevYear = selectedYear - 1;
   const isUtil = viewMode === "utilidad";
@@ -216,6 +223,8 @@ export function ResumenView({
   // Columna "Cierre de mes (proy.)" — método-b retail / run-rate mayorista. Solo año en curso.
   const showMensualCol = !isClosedYear && !!data.proyeccionMensual;
   const mesProyLabel = data.mesProyeccion ? MONTHS[data.mesProyeccion - 1] : "";
+  // Ancho total (en columnas) del heatmap → colSpan de la fila acordeón mes × año.
+  const heatmapColCount = 1 + cols.length + 1 + (showProyeccionCol ? 1 : 0) + (showMensualCol ? 1 : 0);
 
   // KPIs YTD del grupo — deltas vs prev year same-period.
   //   ventasDelta   = ratio decimal (0.05 = +5%)
@@ -256,6 +265,8 @@ export function ResumenView({
         anualError={anualError}
         mesAnioData={mesAnioData}
         mesAnioError={mesAnioError}
+        expandedEmpresaId={expandedEmpresaId}
+        onToggleEmpresa={toggleEmpresa}
         multiMayoreoLabel={
           multi && multi.wholesale.ytdVentas > 0
             ? multi.wholesale.totalClientes > 1
@@ -332,7 +343,7 @@ export function ResumenView({
           {/* Bug #1 fix: selector año global vive ahora en VentasShell header,
               visible desde cualquier tab. No se duplica aquí. */}
           <div className="inline-flex rounded-full bg-stone-100 p-0.5 text-xs">
-            {(["mensual", "trimestral", "anual", "mes-anio"] as const).map(g => (
+            {(["mensual", "trimestral", "anual"] as const).map(g => (
               <button
                 key={g}
                 onClick={() => setGranularity(g)}
@@ -343,16 +354,14 @@ export function ResumenView({
                     : "text-stone-500 hover:text-stone-700"
                 )}
               >
-                {g === "mensual" ? "Mensual" : g === "trimestral" ? "Trimestral" : g === "anual" ? "Anual" : "Mes × año"}
+                {g === "mensual" ? "Mensual" : g === "trimestral" ? "Trimestral" : "Anual"}
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      {isMesAnio ? (
-        <ResumenMesAnio data={mesAnioData} error={mesAnioError} viewMode={viewMode} />
-      ) : isAnual ? (
+      {isAnual ? (
         <ResumenAnual data={anualData} error={anualError} viewMode={viewMode} />
       ) : (
       <>
@@ -386,21 +395,45 @@ export function ResumenView({
               </tr>
             </thead>
             <tbody>
-              {rows.map(r => (
-                <tr key={r.empresa.id} className={r.empresa.id === "multi" ? "bg-teal-50/60" : ""}>
+              {rows.map(r => {
+                const isMulti = r.empresa.id === "multi";
+                const isExpanded = expandedEmpresaId === r.empresa.id;
+                const empMesAnio = isExpanded ? mesAnioData?.empresas.find(e => e.id === r.empresa.id) ?? null : null;
+                return (
+                <Fragment key={r.empresa.id}>
+                <tr
+                  onClick={() => toggleEmpresa(r.empresa.id)}
+                  aria-expanded={isExpanded}
+                  className={cn(
+                    "cursor-pointer transition-colors",
+                    isMulti ? "bg-teal-50/60 hover:bg-teal-100/60" : "hover:bg-stone-50",
+                    isExpanded && !isMulti && "bg-stone-50",
+                  )}
+                >
                   <td className={cn(
                     "sticky left-0 z-10 whitespace-nowrap border-b border-stone-200 px-3.5 py-3.5 text-sm text-stone-950",
-                    r.empresa.id === "multi" ? "bg-teal-50" : "bg-white"
+                    isMulti ? "bg-teal-50" : isExpanded ? "bg-stone-50" : "bg-white"
                   )}>
-                    {r.empresa.id === "multi" && multi && multi.wholesale.ytdVentas > 0 ? (
-                      <MultifashionNameWithBreakdown
-                        nombre={r.empresa.nombre}
-                        retailYtd={multi.retail.ytdVentas}
-                        wholesale={multi.wholesale}
-                      />
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5">{r.empresa.nombre}</span>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); toggleEmpresa(r.empresa.id); }}
+                        aria-expanded={isExpanded}
+                        aria-label={`${isExpanded ? "Ocultar" : "Ver"} histórico mes × año de ${r.empresa.nombre}`}
+                        className="grid h-5 w-5 shrink-0 place-items-center rounded text-stone-400 transition-colors hover:text-stone-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-700/30"
+                      >
+                        <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", isExpanded && "rotate-90")} />
+                      </button>
+                      {isMulti && multi && multi.wholesale.ytdVentas > 0 ? (
+                        <MultifashionNameWithBreakdown
+                          nombre={r.empresa.nombre}
+                          retailYtd={multi.retail.ytdVentas}
+                          wholesale={multi.wholesale}
+                        />
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5">{r.empresa.nombre}</span>
+                      )}
+                    </div>
                   </td>
                   {r.cells.map((c, ci) => (
                     <HeatCell key={ci} cell={c} mode={viewMode} prevYear={prevYear} />
@@ -426,7 +459,31 @@ export function ResumenView({
                   )}
                   {showMensualCol && <EmpresaMensualCell pm={data.proyeccionMensual![r.empresa.id]} />}
                 </tr>
-              ))}
+                {isExpanded && (
+                  <tr>
+                    <td colSpan={heatmapColCount} className="border-b border-stone-200 bg-stone-50 p-3">
+                      {mesAnioError ? (
+                        <p className="px-1 py-2 text-sm text-stone-500">No se pudo cargar el histórico mes × año: {mesAnioError}</p>
+                      ) : !mesAnioData ? (
+                        <p className="px-1 py-2 text-sm text-stone-400">Cargando histórico mes × año…</p>
+                      ) : empMesAnio ? (
+                        <MesAnioMatrix
+                          empresa={empMesAnio}
+                          years={mesAnioData.years}
+                          currentYear={mesAnioData.currentYear}
+                          partial={mesAnioData.partial}
+                          earliestPartial={mesAnioData.earliestPartial}
+                          viewMode={viewMode}
+                        />
+                      ) : (
+                        <p className="px-1 py-2 text-sm text-stone-400">Sin histórico para esta empresa.</p>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
+                );
+              })}
               <tr className="bg-stone-950 text-white">
                 <td className="sticky left-0 z-10 bg-stone-950 px-3.5 py-3.5 text-xs font-medium uppercase tracking-widest">Total Grupo</td>
                 {totalColAggs.map((agg, ci) => (
