@@ -18,6 +18,7 @@ import { formatDeltaRatio } from "@/lib/ventas/formatDelta";
 import { cn } from "@/lib/utils";
 import { ResumenViewMobile } from "./ResumenViewMobile";
 import { ResumenAnual, useResumenAnual } from "./ResumenAnual";
+import { ResumenMesAnio, useResumenMesAnio } from "./ResumenMesAnio";
 
 // Mapeo ventas_id (short) → empresa key snake_case usado por la RPC de
 // proyección. Inline para evitar importar server-only de empresa-mapping.
@@ -38,7 +39,7 @@ function findProyeccionForEmpresa(p: ProyeccionResp, ventasId: string): Proyecci
 }
 
 
-type Granularity = "mensual" | "trimestral" | "anual";
+type Granularity = "mensual" | "trimestral" | "anual" | "mes-anio";
 type ViewMode = "ventas" | "utilidad" | "margen";
 
 // Una celda de la matriz carga las 4 fuentes siempre: ventas y utilidad
@@ -141,7 +142,11 @@ export function ResumenView({
   // Modo Anual: matriz empresas × años (mismo MV agregado por año). Fetch perezoso
   // compartido entre la vista desktop y la mobile (una sola llamada).
   const isAnual = granularity === "anual";
+  const isMesAnio = granularity === "mes-anio";
   const { data: anualData, error: anualError } = useResumenAnual(isAnual);
+  // Modo Mes × año: matriz 12 meses × años de UNA empresa (mismo MV agregado por
+  // empresa/mes/año). Fetch perezoso compartido desktop/mobile.
+  const { data: mesAnioData, error: mesAnioError } = useResumenMesAnio(isMesAnio);
   const k = data.kpis;
   const prevYear = selectedYear - 1;
   const isUtil = viewMode === "utilidad";
@@ -249,6 +254,8 @@ export function ResumenView({
         setGranularity={setGranularity}
         anualData={anualData}
         anualError={anualError}
+        mesAnioData={mesAnioData}
+        mesAnioError={mesAnioError}
         multiMayoreoLabel={
           multi && multi.wholesale.ytdVentas > 0
             ? multi.wholesale.totalClientes > 1
@@ -325,7 +332,7 @@ export function ResumenView({
           {/* Bug #1 fix: selector año global vive ahora en VentasShell header,
               visible desde cualquier tab. No se duplica aquí. */}
           <div className="inline-flex rounded-full bg-stone-100 p-0.5 text-xs">
-            {(["mensual", "trimestral", "anual"] as const).map(g => (
+            {(["mensual", "trimestral", "anual", "mes-anio"] as const).map(g => (
               <button
                 key={g}
                 onClick={() => setGranularity(g)}
@@ -336,14 +343,16 @@ export function ResumenView({
                     : "text-stone-500 hover:text-stone-700"
                 )}
               >
-                {g === "mensual" ? "Mensual" : g === "trimestral" ? "Trimestral" : "Anual"}
+                {g === "mensual" ? "Mensual" : g === "trimestral" ? "Trimestral" : g === "anual" ? "Anual" : "Mes × año"}
               </button>
             ))}
           </div>
         </div>
       </div>
 
-      {isAnual ? (
+      {isMesAnio ? (
+        <ResumenMesAnio data={mesAnioData} error={mesAnioError} viewMode={viewMode} />
+      ) : isAnual ? (
         <ResumenAnual data={anualData} error={anualError} viewMode={viewMode} />
       ) : (
       <>

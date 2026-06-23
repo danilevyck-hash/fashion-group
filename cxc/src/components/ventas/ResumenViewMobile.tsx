@@ -23,8 +23,9 @@ import { cn } from "@/lib/utils";
 import SyncStatus from "@/components/shared/SyncStatus";
 import { SWITCH_FACTURAS_EMPRESA_KEYS, EMPRESA_KEY_TO_NAME } from "@/lib/empresa-mapping";
 import { ResumenAnual, type AnualData } from "./ResumenAnual";
+import { ResumenMesAnio, type MesAnioData } from "./ResumenMesAnio";
 
-type Granularity = "mensual" | "trimestral" | "anual";
+type Granularity = "mensual" | "trimestral" | "anual" | "mes-anio";
 type ViewMode = "ventas" | "utilidad" | "margen";
 
 const MARGEN_VENTAS_MIN = 100;
@@ -51,6 +52,9 @@ interface ResumenViewMobileProps {
   /** Datos del modo Anual (compartidos con el desktop; fetch perezoso en ResumenView). */
   anualData: AnualData | null;
   anualError: string | null;
+  /** Datos del modo Mes × año (compartidos con el desktop; fetch perezoso en ResumenView). */
+  mesAnioData: MesAnioData | null;
+  mesAnioError: string | null;
   /** Etiqueta del cliente de mayoreo de Multifashion (american_classic). null si
    *  no hay mayoreo en el período → la nota "incluye mayoreo" no se muestra. */
   multiMayoreoLabel?: string | null;
@@ -66,6 +70,8 @@ export function ResumenViewMobile({
   setGranularity,
   anualData,
   anualError,
+  mesAnioData,
+  mesAnioError,
   multiMayoreoLabel,
 }: ResumenViewMobileProps) {
   const prevYear = selectedYear - 1;
@@ -86,7 +92,9 @@ export function ResumenViewMobile({
         granularity={granularity}
         setGranularity={setGranularity}
       />
-      {granularity === "anual" ? (
+      {granularity === "mes-anio" ? (
+        <ResumenMesAnio data={mesAnioData} error={mesAnioError} viewMode={viewMode} />
+      ) : granularity === "anual" ? (
         <ResumenAnual data={anualData} error={anualError} viewMode={viewMode} />
       ) : (
         <MobileHeatmap
@@ -192,6 +200,7 @@ function MobileToggles({
           { value: "mensual", label: "Mensual" },
           { value: "trimestral", label: "Trimestral" },
           { value: "anual", label: "Anual" },
+          { value: "mes-anio", label: "Mes × año" },
         ]}
         active={granularity}
         onChange={setGranularity}
