@@ -105,6 +105,35 @@ export async function GET(req: NextRequest) {
     );
   }
 
+  // 3) Aging de CXC (switch_estadocuenta_aging_mv). Mismo patrón: REFRESH
+  //    CONCURRENTLY via RPC SECURITY DEFINER. Corre a las 6:30 UTC, después del
+  //    switch-sync de las 6 empresas B2B (5:30–5:40) → la MV refleja el sync del día.
+  const { error: agingError } = await supabaseServer.rpc("refresh_switch_estadocuenta_aging_mv");
+
+  if (agingError) {
+    const durationMs = Date.now() - startedAt;
+    console.error(`[cron/refresh-clientes-views] aging mv failed after ${durationMs}ms:`, agingError.message);
+    try {
+      const { error: logErr } = await supabaseServer
+        .from("cron_email_errors")
+        .insert({
+          tipo: "refresh_cxc_aging_mv",
+          cheque_context: null,
+          error_message: agingError.message,
+        });
+      if (logErr) {
+        console.error("[cron/refresh-clientes-views] cron_email_errors insert failed:", logErr.message);
+      }
+    } catch (logErr) {
+      console.error("[cron/refresh-clientes-views] cron_email_errors insert threw:", logErr);
+    }
+    await logCronError("refresh_cxc_aging_mv_failed", agingError.message);
+    return NextResponse.json(
+      { ok: false, error: agingError.message, durationMs, refreshedAt: startedAtIso },
+      { status: 500 }
+    );
+  }
+
   const refreshedAt = new Date().toISOString();
   const durationMs = Date.now() - startedAt;
   console.log(`[cron/refresh-clientes-views] ok in ${durationMs}ms`);

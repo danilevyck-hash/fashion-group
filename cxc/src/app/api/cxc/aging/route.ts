@@ -31,13 +31,30 @@ export async function GET(req: NextRequest) {
     companyKey = u?.associated_company ?? null;
   }
 
-  let query = supabaseServer.from("switch_estadocuenta_aging").select("*");
-  if (companyKey) query = query.eq("company_key", companyKey);
+  // Lee la MV precalculada (switch_estadocuenta_aging_mv). Degrada suave: si la MV
+  // aún no existe (ventana de deploy antes de la migración), cae a la VIEW en vivo
+  // → CXC nunca rompe. La MV trae materializado_en = cuándo se refrescó (frescura
+  // real, no la hora del request).
+  let rows: unknown[] = [];
+  let refreshedAt: string | null = null;
 
-  const { data, error } = await query;
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  let mvQuery = supabaseServer.from("switch_estadocuenta_aging_mv").select("*");
+  if (companyKey) mvQuery = mvQuery.eq("company_key", companyKey);
+  const mvRes = await mvQuery;
+
+  if (mvRes.error) {
+    // Fallback a la view en vivo (mismo shape de filas).
+    let vQuery = supabaseServer.from("switch_estadocuenta_aging").select("*");
+    if (companyKey) vQuery = vQuery.eq("company_key", companyKey);
+    const vRes = await vQuery;
+    if (vRes.error) {
+      return NextResponse.json({ error: vRes.error.message }, { status: 500 });
+    }
+    rows = vRes.data ?? [];
+  } else {
+    rows = mvRes.data ?? [];
+    refreshedAt = (mvRes.data?.[0] as { materializado_en?: string } | undefined)?.materializado_en ?? null;
   }
 
-  return NextResponse.json({ rows: data ?? [], companyKey });
+  return NextResponse.json({ rows, companyKey, refreshedAt });
 }
